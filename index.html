@@ -1,0 +1,733 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Conlexicon</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="dictionary-panel" aria-label="工具导航">
+        <div class="brand-row">
+          <div>
+            <p class="eyebrow" id="brandEyebrow">Conlexicon</p>
+            <h1 data-i18n="appTitle">人造语言词典</h1>
+          </div>
+          <button class="icon-button" id="dictionaryManagerButton" type="button" aria-label="管理词典" title="管理词典">⇄</button>
+        </div>
+
+        <nav class="tool-list" aria-label="功能">
+          <button class="tool-button active" type="button" data-view="editor">
+            <span data-i18n="entryEditor">词条编辑</span>
+          </button>
+          <button class="tool-button" type="button" data-view="docs">
+            <span data-i18n="languageDocs">语言文档</span>
+          </button>
+          <button class="tool-button" type="button" data-view="analysis">
+            <span data-i18n="analysis">数据分析</span>
+          </button>
+          <button class="tool-button" type="button" data-view="ipa">
+            <span data-i18n="ipaConfig">自动 IPA 标注</span>
+          </button>
+          <button class="tool-button" type="button" data-view="morphology">
+            <span data-i18n="morphologyConfig">自动形态学</span>
+          </button>
+          <button class="tool-button" type="button" data-view="settings">
+            <span data-i18n="otherSettings">其他设置</span>
+          </button>
+        </nav>
+
+        <div class="panel-actions utility-actions">
+          <button class="secondary-button" id="themeToggleButton" type="button" data-i18n="darkMode">暗黑模式</button>
+          <button class="secondary-button" id="languageToggleButton" type="button">EN</button>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <section class="view active" id="editorView" aria-label="词条编辑">
+          <section class="top-bar" id="editorTopBar">
+            <div>
+              <p class="eyebrow" id="dictionaryMeta">0 个词条</p>
+              <h2 id="dictionaryTitle">词典</h2>
+            </div>
+            <div class="top-actions">
+              <button class="primary-button" id="newEntryButton" type="button" data-i18n="newEntry">新建词条</button>
+            </div>
+          </section>
+
+          <section class="notice-panel" id="backendNotice" hidden>
+            <p class="eyebrow" data-i18n="backendOffline">后端未连接</p>
+            <h3 data-i18n="openViaServer">请通过本地服务打开 Conlexicon</h3>
+            <p id="backendNoticeText">当前页面无法访问保存词典所需的 API。启动后端后，请访问 http://localhost:4173/。</p>
+          </section>
+
+          <section class="notice-panel" id="emptyDictionaryNotice" hidden>
+            <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
+            <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
+            <p data-i18n="emptyDictionaryBody">词条编辑器会在存在当前词典后显示。进入词典管理即可新建、导入或切换词典。</p>
+            <button class="primary-button" id="emptyCreateDictionaryButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+          </section>
+
+          <section class="content-grid">
+            <section class="entry-browser" aria-label="词条列表">
+              <div class="filter-row">
+                <input id="searchInput" type="search" data-i18n-placeholder="searchPlaceholder" placeholder="搜索词形、释义、标签">
+                <select id="partFilter" aria-label="词性筛选">
+                  <option value="" data-i18n="allParts">全部词性</option>
+                </select>
+                <select id="sortSelect" aria-label="词条排序">
+                  <option value="lemmaAsc" data-i18n="sortLemmaAsc">首字母正序</option>
+                  <option value="lemmaDesc" data-i18n="sortLemmaDesc">首字母倒序</option>
+                  <option value="updatedAsc" data-i18n="sortUpdatedAsc">编辑时间正序</option>
+                  <option value="updatedDesc" data-i18n="sortUpdatedDesc">编辑时间倒序</option>
+                  <option value="createdAsc" data-i18n="sortCreatedAsc">创建时间正序</option>
+                  <option value="createdDesc" data-i18n="sortCreatedDesc">创建时间倒序</option>
+                </select>
+                <div class="root-mode-controls">
+                  <button class="secondary-button" id="rootModeToggleButton" type="button" data-i18n="rootMode">词根模式</button>
+                  <button class="secondary-button" id="expandAllRootsButton" type="button" data-i18n="expandAll" hidden>全部展开</button>
+                  <button class="secondary-button" id="collapseAllRootsButton" type="button" data-i18n="collapseAll" hidden>全部收起</button>
+                </div>
+              </div>
+              <div class="entry-list" id="entryList"></div>
+            </section>
+
+            <section class="entry-detail-panel" aria-label="词条详情">
+              <article class="entry-display" id="entryDisplay" hidden>
+                <div class="entry-display-header" data-edit-section="basic">
+                  <div>
+                    <div class="entry-title-row">
+                      <h3 id="displayLemma"></h3>
+                      <span class="pronunciation-pill" id="displayPronunciation"></span>
+                      <span class="part-badge" id="displayPart"></span>
+                    </div>
+                    <div class="chip-row" id="displayTags"></div>
+                  </div>
+                  <div class="entry-display-actions">
+                    <button class="secondary-button" id="openLexicalNetworkButton" type="button" data-i18n="lexicalNetwork">词汇网络</button>
+                    <button class="secondary-button" id="editEntryButton" type="button" data-i18n="editEntry">编辑词条</button>
+                  </div>
+                </div>
+
+                <section class="display-section" id="displayDefinitionsSection" data-edit-section="definitions">
+                  <div class="section-heading">
+                    <span data-i18n="definitions">释义</span>
+                  </div>
+                  <div class="definition-list" id="displayDefinitions"></div>
+                </section>
+
+                <section class="display-section" id="displayEtymologySection" data-edit-section="etymology" hidden>
+                  <div class="section-heading">
+                    <span data-i18n="etymology">词源</span>
+                  </div>
+                  <div class="etymology-view" id="displayEtymology"></div>
+                </section>
+
+                <section class="display-section" id="displayDerivedSection" hidden>
+                  <div class="section-heading">
+                    <span data-i18n="derivedEntries">衍生</span>
+                  </div>
+                  <div class="derived-list" id="displayDerived"></div>
+                </section>
+
+                <section class="display-section" id="displayMorphologySection" data-edit-section="morphology" hidden>
+                  <div class="section-heading">
+                    <span data-i18n="morphologyDisplay">形态学</span>
+                  </div>
+                  <div id="displayMorphology"></div>
+                </section>
+
+                <section class="display-section" id="displayEntryNotesSection" data-edit-section="notes" hidden>
+                  <div class="section-heading">
+                    <span data-i18n="entryNotes">词条备注</span>
+                  </div>
+                  <p class="entry-note-body" id="displayEntryNotes"></p>
+                </section>
+              </article>
+
+              <form class="editor-panel" id="entryForm" autocomplete="off" hidden>
+                <input id="entryId" type="hidden">
+                <div class="form-heading">
+                  <div>
+                    <p class="eyebrow" id="entryMode">新建</p>
+                    <h3 id="entryFormTitle">词条</h3>
+                  </div>
+                  <button class="danger-ghost" id="deleteEntryButton" type="button" data-i18n="delete">删除</button>
+                </div>
+
+                <label>
+                  <span data-i18n="lemma">词形</span>
+                  <input id="lemmaInput" name="lemma" required maxlength="80">
+                </label>
+
+                <label>
+                  <span data-i18n="pronunciation">发音</span>
+                  <div class="inline-field-action">
+                    <input id="pronunciationInput" name="pronunciation" maxlength="120">
+                    <button class="secondary-button" id="autoIpaButton" type="button" data-i18n="autoIpa">自动 IPA</button>
+                  </div>
+                </label>
+                <div class="ipa-keyboard" id="ipaKeyboard" aria-label="IPA 虚拟键盘"></div>
+
+                <label>
+                  <span data-i18n="tagsLabel">属性标签（第一个标签会作为词性）</span>
+                  <input id="tagsInput" name="tags" maxlength="180">
+                </label>
+
+                <section class="definition-editor">
+                  <div class="form-heading compact-heading">
+                    <div>
+                      <p class="eyebrow" data-i18n="morphologyConfig">自动形态学</p>
+                    </div>
+                  </div>
+                  <label>
+                    <span data-i18n="morphologyTable">形态表格</span>
+                    <select id="entryMorphologyTableSelect"></select>
+                  </label>
+                  <div class="morphology-override-grid" id="entryMorphologyOverrides"></div>
+                </section>
+
+                <section class="definition-editor">
+                  <div class="form-heading compact-heading">
+                    <div>
+                      <p class="eyebrow" data-i18n="definitions">释义</p>
+                    </div>
+                    <button class="secondary-button" id="addDefinitionButton" type="button" data-i18n="addDefinition">添加释义</button>
+                  </div>
+                  <div class="definition-form-list" id="definitionFormList"></div>
+                </section>
+
+                <section class="definition-editor">
+                  <div class="form-heading compact-heading">
+                    <div>
+                      <p class="eyebrow" data-i18n="etymology">词源</p>
+                    </div>
+                  </div>
+                  <label>
+                    <span data-i18n="sourceEntry">来源词条</span>
+                    <input id="sourceEntryInput" maxlength="220">
+                    <div class="source-suggestions" id="sourceSuggestionBox" hidden></div>
+                  </label>
+                  <label>
+                    <span data-i18n="etymologyDescription">说明</span>
+                    <textarea id="etymologyDescriptionInput" rows="3"></textarea>
+                  </label>
+                </section>
+
+                <label>
+                  <span data-i18n="entryNotes">词条整体备注</span>
+                  <textarea id="notesInput" name="notes" rows="4"></textarea>
+                </label>
+
+                <div class="form-actions">
+                  <button class="secondary-button" id="cancelEditButton" type="button" data-i18n="cancel">取消</button>
+                  <button class="secondary-button" id="clearEntryButton" type="button" data-i18n="clear">清空</button>
+                  <button class="primary-button" type="submit" data-i18n="saveEntry">保存词条</button>
+                </div>
+              </form>
+            </section>
+          </section>
+        </section>
+
+        <section class="view" id="dictionaryManagerView" aria-label="词典管理">
+          <section class="top-bar">
+            <div>
+              <p class="eyebrow" data-i18n="dictionaryManagerEyebrow">多词典管理</p>
+              <h2 data-i18n="dictionaryManager">词典管理</h2>
+            </div>
+            <div class="top-actions">
+              <button class="secondary-button" id="backToEditorButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+              <button class="primary-button" id="addDictionaryButton" type="button" data-i18n="newDictionary">新建词典</button>
+              <label class="secondary-button file-trigger">
+                <span data-i18n="importJson">导入 JSON</span>
+                <input id="importInput" type="file" accept="application/json,.json">
+              </label>
+            </div>
+          </section>
+
+          <section class="notice-panel" id="managerBackendNotice" hidden>
+            <p class="eyebrow" data-i18n="backendOffline">后端未连接</p>
+            <h3 data-i18n="managerNeedsBackend">词典管理需要本地后端</h3>
+            <p id="managerBackendNoticeText">请先启动 server.js，然后访问 http://localhost:4173/。</p>
+          </section>
+
+          <section class="manager-grid" id="managerGrid">
+            <div class="manager-list" id="dictionaryManagerList"></div>
+
+            <section class="editor-panel" aria-label="词典配置">
+              <form id="dictionaryForm" autocomplete="off">
+                <input id="dictionaryId" type="hidden">
+                <div class="form-heading">
+                  <div>
+                    <p class="eyebrow" id="dictionaryMode">配置</p>
+                    <h3 id="dictionaryFormTitle">词典资料</h3>
+                  </div>
+                  <button class="danger-ghost" id="deleteDictionaryButton" type="button" data-i18n="deleteDictionary">删除词典</button>
+                </div>
+                <label>
+                  <span data-i18n="name">名称</span>
+                  <input id="dictionaryNameInput" required maxlength="80">
+                </label>
+                <label>
+                  <span data-i18n="language">语言</span>
+                  <input id="dictionaryLanguageInput" maxlength="80">
+                </label>
+                <label>
+                  <span data-i18n="description">描述</span>
+                  <textarea id="dictionaryDescriptionInput" rows="4"></textarea>
+                </label>
+                <div class="manager-data-actions">
+                  <button class="secondary-button" id="exportButton" type="button" data-i18n="exportJson">导出 JSON</button>
+                </div>
+                <div class="form-actions">
+                  <button class="secondary-button" id="activateDictionaryButton" type="button" data-i18n="setCurrentDictionary">设为当前词典</button>
+                  <button class="primary-button" type="submit" data-i18n="saveConfig">保存配置</button>
+                </div>
+              </form>
+            </section>
+          </section>
+        </section>
+
+        <section class="view" id="analysisView" aria-label="数据分析">
+          <section class="top-bar">
+            <div>
+              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <h2 data-i18n="analysis">数据分析</h2>
+            </div>
+            <div class="top-actions">
+              <button class="secondary-button" id="backToEditorFromAnalysisButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+            </div>
+          </section>
+
+          <section class="notice-panel" id="analysisNoDictionaryNotice" hidden>
+            <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
+            <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
+            <p data-i18n="analysisNeedDictionary">数据分析会根据当前词典中的词条、标签、词源、IPA 和形态学配置实时生成。</p>
+            <button class="primary-button" id="analysisOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+          </section>
+
+          <section class="analysis-panel" id="analysisPanel"></section>
+        </section>
+
+        <section class="view" id="settingsView" aria-label="其他设置">
+          <section class="top-bar">
+            <div>
+              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <h2 data-i18n="otherSettings">其他设置</h2>
+            </div>
+            <div class="top-actions">
+              <button class="secondary-button" id="backToEditorFromSettingsButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+            </div>
+          </section>
+
+          <section class="notice-panel" id="settingsNoDictionaryNotice" hidden>
+            <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
+            <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
+            <p data-i18n="settingsNeedDictionary">其他设置会保存到当前词典文件中。</p>
+            <button class="primary-button" id="settingsOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+          </section>
+
+          <section class="editor-panel" id="settingsPanel">
+            <form id="settingsForm" autocomplete="off">
+              <section class="settings-section">
+                <div class="form-heading compact-heading">
+                  <div>
+                    <p class="eyebrow">Gloss</p>
+                    <h3 data-i18n="glossSettings">Gloss 渲染</h3>
+                  </div>
+                </div>
+                <label class="toggle-row">
+                  <span data-i18n="glbSmallCaps">将 \\glb 中的小写字母渲染为 small caps</span>
+                  <input id="glbSmallCapsInput" type="checkbox">
+                </label>
+              </section>
+              <section class="settings-section">
+                <div class="form-heading compact-heading">
+                  <div>
+                    <p class="eyebrow" data-i18n="tags">标签</p>
+                    <h3 data-i18n="tagDisplayReplacement">标签显示替换</h3>
+                  </div>
+                </div>
+                <label>
+                  <span data-i18n="tagDisplayReplacementHelp">每行一条，格式为 原标签 = 显示文本。仅影响查看模式中的显示，不改变词条数据。</span>
+                  <textarea id="tagDisplayMapInput" rows="4"></textarea>
+                </label>
+                <div class="subsection-title">
+                  <h3 data-i18n="tagDisplaySettings">标签显示</h3>
+                </div>
+                <label>
+                  <span data-i18n="tagRedHighlightHelp">配置后，这些标签会在词条浏览栏和查看界面中以红色显示。多个标签用逗号、空格或换行分隔。</span>
+                  <textarea id="tagRedHighlightInput" rows="3"></textarea>
+                </label>
+              </section>
+              <section class="settings-section">
+                <div class="form-heading compact-heading">
+                  <div>
+                    <p class="eyebrow" data-i18n="displaySettings">显示</p>
+                    <h3 data-i18n="polysemyDisplay">多义项显示</h3>
+                  </div>
+                </div>
+                <label class="toggle-row">
+                  <span data-i18n="entryListPolysemyDisplay">词条浏览栏的多义项显示</span>
+                  <input id="entryListPolysemyInput" type="checkbox">
+                </label>
+                <label class="toggle-row">
+                  <span data-i18n="networkPolysemyDisplay">词汇网络悬浮卡片的多义项显示</span>
+                  <input id="networkPolysemyInput" type="checkbox">
+                </label>
+              </section>
+              <section class="settings-section">
+                <div class="form-heading compact-heading">
+                  <div>
+                    <p class="eyebrow" data-i18n="searchSettings">搜索</p>
+                    <h3 data-i18n="fuzzySearch">模糊匹配</h3>
+                  </div>
+                </div>
+                <label class="toggle-row">
+                  <span data-i18n="fuzzySearchHelp">在词条搜索中启用模糊匹配</span>
+                  <input id="fuzzySearchInput" type="checkbox">
+                </label>
+                <label class="toggle-row">
+                  <span data-i18n="tagFuzzySearchHelp">在原始标签和替换后标签中启用模糊匹配</span>
+                  <input id="tagFuzzySearchInput" type="checkbox">
+                </label>
+                <label class="toggle-row">
+                  <span data-i18n="sourceFuzzyHelp">在词源来源补全中启用模糊匹配</span>
+                  <input id="sourceFuzzyInput" type="checkbox">
+                </label>
+                <div class="subsection-title">
+                  <h3 data-i18n="searchDisplay">显示</h3>
+                </div>
+                <label class="toggle-row">
+                  <span data-i18n="searchHighlightHelp">搜索时高亮显示匹配结果</span>
+                  <input id="searchHighlightInput" type="checkbox">
+                </label>
+              </section>
+              <section class="settings-section">
+                <div class="form-heading compact-heading">
+                  <div>
+                    <p class="eyebrow" data-i18n="save">保存</p>
+                    <h3 data-i18n="switchEntrySettings">切换词条</h3>
+                  </div>
+                </div>
+                <label class="toggle-row">
+                  <span data-i18n="savePartialOnSwitch">切换页面时保存局部编辑设置</span>
+                  <input id="savePartialOnSwitchInput" type="checkbox">
+                </label>
+                <label class="toggle-row">
+                  <span data-i18n="saveFullOnSwitch">切换页面时保存完整编辑设置</span>
+                  <input id="saveFullOnSwitchInput" type="checkbox">
+                </label>
+                <div class="subsection-title">
+                  <h3 data-i18n="editEntrySettings">编辑词条</h3>
+                </div>
+                <label class="toggle-row">
+                  <span data-i18n="allowEmptyPronunciation">允许发音留空时保存</span>
+                  <input id="allowEmptyPronunciationInput" type="checkbox">
+                </label>
+                <label class="toggle-row">
+                  <span data-i18n="allowEmptyTags">允许标签留空时保存</span>
+                  <input id="allowEmptyTagsInput" type="checkbox">
+                </label>
+                <label class="toggle-row">
+                  <span data-i18n="allowEmptyDefinitions">允许释义留空时保存</span>
+                  <input id="allowEmptyDefinitionsInput" type="checkbox">
+                </label>
+              </section>
+              <section class="settings-section">
+                <div class="form-heading compact-heading">
+                  <div>
+                    <p class="eyebrow">IPA</p>
+                    <h3 data-i18n="ipaKeyboardSettings">IPA 虚拟键盘</h3>
+                  </div>
+                </div>
+                <label>
+                  <span data-i18n="ipaKeyboardSymbols">键盘符号</span>
+                  <textarea id="ipaKeyboardInput" rows="3"></textarea>
+                </label>
+                <p class="field-help" data-i18n="ipaKeyboardHelp">以空格、逗号或换行分隔。新词典默认包含 ˈ 和 ˌ。</p>
+              </section>
+              <div class="form-actions">
+                <button class="primary-button" type="submit" data-i18n="saveConfig">保存配置</button>
+              </div>
+            </form>
+          </section>
+        </section>
+
+        <section class="view" id="docsView" aria-label="语言文档">
+          <section class="top-bar">
+            <div>
+              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <h2 data-i18n="languageDocs">语言文档</h2>
+            </div>
+            <div class="top-actions">
+              <div class="segmented-control" id="docsModeControl" aria-label="文档模式">
+                <button class="active" type="button" data-doc-mode="split" data-i18n="splitMode">分栏</button>
+                <button type="button" data-doc-mode="edit" data-i18n="editMode">编辑</button>
+                <button type="button" data-doc-mode="preview" data-i18n="previewMode">查看</button>
+              </div>
+              <button class="secondary-button" id="backToEditorFromDocsButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+              <button class="primary-button" id="saveDocsButton" type="button" data-i18n="saveDocs">保存文档</button>
+            </div>
+          </section>
+
+          <section class="notice-panel" id="docsNoDictionaryNotice" hidden>
+            <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
+            <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
+            <p data-i18n="docsNeedDictionary">语言文档会保存到当前词典文件中。</p>
+            <button class="primary-button" id="docsOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+          </section>
+
+          <section class="docs-panel" id="docsPanel">
+            <div class="docs-editor-pane">
+              <textarea id="docsMarkdownInput" spellcheck="false"></textarea>
+            </div>
+            <article class="markdown-preview" id="docsPreview"></article>
+          </section>
+        </section>
+
+        <section class="view" id="morphologyView" aria-label="自动形态学">
+          <section class="top-bar">
+            <div>
+              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <h2 data-i18n="morphologyConfig">自动形态学</h2>
+            </div>
+            <div class="top-actions">
+              <button class="secondary-button" id="backToEditorFromMorphologyButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+            </div>
+          </section>
+
+          <section class="notice-panel" id="morphologyNoDictionaryNotice" hidden>
+            <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
+            <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
+            <p data-i18n="morphologyNeedDictionary">自动形态学配置会保存到当前词典文件中。</p>
+            <button class="primary-button" id="morphologyOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+          </section>
+
+          <section class="editor-panel" id="morphologyPanel">
+            <form id="morphologyForm" autocomplete="off">
+              <section class="settings-section morphology-function-section">
+                <div class="form-heading compact-heading">
+                  <div>
+                    <h3 data-i18n="morphologyFunctionObjects">函数识别对象</h3>
+                  </div>
+                </div>
+                <div class="form-grid">
+                  <label>
+                    <span data-i18n="morphologyLeftVObjects">leftV 识别对象</span>
+                    <input id="morphologyLeftVObjectsInput">
+                  </label>
+                  <label>
+                    <span data-i18n="morphologyRightVObjects">rightV 识别对象</span>
+                    <input id="morphologyRightVObjectsInput">
+                  </label>
+                </div>
+                <p class="field-help" data-i18n="morphologyFunctionObjectsHelp">为 leftV/rightV 配置它们会识别的对象。多个对象用逗号分隔。</p>
+              </section>
+              <div class="form-heading morphology-table-heading">
+                <div class="heading-line">
+                  <h3 data-i18n="morphologyTables">形态表格</h3>
+                  <button class="info-button" id="morphologySyntaxButton" type="button" data-i18n-title="morphologySyntaxInfo" aria-label="形态语法">i</button>
+                </div>
+                <button class="secondary-button" id="addMorphologyTableButton" type="button" data-i18n="addMorphologyTable">添加表格</button>
+              </div>
+              <div class="morphology-table-list" id="morphologyTableList"></div>
+              <div class="form-actions">
+                <button class="primary-button" type="submit" data-i18n="saveConfig">保存配置</button>
+              </div>
+            </form>
+          </section>
+        </section>
+
+        <section class="view" id="ipaView" aria-label="自动 IPA 标注">
+          <section class="top-bar">
+            <div>
+              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <h2 data-i18n="ipaConfig">自动 IPA 标注</h2>
+            </div>
+            <div class="top-actions">
+              <button class="secondary-button" id="backToEditorFromIpaButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+              <button class="primary-button ipa-batch-safe" id="batchIpaMissingButton" type="button" data-i18n="batchIpaMissing">补全空发音</button>
+              <button class="danger-button ipa-batch-danger" id="batchIpaAllButton" type="button" data-i18n="batchIpaAll">重写全部发音</button>
+            </div>
+          </section>
+
+          <section class="notice-panel" id="ipaNoDictionaryNotice" hidden>
+            <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
+            <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
+            <p data-i18n="ipaNeedDictionary">自动 IPA 标注规则会保存到当前词典文件中。</p>
+            <button class="primary-button" id="ipaOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+          </section>
+
+          <section class="editor-panel ipa-layout" id="ipaPanel">
+            <div class="ipa-config-column">
+              <form id="ipaForm" autocomplete="off">
+              <section class="settings-section">
+                <div class="form-heading compact-heading">
+                  <div>
+                    <p class="eyebrow" data-i18n="orthographyModule">正写法识别</p>
+                    <h3 data-i18n="mappingRules">映射规则</h3>
+                  </div>
+                  <button class="secondary-button" id="addIpaMappingButton" type="button" data-i18n="addMapping">添加映射</button>
+                </div>
+                <p class="field-help" data-i18n="mappingRuleHelp">按顺序配置输入、输出、前接条件、后接条件。输出中写入 ˈ 或以 ' 开头，可将该音节标为重读并覆盖默认重音。</p>
+                <div class="ipa-rule-header" aria-hidden="true">
+                  <span data-i18n="ruleFrom">输入</span>
+                  <span data-i18n="ruleTo">输出</span>
+                  <span data-i18n="ruleBefore">前接条件</span>
+                  <span data-i18n="ruleAfter">后接条件</span>
+                  <span></span>
+                </div>
+                <div class="ipa-rule-list" id="ipaMappingList"></div>
+              </section>
+
+              <section class="settings-section">
+                <div class="form-heading compact-heading">
+                  <div>
+                    <p class="eyebrow" data-i18n="syllabification">音节划分</p>
+                    <div class="heading-line">
+                      <h3 data-i18n="syllableRules">音节规则</h3>
+                      <button class="info-button" id="ipaSyllableHelpButton" type="button" data-i18n-title="ipaSyllableHelpInfo" aria-label="音节划分逻辑">i</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-grid">
+                  <label>
+                    <span data-i18n="vowels">元音音位</span>
+                    <input id="ipaVowelsInput" maxlength="120">
+                  </label>
+                  <label>
+                    <span data-i18n="syllableSeparator">音节分隔符</span>
+                    <input id="ipaSyllableSeparatorInput" maxlength="4">
+                  </label>
+                  <label>
+                    <span data-i18n="onsetClusters">音节首辅音簇</span>
+                    <input id="ipaOnsetClustersInput" maxlength="220">
+                  </label>
+                  <label>
+                    <span data-i18n="codaClusters">音节尾辅音簇</span>
+                    <input id="ipaCodaClustersInput" maxlength="220">
+                  </label>
+                  <label>
+                    <span data-i18n="complexPhonemes">复杂音位</span>
+                    <input id="ipaComplexPhonemesInput" maxlength="220">
+                  </label>
+                </div>
+              </section>
+
+              <section class="settings-section">
+                <div class="form-heading compact-heading">
+                  <div>
+                    <p class="eyebrow" data-i18n="defaultStressPosition">默认重音位置</p>
+                    <h3 data-i18n="stressRules">重音规则</h3>
+                  </div>
+                </div>
+                <label>
+                  <span data-i18n="defaultStressHelp">整数。正数为正数第几音节，负数为倒数第几音节；0 表示不标默认重音。词更短时落在可达到的最远位置。</span>
+                  <input id="ipaDefaultStressInput" type="number" step="1">
+                </label>
+                <label class="toggle-row">
+                  <span data-i18n="unstressMonosyllables">单音节词不标重音</span>
+                  <input id="ipaUnstressMonosyllablesInput" type="checkbox">
+                </label>
+              </section>
+
+              <div class="form-actions">
+                <button class="primary-button" type="submit" data-i18n="saveConfig">保存配置</button>
+              </div>
+              </form>
+            </div>
+            <aside class="settings-section ipa-sandbox-panel">
+              <div class="form-heading compact-heading">
+                <div>
+                  <p class="eyebrow">Sandbox</p>
+                  <h3 data-i18n="ipaSandbox">IPA 沙盒</h3>
+                </div>
+              </div>
+              <label>
+                <span data-i18n="ipaSandboxInput">输入</span>
+                <input id="ipaSandboxInput" maxlength="160">
+              </label>
+              <div class="ipa-sandbox-output">
+                <span data-i18n="ipaSandboxMapped">映射</span>
+                <output id="ipaSandboxMapped"></output>
+              </div>
+              <div class="ipa-sandbox-output">
+                <span data-i18n="ipaSandboxSyllables">音节划分</span>
+                <output id="ipaSandboxSyllables"></output>
+              </div>
+              <div class="ipa-sandbox-output">
+                <span data-i18n="ipaSandboxFinal">最终输出</span>
+                <output id="ipaSandboxFinal"></output>
+              </div>
+            </aside>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <section class="network-overlay" id="lexicalNetworkOverlay" hidden>
+      <div class="network-panel" id="lexicalNetworkPanel">
+        <div class="network-header">
+          <div>
+            <p class="eyebrow" data-i18n="lexicalNetwork">词汇网络</p>
+            <h2 id="networkTitle"></h2>
+          </div>
+          <button class="secondary-button" id="closeLexicalNetworkButton" type="button" data-i18n="closeNetwork">关闭网络</button>
+        </div>
+        <div class="network-grid">
+          <section class="network-column">
+            <h3 data-i18n="source">来源</h3>
+            <div class="network-node-list" id="networkSources"></div>
+          </section>
+          <section class="network-center">
+            <div class="network-focus" id="networkFocus"></div>
+          </section>
+          <section class="network-column">
+            <h3 data-i18n="derivedEntries">衍生</h3>
+            <div class="network-node-list" id="networkDerived"></div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <section class="modal-overlay" id="morphologySyntaxDialog" hidden>
+      <article class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="morphologySyntaxTitle">
+        <div class="modal-header">
+          <h2 id="morphologySyntaxTitle" data-i18n="morphologySyntaxTitle">形态语法</h2>
+          <button class="secondary-button" id="closeMorphologySyntaxButton" type="button" data-i18n="close">关闭</button>
+        </div>
+        <div class="syntax-help">
+          <p data-i18n="morphologySyntaxIntro"></p>
+          <ul>
+            <li data-i18n="morphologySyntaxLemma"></li>
+            <li data-i18n="morphologySyntaxReplace"></li>
+            <li data-i18n="morphologySyntaxCondition"></li>
+            <li data-i18n="morphologySyntaxContext"></li>
+            <li data-i18n="morphologySyntaxElse"></li>
+            <li data-i18n="morphologySyntaxSpacing"></li>
+          </ul>
+          <p data-i18n="morphologySyntaxExamples"></p>
+        </div>
+      </article>
+    </section>
+
+    <section class="modal-overlay" id="confirmDialog" hidden>
+      <article class="modal-panel confirm-panel" role="dialog" aria-modal="true" aria-labelledby="confirmDialogTitle">
+        <div class="modal-header">
+          <h2 id="confirmDialogTitle" data-i18n="confirmTitle">确认操作</h2>
+        </div>
+        <p class="confirm-dialog-message" id="confirmDialogMessage"></p>
+        <div class="form-actions confirm-actions">
+          <button class="secondary-button" id="confirmCancelButton" type="button" data-i18n="cancel">取消</button>
+          <button class="primary-button" id="confirmAcceptButton" type="button" data-i18n="confirm">确认</button>
+        </div>
+      </article>
+    </section>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
