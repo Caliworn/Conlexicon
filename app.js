@@ -1359,7 +1359,7 @@ function renderAvailability() {
   elements.managerGrid.hidden = !backendAvailable;
   elements.newEntryButton.hidden = !backendAvailable || !hasDictionary;
   elements.addDictionaryButton.disabled = !backendAvailable;
-  elements.exportButton.disabled = !backendAvailable;
+  elements.exportButton.disabled = !backendAvailable || !hasDictionary;
   elements.importInput.disabled = !backendAvailable;
 
   if (!backendAvailable) {
@@ -5704,7 +5704,24 @@ async function deleteSelectedDictionary() {
 }
 
 function exportData() {
-  window.location.href = "/api/export";
+  const dictionary = activeDictionary();
+  if (!dictionary) {
+    showToast(t("createDictionaryFirstToast"));
+    return;
+  }
+  window.location.href = `/api/export?dictionaryId=${encodeURIComponent(dictionary.id)}`;
+}
+
+function isDictionaryImportPayload(payload) {
+  if (Array.isArray(payload?.dictionaries)) {
+    return payload.dictionaries.length > 0;
+  }
+  return Boolean(
+    payload
+    && typeof payload === "object"
+    && !Array.isArray(payload)
+    && (payload.id || payload.name || Array.isArray(payload.entries) || payload.settings || payload.docs || payload.morphology)
+  );
 }
 
 function importData(event) {
@@ -5717,7 +5734,7 @@ function importData(event) {
   reader.addEventListener("load", async () => {
     try {
       const imported = JSON.parse(reader.result);
-      if (!Array.isArray(imported.dictionaries)) {
+      if (!isDictionaryImportPayload(imported)) {
         throw new Error("Invalid file");
       }
       await api("/api/import", {

@@ -436,6 +436,26 @@ function localDateStamp(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+function importDictionaryFromPayload(payload) {
+  if (Array.isArray(payload?.dictionaries)) {
+    const dictionary = payload.dictionaries.find((item) => item?.id === payload.activeDictionaryId) || payload.dictionaries[0];
+    if (!dictionary) {
+      throw Object.assign(new Error("Invalid import payload"), { status: 400 });
+    }
+    return normalizeDictionary(dictionary);
+  }
+
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    const hasDictionaryShape = payload.id || payload.name || Array.isArray(payload.entries) || payload.settings || payload.docs || payload.morphology;
+    if (!hasDictionaryShape) {
+      throw Object.assign(new Error("Invalid import payload"), { status: 400 });
+    }
+    return normalizeDictionary(payload);
+  }
+
+  throw Object.assign(new Error("Invalid import payload"), { status: 400 });
+}
+
 async function routeApi(request, response, url) {
   if (request.method === "GET" && url.pathname === "/api/state") {
     sendJson(response, 200, await readState());
@@ -443,28 +463,27 @@ async function routeApi(request, response, url) {
   }
 
   if (request.method === "GET" && url.pathname === "/api/export") {
-    sendJson(response, 200, await readState(), {
-      "Content-Disposition": `attachment; filename="conlexicon-${localDateStamp()}.json"`,
+    const index = await readIndex();
+    const requestedId = url.searchParams.get("dictionaryId") || index.activeDictionaryId;
+    if (!requestedId || !index.dictionaryIds.includes(requestedId)) {
+      throw Object.assign(new Error("Dictionary not found"), { status: 404 });
+    }
+    const dictionary = await readDictionary(requestedId);
+    sendJson(response, 200, dictionary, {
+      "Content-Disposition": `attachment; filename="conlexicon-${requestedId}-${localDateStamp()}.json"`,
     });
     return true;
   }
 
   if (request.method === "POST" && url.pathname === "/api/import") {
-    const imported = await readRequestBody(request);
-    const dictionaries = Array.isArray(imported.dictionaries) ? imported.dictionaries.map(normalizeDictionary) : [];
+    const dictionary = importDictionaryFromPayload(await readRequestBody(request));
     const existing = await readIndex();
+    await writeDictionary(dictionary);
 
-    for (const id of existing.dictionaryIds) {
-      await fs.rm(dictionaryPath(id), { force: true });
-    }
-
-    for (const dictionary of dictionaries) {
-      await writeDictionary(dictionary);
-    }
-
-    const dictionaryIds = dictionaries.map((dictionary) => dictionary.id);
-    const activeDictionaryId = dictionaryIds.includes(imported.activeDictionaryId) ? imported.activeDictionaryId : dictionaryIds[0] || "";
-    await writeIndex({ activeDictionaryId, dictionaryIds });
+    const dictionaryIds = existing.dictionaryIds.includes(dictionary.id)
+      ? existing.dictionaryIds
+      : [...existing.dictionaryIds, dictionary.id];
+    await writeIndex({ activeDictionaryId: dictionary.id, dictionaryIds });
     sendJson(response, 200, await readState());
     return true;
   }
