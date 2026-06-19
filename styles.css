@@ -220,7 +220,7 @@ body.english-locale .brand-row h1 {
   top: 20px;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  height: calc(100vh - 148px);
+  height: calc(100vh - 172px);
   min-height: 0;
   overflow: hidden;
 }
@@ -259,6 +259,52 @@ body.english-locale .brand-row h1 {
 .root-mode-controls .secondary-button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.advanced-filter-label {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.advanced-filter-label span {
+  min-width: 0;
+}
+
+.advanced-filter-cycle {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--accent) 48%, transparent);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent-strong);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.advanced-filter-cycle:hover {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.filter-row input:disabled,
+.filter-row select:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
 }
 
 body.english-locale .root-mode-controls .secondary-button {
@@ -470,7 +516,7 @@ label span {
 }
 
 .entry-detail-panel {
-  min-height: 520px;
+  min-height: 0;
 }
 
 .entry-display {
@@ -1300,7 +1346,84 @@ dialog {
   background: color-mix(in srgb, var(--surface) 90%, var(--bg));
 }
 
+.tool-order-list {
+  display: grid;
+  gap: 8px;
+}
+
+.tool-order-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: grab;
+  user-select: none;
+}
+
+.tool-order-card:active {
+  cursor: grabbing;
+}
+
+.tool-order-card.dragging {
+  opacity: 0.45;
+}
+
+.tool-order-handle {
+  color: var(--muted);
+  font-weight: 900;
+  letter-spacing: 1px;
+}
+
+.tool-order-card strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+
 .analysis-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.analysis-page-tabs,
+.analysis-subpage-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.analysis-page-tabs button,
+.analysis-subpage-tabs button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 900;
+  padding: 9px 12px;
+}
+
+.analysis-subpage-tabs button {
+  padding: 7px 10px;
+  font-size: 0.78rem;
+}
+
+.analysis-page-tabs button.active,
+.analysis-subpage-tabs button.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.analysis-page-body {
   display: grid;
   gap: 18px;
 }
@@ -1319,6 +1442,13 @@ dialog {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.3fr);
   gap: 14px;
+}
+
+.analysis-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
 }
 
 .analysis-metric,
@@ -1397,12 +1527,32 @@ dialog {
 }
 
 button.analysis-bar-label,
-.analysis-issue-list button {
+.analysis-issue-list button,
+.analysis-bar-row[data-advanced-filter-id],
+.analysis-bar-row[data-entry-id],
+.analysis-bar-row[data-view-target],
+.analysis-metric[data-advanced-filter-id],
+.analysis-metric[data-entry-id],
+.analysis-metric[data-view-target],
+.analysis-fact-list div[data-advanced-filter-id],
+.analysis-fact-list div[data-entry-id],
+.analysis-fact-list div[data-view-target],
+.analysis-issue-list li[data-entry-id] {
   cursor: pointer;
 }
 
 button.analysis-bar-label:hover,
-.analysis-issue-list button:hover {
+.analysis-issue-list button:hover,
+.analysis-bar-row[data-advanced-filter-id]:hover .analysis-bar-label,
+.analysis-bar-row[data-entry-id]:hover .analysis-bar-label,
+.analysis-bar-row[data-view-target]:hover .analysis-bar-label,
+.analysis-metric[data-advanced-filter-id]:hover span,
+.analysis-metric[data-entry-id]:hover span,
+.analysis-metric[data-view-target]:hover span,
+.analysis-fact-list div[data-advanced-filter-id]:hover dt,
+.analysis-fact-list div[data-entry-id]:hover dt,
+.analysis-fact-list div[data-view-target]:hover dt,
+.analysis-issue-list li[data-entry-id]:hover button {
   color: var(--accent-strong);
 }
 
@@ -2201,6 +2351,7 @@ dialog::backdrop {
   .ipa-rule-header,
   .analysis-grid,
   .analysis-summary-grid,
+  .analysis-detail-grid,
   .analysis-bar-row {
     grid-template-columns: 1fr;
   }

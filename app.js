@@ -34,6 +34,23 @@ const expandedMorphologyTables = new Set();
 let rootMode = false;
 const expandedRootEntries = new Set();
 let entryDraft = null;
+const defaultAnalysisViewState = {
+  page: "overview",
+  subpageByPage: {
+    entries: "tags",
+    ipa: "distribution",
+    morphology: "tables",
+    activity: "updated",
+    quality: "issues",
+  },
+  scrollByRoute: {},
+};
+const analysisViewStates = new Map();
+const DEFAULT_TOOL_NAV_ORDER = ["editor", "docs", "analysis", "ipa", "morphology", "settings"];
+let advancedFilter = null;
+let analysisFilterCounter = 0;
+const analysisFilterRegistry = new Map();
+let draggedToolNavView = "";
 
 const i18n = {
   zh: {
@@ -104,6 +121,9 @@ const i18n = {
     normalMode: "普通模式",
     expandAll: "全部展开",
     collapseAll: "全部收起",
+    advancedFilterMode: "高级筛选",
+    exitAdvancedFilter: "退出高级筛选",
+    cycleAdvancedFilter: "切换筛选条件",
     sortLemmaAsc: "首字母正序",
     sortLemmaDesc: "首字母倒序",
     sortUpdatedAsc: "编辑时间正序",
@@ -163,6 +183,9 @@ const i18n = {
     ipaKeyboardSettings: "IPA 虚拟键盘",
     ipaKeyboardSymbols: "键盘符号",
     ipaKeyboardHelp: "以空格、逗号或换行分隔。新词典默认包含 ˈ 和 ˌ。",
+    interfaceLayout: "界面布局",
+    toolNavigationOrder: "工具导航排序",
+    toolNavigationOrderHelp: "拖动卡片来调整左侧导航栏顺序。该顺序保存到当前词典文件中。",
     cancel: "取消",
     confirm: "确认",
     confirmTitle: "确认操作",
@@ -345,6 +368,9 @@ const i18n = {
     normalMode: "Normal Mode",
     expandAll: "Expand All",
     collapseAll: "Collapse All",
+    advancedFilterMode: "Advanced Filter",
+    exitAdvancedFilter: "Exit Advanced Filter",
+    cycleAdvancedFilter: "Cycle Filter Condition",
     sortLemmaAsc: "Lemma A-Z",
     sortLemmaDesc: "Lemma Z-A",
     sortUpdatedAsc: "Updated Oldest",
@@ -404,6 +430,9 @@ const i18n = {
     ipaKeyboardSettings: "IPA Virtual Keyboard",
     ipaKeyboardSymbols: "Keyboard Symbols",
     ipaKeyboardHelp: "Separate symbols with spaces, commas, or line breaks. New dictionaries include ˈ and ˌ by default.",
+    interfaceLayout: "Interface Layout",
+    toolNavigationOrder: "Tool Navigation Order",
+    toolNavigationOrderHelp: "Drag cards to reorder the left navigation. The order is saved in the current dictionary file.",
     cancel: "Cancel",
     confirm: "Confirm",
     confirmTitle: "Confirm Action",
@@ -545,6 +574,7 @@ const elements = {
   brandTitle: document.querySelector('[data-i18n="appTitle"]'),
   toolList: document.querySelector(".tool-list"),
   toolButtons: document.querySelectorAll(".tool-button"),
+  toolNavOrderList: document.querySelector("#toolNavOrderList"),
   dictionaryManagerList: document.querySelector("#dictionaryManagerList"),
   dictionaryMeta: document.querySelector("#dictionaryMeta"),
   dictionaryTitle: document.querySelector("#dictionaryTitle"),
@@ -553,6 +583,8 @@ const elements = {
   rootModeToggleButton: document.querySelector("#rootModeToggleButton"),
   expandAllRootsButton: document.querySelector("#expandAllRootsButton"),
   collapseAllRootsButton: document.querySelector("#collapseAllRootsButton"),
+  advancedFilterLabel: document.querySelector("#advancedFilterLabel"),
+  advancedFilterExitButton: document.querySelector("#advancedFilterExitButton"),
   partFilter: document.querySelector("#partFilter"),
   sortSelect: document.querySelector("#sortSelect"),
   newEntryButton: document.querySelector("#newEntryButton"),
@@ -858,7 +890,37 @@ function normalizeDictionarySettings(settings = {}) {
     allowEmptyDefinitions: Boolean(settings.allowEmptyDefinitions ?? true),
     ipaKeyboard: normalizeIpaKeyboard(settings.ipaKeyboard),
     ipa: normalizeIpaSettings(settings.ipa),
+    toolNavOrder: normalizeToolNavOrder(settings.toolNavOrder),
   };
+}
+
+function normalizeToolNavOrder(order = []) {
+  const source = Array.isArray(order) ? order : [];
+  const result = [];
+  source.forEach((item) => {
+    const view = String(item || "").trim();
+    if (DEFAULT_TOOL_NAV_ORDER.includes(view) && !result.includes(view)) {
+      result.push(view);
+    }
+  });
+  DEFAULT_TOOL_NAV_ORDER.forEach((view) => {
+    if (!result.includes(view)) {
+      result.push(view);
+    }
+  });
+  return result;
+}
+
+function toolNavLabel(view) {
+  const labels = {
+    editor: t("entryEditor"),
+    docs: t("languageDocs"),
+    analysis: t("analysis"),
+    ipa: t("ipaConfig"),
+    morphology: t("morphologyConfig"),
+    settings: t("otherSettings"),
+  };
+  return labels[view] || view;
 }
 
 function normalizeTagDisplayMap(map = {}) {
@@ -1155,7 +1217,8 @@ function rememberProcessScroll() {
   if (state.activeView === "docs") {
     viewScrollMemory.docsPage = window.scrollY;
   } else if (state.activeView === "analysis") {
-    viewScrollMemory.analysisPage = window.scrollY;
+    const analysisViewState = activeAnalysisViewState();
+    analysisViewState.scrollByRoute[analysisRouteKey()] = window.scrollY;
   }
 }
 
@@ -1169,7 +1232,8 @@ function restoreProcessScroll() {
       elements.docsMarkdownInput.scrollTop = viewScrollMemory.docsEditor;
       elements.docsPreview.scrollTop = viewScrollMemory.docsPreview;
     } else if (state.activeView === "analysis") {
-      window.scrollTo({ top: viewScrollMemory.analysisPage, behavior: "auto" });
+      const analysisViewState = activeAnalysisViewState();
+      window.scrollTo({ top: analysisViewState.scrollByRoute[analysisRouteKey()] || 0, behavior: "auto" });
     }
   });
 }
@@ -1177,6 +1241,42 @@ function restoreProcessScroll() {
 function rememberDocsPaneScroll() {
   viewScrollMemory.docsEditor = elements.docsMarkdownInput.scrollTop;
   viewScrollMemory.docsPreview = elements.docsPreview.scrollTop;
+}
+
+function createAnalysisViewState() {
+  return {
+    page: defaultAnalysisViewState.page,
+    subpageByPage: { ...defaultAnalysisViewState.subpageByPage },
+    scrollByRoute: {},
+  };
+}
+
+function activeAnalysisViewState() {
+  const dictionaryId = state.activeDictionaryId || "__none__";
+  if (!analysisViewStates.has(dictionaryId)) {
+    analysisViewStates.set(dictionaryId, createAnalysisViewState());
+  }
+  return analysisViewStates.get(dictionaryId);
+}
+
+function forgetAnalysisViewState(dictionaryId) {
+  if (dictionaryId) {
+    analysisViewStates.delete(dictionaryId);
+  }
+}
+
+function analysisRouteKey(page = activeAnalysisViewState().page, subpage = activeAnalysisSubpage(page)) {
+  return `${page}:${subpage || ""}`;
+}
+
+function activeAnalysisSubpage(page = activeAnalysisViewState().page) {
+  const analysisViewState = activeAnalysisViewState();
+  const subpages = analysisSubpages(page);
+  if (!subpages.length) {
+    return "";
+  }
+  const current = analysisViewState.subpageByPage[page];
+  return subpages.some(([subpage]) => subpage === current) ? current : subpages[0][0];
 }
 
 function ensureValidSelection() {
@@ -1280,6 +1380,13 @@ function renderView() {
 }
 
 function renderToolNav() {
+  const order = normalizeToolNavOrder(activeDictionary()?.settings?.toolNavOrder);
+  order.forEach((view) => {
+    const button = [...elements.toolButtons].find((item) => item.dataset.view === view);
+    if (button) {
+      elements.toolList.append(button);
+    }
+  });
   elements.dictionaryManagerButton.hidden = state.activeView === "manager";
   elements.toolButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.view === state.activeView);
@@ -1313,7 +1420,12 @@ function firstLemmaEntry(dictionary) {
 
 function renderPartFilter() {
   const dictionary = activeDictionary();
-  if (rootMode) {
+  if (advancedFilter) {
+    rootMode = false;
+    activePart = "";
+    searchQuery = "";
+    elements.searchInput.value = "";
+  } else if (rootMode) {
     activePart = "";
     elements.partFilter.value = "";
   }
@@ -1321,19 +1433,26 @@ function renderPartFilter() {
     ? [...new Set(dictionary.entries.map(entryPart).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN"))
     : [];
   const options = ["", ...usedParts];
-  const current = elements.partFilter.value;
+  const current = activePart;
 
   elements.partFilter.innerHTML = options
     .map((part) => `<option value="${escapeHtml(part)}">${part ? escapeHtml(displayTag(part, dictionary)) : t("allParts")}</option>`)
     .join("");
 
   elements.partFilter.value = options.includes(current) ? current : "";
-  elements.partFilter.disabled = rootMode;
+  elements.partFilter.disabled = rootMode || Boolean(advancedFilter);
+  elements.searchInput.disabled = Boolean(advancedFilter);
   activePart = elements.partFilter.value;
   elements.rootModeToggleButton.textContent = rootMode ? t("normalMode") : t("rootMode");
   elements.rootModeToggleButton.classList.toggle("active", rootMode);
-  elements.expandAllRootsButton.hidden = !rootMode;
-  elements.collapseAllRootsButton.hidden = !rootMode;
+  elements.rootModeToggleButton.hidden = Boolean(advancedFilter);
+  elements.expandAllRootsButton.hidden = !rootMode || Boolean(advancedFilter);
+  elements.collapseAllRootsButton.hidden = !rootMode || Boolean(advancedFilter);
+  elements.advancedFilterLabel.hidden = !advancedFilter;
+  elements.advancedFilterExitButton.hidden = !advancedFilter;
+  elements.advancedFilterLabel.innerHTML = advancedFilter
+    ? `<span>${escapeHtml(`${t("advancedFilterMode")}: ${advancedFilter.title}`)}</span>${advancedFilter.variants?.length > 1 ? `<button class="advanced-filter-cycle" type="button" data-action="cycle-advanced-filter" title="${escapeHtml(t("cycleAdvancedFilter"))}" aria-label="${escapeHtml(t("cycleAdvancedFilter"))}">⇄</button>` : ""}`
+    : "";
   const hasRootSearch = Boolean(normalize(searchQuery));
   elements.expandAllRootsButton.disabled = rootMode && hasRootSearch;
   elements.collapseAllRootsButton.disabled = rootMode && hasRootSearch;
@@ -1347,7 +1466,7 @@ function renderEntries() {
     return;
   }
 
-  if (rootMode) {
+  if (!advancedFilter && rootMode) {
     renderRootModeEntries();
     return;
   }
@@ -1375,7 +1494,7 @@ function renderRootModeEntries() {
     wrapper.className = "root-entry-group";
     wrapper.dataset.rootId = group.root.id;
 
-    const rootCard = createEntryCard(group.root, { root: true });
+    const rootCard = createEntryCard(group.root, { root: true, rootId: group.root.id });
     wrapper.append(rootCard);
 
     const children = document.createElement("div");
@@ -1384,7 +1503,7 @@ function renderRootModeEntries() {
     children.hidden = !expanded;
 
     group.derived.forEach((entry) => {
-      children.append(createEntryCard(entry, { derived: true }));
+      children.append(createEntryCard(entry, { derived: true, rootId: group.root.id }));
     });
 
     if (group.derived.length) {
@@ -1430,6 +1549,10 @@ function createEntryCard(entry, options = {}) {
     options.root ? "root-card" : "",
     options.derived ? "derived-entry-card" : "",
   ].filter(Boolean).join(" ");
+  button.dataset.entryId = entry.id;
+  if (options.rootId) {
+    button.dataset.rootId = options.rootId;
+  }
   button.innerHTML = `
     <div>
       <strong>${highlightSearchText(entry.lemma, contentFuzzyEnabled)}</strong>
@@ -1439,7 +1562,7 @@ function createEntryCard(entry, options = {}) {
     <div class="chip-row">${renderChips(entry, 3, true, tagFuzzyEnabled)}</div>
     ${searchSnippets}
   `;
-  button.addEventListener("click", () => switchToEntry(entry.id));
+  button.addEventListener("click", () => switchToEntry(entry.id, { rootId: options.rootId || "" }));
   button.addEventListener("contextmenu", (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -1465,7 +1588,7 @@ function entryDefinitionSummary(entry, showPolysemy = false) {
   return meanings.map((meaning, index) => `${index + 1}. ${meaning}`).join("  ");
 }
 
-async function switchToEntry(entryId) {
+async function switchToEntry(entryId, options = {}) {
   if (!entryId) {
     return;
   }
@@ -1489,6 +1612,24 @@ async function switchToEntry(entryId) {
   state.selectedEntryId = entryId;
   editorMode = "display";
   render();
+  scheduleEntryCardScroll(entryId, options);
+}
+
+function scheduleEntryCardScroll(entryId, options = {}) {
+  if (!entryId) {
+    return;
+  }
+  requestAnimationFrame(() => {
+    const cards = [...elements.entryList.querySelectorAll(".entry-card")]
+      .filter((item) => item.dataset.entryId === entryId);
+    const card = options.rootId
+      ? cards.find((item) => item.dataset.rootId === options.rootId) || cards[0]
+      : cards[0];
+    if (!card || !card.getClientRects().length) {
+      return;
+    }
+    card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  });
 }
 
 async function closePendingEditsForPageSwitch() {
@@ -1530,18 +1671,131 @@ async function closePendingEditsForPageSwitch() {
 
 function filteredEntries() {
   const dictionary = activeDictionary();
-  const query = normalize(searchQuery);
-  const settings = normalizeDictionarySettings(dictionary?.settings);
-  const contentFuzzyEnabled = Boolean(settings.fuzzySearch);
-  const tagFuzzyEnabled = Boolean(settings.tagFuzzySearch);
 
   if (!dictionary) {
     return [];
   }
 
+  if (advancedFilter) {
+    const ids = new Set(advancedFilter.entryIds || []);
+    return [...dictionary.entries].filter((entry) => ids.has(entry.id)).sort(compareEntries);
+  }
+
+  const query = normalize(searchQuery);
+  const settings = normalizeDictionarySettings(dictionary?.settings);
+  const contentFuzzyEnabled = Boolean(settings.fuzzySearch);
+  const tagFuzzyEnabled = Boolean(settings.tagFuzzySearch);
+
   return [...dictionary.entries]
     .filter((entry) => entryMatchesSearch(entry, dictionary, { query, contentFuzzyEnabled, tagFuzzyEnabled, respectPart: true }))
     .sort(compareEntries);
+}
+
+function entryViewSnapshot() {
+  return {
+    rootMode,
+    activePart,
+    entrySort,
+    searchQuery,
+    expandedRootEntries: [...expandedRootEntries],
+  };
+}
+
+function restoreEntryViewSnapshot(snapshot = {}) {
+  rootMode = Boolean(snapshot.rootMode);
+  activePart = snapshot.activePart || "";
+  entrySort = snapshot.entrySort || "lemmaAsc";
+  searchQuery = snapshot.searchQuery || "";
+  expandedRootEntries.clear();
+  (snapshot.expandedRootEntries || []).forEach((id) => expandedRootEntries.add(id));
+  elements.searchInput.value = searchQuery;
+  elements.sortSelect.value = entrySort;
+}
+
+async function enterAdvancedFilter(action) {
+  const dictionary = activeDictionary();
+  if (!dictionary || (!action?.entryIds?.length && !action?.variants?.length)) {
+    return;
+  }
+
+  const ready = await closePendingEditsForPageSwitch();
+  if (!ready) {
+    return;
+  }
+
+  const previous = advancedFilter?.previous || entryViewSnapshot();
+  const variants = normalizeAdvancedFilterVariants(action);
+  const activeVariant = variants[0] || {
+    title: action.title || t("advancedFilterMode"),
+    entryIds: entryIdsFrom(action.entryIds),
+  };
+  advancedFilter = {
+    title: activeVariant.title,
+    entryIds: activeVariant.entryIds,
+    previous,
+    variants,
+    variantIndex: 0,
+  };
+  rootMode = false;
+  activePart = "";
+  searchQuery = "";
+  state.activeView = "editor";
+  const ids = new Set(advancedFilter.entryIds);
+  const firstEntry = [...dictionary.entries].filter((entry) => ids.has(entry.id)).sort(compareEntries)[0];
+  if (firstEntry) {
+    state.selectedEntryId = firstEntry.id;
+    editorMode = "display";
+    entryDraft = null;
+  }
+  render();
+  scheduleEntryCardScroll(state.selectedEntryId);
+}
+
+function exitAdvancedFilter() {
+  if (!advancedFilter) {
+    return;
+  }
+  const previous = advancedFilter.previous;
+  advancedFilter = null;
+  restoreEntryViewSnapshot(previous);
+  render();
+}
+
+function normalizeAdvancedFilterVariants(action) {
+  const variants = action?.variants?.length
+    ? action.variants
+    : [{ title: action?.title || t("advancedFilterMode"), entryIds: action?.entryIds || [] }];
+  return variants
+    .map((variant) => ({
+      title: variant.title || t("advancedFilterMode"),
+      entryIds: entryIdsFrom(variant.entryIds),
+    }))
+    .filter((variant) => variant.entryIds.length);
+}
+
+function cycleAdvancedFilterVariant() {
+  if (!advancedFilter?.variants?.length || advancedFilter.variants.length < 2) {
+    return;
+  }
+  const dictionary = activeDictionary();
+  if (!dictionary) {
+    return;
+  }
+  const nextIndex = (advancedFilter.variantIndex + 1) % advancedFilter.variants.length;
+  const next = advancedFilter.variants[nextIndex];
+  advancedFilter = {
+    ...advancedFilter,
+    title: next.title,
+    entryIds: next.entryIds,
+    variantIndex: nextIndex,
+  };
+  const ids = new Set(advancedFilter.entryIds);
+  if (!ids.has(state.selectedEntryId)) {
+    const firstEntry = [...dictionary.entries].filter((entry) => ids.has(entry.id)).sort(compareEntries)[0];
+    state.selectedEntryId = firstEntry?.id || state.selectedEntryId;
+  }
+  render();
+  scheduleEntryCardScroll(state.selectedEntryId);
 }
 
 function entryMatchesSearch(entry, dictionary = activeDictionary(), options = {}) {
@@ -2112,8 +2366,8 @@ function parseGloss(example) {
 }
 
 function renderSmallCaps(value) {
-  return String(value || "").replace(/[a-z]+|[&<>"']/g, (match) => {
-    if (/^[a-z]+$/.test(match)) {
+  return String(value || "").replace(/[a-z0-9]+|[&<>"']/g, (match) => {
+    if (/^[a-z0-9]+$/.test(match)) {
       return `<span class="smallcaps">${match}</span>`;
     }
     return escapeHtml(match);
@@ -2507,59 +2761,231 @@ function renderAnalysis(dictionary = activeDictionary()) {
     return;
   }
 
+  analysisFilterRegistry.clear();
+  analysisFilterCounter = 0;
   const report = buildDictionaryAnalysis(dictionary);
-  elements.analysisPanel.innerHTML = `
-    <section class="analysis-grid analysis-summary-grid">
-      ${analysisMetricCard(aText("词条", "Entries"), report.entries.length, `${report.rootCount} ${aText("个词根", "roots")}`)}
-      ${analysisMetricCard(aText("衍生词", "Derived"), report.derivedCount, `${report.isolatedRootCount} ${aText("个孤立词根", "isolated roots")}`)}
-      ${analysisMetricCard(aText("释义覆盖", "Definition Coverage"), percentText(report.coverage.definitions), `${report.definitionCount} ${aText("条释义", "definitions")}`)}
-      ${analysisMetricCard("IPA", percentText(report.coverage.ipa), `${report.ipa.syllableAverage} ${aText("平均音节", "avg syllables")}`)}
-      ${analysisMetricCard(aText("形态学", "Morphology"), percentText(report.coverage.morphology), `${report.morphology.generatedForms} ${aText("个生成形式", "generated forms")}`)}
-      ${analysisMetricCard(aText("质量问题", "Quality Issues"), report.issues.length, `${report.issues.filter((issue) => issue.severity === "high").length} ${aText("个高优先级", "high priority")}`)}
-    </section>
+  elements.analysisPanel.innerHTML = renderAnalysisPage(report);
+}
 
+function renderAnalysisPage(report) {
+  const analysisViewState = activeAnalysisViewState();
+  const page = analysisViewState.page || "overview";
+  const subpage = activeAnalysisSubpage(page);
+  return `
+    ${analysisPageNav(page)}
+    ${analysisSubpageNav(page, subpage)}
+    <section class="analysis-page-body">
+      ${analysisPageBody(report, page, subpage)}
+    </section>
+  `;
+}
+
+function analysisPageNav(activePage) {
+  const pages = [
+    ["overview", aText("总览", "Overview")],
+    ["entries", aText("词条与标签", "Entries & Tags")],
+    ["ipa", "IPA"],
+    ["morphology", aText("形态学", "Morphology")],
+    ["activity", aText("编辑进度", "Activity")],
+    ["quality", aText("质量检查", "Quality")],
+  ];
+  return `<nav class="analysis-page-tabs">${pages.map(([page, label]) => `
+    <button type="button" class="${page === activePage ? "active" : ""}" data-analysis-page="${escapeHtml(page)}">${escapeHtml(label)}</button>
+  `).join("")}</nav>`;
+}
+
+function analysisSubpageNav(page, activeSubpage) {
+  const subpages = analysisSubpages(page);
+  if (!subpages.length) {
+    return "";
+  }
+  return `<nav class="analysis-subpage-tabs">${subpages.map(([subpage, label]) => `
+    <button type="button" class="${subpage === activeSubpage ? "active" : ""}" data-analysis-subpage="${escapeHtml(subpage)}">${escapeHtml(label)}</button>
+  `).join("")}</nav>`;
+}
+
+function analysisSubpages(page) {
+  const subpages = {
+    entries: [
+      ["tags", aText("标签", "Tags")],
+      ["forms", aText("词形结构", "Word Forms")],
+      ["roots", aText("词根关系", "Roots")],
+      ["coverage", aText("覆盖率", "Coverage")],
+    ],
+    ipa: [
+      ["distribution", aText("分布", "Distribution")],
+      ["units", aText("音位", "Units")],
+      ["mismatches", aText("自动生成检查", "Auto Checks")],
+    ],
+    morphology: [
+      ["tables", aText("表格使用", "Tables")],
+      ["overrides", "Override"],
+      ["generated", aText("生成检查", "Generated")],
+    ],
+    activity: [
+      ["updated", aText("编辑日期", "Updated")],
+      ["created", aText("新增日期", "Created")],
+      ["latest", aText("最近修改", "Recent")],
+    ],
+    quality: [
+      ["issues", aText("全部问题", "All Issues")],
+      ["high", aText("高优先级", "High")],
+      ["medium", aText("中优先级", "Medium")],
+      ["low", aText("低优先级", "Low")],
+      ["network", aText("词源网络", "Etymology")],
+      ["gloss", aText("Glossed 例句", "Glossed Examples")],
+    ],
+  };
+  return subpages[page] || [];
+}
+
+function analysisPageBody(report, page, subpage) {
+  if (page === "entries") {
+    return renderAnalysisEntriesPage(report, subpage);
+  }
+  if (page === "ipa") {
+    return renderAnalysisIpaPage(report, subpage);
+  }
+  if (page === "morphology") {
+    return renderAnalysisMorphologyPage(report, subpage);
+  }
+  if (page === "activity") {
+    return renderAnalysisActivityPage(report, subpage);
+  }
+  if (page === "quality") {
+    return renderAnalysisQualityPage(report, subpage);
+  }
+  return renderAnalysisOverview(report);
+}
+
+function renderAnalysisOverview(report) {
+  const issueEntryIds = entryIdsFrom(report.issues.map((issue) => issue.entryId));
+  const highIssueEntryIds = entryIdsFrom(report.issues.filter((issue) => issue.severity === "high").map((issue) => issue.entryId));
+  const mediumIssueEntryIds = entryIdsFrom(report.issues.filter((issue) => issue.severity === "medium").map((issue) => issue.entryId));
+  const lowIssueEntryIds = entryIdsFrom(report.issues.filter((issue) => issue.severity === "low").map((issue) => issue.entryId));
+  return `
+    <section class="analysis-grid analysis-summary-grid">
+      ${analysisMetricCard(aText("词条", "Entries"), report.entries.length, `${report.rootCount} ${aText("个词根", "roots")}`, viewAction("editor"))}
+      ${analysisMetricCard(aText("衍生词", "Derived"), report.derivedCount, `${report.isolatedRootCount} ${aText("个孤立词根", "isolated roots")}`, advancedFilterAction(aText("衍生词", "Derived entries"), report.derivedEntryIds))}
+      ${analysisMetricCard(aText("释义覆盖", "Definition Coverage"), percentText(report.coverage.definitions), `${report.definitionCount} ${aText("条释义", "definitions")}`, advancedFilterAction(aText("有释义", "Has definitions"), report.definitionEntryIds, { variants: [{ title: aText("无释义", "No definitions"), entryIds: report.noDefinitionEntryIds }] }))}
+      ${analysisMetricCard("IPA", percentText(report.coverage.ipa), `${report.ipa.syllableAverage} ${aText("平均音节", "avg syllables")}`, advancedFilterAction(aText("有 IPA", "Has IPA"), report.ipaEntryIds, { variants: [{ title: aText("无 IPA", "No IPA"), entryIds: report.noIpaEntryIds }] }))}
+      ${analysisMetricCard(aText("形态学", "Morphology"), percentText(report.coverage.morphology), `${report.morphology.generatedForms} ${aText("个生成形式", "generated forms")}`, advancedFilterAction(aText("有形态表格", "Has morphology table"), report.morphologyEntryIds, { variants: [{ title: aText("无形态表格", "No morphology table"), entryIds: report.noMorphologyEntryIds }] }))}
+      ${analysisMetricCard(aText("质量问题", "Quality Issues"), report.issues.length, `${highIssueEntryIds.length} ${aText("个高优先级", "high priority")}`, advancedFilterAction(aText("质量问题", "Quality issues"), issueEntryIds, { variants: [{ title: aText("高优先级质量问题", "High-priority quality issues"), entryIds: highIssueEntryIds }, { title: aText("中优先级质量问题", "Medium-priority quality issues"), entryIds: mediumIssueEntryIds }, { title: aText("低优先级质量问题", "Low-priority quality issues"), entryIds: lowIssueEntryIds }] }))}
+    </section>
     <section class="analysis-grid">
       ${analysisCard(aText("词类分布", "Part of Speech"), analysisBarList(report.parts, { empty: aText("暂无词类标签", "No part tags yet") }))}
       ${analysisCard(aText("标签频率", "Tag Frequency"), analysisBarList(report.tags, { empty: aText("暂无标签", "No tags yet") }))}
-      ${analysisCard(aText("标签组合", "Tag Combinations"), analysisBarList(report.tagCombos, { empty: aText("暂无组合", "No combinations yet") }))}
       ${analysisCard(aText("词根家族排行", "Root Families"), analysisBarList(report.rootFamilies, { empty: aText("暂无衍生关系", "No derivation links yet") }))}
-    </section>
-
-    <section class="analysis-grid">
-      ${analysisCard(aText("覆盖率", "Coverage"), analysisCoverageList(report.coverageRows))}
-      ${analysisCard(aText("当前搜索命中字段", "Current Search Fields"), analysisBarList(report.searchFields, { empty: aText("暂无搜索", "No active search") }))}
-      ${analysisCard(aText("词长分布", "Word Lengths"), analysisBarList(report.wordLengths, { empty: aText("暂无词形", "No lemmas yet") }))}
-      ${analysisCard(aText("音节数分布", "Syllable Counts"), analysisBarList(report.ipa.syllableCounts, { empty: aText("暂无 IPA", "No IPA yet") }))}
-      ${analysisCard(aText("首字母分布", "Initial Letters"), analysisBarList(report.initialLetters, { empty: aText("暂无词形", "No lemmas yet") }))}
-    </section>
-
-    <section class="analysis-grid">
-      ${analysisCard(aText("IPA 音位频率", "IPA Unit Frequency"), analysisBarList(report.ipa.units, { empty: aText("暂无 IPA", "No IPA yet") }))}
-      ${analysisCard(aText("IPA 首音", "IPA Initials"), analysisBarList(report.ipa.initials, { empty: aText("暂无 IPA", "No IPA yet") }))}
-      ${analysisCard(aText("IPA 尾音", "IPA Finals"), analysisBarList(report.ipa.finals, { empty: aText("暂无 IPA", "No IPA yet") }))}
-      ${analysisCard(aText("正写法字符", "Orthographic Characters"), analysisBarList(report.characters, { empty: aText("暂无词形", "No lemmas yet") }))}
-    </section>
-
-    <section class="analysis-grid">
-      ${analysisCard(aText("正写法双字符组合", "Orthographic Bigrams"), analysisBarList(report.bigrams, { empty: aText("暂无组合", "No bigrams yet") }))}
-      ${analysisCard(aText("形态表格使用", "Morphology Tables"), analysisBarList(report.morphology.tables, { empty: aText("暂无形态表格", "No morphology tables yet") }))}
-      ${analysisCard(aText("Override 排行", "Override Ranking"), analysisBarList(report.morphology.overrides, { empty: aText("暂无 override", "No overrides yet") }))}
-      ${analysisCard(aText("编辑进度", "Editing Progress"), analysisActivityList(report.activity))}
-    </section>
-
-    <section class="analysis-wide-grid">
-      ${analysisCard(aText("规则与资料", "Rules and Data"), analysisFactList([
-        [aText("例句数量", "Examples"), report.examples],
-        [aText("Gloss 例句", "Gloss examples"), report.glossExamples],
-        [aText("多来源词条", "Multi-source entries"), report.multiSourceCount],
-        [aText("IPA 自动生成不一致", "Auto IPA mismatches"), report.ipa.generatedMismatch],
-        [aText("形态空单元", "Empty morphology cells"), report.morphology.emptyCells],
-        [aText("当前搜索命中", "Current search matches"), report.searchMatches],
-      ]))}
-      ${analysisCard(aText("词源网络检查", "Etymology Network Checks"), analysisIssueList(report.networkIssues))}
-      ${analysisCard(aText("质量检查", "Quality Checks"), analysisIssueList(report.issues))}
+      ${analysisCard(aText("编辑进度", "Editing Progress"), analysisActivityList({
+        created: report.activity.created.slice(-10),
+        updated: report.activity.updated.slice(-10),
+        latest: report.activity.latest.slice(0, 6),
+      }))}
     </section>
   `;
+}
+
+function renderAnalysisEntriesPage(report, subpage) {
+  if (subpage === "forms") {
+    return `<section class="analysis-detail-grid">
+      ${analysisCard(aText("词长分布", "Word Lengths"), analysisBarList(report.allWordLengths, { empty: aText("暂无词形", "No lemmas yet") }))}
+      ${analysisCard(aText("首字母分布", "Initial Letters"), analysisBarList(report.allInitialLetters, { empty: aText("暂无词形", "No lemmas yet") }))}
+      ${analysisCard(aText("正写法字符", "Orthographic Characters"), analysisBarList(report.allCharacters, { empty: aText("暂无词形", "No lemmas yet") }))}
+      ${analysisCard(aText("正写法双字符组合", "Orthographic Bigrams"), analysisBarList(report.allBigrams, { empty: aText("暂无组合", "No bigrams yet") }))}
+    </section>`;
+  }
+  if (subpage === "roots") {
+    return `<section class="analysis-detail-grid">${analysisCard(aText("词根家族排行", "Root Families"), analysisBarList(report.allRootFamilies, { empty: aText("暂无衍生关系", "No derivation links yet") }))}</section>`;
+  }
+  if (subpage === "coverage") {
+    return `<section class="analysis-detail-grid">
+      ${analysisCard(aText("覆盖率", "Coverage"), analysisCoverageList(report.coverageRows))}
+      ${analysisCard(aText("规则与资料", "Rules and Data"), analysisFactList(analysisFactRows(report)))}
+      ${analysisCard(aText("当前搜索命中字段", "Current Search Fields"), analysisBarList(report.searchFields, { empty: aText("暂无搜索", "No active search") }))}
+    </section>`;
+  }
+  return `<section class="analysis-detail-grid">
+    ${analysisCard(aText("词类分布", "Part of Speech"), analysisBarList(report.allParts, { empty: aText("暂无词类标签", "No part tags yet") }))}
+    ${analysisCard(aText("标签频率", "Tag Frequency"), analysisBarList(report.allTags, { empty: aText("暂无标签", "No tags yet") }))}
+    ${analysisCard(aText("标签组合", "Tag Combinations"), analysisBarList(report.allTagCombos, { empty: aText("暂无组合", "No combinations yet") }))}
+  </section>`;
+}
+
+function renderAnalysisIpaPage(report, subpage) {
+  if (subpage === "units") {
+    return `<section class="analysis-detail-grid">
+      ${analysisCard(aText("IPA 音位频率", "IPA Unit Frequency"), analysisBarList(report.ipa.allUnits, { empty: aText("暂无 IPA", "No IPA yet") }))}
+      ${analysisCard(aText("IPA 首音", "IPA Initials"), analysisBarList(report.ipa.allInitials, { empty: aText("暂无 IPA", "No IPA yet") }))}
+      ${analysisCard(aText("IPA 尾音", "IPA Finals"), analysisBarList(report.ipa.allFinals, { empty: aText("暂无 IPA", "No IPA yet") }))}
+    </section>`;
+  }
+  if (subpage === "mismatches") {
+    return `<section class="analysis-detail-grid">${analysisCard(aText("自动生成检查", "Auto Checks"), analysisFactList(analysisIpaMismatchRows(report)))}</section>`;
+  }
+  return `<section class="analysis-detail-grid">
+    ${analysisCard(aText("音节数分布", "Syllable Counts"), analysisBarList(report.ipa.allSyllableCounts, { empty: aText("暂无 IPA", "No IPA yet") }))}
+    ${analysisCard(aText("IPA 覆盖", "IPA Coverage"), analysisCoverageList([["IPA", report.coverage.ipa, advancedFilterAction(aText("有 IPA", "Has IPA"), report.ipaEntryIds, { variants: [{ title: aText("无 IPA", "No IPA"), entryIds: report.noIpaEntryIds }] })]]))}
+  </section>`;
+}
+
+function renderAnalysisMorphologyPage(report, subpage) {
+  if (subpage === "overrides") {
+    return `<section class="analysis-detail-grid">${analysisCard(aText("Override 排行", "Override Ranking"), analysisBarList(report.morphology.allOverrides, { empty: aText("暂无 override", "No overrides yet") }))}</section>`;
+  }
+  if (subpage === "generated") {
+    return `<section class="analysis-detail-grid">${analysisCard(aText("生成检查", "Generated Checks"), analysisFactList([
+      [aText("生成形式", "Generated forms"), report.morphology.generatedForms],
+      [aText("形态空单元", "Empty morphology cells"), report.morphology.emptyCells, advancedFilterAction(aText("形态空单元", "Empty morphology cells"), report.morphology.emptyCellEntryIds)],
+    ]))}</section>`;
+  }
+  return `<section class="analysis-detail-grid">
+    ${analysisCard(aText("形态表格使用", "Morphology Tables"), analysisBarList(report.morphology.allTables, { empty: aText("暂无形态表格", "No morphology tables yet") }))}
+    ${analysisCard(aText("形态学覆盖", "Morphology Coverage"), analysisCoverageList([[aText("形态表格", "Morphology table"), report.coverage.morphology, advancedFilterAction(aText("有形态表格", "Has morphology table"), report.morphologyEntryIds, { variants: [{ title: aText("无形态表格", "No morphology table"), entryIds: report.noMorphologyEntryIds }] })]]))}
+  </section>`;
+}
+
+function renderAnalysisActivityPage(report, subpage) {
+  if (subpage === "created") {
+    return `<section class="analysis-detail-grid">${analysisCard(aText("新增日期", "Created Date"), analysisBarList(report.activity.created, { empty: aText("暂无创建记录", "No creation records") }))}</section>`;
+  }
+  if (subpage === "latest") {
+    return `<section class="analysis-detail-grid">${analysisCard(aText("最近修改", "Recently Edited"), analysisLatestList(report.activity.latest))}</section>`;
+  }
+  return `<section class="analysis-detail-grid">${analysisCard(aText("编辑日期", "Updated Date"), analysisBarList(report.activity.updated, { empty: aText("暂无编辑记录", "No edit records") }))}</section>`;
+}
+
+function renderAnalysisQualityPage(report, subpage) {
+  if (subpage === "network") {
+    return `<section class="analysis-detail-grid">${analysisCard(aText("词源网络检查", "Etymology Network Checks"), analysisIssueList(report.networkIssues, { limit: Infinity }))}</section>`;
+  }
+  if (subpage === "gloss") {
+    const glossIssues = report.issues.filter((issue) => /gloss/i.test(`${issue.title} ${issue.detail}`));
+    return `<section class="analysis-detail-grid">
+      ${analysisCard(aText("Glossed 例句", "Glossed Examples"), analysisFactList([[aText("Glossed 例句", "Glossed examples"), report.glossExamples, advancedFilterAction(aText("Glossed 例句", "Glossed examples"), report.glossEntryIds)]]))}
+      ${analysisCard(aText("Glossed 例句问题", "Glossed Example Issues"), analysisIssueList(glossIssues, { limit: Infinity }))}
+    </section>`;
+  }
+  if (["high", "medium", "low"].includes(subpage)) {
+    const issues = report.issues.filter((issue) => issue.severity === subpage);
+    return `<section class="analysis-detail-grid">${analysisCard(aText("质量检查", "Quality Checks"), analysisIssueList(issues, { limit: Infinity }))}</section>`;
+  }
+  return `<section class="analysis-detail-grid">${analysisCard(aText("质量检查", "Quality Checks"), analysisIssueList(report.issues, { limit: Infinity }))}</section>`;
+}
+
+function analysisFactRows(report) {
+  return [
+    [aText("例句数量", "Examples"), report.examples, advancedFilterAction(aText("有例句", "Has examples"), report.exampleEntryIds)],
+    [aText("Glossed 例句", "Glossed examples"), report.glossExamples, advancedFilterAction(aText("Glossed 例句", "Glossed examples"), report.glossEntryIds)],
+    [aText("多来源词条", "Multi-source entries"), report.multiSourceCount, advancedFilterAction(aText("多来源词条", "Multi-source entries"), report.multiSourceEntryIds)],
+    [aText("当前搜索命中", "Current search matches"), report.searchMatches, viewAction("editor")],
+  ];
+}
+
+function analysisIpaMismatchRows(report) {
+  return [
+    [aText("IPA 自动生成不一致（宽松）", "Auto IPA mismatches (loose)"), report.ipa.generatedMismatch, advancedFilterAction(aText("IPA 自动生成不一致（宽松）", "Auto IPA mismatches (loose)"), report.ipa.generatedMismatchEntryIds, { variants: [{ title: aText("IPA 自动生成不一致（严格）", "Auto IPA mismatches (strict)"), entryIds: report.ipa.generatedMismatchStrictEntryIds }] })],
+    [aText("IPA 自动生成不一致（严格）", "Auto IPA mismatches (strict)"), report.ipa.generatedMismatchStrict, advancedFilterAction(aText("IPA 自动生成不一致（严格）", "Auto IPA mismatches (strict)"), report.ipa.generatedMismatchStrictEntryIds, { variants: [{ title: aText("IPA 自动生成不一致（宽松）", "Auto IPA mismatches (loose)"), entryIds: report.ipa.generatedMismatchEntryIds }] })],
+  ];
 }
 
 function buildDictionaryAnalysis(dictionary) {
@@ -2580,6 +3006,14 @@ function buildDictionaryAnalysis(dictionary) {
   const networkIssues = [];
   const duplicateLemmas = new Map();
   const normalizedTagForms = new Map();
+  const definitionEntryIds = new Set();
+  const exampleEntryIds = new Set();
+  const glossEntryIds = new Set();
+  const noteEntryIds = new Set();
+  const sourceEntryIds = new Set();
+  const ipaEntryIds = new Set();
+  const morphologyEntryIds = new Set();
+  const multiSourceEntryIds = new Set();
 
   let definitionCount = 0;
   let examples = 0;
@@ -2598,26 +3032,26 @@ function buildDictionaryAnalysis(dictionary) {
       mapPush(duplicateLemmas, lemmaKey, entry);
     }
     const part = entryPart(entry) || aText("无词类", "No part");
-    increment(parts, displayTag(part, dictionary));
+    incrementEntry(parts, displayTag(part, dictionary), entry);
     (entry.tags || []).forEach((tag) => {
-      increment(tags, displayTag(tag, dictionary));
+      incrementEntry(tags, displayTag(tag, dictionary), entry);
       const compact = normalize(tag).replace(/[^\p{L}\p{N}]+/gu, "");
       if (compact) {
         mapPush(normalizedTagForms, compact, tag);
       }
     });
     if ((entry.tags || []).length > 1) {
-      increment(tagCombos, entry.tags.map((tag) => displayTag(tag, dictionary)).join(" + "));
+      incrementEntry(tagCombos, entry.tags.map((tag) => displayTag(tag, dictionary)).join(" + "), entry);
     }
 
     const lemma = String(entry.lemma || "");
     if (lemma) {
-      increment(wordLengths, String(Array.from(lemma).length));
-      increment(initialLetters, Array.from(lemma.trim())[0] || "");
-      Array.from(lemma.replace(/\s+/g, "")).forEach((char) => increment(characters, char));
+      incrementEntry(wordLengths, String(Array.from(lemma).length), entry);
+      incrementEntry(initialLetters, Array.from(lemma.trim())[0] || "", entry);
+      Array.from(lemma.replace(/\s+/g, "")).forEach((char) => incrementEntry(characters, char, entry));
       Array.from(lemma.replace(/\s+/g, "")).forEach((char, index, chars) => {
         if (index < chars.length - 1) {
-          increment(bigrams, `${char}${chars[index + 1]}`);
+          incrementEntry(bigrams, `${char}${chars[index + 1]}`, entry);
         }
       });
     }
@@ -2627,15 +3061,18 @@ function buildDictionaryAnalysis(dictionary) {
     definitionCount += meaningfulDefinitions.length;
     if (meaningfulDefinitions.length) {
       entriesWithDefinition += 1;
+      definitionEntryIds.add(entry.id);
     }
     if (definitions.some((definition) => definition.example)) {
       entriesWithExample += 1;
+      exampleEntryIds.add(entry.id);
     }
     examples += definitions.filter((definition) => definition.example).length;
     definitions.forEach((definition) => {
       const gloss = parseGloss(definition.example);
       if (gloss) {
         glossExamples += 1;
+        glossEntryIds.add(entry.id);
         const missing = ["gla", "glb", "ft"].filter((key) => key === "ft" ? !gloss.ft : !gloss[key]?.length);
         if (missing.length) {
           addIssue(issues, "medium", entry, aText("Gloss 不完整", "Incomplete gloss"), `${aText("缺少", "Missing")}: ${missing.map((key) => `\\${key}`).join(", ")}`);
@@ -2647,18 +3084,23 @@ function buildDictionaryAnalysis(dictionary) {
 
     if (entry.notes) {
       entriesWithNotes += 1;
+      noteEntryIds.add(entry.id);
     }
     if (entryHasSources(entry)) {
       entriesWithSource += 1;
+      sourceEntryIds.add(entry.id);
     }
     if ((entry.etymology?.sources || []).length > 1) {
       multiSourceCount += 1;
+      multiSourceEntryIds.add(entry.id);
     }
     if (entry.pronunciation) {
       entriesWithIpa += 1;
+      ipaEntryIds.add(entry.id);
     }
     if (resolveEntryMorphologyTable(entry, dictionary)) {
       entriesWithMorphology += 1;
+      morphologyEntryIds.add(entry.id);
     }
   });
 
@@ -2720,41 +3162,77 @@ function buildDictionaryAnalysis(dictionary) {
     morphology: entriesWithMorphology / total,
   };
   const coverageRows = [
-    [aText("有释义", "Definitions"), coverage.definitions],
-    [aText("有例句", "Examples"), coverage.examples],
-    [aText("有备注", "Notes"), coverage.notes],
-    [aText("有来源", "Sources"), coverage.sources],
-    ["IPA", coverage.ipa],
-    [aText("形态表格", "Morphology table"), coverage.morphology],
+    [aText("有释义", "Definitions"), coverage.definitions, advancedFilterAction(aText("有释义", "Has definitions"), [...definitionEntryIds])],
+    [aText("有例句", "Examples"), coverage.examples, advancedFilterAction(aText("有例句", "Has examples"), [...exampleEntryIds])],
+    [aText("有备注", "Notes"), coverage.notes, advancedFilterAction(aText("有备注", "Has notes"), [...noteEntryIds])],
+    [aText("有来源", "Sources"), coverage.sources, advancedFilterAction(aText("有来源", "Has sources"), [...sourceEntryIds])],
+    ["IPA", coverage.ipa, advancedFilterAction("IPA", [...ipaEntryIds])],
+    [aText("形态表格", "Morphology table"), coverage.morphology, advancedFilterAction(aText("有形态表格", "Has morphology table"), [...morphologyEntryIds])],
   ];
+  const searchMatchEntries = normalize(searchQuery)
+    ? entries.filter((entry) => entryMatchesSearch(entry, dictionary))
+    : entries;
+  const noDefinitionEntryIds = entries
+    .filter((entry) => !(entry.definitions || []).some((definition) => definition.meaning))
+    .map((entry) => entry.id);
+  const noIpaEntryIds = entries
+    .filter((entry) => !entry.pronunciation)
+    .map((entry) => entry.id);
+  const noMorphologyEntryIds = entries
+    .filter((entry) => !resolveEntryMorphologyTable(entry, dictionary))
+    .map((entry) => entry.id);
 
   return {
     entries,
     rootCount: rootGroups.length,
     derivedCount: derivedEntries.length,
+    derivedEntryIds: derivedEntries.map((entry) => entry.id),
     isolatedRootCount,
     definitionCount,
     examples,
     glossExamples,
     multiSourceCount,
-    parts: topMapItems(parts, 12),
-    tags: topMapItems(tags, 16),
-    tagCombos: topMapItems(tagCombos, 10),
-    initialLetters: topMapItems(initialLetters, 14),
-    wordLengths: numericMapItems(wordLengths),
-    characters: topMapItems(characters, 16),
-    bigrams: topMapItems(bigrams, 16),
+    definitionEntryIds: [...definitionEntryIds],
+    exampleEntryIds: [...exampleEntryIds],
+    glossEntryIds: [...glossEntryIds],
+    noteEntryIds: [...noteEntryIds],
+    sourceEntryIds: [...sourceEntryIds],
+    ipaEntryIds: [...ipaEntryIds],
+    morphologyEntryIds: [...morphologyEntryIds],
+    noDefinitionEntryIds,
+    noIpaEntryIds,
+    noMorphologyEntryIds,
+    multiSourceEntryIds: [...multiSourceEntryIds],
+    parts: topEntryMapItems(parts, 12, aText("词类", "Part of Speech")),
+    allParts: topEntryMapItems(parts, Number.MAX_SAFE_INTEGER, aText("词类", "Part of Speech")),
+    tags: topEntryMapItems(tags, 16, aText("标签", "Tag")),
+    allTags: topEntryMapItems(tags, Number.MAX_SAFE_INTEGER, aText("标签", "Tag")),
+    tagCombos: topEntryMapItems(tagCombos, 10, aText("标签组合", "Tag Combination")),
+    allTagCombos: topEntryMapItems(tagCombos, Number.MAX_SAFE_INTEGER, aText("标签组合", "Tag Combination")),
+    initialLetters: topEntryMapItems(initialLetters, 14, aText("首字母", "Initial Letter")),
+    allInitialLetters: topEntryMapItems(initialLetters, Number.MAX_SAFE_INTEGER, aText("首字母", "Initial Letter")),
+    wordLengths: numericEntryMapItems(wordLengths, aText("词长", "Word Length")),
+    allWordLengths: numericEntryMapItems(wordLengths, aText("词长", "Word Length")),
+    characters: topEntryMapItems(characters, 16, aText("正写法字符", "Orthographic Character")),
+    allCharacters: topEntryMapItems(characters, Number.MAX_SAFE_INTEGER, aText("正写法字符", "Orthographic Character")),
+    bigrams: topEntryMapItems(bigrams, 16, aText("正写法双字符组合", "Orthographic Bigram")),
+    allBigrams: topEntryMapItems(bigrams, Number.MAX_SAFE_INTEGER, aText("正写法双字符组合", "Orthographic Bigram")),
     rootFamilies: rootGroups
       .filter((group) => group.derived.length)
       .sort((a, b) => b.derived.length - a.derived.length)
       .slice(0, 12)
-      .map((group) => [group.root.lemma, group.derived.length, group.root.id]),
+      .map((group) => [group.root.lemma, group.derived.length, directEntryAction(group.root.id)]),
+    allRootFamilies: rootGroups
+      .filter((group) => group.derived.length)
+      .sort((a, b) => b.derived.length - a.derived.length)
+      .map((group) => [group.root.lemma, group.derived.length, directEntryAction(group.root.id)]),
     ipa,
     morphology,
     coverage,
     coverageRows,
     issues,
-    searchMatches: normalize(searchQuery) ? filteredEntries().length : entries.length,
+    searchMatches: searchMatchEntries.length,
+    searchMatchEntryIds: searchMatchEntries.map((entry) => entry.id),
     searchFields: analyzeSearchFields(entries, dictionary),
     networkIssues: networkIssues.length ? networkIssues : [{
       severity: "ok",
@@ -2773,6 +3251,9 @@ function analyzeIpa(entries, dictionary) {
   let syllableTotal = 0;
   let syllableEntries = 0;
   let generatedMismatch = 0;
+  let generatedMismatchStrict = 0;
+  const generatedMismatchEntryIds = new Set();
+  const generatedMismatchStrictEntryIds = new Set();
   const complex = normalizeIpaSettings(dictionary.settings?.ipa).syllable.complexPhonemes;
   entries.forEach((entry) => {
     if (!entry.pronunciation) {
@@ -2780,49 +3261,62 @@ function analyzeIpa(entries, dictionary) {
     }
     const clean = cleanIpaText(entry.pronunciation);
     const tokens = tokenizePhonemeUnits(clean.replace(/[.\s]/g, ""), complex).map((token) => token.value).filter(Boolean);
-    tokens.forEach((token) => increment(units, token));
+    tokens.forEach((token) => incrementEntry(units, token, entry));
     if (tokens[0]) {
-      increment(initials, tokens[0]);
+      incrementEntry(initials, tokens[0], entry);
     }
     if (tokens[tokens.length - 1]) {
-      increment(finals, tokens[tokens.length - 1]);
+      incrementEntry(finals, tokens[tokens.length - 1], entry);
     }
     const syllables = clean.split(/[.\s]+/).filter(Boolean);
     if (syllables.length) {
       syllableEntries += 1;
       syllableTotal += syllables.length;
-      increment(syllableCounts, String(syllables.length));
+      incrementEntry(syllableCounts, String(syllables.length), entry);
     }
     const generated = generateIpaFromLemma(entry.lemma, dictionary.settings?.ipa);
     if (generated && normalizeIpaCompare(generated) !== normalizeIpaCompare(entry.pronunciation)) {
       generatedMismatch += 1;
+      generatedMismatchEntryIds.add(entry.id);
+    }
+    if (generated && generated !== String(entry.pronunciation ?? "")) {
+      generatedMismatchStrict += 1;
+      generatedMismatchStrictEntryIds.add(entry.id);
     }
   });
   return {
-    units: topMapItems(units, 16),
-    initials: topMapItems(initials, 12),
-    finals: topMapItems(finals, 12),
-    syllableCounts: numericMapItems(syllableCounts),
+    units: topEntryMapItems(units, 16, aText("IPA 音位", "IPA Unit")),
+    allUnits: topEntryMapItems(units, Number.MAX_SAFE_INTEGER, aText("IPA 音位", "IPA Unit")),
+    initials: topEntryMapItems(initials, 12, aText("IPA 首音", "IPA Initial")),
+    allInitials: topEntryMapItems(initials, Number.MAX_SAFE_INTEGER, aText("IPA 首音", "IPA Initial")),
+    finals: topEntryMapItems(finals, 12, aText("IPA 尾音", "IPA Final")),
+    allFinals: topEntryMapItems(finals, Number.MAX_SAFE_INTEGER, aText("IPA 尾音", "IPA Final")),
+    syllableCounts: numericEntryMapItems(syllableCounts, aText("音节数", "Syllable Count")),
+    allSyllableCounts: numericEntryMapItems(syllableCounts, aText("音节数", "Syllable Count")),
     syllableAverage: syllableEntries ? (syllableTotal / syllableEntries).toFixed(2) : "0",
     generatedMismatch,
+    generatedMismatchEntryIds: [...generatedMismatchEntryIds],
+    generatedMismatchStrict,
+    generatedMismatchStrictEntryIds: [...generatedMismatchStrictEntryIds],
   };
 }
 
 function analyzeMorphology(entries, dictionary) {
   const tableUse = new Map();
-  const overrideUse = new Map();
+  const overrideRows = [];
   let generatedForms = 0;
   let emptyCells = 0;
+  const emptyCellEntryIds = new Set();
   entries.forEach((entry) => {
     const table = resolveEntryMorphologyTable(entry, dictionary);
     if (!table) {
-      increment(tableUse, aText("无表格", "No table"));
+      incrementEntry(tableUse, aText("无表格", "No table"), entry);
       return;
     }
-    increment(tableUse, table.name || aText("未命名表格", "Untitled table"));
+    incrementEntry(tableUse, table.name || aText("未命名表格", "Untitled table"), entry);
     const overrides = Object.keys(entry.morphology?.overrides || {});
     if (overrides.length) {
-      increment(overrideUse, entry.lemma || aText("无词形", "No lemma"), overrides.length);
+      overrideRows.push([entry.lemma || aText("无词形", "No lemma"), overrides.length, directEntryAction(entry.id)]);
     }
     for (let row = 0; row < table.rows; row += 1) {
       for (let col = 0; col < table.cols; col += 1) {
@@ -2836,15 +3330,22 @@ function analyzeMorphology(entries, dictionary) {
           generatedForms += 1;
         } else {
           emptyCells += 1;
+          emptyCellEntryIds.add(entry.id);
         }
       }
     }
   });
   return {
-    tables: topMapItems(tableUse, 12),
-    overrides: topMapItems(overrideUse, 12),
+    tables: topEntryMapItems(tableUse, 12, aText("形态表格", "Morphology Table")),
+    allTables: topEntryMapItems(tableUse, Number.MAX_SAFE_INTEGER, aText("形态表格", "Morphology Table")),
+    overrides: overrideRows
+      .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), "zh-CN"))
+      .slice(0, 12),
+    allOverrides: overrideRows
+      .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), "zh-CN")),
     generatedForms,
     emptyCells,
+    emptyCellEntryIds: [...emptyCellEntryIds],
   };
 }
 
@@ -2855,19 +3356,18 @@ function analyzeActivity(entries) {
     const createdDay = dateBucket(entry.createdAt);
     const updatedDay = dateBucket(entry.updatedAt);
     if (createdDay) {
-      increment(created, createdDay);
+      incrementEntry(created, createdDay, entry);
     }
     if (updatedDay) {
-      increment(updated, updatedDay);
+      incrementEntry(updated, updatedDay, entry);
     }
   });
   return {
-    created: numericDateItems(created).slice(-10),
-    updated: numericDateItems(updated).slice(-10),
+    created: numericDateEntryItems(created, aText("新增日期", "Created Date")),
+    updated: numericDateEntryItems(updated, aText("编辑日期", "Updated Date")),
     latest: [...entries]
       .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
-      .slice(0, 6)
-      .map((entry) => [entry.lemma || aText("无词形", "No lemma"), dateBucket(entry.updatedAt) || "", entry.id]),
+      .map((entry) => [entry.lemma || aText("无词形", "No lemma"), dateBucket(entry.updatedAt) || "", directEntryAction(entry.id)]),
   };
 }
 
@@ -2892,15 +3392,16 @@ function analyzeSearchFields(entries, dictionary) {
     fieldGroups.forEach(([label, values, fuzzy]) => {
       const text = values.map(normalize).join(" ");
       if (textMatches(text, query, Boolean(fuzzy))) {
-        increment(counts, label);
+        incrementEntry(counts, label, entry);
       }
     });
   });
-  return topMapItems(counts, 10);
+  return topEntryMapItems(counts, 10, aText("搜索字段", "Search Field"));
 }
 
-function analysisMetricCard(label, value, note = "") {
-  return `<article class="analysis-metric"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></article>`;
+function analysisMetricCard(label, value, note = "", action = null) {
+  const attrs = analysisActionAttributes(action);
+  return `<article class="analysis-metric"${attrs}><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></article>`;
 }
 
 function analysisCard(title, body) {
@@ -2912,48 +3413,66 @@ function analysisBarList(items, options = {}) {
     return `<p class="muted-text">${escapeHtml(options.empty || aText("暂无数据", "No data"))}</p>`;
   }
   const max = Math.max(...items.map((item) => item[1]), 1);
-  return `<div class="analysis-bars">${items.map(([label, value, entryId]) => `
-    <div class="analysis-bar-row">
-      <button class="analysis-bar-label" type="button"${entryId ? ` data-entry-id="${escapeHtml(entryId)}"` : ""}>${escapeHtml(label)}</button>
+  return `<div class="analysis-bars">${items.map(([label, value, action]) => {
+    const attrs = analysisActionAttributes(action);
+    const labelTag = attrs ? "button" : "span";
+    const labelAttrs = attrs ? ` type="button"` : "";
+    return `
+    <div class="analysis-bar-row"${attrs}>
+      <${labelTag} class="analysis-bar-label"${labelAttrs}>${escapeHtml(label)}</${labelTag}>
       <div class="analysis-bar-track"><span style="width: ${Math.max(4, (value / max) * 100).toFixed(2)}%"></span></div>
       <strong>${escapeHtml(value)}</strong>
     </div>
-  `).join("")}</div>`;
+  `;
+  }).join("")}</div>`;
 }
 
 function analysisCoverageList(rows) {
-  return `<div class="analysis-bars">${rows.map(([label, ratio]) => `
-    <div class="analysis-bar-row">
-      <span class="analysis-bar-label">${escapeHtml(label)}</span>
+  return `<div class="analysis-bars">${rows.map(([label, ratio, action]) => {
+    const attrs = analysisActionAttributes(action);
+    const labelTag = attrs ? "button" : "span";
+    const labelAttrs = attrs ? ` type="button"` : "";
+    return `
+    <div class="analysis-bar-row"${attrs}>
+      <${labelTag} class="analysis-bar-label"${labelAttrs}>${escapeHtml(label)}</${labelTag}>
       <div class="analysis-bar-track"><span style="width: ${(ratio * 100).toFixed(2)}%"></span></div>
       <strong>${percentText(ratio)}</strong>
     </div>
-  `).join("")}</div>`;
+  `;
+  }).join("")}</div>`;
 }
 
 function analysisActivityList(activity) {
-  const created = analysisBarList(activity.created.map(([label, value]) => [label, value]), { empty: aText("暂无创建记录", "No creation records") });
-  const updated = analysisBarList(activity.updated.map(([label, value]) => [label, value]), { empty: aText("暂无编辑记录", "No edit records") });
+  const created = analysisBarList(activity.created, { empty: aText("暂无创建记录", "No creation records") });
+  const updated = analysisBarList(activity.updated, { empty: aText("暂无编辑记录", "No edit records") });
   const latest = activity.latest.length
-    ? `<ul class="analysis-issue-list">${activity.latest.map(([lemma, date, id]) => `<li><button type="button" data-entry-id="${escapeHtml(id)}">${escapeHtml(lemma)}</button><span>${escapeHtml(date)}</span></li>`).join("")}</ul>`
+    ? `<ul class="analysis-issue-list">${activity.latest.map(([lemma, date, action]) => `<li${analysisActionAttributes(action)}><button type="button">${escapeHtml(lemma)}</button><span>${escapeHtml(date)}</span></li>`).join("")}</ul>`
     : `<p class="muted-text">${escapeHtml(aText("暂无最近活动", "No recent activity"))}</p>`;
   return `<h4>${escapeHtml(aText("新增", "Created"))}</h4>${created}<h4>${escapeHtml(aText("编辑", "Updated"))}</h4>${updated}<h4>${escapeHtml(aText("最近修改", "Recently Edited"))}</h4>${latest}`;
 }
 
+function analysisLatestList(items) {
+  if (!items.length) {
+    return `<p class="muted-text">${escapeHtml(aText("暂无最近活动", "No recent activity"))}</p>`;
+  }
+  return `<ul class="analysis-issue-list">${items.map(([lemma, date, action]) => `<li${analysisActionAttributes(action)}><button type="button">${escapeHtml(lemma)}</button><span>${escapeHtml(date)}</span></li>`).join("")}</ul>`;
+}
+
 function analysisFactList(rows) {
-  return `<dl class="analysis-fact-list">${rows.map(([label, value]) => `
-    <div>
+  return `<dl class="analysis-fact-list">${rows.map(([label, value, action]) => `
+    <div${analysisActionAttributes(action)}>
       <dt>${escapeHtml(label)}</dt>
       <dd>${escapeHtml(value)}</dd>
     </div>
   `).join("")}</dl>`;
 }
 
-function analysisIssueList(issues) {
+function analysisIssueList(issues, options = {}) {
   if (!issues.length) {
     return `<p class="muted-text">${escapeHtml(aText("未发现问题", "No issues found"))}</p>`;
   }
-  return `<ul class="analysis-issue-list">${issues.slice(0, 80).map((issue) => `
+  const limit = options.limit === Infinity ? issues.length : (Number.isFinite(options.limit) ? options.limit : 80);
+  return `<ul class="analysis-issue-list">${issues.slice(0, limit).map((issue) => `
     <li class="analysis-issue ${escapeHtml(issue.severity || "low")}"${issue.entryId ? ` data-entry-id="${escapeHtml(issue.entryId)}"` : ""}>
       <span>${escapeHtml(issue.severity || "")}</span>
       <div>
@@ -3029,9 +3548,85 @@ function aText(zh, en) {
   return currentLanguage === "zh" ? zh : en;
 }
 
+function entryIdsFrom(items) {
+  return [...new Set((items || [])
+    .map((item) => typeof item === "string" ? item : item?.id)
+    .filter(Boolean))];
+}
+
+function analysisFilterTitle(label, value = "") {
+  return value ? `${label}: ${value}` : label;
+}
+
+function advancedFilterAction(title, items, options = {}) {
+  const entryIds = entryIdsFrom(items);
+  const variants = [
+    { title, entryIds },
+    ...(options.variants || []).map((variant) => ({
+      title: variant.title,
+      entryIds: entryIdsFrom(variant.entryIds),
+    })),
+  ].filter((variant) => variant.entryIds.length);
+  return {
+    type: "advanced-filter",
+    title,
+    entryIds,
+    variants,
+  };
+}
+
+function directEntryAction(entryId) {
+  return entryId ? { type: "entry", entryId } : null;
+}
+
+function viewAction(view = "editor") {
+  return { type: "view", view };
+}
+
+function normalizeAnalysisAction(action) {
+  if (!action) {
+    return null;
+  }
+  if (typeof action === "string") {
+    return directEntryAction(action);
+  }
+  return action;
+}
+
+function analysisActionAttributes(action) {
+  const normalized = normalizeAnalysisAction(action);
+  if (!normalized) {
+    return "";
+  }
+  if (normalized.type === "entry" && normalized.entryId) {
+    return ` data-entry-id="${escapeHtml(normalized.entryId)}"`;
+  }
+  if (normalized.type === "view" && normalized.view) {
+    return ` data-view-target="${escapeHtml(normalized.view)}"`;
+  }
+  if (normalized.type === "advanced-filter" && (normalized.entryIds?.length || normalized.variants?.length)) {
+    const id = `filter-${analysisFilterCounter += 1}`;
+    analysisFilterRegistry.set(id, normalized);
+    return ` data-advanced-filter-id="${escapeHtml(id)}"`;
+  }
+  return "";
+}
+
 function increment(map, key, amount = 1) {
   const label = String(key || aText("未命名", "Untitled"));
   map.set(label, (map.get(label) || 0) + amount);
+}
+
+function incrementEntry(map, key, entry, amount = 1) {
+  const label = String(key || aText("未命名", "Untitled"));
+  if (!map.has(label)) {
+    map.set(label, { count: 0, entryIds: new Set() });
+  }
+  const item = map.get(label);
+  item.count += amount;
+  if (entry?.id) {
+    item.entryIds.add(entry.id);
+  }
 }
 
 function mapPush(map, key, value) {
@@ -3047,12 +3642,31 @@ function topMapItems(map, limit = 12) {
     .slice(0, limit);
 }
 
+function topEntryMapItems(map, limit = 12, title = "") {
+  return [...map.entries()]
+    .sort((a, b) => b[1].count - a[1].count || String(a[0]).localeCompare(String(b[0]), "zh-CN"))
+    .slice(0, limit)
+    .map(([label, item]) => [label, item.count, advancedFilterAction(analysisFilterTitle(title, label), [...item.entryIds])]);
+}
+
 function numericMapItems(map) {
   return [...map.entries()].sort((a, b) => Number(a[0]) - Number(b[0]));
 }
 
+function numericEntryMapItems(map, title = "") {
+  return [...map.entries()]
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .map(([label, item]) => [label, item.count, advancedFilterAction(analysisFilterTitle(title, label), [...item.entryIds])]);
+}
+
 function numericDateItems(map) {
   return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+}
+
+function numericDateEntryItems(map, title = "") {
+  return [...map.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([label, item]) => [label, item.count, advancedFilterAction(analysisFilterTitle(title, label), [...item.entryIds])]);
 }
 
 function renderMorphologyDisplay(entry) {
@@ -3485,6 +4099,42 @@ function fillSettingsForm(dictionary) {
   elements.allowEmptyTagsInput.checked = settings.allowEmptyTags;
   elements.allowEmptyDefinitionsInput.checked = settings.allowEmptyDefinitions;
   elements.ipaKeyboardInput.value = normalizeIpaKeyboard(settings.ipaKeyboard).join(" ");
+  renderToolNavOrderEditor(settings.toolNavOrder);
+}
+
+function renderToolNavOrderEditor(order = DEFAULT_TOOL_NAV_ORDER) {
+  if (!elements.toolNavOrderList) {
+    return;
+  }
+  elements.toolNavOrderList.innerHTML = "";
+  normalizeToolNavOrder(order).forEach((view) => {
+    const card = document.createElement("article");
+    card.className = "tool-order-card";
+    card.draggable = true;
+    card.dataset.view = view;
+    card.innerHTML = `
+      <span class="tool-order-handle" aria-hidden="true">⋮⋮</span>
+      <strong>${escapeHtml(toolNavLabel(view))}</strong>
+    `;
+    elements.toolNavOrderList.append(card);
+  });
+}
+
+function collectToolNavOrder() {
+  return normalizeToolNavOrder([...elements.toolNavOrderList?.querySelectorAll(".tool-order-card") || []]
+    .map((card) => card.dataset.view));
+}
+
+function toolOrderInsertBefore(y) {
+  const cards = [...(elements.toolNavOrderList?.querySelectorAll(".tool-order-card:not(.dragging)") || [])];
+  return cards.reduce((closest, card) => {
+    const box = card.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) {
+      return { offset, card };
+    }
+    return closest;
+  }, { offset: Number.NEGATIVE_INFINITY, card: null }).card;
 }
 
 function renderIpaKeyboard(dictionary = activeDictionary()) {
@@ -3632,6 +4282,7 @@ function settingsFormSnapshot() {
     allowEmptyTags: elements.allowEmptyTagsInput.checked,
     allowEmptyDefinitions: elements.allowEmptyDefinitionsInput.checked,
     ipaKeyboard: normalizeIpaKeyboard(elements.ipaKeyboardInput.value),
+    toolNavOrder: collectToolNavOrder(),
   };
 }
 
@@ -3653,6 +4304,7 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     allowEmptyTags: settings.allowEmptyTags,
     allowEmptyDefinitions: settings.allowEmptyDefinitions,
     ipaKeyboard: settings.ipaKeyboard,
+    toolNavOrder: settings.toolNavOrder,
   };
 }
 
@@ -3749,6 +4401,7 @@ async function saveSettings(event) {
     allowEmptyTags: elements.allowEmptyTagsInput.checked,
     allowEmptyDefinitions: elements.allowEmptyDefinitionsInput.checked,
     ipaKeyboard: normalizeIpaKeyboard(elements.ipaKeyboardInput.value),
+    toolNavOrder: collectToolNavOrder(),
   };
   dictionary.updatedAt = new Date().toISOString();
   await persistDictionary(dictionary);
@@ -5012,6 +5665,7 @@ async function activateDictionary(dictionaryId) {
     state.selectedDictionaryConfigId = dictionary.id;
     state.selectedEntryId = firstLemmaEntry(dictionary)?.id || "";
     editorMode = "display";
+    advancedFilter = null;
     searchQuery = "";
     activePart = "";
     elements.searchInput.value = "";
@@ -5037,6 +5691,7 @@ async function deleteSelectedDictionary() {
 
   try {
     await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}`, { method: "DELETE" });
+    forgetAnalysisViewState(dictionary.id);
     state.selectedDictionaryConfigId = "";
     state.selectedEntryId = "";
     editorMode = "display";
@@ -5149,12 +5804,19 @@ function escapeHtml(value) {
 }
 
 elements.searchInput.addEventListener("input", (event) => {
+  if (advancedFilter) {
+    event.target.value = "";
+    return;
+  }
   searchQuery = event.target.value;
   renderPartFilter();
   renderEntries();
 });
 
 elements.rootModeToggleButton.addEventListener("click", () => {
+  if (advancedFilter) {
+    return;
+  }
   rootMode = !rootMode;
   if (rootMode) {
     activePart = "";
@@ -5165,7 +5827,7 @@ elements.rootModeToggleButton.addEventListener("click", () => {
 });
 
 elements.expandAllRootsButton.addEventListener("click", () => {
-  if (normalize(searchQuery)) {
+  if (advancedFilter || normalize(searchQuery)) {
     return;
   }
   rootModeGroups().forEach((group) => expandedRootEntries.add(group.root.id));
@@ -5173,7 +5835,7 @@ elements.expandAllRootsButton.addEventListener("click", () => {
 });
 
 elements.collapseAllRootsButton.addEventListener("click", () => {
-  if (normalize(searchQuery)) {
+  if (advancedFilter || normalize(searchQuery)) {
     return;
   }
   expandedRootEntries.clear();
@@ -5181,7 +5843,7 @@ elements.collapseAllRootsButton.addEventListener("click", () => {
 });
 
 elements.partFilter.addEventListener("change", (event) => {
-  if (rootMode) {
+  if (advancedFilter || rootMode) {
     activePart = "";
     elements.partFilter.value = "";
     return;
@@ -5337,13 +5999,59 @@ elements.ipaOpenDictionaryManagerButton.addEventListener("click", () => showView
 elements.newEntryButton.addEventListener("click", () => beginNewEntry());
 elements.editEntryButton.addEventListener("click", beginEditEntry);
 elements.analysisPanel.addEventListener("click", (event) => {
+  const pageButton = event.target.closest("[data-analysis-page]");
+  if (pageButton) {
+    rememberProcessScroll();
+    const analysisViewState = activeAnalysisViewState();
+    analysisViewState.page = pageButton.dataset.analysisPage || "overview";
+    const firstSubpage = analysisSubpages(analysisViewState.page)[0]?.[0] || "";
+    if (firstSubpage && !analysisViewState.subpageByPage[analysisViewState.page]) {
+      analysisViewState.subpageByPage[analysisViewState.page] = firstSubpage;
+    }
+    renderAnalysis(activeDictionary());
+    restoreProcessScroll();
+    return;
+  }
+  const subpageButton = event.target.closest("[data-analysis-subpage]");
+  if (subpageButton) {
+    rememberProcessScroll();
+    const analysisViewState = activeAnalysisViewState();
+    analysisViewState.subpageByPage[analysisViewState.page] = subpageButton.dataset.analysisSubpage || "";
+    renderAnalysis(activeDictionary());
+    restoreProcessScroll();
+    return;
+  }
+  const viewTarget = event.target.closest("[data-view-target]");
+  if (viewTarget) {
+    advancedFilter = null;
+    state.activeView = viewTarget.dataset.viewTarget || "editor";
+    render();
+    return;
+  }
+  const filterTarget = event.target.closest("[data-advanced-filter-id]");
+  if (filterTarget) {
+    const action = analysisFilterRegistry.get(filterTarget.dataset.advancedFilterId);
+    enterAdvancedFilter(action);
+    return;
+  }
   const target = event.target.closest("[data-entry-id]");
   if (!target) {
     return;
   }
   state.activeView = "editor";
+  advancedFilter = null;
   switchToEntry(target.dataset.entryId);
 });
+elements.advancedFilterLabel.addEventListener("click", (event) => {
+  const button = event.target.closest('[data-action="cycle-advanced-filter"]');
+  if (!button) {
+    return;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  cycleAdvancedFilterVariant();
+});
+elements.advancedFilterExitButton.addEventListener("click", exitAdvancedFilter);
 elements.openLexicalNetworkButton.addEventListener("click", openLexicalNetwork);
 elements.closeLexicalNetworkButton.addEventListener("click", closeLexicalNetwork);
 elements.lexicalNetworkOverlay.addEventListener("click", (event) => {
@@ -5364,6 +6072,38 @@ elements.tagsInput.addEventListener("input", () => {
   }
 });
 elements.settingsForm.addEventListener("submit", saveSettings);
+elements.toolNavOrderList.addEventListener("dragstart", (event) => {
+  const card = event.target.closest(".tool-order-card");
+  if (!card) {
+    return;
+  }
+  draggedToolNavView = card.dataset.view || "";
+  card.classList.add("dragging");
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", draggedToolNavView);
+});
+elements.toolNavOrderList.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  const dragging = elements.toolNavOrderList.querySelector(".tool-order-card.dragging");
+  if (!dragging) {
+    return;
+  }
+  const before = toolOrderInsertBefore(event.clientY);
+  if (before) {
+    elements.toolNavOrderList.insertBefore(dragging, before);
+  } else {
+    elements.toolNavOrderList.append(dragging);
+  }
+});
+elements.toolNavOrderList.addEventListener("dragend", () => {
+  elements.toolNavOrderList.querySelector(".tool-order-card.dragging")?.classList.remove("dragging");
+  draggedToolNavView = "";
+});
+elements.toolNavOrderList.addEventListener("drop", (event) => {
+  event.preventDefault();
+  elements.toolNavOrderList.querySelector(".tool-order-card.dragging")?.classList.remove("dragging");
+  draggedToolNavView = "";
+});
 elements.docsMarkdownInput.addEventListener("input", () => {
   const dictionary = activeDictionary();
   if (dictionary) {

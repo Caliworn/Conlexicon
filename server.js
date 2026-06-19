@@ -429,6 +429,13 @@ function sendText(response, status, value) {
   response.end(value);
 }
 
+function localDateStamp(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 async function routeApi(request, response, url) {
   if (request.method === "GET" && url.pathname === "/api/state") {
     sendJson(response, 200, await readState());
@@ -437,7 +444,7 @@ async function routeApi(request, response, url) {
 
   if (request.method === "GET" && url.pathname === "/api/export") {
     sendJson(response, 200, await readState(), {
-      "Content-Disposition": `attachment; filename="conlexicon-${new Date().toISOString().slice(0, 10)}.json"`,
+      "Content-Disposition": `attachment; filename="conlexicon-${localDateStamp()}.json"`,
     });
     return true;
   }

@@ -88,6 +88,8 @@
                   <button class="secondary-button" id="rootModeToggleButton" type="button" data-i18n="rootMode">词根模式</button>
                   <button class="secondary-button" id="expandAllRootsButton" type="button" data-i18n="expandAll" hidden>全部展开</button>
                   <button class="secondary-button" id="collapseAllRootsButton" type="button" data-i18n="collapseAll" hidden>全部收起</button>
+                  <span class="advanced-filter-label" id="advancedFilterLabel" hidden></span>
+                  <button class="secondary-button" id="advancedFilterExitButton" type="button" data-i18n="exitAdvancedFilter" hidden>退出高级筛选</button>
                 </div>
               </div>
               <div class="entry-list" id="entryList"></div>
@@ -376,6 +378,16 @@
                   <span data-i18n="networkPolysemyDisplay">词汇网络悬浮卡片的多义项显示</span>
                   <input id="networkPolysemyInput" type="checkbox">
                 </label>
+              </section>
+              <section class="settings-section">
+                <div class="form-heading compact-heading">
+                  <div>
+                    <p class="eyebrow" data-i18n="displaySettings">显示</p>
+                    <h3 data-i18n="toolNavigationOrder">工具导航排序</h3>
+                  </div>
+                </div>
+                <p class="muted-text" data-i18n="toolNavigationOrderHelp">拖动卡片来调整左侧导航栏顺序。该顺序保存到当前词典文件中。</p>
+                <div class="tool-order-list" id="toolNavOrderList"></div>
               </section>
               <section class="settings-section">
                 <div class="form-heading compact-heading">
