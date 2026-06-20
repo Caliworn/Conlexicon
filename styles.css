@@ -1110,6 +1110,14 @@ body.dark-theme .entry-card p {
   overflow: hidden;
 }
 
+.entry-card .chip[data-entry-tag-index] {
+  cursor: pointer;
+}
+
+.entry-card .chip[data-entry-tag-index]:hover {
+  filter: brightness(0.96);
+}
+
 .chip {
   flex: 0 1 auto;
   max-width: 100%;
@@ -1140,6 +1148,16 @@ body.dark-theme .entry-card p {
   border-color: color-mix(in srgb, var(--danger) 35%, var(--line));
   background: var(--danger-soft);
   color: var(--danger);
+}
+
+.entry-display .part-badge[data-entry-tag-index],
+.entry-display .outline-chip[data-entry-tag-index] {
+  cursor: pointer;
+}
+
+.entry-display .part-badge[data-entry-tag-index]:hover,
+.entry-display .outline-chip[data-entry-tag-index]:hover {
+  filter: brightness(0.96);
 }
 
 .chip.ellipsis-chip {

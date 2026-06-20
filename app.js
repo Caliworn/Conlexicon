@@ -33,6 +33,7 @@ let partialEditHost = null;
 const expandedMorphologyTables = new Set();
 let rootMode = false;
 const expandedRootEntries = new Set();
+let rootNavigationContextId = "";
 let entryDraft = null;
 const defaultAnalysisViewState = {
   page: "overview",
@@ -176,6 +177,8 @@ const i18n = {
     tagDisplayReplacementHelp: "每行一条，格式为 原标签 = 显示文本。仅影响查看模式中的显示，不改变词条数据。",
     tagDisplaySettings: "标签显示",
     tagRedHighlightHelp: "配置后，这些标签会在词条浏览栏和查看界面中以红色显示。多个标签用逗号、空格或换行分隔。",
+    tagFilterSettings: "标签筛选",
+    entryListTagFilteringHelp: "在词条浏览栏中点击标签时启用筛选",
     displaySettings: "显示",
     polysemyDisplay: "多义项显示",
     entryListPolysemyDisplay: "词条浏览栏的多义项显示",
@@ -423,6 +426,8 @@ const i18n = {
     tagDisplayReplacementHelp: "One per line, in the format Original Tag = Display Text. Only affects display mode; entry data is unchanged.",
     tagDisplaySettings: "Tag Display",
     tagRedHighlightHelp: "Configured tags are shown in red in the entry browser and display mode. Separate tags with commas, spaces, or line breaks.",
+    tagFilterSettings: "Tag Filtering",
+    entryListTagFilteringHelp: "Enable filtering when clicking tags in the entry browser",
     displaySettings: "Display",
     polysemyDisplay: "Polysemy Display",
     entryListPolysemyDisplay: "Entry browser polysemy display",
@@ -651,6 +656,7 @@ const elements = {
   glbSmallCapsInput: document.querySelector("#glbSmallCapsInput"),
   tagDisplayMapInput: document.querySelector("#tagDisplayMapInput"),
   tagRedHighlightInput: document.querySelector("#tagRedHighlightInput"),
+  entryListTagFilteringInput: document.querySelector("#entryListTagFilteringInput"),
   entryListPolysemyInput: document.querySelector("#entryListPolysemyInput"),
   networkPolysemyInput: document.querySelector("#networkPolysemyInput"),
   fuzzySearchInput: document.querySelector("#fuzzySearchInput"),
@@ -877,6 +883,7 @@ function normalizeDictionarySettings(settings = {}) {
     glossSmallCaps: Boolean(settings.glossSmallCaps),
     tagDisplayMap: normalizeTagDisplayMap(settings.tagDisplayMap),
     redHighlightTags: normalizeRedHighlightTags(settings.redHighlightTags),
+    entryListTagFiltering: Boolean(settings.entryListTagFiltering ?? true),
     entryListPolysemyDisplay: Boolean(settings.entryListPolysemyDisplay),
     networkPolysemyDisplay: Boolean(settings.networkPolysemyDisplay),
     fuzzySearch: Boolean(settings.fuzzySearch),
@@ -1515,6 +1522,7 @@ function renderRootModeEntries() {
       toggle.innerHTML = '<span class="chevron-icon" aria-hidden="true"></span>';
       toggle.addEventListener("click", (event) => {
         event.stopPropagation();
+        rootNavigationContextId = group.root.id;
         if (expandedRootEntries.has(group.root.id)) {
           expandedRootEntries.delete(group.root.id);
         } else {
@@ -1559,10 +1567,19 @@ function createEntryCard(entry, options = {}) {
       <small>${subtitle}</small>
     </div>
     <p>${highlightSearchText(meaningSummary, contentFuzzyEnabled)}</p>
-    <div class="chip-row">${renderChips(entry, 3, true, tagFuzzyEnabled)}</div>
+    <div class="chip-row">${renderChips(entry, 3, true, tagFuzzyEnabled, settings.entryListTagFiltering)}</div>
     ${searchSnippets}
   `;
-  button.addEventListener("click", () => switchToEntry(entry.id, { rootId: options.rootId || "" }));
+  button.addEventListener("click", (event) => {
+    const tagTarget = event.target.closest("[data-entry-tag-index]");
+    if (tagTarget && button.contains(tagTarget)) {
+      event.preventDefault();
+      event.stopPropagation();
+      applyTagFilter(entry, Number(tagTarget.dataset.entryTagIndex), tagTarget.dataset.entryTagValue || "");
+      return;
+    }
+    switchToEntry(entry.id, { rootId: options.rootId || "" });
+  });
   button.addEventListener("contextmenu", (event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -1611,8 +1628,37 @@ async function switchToEntry(entryId, options = {}) {
   entryDraft = null;
   state.selectedEntryId = entryId;
   editorMode = "display";
+  const navigationOptions = prepareRootModeEntryNavigation(entryId, options);
   render();
-  scheduleEntryCardScroll(entryId, options);
+  scheduleEntryCardScroll(entryId, navigationOptions);
+}
+
+function prepareRootModeEntryNavigation(entryId, options = {}) {
+  if (!rootMode || advancedFilter) {
+    return options;
+  }
+
+  const matchingGroups = rootModeGroups()
+    .filter((group) => group.root.id === entryId || group.derived.some((entry) => entry.id === entryId));
+  if (!matchingGroups.length) {
+    return options;
+  }
+
+  const requestedGroup = options.rootId
+    ? matchingGroups.find((group) => group.root.id === options.rootId)
+    : null;
+  const contextGroup = rootNavigationContextId
+    ? matchingGroups.find((group) => group.root.id === rootNavigationContextId)
+    : null;
+  const expandedGroup = matchingGroups.find((group) => expandedRootEntries.has(group.root.id));
+  const targetGroup = requestedGroup || contextGroup || expandedGroup || matchingGroups[0];
+  const isDerivedEntry = targetGroup.root.id !== entryId;
+
+  rootNavigationContextId = targetGroup.root.id;
+  if (isDerivedEntry) {
+    expandedRootEntries.add(targetGroup.root.id);
+  }
+  return { ...options, rootId: targetGroup.root.id };
 }
 
 function scheduleEntryCardScroll(entryId, options = {}) {
@@ -1623,8 +1669,8 @@ function scheduleEntryCardScroll(entryId, options = {}) {
     const cards = [...elements.entryList.querySelectorAll(".entry-card")]
       .filter((item) => item.dataset.entryId === entryId);
     const card = options.rootId
-      ? cards.find((item) => item.dataset.rootId === options.rootId) || cards[0]
-      : cards[0];
+      ? cards.find((item) => item.dataset.rootId === options.rootId) || cards.find((item) => item.getClientRects().length) || cards[0]
+      : cards.find((item) => item.getClientRects().length) || cards[0];
     if (!card || !card.getClientRects().length) {
       return;
     }
@@ -1741,7 +1787,11 @@ async function enterAdvancedFilter(action) {
   searchQuery = "";
   state.activeView = "editor";
   const ids = new Set(advancedFilter.entryIds);
-  const firstEntry = [...dictionary.entries].filter((entry) => ids.has(entry.id)).sort(compareEntries)[0];
+  const filteredEntries = [...dictionary.entries].filter((entry) => ids.has(entry.id)).sort(compareEntries);
+  const preferredEntry = action.preferredEntryId
+    ? filteredEntries.find((entry) => entry.id === action.preferredEntryId)
+    : null;
+  const firstEntry = preferredEntry || filteredEntries[0];
   if (firstEntry) {
     state.selectedEntryId = firstEntry.id;
     editorMode = "display";
@@ -1749,6 +1799,37 @@ async function enterAdvancedFilter(action) {
   }
   render();
   scheduleEntryCardScroll(state.selectedEntryId);
+}
+
+async function applyTagFilter(entry, tagIndex, tag) {
+  const dictionary = activeDictionary();
+  if (!dictionary || !tag) {
+    return;
+  }
+
+  const ready = await closePendingEditsForPageSwitch();
+  if (!ready) {
+    return;
+  }
+
+  if (tagIndex === 0) {
+    advancedFilter = null;
+    rootMode = false;
+    activePart = tag;
+    renderPartFilter();
+    renderEntries();
+    scheduleEntryCardScroll(entry.id);
+    return;
+  }
+
+  const normalizedTag = normalize(tag);
+  const matchingEntryIds = dictionary.entries
+    .filter((candidate) => (candidate.tags || []).some((item) => normalize(item) === normalizedTag))
+    .map((candidate) => candidate.id);
+  await enterAdvancedFilter({
+    ...advancedFilterAction(analysisFilterTitle(t("tags"), displayTag(tag, dictionary)), matchingEntryIds),
+    preferredEntryId: entry.id,
+  });
 }
 
 function exitAdvancedFilter() {
@@ -2091,6 +2172,8 @@ function renderEmptyDetail() {
   elements.displayPart.textContent = "";
   elements.displayPart.hidden = true;
   elements.displayPart.classList.remove("highlight-tag");
+  delete elements.displayPart.dataset.entryTagIndex;
+  delete elements.displayPart.dataset.entryTagValue;
   elements.displayTags.innerHTML = "";
   elements.displayDefinitions.innerHTML = "";
   elements.displayDefinitions.append(emptyState(t("noEntries"), t("noEntriesBody")));
@@ -2113,8 +2196,15 @@ function renderEntryDisplay(entry) {
   elements.displayPart.textContent = displayTag(part);
   elements.displayPart.hidden = !part;
   elements.displayPart.classList.toggle("highlight-tag", Boolean(part && tagIsRedHighlighted(part)));
+  if (part) {
+    elements.displayPart.dataset.entryTagIndex = "0";
+    elements.displayPart.dataset.entryTagValue = part;
+  } else {
+    delete elements.displayPart.dataset.entryTagIndex;
+    delete elements.displayPart.dataset.entryTagValue;
+  }
   elements.displayTags.innerHTML = otherTags
-    .map((tag) => `<span class="outline-chip${tagIsRedHighlighted(tag) ? " highlight-tag" : ""}">${escapeHtml(displayTag(tag))}</span>`)
+    .map((tag, index) => `<span class="outline-chip${tagIsRedHighlighted(tag) ? " highlight-tag" : ""}" data-entry-tag-index="${index + 1}" data-entry-tag-value="${escapeHtml(tag)}">${escapeHtml(displayTag(tag))}</span>`)
     .join("");
 
   elements.displayDefinitions.innerHTML = "";
@@ -2374,7 +2464,7 @@ function renderSmallCaps(value) {
   });
 }
 
-function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = Boolean(activeDictionary()?.settings?.tagFuzzySearch)) {
+function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = Boolean(activeDictionary()?.settings?.tagFuzzySearch), clickable = false) {
   const tags = entry.tags || [];
   const hasHiddenTags = tags.length > limit;
   const visibleLimit = hasHiddenTags ? Math.max(1, limit - 1) : limit;
@@ -2383,7 +2473,10 @@ function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = Boolean
     .map((tag, index) => {
       const text = displayTag(tag);
       const classes = ["chip", index === 0 ? "part-chip" : "", tagIsRedHighlighted(tag) ? "highlight-tag" : ""].filter(Boolean).join(" ");
-      return `<span class="${classes}">${highlight ? highlightSearchText(text, fuzzyEnabled) : escapeHtml(text)}</span>`;
+      const tagAttributes = clickable
+        ? ` data-entry-tag-index="${index}" data-entry-tag-value="${escapeHtml(tag)}"`
+        : "";
+      return `<span class="${classes}"${tagAttributes}>${highlight ? highlightSearchText(text, fuzzyEnabled) : escapeHtml(text)}</span>`;
     })
     .join("");
   const hiddenTagTitle = hasHiddenTags
@@ -4087,6 +4180,7 @@ function fillSettingsForm(dictionary) {
   elements.glbSmallCapsInput.checked = settings.glossSmallCaps;
   elements.tagDisplayMapInput.value = serializeTagDisplayMap(settings.tagDisplayMap);
   elements.tagRedHighlightInput.value = settings.redHighlightTags.join("\n");
+  elements.entryListTagFilteringInput.checked = settings.entryListTagFiltering;
   elements.entryListPolysemyInput.checked = settings.entryListPolysemyDisplay;
   elements.networkPolysemyInput.checked = settings.networkPolysemyDisplay;
   elements.fuzzySearchInput.checked = settings.fuzzySearch;
@@ -4270,6 +4364,7 @@ function settingsFormSnapshot() {
     glossSmallCaps: elements.glbSmallCapsInput.checked,
     tagDisplayMap: normalizeTagDisplayMap(parseTagDisplayMap(elements.tagDisplayMapInput.value)),
     redHighlightTags: normalizeRedHighlightTags(elements.tagRedHighlightInput.value),
+    entryListTagFiltering: elements.entryListTagFilteringInput.checked,
     entryListPolysemyDisplay: elements.entryListPolysemyInput.checked,
     networkPolysemyDisplay: elements.networkPolysemyInput.checked,
     fuzzySearch: elements.fuzzySearchInput.checked,
@@ -4292,6 +4387,7 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     glossSmallCaps: settings.glossSmallCaps,
     tagDisplayMap: settings.tagDisplayMap,
     redHighlightTags: settings.redHighlightTags,
+    entryListTagFiltering: settings.entryListTagFiltering,
     entryListPolysemyDisplay: settings.entryListPolysemyDisplay,
     networkPolysemyDisplay: settings.networkPolysemyDisplay,
     fuzzySearch: settings.fuzzySearch,
@@ -4389,6 +4485,7 @@ async function saveSettings(event) {
     glossSmallCaps: elements.glbSmallCapsInput.checked,
     tagDisplayMap: parseTagDisplayMap(elements.tagDisplayMapInput.value),
     redHighlightTags: normalizeRedHighlightTags(elements.tagRedHighlightInput.value),
+    entryListTagFiltering: elements.entryListTagFilteringInput.checked,
     entryListPolysemyDisplay: elements.entryListPolysemyInput.checked,
     networkPolysemyDisplay: elements.networkPolysemyInput.checked,
     fuzzySearch: elements.fuzzySearchInput.checked,
@@ -5835,6 +5932,7 @@ elements.rootModeToggleButton.addEventListener("click", () => {
     return;
   }
   rootMode = !rootMode;
+  rootNavigationContextId = "";
   if (rootMode) {
     activePart = "";
     elements.partFilter.value = "";
@@ -5906,6 +6004,17 @@ elements.entryDisplay.addEventListener("contextmenu", (event) => {
 });
 
 elements.entryDisplay.addEventListener("click", (event) => {
+  const tagTarget = event.target.closest("[data-entry-tag-index]");
+  if (tagTarget && elements.entryDisplay.contains(tagTarget)) {
+    const entry = selectedEntry();
+    if (entry) {
+      event.preventDefault();
+      event.stopPropagation();
+      applyTagFilter(entry, Number(tagTarget.dataset.entryTagIndex), tagTarget.dataset.entryTagValue || "");
+    }
+    return;
+  }
+
   const cancelButton = event.target.closest('[data-action="cancel-partial-edit"]');
   if (cancelButton) {
     cancelPartialEdit();
