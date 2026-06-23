@@ -1,4 +1,5 @@
 data/
 node_modules/
+electron-shell/dist/
 .DS_Store
 Thumbs.db

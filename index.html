@@ -24,6 +24,9 @@
           <button class="tool-button" type="button" data-view="docs">
             <span data-i18n="languageDocs">语言文档</span>
           </button>
+          <button class="tool-button" type="button" data-view="corpus">
+            <span data-i18n="corpus">语料库</span>
+          </button>
           <button class="tool-button" type="button" data-view="analysis">
             <span data-i18n="analysis">数据分析</span>
           </button>
@@ -330,33 +333,131 @@
             <button class="primary-button" id="settingsOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
           </section>
 
-          <section class="editor-panel" id="settingsPanel">
+          <section class="editor-panel tool-config-panel" id="settingsPanel">
             <form id="settingsForm" autocomplete="off">
               <section class="settings-section">
                 <div class="form-heading compact-heading">
                   <div>
-                    <p class="eyebrow">Gloss</p>
-                    <h3 data-i18n="glossSettings">Gloss 渲染</h3>
+                    <p class="eyebrow" data-i18n="corpus">语料库</p>
+                    <h3 data-i18n="corpusRendering">渲染</h3>
                   </div>
                 </div>
-                <label class="toggle-row">
-                  <span data-i18n="glbSmallCaps">将 \\glb 中的小写字母渲染为 small caps</span>
-                  <input id="glbSmallCapsInput" type="checkbox">
-                </label>
+                <div class="gloss-render-contexts">
+                  <section class="gloss-render-context">
+                    <h4 data-i18n="corpusCardRendering">语料单元卡片</h4>
+                    <label>
+                      <span data-i18n="corpusRenderPattern">渲染对象</span>
+                      <textarea id="corpusUnitCardRenderPatternInput" rows="4" spellcheck="false" placeholder="\gla&#10;(\glb)&#10;(\ft)"></textarea>
+                    </label>
+                    <label class="toggle-row">
+                      <span data-i18n="corpusCardGlossAlign">卡片中对齐多行 Gloss</span>
+                      <input id="corpusUnitCardGlossAlignInput" type="checkbox">
+                    </label>
+                  </section>
+                  <section class="gloss-render-context">
+                    <h4 data-i18n="corpusUnitNameRendering">语料单元名称（内容）</h4>
+                    <label>
+                      <span data-i18n="corpusRenderPattern">渲染对象</span>
+                      <textarea id="corpusUnitRenderPatternInput" rows="4" spellcheck="false" placeholder="\gla&#10;(\glb)&#10;(\ft)"></textarea>
+                    </label>
+                    <label class="toggle-row">
+                      <span data-i18n="corpusUnitGlossAlign">单元名称中对齐多行 Gloss</span>
+                      <input id="corpusUnitGlossAlignInput" type="checkbox">
+                    </label>
+                  </section>
+                  <section class="gloss-render-context">
+                    <h4 data-i18n="entryExampleRendering">词条例句</h4>
+                    <label>
+                      <span data-i18n="corpusRenderPattern">渲染对象</span>
+                      <textarea id="entryExampleRenderPatternInput" rows="4" spellcheck="false" placeholder="\gla&#10;(\glb)&#10;(\ft)"></textarea>
+                    </label>
+                    <label class="toggle-row">
+                      <span data-i18n="entryExampleGlossAlign">例句中对齐多行 Gloss</span>
+                      <input id="entryExampleGlossAlignInput" type="checkbox">
+                    </label>
+                  </section>
+                </div>
+                <p class="field-help" data-i18n="corpusRenderPatternHelp">留空时将对应内容作为纯文本原样显示并保持换行，不识别 Gloss 格式。填写时仅接受 \gla、\glb、\glc、\ft；配置中的每一行对应一条输出行，多条非 \ft 输出行可按词位对齐。用括号包裹对象（如 (\gla)）可在内容缺失时跳过该对象。</p>
+                <div class="gloss-style-list">
+                  <div class="gloss-style-row" data-gloss-style="gla">
+                    <code>\gla</code>
+                    <select data-gloss-style-font data-i18n-title="glossFontFamily">
+                      <option value="serif" data-i18n="fontSerif">衬线</option>
+                      <option value="sans" data-i18n="fontSans">无衬线</option>
+                      <option value="mono" data-i18n="fontMono">等宽</option>
+                    </select>
+                    <select data-gloss-style-size data-i18n-title="glossFontSize">
+                      <option value="small" data-i18n="fontSizeSmall">小</option>
+                      <option value="medium" data-i18n="fontSizeMedium">中</option>
+                      <option value="large" data-i18n="fontSizeLarge">大</option>
+                    </select>
+                    <label class="gloss-style-toggle" data-i18n-title="glossStyleBold"><input type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
+                    <label class="gloss-style-toggle" data-i18n-title="glossStyleItalic"><input type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
+                    <span class="gloss-style-toggle-placeholder" aria-hidden="true"></span>
+                  </div>
+                  <div class="gloss-style-row" data-gloss-style="glb">
+                    <code>\glb</code>
+                    <select data-gloss-style-font data-i18n-title="glossFontFamily">
+                      <option value="serif" data-i18n="fontSerif">衬线</option>
+                      <option value="sans" data-i18n="fontSans">无衬线</option>
+                      <option value="mono" data-i18n="fontMono">等宽</option>
+                    </select>
+                    <select data-gloss-style-size data-i18n-title="glossFontSize">
+                      <option value="small" data-i18n="fontSizeSmall">小</option>
+                      <option value="medium" data-i18n="fontSizeMedium">中</option>
+                      <option value="large" data-i18n="fontSizeLarge">大</option>
+                    </select>
+                    <label class="gloss-style-toggle" data-i18n-title="glossStyleBold"><input type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
+                    <label class="gloss-style-toggle" data-i18n-title="glossStyleItalic"><input type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
+                    <label class="gloss-style-toggle smallcaps-toggle" data-i18n-title="glossStyleSmallCaps"><input id="glbSmallCapsInput" type="checkbox" data-gloss-style-smallcaps><span aria-hidden="true">SC</span></label>
+                  </div>
+                  <div class="gloss-style-row" data-gloss-style="glc">
+                    <code>\glc</code>
+                    <select data-gloss-style-font data-i18n-title="glossFontFamily">
+                      <option value="serif" data-i18n="fontSerif">衬线</option>
+                      <option value="sans" data-i18n="fontSans">无衬线</option>
+                      <option value="mono" data-i18n="fontMono">等宽</option>
+                    </select>
+                    <select data-gloss-style-size data-i18n-title="glossFontSize">
+                      <option value="small" data-i18n="fontSizeSmall">小</option>
+                      <option value="medium" data-i18n="fontSizeMedium">中</option>
+                      <option value="large" data-i18n="fontSizeLarge">大</option>
+                    </select>
+                    <label class="gloss-style-toggle" data-i18n-title="glossStyleBold"><input type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
+                    <label class="gloss-style-toggle" data-i18n-title="glossStyleItalic"><input type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
+                    <span class="gloss-style-toggle-placeholder" aria-hidden="true"></span>
+                  </div>
+                  <div class="gloss-style-row" data-gloss-style="ft">
+                    <code>\ft</code>
+                    <select data-gloss-style-font data-i18n-title="glossFontFamily">
+                      <option value="serif" data-i18n="fontSerif">衬线</option>
+                      <option value="sans" data-i18n="fontSans">无衬线</option>
+                      <option value="mono" data-i18n="fontMono">等宽</option>
+                    </select>
+                    <select data-gloss-style-size data-i18n-title="glossFontSize">
+                      <option value="small" data-i18n="fontSizeSmall">小</option>
+                      <option value="medium" data-i18n="fontSizeMedium">中</option>
+                      <option value="large" data-i18n="fontSizeLarge">大</option>
+                    </select>
+                    <label class="gloss-style-toggle" data-i18n-title="glossStyleBold"><input type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
+                    <label class="gloss-style-toggle" data-i18n-title="glossStyleItalic"><input type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
+                    <span class="gloss-style-toggle-placeholder" aria-hidden="true"></span>
+                  </div>
+                </div>
               </section>
               <section class="settings-section">
                 <div class="form-heading compact-heading">
                   <div>
-                    <p class="eyebrow" data-i18n="tags">标签</p>
+                    <p class="eyebrow" data-i18n="entryTagSettings">词条标签</p>
                     <h3 data-i18n="tagDisplayReplacement">标签显示替换</h3>
                   </div>
                 </div>
                 <label>
                   <span data-i18n="tagDisplayReplacementHelp">每行一条，格式为 原标签 = 显示文本。仅影响查看模式中的显示，不改变词条数据。</span>
-                  <textarea id="tagDisplayMapInput" rows="4"></textarea>
+                  <textarea id="tagDisplayMapInput" rows="6"></textarea>
                 </label>
                 <div class="subsection-title">
-                  <h3 data-i18n="tagDisplaySettings">标签显示</h3>
+                  <h3 data-i18n="tagDisplaySettings">标签突出显示</h3>
                 </div>
                 <label>
                   <span data-i18n="tagRedHighlightHelp">配置后，这些标签会在词条浏览栏和查看界面中以红色显示。多个标签用逗号、空格或换行分隔。</span>
@@ -425,13 +526,21 @@
                     <h3 data-i18n="switchEntrySettings">切换词条</h3>
                   </div>
                 </div>
-                <label class="toggle-row">
-                  <span data-i18n="savePartialOnSwitch">切换页面时保存局部编辑设置</span>
-                  <input id="savePartialOnSwitchInput" type="checkbox">
+                <label>
+                  <span data-i18n="savePartialOnSwitch">切换页面时处理局部编辑</span>
+                  <select id="savePartialOnSwitchInput">
+                    <option value="save" data-i18n="editSwitchSave">保存</option>
+                    <option value="discard" data-i18n="editSwitchDiscard">放弃更改</option>
+                    <option value="prompt" data-i18n="editSwitchPrompt">弹窗提示</option>
+                  </select>
                 </label>
-                <label class="toggle-row">
-                  <span data-i18n="saveFullOnSwitch">切换页面时保存完整编辑设置</span>
-                  <input id="saveFullOnSwitchInput" type="checkbox">
+                <label>
+                  <span data-i18n="saveFullOnSwitch">切换页面时处理完整编辑</span>
+                  <select id="saveFullOnSwitchInput">
+                    <option value="save" data-i18n="editSwitchSave">保存</option>
+                    <option value="discard" data-i18n="editSwitchDiscard">放弃更改</option>
+                    <option value="prompt" data-i18n="editSwitchPrompt">弹窗提示</option>
+                  </select>
                 </label>
                 <div class="subsection-title">
                   <h3 data-i18n="editEntrySettings">编辑词条</h3>
@@ -447,6 +556,17 @@
                 <label class="toggle-row">
                   <span data-i18n="allowEmptyDefinitions">允许释义留空时保存</span>
                   <input id="allowEmptyDefinitionsInput" type="checkbox">
+                </label>
+                <div class="subsection-title">
+                  <h3 data-i18n="autoSaveSettings">自动保存</h3>
+                </div>
+                <label class="toggle-row">
+                  <span data-i18n="corpusAutoSave">语料库自动保存</span>
+                  <input id="corpusAutoSaveInput" type="checkbox">
+                </label>
+                <label class="toggle-row">
+                  <span data-i18n="docsAutoSave">语言文档自动保存</span>
+                  <input id="docsAutoSaveInput" type="checkbox">
                 </label>
               </section>
               <section class="settings-section">
@@ -501,6 +621,51 @@
           </section>
         </section>
 
+        <section class="view" id="corpusView" aria-label="语料库">
+          <section class="top-bar">
+            <div>
+              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <h2 data-i18n="corpus">语料库</h2>
+            </div>
+            <div class="top-actions">
+              <button class="secondary-button" id="backToEditorFromCorpusButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+              <button class="primary-button" id="saveCorpusButton" type="button" data-i18n="saveCorpus">保存语料库</button>
+            </div>
+          </section>
+
+          <section class="notice-panel" id="corpusNoDictionaryNotice" hidden>
+            <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
+            <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
+            <p data-i18n="corpusNeedDictionary">语料库会保存到当前词典文件中。</p>
+            <button class="primary-button" id="corpusOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+          </section>
+
+          <section class="corpus-integrity-panel" id="corpusIntegrityPanel" hidden>
+            <div>
+              <strong data-i18n="corpusIntegrityTitle">检测到语料链接问题</strong>
+              <p data-i18n="corpusIntegrityHelp">手动编辑 JSON 可能让一个单元出现在多个父级中。请检查以下项目。</p>
+            </div>
+            <ul id="corpusIntegrityList"></ul>
+          </section>
+
+          <section class="corpus-panel" id="corpusPanel">
+            <div class="corpus-toolbar">
+              <div class="segmented-control" id="corpusModeControl" aria-label="语料类型">
+                <button class="active" type="button" data-corpus-mode="blocks" data-i18n="corpusBlocks">块</button>
+                <button type="button" data-corpus-mode="units" data-i18n="corpusUnits">单元</button>
+              </div>
+              <button class="primary-button" id="newCorpusItemButton" type="button" data-i18n="newCorpusBlock">新建块</button>
+            </div>
+            <div class="corpus-layout">
+              <aside class="corpus-browser">
+                <input id="corpusSearchInput" type="search" data-i18n-placeholder="corpusSearchPlaceholder" placeholder="搜索块或单元">
+                <div class="corpus-item-list" id="corpusItemList"></div>
+              </aside>
+              <section class="corpus-editor-panel" id="corpusEditor"></section>
+            </div>
+          </section>
+        </section>
+
         <section class="view" id="morphologyView" aria-label="自动形态学">
           <section class="top-bar">
             <div>
@@ -519,7 +684,7 @@
             <button class="primary-button" id="morphologyOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
           </section>
 
-          <section class="editor-panel" id="morphologyPanel">
+          <section class="editor-panel tool-config-panel" id="morphologyPanel">
             <form id="morphologyForm" autocomplete="off">
               <section class="settings-section morphology-function-section">
                 <div class="form-heading compact-heading">
@@ -574,7 +739,7 @@
             <button class="primary-button" id="ipaOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
           </section>
 
-          <section class="editor-panel ipa-layout" id="ipaPanel">
+          <section class="editor-panel ipa-layout tool-config-panel" id="ipaPanel">
             <div class="ipa-config-column">
               <form id="ipaForm" autocomplete="off">
               <section class="settings-section">
@@ -735,6 +900,7 @@
         <p class="confirm-dialog-message" id="confirmDialogMessage"></p>
         <div class="form-actions confirm-actions">
           <button class="secondary-button" id="confirmCancelButton" type="button" data-i18n="cancel">取消</button>
+          <button class="danger-ghost" id="confirmAlternateButton" type="button" hidden>放弃更改</button>
           <button class="primary-button" id="confirmAcceptButton" type="button" data-i18n="confirm">确认</button>
         </div>
       </article>

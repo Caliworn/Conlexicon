@@ -3,6 +3,7 @@ let state = {
   selectedEntryId: "",
   selectedDictionaryConfigId: "",
   activeView: "editor",
+  uiLanguage: "zh",
   dictionaries: [],
 };
 
@@ -16,9 +17,18 @@ let editorMode = "display";
 let currentTheme = "light";
 let currentLanguage = "zh";
 const IPA_STRESS_MARKER = "\uE000";
+const GLOSS_STYLE_KEYS = ["gla", "glb", "glc", "ft"];
+const DEFAULT_ENTRY_EXAMPLE_RENDER_PATTERN = "(\\gla)\n(\\glb)\n(\\glc)\n(\\ft)";
 let docsViewMode = "split";
 let docsSaveTimer = null;
+let corpusSaveTimer = null;
+let corpusSavePromise = null;
+let corpusSaveRequested = false;
+let corpusUnitPreviewFrame = null;
+let lastDuplicateEntityIdAlert = "";
+let docsDraftState = null;
 let confirmDialogResolver = null;
+let confirmDialogResults = { cancel: false, alternate: false, accept: true };
 const viewScrollMemory = {
   docsPage: 0,
   docsEditor: 0,
@@ -47,11 +57,16 @@ const defaultAnalysisViewState = {
   scrollByRoute: {},
 };
 const analysisViewStates = new Map();
-const DEFAULT_TOOL_NAV_ORDER = ["editor", "docs", "analysis", "ipa", "morphology", "settings"];
+const corpusViewStates = new Map();
+let corpusDraftState = null;
+const DEFAULT_TOOL_NAV_ORDER = ["editor", "docs", "corpus", "analysis", "ipa", "morphology", "settings"];
 let advancedFilter = null;
 let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
 let draggedToolNavView = "";
+const entryVirtualList = createVirtualListState(138);
+const corpusVirtualList = createVirtualListState(74);
+const masonryLayouts = new WeakMap();
 
 const i18n = {
   zh: {
@@ -62,6 +77,7 @@ const i18n = {
     ipaConfig: "自动 IPA 标注",
     analysis: "数据分析",
     languageDocs: "语言文档",
+    corpus: "语料库",
     morphologyConfig: "自动形态学",
     morphologyDisplay: "形态学",
     morphologyNeedDictionary: "自动形态学配置会保存到当前词典文件中。",
@@ -150,6 +166,28 @@ const i18n = {
     settingsNeedDictionary: "其他设置会保存到当前词典文件中。",
     glossSettings: "Gloss 渲染",
     glbSmallCaps: "将 \\glb 中的小写字母渲染为 small caps",
+    corpusRendering: "渲染",
+    corpusRenderPattern: "渲染对象",
+    corpusRenderPatternHelp: "留空时将对应内容作为纯文本原样显示并保持换行，不识别 Gloss 格式。填写时仅接受 \\gla、\\glb、\\glc、\\ft；配置中的每一行对应一条输出行，多条非 \\ft 输出行可按词位对齐。用括号包裹对象（如 (\\gla)）可在内容缺失时跳过该对象。",
+    corpusCardRendering: "语料单元卡片",
+    corpusUnitNameRendering: "语料单元名称（内容）",
+    entryExampleRendering: "词条例句",
+    corpusCardGlossAlign: "卡片中对齐多行 Gloss",
+    corpusUnitGlossAlign: "单元名称中对齐多行 Gloss",
+    entryExampleGlossAlign: "例句中对齐多行 Gloss",
+    glossFontFamily: "渲染字体",
+    glossFontSize: "渲染字号",
+    glossStyleBold: "粗体",
+    glossStyleItalic: "斜体",
+    glossStyleSmallCaps: "Small caps",
+    fontSerif: "衬线",
+    fontSans: "无衬线",
+    fontMono: "等宽",
+    fontSizeSmall: "小",
+    fontSizeMedium: "中",
+    fontSizeLarge: "大",
+    invalidCorpusRenderPattern: "渲染对象只能包含 \\gla、\\glb、\\glc、\\ft、用于可选对象的括号和换行。",
+    corpusRenderError: "单元名称渲染错误",
     searchSettings: "搜索",
     searchDisplay: "显示",
     save: "保存",
@@ -160,8 +198,16 @@ const i18n = {
     searchHighlightHelp: "搜索时高亮显示匹配结果",
     switchEntrySettings: "切换词条",
     editEntrySettings: "编辑词条",
-    savePartialOnSwitch: "切换页面时保存局部编辑设置",
-    saveFullOnSwitch: "切换页面时保存完整编辑设置",
+    savePartialOnSwitch: "切换页面时处理局部编辑",
+    saveFullOnSwitch: "切换页面时处理完整编辑",
+    editSwitchSave: "保存",
+    editSwitchDiscard: "放弃更改",
+    editSwitchPrompt: "弹窗提示",
+    partialEditSwitchPrompt: "当前局部编辑尚未处理。请选择保存更改、放弃更改，或取消当前操作。",
+    fullEditSwitchPrompt: "当前完整编辑尚未处理。请选择保存更改、放弃更改，或取消当前操作。",
+    autoSaveSettings: "自动保存",
+    corpusAutoSave: "语料库自动保存",
+    docsAutoSave: "语言文档自动保存",
     allowEmptyPronunciation: "允许发音留空时保存",
     allowEmptyTags: "允许标签留空时保存",
     allowEmptyDefinitions: "允许释义留空时保存",
@@ -172,10 +218,13 @@ const i18n = {
     unsavedIpaConfirm: "自动 IPA 标注中有未保存的更改。要放弃这些更改并离开吗？",
     unsavedDictionaryConfirm: "词典设置中有未保存的更改。要放弃这些更改并离开吗？",
     unsavedMorphologyConfirm: "自动形态学中有未保存的更改。要放弃这些更改并离开吗？",
+    unsavedCorpusConfirm: "语料库中有未保存的更改。要放弃这些更改并离开吗？",
+    unsavedDocsConfirm: "语言文档中有未保存的更改。要放弃这些更改并离开吗？",
     tags: "标签",
+    entryTagSettings: "词条标签",
     tagDisplayReplacement: "标签显示替换",
     tagDisplayReplacementHelp: "每行一条，格式为 原标签 = 显示文本。仅影响查看模式中的显示，不改变词条数据。",
-    tagDisplaySettings: "标签显示",
+    tagDisplaySettings: "标签突出显示",
     tagRedHighlightHelp: "配置后，这些标签会在词条浏览栏和查看界面中以红色显示。多个标签用逗号、空格或换行分隔。",
     tagFilterSettings: "标签筛选",
     entryListTagFilteringHelp: "在词条浏览栏中点击标签时启用筛选",
@@ -247,6 +296,10 @@ const i18n = {
     switchedTo: "已切换到",
     imported: "数据已导入",
     importFailed: "无法读取这个 JSON 文件",
+    languageSaveFailed: "界面语言保存失败",
+    importOverwriteTitle: "词典 ID 已存在",
+    importOverwriteMessage: "词典 ID“{id}”已经存在。导入“{name}”将覆盖现有词典及其全部数据。",
+    importAndOverwrite: "导入并覆盖",
     updatedAt: "修订日期",
     source: "来源",
     derivedEntries: "衍生",
@@ -300,6 +353,75 @@ const i18n = {
     previewMode: "查看",
     saveDocs: "保存文档",
     docsSaved: "文档已保存",
+    corpusNeedDictionary: "语料库会保存到当前词典文件中。",
+    saveCorpus: "保存语料库",
+    corpusSaved: "语料库已保存",
+    corpusBlocks: "块",
+    corpusUnits: "单元",
+    newCorpusBlock: "新建块",
+    newCorpusUnit: "新建单元",
+    corpusSearchPlaceholder: "搜索块或单元",
+    noCorpusBlocks: "还没有语料块",
+    noCorpusUnits: "还没有语料单元",
+    noCorpusSelection: "从左侧选择一项，或新建内容。",
+    corpusBlock: "语料块",
+    corpusLayer: "语料层",
+    corpusUnit: "语料单元",
+    corpusBlockTitle: "块标题",
+    corpusUnitContent: "单元内容",
+    corpusTags: "标签",
+    corpusTagsHelp: "使用逗号或换行分隔。",
+    corpusNotes: "备注",
+    corpusAttributes: "属性",
+    addAttribute: "添加属性",
+    attributeName: "属性名",
+    attributeValue: "属性值",
+    removeAttribute: "删除属性",
+    directUnits: "块直属单元",
+    corpusLayers: "层",
+    addLayer: "添加层",
+    layerName: "层名称",
+    speaker: "发言人",
+    modality: "模态",
+    linkedUnits: "关联单元",
+    chooseUnit: "选择单元",
+    linkUnit: "关联单元",
+    unlink: "解除链接",
+    moveUp: "上移",
+    moveDown: "下移",
+    deleteCorpusBlock: "删除块",
+    deleteCorpusLayer: "删除层",
+    deleteCorpusUnit: "删除单元",
+    deleteCorpusBlockConfirm: "删除这个块？其中的层会一并删除，关联单元将变为孤立单元。",
+    deleteCorpusLayerConfirm: "删除这个层？关联单元将变为孤立单元。",
+    deleteCorpusUnitConfirm: "删除这个单元？它也会从当前父级解除链接。",
+    corpusParent: "父级链接",
+    corpusOrphan: "孤立单元",
+    corpusBlockParent: "块",
+    corpusLayerParent: "层",
+    effectiveAttributes: "生效属性",
+    effectiveAttributesHelp: "层内单元依次继承块和层属性，单元自己的同名属性优先。单独写入的属性始终保留在单元中。",
+    noEffectiveAttributes: "暂无生效属性",
+    attributeSourceBlock: "块",
+    attributeSourceLayer: "层",
+    attributeSourceUnit: "单元",
+    corpusLinkMovesUnit: "关联操作会先解除该单元原有的父级链接。",
+    corpusIntegrityTitle: "检测到语料完整性问题",
+    corpusIntegrityHelp: "手动编辑 JSON 可能造成重复 ID、无效链接或多父级链接。请检查以下项目。",
+    corpusMultipleParents: "单元“{unit}”被链接到多个父级：{parents}",
+    corpusMissingUnit: "父级“{parent}”引用了不存在的单元：{unit}",
+    corpusDuplicateLink: "父级“{parent}”重复引用了单元“{unit}”",
+    corpusDuplicateEntityId: "语料 ID“{id}”被多个对象使用：{types}",
+    duplicateEntityIdsTitle: "检测到重复 ID",
+    duplicateEntityIdsMessage: "以下 ID 被多个条目或语料对象使用，保存或导入已停止：\n{details}",
+    entryEntity: "词条",
+    corpusBlockFallback: "未命名块",
+    corpusLayerFallback: "未命名层",
+    corpusUnitFallback: "空单元",
+    corpusRequiredBlockTitle: "请填写块标题",
+    corpusRequiredUnitContent: "请填写单元内容",
+    corpusBlockStats: "{layers} 层 · {units} 单元",
+    corpusUnitParentLabel: "父级：{parent}",
     lexicalNetwork: "词汇网络",
     closeNetwork: "关闭网络",
   },
@@ -311,6 +433,7 @@ const i18n = {
     ipaConfig: "Auto IPA",
     analysis: "Analytics",
     languageDocs: "Language Docs",
+    corpus: "Corpus",
     morphologyConfig: "Auto Morphology",
     morphologyDisplay: "Morphology",
     morphologyNeedDictionary: "Auto morphology config is saved in the current dictionary file.",
@@ -399,6 +522,28 @@ const i18n = {
     settingsNeedDictionary: "Settings are saved in the current dictionary file.",
     glossSettings: "Gloss Rendering",
     glbSmallCaps: "Render lowercase letters in \\glb as small caps",
+    corpusRendering: "Rendering",
+    corpusRenderPattern: "Render Objects",
+    corpusRenderPatternHelp: "Leave blank to display the corresponding content verbatim as plain text, preserving line breaks without parsing Gloss syntax. Otherwise use only \\gla, \\glb, \\glc, and \\ft; each configured line becomes one output row, and multiple non-\\ft rows can align by token. Wrap an object in parentheses, such as (\\gla), to skip it when its content is missing.",
+    corpusCardRendering: "Corpus Unit Cards",
+    corpusUnitNameRendering: "Unit Name (Content)",
+    entryExampleRendering: "Entry Examples",
+    corpusCardGlossAlign: "Align multi-line Gloss in cards",
+    corpusUnitGlossAlign: "Align multi-line Gloss in unit names",
+    entryExampleGlossAlign: "Align multi-line Gloss in examples",
+    glossFontFamily: "Rendering Font",
+    glossFontSize: "Rendering Size",
+    glossStyleBold: "Bold",
+    glossStyleItalic: "Italic",
+    glossStyleSmallCaps: "Small Caps",
+    fontSerif: "Serif",
+    fontSans: "Sans",
+    fontMono: "Mono",
+    fontSizeSmall: "Small",
+    fontSizeMedium: "Medium",
+    fontSizeLarge: "Large",
+    invalidCorpusRenderPattern: "Render Objects may contain only \\gla, \\glb, \\glc, \\ft, parentheses around optional objects, and line breaks.",
+    corpusRenderError: "Unit name rendering error",
     searchSettings: "Search",
     searchDisplay: "Display",
     save: "Save",
@@ -409,8 +554,16 @@ const i18n = {
     searchHighlightHelp: "Highlight matches while searching",
     switchEntrySettings: "Entry Switching",
     editEntrySettings: "Entry Editing",
-    savePartialOnSwitch: "Save local edits when switching pages",
-    saveFullOnSwitch: "Save full edits when switching pages",
+    savePartialOnSwitch: "Handle local edits when switching pages",
+    saveFullOnSwitch: "Handle full edits when switching pages",
+    editSwitchSave: "Save",
+    editSwitchDiscard: "Discard Changes",
+    editSwitchPrompt: "Show Prompt",
+    partialEditSwitchPrompt: "The current local edit has not been handled. Save it, discard it, or cancel the current action.",
+    fullEditSwitchPrompt: "The current full edit has not been handled. Save it, discard it, or cancel the current action.",
+    autoSaveSettings: "Auto Save",
+    corpusAutoSave: "Auto-save corpus",
+    docsAutoSave: "Auto-save language docs",
     allowEmptyPronunciation: "Allow saving without pronunciation",
     allowEmptyTags: "Allow saving without tags",
     allowEmptyDefinitions: "Allow saving without definitions",
@@ -421,10 +574,13 @@ const i18n = {
     unsavedIpaConfirm: "Auto IPA has unsaved changes. Discard them and leave?",
     unsavedDictionaryConfirm: "Dictionary settings has unsaved changes. Discard them and leave?",
     unsavedMorphologyConfirm: "Auto Morphology has unsaved changes. Discard them and leave?",
+    unsavedCorpusConfirm: "Corpus has unsaved changes. Discard them and leave?",
+    unsavedDocsConfirm: "Language Docs has unsaved changes. Discard them and leave?",
     tags: "Tags",
+    entryTagSettings: "Entry Tags",
     tagDisplayReplacement: "Tag Display Replacement",
     tagDisplayReplacementHelp: "One per line, in the format Original Tag = Display Text. Only affects display mode; entry data is unchanged.",
-    tagDisplaySettings: "Tag Display",
+    tagDisplaySettings: "Tag Highlighting",
     tagRedHighlightHelp: "Configured tags are shown in red in the entry browser and display mode. Separate tags with commas, spaces, or line breaks.",
     tagFilterSettings: "Tag Filtering",
     entryListTagFilteringHelp: "Enable filtering when clicking tags in the entry browser",
@@ -496,6 +652,10 @@ const i18n = {
     switchedTo: "Switched to",
     imported: "Data imported",
     importFailed: "Cannot read this JSON file",
+    languageSaveFailed: "Failed to save the interface language",
+    importOverwriteTitle: "Dictionary ID already exists",
+    importOverwriteMessage: "Dictionary ID “{id}” already exists. Importing “{name}” will overwrite the existing dictionary and all of its data.",
+    importAndOverwrite: "Import and Overwrite",
     updatedAt: "Updated",
     source: "Source",
     derivedEntries: "Derived",
@@ -549,6 +709,75 @@ const i18n = {
     previewMode: "Preview",
     saveDocs: "Save Docs",
     docsSaved: "Docs saved",
+    corpusNeedDictionary: "The corpus is saved in the current dictionary file.",
+    saveCorpus: "Save Corpus",
+    corpusSaved: "Corpus saved",
+    corpusBlocks: "Blocks",
+    corpusUnits: "Units",
+    newCorpusBlock: "New Block",
+    newCorpusUnit: "New Unit",
+    corpusSearchPlaceholder: "Search blocks or units",
+    noCorpusBlocks: "No corpus blocks yet",
+    noCorpusUnits: "No corpus units yet",
+    noCorpusSelection: "Select an item on the left, or create one.",
+    corpusBlock: "Corpus Block",
+    corpusLayer: "Corpus Layer",
+    corpusUnit: "Corpus Unit",
+    corpusBlockTitle: "Block Title",
+    corpusUnitContent: "Unit Content",
+    corpusTags: "Tags",
+    corpusTagsHelp: "Separate with commas or line breaks.",
+    corpusNotes: "Notes",
+    corpusAttributes: "Attributes",
+    addAttribute: "Add Attribute",
+    attributeName: "Attribute Name",
+    attributeValue: "Attribute Value",
+    removeAttribute: "Remove Attribute",
+    directUnits: "Direct Block Units",
+    corpusLayers: "Layers",
+    addLayer: "Add Layer",
+    layerName: "Layer Name",
+    speaker: "Speaker",
+    modality: "Modality",
+    linkedUnits: "Linked Units",
+    chooseUnit: "Choose a unit",
+    linkUnit: "Link Unit",
+    unlink: "Unlink",
+    moveUp: "Move Up",
+    moveDown: "Move Down",
+    deleteCorpusBlock: "Delete Block",
+    deleteCorpusLayer: "Delete Layer",
+    deleteCorpusUnit: "Delete Unit",
+    deleteCorpusBlockConfirm: "Delete this block? Its layers will also be removed, and linked units will become orphan units.",
+    deleteCorpusLayerConfirm: "Delete this layer? Linked units will become orphan units.",
+    deleteCorpusUnitConfirm: "Delete this unit? It will also be unlinked from its current parent.",
+    corpusParent: "Parent Link",
+    corpusOrphan: "Orphan Unit",
+    corpusBlockParent: "Block",
+    corpusLayerParent: "Layer",
+    effectiveAttributes: "Effective Attributes",
+    effectiveAttributesHelp: "A unit in a layer inherits block then layer attributes; its own values take precedence. Explicit unit attributes always remain stored on that unit.",
+    noEffectiveAttributes: "No effective attributes",
+    attributeSourceBlock: "Block",
+    attributeSourceLayer: "Layer",
+    attributeSourceUnit: "Unit",
+    corpusLinkMovesUnit: "Linking first removes the unit from its previous parent.",
+    corpusIntegrityTitle: "Corpus integrity problems detected",
+    corpusIntegrityHelp: "Manual JSON edits can create duplicate IDs, invalid links, or multiple parents. Review these items.",
+    corpusMultipleParents: "Unit “{unit}” is linked to multiple parents: {parents}",
+    corpusMissingUnit: "Parent “{parent}” references a missing unit: {unit}",
+    corpusDuplicateLink: "Parent “{parent}” references unit “{unit}” more than once",
+    corpusDuplicateEntityId: "Corpus ID “{id}” is used by multiple objects: {types}",
+    duplicateEntityIdsTitle: "Duplicate IDs detected",
+    duplicateEntityIdsMessage: "These IDs are used by multiple entries or corpus objects. Saving or importing has been stopped:\n{details}",
+    entryEntity: "Entry",
+    corpusBlockFallback: "Untitled Block",
+    corpusLayerFallback: "Untitled Layer",
+    corpusUnitFallback: "Empty Unit",
+    corpusRequiredBlockTitle: "Enter a block title",
+    corpusRequiredUnitContent: "Enter unit content",
+    corpusBlockStats: "{layers} layers · {units} units",
+    corpusUnitParentLabel: "Parent: {parent}",
     lexicalNetwork: "Lexical Network",
     closeNetwork: "Close Network",
   },
@@ -561,6 +790,7 @@ const elements = {
   analysisView: document.querySelector("#analysisView"),
   settingsView: document.querySelector("#settingsView"),
   docsView: document.querySelector("#docsView"),
+  corpusView: document.querySelector("#corpusView"),
   morphologyView: document.querySelector("#morphologyView"),
   ipaView: document.querySelector("#ipaView"),
   dictionaryManagerButton: document.querySelector("#dictionaryManagerButton"),
@@ -568,6 +798,7 @@ const elements = {
   backToEditorFromSettingsButton: document.querySelector("#backToEditorFromSettingsButton"),
   backToEditorFromAnalysisButton: document.querySelector("#backToEditorFromAnalysisButton"),
   backToEditorFromDocsButton: document.querySelector("#backToEditorFromDocsButton"),
+  backToEditorFromCorpusButton: document.querySelector("#backToEditorFromCorpusButton"),
   backToEditorFromMorphologyButton: document.querySelector("#backToEditorFromMorphologyButton"),
   backToEditorFromIpaButton: document.querySelector("#backToEditorFromIpaButton"),
   batchIpaAllButton: document.querySelector("#batchIpaAllButton"),
@@ -653,7 +884,13 @@ const elements = {
   analysisOpenDictionaryManagerButton: document.querySelector("#analysisOpenDictionaryManagerButton"),
   analysisPanel: document.querySelector("#analysisPanel"),
   settingsForm: document.querySelector("#settingsForm"),
-  glbSmallCapsInput: document.querySelector("#glbSmallCapsInput"),
+  glossStyleRows: [...document.querySelectorAll("[data-gloss-style]")],
+  corpusUnitCardRenderPatternInput: document.querySelector("#corpusUnitCardRenderPatternInput"),
+  corpusUnitCardGlossAlignInput: document.querySelector("#corpusUnitCardGlossAlignInput"),
+  corpusUnitRenderPatternInput: document.querySelector("#corpusUnitRenderPatternInput"),
+  corpusUnitGlossAlignInput: document.querySelector("#corpusUnitGlossAlignInput"),
+  entryExampleRenderPatternInput: document.querySelector("#entryExampleRenderPatternInput"),
+  entryExampleGlossAlignInput: document.querySelector("#entryExampleGlossAlignInput"),
   tagDisplayMapInput: document.querySelector("#tagDisplayMapInput"),
   tagRedHighlightInput: document.querySelector("#tagRedHighlightInput"),
   entryListTagFilteringInput: document.querySelector("#entryListTagFilteringInput"),
@@ -665,6 +902,8 @@ const elements = {
   searchHighlightInput: document.querySelector("#searchHighlightInput"),
   savePartialOnSwitchInput: document.querySelector("#savePartialOnSwitchInput"),
   saveFullOnSwitchInput: document.querySelector("#saveFullOnSwitchInput"),
+  corpusAutoSaveInput: document.querySelector("#corpusAutoSaveInput"),
+  docsAutoSaveInput: document.querySelector("#docsAutoSaveInput"),
   allowEmptyPronunciationInput: document.querySelector("#allowEmptyPronunciationInput"),
   allowEmptyTagsInput: document.querySelector("#allowEmptyTagsInput"),
   allowEmptyDefinitionsInput: document.querySelector("#allowEmptyDefinitionsInput"),
@@ -676,6 +915,17 @@ const elements = {
   docsMarkdownInput: document.querySelector("#docsMarkdownInput"),
   docsPreview: document.querySelector("#docsPreview"),
   saveDocsButton: document.querySelector("#saveDocsButton"),
+  saveCorpusButton: document.querySelector("#saveCorpusButton"),
+  corpusNoDictionaryNotice: document.querySelector("#corpusNoDictionaryNotice"),
+  corpusOpenDictionaryManagerButton: document.querySelector("#corpusOpenDictionaryManagerButton"),
+  corpusIntegrityPanel: document.querySelector("#corpusIntegrityPanel"),
+  corpusIntegrityList: document.querySelector("#corpusIntegrityList"),
+  corpusPanel: document.querySelector("#corpusPanel"),
+  corpusModeControl: document.querySelector("#corpusModeControl"),
+  newCorpusItemButton: document.querySelector("#newCorpusItemButton"),
+  corpusSearchInput: document.querySelector("#corpusSearchInput"),
+  corpusItemList: document.querySelector("#corpusItemList"),
+  corpusEditor: document.querySelector("#corpusEditor"),
   morphologyNoDictionaryNotice: document.querySelector("#morphologyNoDictionaryNotice"),
   morphologyOpenDictionaryManagerButton: document.querySelector("#morphologyOpenDictionaryManagerButton"),
   morphologyPanel: document.querySelector("#morphologyPanel"),
@@ -718,6 +968,7 @@ const elements = {
   confirmDialogTitle: document.querySelector("#confirmDialogTitle"),
   confirmDialogMessage: document.querySelector("#confirmDialogMessage"),
   confirmCancelButton: document.querySelector("#confirmCancelButton"),
+  confirmAlternateButton: document.querySelector("#confirmAlternateButton"),
   confirmAcceptButton: document.querySelector("#confirmAcceptButton"),
   toast: document.querySelector("#toast"),
 };
@@ -726,14 +977,26 @@ function t(key) {
   return i18n[currentLanguage][key] || i18n.zh[key] || key;
 }
 
-function closeConfirmDialog(confirmed) {
+function normalizeUiLanguage(value) {
+  return value === "en" ? "en" : "zh";
+}
+
+function formatText(key, values = {}) {
+  return Object.entries(values).reduce(
+    (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
+    t(key),
+  );
+}
+
+function closeConfirmDialog(result) {
   if (!confirmDialogResolver) {
     return;
   }
   elements.confirmDialog.hidden = true;
+  elements.confirmAlternateButton.hidden = true;
   const resolver = confirmDialogResolver;
   confirmDialogResolver = null;
-  resolver(Boolean(confirmed));
+  resolver(result);
 }
 
 function appConfirm(message, options = {}) {
@@ -745,10 +1008,33 @@ function appConfirm(message, options = {}) {
     elements.confirmDialogTitle.textContent = options.title || t("confirmTitle");
     elements.confirmDialogMessage.textContent = message;
     elements.confirmCancelButton.textContent = options.cancelText || t("cancel");
+    elements.confirmAlternateButton.hidden = true;
     elements.confirmAcceptButton.textContent = options.confirmText || t("confirm");
     elements.confirmCancelButton.hidden = Boolean(options.alert);
+    confirmDialogResults = { cancel: false, alternate: false, accept: true };
     elements.confirmAcceptButton.classList.toggle("danger-button", Boolean(options.danger));
     elements.confirmAcceptButton.classList.toggle("primary-button", !options.danger);
+    elements.confirmDialog.hidden = false;
+    elements.confirmAcceptButton.focus();
+  });
+}
+
+function appEditSwitchPrompt(message) {
+  return new Promise((resolve) => {
+    if (confirmDialogResolver) {
+      closeConfirmDialog(false);
+    }
+    confirmDialogResolver = resolve;
+    confirmDialogResults = { cancel: "cancel", alternate: "discard", accept: "save" };
+    elements.confirmDialogTitle.textContent = t("confirmTitle");
+    elements.confirmDialogMessage.textContent = message;
+    elements.confirmCancelButton.textContent = t("cancel");
+    elements.confirmCancelButton.hidden = false;
+    elements.confirmAlternateButton.textContent = t("editSwitchDiscard");
+    elements.confirmAlternateButton.hidden = false;
+    elements.confirmAcceptButton.textContent = t("editSwitchSave");
+    elements.confirmAcceptButton.classList.remove("danger-button");
+    elements.confirmAcceptButton.classList.add("primary-button");
     elements.confirmDialog.hidden = false;
     elements.confirmAcceptButton.focus();
   });
@@ -780,6 +1066,7 @@ async function loadState() {
     const serverState = await api("/api/state");
     backendAvailable = true;
     backendMessage = "";
+    currentLanguage = normalizeUiLanguage(serverState.uiLanguage);
     state = normalizeState({
       ...serverState,
       selectedEntryId: state.selectedEntryId,
@@ -801,11 +1088,19 @@ function normalizeState(source) {
     selectedEntryId: source.selectedEntryId || "",
     selectedDictionaryConfigId: source.selectedDictionaryConfigId || source.activeDictionaryId || "",
     activeView: source.activeView || "editor",
+    uiLanguage: normalizeUiLanguage(source.uiLanguage),
     dictionaries: Array.isArray(source.dictionaries) ? source.dictionaries.map(normalizeDictionary) : [],
   };
 }
 
 function normalizeDictionary(dictionary) {
+  const usedEntityIds = new Set(dictionaryEntityIdRecords(dictionary).map(({ id }) => id));
+  const entries = Array.isArray(dictionary.entries)
+    ? dictionary.entries.map((entry) => normalizeEntry({
+      ...entry,
+      id: reserveEntityId(entry.id, "entry", usedEntityIds),
+    }))
+    : [];
   return {
     id: dictionary.id || uid("dict"),
     name: dictionary.name || t("unnamedDictionary"),
@@ -813,10 +1108,11 @@ function normalizeDictionary(dictionary) {
     description: dictionary.description || "",
     settings: normalizeDictionarySettings(dictionary.settings),
     docs: normalizeDocs(dictionary.docs),
+    corpus: normalizeCorpus(dictionary.corpus, usedEntityIds),
     morphology: normalizeMorphology(dictionary.morphology),
     createdAt: dictionary.createdAt || new Date().toISOString(),
     updatedAt: dictionary.updatedAt || new Date().toISOString(),
-    entries: Array.isArray(dictionary.entries) ? dictionary.entries.map(normalizeEntry) : [],
+    entries,
   };
 }
 
@@ -873,14 +1169,28 @@ function normalizeDefinition(definition = {}) {
 
 function normalizeDictionarySettings(settings = {}) {
   const {
+    glossSmallCaps,
+    glossFontFamily,
+    glossFont,
+    corpusGlossAlign,
     savePartialEditOnSwitch,
     saveFullEditOnSwitch,
+    savePartialEditOnPageSwitch,
+    saveFullEditOnPageSwitch,
     ...restSettings
   } = settings;
 
   return {
     ...restSettings,
-    glossSmallCaps: Boolean(settings.glossSmallCaps),
+    glossStyles: normalizeGlossStyles(settings.glossStyles, glossFontFamily || glossFont, glossSmallCaps),
+    corpusUnitCardRenderPattern: String(settings.corpusUnitCardRenderPattern ?? settings.corpusUnitRenderPattern ?? ""),
+    corpusUnitCardGlossAlign: Boolean(settings.corpusUnitCardGlossAlign ?? corpusGlossAlign ?? true),
+    corpusUnitRenderPattern: String(settings.corpusUnitRenderPattern || ""),
+    corpusUnitGlossAlign: Boolean(settings.corpusUnitGlossAlign ?? corpusGlossAlign ?? true),
+    entryExampleRenderPattern: String(settings.entryExampleRenderPattern ?? DEFAULT_ENTRY_EXAMPLE_RENDER_PATTERN),
+    entryExampleGlossAlign: Boolean(settings.entryExampleGlossAlign ?? true),
+    corpusAutoSave: Boolean(settings.corpusAutoSave ?? true),
+    docsAutoSave: Boolean(settings.docsAutoSave ?? true),
     tagDisplayMap: normalizeTagDisplayMap(settings.tagDisplayMap),
     redHighlightTags: normalizeRedHighlightTags(settings.redHighlightTags),
     entryListTagFiltering: Boolean(settings.entryListTagFiltering ?? true),
@@ -890,8 +1200,14 @@ function normalizeDictionarySettings(settings = {}) {
     tagFuzzySearch: Boolean(settings.tagFuzzySearch),
     sourceFuzzyCompletion: Boolean(settings.sourceFuzzyCompletion),
     searchHighlight: Boolean(settings.searchHighlight ?? true),
-    savePartialEditOnPageSwitch: Boolean(settings.savePartialEditOnPageSwitch ?? savePartialEditOnSwitch),
-    saveFullEditOnPageSwitch: Boolean(settings.saveFullEditOnPageSwitch ?? saveFullEditOnSwitch),
+    partialEditPageSwitchAction: normalizeEditPageSwitchAction(
+      settings.partialEditPageSwitchAction,
+      savePartialEditOnPageSwitch ?? savePartialEditOnSwitch,
+    ),
+    fullEditPageSwitchAction: normalizeEditPageSwitchAction(
+      settings.fullEditPageSwitchAction,
+      saveFullEditOnPageSwitch ?? saveFullEditOnSwitch,
+    ),
     allowEmptyPronunciation: Boolean(settings.allowEmptyPronunciation ?? true),
     allowEmptyTags: Boolean(settings.allowEmptyTags ?? true),
     allowEmptyDefinitions: Boolean(settings.allowEmptyDefinitions ?? true),
@@ -899,6 +1215,34 @@ function normalizeDictionarySettings(settings = {}) {
     ipa: normalizeIpaSettings(settings.ipa),
     toolNavOrder: normalizeToolNavOrder(settings.toolNavOrder),
   };
+}
+
+function normalizeEditPageSwitchAction(value, legacySaveValue = false) {
+  return ["save", "discard", "prompt"].includes(value)
+    ? value
+    : (legacySaveValue ? "save" : "discard");
+}
+
+function normalizeGlossFontFamily(value) {
+  return ["serif", "sans", "mono"].includes(value) ? value : "serif";
+}
+
+function normalizeGlossFontSize(value) {
+  return ["small", "medium", "large"].includes(value) ? value : "medium";
+}
+
+function normalizeGlossStyles(styles = {}, legacyFontFamily = "serif", legacySmallCaps = false) {
+  const fallbackFont = normalizeGlossFontFamily(legacyFontFamily);
+  return Object.fromEntries(GLOSS_STYLE_KEYS.map((key) => {
+    const style = styles?.[key] && typeof styles[key] === "object" ? styles[key] : {};
+    return [key, {
+      fontFamily: normalizeGlossFontFamily(style.fontFamily || fallbackFont),
+      fontSize: normalizeGlossFontSize(style.fontSize),
+      bold: Boolean(style.bold),
+      italic: Boolean(style.italic ?? (key === "ft")),
+      ...(key === "glb" ? { smallCaps: Boolean(style.smallCaps ?? legacySmallCaps) } : {}),
+    }];
+  }));
 }
 
 function normalizeToolNavOrder(order = []) {
@@ -922,6 +1266,7 @@ function toolNavLabel(view) {
   const labels = {
     editor: t("entryEditor"),
     docs: t("languageDocs"),
+    corpus: t("corpus"),
     analysis: t("analysis"),
     ipa: t("ipaConfig"),
     morphology: t("morphologyConfig"),
@@ -987,6 +1332,76 @@ function normalizeDocs(docs = {}) {
   return {
     markdown: String(docs.markdown || ""),
   };
+}
+
+function normalizeCorpus(corpus = {}, usedIds = null) {
+  const reservedIds = usedIds || new Set(corpusEntityIdRecords(corpus).map(({ id }) => id));
+  return {
+    ...corpus,
+    blocks: Array.isArray(corpus.blocks) ? corpus.blocks.map((block) => normalizeCorpusBlock(block, reservedIds)) : [],
+    units: Array.isArray(corpus.units) ? corpus.units.map((unit) => normalizeCorpusUnit(unit, reservedIds)) : [],
+  };
+}
+
+function normalizeCorpusBlock(block = {}, usedIds = new Set()) {
+  const now = new Date().toISOString();
+  return {
+    ...block,
+    id: reserveEntityId(block.id, "corpus-block", usedIds),
+    title: String(block.title || block.name || ""),
+    attributes: normalizeCorpusAttributes(block.attributes),
+    tags: uniqueList(block.tags),
+    notes: String(block.notes || ""),
+    unitIds: normalizeCorpusUnitIds(block.unitIds),
+    layers: Array.isArray(block.layers) ? block.layers.map((layer) => normalizeCorpusLayer(layer, usedIds)) : [],
+    createdAt: block.createdAt || now,
+    updatedAt: block.updatedAt || now,
+  };
+}
+
+function normalizeCorpusLayer(layer = {}, usedIds = new Set()) {
+  return {
+    ...layer,
+    id: reserveEntityId(layer.id, "corpus-layer", usedIds),
+    name: String(layer.name || ""),
+    speaker: String(layer.speaker || ""),
+    modality: String(layer.modality || ""),
+    attributes: normalizeCorpusAttributes(layer.attributes),
+    tags: uniqueList(layer.tags),
+    notes: String(layer.notes || ""),
+    unitIds: normalizeCorpusUnitIds(layer.unitIds),
+  };
+}
+
+function normalizeCorpusUnit(unit = {}, usedIds = new Set()) {
+  const now = new Date().toISOString();
+  return {
+    ...unit,
+    id: reserveEntityId(unit.id, "corpus-unit", usedIds),
+    content: String(unit.content || unit.text || ""),
+    attributes: normalizeCorpusAttributes(unit.attributes),
+    tags: uniqueList(unit.tags),
+    notes: String(unit.notes || ""),
+    createdAt: unit.createdAt || now,
+    updatedAt: unit.updatedAt || now,
+  };
+}
+
+function normalizeCorpusAttributes(attributes = {}) {
+  if (!attributes || typeof attributes !== "object" || Array.isArray(attributes)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(attributes)
+      .map(([key, value]) => [String(key).trim(), String(value ?? "")])
+      .filter(([key]) => key),
+  );
+}
+
+function normalizeCorpusUnitIds(unitIds = []) {
+  return Array.isArray(unitIds)
+    ? unitIds.map((unitId) => String(unitId || "").trim()).filter(Boolean)
+    : [];
 }
 
 function normalizeMorphology(morphology = {}) {
@@ -1151,6 +1566,91 @@ function uid(prefix) {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
+function reserveEntityId(value, prefix, usedIds) {
+  const existing = String(value || "").trim();
+  if (existing) {
+    usedIds.add(existing);
+    return existing;
+  }
+  let id = uid(prefix);
+  while (usedIds.has(id)) {
+    id = uid(prefix);
+  }
+  usedIds.add(id);
+  return id;
+}
+
+function corpusEntityIdRecords(corpus = {}) {
+  const records = [];
+  (corpus.blocks || []).forEach((block) => {
+    records.push({ id: String(block.id || "").trim(), typeKey: "corpusBlock" });
+    (block.layers || []).forEach((layer) => {
+      records.push({ id: String(layer.id || "").trim(), typeKey: "corpusLayer" });
+    });
+  });
+  (corpus.units || []).forEach((unit) => {
+    records.push({ id: String(unit.id || "").trim(), typeKey: "corpusUnit" });
+  });
+  return records.filter((record) => record.id);
+}
+
+function dictionaryEntityIdRecords(dictionary = {}) {
+  return [
+    ...(dictionary.entries || []).map((entry) => ({
+      id: String(entry.id || "").trim(),
+      typeKey: "entryEntity",
+    })),
+    ...corpusEntityIdRecords(dictionary.corpus),
+  ].filter((record) => record.id);
+}
+
+function duplicateEntityIdGroups(records) {
+  const recordsById = new Map();
+  records.forEach((record) => {
+    if (!recordsById.has(record.id)) {
+      recordsById.set(record.id, []);
+    }
+    recordsById.get(record.id).push(record);
+  });
+  return [...recordsById.entries()]
+    .filter(([, matches]) => matches.length > 1)
+    .map(([id, matches]) => ({ id, matches }));
+}
+
+function duplicateDictionaryEntityIds(dictionary = {}) {
+  return duplicateEntityIdGroups(dictionaryEntityIdRecords(dictionary));
+}
+
+function uniqueDictionaryEntityId(prefix, dictionary = activeDictionary()) {
+  const usedIds = new Set(dictionaryEntityIdRecords(dictionary).map((record) => record.id));
+  let id = uid(prefix);
+  while (usedIds.has(id)) {
+    id = uid(prefix);
+  }
+  return id;
+}
+
+function validateDictionaryEntityIds(dictionary = {}) {
+  const duplicates = duplicateDictionaryEntityIds(dictionary);
+  if (!duplicates.length) {
+    lastDuplicateEntityIdAlert = "";
+    return true;
+  }
+  const signature = stableJson(duplicates.map(({ id, matches }) => [id, matches.map(({ typeKey }) => typeKey)]));
+  if (signature !== lastDuplicateEntityIdAlert) {
+    lastDuplicateEntityIdAlert = signature;
+    const details = duplicates.map(({ id, matches }) => {
+      const types = [...new Set(matches.map(({ typeKey }) => t(typeKey)))].join(", ");
+      return `${id} (${types})`;
+    }).join("\n");
+    appConfirm(formatText("duplicateEntityIdsMessage", { details }), {
+      title: t("duplicateEntityIdsTitle"),
+      alert: true,
+    });
+  }
+  return false;
+}
+
 function activeDictionary() {
   return state.dictionaries.find((dictionary) => dictionary.id === state.activeDictionaryId) || null;
 }
@@ -1205,19 +1705,48 @@ function render() {
   renderAvailability();
   renderHeader();
   renderToolNav();
-  renderPartFilter();
-  renderEntries();
-  renderDetail();
-  renderDictionaryManager();
-  fillDictionaryForm(selectedDictionaryConfig());
-  fillSettingsForm(activeDictionary());
-  renderLanguageDocs(activeDictionary());
-  renderMorphologyConfig(activeDictionary());
-  fillIpaForm(activeDictionary());
-  renderIpaSandbox();
-  renderAnalysis(activeDictionary());
-  renderLexicalNetwork();
+  renderActiveView();
   restoreProcessScroll();
+}
+
+function renderActiveView() {
+  const dictionary = activeDictionary();
+  if (state.activeView === "editor") {
+    renderPartFilter();
+    renderEntries();
+    renderDetail();
+    renderLexicalNetwork();
+    return;
+  }
+  if (state.activeView === "manager") {
+    renderDictionaryManager();
+    fillDictionaryForm(selectedDictionaryConfig());
+    return;
+  }
+  if (state.activeView === "settings") {
+    fillSettingsForm(dictionary);
+    return;
+  }
+  if (state.activeView === "docs") {
+    renderLanguageDocs(dictionary);
+    return;
+  }
+  if (state.activeView === "corpus") {
+    renderCorpus(dictionary);
+    return;
+  }
+  if (state.activeView === "morphology") {
+    renderMorphologyConfig(dictionary);
+    return;
+  }
+  if (state.activeView === "ipa") {
+    fillIpaForm(dictionary);
+    renderIpaSandbox();
+    return;
+  }
+  if (state.activeView === "analysis") {
+    renderAnalysis(dictionary);
+  }
 }
 
 function rememberProcessScroll() {
@@ -1309,7 +1838,7 @@ function ensureValidSelection() {
     state.selectedEntryId = firstLemmaEntry(dictionary)?.id || "";
   }
 
-  if (!["editor", "manager", "analysis", "settings", "docs", "morphology", "ipa"].includes(state.activeView)) {
+  if (!["editor", "manager", "analysis", "settings", "docs", "corpus", "morphology", "ipa"].includes(state.activeView)) {
     state.activeView = "editor";
   }
 
@@ -1344,6 +1873,7 @@ function applyTheme() {
 
 function renderAvailability() {
   const hasDictionary = Boolean(activeDictionary());
+  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
   elements.backendNotice.hidden = backendAvailable;
   elements.managerBackendNotice.hidden = backendAvailable;
   elements.emptyDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "editor";
@@ -1353,7 +1883,10 @@ function renderAvailability() {
   elements.analysisPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "analysis";
   elements.docsNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "docs";
   elements.docsPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "docs";
-  elements.saveDocsButton.hidden = !backendAvailable || !hasDictionary || state.activeView !== "docs";
+  elements.saveDocsButton.hidden = !backendAvailable || !hasDictionary || state.activeView !== "docs" || settings.docsAutoSave;
+  elements.corpusNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "corpus";
+  elements.corpusPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "corpus";
+  elements.saveCorpusButton.hidden = !backendAvailable || !hasDictionary || state.activeView !== "corpus" || settings.corpusAutoSave;
   elements.morphologyNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "morphology";
   elements.morphologyPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "morphology";
   elements.ipaNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "ipa";
@@ -1382,6 +1915,7 @@ function renderView() {
   elements.analysisView.classList.toggle("active", state.activeView === "analysis");
   elements.settingsView.classList.toggle("active", state.activeView === "settings");
   elements.docsView.classList.toggle("active", state.activeView === "docs");
+  elements.corpusView.classList.toggle("active", state.activeView === "corpus");
   elements.morphologyView.classList.toggle("active", state.activeView === "morphology");
   elements.ipaView.classList.toggle("active", state.activeView === "ipa");
 }
@@ -1465,11 +1999,289 @@ function renderPartFilter() {
   elements.collapseAllRootsButton.disabled = rootMode && hasRootSearch;
 }
 
-function renderEntries() {
-  elements.entryList.innerHTML = "";
+function createVirtualListState(estimatedItemHeight) {
+  return {
+    container: null,
+    items: [],
+    indexByKey: new Map(),
+    offsets: [0],
+    sizes: new Map(),
+    estimatedItemHeight,
+    resetToken: "",
+    renderItem: null,
+    frame: 0,
+    width: 0,
+    resizeObserver: null,
+    viewportObserver: null,
+    scrollHandler: null,
+  };
+}
 
+function initializeVirtualList(virtualList, container) {
+  if (virtualList.container === container) {
+    return;
+  }
+  if (virtualList.container && virtualList.scrollHandler) {
+    virtualList.container.removeEventListener("scroll", virtualList.scrollHandler);
+  }
+  virtualList.resizeObserver?.disconnect();
+  virtualList.viewportObserver?.disconnect();
+  virtualList.container = container;
+  virtualList.scrollHandler = () => scheduleVirtualListRender(virtualList);
+  container.addEventListener("scroll", virtualList.scrollHandler, { passive: true });
+  if (typeof ResizeObserver === "undefined") {
+    return;
+  }
+  virtualList.resizeObserver = new ResizeObserver((entries) => {
+    const anchor = virtualListAnchor(virtualList);
+    let changed = false;
+    entries.forEach((entry) => {
+      const key = entry.target.dataset.virtualKey;
+      const height = entry.borderBoxSize?.[0]?.blockSize || entry.target.getBoundingClientRect().height;
+      if (key && height > 0 && Math.abs((virtualList.sizes.get(key) || 0) - height) > 0.5) {
+        virtualList.sizes.set(key, height);
+        changed = true;
+      }
+    });
+    if (!changed) {
+      return;
+    }
+    rebuildVirtualListOffsets(virtualList);
+    restoreVirtualListAnchor(virtualList, anchor);
+    scheduleVirtualListRender(virtualList);
+  });
+  virtualList.viewportObserver = new ResizeObserver((entries) => {
+    const width = Math.round(entries[0]?.contentRect?.width || container.clientWidth);
+    if (virtualList.width && width && width !== virtualList.width) {
+      virtualList.sizes.clear();
+      rebuildVirtualListOffsets(virtualList);
+    }
+    virtualList.width = width;
+    scheduleVirtualListRender(virtualList);
+  });
+  virtualList.viewportObserver.observe(container);
+}
+
+function rebuildVirtualListOffsets(virtualList) {
+  const offsets = new Array(virtualList.items.length + 1);
+  offsets[0] = 0;
+  virtualList.items.forEach((item, index) => {
+    const height = virtualList.sizes.get(item.key) || item.estimatedHeight || virtualList.estimatedItemHeight;
+    offsets[index + 1] = offsets[index] + height;
+  });
+  virtualList.offsets = offsets;
+}
+
+function virtualListIndexAt(offsets, position) {
+  let low = 0;
+  let high = Math.max(0, offsets.length - 2);
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    if (offsets[middle + 1] <= position) {
+      low = middle + 1;
+    } else if (offsets[middle] > position) {
+      high = middle - 1;
+    } else {
+      return middle;
+    }
+  }
+  return Math.min(low, Math.max(0, offsets.length - 2));
+}
+
+function virtualListAnchor(virtualList) {
+  if (!virtualList.container || !virtualList.items.length) {
+    return null;
+  }
+  const index = virtualListIndexAt(virtualList.offsets, virtualList.container.scrollTop);
+  return {
+    key: virtualList.items[index]?.key || "",
+    offset: virtualList.container.scrollTop - virtualList.offsets[index],
+  };
+}
+
+function restoreVirtualListAnchor(virtualList, anchor) {
+  if (!anchor?.key || !virtualList.container) {
+    return;
+  }
+  const index = virtualList.indexByKey.get(anchor.key);
+  if (index !== undefined) {
+    virtualList.container.scrollTop = Math.max(0, virtualList.offsets[index] + anchor.offset);
+  }
+}
+
+function scheduleVirtualListRender(virtualList) {
+  if (virtualList.frame) {
+    return;
+  }
+  virtualList.frame = requestAnimationFrame(() => {
+    virtualList.frame = 0;
+    renderVirtualListWindow(virtualList);
+  });
+}
+
+function renderVirtualListWindow(virtualList) {
+  const { container, items, offsets } = virtualList;
+  if (!container || !items.length || !virtualList.renderItem) {
+    return;
+  }
+  const viewportHeight = Math.max(container.clientHeight, 1);
+  const overscan = Math.max(500, viewportHeight);
+  const start = virtualListIndexAt(offsets, Math.max(0, container.scrollTop - overscan));
+  const end = Math.min(items.length, virtualListIndexAt(offsets, container.scrollTop + viewportHeight + overscan) + 1);
+  const fragment = document.createDocumentFragment();
+  const topSpacer = document.createElement("div");
+  topSpacer.className = "virtual-list-spacer";
+  topSpacer.style.height = `${offsets[start]}px`;
+  fragment.append(topSpacer);
+  for (let index = start; index < end; index += 1) {
+    const item = items[index];
+    const row = document.createElement("div");
+    row.className = "virtual-list-row";
+    row.dataset.virtualKey = item.key;
+    row.append(virtualList.renderItem(item.value));
+    fragment.append(row);
+  }
+  const bottomSpacer = document.createElement("div");
+  bottomSpacer.className = "virtual-list-spacer";
+  bottomSpacer.style.height = `${Math.max(0, offsets[offsets.length - 1] - offsets[end])}px`;
+  fragment.append(bottomSpacer);
+  virtualList.resizeObserver?.disconnect();
+  container.replaceChildren(fragment);
+  container.querySelectorAll(".virtual-list-row").forEach((row) => virtualList.resizeObserver?.observe(row));
+}
+
+function renderVirtualList(container, virtualList, items, options) {
+  initializeVirtualList(virtualList, container);
+  container.classList.add("virtualized-list");
+  const resetScroll = virtualList.resetToken !== options.resetToken;
+  virtualList.resetToken = options.resetToken;
+  virtualList.renderItem = options.renderItem;
+  virtualList.items = items.map((value) => ({
+    key: String(options.getKey(value)),
+    estimatedHeight: options.getEstimatedHeight?.(value) || virtualList.estimatedItemHeight,
+    value,
+  }));
+  virtualList.indexByKey = new Map(virtualList.items.map((item, index) => [item.key, index]));
+  rebuildVirtualListOffsets(virtualList);
+  if (resetScroll) {
+    container.scrollTop = 0;
+  }
+  renderVirtualListWindow(virtualList);
+}
+
+function renderVirtualListEmpty(container, virtualList, content) {
+  initializeVirtualList(virtualList, container);
+  virtualList.resizeObserver?.disconnect();
+  virtualList.items = [];
+  virtualList.indexByKey.clear();
+  virtualList.offsets = [0];
+  container.classList.remove("virtualized-list");
+  container.replaceChildren(content);
+}
+
+function scrollVirtualListItemIntoView(virtualList, key, behavior = "smooth") {
+  const index = virtualList.indexByKey.get(key);
+  const container = virtualList.container;
+  if (index === undefined || !container) {
+    return false;
+  }
+  const start = virtualList.offsets[index];
+  const end = virtualList.offsets[index + 1];
+  const viewportStart = container.scrollTop;
+  const viewportEnd = viewportStart + container.clientHeight;
+  let top = viewportStart;
+  if (start < viewportStart) {
+    top = start;
+  } else if (end > viewportEnd) {
+    top = Math.max(0, end - container.clientHeight);
+  }
+  if (top !== viewportStart) {
+    container.scrollTo({ top, behavior });
+  }
+  scheduleVirtualListRender(virtualList);
+  return true;
+}
+
+function setupMasonryLayout(container, itemSelector, itemGap) {
+  if (!container) {
+    return;
+  }
+  let layout = masonryLayouts.get(container);
+  if (!layout) {
+    layout = {
+      frame: 0,
+      itemGap,
+      itemSelector,
+      observer: typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => scheduleMasonryLayout(container)),
+    };
+    masonryLayouts.set(container, layout);
+  }
+  layout.itemGap = itemGap;
+  layout.itemSelector = itemSelector;
+  container.classList.add("masonry-layout");
+  layout.observer?.disconnect();
+  layout.observer?.observe(container);
+  masonryLayoutItems(container, itemSelector).forEach((item) => {
+    item.classList.add("masonry-item");
+    layout.observer?.observe(item);
+  });
+  scheduleMasonryLayout(container);
+}
+
+function masonryLayoutItems(container, itemSelector) {
+  return [...container.children].filter((item) => item.matches(itemSelector));
+}
+
+function scheduleMasonryLayout(container) {
+  const layout = masonryLayouts.get(container);
+  if (!layout || layout.frame) {
+    return;
+  }
+  layout.frame = requestAnimationFrame(() => {
+    layout.frame = 0;
+    updateMasonryLayout(container);
+  });
+}
+
+function updateMasonryLayout(container) {
+  const layout = masonryLayouts.get(container);
+  if (!layout || !container.getClientRects().length) {
+    return;
+  }
+  const rowHeight = Number.parseFloat(getComputedStyle(container).gridAutoRows);
+  const rowGap = Number.parseFloat(getComputedStyle(container).rowGap) || 0;
+  if (!Number.isFinite(rowHeight) || rowHeight <= 0) {
+    return;
+  }
+  masonryLayoutItems(container, layout.itemSelector).forEach((item) => {
+    const height = item.getBoundingClientRect().height;
+    const span = Math.max(1, Math.ceil((height + layout.itemGap) / (rowHeight + rowGap)));
+    item.style.gridRowEnd = `span ${span}`;
+  });
+}
+
+function disconnectMasonryLayoutsWithin(root) {
+  root?.querySelectorAll(".masonry-layout").forEach((container) => {
+    const layout = masonryLayouts.get(container);
+    if (layout?.frame) {
+      cancelAnimationFrame(layout.frame);
+    }
+    layout?.observer?.disconnect();
+    masonryLayouts.delete(container);
+  });
+}
+
+function setupAnalysisMasonryLayouts() {
+  elements.analysisPanel.querySelectorAll(
+    ".analysis-grid:not(.analysis-summary-grid), .analysis-detail-grid, .analysis-wide-grid",
+  ).forEach((container) => setupMasonryLayout(container, ".analysis-card", 14));
+}
+
+function renderEntries() {
   if (!activeDictionary()) {
-    elements.entryList.append(emptyState(t("noDictionary"), t("emptyDictionaryBody")));
+    renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noDictionary"), t("emptyDictionaryBody")));
     return;
   }
 
@@ -1480,62 +2292,85 @@ function renderEntries() {
 
   const entries = filteredEntries();
   if (!entries.length) {
-    elements.entryList.append(emptyState(t("noMatch"), t("noMatchBody")));
+    renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noMatch"), t("noMatchBody")));
     return;
   }
 
-  entries.forEach((entry) => {
-    elements.entryList.append(createEntryCard(entry));
+  const rows = entries.map((entry) => ({ kind: "entry", entry }));
+  renderVirtualList(elements.entryList, entryVirtualList, rows, {
+    resetToken: entryVirtualResetToken(),
+    getKey: (row) => `entry:${row.entry.id}`,
+    renderItem: (row) => createEntryCard(row.entry),
   });
 }
 
 function renderRootModeEntries() {
   const groups = rootModeGroups();
   if (!groups.length) {
-    elements.entryList.append(emptyState(t("noMatch"), t("noMatchBody")));
+    renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noMatch"), t("noMatchBody")));
     return;
   }
 
+  const rows = [];
   groups.forEach((group) => {
-    const wrapper = document.createElement("article");
-    wrapper.className = "root-entry-group";
-    wrapper.dataset.rootId = group.root.id;
-
-    const rootCard = createEntryCard(group.root, { root: true, rootId: group.root.id });
-    wrapper.append(rootCard);
-
-    const children = document.createElement("div");
-    children.className = "root-derived-list";
     const expanded = expandedRootEntries.has(group.root.id) || Boolean(searchQuery && group.matchedDerived.length);
-    children.hidden = !expanded;
-
-    group.derived.forEach((entry) => {
-      children.append(createEntryCard(entry, { derived: true, rootId: group.root.id }));
-    });
-
-    if (group.derived.length) {
-      const toggle = document.createElement("button");
-      toggle.type = "button";
-      toggle.className = `root-toggle-button${expanded ? " expanded" : ""}`;
-      toggle.title = expanded ? t("collapse") : t("expand");
-      toggle.setAttribute("aria-label", expanded ? t("collapse") : t("expand"));
-      toggle.innerHTML = '<span class="chevron-icon" aria-hidden="true"></span>';
-      toggle.addEventListener("click", (event) => {
-        event.stopPropagation();
-        rootNavigationContextId = group.root.id;
-        if (expandedRootEntries.has(group.root.id)) {
-          expandedRootEntries.delete(group.root.id);
-        } else {
-          expandedRootEntries.add(group.root.id);
-        }
-        renderEntries();
-      });
-      wrapper.append(toggle);
+    rows.push({ kind: "root", group, expanded });
+    if (expanded) {
+      group.derived.forEach((entry) => rows.push({ kind: "derived", entry, rootId: group.root.id }));
     }
-
-    wrapper.append(children);
-    elements.entryList.append(wrapper);
   });
+  renderVirtualList(elements.entryList, entryVirtualList, rows, {
+    resetToken: entryVirtualResetToken(),
+    getKey: (row) => row.kind === "root" ? `root:${row.group.root.id}` : `derived:${row.rootId}:${row.entry.id}`,
+    getEstimatedHeight: (row) => row.kind === "root" ? 156 : 116,
+    renderItem: renderRootModeRow,
+  });
+}
+
+function entryVirtualResetToken() {
+  return [
+    state.activeDictionaryId,
+    rootMode ? "root" : "entries",
+    normalize(searchQuery),
+    activePart,
+    entrySort,
+    advancedFilter?.title || "",
+  ].join("|");
+}
+
+function renderRootModeRow(row) {
+  if (row.kind === "derived") {
+    const wrapper = document.createElement("div");
+    wrapper.className = "root-derived-list virtual-root-derived-row";
+    wrapper.dataset.rootId = row.rootId;
+    wrapper.append(createEntryCard(row.entry, { derived: true, rootId: row.rootId }));
+    return wrapper;
+  }
+  const { group, expanded } = row;
+  const wrapper = document.createElement("article");
+  wrapper.className = "root-entry-group";
+  wrapper.dataset.rootId = group.root.id;
+  wrapper.append(createEntryCard(group.root, { root: true, rootId: group.root.id }));
+  if (group.derived.length) {
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = `root-toggle-button${expanded ? " expanded" : ""}`;
+    toggle.title = expanded ? t("collapse") : t("expand");
+    toggle.setAttribute("aria-label", expanded ? t("collapse") : t("expand"));
+    toggle.innerHTML = '<span class="chevron-icon" aria-hidden="true"></span>';
+    toggle.addEventListener("click", (event) => {
+      event.stopPropagation();
+      rootNavigationContextId = group.root.id;
+      if (expandedRootEntries.has(group.root.id)) {
+        expandedRootEntries.delete(group.root.id);
+      } else {
+        expandedRootEntries.add(group.root.id);
+      }
+      renderEntries();
+    });
+    wrapper.append(toggle);
+  }
+  return wrapper;
 }
 
 function createEntryCard(entry, options = {}) {
@@ -1666,15 +2501,19 @@ function scheduleEntryCardScroll(entryId, options = {}) {
     return;
   }
   requestAnimationFrame(() => {
-    const cards = [...elements.entryList.querySelectorAll(".entry-card")]
-      .filter((item) => item.dataset.entryId === entryId);
-    const card = options.rootId
-      ? cards.find((item) => item.dataset.rootId === options.rootId) || cards.find((item) => item.getClientRects().length) || cards[0]
-      : cards.find((item) => item.getClientRects().length) || cards[0];
-    if (!card || !card.getClientRects().length) {
+    let key = `entry:${entryId}`;
+    if (rootMode && !advancedFilter) {
+      key = options.rootId && options.rootId !== entryId
+        ? `derived:${options.rootId}:${entryId}`
+        : `root:${options.rootId || entryId}`;
+    }
+    if (scrollVirtualListItemIntoView(entryVirtualList, key)) {
       return;
     }
-    card.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const row = entryVirtualList.items.find((item) => item.value?.entry?.id === entryId || item.value?.group?.root?.id === entryId);
+    if (row) {
+      scrollVirtualListItemIntoView(entryVirtualList, row.key);
+    }
   });
 }
 
@@ -1688,23 +2527,36 @@ async function closePendingEditsForPageSwitch() {
   const inlineForm = partialEditForm();
   try {
     if (inlineForm) {
-      if (settings.savePartialEditOnPageSwitch) {
+      const action = settings.partialEditPageSwitchAction === "prompt"
+        ? await appEditSwitchPrompt(t("partialEditSwitchPrompt"))
+        : settings.partialEditPageSwitchAction;
+      if (action === "cancel" || action === false) {
+        return false;
+      }
+      if (action === "save") {
         const saved = await savePartialEdit({ preventDefault() {} });
         if (!saved) {
           return false;
         }
-      } else {
+      } else if (action === "discard") {
         cancelPartialEdit();
       }
     }
 
     if (state.activeView === "editor" && editorMode === "edit" && !elements.entryForm.hidden) {
-      if (settings.saveFullEditOnPageSwitch) {
+      const action = settings.fullEditPageSwitchAction === "prompt"
+        ? await appEditSwitchPrompt(t("fullEditSwitchPrompt"))
+        : settings.fullEditPageSwitchAction;
+      if (action === "cancel" || action === false) {
+        return false;
+      }
+      if (action === "save") {
         const saved = await saveEntry({ preventDefault() {} });
         if (!saved) {
           return false;
         }
-      } else {
+      } else if (action === "discard") {
+        entryDraft = null;
         editorMode = "display";
       }
     }
@@ -2219,7 +3071,7 @@ function renderEntryDisplay(entry) {
       <div class="definition-number">${index + 1}</div>
       <div class="definition-content">
         <p class="definition-meaning">${escapeHtml(definition.meaning)}</p>
-        ${definition.example ? `<div class="example-box"><span>${escapeHtml(t("example"))}</span>${renderExampleHtml(definition.example, Boolean(activeDictionary()?.settings?.glossSmallCaps))}</div>` : ""}
+        ${definition.example ? `<div class="example-box"><span>${escapeHtml(t("example"))}</span>${renderExampleHtml(definition.example, activeDictionary()?.settings)}</div>` : ""}
         ${definition.note ? `<div class="definition-note"><span>${escapeHtml(t("definitionNote"))}</span><p>${escapeHtml(definition.note)}</p></div>` : ""}
       </div>
     `;
@@ -2412,26 +3264,40 @@ function resolveSourceEntry(sourceName, dictionary = activeDictionary()) {
   return dictionary?.entries.find((entry) => normalize(entry.lemma) === normalized || normalize(entry.id) === normalized) || null;
 }
 
-function renderExampleHtml(example, smallCaps = false) {
+function glossStyleClassNames(key, settings) {
+  const style = settings.glossStyles[key];
+  return [
+    `gloss-${key}`,
+    `gloss-font-${style.fontFamily}`,
+    `gloss-size-${style.fontSize}`,
+    style.bold ? "gloss-is-bold" : "gloss-not-bold",
+    style.italic ? "gloss-is-italic" : "gloss-not-italic",
+  ].join(" ");
+}
+
+function renderGlossTokenText(key, value, settings) {
+  return key === "glb" && settings.glossStyles.glb.smallCaps
+    ? renderSmallCaps(value)
+    : escapeHtml(value);
+}
+
+function renderExampleHtml(example, rawSettings = {}) {
+  const settings = normalizeDictionarySettings(rawSettings);
+  const pattern = parseCorpusRenderPattern(settings.entryExampleRenderPattern);
+  if (pattern.error) {
+    return `<p class="corpus-unit-render-error" title="${escapeHtml(pattern.error)}">${escapeHtml(t("corpusRenderError"))}</p>`;
+  }
+  if (!pattern.groups.length) {
+    return `<p>${escapeHtml(example).replaceAll("\n", "<br>")}</p>`;
+  }
   const gloss = parseGloss(example);
   if (!gloss) {
     return `<p>${escapeHtml(example).replaceAll("\n", "<br>")}</p>`;
   }
-
-  const rows = ["gla", "glb", "glc"].filter((key) => gloss[key]?.length);
-  const columnCount = Math.max(...rows.map((key) => gloss[key].length));
-  const rowHtml = rows
-    .map((key) => {
-      const cells = Array.from({ length: columnCount }, (_, index) => {
-        const value = gloss[key][index] || "";
-        const text = key === "glb" && smallCaps ? renderSmallCaps(value) : escapeHtml(value);
-        return `<td class="gloss-cell">${text}</td>`;
-      }).join("");
-      return `<tr class="gloss-row gloss-${key}">${cells}</tr>`;
-    })
-    .join("");
-  const freeTranslation = gloss.ft ? `<p class="gloss-ft">${escapeHtml(gloss.ft)}</p>` : "";
-  return `<div class="gloss-block"><table class="gloss-table"><tbody>${rowHtml}</tbody></table>${freeTranslation}</div>`;
+  if (!corpusGlossHasTargets(gloss, pattern.groups)) {
+    return `<p class="corpus-unit-render-error">${escapeHtml(t("corpusRenderError"))}</p>`;
+  }
+  return `<div class="gloss-block">${renderCorpusGlossRows(pattern.groups, gloss, settings, settings.entryExampleGlossAlign)}</div>`;
 }
 
 function parseGloss(example) {
@@ -2849,6 +3715,7 @@ function renderAnalysis(dictionary = activeDictionary()) {
   if (!elements.analysisPanel) {
     return;
   }
+  disconnectMasonryLayoutsWithin(elements.analysisPanel);
   if (!dictionary) {
     elements.analysisPanel.innerHTML = "";
     return;
@@ -2858,6 +3725,7 @@ function renderAnalysis(dictionary = activeDictionary()) {
   analysisFilterCounter = 0;
   const report = buildDictionaryAnalysis(dictionary);
   elements.analysisPanel.innerHTML = renderAnalysisPage(report);
+  setupAnalysisMasonryLayouts();
 }
 
 function renderAnalysisPage(report) {
@@ -4175,9 +5043,48 @@ function fillDictionaryForm(dictionary) {
   elements.deleteDictionaryButton.hidden = !isExisting;
 }
 
+function fillGlossStyleForm(styles) {
+  const normalized = normalizeGlossStyles(styles);
+  elements.glossStyleRows.forEach((row) => {
+    const key = row.dataset.glossStyle;
+    const style = normalized[key];
+    row.querySelector("[data-gloss-style-font]").value = style.fontFamily;
+    row.querySelector("[data-gloss-style-size]").value = style.fontSize;
+    row.querySelector("[data-gloss-style-bold]").checked = style.bold;
+    row.querySelector("[data-gloss-style-italic]").checked = style.italic;
+    const smallCapsInput = row.querySelector("[data-gloss-style-smallcaps]");
+    if (smallCapsInput) {
+      smallCapsInput.checked = Boolean(style.smallCaps);
+    }
+  });
+}
+
+function collectGlossStyleForm() {
+  const styles = {};
+  elements.glossStyleRows.forEach((row) => {
+    const key = row.dataset.glossStyle;
+    styles[key] = {
+      fontFamily: normalizeGlossFontFamily(row.querySelector("[data-gloss-style-font]").value),
+      fontSize: normalizeGlossFontSize(row.querySelector("[data-gloss-style-size]").value),
+      bold: row.querySelector("[data-gloss-style-bold]").checked,
+      italic: row.querySelector("[data-gloss-style-italic]").checked,
+      ...(key === "glb" ? {
+        smallCaps: row.querySelector("[data-gloss-style-smallcaps]").checked,
+      } : {}),
+    };
+  });
+  return normalizeGlossStyles(styles);
+}
+
 function fillSettingsForm(dictionary) {
   const settings = normalizeDictionarySettings(dictionary?.settings);
-  elements.glbSmallCapsInput.checked = settings.glossSmallCaps;
+  fillGlossStyleForm(settings.glossStyles);
+  elements.corpusUnitCardRenderPatternInput.value = settings.corpusUnitCardRenderPattern;
+  elements.corpusUnitCardGlossAlignInput.checked = settings.corpusUnitCardGlossAlign;
+  elements.corpusUnitRenderPatternInput.value = settings.corpusUnitRenderPattern;
+  elements.corpusUnitGlossAlignInput.checked = settings.corpusUnitGlossAlign;
+  elements.entryExampleRenderPatternInput.value = settings.entryExampleRenderPattern;
+  elements.entryExampleGlossAlignInput.checked = settings.entryExampleGlossAlign;
   elements.tagDisplayMapInput.value = serializeTagDisplayMap(settings.tagDisplayMap);
   elements.tagRedHighlightInput.value = settings.redHighlightTags.join("\n");
   elements.entryListTagFilteringInput.checked = settings.entryListTagFiltering;
@@ -4187,13 +5094,16 @@ function fillSettingsForm(dictionary) {
   elements.tagFuzzySearchInput.checked = settings.tagFuzzySearch;
   elements.sourceFuzzyInput.checked = settings.sourceFuzzyCompletion;
   elements.searchHighlightInput.checked = settings.searchHighlight;
-  elements.savePartialOnSwitchInput.checked = settings.savePartialEditOnPageSwitch;
-  elements.saveFullOnSwitchInput.checked = settings.saveFullEditOnPageSwitch;
+  elements.savePartialOnSwitchInput.value = settings.partialEditPageSwitchAction;
+  elements.saveFullOnSwitchInput.value = settings.fullEditPageSwitchAction;
+  elements.corpusAutoSaveInput.checked = settings.corpusAutoSave;
+  elements.docsAutoSaveInput.checked = settings.docsAutoSave;
   elements.allowEmptyPronunciationInput.checked = settings.allowEmptyPronunciation;
   elements.allowEmptyTagsInput.checked = settings.allowEmptyTags;
   elements.allowEmptyDefinitionsInput.checked = settings.allowEmptyDefinitions;
   elements.ipaKeyboardInput.value = normalizeIpaKeyboard(settings.ipaKeyboard).join(" ");
   renderToolNavOrderEditor(settings.toolNavOrder);
+  setupMasonryLayout(elements.settingsForm, ".settings-section, .form-actions", 18);
 }
 
 function renderToolNavOrderEditor(order = DEFAULT_TOOL_NAV_ORDER) {
@@ -4361,7 +5271,15 @@ function savedDictionarySnapshot(dictionary = selectedDictionaryConfig()) {
 
 function settingsFormSnapshot() {
   return {
-    glossSmallCaps: elements.glbSmallCapsInput.checked,
+    glossStyles: collectGlossStyleForm(),
+    corpusUnitCardRenderPattern: elements.corpusUnitCardRenderPatternInput.value.trim(),
+    corpusUnitCardGlossAlign: elements.corpusUnitCardGlossAlignInput.checked,
+    corpusUnitRenderPattern: elements.corpusUnitRenderPatternInput.value.trim(),
+    corpusUnitGlossAlign: elements.corpusUnitGlossAlignInput.checked,
+    entryExampleRenderPattern: elements.entryExampleRenderPatternInput.value.trim(),
+    entryExampleGlossAlign: elements.entryExampleGlossAlignInput.checked,
+    corpusAutoSave: elements.corpusAutoSaveInput.checked,
+    docsAutoSave: elements.docsAutoSaveInput.checked,
     tagDisplayMap: normalizeTagDisplayMap(parseTagDisplayMap(elements.tagDisplayMapInput.value)),
     redHighlightTags: normalizeRedHighlightTags(elements.tagRedHighlightInput.value),
     entryListTagFiltering: elements.entryListTagFilteringInput.checked,
@@ -4371,8 +5289,8 @@ function settingsFormSnapshot() {
     tagFuzzySearch: elements.tagFuzzySearchInput.checked,
     sourceFuzzyCompletion: elements.sourceFuzzyInput.checked,
     searchHighlight: elements.searchHighlightInput.checked,
-    savePartialEditOnPageSwitch: elements.savePartialOnSwitchInput.checked,
-    saveFullEditOnPageSwitch: elements.saveFullOnSwitchInput.checked,
+    partialEditPageSwitchAction: normalizeEditPageSwitchAction(elements.savePartialOnSwitchInput.value),
+    fullEditPageSwitchAction: normalizeEditPageSwitchAction(elements.saveFullOnSwitchInput.value),
     allowEmptyPronunciation: elements.allowEmptyPronunciationInput.checked,
     allowEmptyTags: elements.allowEmptyTagsInput.checked,
     allowEmptyDefinitions: elements.allowEmptyDefinitionsInput.checked,
@@ -4384,7 +5302,15 @@ function settingsFormSnapshot() {
 function savedSettingsSnapshot(dictionary = activeDictionary()) {
   const settings = normalizeDictionarySettings(dictionary?.settings);
   return {
-    glossSmallCaps: settings.glossSmallCaps,
+    glossStyles: settings.glossStyles,
+    corpusUnitCardRenderPattern: settings.corpusUnitCardRenderPattern,
+    corpusUnitCardGlossAlign: settings.corpusUnitCardGlossAlign,
+    corpusUnitRenderPattern: settings.corpusUnitRenderPattern,
+    corpusUnitGlossAlign: settings.corpusUnitGlossAlign,
+    entryExampleRenderPattern: settings.entryExampleRenderPattern,
+    entryExampleGlossAlign: settings.entryExampleGlossAlign,
+    corpusAutoSave: settings.corpusAutoSave,
+    docsAutoSave: settings.docsAutoSave,
     tagDisplayMap: settings.tagDisplayMap,
     redHighlightTags: settings.redHighlightTags,
     entryListTagFiltering: settings.entryListTagFiltering,
@@ -4394,8 +5320,8 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     tagFuzzySearch: settings.tagFuzzySearch,
     sourceFuzzyCompletion: settings.sourceFuzzyCompletion,
     searchHighlight: settings.searchHighlight,
-    savePartialEditOnPageSwitch: settings.savePartialEditOnPageSwitch,
-    saveFullEditOnPageSwitch: settings.saveFullEditOnPageSwitch,
+    partialEditPageSwitchAction: settings.partialEditPageSwitchAction,
+    fullEditPageSwitchAction: settings.fullEditPageSwitchAction,
     allowEmptyPronunciation: settings.allowEmptyPronunciation,
     allowEmptyTags: settings.allowEmptyTags,
     allowEmptyDefinitions: settings.allowEmptyDefinitions,
@@ -4472,17 +5398,47 @@ async function saveSettings(event) {
     return;
   }
 
+  const renderPatternInputs = [
+    elements.corpusUnitCardRenderPatternInput,
+    elements.corpusUnitRenderPatternInput,
+    elements.entryExampleRenderPatternInput,
+  ];
+  const invalidRenderPatternInput = renderPatternInputs.find((input) => parseCorpusRenderPattern(input.value).error);
+  if (invalidRenderPatternInput) {
+    await appConfirm(t("invalidCorpusRenderPattern"), {
+      title: t("corpusRenderError"),
+      alert: true,
+    });
+    invalidRenderPatternInput.focus();
+    return;
+  }
+
   const {
+    glossSmallCaps,
+    glossFontFamily,
+    glossFont,
+    glossStyles,
+    corpusGlossAlign,
     savePartialEditOnSwitch,
     saveFullEditOnSwitch,
     savePartialEditOnPageSwitch,
     saveFullEditOnPageSwitch,
+    partialEditPageSwitchAction,
+    fullEditPageSwitchAction,
     ...existingSettings
   } = dictionary.settings || {};
 
   dictionary.settings = {
     ...existingSettings,
-    glossSmallCaps: elements.glbSmallCapsInput.checked,
+    glossStyles: collectGlossStyleForm(),
+    corpusUnitCardRenderPattern: elements.corpusUnitCardRenderPatternInput.value.trim(),
+    corpusUnitCardGlossAlign: elements.corpusUnitCardGlossAlignInput.checked,
+    corpusUnitRenderPattern: elements.corpusUnitRenderPatternInput.value.trim(),
+    corpusUnitGlossAlign: elements.corpusUnitGlossAlignInput.checked,
+    entryExampleRenderPattern: elements.entryExampleRenderPatternInput.value.trim(),
+    entryExampleGlossAlign: elements.entryExampleGlossAlignInput.checked,
+    corpusAutoSave: elements.corpusAutoSaveInput.checked,
+    docsAutoSave: elements.docsAutoSaveInput.checked,
     tagDisplayMap: parseTagDisplayMap(elements.tagDisplayMapInput.value),
     redHighlightTags: normalizeRedHighlightTags(elements.tagRedHighlightInput.value),
     entryListTagFiltering: elements.entryListTagFilteringInput.checked,
@@ -4492,21 +5448,27 @@ async function saveSettings(event) {
     tagFuzzySearch: elements.tagFuzzySearchInput.checked,
     sourceFuzzyCompletion: elements.sourceFuzzyInput.checked,
     searchHighlight: elements.searchHighlightInput.checked,
-    savePartialEditOnPageSwitch: elements.savePartialOnSwitchInput.checked,
-    saveFullEditOnPageSwitch: elements.saveFullOnSwitchInput.checked,
+    partialEditPageSwitchAction: normalizeEditPageSwitchAction(elements.savePartialOnSwitchInput.value),
+    fullEditPageSwitchAction: normalizeEditPageSwitchAction(elements.saveFullOnSwitchInput.value),
     allowEmptyPronunciation: elements.allowEmptyPronunciationInput.checked,
     allowEmptyTags: elements.allowEmptyTagsInput.checked,
     allowEmptyDefinitions: elements.allowEmptyDefinitionsInput.checked,
     ipaKeyboard: normalizeIpaKeyboard(elements.ipaKeyboardInput.value),
     toolNavOrder: collectToolNavOrder(),
   };
+  if (!dictionary.settings.docsAutoSave) {
+    clearTimeout(docsSaveTimer);
+  }
+  if (!dictionary.settings.corpusAutoSave) {
+    clearTimeout(corpusSaveTimer);
+  }
   dictionary.updatedAt = new Date().toISOString();
   await persistDictionary(dictionary);
   showToast(t("dictionarySaved"));
 }
 
 function renderLanguageDocs(dictionary) {
-  const markdown = dictionary?.docs?.markdown || "";
+  const markdown = ensureDocsDraft(dictionary)?.markdown || "";
   elements.docsPanel.dataset.mode = docsViewMode;
   elements.docsModeControl.querySelectorAll("[data-doc-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.docMode === docsViewMode);
@@ -4516,31 +5478,935 @@ function renderLanguageDocs(dictionary) {
     elements.docsMarkdownInput.value = markdown;
   }
   elements.docsPreview.innerHTML = renderMarkdown(markdown);
+  if (dictionary && normalizeDictionarySettings(dictionary.settings).docsAutoSave && docsFormIsDirty(dictionary)) {
+    scheduleDocsSave();
+  }
+}
+
+function ensureDocsDraft(dictionary = activeDictionary()) {
+  if (!dictionary) {
+    return null;
+  }
+  if (!docsDraftState || docsDraftState.dictionaryId !== dictionary.id) {
+    docsDraftState = {
+      dictionaryId: dictionary.id,
+      markdown: String(dictionary.docs?.markdown || ""),
+    };
+  }
+  return docsDraftState;
+}
+
+function docsFormIsDirty(dictionary = activeDictionary()) {
+  if (!dictionary || docsDraftState?.dictionaryId !== dictionary.id) {
+    return false;
+  }
+  return docsDraftState.markdown !== String(dictionary.docs?.markdown || "");
 }
 
 async function saveLanguageDocs(showSavedToast = true) {
   const dictionary = activeDictionary();
   if (!dictionary) {
     showToast(t("createDictionaryFirstToast"));
-    return;
+    return false;
   }
-
-  dictionary.docs = {
+  clearTimeout(docsSaveTimer);
+  const draft = ensureDocsDraft(dictionary);
+  const docs = {
     ...(dictionary.docs || {}),
-    markdown: elements.docsMarkdownInput.value,
+    markdown: draft.markdown,
   };
-  dictionary.updatedAt = new Date().toISOString();
-  await persistDictionary(dictionary);
+  await persistDictionaryPatch(dictionary.id, { docs, updatedAt: new Date().toISOString() });
+  docsDraftState = null;
+  renderLanguageDocs(activeDictionary());
   if (showSavedToast) {
     showToast(t("docsSaved"));
   }
+  return true;
 }
 
 function scheduleDocsSave() {
   clearTimeout(docsSaveTimer);
+  const dictionary = activeDictionary();
+  if (!dictionary || !normalizeDictionarySettings(dictionary.settings).docsAutoSave || !docsFormIsDirty(dictionary)) {
+    return;
+  }
   docsSaveTimer = setTimeout(() => {
     saveLanguageDocs(false).catch((error) => console.error(error));
   }, 700);
+}
+
+function cloneCorpus(corpus = {}) {
+  return JSON.parse(JSON.stringify(normalizeCorpus(corpus)));
+}
+
+function createCorpusViewState() {
+  return {
+    mode: "blocks",
+    query: "",
+    selectedBlockId: "",
+    selectedUnitId: "",
+  };
+}
+
+function activeCorpusViewState() {
+  const dictionaryId = state.activeDictionaryId || "__none__";
+  if (!corpusViewStates.has(dictionaryId)) {
+    corpusViewStates.set(dictionaryId, createCorpusViewState());
+  }
+  return corpusViewStates.get(dictionaryId);
+}
+
+function ensureCorpusDraft(dictionary = activeDictionary()) {
+  if (!dictionary) {
+    return null;
+  }
+  if (!corpusDraftState || corpusDraftState.dictionaryId !== dictionary.id) {
+    corpusDraftState = {
+      dictionaryId: dictionary.id,
+      corpus: cloneCorpus(dictionary.corpus),
+    };
+  }
+  return corpusDraftState.corpus;
+}
+
+function corpusParentRefs(corpus = ensureCorpusDraft()) {
+  if (!corpus) {
+    return [];
+  }
+  const refs = [];
+  corpus.blocks.forEach((block) => {
+    refs.push({
+      key: `block:${block.id}`,
+      type: "block",
+      block,
+      layer: null,
+      unitIds: block.unitIds,
+    });
+    block.layers.forEach((layer) => {
+      refs.push({
+        key: `layer:${block.id}:${layer.id}`,
+        type: "layer",
+        block,
+        layer,
+        unitIds: layer.unitIds,
+      });
+    });
+  });
+  return refs;
+}
+
+function corpusParentLabel(ref) {
+  if (!ref) {
+    return t("corpusOrphan");
+  }
+  const blockTitle = ref.block.title || t("corpusBlockFallback");
+  if (ref.type === "block") {
+    return `${t("corpusBlockParent")}: ${blockTitle}`;
+  }
+  const layerName = ref.layer.name || t("corpusLayerFallback");
+  return `${t("corpusLayerParent")}: ${blockTitle} / ${layerName}`;
+}
+
+function corpusParentsForUnit(unitId, corpus = ensureCorpusDraft()) {
+  return corpusParentRefs(corpus).filter((ref) => ref.unitIds.includes(unitId));
+}
+
+function corpusOwnerByKey(ownerKey, corpus = ensureCorpusDraft()) {
+  return corpusParentRefs(corpus).find((ref) => ref.key === ownerKey) || null;
+}
+
+function moveCorpusUnitToParent(corpus, unitId, ownerKey = "") {
+  const currentParents = corpusParentsForUnit(unitId, corpus);
+  const currentOccurrences = currentParents.reduce(
+    (count, ref) => count + ref.unitIds.filter((id) => id === unitId).length,
+    0,
+  );
+  if (
+    (currentParents.length === 0 && !ownerKey)
+    || (currentParents.length === 1 && currentOccurrences === 1 && currentParents[0].key === ownerKey)
+  ) {
+    return;
+  }
+  corpusParentRefs(corpus).forEach((ref) => {
+    ref.unitIds.splice(0, ref.unitIds.length, ...ref.unitIds.filter((id) => id !== unitId));
+  });
+  const target = ownerKey ? corpusOwnerByKey(ownerKey, corpus) : null;
+  if (target) {
+    target.unitIds.push(unitId);
+  }
+}
+
+function corpusIntegrityIssues(corpus = ensureCorpusDraft()) {
+  if (!corpus) {
+    return [];
+  }
+  const unitsById = new Map(corpus.units.map((unit) => [unit.id, unit]));
+  const parentsByUnit = new Map();
+  const issues = [];
+  duplicateEntityIdGroups(corpusEntityIdRecords(corpus)).forEach(({ id, matches }) => {
+    const types = [...new Set(matches.map(({ typeKey }) => t(typeKey)))].join(", ");
+    issues.push(formatText("corpusDuplicateEntityId", { id, types }));
+  });
+  corpusParentRefs(corpus).forEach((ref) => {
+    const parent = corpusParentLabel(ref);
+    const seen = new Set();
+    ref.unitIds.forEach((unitId) => {
+      if (seen.has(unitId)) {
+        const unit = unitsById.get(unitId);
+        issues.push(formatText("corpusDuplicateLink", {
+          parent,
+          unit: corpusUnitLabel(unit, unitId),
+        }));
+        return;
+      }
+      seen.add(unitId);
+      if (!unitsById.has(unitId)) {
+        issues.push(formatText("corpusMissingUnit", { parent, unit: unitId }));
+        return;
+      }
+      if (!parentsByUnit.has(unitId)) {
+        parentsByUnit.set(unitId, []);
+      }
+      parentsByUnit.get(unitId).push(ref);
+    });
+  });
+  parentsByUnit.forEach((parents, unitId) => {
+    if (parents.length > 1) {
+      issues.push(formatText("corpusMultipleParents", {
+        unit: corpusUnitLabel(unitsById.get(unitId), unitId),
+        parents: parents.map(corpusParentLabel).join("; "),
+      }));
+    }
+  });
+  return issues;
+}
+
+function corpusUnitLabel(unit, fallback = "") {
+  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
+  const pattern = parseCorpusRenderPattern(settings.corpusUnitCardRenderPattern);
+  let content = "";
+  if (!pattern.error && pattern.groups.length) {
+    const parsed = parseStrictCorpusGloss(unit?.content);
+    if (!parsed.error && corpusGlossHasTargets(parsed.gloss, pattern.groups)) {
+      content = pattern.groups
+        .map((group) => group
+          .filter((target) => corpusGlossTargetHasContent(parsed.gloss, target))
+          .map((target) => corpusGlossText(parsed.gloss, target.key))
+          .filter(Boolean)
+          .join(" "))
+        .filter(Boolean)
+        .join(" / ");
+    }
+  } else if (!pattern.error) {
+    content = String(unit?.content || "")
+      .replaceAll("\\n", "\n")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .join(" / ");
+  }
+  if (!content) {
+    return fallback || t("corpusUnitFallback");
+  }
+  return content.length > 72 ? `${content.slice(0, 72)}...` : content;
+}
+
+function parseCorpusRenderPattern(value) {
+  const source = String(value || "").trim();
+  if (!source) {
+    return { groups: [], error: "" };
+  }
+  const groups = [];
+  for (const line of source.split(/\r?\n/)) {
+    const compact = line.replace(/\s+/g, "");
+    if (!compact) {
+      continue;
+    }
+    const tokens = compact.match(/\(\\(?:gla|glb|glc|ft)\)|\\(?:gla|glb|glc|ft)/g) || [];
+    if (!tokens.length || tokens.join("") !== compact) {
+      return { groups: [], error: t("invalidCorpusRenderPattern") };
+    }
+    groups.push(tokens.map((token) => ({
+      key: token.match(/\\(gla|glb|glc|ft)/)[1],
+      optional: token.startsWith("("),
+    })));
+  }
+  return { groups, error: "" };
+}
+
+function parseStrictCorpusGloss(value) {
+  const gloss = { gla: [], glb: [], glc: [], ft: "" };
+  const lines = String(value || "").replaceAll("\\n", "\n").split(/\r?\n/).filter((line) => line.trim());
+  if (!lines.length) {
+    return { gloss, error: "" };
+  }
+  for (const line of lines) {
+    const match = line.match(/^\\(gla|glb|glc|ft)\s*(.*)$/);
+    if (!match) {
+      return { gloss, error: t("corpusRenderError") };
+    }
+    if (match[1] === "ft") {
+      gloss.ft = match[2].trim();
+    } else {
+      gloss[match[1]] = match[2].trim().split(/\s+/).filter(Boolean);
+    }
+  }
+  return { gloss, error: "" };
+}
+
+function corpusGlossHasTargets(gloss, groups) {
+  return groups.flat().every((target) => target.optional || corpusGlossTargetHasContent(gloss, target));
+}
+
+function corpusGlossTargetHasContent(gloss, target) {
+  return target.key === "ft" ? Boolean(gloss.ft) : Boolean(gloss[target.key]?.length);
+}
+
+function corpusGlossText(gloss, key) {
+  return key === "ft" ? gloss.ft : (gloss[key] || []).join(" ");
+}
+
+function corpusUnitRenderConfig(settings, context) {
+  return context === "card"
+    ? { pattern: settings.corpusUnitCardRenderPattern, align: settings.corpusUnitCardGlossAlign }
+    : { pattern: settings.corpusUnitRenderPattern, align: settings.corpusUnitGlossAlign };
+}
+
+function renderCorpusUnitNameHtml(unit, context = "content") {
+  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
+  const renderConfig = corpusUnitRenderConfig(settings, context);
+  const pattern = parseCorpusRenderPattern(renderConfig.pattern);
+  if (pattern.error) {
+    return `<span class="corpus-unit-render-error" title="${escapeHtml(pattern.error)}">${escapeHtml(t("corpusRenderError"))}</span>`;
+  }
+  if (!pattern.groups.length) {
+    const lines = String(unit?.content || "").replaceAll("\\n", "\n").split(/\r?\n/);
+    const rendered = lines.map((line) => `<span>${line ? escapeHtml(line) : "&nbsp;"}</span>`).join("");
+    return `<span class="corpus-unit-name corpus-unit-name-raw">${rendered || escapeHtml(t("corpusUnitFallback"))}</span>`;
+  }
+  const parsed = parseStrictCorpusGloss(unit?.content);
+  if (parsed.error || !corpusGlossHasTargets(parsed.gloss, pattern.groups)) {
+    return `<span class="corpus-unit-render-error" title="${escapeHtml(t("corpusRenderError"))}">${escapeHtml(t("corpusRenderError"))}</span>`;
+  }
+  return `
+    <span class="corpus-unit-name corpus-unit-name-gloss">
+      ${renderCorpusGlossRows(pattern.groups, parsed.gloss, settings, renderConfig.align)}
+    </span>
+  `;
+}
+
+function updateCorpusUnitNamePreview(unitId) {
+  const corpus = ensureCorpusDraft();
+  const unit = corpus?.units.find((item) => item.id === unitId);
+  if (!unit) {
+    return;
+  }
+  const contentRendered = renderCorpusUnitNameHtml(unit, "content");
+  const cardRendered = renderCorpusUnitNameHtml(unit, "card");
+  const form = elements.corpusEditor.querySelector('.corpus-form[data-corpus-kind="unit"]');
+  if (form?.dataset.corpusId === unitId) {
+    const heading = form.querySelector(".corpus-rendered-heading");
+    if (heading) {
+      heading.innerHTML = contentRendered;
+    }
+  }
+  elements.corpusPanel.querySelectorAll("[data-corpus-unit-id], [data-linked-unit-id]").forEach((container) => {
+    const linkedUnitId = container.dataset.corpusUnitId || container.dataset.linkedUnitId;
+    if (linkedUnitId !== unitId) {
+      return;
+    }
+    const host = container.querySelector(".corpus-unit-name-host");
+    if (host) {
+      host.innerHTML = cardRendered;
+    }
+  });
+}
+
+function scheduleCorpusUnitNamePreview(unitId) {
+  if (corpusUnitPreviewFrame !== null) {
+    cancelAnimationFrame(corpusUnitPreviewFrame);
+  }
+  corpusUnitPreviewFrame = requestAnimationFrame(() => {
+    corpusUnitPreviewFrame = null;
+    updateCorpusUnitNamePreview(unitId);
+  });
+}
+
+function corpusGlossRowTokens(targets, gloss) {
+  return targets.flatMap(({ key }) => {
+    const values = key === "ft" ? gloss.ft.split(/\s+/).filter(Boolean) : gloss[key];
+    return values.map((value) => ({ key, value }));
+  });
+}
+
+function corpusGlossRowClasses(targets) {
+  return targets.map(({ key }) => `gloss-${key}`).join(" ");
+}
+
+function renderCorpusGlossRows(groups, gloss, settings, alignEnabled) {
+  const rows = groups
+    .map((targets) => targets.filter((target) => corpusGlossTargetHasContent(gloss, target)))
+    .filter((targets) => targets.length)
+    .map((targets) => ({ targets, tokens: corpusGlossRowTokens(targets, gloss) }));
+  if (!rows.length) {
+    return escapeHtml(t("corpusUnitFallback"));
+  }
+
+  const output = [];
+  let alignableRows = [];
+  const flushAlignableRows = () => {
+    if (alignableRows.length) {
+      output.push(renderCorpusGlossRowGroup(alignableRows, alignEnabled, settings));
+      alignableRows = [];
+    }
+  };
+  rows.forEach((row) => {
+    if (row.targets.some(({ key }) => key === "ft")) {
+      flushAlignableRows();
+      output.push(renderCorpusGlossRowGroup([row], false, settings));
+    } else {
+      alignableRows.push(row);
+    }
+  });
+  flushAlignableRows();
+  return output.join("");
+}
+
+function renderCorpusGlossRowGroup(rows, alignEnabled, settings) {
+  const align = alignEnabled && rows.length > 1;
+  if (!align) {
+    return `
+      <span class="corpus-gloss-group unaligned">
+        ${rows.map(({ targets, tokens }) => `<span class="corpus-gloss-row ${corpusGlossRowClasses(targets)}">${tokens.map(({ key, value }) => renderCorpusGlossToken(key, value, settings)).join(" ")}</span>`).join("")}
+      </span>
+    `;
+  }
+  const columnCount = Math.max(...rows.map(({ tokens }) => tokens.length));
+  return `
+    <span class="corpus-gloss-group aligned">
+      <table class="gloss-table"><tbody>
+        ${rows.map(({ targets, tokens }) => `
+          <tr class="gloss-row ${corpusGlossRowClasses(targets)}">
+            ${Array.from({ length: columnCount }, (_, column) => {
+              const token = tokens[column];
+              return `<td class="gloss-cell">${token ? renderCorpusGlossToken(token.key, token.value, settings) : ""}</td>`;
+            }).join("")}
+          </tr>
+        `).join("")}
+      </tbody></table>
+    </span>
+  `;
+}
+
+function renderCorpusGlossToken(key, value, settings) {
+  return `<span class="${glossStyleClassNames(key, settings)}">${renderGlossTokenText(key, value, settings)}</span>`;
+}
+
+function ensureCorpusSelection(corpus, viewState = activeCorpusViewState()) {
+  if (!corpus.blocks.some((block) => block.id === viewState.selectedBlockId)) {
+    viewState.selectedBlockId = corpus.blocks[0]?.id || "";
+  }
+  if (!corpus.units.some((unit) => unit.id === viewState.selectedUnitId)) {
+    viewState.selectedUnitId = corpus.units[0]?.id || "";
+  }
+}
+
+function renderCorpus(dictionary = activeDictionary()) {
+  if (!elements.corpusPanel) {
+    return;
+  }
+  syncCorpusEditorToDraft();
+  if (!dictionary) {
+    elements.corpusItemList.innerHTML = "";
+    elements.corpusEditor.innerHTML = "";
+    elements.corpusIntegrityPanel.hidden = true;
+    return;
+  }
+
+  const corpus = ensureCorpusDraft(dictionary);
+  const viewState = activeCorpusViewState();
+  ensureCorpusSelection(corpus, viewState);
+  elements.corpusPanel.classList.toggle("is-empty", viewState.mode === "blocks" ? !corpus.blocks.length : !corpus.units.length);
+  elements.corpusEditor.dataset.dictionaryId = dictionary.id;
+  elements.corpusSearchInput.value = viewState.query;
+  elements.corpusModeControl.querySelectorAll("[data-corpus-mode]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.corpusMode === viewState.mode);
+  });
+  elements.newCorpusItemButton.textContent = t(viewState.mode === "blocks" ? "newCorpusBlock" : "newCorpusUnit");
+  renderCorpusIntegrity(corpus);
+  renderCorpusItemList(corpus, viewState);
+  renderCorpusEditor(corpus, viewState);
+  if (normalizeDictionarySettings(dictionary.settings).corpusAutoSave && corpusFormIsDirty(dictionary)) {
+    scheduleCorpusSave();
+  }
+}
+
+function renderCorpusIntegrity(corpus) {
+  const issues = corpusIntegrityIssues(corpus);
+  elements.corpusIntegrityPanel.hidden = !issues.length;
+  elements.corpusIntegrityList.innerHTML = issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join("");
+}
+
+function renderCorpusItemList(corpus, viewState) {
+  const query = normalize(viewState.query);
+  if (viewState.mode === "blocks") {
+    const blocks = corpus.blocks.filter((block) => {
+      const text = [
+        block.title,
+        block.notes,
+        ...block.tags,
+        ...Object.entries(block.attributes).flat(),
+        ...block.layers.flatMap((layer) => [layer.name, layer.speaker, layer.modality, layer.notes, ...layer.tags]),
+      ].join(" ");
+      return !query || normalize(text).includes(query);
+    });
+    if (!blocks.length) {
+      const empty = document.createElement("p");
+      empty.className = "corpus-empty-list";
+      empty.textContent = t("noCorpusBlocks");
+      renderVirtualListEmpty(elements.corpusItemList, corpusVirtualList, empty);
+      return;
+    }
+    renderVirtualList(elements.corpusItemList, corpusVirtualList, blocks, {
+      resetToken: corpusVirtualResetToken(viewState),
+      getKey: (block) => `block:${block.id}`,
+      renderItem: (block) => createCorpusBlockCard(block, viewState),
+    });
+    return;
+  }
+
+  const units = corpus.units.filter((unit) => {
+    const text = [unit.content, unit.notes, ...unit.tags, ...Object.entries(unit.attributes).flat()].join(" ");
+    return !query || normalize(text).includes(query);
+  });
+  if (!units.length) {
+    const empty = document.createElement("p");
+    empty.className = "corpus-empty-list";
+    empty.textContent = t("noCorpusUnits");
+    renderVirtualListEmpty(elements.corpusItemList, corpusVirtualList, empty);
+    return;
+  }
+  renderVirtualList(elements.corpusItemList, corpusVirtualList, units, {
+    resetToken: corpusVirtualResetToken(viewState),
+    getKey: (unit) => `unit:${unit.id}`,
+    getEstimatedHeight: () => 92,
+    renderItem: (unit) => createCorpusUnitCard(unit, corpus, viewState),
+  });
+}
+
+function corpusVirtualResetToken(viewState) {
+  return [state.activeDictionaryId, viewState.mode, normalize(viewState.query)].join("|");
+}
+
+function createCorpusBlockCard(block, viewState) {
+  const button = document.createElement("button");
+  const unitCount = block.unitIds.length + block.layers.reduce((sum, layer) => sum + layer.unitIds.length, 0);
+  button.className = `corpus-item-card${block.id === viewState.selectedBlockId ? " selected" : ""}`;
+  button.type = "button";
+  button.dataset.corpusBlockId = block.id;
+  button.innerHTML = `
+    <strong>${escapeHtml(block.title || t("corpusBlockFallback"))}</strong>
+    <span>${escapeHtml(formatText("corpusBlockStats", { layers: block.layers.length, units: unitCount }))}</span>
+  `;
+  return button;
+}
+
+function createCorpusUnitCard(unit, corpus, viewState) {
+  const button = document.createElement("button");
+  const parent = corpusParentsForUnit(unit.id, corpus)[0];
+  button.className = `corpus-item-card${unit.id === viewState.selectedUnitId ? " selected" : ""}`;
+  button.type = "button";
+  button.dataset.corpusUnitId = unit.id;
+  button.innerHTML = `
+    <div class="corpus-unit-name-host">${renderCorpusUnitNameHtml(unit, "card")}</div>
+    <span>${escapeHtml(formatText("corpusUnitParentLabel", { parent: corpusParentLabel(parent) }))}</span>
+  `;
+  return button;
+}
+
+function scheduleCorpusItemScroll(mode, itemId, behavior = "smooth") {
+  if (!itemId) {
+    return;
+  }
+  requestAnimationFrame(() => {
+    scrollVirtualListItemIntoView(corpusVirtualList, `${mode === "blocks" ? "block" : "unit"}:${itemId}`, behavior);
+  });
+}
+
+function renderCorpusEditor(corpus, viewState) {
+  if (viewState.mode === "blocks") {
+    const block = corpus.blocks.find((item) => item.id === viewState.selectedBlockId);
+    elements.corpusEditor.innerHTML = block
+      ? renderCorpusBlockEditor(block, corpus)
+      : `<p class="corpus-empty-editor">${escapeHtml(t("noCorpusSelection"))}</p>`;
+    return;
+  }
+  const unit = corpus.units.find((item) => item.id === viewState.selectedUnitId);
+  elements.corpusEditor.innerHTML = unit
+    ? renderCorpusUnitEditor(unit, corpus)
+    : `<p class="corpus-empty-editor">${escapeHtml(t("noCorpusSelection"))}</p>`;
+}
+
+function renderCorpusAttributeEditor(attributes = {}) {
+  const rows = Object.entries(attributes).map(([key, value]) => renderCorpusAttributeRow(key, value)).join("");
+  return `
+    <div class="corpus-attribute-editor" data-corpus-attributes>
+      <div class="corpus-attribute-rows">${rows}</div>
+      <button class="secondary-button" type="button" data-action="add-corpus-attribute">${escapeHtml(t("addAttribute"))}</button>
+    </div>
+  `;
+}
+
+function renderCorpusAttributeRow(key = "", value = "") {
+  return `
+    <div class="corpus-attribute-row">
+      <input data-field="attribute-key" aria-label="${escapeHtml(t("attributeName"))}" placeholder="${escapeHtml(t("attributeName"))}" value="${escapeHtml(key)}">
+      <input data-field="attribute-value" aria-label="${escapeHtml(t("attributeValue"))}" placeholder="${escapeHtml(t("attributeValue"))}" value="${escapeHtml(value)}">
+      <button class="corpus-icon-button danger" type="button" data-action="remove-corpus-attribute" title="${escapeHtml(t("removeAttribute"))}" aria-label="${escapeHtml(t("removeAttribute"))}">×</button>
+    </div>
+  `;
+}
+
+function collectCorpusAttributes(container) {
+  if (!container) {
+    return {};
+  }
+  const attributes = {};
+  container.querySelectorAll(".corpus-attribute-row").forEach((row) => {
+    const key = row.querySelector('[data-field="attribute-key"]')?.value.trim() || "";
+    if (key) {
+      attributes[key] = row.querySelector('[data-field="attribute-value"]')?.value || "";
+    }
+  });
+  return attributes;
+}
+
+function renderCorpusBlockEditor(block, corpus) {
+  return `
+    <form class="corpus-form" data-corpus-kind="block" data-corpus-id="${escapeHtml(block.id)}" autocomplete="off">
+      <div class="form-heading compact-heading">
+        <div><p class="eyebrow">${escapeHtml(t("corpusBlock"))}</p><h3>${escapeHtml(block.title || t("corpusBlockFallback"))}</h3></div>
+        <button class="danger-ghost" type="button" data-action="delete-corpus-block">${escapeHtml(t("deleteCorpusBlock"))}</button>
+      </div>
+      <label><span>${escapeHtml(t("corpusBlockTitle"))}</span><input data-field="title" maxlength="160" value="${escapeHtml(block.title)}"></label>
+      <label><span>${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(block.tags.join("，"))}"><small class="field-help">${escapeHtml(t("corpusTagsHelp"))}</small></label>
+      <label><span>${escapeHtml(t("corpusNotes"))}</span><textarea data-field="notes" rows="4">${escapeHtml(block.notes)}</textarea></label>
+      <section class="corpus-subsection">
+        <div class="subsection-title"><h3>${escapeHtml(t("corpusAttributes"))}</h3></div>
+        ${renderCorpusAttributeEditor(block.attributes)}
+      </section>
+      <section class="corpus-subsection">
+        <div class="subsection-title"><h3>${escapeHtml(t("directUnits"))}</h3></div>
+        ${renderCorpusLinkedUnits(block.unitIds, `block:${block.id}`, corpus)}
+      </section>
+      <section class="corpus-subsection">
+        <div class="form-heading compact-heading">
+          <div><h3>${escapeHtml(t("corpusLayers"))}</h3></div>
+          <button class="secondary-button" type="button" data-action="add-corpus-layer">${escapeHtml(t("addLayer"))}</button>
+        </div>
+        <div class="corpus-layer-list">
+          ${block.layers.map((layer, index) => renderCorpusLayerEditor(block, layer, index, corpus)).join("")}
+        </div>
+      </section>
+    </form>
+  `;
+}
+
+function renderCorpusLayerEditor(block, layer, index, corpus) {
+  return `
+    <article class="corpus-layer-card" data-layer-id="${escapeHtml(layer.id)}">
+      <div class="corpus-layer-header">
+        <div><p class="eyebrow">${escapeHtml(t("corpusLayer"))} ${index + 1}</p><strong>${escapeHtml(layer.name || t("corpusLayerFallback"))}</strong></div>
+        <div class="corpus-order-actions">
+          <button class="corpus-icon-button" type="button" data-action="move-corpus-layer-up" title="${escapeHtml(t("moveUp"))}" aria-label="${escapeHtml(t("moveUp"))}" ${index === 0 ? "disabled" : ""}>↑</button>
+          <button class="corpus-icon-button" type="button" data-action="move-corpus-layer-down" title="${escapeHtml(t("moveDown"))}" aria-label="${escapeHtml(t("moveDown"))}" ${index === block.layers.length - 1 ? "disabled" : ""}>↓</button>
+          <button class="corpus-icon-button danger" type="button" data-action="delete-corpus-layer" title="${escapeHtml(t("deleteCorpusLayer"))}" aria-label="${escapeHtml(t("deleteCorpusLayer"))}">×</button>
+        </div>
+      </div>
+      <div class="form-grid">
+        <label><span>${escapeHtml(t("layerName"))}</span><input data-field="name" value="${escapeHtml(layer.name)}"></label>
+        <label><span>${escapeHtml(t("speaker"))}</span><input data-field="speaker" value="${escapeHtml(layer.speaker)}"></label>
+        <label><span>${escapeHtml(t("modality"))}</span><input data-field="modality" value="${escapeHtml(layer.modality)}"></label>
+        <label><span>${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(layer.tags.join("，"))}"></label>
+      </div>
+      <label><span>${escapeHtml(t("corpusNotes"))}</span><textarea data-field="notes" rows="3">${escapeHtml(layer.notes)}</textarea></label>
+      <div class="subsection-title"><h3>${escapeHtml(t("corpusAttributes"))}</h3></div>
+      ${renderCorpusAttributeEditor(layer.attributes)}
+      <div class="subsection-title"><h3>${escapeHtml(t("linkedUnits"))}</h3></div>
+      ${renderCorpusLinkedUnits(layer.unitIds, `layer:${block.id}:${layer.id}`, corpus)}
+    </article>
+  `;
+}
+
+function renderCorpusLinkedUnits(unitIds, ownerKey, corpus) {
+  const unitsById = new Map(corpus.units.map((unit) => [unit.id, unit]));
+  const linked = unitIds.map((unitId, index) => {
+    const unit = unitsById.get(unitId);
+    return `
+      <li data-linked-unit-id="${escapeHtml(unitId)}">
+        <div class="corpus-unit-name-host${unit ? "" : " missing"}">${unit ? renderCorpusUnitNameHtml(unit, "card") : escapeHtml(unitId)}</div>
+        <div class="corpus-order-actions">
+          <button class="corpus-icon-button" type="button" data-action="move-corpus-unit-up" title="${escapeHtml(t("moveUp"))}" aria-label="${escapeHtml(t("moveUp"))}" ${index === 0 ? "disabled" : ""}>↑</button>
+          <button class="corpus-icon-button" type="button" data-action="move-corpus-unit-down" title="${escapeHtml(t("moveDown"))}" aria-label="${escapeHtml(t("moveDown"))}" ${index === unitIds.length - 1 ? "disabled" : ""}>↓</button>
+          <button class="corpus-icon-button danger" type="button" data-action="unlink-corpus-unit" title="${escapeHtml(t("unlink"))}" aria-label="${escapeHtml(t("unlink"))}">×</button>
+        </div>
+      </li>
+    `;
+  }).join("");
+  const availableUnits = corpus.units.filter((unit) => !unitIds.includes(unit.id));
+  return `
+    <div class="corpus-linked-units" data-corpus-owner="${escapeHtml(ownerKey)}">
+      <ol>${linked}</ol>
+      <div class="corpus-link-row">
+        <select data-corpus-unit-link aria-label="${escapeHtml(t("chooseUnit"))}" ${availableUnits.length ? "" : "disabled"}>
+          <option value="">${escapeHtml(t("chooseUnit"))}</option>
+          ${availableUnits.map((unit) => `<option value="${escapeHtml(unit.id)}">${escapeHtml(corpusUnitLabel(unit))}</option>`).join("")}
+        </select>
+        <button class="secondary-button" type="button" data-action="link-corpus-unit" ${availableUnits.length ? "" : "disabled"}>${escapeHtml(t("linkUnit"))}</button>
+      </div>
+      <p class="field-help">${escapeHtml(t("corpusLinkMovesUnit"))}</p>
+    </div>
+  `;
+}
+
+function renderCorpusUnitEditor(unit, corpus) {
+  const parents = corpusParentsForUnit(unit.id, corpus);
+  const parent = parents[0] || null;
+  return `
+    <form class="corpus-form" data-corpus-kind="unit" data-corpus-id="${escapeHtml(unit.id)}" autocomplete="off">
+      <div class="form-heading compact-heading">
+        <div><p class="eyebrow">${escapeHtml(t("corpusUnit"))}</p><div class="corpus-rendered-heading">${renderCorpusUnitNameHtml(unit, "content")}</div></div>
+        <button class="danger-ghost" type="button" data-action="delete-corpus-unit">${escapeHtml(t("deleteCorpusUnit"))}</button>
+      </div>
+      <label><span>${escapeHtml(t("corpusUnitContent"))}</span><textarea data-field="content" rows="6">${escapeHtml(unit.content)}</textarea></label>
+      <label><span>${escapeHtml(t("corpusParent"))}</span>
+        <select data-field="parent">
+          <option value="">${escapeHtml(t("corpusOrphan"))}</option>
+          ${corpusParentRefs(corpus).map((ref) => `<option value="${escapeHtml(ref.key)}"${parent?.key === ref.key ? " selected" : ""}>${escapeHtml(corpusParentLabel(ref))}</option>`).join("")}
+        </select>
+      </label>
+      <label><span>${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(unit.tags.join("，"))}"><small class="field-help">${escapeHtml(t("corpusTagsHelp"))}</small></label>
+      <label><span>${escapeHtml(t("corpusNotes"))}</span><textarea data-field="notes" rows="4">${escapeHtml(unit.notes)}</textarea></label>
+      <section class="corpus-subsection">
+        <div class="subsection-title"><h3>${escapeHtml(t("corpusAttributes"))}</h3></div>
+        ${renderCorpusAttributeEditor(unit.attributes)}
+      </section>
+      <section class="corpus-subsection">
+        <div class="subsection-title"><h3>${escapeHtml(t("effectiveAttributes"))}</h3></div>
+        <p class="field-help">${escapeHtml(t("effectiveAttributesHelp"))}</p>
+        ${renderCorpusEffectiveAttributes(unit, parent)}
+      </section>
+    </form>
+  `;
+}
+
+function renderCorpusEffectiveAttributes(unit, parent) {
+  const effective = new Map();
+  const apply = (attributes, source) => {
+    Object.entries(attributes || {}).forEach(([key, value]) => effective.set(key, { value, source }));
+  };
+  if (parent) {
+    apply(parent.block.attributes, t("attributeSourceBlock"));
+    if (parent.layer) {
+      apply(parent.layer.attributes, t("attributeSourceLayer"));
+    }
+  }
+  apply(unit.attributes, t("attributeSourceUnit"));
+  if (!effective.size) {
+    return `<p class="muted-text">${escapeHtml(t("noEffectiveAttributes"))}</p>`;
+  }
+  return `
+    <div class="corpus-effective-table">
+      ${[...effective.entries()].map(([key, detail]) => `
+        <div><strong>${escapeHtml(key)}</strong><span>${escapeHtml(detail.value)}</span><small>${escapeHtml(detail.source)}</small></div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function updateCorpusRecord(record, changes) {
+  const changed = Object.entries(changes).some(([key, value]) => stableJson(record[key]) !== stableJson(value));
+  if (!changed) {
+    return;
+  }
+  Object.assign(record, changes);
+  if (Object.hasOwn(record, "updatedAt")) {
+    record.updatedAt = new Date().toISOString();
+  }
+}
+
+function syncCorpusEditorToDraft() {
+  const form = elements.corpusEditor?.querySelector(".corpus-form");
+  if (!form || !corpusDraftState || elements.corpusEditor.dataset.dictionaryId !== corpusDraftState.dictionaryId) {
+    return;
+  }
+  const corpus = corpusDraftState.corpus;
+  if (form.dataset.corpusKind === "block") {
+    const block = corpus.blocks.find((item) => item.id === form.dataset.corpusId);
+    if (!block) {
+      return;
+    }
+    updateCorpusRecord(block, {
+      title: form.querySelector('[data-field="title"]').value.trim(),
+      tags: uniqueList(form.querySelector(':scope > label [data-field="tags"]').value),
+      notes: form.querySelector(':scope > label [data-field="notes"]').value,
+      attributes: collectCorpusAttributes(form.querySelector(':scope > .corpus-subsection [data-corpus-attributes]')),
+    });
+    form.querySelectorAll(".corpus-layer-card").forEach((card) => {
+      const layer = block.layers.find((item) => item.id === card.dataset.layerId);
+      if (!layer) {
+        return;
+      }
+      updateCorpusRecord(layer, {
+        name: card.querySelector('[data-field="name"]').value.trim(),
+        speaker: card.querySelector('[data-field="speaker"]').value.trim(),
+        modality: card.querySelector('[data-field="modality"]').value.trim(),
+        tags: uniqueList(card.querySelector('[data-field="tags"]').value),
+        notes: card.querySelector('[data-field="notes"]').value,
+        attributes: collectCorpusAttributes(card.querySelector('[data-corpus-attributes]')),
+      });
+    });
+    return;
+  }
+  const unit = corpus.units.find((item) => item.id === form.dataset.corpusId);
+  if (!unit) {
+    return;
+  }
+  updateCorpusRecord(unit, {
+    content: form.querySelector('[data-field="content"]').value,
+    tags: uniqueList(form.querySelector('[data-field="tags"]').value),
+    notes: form.querySelector('[data-field="notes"]').value,
+    attributes: collectCorpusAttributes(form.querySelector('[data-corpus-attributes]')),
+  });
+  moveCorpusUnitToParent(corpus, unit.id, form.querySelector('[data-field="parent"]').value);
+}
+
+function corpusFormIsDirty(dictionary = activeDictionary()) {
+  if (!dictionary || corpusDraftState?.dictionaryId !== dictionary.id) {
+    return false;
+  }
+  syncCorpusEditorToDraft();
+  return stableJson(corpusDraftState.corpus) !== stableJson(normalizeCorpus(dictionary.corpus));
+}
+
+async function runCorpusSaveQueue() {
+  let savedAny = false;
+  while (corpusSaveRequested) {
+    corpusSaveRequested = false;
+    const dictionary = activeDictionary();
+    if (!dictionary) {
+      return savedAny;
+    }
+    syncCorpusEditorToDraft();
+    const snapshot = cloneCorpus(ensureCorpusDraft(dictionary));
+    const saved = await persistDictionaryPatch(dictionary.id, {
+      corpus: snapshot,
+      updatedAt: new Date().toISOString(),
+    }, { refresh: false });
+    savedAny = true;
+    clearTimeout(corpusSaveTimer);
+    corpusSaveTimer = null;
+
+    // Input may have changed the live draft while this snapshot was being saved.
+    if (
+      corpusDraftState?.dictionaryId === saved.id
+      && stableJson(corpusDraftState.corpus) !== stableJson(saved.corpus)
+    ) {
+      corpusSaveRequested = true;
+    }
+  }
+  return savedAny;
+}
+
+function saveCorpus(showSavedToast = true) {
+  const dictionary = activeDictionary();
+  if (!dictionary) {
+    showToast(t("createDictionaryFirstToast"));
+    return Promise.resolve(false);
+  }
+  syncCorpusEditorToDraft();
+  const corpus = ensureCorpusDraft(dictionary);
+  if (!validateDictionaryEntityIds({ ...dictionary, corpus })) {
+    return Promise.resolve(false);
+  }
+  clearTimeout(corpusSaveTimer);
+  corpusSaveTimer = null;
+  corpusSaveRequested = true;
+  if (!corpusSavePromise) {
+    corpusSavePromise = runCorpusSaveQueue().finally(() => {
+      corpusSavePromise = null;
+    });
+  }
+  const pendingSave = corpusSavePromise;
+  if (!showSavedToast) {
+    return pendingSave;
+  }
+  return pendingSave.then((saved) => {
+    if (saved) {
+      showToast(t("corpusSaved"));
+    }
+    return saved;
+  });
+}
+
+function scheduleCorpusSave() {
+  clearTimeout(corpusSaveTimer);
+  const dictionary = activeDictionary();
+  if (!dictionary || !normalizeDictionarySettings(dictionary.settings).corpusAutoSave || !corpusFormIsDirty(dictionary)) {
+    return;
+  }
+  corpusSaveTimer = setTimeout(() => {
+    saveCorpus(false).catch((error) => console.error(error));
+  }, 700);
+}
+
+function addCorpusBlock() {
+  const dictionary = activeDictionary();
+  const corpus = ensureCorpusDraft(dictionary);
+  if (!corpus) {
+    return;
+  }
+  syncCorpusEditorToDraft();
+  const block = normalizeCorpusBlock({
+    id: uniqueDictionaryEntityId("corpus-block", { ...dictionary, corpus }),
+    title: "",
+  });
+  corpus.blocks.push(block);
+  const viewState = activeCorpusViewState();
+  viewState.mode = "blocks";
+  viewState.selectedBlockId = block.id;
+  renderCorpus(dictionary);
+  scheduleCorpusItemScroll("blocks", block.id);
+  elements.corpusEditor.querySelector('[data-field="title"]')?.focus();
+}
+
+function addCorpusUnit() {
+  const dictionary = activeDictionary();
+  const corpus = ensureCorpusDraft(dictionary);
+  if (!corpus) {
+    return;
+  }
+  syncCorpusEditorToDraft();
+  const unit = normalizeCorpusUnit({
+    id: uniqueDictionaryEntityId("corpus-unit", { ...dictionary, corpus }),
+    content: "",
+  });
+  corpus.units.push(unit);
+  const viewState = activeCorpusViewState();
+  viewState.mode = "units";
+  viewState.selectedUnitId = unit.id;
+  renderCorpus(dictionary);
+  scheduleCorpusItemScroll("units", unit.id);
+  elements.corpusEditor.querySelector('[data-field="content"]')?.focus();
+}
+
+function moveArrayItem(items, index, offset) {
+  const nextIndex = index + offset;
+  if (index < 0 || nextIndex < 0 || nextIndex >= items.length) {
+    return;
+  }
+  const [item] = items.splice(index, 1);
+  items.splice(nextIndex, 0, item);
 }
 
 function renderMorphologyConfig(dictionary) {
@@ -5272,10 +7138,13 @@ function emptyState(title, body) {
   return empty;
 }
 
-function openPartialEdit(section) {
+async function openPartialEdit(section) {
+  if (partialEditForm() && !(await closePendingEditsForPageSwitch())) {
+    return false;
+  }
   const entry = selectedEntry();
   if (!entry || editorMode === "edit") {
-    return;
+    return false;
   }
 
   cancelPartialEdit();
@@ -5372,6 +7241,7 @@ function openPartialEdit(section) {
   }
 
   body.querySelector("input, textarea")?.focus();
+  return true;
 }
 
 function partialEditTitle(section) {
@@ -5546,11 +7416,14 @@ function createEntryDraft(overrides = {}) {
   };
 }
 
-function beginNewEntry(draft = null) {
+async function beginNewEntry(draft = null) {
   if (!activeDictionary()) {
-    showView("manager");
+    await showView("manager");
     showToast(t("createDictionaryFirstToast"));
-    return;
+    return false;
+  }
+  if (!(await closePendingEditsForPageSwitch())) {
+    return false;
   }
 
   cancelPartialEdit();
@@ -5559,34 +7432,38 @@ function beginNewEntry(draft = null) {
   editorMode = "edit";
   render();
   elements.lemmaInput.focus();
+  return true;
 }
 
 async function beginDerivedEntry(sourceEntry) {
   if (!sourceEntry) {
     return;
   }
-  const ready = await closePendingEditsForPageSwitch();
-  if (!ready) {
-    return;
-  }
-  beginNewEntry({
+  const started = await beginNewEntry({
     etymology: {
       sources: [sourceEntry.lemma],
       description: "",
     },
   });
+  if (!started) {
+    return;
+  }
   showToast(t("derivedEntryDraft"));
 }
 
-function beginEditEntry() {
+async function beginEditEntry() {
   if (!selectedEntry()) {
-    return;
+    return false;
+  }
+  if (!(await closePendingEditsForPageSwitch())) {
+    return false;
   }
   cancelPartialEdit();
   entryDraft = null;
   editorMode = "edit";
   render();
   elements.lemmaInput.focus();
+  return true;
 }
 
 function cancelEntryEdit() {
@@ -5612,9 +7489,12 @@ async function saveEntry(event) {
     showToast(t("createDictionaryFirstToast"));
     return false;
   }
+  if (!validateDictionaryEntityIds(dictionary)) {
+    return false;
+  }
 
   const now = new Date().toISOString();
-  const entryId = elements.entryId.value || uid("entry");
+  const entryId = elements.entryId.value || uniqueDictionaryEntityId("entry", dictionary);
   const existing = dictionary.entries.find((entry) => entry.id === entryId);
   const definitions = collectDefinitions();
   const entry = {
@@ -5750,6 +7630,29 @@ async function persistDictionary(dictionary) {
   }
 }
 
+async function persistDictionaryPatch(dictionaryId, patch, { refresh = true } = {}) {
+  try {
+    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionaryId)}`, {
+      method: "PUT",
+      body: JSON.stringify(patch),
+    });
+    if (refresh) {
+      await refreshState();
+      return saved;
+    }
+    const normalized = normalizeDictionary(saved);
+    const dictionaryIndex = state.dictionaries.findIndex((dictionary) => dictionary.id === dictionaryId);
+    if (dictionaryIndex >= 0) {
+      state.dictionaries[dictionaryIndex] = normalized;
+    }
+    return normalized;
+  } catch (error) {
+    showToast(t("saveFailed"));
+    console.error(error);
+    throw error;
+  }
+}
+
 async function activateDictionary(dictionaryId) {
   const dictionary = state.dictionaries.find((item) => item.id === dictionaryId);
   if (!dictionary) {
@@ -5789,6 +7692,13 @@ async function deleteSelectedDictionary() {
   try {
     await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}`, { method: "DELETE" });
     forgetAnalysisViewState(dictionary.id);
+    corpusViewStates.delete(dictionary.id);
+    if (corpusDraftState?.dictionaryId === dictionary.id) {
+      corpusDraftState = null;
+    }
+    if (docsDraftState?.dictionaryId === dictionary.id) {
+      docsDraftState = null;
+    }
     state.selectedDictionaryConfigId = "";
     state.selectedEntryId = "";
     editorMode = "display";
@@ -5817,8 +7727,15 @@ function isDictionaryImportPayload(payload) {
     payload
     && typeof payload === "object"
     && !Array.isArray(payload)
-    && (payload.id || payload.name || Array.isArray(payload.entries) || payload.settings || payload.docs || payload.morphology)
+    && (payload.id || payload.name || Array.isArray(payload.entries) || payload.settings || payload.docs || payload.corpus || payload.morphology)
   );
+}
+
+function dictionaryFromImportPayload(payload) {
+  if (Array.isArray(payload?.dictionaries)) {
+    return payload.dictionaries.find((item) => item?.id === payload.activeDictionaryId) || payload.dictionaries[0] || null;
+  }
+  return payload && typeof payload === "object" && !Array.isArray(payload) ? payload : null;
 }
 
 function importData(event) {
@@ -5834,10 +7751,40 @@ function importData(event) {
       if (!isDictionaryImportPayload(imported)) {
         throw new Error("Invalid file");
       }
-      await api("/api/import", {
+      const dictionary = dictionaryFromImportPayload(imported);
+      if (!validateDictionaryEntityIds(normalizeDictionary(dictionary))) {
+        return;
+      }
+      const existing = state.dictionaries.find((item) => item.id === dictionary.id);
+      let overwrite = false;
+      if (existing) {
+        overwrite = await appConfirm(formatText("importOverwriteMessage", {
+          id: dictionary.id,
+          name: dictionary.name || t("unnamedDictionary"),
+        }), {
+          title: t("importOverwriteTitle"),
+          confirmText: t("importAndOverwrite"),
+          cancelText: t("cancel"),
+          danger: true,
+        });
+        if (!overwrite) {
+          return;
+        }
+      }
+      await api(`/api/import${overwrite ? "?overwrite=true" : ""}`, {
         method: "POST",
         body: JSON.stringify(imported),
       });
+      if (overwrite) {
+        corpusViewStates.delete(dictionary.id);
+        forgetAnalysisViewState(dictionary.id);
+        if (corpusDraftState?.dictionaryId === dictionary.id) {
+          corpusDraftState = null;
+        }
+        if (docsDraftState?.dictionaryId === dictionary.id) {
+          docsDraftState = null;
+        }
+      }
       state.selectedEntryId = "";
       editorMode = "display";
       await refreshState();
@@ -5856,6 +7803,7 @@ async function refreshState() {
   const serverState = await api("/api/state");
   backendAvailable = true;
   backendMessage = "";
+  currentLanguage = normalizeUiLanguage(serverState.uiLanguage);
   state = normalizeState({
     ...serverState,
     selectedEntryId: state.selectedEntryId,
@@ -5896,6 +7844,39 @@ async function confirmLeaveUnsavedConfigView() {
   if (state.activeView === "morphology" && morphologyFormIsDirty()) {
     return appConfirm(t("unsavedMorphologyConfirm"));
   }
+  const settings = normalizeDictionarySettings(activeDictionary().settings);
+  if (state.activeView === "docs" && docsFormIsDirty()) {
+    if (settings.docsAutoSave) {
+      try {
+        return await saveLanguageDocs(false);
+      } catch (error) {
+        console.error(error);
+        return false;
+      }
+    }
+    const confirmed = await appConfirm(t("unsavedDocsConfirm"));
+    if (confirmed) {
+      clearTimeout(docsSaveTimer);
+      docsDraftState = null;
+    }
+    return confirmed;
+  }
+  if (state.activeView === "corpus" && corpusFormIsDirty()) {
+    if (settings.corpusAutoSave) {
+      try {
+        return await saveCorpus(false);
+      } catch (error) {
+        console.error(error);
+        return false;
+      }
+    }
+    const confirmed = await appConfirm(t("unsavedCorpusConfirm"));
+    if (confirmed) {
+      clearTimeout(corpusSaveTimer);
+      corpusDraftState = null;
+    }
+    return confirmed;
+  }
   return true;
 }
 
@@ -5906,6 +7887,53 @@ function showToast(message) {
   toastTimer = setTimeout(() => {
     elements.toast.classList.remove("show");
   }, 2200);
+}
+
+function hasManualModuleChangesOnExit() {
+  const dictionary = activeDictionary();
+  if (!dictionary) {
+    return false;
+  }
+  const settings = normalizeDictionarySettings(dictionary.settings);
+  return (
+    (!settings.docsAutoSave && docsFormIsDirty(dictionary))
+    || (!settings.corpusAutoSave && corpusFormIsDirty(dictionary))
+  );
+}
+
+function flushAutomaticModuleSaves() {
+  const dictionary = activeDictionary();
+  if (!dictionary) {
+    return;
+  }
+  syncCorpusEditorToDraft();
+  const settings = normalizeDictionarySettings(dictionary.settings);
+  const body = { updatedAt: new Date().toISOString() };
+  if (settings.docsAutoSave && docsFormIsDirty(dictionary)) {
+    body.docs = {
+      ...(dictionary.docs || {}),
+      markdown: docsDraftState.markdown,
+    };
+  }
+  if (settings.corpusAutoSave && corpusFormIsDirty(dictionary)) {
+    body.corpus = cloneCorpus(corpusDraftState.corpus);
+  }
+  if (!body.docs && !body.corpus) {
+    return;
+  }
+  const payload = JSON.stringify(body);
+  const autosavePath = `/api/dictionaries/${encodeURIComponent(dictionary.id)}/autosave`;
+  const queued = typeof navigator.sendBeacon === "function"
+    && navigator.sendBeacon(autosavePath, new Blob([payload], { type: "application/json" }));
+  if (queued) {
+    return;
+  }
+  fetch(`/api/dictionaries/${encodeURIComponent(dictionary.id)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: payload,
+    keepalive: true,
+  }).catch((error) => console.error(error));
 }
 
 function escapeHtml(value) {
@@ -6113,6 +8141,7 @@ elements.backToEditorButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromSettingsButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromAnalysisButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromDocsButton.addEventListener("click", () => showView("editor"));
+elements.backToEditorFromCorpusButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromMorphologyButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromIpaButton.addEventListener("click", () => showView("editor"));
 elements.addDictionaryButton.addEventListener("click", prepareNewDictionary);
@@ -6120,6 +8149,7 @@ elements.emptyCreateDictionaryButton.addEventListener("click", () => showView("m
 elements.settingsOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.analysisOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.docsOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
+elements.corpusOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.morphologyOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.ipaOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.newEntryButton.addEventListener("click", () => beginNewEntry());
@@ -6230,10 +8260,187 @@ elements.toolNavOrderList.addEventListener("drop", (event) => {
   elements.toolNavOrderList.querySelector(".tool-order-card.dragging")?.classList.remove("dragging");
   draggedToolNavView = "";
 });
-elements.docsMarkdownInput.addEventListener("input", () => {
+elements.corpusModeControl.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-corpus-mode]");
+  if (!button) {
+    return;
+  }
+  syncCorpusEditorToDraft();
+  const viewState = activeCorpusViewState();
+  viewState.mode = button.dataset.corpusMode;
+  renderCorpus(activeDictionary());
+  scheduleCorpusItemScroll(
+    viewState.mode,
+    viewState.mode === "blocks" ? viewState.selectedBlockId : viewState.selectedUnitId,
+    "auto",
+  );
+});
+elements.newCorpusItemButton.addEventListener("click", () => {
+  if (activeCorpusViewState().mode === "blocks") {
+    addCorpusBlock();
+  } else {
+    addCorpusUnit();
+  }
+});
+elements.corpusSearchInput.addEventListener("input", () => {
+  const corpus = ensureCorpusDraft();
+  if (!corpus) {
+    return;
+  }
+  syncCorpusEditorToDraft();
+  const viewState = activeCorpusViewState();
+  viewState.query = elements.corpusSearchInput.value;
+  renderCorpusItemList(corpus, viewState);
+});
+elements.corpusItemList.addEventListener("click", (event) => {
+  const blockButton = event.target.closest("[data-corpus-block-id]");
+  const unitButton = event.target.closest("[data-corpus-unit-id]");
+  if (!blockButton && !unitButton) {
+    return;
+  }
+  syncCorpusEditorToDraft();
+  const viewState = activeCorpusViewState();
+  if (blockButton) {
+    viewState.selectedBlockId = blockButton.dataset.corpusBlockId;
+  } else {
+    viewState.selectedUnitId = unitButton.dataset.corpusUnitId;
+  }
+  renderCorpus(activeDictionary());
+});
+elements.saveCorpusButton.addEventListener("click", () => {
+  saveCorpus().catch((error) => console.error(error));
+});
+elements.corpusEditor.addEventListener("submit", (event) => {
+  event.preventDefault();
+  saveCorpus().catch((error) => console.error(error));
+});
+elements.corpusEditor.addEventListener("input", (event) => {
+  syncCorpusEditorToDraft();
+  const form = event.target.closest('.corpus-form[data-corpus-kind="unit"]');
+  if (form && event.target.matches('[data-field="content"]')) {
+    scheduleCorpusUnitNamePreview(form.dataset.corpusId);
+  }
+  scheduleCorpusSave();
+});
+elements.corpusEditor.addEventListener("change", (event) => {
+  if (!event.target.matches('[data-field="parent"]')) {
+    return;
+  }
+  syncCorpusEditorToDraft();
+  renderCorpus(activeDictionary());
+});
+elements.corpusEditor.addEventListener("click", async (event) => {
+  const actionButton = event.target.closest("[data-action]");
+  if (!actionButton) {
+    return;
+  }
+  const action = actionButton.dataset.action;
+  if (action === "add-corpus-attribute") {
+    const editor = actionButton.closest("[data-corpus-attributes]");
+    editor.querySelector(".corpus-attribute-rows").insertAdjacentHTML("beforeend", renderCorpusAttributeRow());
+    editor.querySelector('.corpus-attribute-row:last-child [data-field="attribute-key"]')?.focus();
+    return;
+  }
+  if (action === "remove-corpus-attribute") {
+    actionButton.closest(".corpus-attribute-row")?.remove();
+    syncCorpusEditorToDraft();
+    scheduleCorpusSave();
+    return;
+  }
+
+  syncCorpusEditorToDraft();
   const dictionary = activeDictionary();
-  if (dictionary) {
-    dictionary.docs = { ...(dictionary.docs || {}), markdown: elements.docsMarkdownInput.value };
+  const corpus = ensureCorpusDraft(dictionary);
+  if (!corpus) {
+    return;
+  }
+  const viewState = activeCorpusViewState();
+  const form = actionButton.closest(".corpus-form");
+  const block = form?.dataset.corpusKind === "block"
+    ? corpus.blocks.find((item) => item.id === form.dataset.corpusId)
+    : null;
+
+  if (action === "add-corpus-layer" && block) {
+    block.layers.push(normalizeCorpusLayer({
+      id: uniqueDictionaryEntityId("corpus-layer", { ...dictionary, corpus }),
+    }));
+    block.updatedAt = new Date().toISOString();
+    renderCorpus(dictionary);
+    return;
+  }
+  if (action === "delete-corpus-block" && block) {
+    const confirmed = await appConfirm(t("deleteCorpusBlockConfirm"), { danger: true });
+    if (!confirmed) {
+      return;
+    }
+    corpus.blocks = corpus.blocks.filter((item) => item.id !== block.id);
+    viewState.selectedBlockId = corpus.blocks[0]?.id || "";
+    renderCorpus(dictionary);
+    return;
+  }
+  if (action === "delete-corpus-unit") {
+    const unitId = form?.dataset.corpusId || "";
+    const confirmed = await appConfirm(t("deleteCorpusUnitConfirm"), { danger: true });
+    if (!confirmed) {
+      return;
+    }
+    moveCorpusUnitToParent(corpus, unitId, "");
+    corpus.units = corpus.units.filter((unit) => unit.id !== unitId);
+    viewState.selectedUnitId = corpus.units[0]?.id || "";
+    renderCorpus(dictionary);
+    return;
+  }
+
+  const layerCard = actionButton.closest(".corpus-layer-card");
+  const layer = block && layerCard
+    ? block.layers.find((item) => item.id === layerCard.dataset.layerId)
+    : null;
+  if (action === "delete-corpus-layer" && block && layer) {
+    const confirmed = await appConfirm(t("deleteCorpusLayerConfirm"), { danger: true });
+    if (!confirmed) {
+      return;
+    }
+    block.layers = block.layers.filter((item) => item.id !== layer.id);
+    block.updatedAt = new Date().toISOString();
+    renderCorpus(dictionary);
+    return;
+  }
+  if ((action === "move-corpus-layer-up" || action === "move-corpus-layer-down") && block && layer) {
+    moveArrayItem(block.layers, block.layers.indexOf(layer), action.endsWith("up") ? -1 : 1);
+    block.updatedAt = new Date().toISOString();
+    renderCorpus(dictionary);
+    return;
+  }
+
+  const linkedUnits = actionButton.closest(".corpus-linked-units");
+  const owner = linkedUnits ? corpusOwnerByKey(linkedUnits.dataset.corpusOwner, corpus) : null;
+  if (action === "link-corpus-unit" && owner) {
+    const unitId = linkedUnits.querySelector("[data-corpus-unit-link]").value;
+    if (unitId) {
+      moveCorpusUnitToParent(corpus, unitId, owner.key);
+      renderCorpus(dictionary);
+    }
+    return;
+  }
+  const linkedItem = actionButton.closest("[data-linked-unit-id]");
+  if (!owner || !linkedItem) {
+    return;
+  }
+  const unitId = linkedItem.dataset.linkedUnitId;
+  if (action === "unlink-corpus-unit") {
+    owner.unitIds.splice(0, owner.unitIds.length, ...owner.unitIds.filter((id) => id !== unitId));
+    renderCorpus(dictionary);
+    return;
+  }
+  if (action === "move-corpus-unit-up" || action === "move-corpus-unit-down") {
+    moveArrayItem(owner.unitIds, owner.unitIds.indexOf(unitId), action.endsWith("up") ? -1 : 1);
+    renderCorpus(dictionary);
+  }
+});
+elements.docsMarkdownInput.addEventListener("input", () => {
+  const draft = ensureDocsDraft();
+  if (draft) {
+    draft.markdown = elements.docsMarkdownInput.value;
   }
   elements.docsPreview.innerHTML = renderMarkdown(elements.docsMarkdownInput.value);
   elements.docsPreview.scrollTop = viewScrollMemory.docsPreview;
@@ -6255,11 +8462,12 @@ elements.morphologySyntaxDialog.addEventListener("click", (event) => {
     elements.morphologySyntaxDialog.hidden = true;
   }
 });
-elements.confirmCancelButton.addEventListener("click", () => closeConfirmDialog(false));
-elements.confirmAcceptButton.addEventListener("click", () => closeConfirmDialog(true));
+elements.confirmCancelButton.addEventListener("click", () => closeConfirmDialog(confirmDialogResults.cancel));
+elements.confirmAlternateButton.addEventListener("click", () => closeConfirmDialog(confirmDialogResults.alternate));
+elements.confirmAcceptButton.addEventListener("click", () => closeConfirmDialog(confirmDialogResults.accept));
 elements.confirmDialog.addEventListener("click", (event) => {
   if (event.target === elements.confirmDialog) {
-    closeConfirmDialog(false);
+    closeConfirmDialog(confirmDialogResults.cancel);
   }
 });
 elements.addMorphologyTableButton.addEventListener("click", () => {
@@ -6336,14 +8544,37 @@ elements.themeToggleButton.addEventListener("click", () => {
   currentTheme = currentTheme === "dark" ? "light" : "dark";
   render();
 });
-elements.languageToggleButton.addEventListener("click", () => {
-  currentLanguage = currentLanguage === "zh" ? "en" : "zh";
+elements.languageToggleButton.addEventListener("click", async () => {
+  const previousLanguage = currentLanguage;
+  const nextLanguage = currentLanguage === "zh" ? "en" : "zh";
+  currentLanguage = nextLanguage;
+  state.uiLanguage = nextLanguage;
   render();
+  if (!backendAvailable) {
+    return;
+  }
+  elements.languageToggleButton.disabled = true;
+  try {
+    const saved = await api("/api/preferences", {
+      method: "PUT",
+      body: JSON.stringify({ uiLanguage: nextLanguage }),
+    });
+    currentLanguage = normalizeUiLanguage(saved.uiLanguage);
+    state.uiLanguage = currentLanguage;
+  } catch (error) {
+    currentLanguage = previousLanguage;
+    state.uiLanguage = previousLanguage;
+    render();
+    showToast(t("languageSaveFailed"));
+    console.error(error);
+  } finally {
+    elements.languageToggleButton.disabled = false;
+  }
 });
 
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && confirmDialogResolver) {
-    closeConfirmDialog(false);
+    closeConfirmDialog(confirmDialogResults.cancel);
     return;
   }
 
@@ -6395,9 +8626,31 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
+  if (state.activeView === "corpus" && !elements.corpusPanel.hidden) {
+    event.preventDefault();
+    saveCorpus().catch((error) => console.error(error));
+    return;
+  }
+
   if (state.activeView === "morphology" && !elements.morphologyForm.hidden) {
     event.preventDefault();
     elements.morphologyForm.requestSubmit();
+  }
+});
+
+window.addEventListener("beforeunload", (event) => {
+  flushAutomaticModuleSaves();
+  if (!hasManualModuleChangesOnExit()) {
+    return;
+  }
+  event.preventDefault();
+  event.returnValue = "";
+});
+
+window.addEventListener("pagehide", flushAutomaticModuleSaves);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    flushAutomaticModuleSaves();
   }
 });
 

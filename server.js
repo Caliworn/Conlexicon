@@ -8,6 +8,8 @@ const dataDir = process.env.CONLEXICON_DATA_DIR ? path.resolve(process.env.CONLE
 const dictionariesDir = path.join(dataDir, "dictionaries");
 const indexPath = path.join(dataDir, "index.json");
 const port = Number(process.env.PORT || 4173);
+const GLOSS_STYLE_KEYS = ["gla", "glb", "glc", "ft"];
+const DEFAULT_ENTRY_EXAMPLE_RENDER_PATTERN = "(\\gla)\n(\\glb)\n(\\glc)\n(\\ft)";
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -25,7 +27,7 @@ async function ensureDataStore() {
   try {
     await fs.access(indexPath);
   } catch {
-    await writeJson(indexPath, { activeDictionaryId: "", dictionaryIds: [] });
+    await writeJson(indexPath, { activeDictionaryId: "", dictionaryIds: [], uiLanguage: "zh" });
   }
 }
 
@@ -54,6 +56,20 @@ function dictionaryPath(id) {
 
 function uid(prefix) {
   return `${prefix}-${crypto.randomUUID()}`;
+}
+
+function reserveEntityId(value, prefix, usedIds) {
+  const existing = String(value || "").trim();
+  if (existing) {
+    usedIds.add(existing);
+    return existing;
+  }
+  let id = uid(prefix);
+  while (usedIds.has(id)) {
+    id = uid(prefix);
+  }
+  usedIds.add(id);
+  return id;
 }
 
 function normalizeEntry(entry = {}) {
@@ -203,14 +219,28 @@ function morphologyCellKey(row, col) {
 
 function normalizeDictionarySettings(settings = {}) {
   const {
+    glossSmallCaps,
+    glossFontFamily,
+    glossFont,
+    corpusGlossAlign,
     savePartialEditOnSwitch,
     saveFullEditOnSwitch,
+    savePartialEditOnPageSwitch,
+    saveFullEditOnPageSwitch,
     ...restSettings
   } = settings;
 
   return {
     ...restSettings,
-    glossSmallCaps: Boolean(settings.glossSmallCaps),
+    glossStyles: normalizeGlossStyles(settings.glossStyles, glossFontFamily || glossFont, glossSmallCaps),
+    corpusUnitCardRenderPattern: String(settings.corpusUnitCardRenderPattern ?? settings.corpusUnitRenderPattern ?? ""),
+    corpusUnitCardGlossAlign: Boolean(settings.corpusUnitCardGlossAlign ?? corpusGlossAlign ?? true),
+    corpusUnitRenderPattern: String(settings.corpusUnitRenderPattern || ""),
+    corpusUnitGlossAlign: Boolean(settings.corpusUnitGlossAlign ?? corpusGlossAlign ?? true),
+    entryExampleRenderPattern: String(settings.entryExampleRenderPattern ?? DEFAULT_ENTRY_EXAMPLE_RENDER_PATTERN),
+    entryExampleGlossAlign: Boolean(settings.entryExampleGlossAlign ?? true),
+    corpusAutoSave: Boolean(settings.corpusAutoSave ?? true),
+    docsAutoSave: Boolean(settings.docsAutoSave ?? true),
     tagDisplayMap: normalizeTagDisplayMap(settings.tagDisplayMap),
     redHighlightTags: normalizeRedHighlightTags(settings.redHighlightTags),
     entryListPolysemyDisplay: Boolean(settings.entryListPolysemyDisplay),
@@ -219,11 +249,45 @@ function normalizeDictionarySettings(settings = {}) {
     tagFuzzySearch: Boolean(settings.tagFuzzySearch),
     sourceFuzzyCompletion: Boolean(settings.sourceFuzzyCompletion),
     searchHighlight: Boolean(settings.searchHighlight ?? true),
-    savePartialEditOnPageSwitch: Boolean(settings.savePartialEditOnPageSwitch ?? savePartialEditOnSwitch),
-    saveFullEditOnPageSwitch: Boolean(settings.saveFullEditOnPageSwitch ?? saveFullEditOnSwitch),
+    partialEditPageSwitchAction: normalizeEditPageSwitchAction(
+      settings.partialEditPageSwitchAction,
+      savePartialEditOnPageSwitch ?? savePartialEditOnSwitch,
+    ),
+    fullEditPageSwitchAction: normalizeEditPageSwitchAction(
+      settings.fullEditPageSwitchAction,
+      saveFullEditOnPageSwitch ?? saveFullEditOnSwitch,
+    ),
     ipaKeyboard: normalizeIpaKeyboard(settings.ipaKeyboard),
     ipa: normalizeIpaSettings(settings.ipa),
   };
+}
+
+function normalizeEditPageSwitchAction(value, legacySaveValue = false) {
+  return ["save", "discard", "prompt"].includes(value)
+    ? value
+    : (legacySaveValue ? "save" : "discard");
+}
+
+function normalizeGlossFontFamily(value) {
+  return ["serif", "sans", "mono"].includes(value) ? value : "serif";
+}
+
+function normalizeGlossFontSize(value) {
+  return ["small", "medium", "large"].includes(value) ? value : "medium";
+}
+
+function normalizeGlossStyles(styles = {}, legacyFontFamily = "serif", legacySmallCaps = false) {
+  const fallbackFont = normalizeGlossFontFamily(legacyFontFamily);
+  return Object.fromEntries(GLOSS_STYLE_KEYS.map((key) => {
+    const style = styles?.[key] && typeof styles[key] === "object" ? styles[key] : {};
+    return [key, {
+      fontFamily: normalizeGlossFontFamily(style.fontFamily || fallbackFont),
+      fontSize: normalizeGlossFontSize(style.fontSize),
+      bold: Boolean(style.bold),
+      italic: Boolean(style.italic ?? (key === "ft")),
+      ...(key === "glb" ? { smallCaps: Boolean(style.smallCaps ?? legacySmallCaps) } : {}),
+    }];
+  }));
 }
 
 function normalizeTagDisplayMap(map = {}) {
@@ -241,6 +305,75 @@ function normalizeDocs(docs = {}) {
   return {
     markdown: String(docs.markdown || ""),
   };
+}
+
+function normalizeCorpus(corpus = {}, usedIds = new Set()) {
+  return {
+    ...corpus,
+    blocks: Array.isArray(corpus.blocks) ? corpus.blocks.map((block) => normalizeCorpusBlock(block, usedIds)) : [],
+    units: Array.isArray(corpus.units) ? corpus.units.map((unit) => normalizeCorpusUnit(unit, usedIds)) : [],
+  };
+}
+
+function normalizeCorpusBlock(block = {}, usedIds = new Set()) {
+  const now = new Date().toISOString();
+  return {
+    ...block,
+    id: reserveEntityId(block.id, "corpus-block", usedIds),
+    title: String(block.title || block.name || ""),
+    attributes: normalizeCorpusAttributes(block.attributes),
+    tags: uniqueList(block.tags),
+    notes: String(block.notes || ""),
+    unitIds: normalizeCorpusUnitIds(block.unitIds),
+    layers: Array.isArray(block.layers) ? block.layers.map((layer) => normalizeCorpusLayer(layer, usedIds)) : [],
+    createdAt: block.createdAt || now,
+    updatedAt: block.updatedAt || now,
+  };
+}
+
+function normalizeCorpusLayer(layer = {}, usedIds = new Set()) {
+  return {
+    ...layer,
+    id: reserveEntityId(layer.id, "corpus-layer", usedIds),
+    name: String(layer.name || ""),
+    speaker: String(layer.speaker || ""),
+    modality: String(layer.modality || ""),
+    attributes: normalizeCorpusAttributes(layer.attributes),
+    tags: uniqueList(layer.tags),
+    notes: String(layer.notes || ""),
+    unitIds: normalizeCorpusUnitIds(layer.unitIds),
+  };
+}
+
+function normalizeCorpusUnit(unit = {}, usedIds = new Set()) {
+  const now = new Date().toISOString();
+  return {
+    ...unit,
+    id: reserveEntityId(unit.id, "corpus-unit", usedIds),
+    content: String(unit.content || unit.text || ""),
+    attributes: normalizeCorpusAttributes(unit.attributes),
+    tags: uniqueList(unit.tags),
+    notes: String(unit.notes || ""),
+    createdAt: unit.createdAt || now,
+    updatedAt: unit.updatedAt || now,
+  };
+}
+
+function normalizeCorpusAttributes(attributes = {}) {
+  if (!attributes || typeof attributes !== "object" || Array.isArray(attributes)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(attributes)
+      .map(([key, value]) => [String(key).trim(), String(value ?? "")])
+      .filter(([key]) => key),
+  );
+}
+
+function normalizeCorpusUnitIds(unitIds = []) {
+  return Array.isArray(unitIds)
+    ? unitIds.map((unitId) => String(unitId || "").trim()).filter(Boolean)
+    : [];
 }
 
 function normalizeIpaKeyboard(symbols) {
@@ -334,6 +467,15 @@ function normalizeIpaRule(rule = {}) {
 
 function normalizeDictionary(dictionary = {}) {
   const now = new Date().toISOString();
+  const usedEntityIds = new Set(
+    dictionaryEntityIdRecords(dictionary).map(({ id }) => String(id).trim()).filter(Boolean),
+  );
+  const entries = Array.isArray(dictionary.entries)
+    ? dictionary.entries.map((entry) => normalizeEntry({
+      ...entry,
+      id: reserveEntityId(entry.id, "entry", usedEntityIds),
+    }))
+    : [];
   return {
     id: dictionary.id || uid("dict"),
     name: dictionary.name || "未命名词典",
@@ -341,34 +483,76 @@ function normalizeDictionary(dictionary = {}) {
     description: dictionary.description || "",
     settings: normalizeDictionarySettings(dictionary.settings),
     docs: normalizeDocs(dictionary.docs),
+    corpus: normalizeCorpus(dictionary.corpus, usedEntityIds),
     morphology: normalizeMorphology(dictionary.morphology),
     createdAt: dictionary.createdAt || now,
     updatedAt: dictionary.updatedAt || now,
-    entries: Array.isArray(dictionary.entries) ? dictionary.entries.map(normalizeEntry) : [],
+    entries,
   };
 }
 
 async function readIndex() {
-  const index = await readJson(indexPath, { activeDictionaryId: "", dictionaryIds: [] });
+  const index = await readJson(indexPath, { activeDictionaryId: "", dictionaryIds: [], uiLanguage: "zh" });
   return {
     activeDictionaryId: index.activeDictionaryId || "",
     dictionaryIds: Array.isArray(index.dictionaryIds) ? index.dictionaryIds : [],
+    uiLanguage: normalizeUiLanguage(index.uiLanguage),
   };
 }
 
 async function writeIndex(index) {
+  const existing = await readJson(indexPath, { activeDictionaryId: "", dictionaryIds: [], uiLanguage: "zh" });
   await writeJson(indexPath, {
     activeDictionaryId: index.activeDictionaryId || "",
     dictionaryIds: Array.isArray(index.dictionaryIds) ? index.dictionaryIds : [],
+    uiLanguage: normalizeUiLanguage(index.uiLanguage ?? existing.uiLanguage),
   });
+}
+
+function normalizeUiLanguage(value) {
+  return value === "en" ? "en" : "zh";
 }
 
 async function readDictionary(id) {
   return normalizeDictionary(await readJson(dictionaryPath(id)));
 }
 
+function dictionaryEntityIdRecords(dictionary = {}) {
+  const records = (dictionary.entries || []).map((entry) => ({ id: entry.id, type: "entry" }));
+  (dictionary.corpus?.blocks || []).forEach((block) => {
+    records.push({ id: block.id, type: "corpus block" });
+    (block.layers || []).forEach((layer) => {
+      records.push({ id: layer.id, type: "corpus layer" });
+    });
+  });
+  (dictionary.corpus?.units || []).forEach((unit) => {
+    records.push({ id: unit.id, type: "corpus unit" });
+  });
+  return records.filter(({ id }) => id);
+}
+
+function assertUniqueDictionaryEntityIds(dictionary) {
+  const recordsById = new Map();
+  dictionaryEntityIdRecords(dictionary).forEach((record) => {
+    if (!recordsById.has(record.id)) {
+      recordsById.set(record.id, []);
+    }
+    recordsById.get(record.id).push(record.type);
+  });
+  const duplicates = [...recordsById.entries()].filter(([, types]) => types.length > 1);
+  if (!duplicates.length) {
+    return;
+  }
+  const details = duplicates
+    .slice(0, 20)
+    .map(([id, types]) => `${id} (${types.join(", ")})`)
+    .join("; ");
+  throw Object.assign(new Error(`Duplicate dictionary entity IDs: ${details}`), { status: 409 });
+}
+
 async function writeDictionary(dictionary) {
   const normalized = normalizeDictionary(dictionary);
+  assertUniqueDictionaryEntityIds(normalized);
   await writeJson(dictionaryPath(normalized.id), normalized);
   return normalized;
 }
@@ -394,7 +578,7 @@ async function readState() {
     await writeIndex({ activeDictionaryId, dictionaryIds });
   }
 
-  return { activeDictionaryId, dictionaries };
+  return { activeDictionaryId, dictionaries, uiLanguage: index.uiLanguage };
 }
 
 async function readRequestBody(request) {
@@ -446,7 +630,7 @@ function importDictionaryFromPayload(payload) {
   }
 
   if (payload && typeof payload === "object" && !Array.isArray(payload)) {
-    const hasDictionaryShape = payload.id || payload.name || Array.isArray(payload.entries) || payload.settings || payload.docs || payload.morphology;
+    const hasDictionaryShape = payload.id || payload.name || Array.isArray(payload.entries) || payload.settings || payload.docs || payload.corpus || payload.morphology;
     if (!hasDictionaryShape) {
       throw Object.assign(new Error("Invalid import payload"), { status: 400 });
     }
@@ -459,6 +643,17 @@ function importDictionaryFromPayload(payload) {
 async function routeApi(request, response, url) {
   if (request.method === "GET" && url.pathname === "/api/state") {
     sendJson(response, 200, await readState());
+    return true;
+  }
+
+  if (request.method === "PUT" && url.pathname === "/api/preferences") {
+    const body = await readRequestBody(request);
+    if (!["zh", "en"].includes(body.uiLanguage)) {
+      throw Object.assign(new Error("Invalid UI language"), { status: 400 });
+    }
+    const index = await readIndex();
+    await writeIndex({ ...index, uiLanguage: body.uiLanguage });
+    sendJson(response, 200, { uiLanguage: body.uiLanguage });
     return true;
   }
 
@@ -478,6 +673,10 @@ async function routeApi(request, response, url) {
   if (request.method === "POST" && url.pathname === "/api/import") {
     const dictionary = importDictionaryFromPayload(await readRequestBody(request));
     const existing = await readIndex();
+    const overwrite = url.searchParams.get("overwrite") === "true";
+    if (existing.dictionaryIds.includes(dictionary.id) && !overwrite) {
+      throw Object.assign(new Error("Dictionary ID already exists; overwrite confirmation required"), { status: 409 });
+    }
     await writeDictionary(dictionary);
 
     const dictionaryIds = existing.dictionaryIds.includes(dictionary.id)
@@ -505,7 +704,7 @@ async function routeApi(request, response, url) {
     return true;
   }
 
-  const dictionaryMatch = url.pathname.match(/^\/api\/dictionaries\/([^/]+)(?:\/(activate))?$/);
+  const dictionaryMatch = url.pathname.match(/^\/api\/dictionaries\/([^/]+)(?:\/(activate|autosave))?$/);
   if (dictionaryMatch) {
     const id = decodeURIComponent(dictionaryMatch[1]);
     const action = dictionaryMatch[2];
@@ -518,6 +717,19 @@ async function routeApi(request, response, url) {
       }
       await writeIndex({ ...index, activeDictionaryId: id });
       sendJson(response, 200, await readState());
+      return true;
+    }
+
+    if (request.method === "POST" && action === "autosave") {
+      const index = await readIndex();
+      if (!index.dictionaryIds.includes(id)) {
+        sendText(response, 404, "Dictionary not found");
+        return true;
+      }
+      const body = await readRequestBody(request);
+      const existing = await readDictionary(id);
+      const dictionary = await writeDictionary({ ...existing, ...body, id });
+      sendJson(response, 200, dictionary);
       return true;
     }
 

@@ -6,8 +6,8 @@ Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。
 
 ## Features / 功能
 
-- Multi-dictionary management: create, switch, import, export, configure, and delete dictionaries.
-- Per-dictionary JSON persistence: dictionary entries, settings, docs, IPA rules, morphology rules, and UI options are saved with the dictionary.
+- Multi-dictionary management: create, switch, import, export, configure, and delete dictionaries, with explicit confirmation before an imported dictionary ID overwrites an existing dictionary.
+- Per-dictionary JSON persistence: dictionary entries, corpus data, settings, docs, IPA rules, morphology rules, and UI options are saved with the dictionary.
 - Lexical entry editing with lemma, pronunciation, tags, multiple definitions, examples, notes, etymology, sources, and derived-entry backlinks.
 - Tag-first part-of-speech logic: the first tag is treated as the part of speech and is used for display/filtering.
 - Display mode and edit mode: saved entries open in a clean reading view, with full editing and inline section editing available.
@@ -17,13 +17,14 @@ Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。
 - Auto IPA rules with mapping, syllabification, onset/coda clusters, complex phonemes, stress settings, sandbox testing, and batch generation.
 - Auto morphology tables with custom rule syntax, function objects, overrides, generated forms, and searchable morphology output.
 - Markdown language documentation with split edit/preview, edit-only, and preview-only modes.
+- Per-dictionary corpus management with ordered blocks, speaker/modality layers, standalone units, inherited attributes, unique entity ID validation, single-parent link validation, and configurable gloss-based unit names with optional render objects.
 - Paged data analysis for overview, entries/tags, IPA, morphology, editing activity, quality checks, etymology checks, and glossed examples.
-- Gloss rendering for `\gla`, `\glb`, `\glc`, and `\ft`, including small-caps rendering for gloss lines.
-- Per-dictionary UI/settings options, including fuzzy search, label display replacement, highlighted tags, gloss rendering, polysemy display, save behavior, IPA keyboard symbols, and left navigation order.
-- Dark mode and Chinese/English UI switching.
+- Gloss rendering for `\gla`, `\glb`, `\glc`, and `\ft`, with independent render-object and alignment settings for corpus unit cards, unit content headings, and entry examples, plus per-object font, size, bold, italic, and `\glb` small-caps styles.
+- Per-dictionary UI/settings options, including fuzzy search, label display replacement, highlighted tags, gloss rendering, polysemy display, save/discard/prompt handling for edits during navigation, corpus/docs auto-save, IPA keyboard symbols, and left navigation order.
+- Dark mode and Chinese/English UI switching, with the global interface language remembered in `data/index.json`.
 
-- 多词典管理：新建、切换、导入、导出、配置和删除词典。
-- 词典级 JSON 保存：词条、设置、语言文档、IPA 规则、形态学规则和界面选项都会随当前词典保存。
+- 多词典管理：新建、切换、导入、导出、配置和删除词典；导入相同词典 ID 的词典前会明确确认是否覆盖。
+- 词典级 JSON 保存：词条、语料库、设置、语言文档、IPA 规则、形态学规则和界面选项都会随当前词典保存。
 - 词条编辑：支持词形、发音、标签、多条释义、例句、备注、词源、来源以及反向衍生链接。
 - 标签即词性：第一个标签会被视为词性，用于显示和筛选。
 - 查看模式与编辑模式：保存后的词条会进入整洁的阅读界面，也支持完整编辑和栏目局部编辑。
@@ -33,10 +34,11 @@ Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。
 - 自动 IPA：支持映射、音节划分、音节首/尾辅音簇、复杂音位、重音设置、沙盒测试和批量生成。
 - 自动形态学：支持自定义形态表格、规则语法、函数识别对象、词条覆盖项、生成形式和搜索生成结果。
 - Markdown 语言文档：支持左右分栏编辑预览、纯编辑和纯查看模式。
+- 词典级语料库：支持有序语料块、发言人/模态语料层、独立语料单元、属性继承、实体 ID 唯一性检查、单父级链接检查，以及带可选渲染对象的 Gloss 单元名渲染。
 - 分页式数据分析：包括总览、词条与标签、IPA、形态学、编辑进度、质量检查、词源检查和 glossed 例句检查。
-- Gloss 渲染：支持 `\gla`、`\glb`、`\glc` 和 `\ft`，并可为 gloss 行启用 small caps。
-- 词典级界面设置：包括模糊搜索、标签显示替换、红色高亮标签、gloss 渲染、多义项显示、保存行为、IPA 虚拟键盘符号和左侧导航栏排序。
-- 暗黑模式和中英界面切换。
+- Gloss 渲染：语料单元卡片、单元内容名称和词条例句可分别配置渲染对象与对齐，并支持 `\gla`、`\glb`、`\glc`、`\ft` 独立配置字体、字号、粗体和斜体，以及 `\glb` small caps。
+- 词典级界面设置：包括模糊搜索、标签显示替换、红色高亮标签、gloss 渲染、多义项显示、导航时保存/放弃/提示编辑、语料库/文档自动保存、IPA 虚拟键盘符号和左侧导航栏排序。
+- 暗黑模式和中英界面切换；全局界面语言会记忆在 `data/index.json` 中。
 
 ## Run Locally / 本地运行
 
@@ -67,6 +69,10 @@ data/
 data/index.json
 data/dictionaries/*.json
 ```
+
+`data/index.json` stores the dictionary index, active dictionary ID, and global interface language. Per-dictionary content and settings remain in `data/dictionaries/*.json`.
+
+`data/index.json` 保存词典索引、当前词典 ID 和全局界面语言；各词典的内容与设置仍分别保存在 `data/dictionaries/*.json` 中。
 
 The `data/` directory is intentionally ignored by Git so personal dictionaries are not committed to the repository.
 
