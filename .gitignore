@@ -1,5 +1,6 @@
 data/
 node_modules/
-electron-shell/dist/
+electron-shell/
 .DS_Store
 Thumbs.db
+NEXT_IMPLEMENTATION_HANDOFF.md

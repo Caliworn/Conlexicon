@@ -64,6 +64,7 @@ let advancedFilter = null;
 let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
 let draggedToolNavView = "";
+let draggedIpaRuleId = "";
 const entryVirtualList = createVirtualListState(138);
 const corpusVirtualList = createVirtualListState(74);
 const masonryLayouts = new WeakMap();
@@ -310,7 +311,7 @@ const i18n = {
     stressMappings: "重音映射",
     addMapping: "添加映射",
     addStressMapping: "添加重音映射",
-    mappingRuleHelp: "按顺序配置输入、输出、前接条件、后接条件。输出中写入 ˈ 或以 ' 开头，可将该音节标为重读并覆盖默认重音。",
+    mappingRuleHelp: "规则从上到下匹配；输入与前后条件始终只读取原始词形，生成结果不会被后续规则再次读取。较前规则消耗的字符不会再参与后续匹配，可拖动规则调整优先级。输出中写入 ˈ 或以 ' 开头，可将该音节标为重读并覆盖默认重音。",
     stressMappingHelp: "输出中写入 ˈ 或以 ' 开头，可将该音节标为重读并覆盖默认重音。",
     syllabification: "音节划分",
     syllableRules: "音节规则",
@@ -336,6 +337,7 @@ const i18n = {
     ruleTo: "输出",
     ruleBefore: "前接条件",
     ruleAfter: "后接条件",
+    reorderIpaRule: "拖动调整规则顺序",
     removeRule: "删除规则",
     ipaSaved: "IPA 配置已保存",
     ipaGenerated: "已生成 IPA",
@@ -666,7 +668,7 @@ const i18n = {
     stressMappings: "Stress Mappings",
     addMapping: "Add Mapping",
     addStressMapping: "Add Stress Mapping",
-    mappingRuleHelp: "Configure input, output, before-condition, and after-condition. Put ˈ in the output, or start it with ', to mark that syllable as stressed and override default stress.",
+    mappingRuleHelp: "Rules are tried from top to bottom. Inputs and contexts always read the original lemma; generated output is never fed into later rules. Characters consumed by an earlier rule are unavailable to later rules. Drag rules to change priority. Put ˈ in the output, or start it with ', to mark that syllable as stressed and override default stress.",
     stressMappingHelp: "Put ˈ in the output, or start it with ', to mark that syllable as stressed and override default stress.",
     syllabification: "Syllabification",
     syllableRules: "Syllabification Rules",
@@ -692,6 +694,7 @@ const i18n = {
     ruleTo: "Output",
     ruleBefore: "Before",
     ruleAfter: "After",
+    reorderIpaRule: "Drag to reorder rule",
     removeRule: "Remove Rule",
     ipaSaved: "IPA config saved",
     ipaGenerated: "IPA generated",
@@ -5211,14 +5214,33 @@ function createIpaRuleCard(rule = normalizeIpaRule()) {
   card.dataset.ruleId = rule.id || uid("ipa");
   card.innerHTML = `
     <div class="ipa-rule-grid">
-      <input data-field="from" aria-label="${escapeHtml(t("ruleFrom"))}" placeholder="${escapeHtml(t("ruleFrom"))}" value="${escapeHtml(rule.from)}">
-      <input data-field="to" aria-label="${escapeHtml(t("ruleTo"))}" placeholder="${escapeHtml(t("ruleTo"))}" value="${escapeHtml(rule.to)}">
-      <input data-field="before" aria-label="${escapeHtml(t("ruleBefore"))}" placeholder="${escapeHtml(t("ruleBefore"))}" value="${escapeHtml(rule.before)}">
-      <input data-field="after" aria-label="${escapeHtml(t("ruleAfter"))}" placeholder="${escapeHtml(t("ruleAfter"))}" value="${escapeHtml(rule.after)}">
+      <button class="ipa-rule-drag-handle" type="button" draggable="true" aria-label="${escapeHtml(t("reorderIpaRule"))}" title="${escapeHtml(t("reorderIpaRule"))}">⋮⋮</button>
+      <textarea class="ipa-single-line" rows="1" data-field="from" aria-label="${escapeHtml(t("ruleFrom"))}" placeholder="${escapeHtml(t("ruleFrom"))}">${escapeHtml(rule.from)}</textarea>
+      <textarea class="ipa-single-line" rows="1" data-field="to" aria-label="${escapeHtml(t("ruleTo"))}" placeholder="${escapeHtml(t("ruleTo"))}">${escapeHtml(rule.to)}</textarea>
+      <textarea class="ipa-single-line" rows="1" data-field="before" aria-label="${escapeHtml(t("ruleBefore"))}" placeholder="${escapeHtml(t("ruleBefore"))}">${escapeHtml(rule.before)}</textarea>
+      <textarea class="ipa-single-line" rows="1" data-field="after" aria-label="${escapeHtml(t("ruleAfter"))}" placeholder="${escapeHtml(t("ruleAfter"))}">${escapeHtml(rule.after)}</textarea>
       <button class="icon-danger-button" type="button" data-action="remove-ipa-rule" aria-label="${escapeHtml(t("removeRule"))}" title="${escapeHtml(t("removeRule"))}">🗑</button>
     </div>
   `;
   return card;
+}
+
+function ipaRuleInsertBefore(container, y) {
+  const cards = [...container.querySelectorAll(".ipa-rule-card:not(.dragging)")];
+  return cards.reduce((closest, card) => {
+    const box = card.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) {
+      return { offset, card };
+    }
+    return closest;
+  }, { offset: Number.NEGATIVE_INFINITY, card: null }).card;
+}
+
+function finishIpaRuleDrag() {
+  elements.ipaMappingList.querySelector(".ipa-rule-card.dragging")?.classList.remove("dragging");
+  draggedIpaRuleId = "";
+  renderIpaSandbox();
 }
 
 function collectIpaRuleList(container) {
@@ -5235,7 +5257,7 @@ function collectIpaRuleList(container) {
 
 function addIpaRule(container) {
   container.append(createIpaRuleCard());
-  container.querySelector(".ipa-rule-card:last-child input")?.focus();
+  container.querySelector('.ipa-rule-card:last-child [data-field="from"]')?.focus();
 }
 
 function stableJson(value) {
@@ -6875,9 +6897,7 @@ function renderIpaSandbox() {
 }
 
 function applyIpaMappings(source, ipa) {
-  const rules = ipa.mappings
-    .filter((rule) => rule.from)
-    .sort((a, b) => b.from.length - a.from.length);
+  const rules = ipa.mappings.filter((rule) => rule.from);
 
   const chunks = [];
   let index = 0;
@@ -7185,7 +7205,7 @@ async function openPartialEdit(section) {
       <label>
         <span>${escapeHtml(t("pronunciation"))}</span>
         <div class="inline-field-action">
-          <input data-field="pronunciation" maxlength="120" value="${escapeHtml(entry.pronunciation)}">
+          <textarea class="ipa-single-line" rows="1" data-field="pronunciation" maxlength="120">${escapeHtml(entry.pronunciation)}</textarea>
           <button class="secondary-button" type="button" data-action="partial-auto-ipa">${escapeHtml(t("autoIpa"))}</button>
         </div>
       </label>
@@ -8526,6 +8546,37 @@ elements.addIpaMappingButton.addEventListener("click", () => {
   addIpaRule(elements.ipaMappingList);
   renderIpaSandbox();
 });
+elements.ipaMappingList.addEventListener("dragstart", (event) => {
+  const handle = event.target.closest(".ipa-rule-drag-handle");
+  const card = handle?.closest(".ipa-rule-card");
+  if (!card) {
+    event.preventDefault();
+    return;
+  }
+  draggedIpaRuleId = card.dataset.ruleId || "";
+  card.classList.add("dragging");
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", draggedIpaRuleId);
+});
+elements.ipaMappingList.addEventListener("dragover", (event) => {
+  const dragging = elements.ipaMappingList.querySelector(".ipa-rule-card.dragging");
+  if (!dragging || !draggedIpaRuleId) {
+    return;
+  }
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+  const before = ipaRuleInsertBefore(elements.ipaMappingList, event.clientY);
+  if (before) {
+    elements.ipaMappingList.insertBefore(dragging, before);
+  } else {
+    elements.ipaMappingList.append(dragging);
+  }
+});
+elements.ipaMappingList.addEventListener("drop", (event) => {
+  event.preventDefault();
+  finishIpaRuleDrag();
+});
+elements.ipaMappingList.addEventListener("dragend", finishIpaRuleDrag);
 elements.ipaSandboxInput.addEventListener("input", renderIpaSandbox);
 elements.ipaForm.addEventListener("input", renderIpaSandbox);
 elements.ipaForm.addEventListener("click", (event) => {
@@ -8572,7 +8623,36 @@ elements.languageToggleButton.addEventListener("click", async () => {
   }
 });
 
+document.addEventListener("beforeinput", (event) => {
+  if (!event.target.matches?.("textarea.ipa-single-line")) {
+    return;
+  }
+  if (event.inputType === "insertLineBreak" || event.inputType === "insertParagraph") {
+    event.preventDefault();
+  }
+});
+
+document.addEventListener("input", (event) => {
+  const field = event.target;
+  if (!field.matches?.("textarea.ipa-single-line") || !/[\r\n]/.test(field.value)) {
+    return;
+  }
+  const start = field.selectionStart ?? field.value.length;
+  const end = field.selectionEnd ?? start;
+  const normalizeLineBreaks = (value) => value.replace(/[\r\n]+/g, " ");
+  const nextStart = normalizeLineBreaks(field.value.slice(0, start)).length;
+  const nextEnd = normalizeLineBreaks(field.value.slice(0, end)).length;
+  field.value = normalizeLineBreaks(field.value);
+  field.setSelectionRange(nextStart, nextEnd);
+}, true);
+
 document.addEventListener("keydown", (event) => {
+  if (event.target.matches?.("textarea.ipa-single-line") && event.key === "Enter" && !event.isComposing) {
+    event.preventDefault();
+    event.target.form?.requestSubmit();
+    return;
+  }
+
   if (event.key === "Escape" && confirmDialogResolver) {
     closeConfirmDialog(confirmDialogResults.cancel);
     return;

@@ -169,7 +169,7 @@
                 <label>
                   <span data-i18n="pronunciation">发音</span>
                   <div class="inline-field-action">
-                    <input id="pronunciationInput" name="pronunciation" maxlength="120">
+                    <textarea class="ipa-single-line" id="pronunciationInput" name="pronunciation" rows="1" maxlength="120"></textarea>
                     <button class="secondary-button" id="autoIpaButton" type="button" data-i18n="autoIpa">自动 IPA</button>
                   </div>
                 </label>
@@ -750,8 +750,9 @@
                   </div>
                   <button class="secondary-button" id="addIpaMappingButton" type="button" data-i18n="addMapping">添加映射</button>
                 </div>
-                <p class="field-help" data-i18n="mappingRuleHelp">按顺序配置输入、输出、前接条件、后接条件。输出中写入 ˈ 或以 ' 开头，可将该音节标为重读并覆盖默认重音。</p>
+                <p class="field-help" data-i18n="mappingRuleHelp">规则从上到下匹配；输入与前后条件始终只读取原始词形，生成结果不会被后续规则再次读取。较前规则消耗的字符不会再参与后续匹配，可拖动规则调整优先级。输出中写入 ˈ 或以 ' 开头，可将该音节标为重读并覆盖默认重音。</p>
                 <div class="ipa-rule-header" aria-hidden="true">
+                  <span></span>
                   <span data-i18n="ruleFrom">输入</span>
                   <span data-i18n="ruleTo">输出</span>
                   <span data-i18n="ruleBefore">前接条件</span>
@@ -774,23 +775,23 @@
                 <div class="form-grid">
                   <label>
                     <span data-i18n="vowels">元音音位</span>
-                    <input id="ipaVowelsInput" maxlength="120">
+                    <textarea class="ipa-single-line" id="ipaVowelsInput" rows="1" maxlength="120"></textarea>
                   </label>
                   <label>
                     <span data-i18n="syllableSeparator">音节分隔符</span>
-                    <input id="ipaSyllableSeparatorInput" maxlength="4">
+                    <textarea class="ipa-single-line" id="ipaSyllableSeparatorInput" rows="1" maxlength="4"></textarea>
                   </label>
                   <label>
                     <span data-i18n="onsetClusters">音节首辅音簇</span>
-                    <input id="ipaOnsetClustersInput" maxlength="220">
+                    <textarea class="ipa-single-line" id="ipaOnsetClustersInput" rows="1" maxlength="220"></textarea>
                   </label>
                   <label>
                     <span data-i18n="codaClusters">音节尾辅音簇</span>
-                    <input id="ipaCodaClustersInput" maxlength="220">
+                    <textarea class="ipa-single-line" id="ipaCodaClustersInput" rows="1" maxlength="220"></textarea>
                   </label>
                   <label>
                     <span data-i18n="complexPhonemes">复杂音位</span>
-                    <input id="ipaComplexPhonemesInput" maxlength="220">
+                    <textarea class="ipa-single-line" id="ipaComplexPhonemesInput" rows="1" maxlength="220"></textarea>
                   </label>
                 </div>
               </section>
@@ -826,7 +827,7 @@
               </div>
               <label>
                 <span data-i18n="ipaSandboxInput">输入</span>
-                <input id="ipaSandboxInput" maxlength="160">
+                <textarea class="ipa-single-line" id="ipaSandboxInput" rows="1" maxlength="160"></textarea>
               </label>
               <div class="ipa-sandbox-output">
                 <span data-i18n="ipaSandboxMapped">映射</span>
