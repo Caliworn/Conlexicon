@@ -16,6 +16,14 @@ let toastTimer = null;
 let editorMode = "display";
 let currentTheme = "light";
 let currentLanguage = "zh";
+const shellState = {
+  navCollapsed: false,
+  wideNavCollapsed: false,
+  browserCollapsedByView: {},
+};
+let activeAppTooltipTarget = null;
+const desktopNavMediaQuery = window.matchMedia("(min-width: 800px)");
+const wideNavMediaQuery = window.matchMedia("(min-width: 1280px)");
 const IPA_STRESS_MARKER = "\uE000";
 const GLOSS_STYLE_KEYS = ["gla", "glb", "glc", "ft"];
 const DEFAULT_ENTRY_EXAMPLE_RENDER_PATTERN = "(\\gla)\n(\\glb)\n(\\glc)\n(\\ft)";
@@ -72,6 +80,12 @@ const masonryLayouts = new WeakMap();
 const i18n = {
   zh: {
     appTitle: "人造语言词典",
+    toolNavigation: "工具导航",
+    collapseNavigation: "收起工具导航",
+    expandNavigation: "展开工具导航",
+    entryBrowser: "词条列表",
+    collapseEntryBrowser: "收起词条列表",
+    expandEntryBrowser: "展开词条列表",
     entryEditor: "词条编辑",
     current: "当前",
     planned: "待实装",
@@ -228,10 +242,10 @@ const i18n = {
     tagDisplaySettings: "标签突出显示",
     tagRedHighlightHelp: "配置后，这些标签会在词条浏览栏和查看界面中以红色显示。多个标签用逗号、空格或换行分隔。",
     tagFilterSettings: "标签筛选",
-    entryListTagFilteringHelp: "在词条浏览栏中点击标签时启用筛选",
+    entryListTagFilteringHelp: "在词条列表中点击标签时启用筛选",
     displaySettings: "显示",
     polysemyDisplay: "多义项显示",
-    entryListPolysemyDisplay: "词条浏览栏的多义项显示",
+    entryListPolysemyDisplay: "词条列表的多义项显示",
     networkPolysemyDisplay: "词汇网络悬浮卡片的多义项显示",
     ipaKeyboardSettings: "IPA 虚拟键盘",
     ipaKeyboardSymbols: "键盘符号",
@@ -429,6 +443,12 @@ const i18n = {
   },
   en: {
     appTitle: "Constructed Language Dictionary",
+    toolNavigation: "Tool navigation",
+    collapseNavigation: "Collapse tool navigation",
+    expandNavigation: "Expand tool navigation",
+    entryBrowser: "Entry list",
+    collapseEntryBrowser: "Collapse entry list",
+    expandEntryBrowser: "Expand entry list",
     entryEditor: "Entries",
     current: "Current",
     planned: "Planned",
@@ -585,10 +605,10 @@ const i18n = {
     tagDisplaySettings: "Tag Highlighting",
     tagRedHighlightHelp: "Configured tags are shown in red in the entry browser and display mode. Separate tags with commas, spaces, or line breaks.",
     tagFilterSettings: "Tag Filtering",
-    entryListTagFilteringHelp: "Enable filtering when clicking tags in the entry browser",
+    entryListTagFilteringHelp: "Enable filtering when clicking tags in the entry list",
     displaySettings: "Display",
     polysemyDisplay: "Polysemy Display",
-    entryListPolysemyDisplay: "Entry browser polysemy display",
+    entryListPolysemyDisplay: "Entry list polysemy display",
     networkPolysemyDisplay: "Lexical network hover-card polysemy display",
     ipaKeyboardSettings: "IPA Virtual Keyboard",
     ipaKeyboardSymbols: "Keyboard Symbols",
@@ -787,8 +807,15 @@ const i18n = {
 };
 
 const elements = {
+  appShell: document.querySelector("#appShell"),
+  appNav: document.querySelector("#appNav"),
+  navCollapseButton: document.querySelector("#navCollapseButton"),
+  appTooltip: document.querySelector("#appTooltip"),
+  appTooltipTargets: [...document.querySelectorAll("#appNav button, [data-app-tooltip]")],
   editorView: document.querySelector("#editorView"),
   editorTopBar: document.querySelector("#editorTopBar"),
+  entryBrowserToggleButton: document.querySelector("#entryBrowserToggleButton"),
+  entryBrowser: document.querySelector("#entryBrowser"),
   dictionaryManagerView: document.querySelector("#dictionaryManagerView"),
   analysisView: document.querySelector("#analysisView"),
   settingsView: document.querySelector("#settingsView"),
@@ -808,6 +835,7 @@ const elements = {
   batchIpaMissingButton: document.querySelector("#batchIpaMissingButton"),
   addDictionaryButton: document.querySelector("#addDictionaryButton"),
   themeToggleButton: document.querySelector("#themeToggleButton"),
+  themeToggleLabel: document.querySelector("#themeToggleLabel"),
   languageToggleButton: document.querySelector("#languageToggleButton"),
   brandEyebrow: document.querySelector("#brandEyebrow"),
   brandTitle: document.querySelector('[data-i18n="appTitle"]'),
@@ -1704,8 +1732,10 @@ function render() {
   ensureValidSelection();
   applyLocale();
   applyTheme();
+  renderShellNav();
   renderView();
   renderAvailability();
+  renderShellEntryBrowser();
   renderHeader();
   renderToolNav();
   renderActiveView();
@@ -1863,15 +1893,153 @@ function applyLocale() {
     node.title = text;
     node.setAttribute("aria-label", text);
   });
+  document.querySelectorAll("[data-i18n-aria-label]").forEach((node) => {
+    node.setAttribute("aria-label", t(node.dataset.i18nAriaLabel));
+  });
   document.body.classList.toggle("english-locale", currentLanguage === "en");
   elements.brandEyebrow.hidden = currentLanguage === "en";
   elements.brandTitle.textContent = currentLanguage === "en" ? "CONLEXICON" : t("appTitle");
   elements.languageToggleButton.textContent = currentLanguage === "zh" ? "EN" : "中";
-  elements.themeToggleButton.textContent = currentTheme === "dark" ? t("lightMode") : t("darkMode");
+  const nextThemeLabel = currentTheme === "dark" ? t("lightMode") : t("darkMode");
+  elements.themeToggleLabel.textContent = nextThemeLabel;
+  elements.themeToggleButton.title = nextThemeLabel;
+  elements.themeToggleButton.setAttribute("aria-label", nextThemeLabel);
+  const nextLanguageLabel = currentLanguage === "zh" ? "English" : "中文";
+  elements.languageToggleButton.title = nextLanguageLabel;
+  elements.languageToggleButton.setAttribute("aria-label", nextLanguageLabel);
 }
 
 function applyTheme() {
   document.body.classList.toggle("dark-theme", currentTheme === "dark");
+}
+
+function effectiveNavCollapsed() {
+  if (!desktopNavMediaQuery.matches) {
+    return false;
+  }
+  return wideNavMediaQuery.matches ? shellState.wideNavCollapsed : true;
+}
+
+function renderShellNav() {
+  hideAppTooltip();
+  const collapsed = effectiveNavCollapsed();
+  shellState.navCollapsed = collapsed;
+  const navState = collapsed ? "rail" : "expanded";
+  elements.appShell.dataset.navState = navState;
+  elements.appNav.dataset.navState = navState;
+  elements.navCollapseButton.hidden = !wideNavMediaQuery.matches;
+  elements.navCollapseButton.setAttribute("aria-expanded", String(!collapsed));
+  const controlLabel = t(collapsed ? "expandNavigation" : "collapseNavigation");
+  elements.navCollapseButton.setAttribute("aria-label", controlLabel);
+  elements.appTooltipTargets.forEach((button) => {
+    if (elements.appNav.contains(button)) {
+      button.removeAttribute("title");
+    }
+  });
+}
+
+function appTooltipEnabledFor(target) {
+  if (!target) {
+    return false;
+  }
+  if (target.dataset.appTooltip === "always") {
+    return true;
+  }
+  return elements.appNav.contains(target)
+    && (shellState.navCollapsed || target.classList.contains("icon-button"));
+}
+
+function showAppTooltip(target) {
+  if (!appTooltipEnabledFor(target) || target.hidden) {
+    return;
+  }
+  const label = target.getAttribute("aria-label");
+  if (!label) {
+    return;
+  }
+  hideAppTooltip();
+  activeAppTooltipTarget = target;
+  elements.appTooltip.textContent = label;
+  elements.appTooltip.hidden = false;
+  target.setAttribute("aria-describedby", "appTooltip");
+  requestAnimationFrame(() => {
+    if (activeAppTooltipTarget !== target || elements.appTooltip.hidden) {
+      return;
+    }
+    const targetRect = target.getBoundingClientRect();
+    const tooltipRect = elements.appTooltip.getBoundingClientRect();
+    const isNavTarget = elements.appNav.contains(target);
+    let left;
+    let top;
+    if (isNavTarget) {
+      left = targetRect.right + 10;
+      top = targetRect.top + (targetRect.height - tooltipRect.height) / 2;
+    } else {
+      left = targetRect.left + (targetRect.width - tooltipRect.width) / 2;
+      top = targetRect.bottom + 8;
+      if (top + tooltipRect.height > window.innerHeight - 8) {
+        top = targetRect.top - tooltipRect.height - 8;
+      }
+    }
+    left = Math.max(8, Math.min(window.innerWidth - tooltipRect.width - 8, left));
+    top = Math.max(8, Math.min(window.innerHeight - tooltipRect.height - 8, top));
+    elements.appTooltip.style.left = `${left}px`;
+    elements.appTooltip.style.top = `${top}px`;
+  });
+}
+
+function hideAppTooltip() {
+  if (activeAppTooltipTarget) {
+    activeAppTooltipTarget.removeAttribute("aria-describedby");
+  }
+  activeAppTooltipTarget = null;
+  elements.appTooltip.hidden = true;
+}
+
+function effectiveEntryBrowserCollapsed(view = state.activeView) {
+  return desktopNavMediaQuery.matches
+    && view === "editor"
+    && Boolean(shellState.browserCollapsedByView[view]);
+}
+
+function renderShellEntryBrowser() {
+  hideAppTooltip();
+  const canToggle = desktopNavMediaQuery.matches
+    && backendAvailable
+    && Boolean(activeDictionary())
+    && state.activeView === "editor";
+  const collapsed = canToggle && effectiveEntryBrowserCollapsed("editor");
+  const browserState = collapsed ? "collapsed" : "expanded";
+  elements.appShell.dataset.browserState = browserState;
+  elements.contentGrid.dataset.browserState = browserState;
+  elements.entryBrowser.hidden = collapsed;
+  elements.entryBrowserToggleButton.hidden = !canToggle;
+  elements.entryBrowserToggleButton.setAttribute("aria-expanded", String(!collapsed));
+  const controlLabel = t(collapsed ? "expandEntryBrowser" : "collapseEntryBrowser");
+  elements.entryBrowserToggleButton.setAttribute("aria-label", controlLabel);
+  elements.entryBrowserToggleButton.removeAttribute("title");
+}
+
+function remeasureEntryVirtualList() {
+  const container = entryVirtualList.container;
+  if (!container || container.offsetParent === null) {
+    return;
+  }
+  const anchor = virtualListAnchor(entryVirtualList);
+  entryVirtualList.sizes.clear();
+  entryVirtualList.width = Math.round(container.clientWidth);
+  rebuildVirtualListOffsets(entryVirtualList);
+  restoreVirtualListAnchor(entryVirtualList, anchor);
+  renderVirtualListWindow(entryVirtualList);
+}
+
+function toggleEntryBrowser() {
+  const view = "editor";
+  shellState.browserCollapsedByView[view] = !effectiveEntryBrowserCollapsed(view);
+  renderShellEntryBrowser();
+  if (!effectiveEntryBrowserCollapsed(view)) {
+    requestAnimationFrame(remeasureEntryVirtualList);
+  }
 }
 
 function renderAvailability() {
@@ -8156,7 +8324,30 @@ elements.addDefinitionButton.addEventListener("click", () => {
   renderDefinitionFormList(definitions);
 });
 
+elements.appTooltipTargets.forEach((button) => {
+  button.addEventListener("pointerenter", () => showAppTooltip(button));
+  button.addEventListener("pointerleave", () => {
+    if (document.activeElement !== button) {
+      hideAppTooltip();
+    }
+  });
+  button.addEventListener("focus", () => showAppTooltip(button));
+  button.addEventListener("blur", () => {
+    if (!button.matches(":hover")) {
+      hideAppTooltip();
+    }
+  });
+});
+elements.toolList.addEventListener("scroll", hideAppTooltip);
 elements.dictionaryManagerButton.addEventListener("click", () => showView("manager"));
+elements.navCollapseButton.addEventListener("click", () => {
+  if (!wideNavMediaQuery.matches) {
+    return;
+  }
+  shellState.wideNavCollapsed = !shellState.wideNavCollapsed;
+  renderShellNav();
+});
+elements.entryBrowserToggleButton.addEventListener("click", toggleEntryBrowser);
 elements.backToEditorButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromSettingsButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromAnalysisButton.addEventListener("click", () => showView("editor"));
@@ -8733,5 +8924,15 @@ document.addEventListener("visibilitychange", () => {
     flushAutomaticModuleSaves();
   }
 });
+
+desktopNavMediaQuery.addEventListener("change", () => {
+  renderShellNav();
+  renderShellEntryBrowser();
+  if (!effectiveEntryBrowserCollapsed("editor")) {
+    requestAnimationFrame(remeasureEntryVirtualList);
+  }
+});
+wideNavMediaQuery.addEventListener("change", renderShellNav);
+window.addEventListener("resize", renderShellNav);
 
 loadState();

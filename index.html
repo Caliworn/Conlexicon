@@ -7,52 +7,82 @@
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <div class="app-shell">
-      <aside class="dictionary-panel" aria-label="工具导航">
+    <div class="app-shell" id="appShell" data-nav-state="expanded" data-browser-state="expanded">
+      <aside class="dictionary-panel app-nav" id="appNav" data-i18n-aria-label="toolNavigation" aria-label="工具导航">
         <div class="brand-row">
-          <div>
+          <div class="brand-copy">
             <p class="eyebrow" id="brandEyebrow">Conlexicon</p>
             <h1 data-i18n="appTitle">人造语言词典</h1>
           </div>
-          <button class="icon-button" id="dictionaryManagerButton" type="button" aria-label="管理词典" title="管理词典">⇄</button>
+          <div class="brand-actions">
+            <button class="icon-button" id="dictionaryManagerButton" type="button" data-i18n-title="dictionaryManager" aria-label="词典管理" title="词典管理">
+              <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M8 7h11m0 0-3-3m3 3-3 3M16 17H5m0 0 3 3m-3-3 3-3"></path>
+              </svg>
+            </button>
+            <button class="icon-button nav-collapse-button" id="navCollapseButton" type="button" aria-controls="appNav" aria-expanded="true" aria-label="收起工具导航" title="收起工具导航">
+              <svg class="nav-icon nav-collapse-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                <path d="M9 4v16"></path>
+                <path class="nav-collapse-arrow" d="m15 8-4 4 4 4"></path>
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <nav class="tool-list" aria-label="功能">
-          <button class="tool-button active" type="button" data-view="editor">
-            <span data-i18n="entryEditor">词条编辑</span>
+        <nav class="tool-list" data-i18n-aria-label="toolNavigation" aria-label="工具导航">
+          <button class="tool-button active" type="button" data-view="editor" data-i18n-title="entryEditor">
+            <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"></path></svg></span>
+            <span class="tool-label" data-i18n="entryEditor">词条编辑</span>
           </button>
-          <button class="tool-button" type="button" data-view="docs">
-            <span data-i18n="languageDocs">语言文档</span>
+          <button class="tool-button" type="button" data-view="docs" data-i18n-title="languageDocs">
+            <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path><path d="M14 2v6h6M8 13h8M8 17h6"></path></svg></span>
+            <span class="tool-label" data-i18n="languageDocs">语言文档</span>
           </button>
-          <button class="tool-button" type="button" data-view="corpus">
-            <span data-i18n="corpus">语料库</span>
+          <button class="tool-button" type="button" data-view="corpus" data-i18n-title="corpus">
+            <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5Z"></path><path d="m3 12 9 5 9-5M3 17l9 5 9-5"></path></svg></span>
+            <span class="tool-label" data-i18n="corpus">语料库</span>
           </button>
-          <button class="tool-button" type="button" data-view="analysis">
-            <span data-i18n="analysis">数据分析</span>
+          <button class="tool-button" type="button" data-view="analysis" data-i18n-title="analysis">
+            <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19V3"></path></svg></span>
+            <span class="tool-label" data-i18n="analysis">数据分析</span>
           </button>
-          <button class="tool-button" type="button" data-view="ipa">
-            <span data-i18n="ipaConfig">自动 IPA 标注</span>
+          <button class="tool-button" type="button" data-view="ipa" data-i18n-title="ipaConfig">
+            <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 10v4M7 7v10M11 4v16M15 8v8M19 6v12M23 10v4"></path></svg></span>
+            <span class="tool-label" data-i18n="ipaConfig">自动 IPA 标注</span>
           </button>
-          <button class="tool-button" type="button" data-view="morphology">
-            <span data-i18n="morphologyConfig">自动形态学</span>
+          <button class="tool-button" type="button" data-view="morphology" data-i18n-title="morphologyConfig">
+            <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 10h18M9 4v16M15 4v16"></path></svg></span>
+            <span class="tool-label" data-i18n="morphologyConfig">自动形态学</span>
           </button>
-          <button class="tool-button" type="button" data-view="settings">
-            <span data-i18n="otherSettings">其他设置</span>
+          <button class="tool-button" type="button" data-view="settings" data-i18n-title="otherSettings">
+            <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"></path></svg></span>
+            <span class="tool-label" data-i18n="otherSettings">其他设置</span>
           </button>
         </nav>
 
         <div class="panel-actions utility-actions">
-          <button class="secondary-button" id="themeToggleButton" type="button" data-i18n="darkMode">暗黑模式</button>
-          <button class="secondary-button" id="languageToggleButton" type="button">EN</button>
+          <button class="secondary-button utility-button" id="themeToggleButton" type="button">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"></path></svg>
+            <span class="utility-label" id="themeToggleLabel">暗黑模式</span>
+          </button>
+          <button class="secondary-button utility-button language-toggle" id="languageToggleButton" type="button" aria-label="English" title="English">EN</button>
         </div>
       </aside>
 
       <main class="workspace">
         <section class="view active" id="editorView" aria-label="词条编辑">
           <section class="top-bar" id="editorTopBar">
-            <div>
+            <div class="dictionary-heading">
               <p class="eyebrow" id="dictionaryMeta">0 个词条</p>
-              <h2 id="dictionaryTitle">词典</h2>
+              <div class="dictionary-title-row">
+                <h2 id="dictionaryTitle">词典</h2>
+                <button class="secondary-button entry-browser-toggle" id="entryBrowserToggleButton" type="button" data-app-tooltip="always" aria-controls="entryBrowser" aria-expanded="true" aria-label="收起词条列表">
+                  <svg class="nav-icon entry-browser-toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="m6 9 6 6 6-6"></path>
+                  </svg>
+                </button>
+              </div>
             </div>
             <div class="top-actions">
               <button class="primary-button" id="newEntryButton" type="button" data-i18n="newEntry">新建词条</button>
@@ -72,8 +102,8 @@
             <button class="primary-button" id="emptyCreateDictionaryButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
           </section>
 
-          <section class="content-grid">
-            <section class="entry-browser" aria-label="词条列表">
+          <section class="content-grid" id="editorContentGrid" data-browser-state="expanded">
+            <section class="entry-browser view-browser" id="entryBrowser" data-i18n-aria-label="entryBrowser" aria-label="词条列表">
               <div class="filter-row">
                 <input id="searchInput" type="search" data-i18n-placeholder="searchPlaceholder" placeholder="搜索词形、释义、标签">
                 <select id="partFilter" aria-label="词性筛选">
@@ -467,7 +497,7 @@
                   <h3 data-i18n="tagFilterSettings">标签筛选</h3>
                 </div>
                 <label class="toggle-row">
-                  <span data-i18n="entryListTagFilteringHelp">在词条浏览栏中点击标签时启用筛选</span>
+                  <span data-i18n="entryListTagFilteringHelp">在词条列表中点击标签时启用筛选</span>
                   <input id="entryListTagFilteringInput" type="checkbox">
                 </label>
               </section>
@@ -479,7 +509,7 @@
                   </div>
                 </div>
                 <label class="toggle-row">
-                  <span data-i18n="entryListPolysemyDisplay">词条浏览栏的多义项显示</span>
+                  <span data-i18n="entryListPolysemyDisplay">词条列表的多义项显示</span>
                   <input id="entryListPolysemyInput" type="checkbox">
                 </label>
                 <label class="toggle-row">
@@ -907,6 +937,7 @@
       </article>
     </section>
 
+    <div class="app-tooltip" id="appTooltip" role="tooltip" hidden></div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
     <script src="app.js"></script>
