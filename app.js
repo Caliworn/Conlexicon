@@ -156,6 +156,8 @@ const i18n = {
     advancedFilterMode: "高级筛选",
     exitAdvancedFilter: "退出高级筛选",
     cycleAdvancedFilter: "切换筛选条件",
+    qualityFilterInfo: "查看质量筛选说明",
+    qualityFilterInfoBody: "点击这里的筛选按钮可以启用高级筛选，并在词条列表中查看全部有对应质量问题的词条。按优先度筛选会在全部、高、中、低之间循环；按检查模块筛选会在词形、标签、词源网络、Glossed 例句和其他问题之间循环。",
     sortLemmaAsc: "首字母正序",
     sortLemmaDesc: "首字母倒序",
     sortUpdatedAsc: "编辑时间正序",
@@ -229,16 +231,27 @@ const i18n = {
     requiredPronunciation: "请填写发音",
     requiredTags: "请填写至少一个标签",
     requiredDefinition: "请填写至少一条释义",
-    unsavedSettingsConfirm: "其他设置中有未保存的更改。要放弃这些更改并离开吗？",
-    unsavedIpaConfirm: "自动 IPA 标注中有未保存的更改。要放弃这些更改并离开吗？",
-    unsavedDictionaryConfirm: "词典设置中有未保存的更改。要放弃这些更改并离开吗？",
-    unsavedMorphologyConfirm: "自动形态学中有未保存的更改。要放弃这些更改并离开吗？",
-    unsavedCorpusConfirm: "语料库中有未保存的更改。要放弃这些更改并离开吗？",
-    unsavedDocsConfirm: "语言文档中有未保存的更改。要放弃这些更改并离开吗？",
+    unsavedSettingsConfirm: "其他设置中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
+    unsavedIpaConfirm: "自动 IPA 标注中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
+    unsavedDictionaryConfirm: "词典设置中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
+    unsavedMorphologyConfirm: "自动形态学中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
+    unsavedCorpusConfirm: "语料库中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
+    unsavedDocsConfirm: "语言文档中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
     tags: "标签",
     entryTagSettings: "词条标签",
     tagDisplayReplacement: "标签显示替换",
     tagDisplayReplacementHelp: "每行一条，格式为 原标签 = 显示文本。仅影响查看模式中的显示，不改变词条数据。",
+    partOfSpeechTagSettings: "词性标签",
+    manualPartOfSpeechTags: "手动配置词性标签",
+    partOfSpeechTagsHelp: "开启后，仅这里列出的标签会被识别为词性；多个标签用逗号分隔。关闭时仍保留内容，但使用第一个词条标签作为词性。",
+    tagOrderSettings: "自动整理标签顺序",
+    tagOrderHelp: "输入统一标签顺序，多个标签用逗号分隔。填写原始标签，不填写显示替换后的文本。",
+    tagOrderInfo: "查看标签排序逻辑",
+    tagOrderInfoBody: "点击刷新后，系统会按输入框中的统一顺序重排每个词条的标签。统一顺序里有而某个词条没有的标签会被跳过；某个词条里有但统一顺序里没有的标签会保留在末尾，多个额外标签保持原始相对顺序。这里应填写原始标签；显示替换只影响界面显示，不参与匹配。",
+    tagOrderConfirm: "将按照当前输入的统一顺序重排当前词典中所有词条的标签，并立即保存。继续吗？",
+    tagOrderApplied: "标签顺序已整理",
+    tagOrderEmpty: "请先输入至少一个标签。",
+    applyTags: "应用",
     tagDisplaySettings: "标签突出显示",
     tagRedHighlightHelp: "配置后，这些标签会在词条浏览栏和查看界面中以红色显示。多个标签用逗号、空格或换行分隔。",
     tagFilterSettings: "标签筛选",
@@ -519,6 +532,8 @@ const i18n = {
     advancedFilterMode: "Advanced Filter",
     exitAdvancedFilter: "Exit Advanced Filter",
     cycleAdvancedFilter: "Cycle Filter Condition",
+    qualityFilterInfo: "Show quality filter help",
+    qualityFilterInfoBody: "Click these filter buttons to enable Advanced Filter and review all entries with the corresponding quality issues in the entry list. Priority filters cycle between all, high, medium, and low priority. Module filters cycle between word-form, tag, etymology network, Glossed example, and other issues.",
     sortLemmaAsc: "Lemma A-Z",
     sortLemmaDesc: "Lemma Z-A",
     sortUpdatedAsc: "Updated Oldest",
@@ -592,16 +607,27 @@ const i18n = {
     requiredPronunciation: "Fill pronunciation",
     requiredTags: "Fill at least one tag",
     requiredDefinition: "Fill at least one definition",
-    unsavedSettingsConfirm: "Other Settings has unsaved changes. Discard them and leave?",
-    unsavedIpaConfirm: "Auto IPA has unsaved changes. Discard them and leave?",
-    unsavedDictionaryConfirm: "Dictionary settings has unsaved changes. Discard them and leave?",
-    unsavedMorphologyConfirm: "Auto Morphology has unsaved changes. Discard them and leave?",
-    unsavedCorpusConfirm: "Corpus has unsaved changes. Discard them and leave?",
-    unsavedDocsConfirm: "Language Docs has unsaved changes. Discard them and leave?",
+    unsavedSettingsConfirm: "Other Settings has unsaved changes. Save them, discard them, or cancel the current action.",
+    unsavedIpaConfirm: "Auto IPA has unsaved changes. Save them, discard them, or cancel the current action.",
+    unsavedDictionaryConfirm: "Dictionary settings has unsaved changes. Save them, discard them, or cancel the current action.",
+    unsavedMorphologyConfirm: "Auto Morphology has unsaved changes. Save them, discard them, or cancel the current action.",
+    unsavedCorpusConfirm: "Corpus has unsaved changes. Save them, discard them, or cancel the current action.",
+    unsavedDocsConfirm: "Language Docs has unsaved changes. Save them, discard them, or cancel the current action.",
     tags: "Tags",
     entryTagSettings: "Entry Tags",
     tagDisplayReplacement: "Tag Display Replacement",
     tagDisplayReplacementHelp: "One per line, in the format Original Tag = Display Text. Only affects display mode; entry data is unchanged.",
+    partOfSpeechTagSettings: "Part-of-Speech Tags",
+    manualPartOfSpeechTags: "Manually configure part-of-speech tags",
+    partOfSpeechTagsHelp: "When enabled, only tags listed here are recognized as parts of speech. Separate tags with commas. When disabled, the value is kept but the first entry tag is used as the part of speech.",
+    tagOrderSettings: "Auto Arrange Tag Order",
+    tagOrderHelp: "Enter a unified tag order separated by commas. Use raw tags, not display replacements.",
+    tagOrderInfo: "Show tag ordering logic",
+    tagOrderInfoBody: "After you click Refresh, each entry's tags are reordered by the unified order in this field. Tags in the unified order that an entry does not have are skipped. Tags on an entry that are not in the unified order are kept at the end, and multiple extra tags keep their original relative order. Use raw tags here; display replacements only affect how tags are shown.",
+    tagOrderConfirm: "This will reorder tags for every entry in the current dictionary using the current unified order and save immediately. Continue?",
+    tagOrderApplied: "Tag order arranged",
+    tagOrderEmpty: "Enter at least one tag first.",
+    applyTags: "Apply",
     tagDisplaySettings: "Tag Highlighting",
     tagRedHighlightHelp: "Configured tags are shown in red in the entry browser and display mode. Separate tags with commas, spaces, or line breaks.",
     tagFilterSettings: "Tag Filtering",
@@ -923,6 +949,11 @@ const elements = {
   entryExampleRenderPatternInput: document.querySelector("#entryExampleRenderPatternInput"),
   entryExampleGlossAlignInput: document.querySelector("#entryExampleGlossAlignInput"),
   tagDisplayMapInput: document.querySelector("#tagDisplayMapInput"),
+  manualPartOfSpeechTagsInput: document.querySelector("#manualPartOfSpeechTagsInput"),
+  partOfSpeechTagsInput: document.querySelector("#partOfSpeechTagsInput"),
+  tagSortOrderInput: document.querySelector("#tagSortOrderInput"),
+  applyTagSortOrderButton: document.querySelector("#applyTagSortOrderButton"),
+  tagOrderInfoButton: document.querySelector("#tagOrderInfoButton"),
   tagRedHighlightInput: document.querySelector("#tagRedHighlightInput"),
   entryListTagFilteringInput: document.querySelector("#entryListTagFilteringInput"),
   entryListPolysemyInput: document.querySelector("#entryListPolysemyInput"),
@@ -1223,6 +1254,9 @@ function normalizeDictionarySettings(settings = {}) {
     corpusAutoSave: Boolean(settings.corpusAutoSave ?? true),
     docsAutoSave: Boolean(settings.docsAutoSave ?? true),
     tagDisplayMap: normalizeTagDisplayMap(settings.tagDisplayMap),
+    manualPartOfSpeechTags: Boolean(settings.manualPartOfSpeechTags),
+    partOfSpeechTags: normalizeTagList(settings.partOfSpeechTags),
+    tagSortOrder: normalizeTagList(settings.tagSortOrder),
     redHighlightTags: normalizeRedHighlightTags(settings.redHighlightTags),
     entryListTagFiltering: Boolean(settings.entryListTagFiltering ?? true),
     entryListPolysemyDisplay: Boolean(settings.entryListPolysemyDisplay),
@@ -1329,8 +1363,49 @@ function normalizeRedHighlightTags(value) {
       if (!unique.includes(item)) {
         unique.push(item);
       }
-    });
+  });
   return unique;
+}
+
+function normalizeTagList(value) {
+  const items = Array.isArray(value) ? value.map(String) : splitList(value);
+  const unique = [];
+  items
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .forEach((item) => {
+      if (!unique.includes(item)) {
+        unique.push(item);
+      }
+  });
+  return unique;
+}
+
+function tagOrderRankMap(order) {
+  const ranks = new Map();
+  normalizeTagList(order).forEach((tag, index) => {
+    const key = normalize(tag);
+    if (key && !ranks.has(key)) {
+      ranks.set(key, index);
+    }
+  });
+  return ranks;
+}
+
+function arrangeTagsByOrder(tags = [], order = []) {
+  const items = (tags || []).filter(Boolean);
+  const ranks = tagOrderRankMap(order);
+  if (!ranks.size || items.length < 2) {
+    return items;
+  }
+  return items
+    .map((tag, index) => ({
+      tag,
+      index,
+      rank: ranks.has(normalize(tag)) ? ranks.get(normalize(tag)) : Number.POSITIVE_INFINITY,
+    }))
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map(({ tag }) => tag);
 }
 
 function parseTagDisplayMap(value) {
@@ -1696,7 +1771,39 @@ function selectedDictionaryConfig() {
 }
 
 function entryPart(entry) {
-  return entry?.tags?.[0] || "";
+  return entryParts(entry)[0] || "";
+}
+
+function entryParts(entry, dictionary = activeDictionary()) {
+  const tags = entry?.tags || [];
+  if (!tags.length) {
+    return [];
+  }
+  const settings = normalizeDictionarySettings(dictionary?.settings);
+  if (!settings.manualPartOfSpeechTags) {
+    return tags[0] ? [tags[0]] : [];
+  }
+  const configuredParts = new Set(settings.partOfSpeechTags.map(normalize));
+  if (!configuredParts.size) {
+    return [];
+  }
+  return tags.filter((tag) => configuredParts.has(normalize(tag)));
+}
+
+function entryPartLabels(entry, dictionary = activeDictionary()) {
+  return entryParts(entry, dictionary).map((part) => displayTag(part, dictionary));
+}
+
+function entryPartText(entry, dictionary = activeDictionary()) {
+  return entryPartLabels(entry, dictionary).join(", ");
+}
+
+function entryTagIsPart(entry, tagIndex, tag, dictionary = activeDictionary()) {
+  const settings = normalizeDictionarySettings(dictionary?.settings);
+  if (!settings.manualPartOfSpeechTags) {
+    return tagIndex === 0;
+  }
+  return entryParts(entry, dictionary).some((part) => normalize(part) === normalize(tag));
 }
 
 function displayTag(tag, dictionary = activeDictionary()) {
@@ -2142,7 +2249,7 @@ function renderPartFilter() {
     elements.partFilter.value = "";
   }
   const usedParts = dictionary
-    ? [...new Set(dictionary.entries.map(entryPart).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN"))
+    ? [...new Set(dictionary.entries.flatMap((entry) => entryParts(entry, dictionary)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN"))
     : [];
   const options = ["", ...usedParts];
   const current = activePart;
@@ -2545,13 +2652,13 @@ function renderRootModeRow(row) {
 }
 
 function createEntryCard(entry, options = {}) {
-  const part = entryPart(entry);
+  const partText = entryPartText(entry);
   const settings = normalizeDictionarySettings(activeDictionary()?.settings);
   const contentFuzzyEnabled = Boolean(settings.fuzzySearch);
   const tagFuzzyEnabled = Boolean(settings.tagFuzzySearch);
   const subtitle = [
     entry.pronunciation ? highlightSearchText(entry.pronunciation, contentFuzzyEnabled) : "",
-    part ? highlightSearchText(displayTag(part), tagFuzzyEnabled) : "",
+    partText ? highlightSearchText(partText, tagFuzzyEnabled) : "",
   ].filter(Boolean).join(" · ");
   const meaningSummary = entryDefinitionSummary(entry, settings.entryListPolysemyDisplay);
   const searchSnippets = renderEntrySearchSnippets(entry);
@@ -2835,7 +2942,7 @@ async function applyTagFilter(entry, tagIndex, tag) {
     return;
   }
 
-  if (tagIndex === 0) {
+  if (entryTagIsPart(entry, tagIndex, tag, dictionary)) {
     advancedFilter = null;
     rootMode = false;
     activePart = tag;
@@ -2908,11 +3015,11 @@ function entryMatchesSearch(entry, dictionary = activeDictionary(), options = {}
   const contentFuzzyEnabled = options.contentFuzzyEnabled ?? Boolean(settings.fuzzySearch);
   const tagFuzzyEnabled = options.tagFuzzyEnabled ?? Boolean(settings.tagFuzzySearch);
   const respectPart = options.respectPart ?? true;
-  const part = entryPart(entry);
-  const matchesPart = !respectPart || !activePart || part === activePart;
+  const parts = entryParts(entry, dictionary);
+  const matchesPart = !respectPart || !activePart || parts.includes(activePart);
   const tagSearchable = [
-    part,
-    displayTag(part, dictionary),
+    ...parts,
+    ...parts.map((part) => displayTag(part, dictionary)),
     ...(entry.tags || []),
     ...(entry.tags || []).map((tag) => displayTag(tag, dictionary)),
   ]
@@ -3209,25 +3316,26 @@ function renderEmptyDetail() {
 }
 
 function renderEntryDisplay(entry) {
-  const part = entryPart(entry);
-  const otherTags = (entry.tags || []).slice(1);
+  const partTags = (entry.tags || [])
+    .map((tag, index) => ({ tag, index }))
+    .filter(({ tag, index }) => entryTagIsPart(entry, index, tag));
+  const otherTags = (entry.tags || [])
+    .map((tag, index) => ({ tag, index }))
+    .filter(({ tag, index }) => !entryTagIsPart(entry, index, tag));
   elements.editEntryButton.hidden = false;
   elements.openLexicalNetworkButton.hidden = false;
   elements.displayLemma.textContent = entry.lemma;
   elements.displayPronunciation.textContent = entry.pronunciation;
   elements.displayPronunciation.hidden = !entry.pronunciation;
-  elements.displayPart.textContent = displayTag(part);
-  elements.displayPart.hidden = !part;
-  elements.displayPart.classList.toggle("highlight-tag", Boolean(part && tagIsRedHighlighted(part)));
-  if (part) {
-    elements.displayPart.dataset.entryTagIndex = "0";
-    elements.displayPart.dataset.entryTagValue = part;
-  } else {
-    delete elements.displayPart.dataset.entryTagIndex;
-    delete elements.displayPart.dataset.entryTagValue;
-  }
+  elements.displayPart.innerHTML = partTags
+    .map(({ tag, index }) => `<span class="part-badge-item${tagIsRedHighlighted(tag) ? " highlight-tag" : ""}" data-entry-tag-index="${index}" data-entry-tag-value="${escapeHtml(tag)}">${escapeHtml(displayTag(tag))}</span>`)
+    .join("");
+  elements.displayPart.hidden = !partTags.length;
+  elements.displayPart.classList.remove("highlight-tag");
+  delete elements.displayPart.dataset.entryTagIndex;
+  delete elements.displayPart.dataset.entryTagValue;
   elements.displayTags.innerHTML = otherTags
-    .map((tag, index) => `<span class="outline-chip${tagIsRedHighlighted(tag) ? " highlight-tag" : ""}" data-entry-tag-index="${index + 1}" data-entry-tag-value="${escapeHtml(tag)}">${escapeHtml(displayTag(tag))}</span>`)
+    .map(({ tag, index }) => `<span class="outline-chip${tagIsRedHighlighted(tag) ? " highlight-tag" : ""}" data-entry-tag-index="${index}" data-entry-tag-value="${escapeHtml(tag)}">${escapeHtml(displayTag(tag))}</span>`)
     .join("");
 
   elements.displayDefinitions.innerHTML = "";
@@ -3302,10 +3410,10 @@ function renderDerivedEntries(entry) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "derived-link";
-    const part = entryPart(derivedEntry);
+    const partText = entryPartText(derivedEntry, dictionary);
     button.innerHTML = `
       <strong>${escapeHtml(derivedEntry.lemma)}</strong>
-      ${part ? `<span>${escapeHtml(displayTag(part))}</span>` : ""}
+      ${partText ? `<span>${escapeHtml(partText)}</span>` : ""}
     `;
     button.addEventListener("click", () => switchToEntry(derivedEntry.id));
     elements.displayDerived.append(button);
@@ -3389,16 +3497,16 @@ function createNetworkNode(entry, isFocus = false) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = `network-node${isFocus ? " focus" : ""}`;
-  const part = entryPart(entry);
+  const partText = entryPartText(entry);
   const settings = normalizeDictionarySettings(activeDictionary()?.settings);
   const meaningHtml = renderNetworkMeaningHtml(entry, settings.networkPolysemyDisplay);
   button.innerHTML = `
     <strong>${escapeHtml(entry.lemma)}</strong>
-    <span>${escapeHtml([entry.pronunciation, displayTag(part)].filter(Boolean).join(" · "))}</span>
+    <span>${escapeHtml([entry.pronunciation, partText].filter(Boolean).join(" · "))}</span>
     <div class="network-card" role="tooltip">
       <b>${escapeHtml(entry.lemma)}</b>
       ${entry.pronunciation ? `<span>${escapeHtml(entry.pronunciation)}</span>` : ""}
-      ${part ? `<span>${escapeHtml(displayTag(part))}</span>` : ""}
+      ${partText ? `<span>${escapeHtml(partText)}</span>` : ""}
       ${meaningHtml}
     </div>
   `;
@@ -3509,7 +3617,7 @@ function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = Boolean
     .slice(0, visibleLimit)
     .map((tag, index) => {
       const text = displayTag(tag);
-      const classes = ["chip", index === 0 ? "part-chip" : "", tagIsRedHighlighted(tag) ? "highlight-tag" : ""].filter(Boolean).join(" ");
+      const classes = ["chip", entryTagIsPart(entry, index, tag) ? "part-chip" : "", tagIsRedHighlighted(tag) ? "highlight-tag" : ""].filter(Boolean).join(" ");
       const tagAttributes = clickable
         ? ` data-entry-tag-index="${index}" data-entry-tag-value="${escapeHtml(tag)}"`
         : "";
@@ -3927,6 +4035,16 @@ function analysisPageNav(activePage) {
 }
 
 function analysisSubpageNav(page, activeSubpage) {
+  if (page === "quality") {
+    return `<div class="analysis-subpage-tab-groups">${analysisQualitySubpageGroups().map((group) => `
+      <div class="analysis-subpage-tab-group">
+        <span>${escapeHtml(group.label)}</span>
+        <nav class="analysis-subpage-tabs">${group.subpages.map(([subpage, label]) => `
+          <button type="button" class="${subpage === activeSubpage ? "active" : ""}" data-analysis-subpage="${escapeHtml(subpage)}">${escapeHtml(label)}</button>
+        `).join("")}</nav>
+      </div>
+    `).join("")}</div>`;
+  }
   const subpages = analysisSubpages(page);
   if (!subpages.length) {
     return "";
@@ -3959,16 +4077,33 @@ function analysisSubpages(page) {
       ["created", aText("新增日期", "Created")],
       ["latest", aText("最近修改", "Recent")],
     ],
-    quality: [
-      ["issues", aText("全部问题", "All Issues")],
-      ["high", aText("高优先级", "High")],
-      ["medium", aText("中优先级", "Medium")],
-      ["low", aText("低优先级", "Low")],
-      ["network", aText("词源网络", "Etymology")],
-      ["gloss", aText("Glossed 例句", "Glossed Examples")],
-    ],
+    quality: analysisQualitySubpageGroups().flatMap((group) => group.subpages),
   };
   return subpages[page] || [];
+}
+
+function analysisQualitySubpageGroups() {
+  return [
+    {
+      label: aText("按优先度", "By priority"),
+      subpages: [
+        ["issues", aText("全部问题", "All Issues")],
+        ["high", aText("高优先级", "High")],
+        ["medium", aText("中优先级", "Medium")],
+        ["low", aText("低优先级", "Low")],
+      ],
+    },
+    {
+      label: aText("按检查模块", "By check module"),
+      subpages: [
+        ["lemma", aText("词形问题", "Word Forms")],
+        ["tags", aText("标签问题", "Tags")],
+        ["network", aText("词源网络", "Etymology")],
+        ["gloss", aText("Glossed 例句", "Glossed Examples")],
+        ["other", aText("其他问题", "Other")],
+      ],
+    },
+  ];
 }
 
 function analysisPageBody(report, page, subpage) {
@@ -4087,26 +4222,110 @@ function renderAnalysisActivityPage(report, subpage) {
 }
 
 function renderAnalysisQualityPage(report, subpage) {
+  const filterBar = renderAnalysisQualityFilterBar(report);
+  if (["lemma", "tags", "other"].includes(subpage)) {
+    const moduleIssues = qualityIssuesByModule(report, subpage);
+    return `${filterBar}<section class="analysis-detail-grid">${analysisCard(qualityIssueModuleLabel(subpage), analysisIssueList(moduleIssues, { limit: Infinity }))}</section>`;
+  }
   if (subpage === "network") {
-    return `<section class="analysis-detail-grid">${analysisCard(aText("词源网络检查", "Etymology Network Checks"), analysisIssueList(report.networkIssues, { limit: Infinity }))}</section>`;
+    return `${filterBar}<section class="analysis-detail-grid">${analysisCard(aText("词源网络检查", "Etymology Network Checks"), analysisIssueList(report.networkIssues, { limit: Infinity }))}</section>`;
   }
   if (subpage === "gloss") {
-    const glossIssues = report.issues.filter((issue) => /gloss/i.test(`${issue.title} ${issue.detail}`));
-    return `<section class="analysis-detail-grid">
+    const glossIssues = qualityIssuesByModule(report, "gloss");
+    return `${filterBar}<section class="analysis-detail-grid">
       ${analysisCard(aText("Glossed 例句", "Glossed Examples"), analysisFactList([[aText("Glossed 例句", "Glossed examples"), report.glossExamples, advancedFilterAction(aText("Glossed 例句", "Glossed examples"), report.glossEntryIds)]]))}
       ${analysisCard(aText("Glossed 例句问题", "Glossed Example Issues"), analysisIssueList(glossIssues, { limit: Infinity }))}
     </section>`;
   }
   if (["high", "medium", "low"].includes(subpage)) {
     const issues = report.issues.filter((issue) => issue.severity === subpage);
-    return `<section class="analysis-detail-grid">${analysisCard(aText("质量检查", "Quality Checks"), analysisIssueList(issues, { limit: Infinity }))}</section>`;
+    return `${filterBar}<section class="analysis-detail-grid">${analysisCard(aText("质量检查", "Quality Checks"), analysisIssueList(issues, { limit: Infinity }))}</section>`;
   }
-  return `<section class="analysis-detail-grid">${analysisCard(aText("质量检查", "Quality Checks"), analysisIssueList(report.issues, { limit: Infinity }))}</section>`;
+  return `${filterBar}<section class="analysis-detail-grid">${analysisCard(aText("质量检查", "Quality Checks"), analysisIssueList(report.issues, { limit: Infinity }))}</section>`;
+}
+
+function renderAnalysisQualityFilterBar(report) {
+  const issueEntryIds = entryIdsFrom(report.issues.map((issue) => issue.entryId));
+  const highIssueEntryIds = entryIdsFrom(report.issues.filter((issue) => issue.severity === "high").map((issue) => issue.entryId));
+  const mediumIssueEntryIds = entryIdsFrom(report.issues.filter((issue) => issue.severity === "medium").map((issue) => issue.entryId));
+  const lowIssueEntryIds = entryIdsFrom(report.issues.filter((issue) => issue.severity === "low").map((issue) => issue.entryId));
+  const priorityVariants = [
+    { title: aText("质量问题", "Quality issues"), entryIds: issueEntryIds },
+    { title: aText("高优先级质量问题", "High-priority quality issues"), entryIds: highIssueEntryIds },
+    { title: aText("中优先级质量问题", "Medium-priority quality issues"), entryIds: mediumIssueEntryIds },
+    { title: aText("低优先级质量问题", "Low-priority quality issues"), entryIds: lowIssueEntryIds },
+  ];
+  const priorityAction = (title, entryIds) => entryIds.length
+    ? advancedFilterAction(title, entryIds, { variants: priorityVariants.filter((variant) => variant.title !== title) })
+    : null;
+  const moduleItems = ["lemma", "tags", "network", "gloss", "other"].map((module) => ({
+    module,
+    title: qualityIssueModuleFilterTitle(module),
+    label: qualityIssueModuleLabel(module),
+    entryIds: qualityIssueEntryIdsByModule(report, module),
+  }));
+  const moduleAction = (title, entryIds) => entryIds.length
+    ? advancedFilterAction(title, entryIds, { variants: moduleItems.filter((item) => item.title !== title).map((item) => ({ title: item.title, entryIds: item.entryIds })) })
+    : null;
+  const priorityItems = [
+    [aText("全部问题", "All issues"), issueEntryIds.length, priorityAction(aText("质量问题", "Quality issues"), issueEntryIds)],
+    [aText("高优先级", "High"), highIssueEntryIds.length, priorityAction(aText("高优先级质量问题", "High-priority quality issues"), highIssueEntryIds)],
+    [aText("中优先级", "Medium"), mediumIssueEntryIds.length, priorityAction(aText("中优先级质量问题", "Medium-priority quality issues"), mediumIssueEntryIds)],
+    [aText("低优先级", "Low"), lowIssueEntryIds.length, priorityAction(aText("低优先级质量问题", "Low-priority quality issues"), lowIssueEntryIds)],
+  ];
+  const moduleFilterItems = moduleItems.map((item) => [item.label, item.entryIds.length, moduleAction(item.title, item.entryIds)]);
+  return `
+    <section class="analysis-filter-strip" aria-label="${escapeHtml(aText("质量检查高级筛选", "Quality advanced filters"))}">
+      <div>
+        <strong>${escapeHtml(aText("高级筛选入口", "Advanced filter shortcuts"))}</strong>
+        <button class="info-button" type="button" data-action="quality-filter-info" aria-label="${escapeHtml(t("qualityFilterInfo"))}" title="${escapeHtml(t("qualityFilterInfo"))}">i</button>
+      </div>
+      ${renderAnalysisQualityFilterGroup(aText("按优先度", "By priority"), priorityItems)}
+      ${renderAnalysisQualityFilterGroup(aText("按检查模块", "By check module"), moduleFilterItems)}
+    </section>
+  `;
+}
+
+function renderAnalysisQualityFilterGroup(label, items) {
+  return `
+    <div class="analysis-filter-group">
+      <span>${escapeHtml(label)}</span>
+      <div class="analysis-filter-actions">
+        ${items.map(([itemLabel, count, action]) => {
+          const attrs = analysisActionAttributes(action);
+          return `<button class="secondary-button" type="button"${attrs} ${attrs ? "" : "disabled"}>${escapeHtml(itemLabel)}<span>${escapeHtml(count)}</span></button>`;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function qualityIssuesByModule(report, module) {
+  return (report.issues || []).filter((issue) => (issue.module || "other") === module);
+}
+
+function qualityIssueEntryIdsByModule(report, module) {
+  return entryIdsFrom(qualityIssuesByModule(report, module).map((issue) => issue.entryId));
+}
+
+function qualityIssueModuleLabel(module) {
+  const labels = {
+    lemma: aText("词形问题", "Word-form issues"),
+    tags: aText("标签问题", "Tag issues"),
+    network: aText("词源网络问题", "Etymology network issues"),
+    gloss: aText("Glossed 例句问题", "Glossed example issues"),
+    other: aText("其他问题", "Other issues"),
+  };
+  return labels[module] || labels.other;
+}
+
+function qualityIssueModuleFilterTitle(module) {
+  return qualityIssueModuleLabel(module);
 }
 
 function analysisFactRows(report) {
   return [
-    [aText("例句数量", "Examples"), report.examples, advancedFilterAction(aText("有例句", "Has examples"), report.exampleEntryIds)],
+    [aText("例句数量", "Examples"), report.examples, binaryCoverageFilterAction(aText("有例句", "Has examples"), report.exampleEntryIds, aText("无例句", "No examples"), report.noExampleEntryIds)],
     [aText("Glossed 例句", "Glossed examples"), report.glossExamples, advancedFilterAction(aText("Glossed 例句", "Glossed examples"), report.glossEntryIds)],
     [aText("多来源词条", "Multi-source entries"), report.multiSourceCount, advancedFilterAction(aText("多来源词条", "Multi-source entries"), report.multiSourceEntryIds)],
     [aText("当前搜索命中", "Current search matches"), report.searchMatches, viewAction("editor")],
@@ -4114,9 +4333,21 @@ function analysisFactRows(report) {
 }
 
 function analysisIpaMismatchRows(report) {
+  const matchTitle = aText("IPA 自动生成一致", "Auto IPA matches");
+  const looseTitle = aText("IPA 自动生成不一致（宽松）", "Auto IPA mismatches (loose)");
+  const strictTitle = aText("IPA 自动生成不一致（严格）", "Auto IPA mismatches (strict)");
+  const variants = [
+    { title: matchTitle, entryIds: report.ipa.generatedMatchEntryIds },
+    { title: looseTitle, entryIds: report.ipa.generatedMismatchEntryIds },
+    { title: strictTitle, entryIds: report.ipa.generatedMismatchStrictEntryIds },
+  ];
+  const ipaFilterAction = (title, entryIds) => entryIds.length
+    ? advancedFilterAction(title, entryIds, { variants: variants.filter((variant) => variant.title !== title) })
+    : null;
   return [
-    [aText("IPA 自动生成不一致（宽松）", "Auto IPA mismatches (loose)"), report.ipa.generatedMismatch, advancedFilterAction(aText("IPA 自动生成不一致（宽松）", "Auto IPA mismatches (loose)"), report.ipa.generatedMismatchEntryIds, { variants: [{ title: aText("IPA 自动生成不一致（严格）", "Auto IPA mismatches (strict)"), entryIds: report.ipa.generatedMismatchStrictEntryIds }] })],
-    [aText("IPA 自动生成不一致（严格）", "Auto IPA mismatches (strict)"), report.ipa.generatedMismatchStrict, advancedFilterAction(aText("IPA 自动生成不一致（严格）", "Auto IPA mismatches (strict)"), report.ipa.generatedMismatchStrictEntryIds, { variants: [{ title: aText("IPA 自动生成不一致（宽松）", "Auto IPA mismatches (loose)"), entryIds: report.ipa.generatedMismatchEntryIds }] })],
+    [matchTitle, report.ipa.generatedMatch, ipaFilterAction(matchTitle, report.ipa.generatedMatchEntryIds)],
+    [looseTitle, report.ipa.generatedMismatch, ipaFilterAction(looseTitle, report.ipa.generatedMismatchEntryIds)],
+    [strictTitle, report.ipa.generatedMismatchStrict, ipaFilterAction(strictTitle, report.ipa.generatedMismatchStrictEntryIds)],
   ];
 }
 
@@ -4163,8 +4394,12 @@ function buildDictionaryAnalysis(dictionary) {
     if (lemmaKey) {
       mapPush(duplicateLemmas, lemmaKey, entry);
     }
-    const part = entryPart(entry) || aText("无词类", "No part");
-    incrementEntry(parts, displayTag(part, dictionary), entry);
+    const entryPartTags = entryParts(entry, dictionary);
+    if (entryPartTags.length) {
+      entryPartTags.forEach((part) => incrementEntry(parts, displayTag(part, dictionary), entry));
+    } else {
+      incrementEntry(parts, aText("无词类", "No part"), entry);
+    }
     (entry.tags || []).forEach((tag) => {
       incrementEntry(tags, displayTag(tag, dictionary), entry);
       const compact = normalize(tag).replace(/[^\p{L}\p{N}]+/gu, "");
@@ -4207,9 +4442,9 @@ function buildDictionaryAnalysis(dictionary) {
         glossEntryIds.add(entry.id);
         const missing = ["gla", "glb", "ft"].filter((key) => key === "ft" ? !gloss.ft : !gloss[key]?.length);
         if (missing.length) {
-          addIssue(issues, "medium", entry, aText("Gloss 不完整", "Incomplete gloss"), `${aText("缺少", "Missing")}: ${missing.map((key) => `\\${key}`).join(", ")}`);
+          addIssue(issues, "medium", entry, aText("Gloss 不完整", "Incomplete gloss"), `${aText("缺少", "Missing")}: ${missing.map((key) => `\\${key}`).join(", ")}`, "gloss");
         } else if (gloss.gla.length !== gloss.glb.length) {
-          addIssue(issues, "medium", entry, aText("Gloss 对齐数量不一致", "Gloss alignment mismatch"), `\\gla ${gloss.gla.length} / \\glb ${gloss.glb.length}`);
+          addIssue(issues, "medium", entry, aText("Gloss 对齐数量不一致", "Gloss alignment mismatch"), `\\gla ${gloss.gla.length} / \\glb ${gloss.glb.length}`, "gloss");
         }
       }
     });
@@ -4238,7 +4473,7 @@ function buildDictionaryAnalysis(dictionary) {
 
   duplicateLemmas.forEach((items) => {
     if (items.length > 1) {
-      items.forEach((entry) => addIssue(issues, "high", entry, aText("重复词形", "Duplicate lemma"), items.map((item) => item.lemma).join(", ")));
+      items.forEach((entry) => addIssue(issues, "high", entry, aText("重复词形", "Duplicate lemma"), items.map((item) => item.lemma).join(", "), "lemma"));
     }
   });
   normalizedTagForms.forEach((forms) => {
@@ -4248,16 +4483,17 @@ function buildDictionaryAnalysis(dictionary) {
         severity: "low",
         title: aText("近似标签可能不一致", "Near-duplicate tags"),
         detail: unique.join(", "),
+        module: "tags",
       });
     }
   });
 
   entries.forEach((entry) => {
     if (!entry.lemma) {
-      addIssue(issues, "high", entry, aText("缺少词形", "Missing lemma"), "");
+      addIssue(issues, "high", entry, aText("缺少词形", "Missing lemma"), "", "lemma");
     }
     if (!(entry.tags || []).length) {
-      addIssue(issues, "high", entry, aText("缺少标签", "Missing tags"), "");
+      addIssue(issues, "high", entry, aText("缺少标签", "Missing tags"), "", "tags");
     }
     if (!(entry.definitions || []).some((definition) => definition.meaning)) {
       addIssue(issues, "high", entry, aText("缺少释义", "Missing definition"), "");
@@ -4266,20 +4502,20 @@ function buildDictionaryAnalysis(dictionary) {
       addIssue(issues, "low", entry, aText("缺少 IPA", "Missing IPA"), "");
     }
     (entry.tags || []).filter((tag) => Array.from(tag).length > 24).forEach((tag) => {
-      addIssue(issues, "low", entry, aText("标签过长", "Long tag"), tag);
+      addIssue(issues, "low", entry, aText("标签过长", "Long tag"), tag, "tags");
     });
     (entry.etymology?.sources || []).forEach((sourceName) => {
       if (!resolveSourceEntry(sourceName, dictionary)) {
         const detail = `${aText("未解析来源", "Unresolved source")}: ${sourceName}`;
-        addIssue(networkIssues, "medium", entry, detail, "");
-        addIssue(issues, "medium", entry, detail, "");
+        addIssue(networkIssues, "medium", entry, detail, "", "network");
+        addIssue(issues, "medium", entry, detail, "", "network");
       }
     });
     const cycle = sourceCycleForEntry(entry, dictionary);
     if (cycle.length) {
       const detail = cycle.map((item) => item.lemma).join(" → ");
-      addIssue(networkIssues, "high", entry, aText("词源循环引用", "Etymology cycle"), detail);
-      addIssue(issues, "high", entry, aText("词源循环引用", "Etymology cycle"), detail);
+      addIssue(networkIssues, "high", entry, aText("词源循环引用", "Etymology cycle"), detail, "network");
+      addIssue(issues, "high", entry, aText("词源循环引用", "Etymology cycle"), detail, "network");
     }
   });
 
@@ -4293,19 +4529,17 @@ function buildDictionaryAnalysis(dictionary) {
     ipa: entriesWithIpa / total,
     morphology: entriesWithMorphology / total,
   };
-  const coverageRows = [
-    [aText("有释义", "Definitions"), coverage.definitions, advancedFilterAction(aText("有释义", "Has definitions"), [...definitionEntryIds])],
-    [aText("有例句", "Examples"), coverage.examples, advancedFilterAction(aText("有例句", "Has examples"), [...exampleEntryIds])],
-    [aText("有备注", "Notes"), coverage.notes, advancedFilterAction(aText("有备注", "Has notes"), [...noteEntryIds])],
-    [aText("有来源", "Sources"), coverage.sources, advancedFilterAction(aText("有来源", "Has sources"), [...sourceEntryIds])],
-    ["IPA", coverage.ipa, advancedFilterAction("IPA", [...ipaEntryIds])],
-    [aText("形态表格", "Morphology table"), coverage.morphology, advancedFilterAction(aText("有形态表格", "Has morphology table"), [...morphologyEntryIds])],
-  ];
-  const searchMatchEntries = normalize(searchQuery)
-    ? entries.filter((entry) => entryMatchesSearch(entry, dictionary))
-    : entries;
   const noDefinitionEntryIds = entries
     .filter((entry) => !(entry.definitions || []).some((definition) => definition.meaning))
+    .map((entry) => entry.id);
+  const noExampleEntryIds = entries
+    .filter((entry) => !(entry.definitions || []).some((definition) => definition.example))
+    .map((entry) => entry.id);
+  const noNoteEntryIds = entries
+    .filter((entry) => !entry.notes)
+    .map((entry) => entry.id);
+  const noSourceEntryIds = entries
+    .filter((entry) => !entryHasSources(entry))
     .map((entry) => entry.id);
   const noIpaEntryIds = entries
     .filter((entry) => !entry.pronunciation)
@@ -4313,6 +4547,17 @@ function buildDictionaryAnalysis(dictionary) {
   const noMorphologyEntryIds = entries
     .filter((entry) => !resolveEntryMorphologyTable(entry, dictionary))
     .map((entry) => entry.id);
+  const coverageRows = [
+    [aText("有释义", "Definitions"), coverage.definitions, binaryCoverageFilterAction(aText("有释义", "Has definitions"), [...definitionEntryIds], aText("无释义", "No definitions"), noDefinitionEntryIds)],
+    [aText("有例句", "Examples"), coverage.examples, binaryCoverageFilterAction(aText("有例句", "Has examples"), [...exampleEntryIds], aText("无例句", "No examples"), noExampleEntryIds)],
+    [aText("有备注", "Notes"), coverage.notes, binaryCoverageFilterAction(aText("有备注", "Has notes"), [...noteEntryIds], aText("无备注", "No notes"), noNoteEntryIds)],
+    [aText("有来源", "Sources"), coverage.sources, binaryCoverageFilterAction(aText("有来源", "Has sources"), [...sourceEntryIds], aText("无来源", "No sources"), noSourceEntryIds)],
+    ["IPA", coverage.ipa, binaryCoverageFilterAction(aText("有 IPA", "Has IPA"), [...ipaEntryIds], aText("无 IPA", "No IPA"), noIpaEntryIds)],
+    [aText("形态表格", "Morphology table"), coverage.morphology, binaryCoverageFilterAction(aText("有形态表格", "Has morphology table"), [...morphologyEntryIds], aText("无形态表格", "No morphology table"), noMorphologyEntryIds)],
+  ];
+  const searchMatchEntries = normalize(searchQuery)
+    ? entries.filter((entry) => entryMatchesSearch(entry, dictionary))
+    : entries;
 
   return {
     entries,
@@ -4332,6 +4577,9 @@ function buildDictionaryAnalysis(dictionary) {
     ipaEntryIds: [...ipaEntryIds],
     morphologyEntryIds: [...morphologyEntryIds],
     noDefinitionEntryIds,
+    noExampleEntryIds,
+    noNoteEntryIds,
+    noSourceEntryIds,
     noIpaEntryIds,
     noMorphologyEntryIds,
     multiSourceEntryIds: [...multiSourceEntryIds],
@@ -4382,8 +4630,10 @@ function analyzeIpa(entries, dictionary) {
   const syllableCounts = new Map();
   let syllableTotal = 0;
   let syllableEntries = 0;
+  let generatedMatch = 0;
   let generatedMismatch = 0;
   let generatedMismatchStrict = 0;
+  const generatedMatchEntryIds = new Set();
   const generatedMismatchEntryIds = new Set();
   const generatedMismatchStrictEntryIds = new Set();
   const complex = normalizeIpaSettings(dictionary.settings?.ipa).syllable.complexPhonemes;
@@ -4407,6 +4657,10 @@ function analyzeIpa(entries, dictionary) {
       incrementEntry(syllableCounts, String(syllables.length), entry);
     }
     const generated = generateIpaFromLemma(entry.lemma, dictionary.settings?.ipa);
+    if (generated && generated === String(entry.pronunciation ?? "")) {
+      generatedMatch += 1;
+      generatedMatchEntryIds.add(entry.id);
+    }
     if (generated && normalizeIpaCompare(generated) !== normalizeIpaCompare(entry.pronunciation)) {
       generatedMismatch += 1;
       generatedMismatchEntryIds.add(entry.id);
@@ -4426,6 +4680,8 @@ function analyzeIpa(entries, dictionary) {
     syllableCounts: numericEntryMapItems(syllableCounts, aText("音节数", "Syllable Count")),
     allSyllableCounts: numericEntryMapItems(syllableCounts, aText("音节数", "Syllable Count")),
     syllableAverage: syllableEntries ? (syllableTotal / syllableEntries).toFixed(2) : "0",
+    generatedMatch,
+    generatedMatchEntryIds: [...generatedMatchEntryIds],
     generatedMismatch,
     generatedMismatchEntryIds: [...generatedMismatchEntryIds],
     generatedMismatchStrict,
@@ -4511,9 +4767,10 @@ function analyzeSearchFields(entries, dictionary) {
   const settings = normalizeDictionarySettings(dictionary.settings);
   const counts = new Map();
   entries.forEach((entry) => {
+    const parts = entryParts(entry, dictionary);
     const fieldGroups = [
       [aText("词形", "Lemma"), [entry.lemma], settings.fuzzySearch],
-      [aText("标签", "Tags"), [entryPart(entry), displayTag(entryPart(entry), dictionary), ...(entry.tags || []), ...(entry.tags || []).map((tag) => displayTag(tag, dictionary))], settings.tagFuzzySearch],
+      [aText("标签", "Tags"), [...parts, ...parts.map((part) => displayTag(part, dictionary)), ...(entry.tags || []), ...(entry.tags || []).map((tag) => displayTag(tag, dictionary))], settings.tagFuzzySearch],
       [aText("释义", "Definitions"), (entry.definitions || []).map((definition) => definition.meaning), settings.fuzzySearch],
       [aText("例句", "Examples"), (entry.definitions || []).map((definition) => definition.example), settings.fuzzySearch],
       [aText("词源", "Etymology"), [...(entry.etymology?.sources || []), entry.etymology?.description], settings.fuzzySearch],
@@ -4616,13 +4873,14 @@ function analysisIssueList(issues, options = {}) {
   `).join("")}</ul>`;
 }
 
-function addIssue(list, severity, entry, title, detail = "") {
+function addIssue(list, severity, entry, title, detail = "", module = "other") {
   list.push({
     severity,
     entryId: entry?.id || "",
     entryLemma: entry?.lemma || "",
     title,
     detail,
+    module,
   });
 }
 
@@ -4688,6 +4946,14 @@ function entryIdsFrom(items) {
 
 function analysisFilterTitle(label, value = "") {
   return value ? `${label}: ${value}` : label;
+}
+
+function binaryCoverageFilterAction(activeTitle, activeEntryIds, alternateTitle, alternateEntryIds) {
+  const activeIds = entryIdsFrom(activeEntryIds);
+  const alternateIds = entryIdsFrom(alternateEntryIds);
+  return activeIds.length
+    ? advancedFilterAction(activeTitle, activeIds, { variants: [{ title: alternateTitle, entryIds: alternateIds }] })
+    : null;
 }
 
 function advancedFilterAction(title, items, options = {}) {
@@ -5257,6 +5523,10 @@ function fillSettingsForm(dictionary) {
   elements.entryExampleRenderPatternInput.value = settings.entryExampleRenderPattern;
   elements.entryExampleGlossAlignInput.checked = settings.entryExampleGlossAlign;
   elements.tagDisplayMapInput.value = serializeTagDisplayMap(settings.tagDisplayMap);
+  elements.manualPartOfSpeechTagsInput.checked = settings.manualPartOfSpeechTags;
+  elements.partOfSpeechTagsInput.value = settings.partOfSpeechTags.join(", ");
+  syncPartOfSpeechTagSettingsControls();
+  elements.tagSortOrderInput.value = settings.tagSortOrder.join(", ");
   elements.tagRedHighlightInput.value = settings.redHighlightTags.join("\n");
   elements.entryListTagFilteringInput.checked = settings.entryListTagFiltering;
   elements.entryListPolysemyInput.checked = settings.entryListPolysemyDisplay;
@@ -5275,6 +5545,13 @@ function fillSettingsForm(dictionary) {
   elements.ipaKeyboardInput.value = normalizeIpaKeyboard(settings.ipaKeyboard).join(" ");
   renderToolNavOrderEditor(settings.toolNavOrder);
   setupMasonryLayout(elements.settingsForm, ".settings-section, .form-actions", 18);
+}
+
+function syncPartOfSpeechTagSettingsControls() {
+  const enabled = Boolean(elements.manualPartOfSpeechTagsInput?.checked);
+  if (elements.partOfSpeechTagsInput) {
+    elements.partOfSpeechTagsInput.disabled = !enabled;
+  }
 }
 
 function renderToolNavOrderEditor(order = DEFAULT_TOOL_NAV_ORDER) {
@@ -5471,6 +5748,9 @@ function settingsFormSnapshot() {
     corpusAutoSave: elements.corpusAutoSaveInput.checked,
     docsAutoSave: elements.docsAutoSaveInput.checked,
     tagDisplayMap: normalizeTagDisplayMap(parseTagDisplayMap(elements.tagDisplayMapInput.value)),
+    manualPartOfSpeechTags: elements.manualPartOfSpeechTagsInput.checked,
+    partOfSpeechTags: normalizeTagList(elements.partOfSpeechTagsInput.value),
+    tagSortOrder: normalizeTagList(elements.tagSortOrderInput.value),
     redHighlightTags: normalizeRedHighlightTags(elements.tagRedHighlightInput.value),
     entryListTagFiltering: elements.entryListTagFilteringInput.checked,
     entryListPolysemyDisplay: elements.entryListPolysemyInput.checked,
@@ -5502,6 +5782,9 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     corpusAutoSave: settings.corpusAutoSave,
     docsAutoSave: settings.docsAutoSave,
     tagDisplayMap: settings.tagDisplayMap,
+    manualPartOfSpeechTags: settings.manualPartOfSpeechTags,
+    partOfSpeechTags: settings.partOfSpeechTags,
+    tagSortOrder: settings.tagSortOrder,
     redHighlightTags: settings.redHighlightTags,
     entryListTagFiltering: settings.entryListTagFiltering,
     entryListPolysemyDisplay: settings.entryListPolysemyDisplay,
@@ -5577,32 +5860,57 @@ function morphologyFormIsDirty() {
 }
 
 async function confirmLeaveUnsavedDictionaryForm() {
-  return !dictionaryFormIsDirty() || appConfirm(t("unsavedDictionaryConfirm"));
+  if (!dictionaryFormIsDirty()) {
+    return true;
+  }
+  return confirmUnsavedChanges(t("unsavedDictionaryConfirm"), {
+    save: () => saveDictionary({ preventDefault() {} }),
+  });
 }
 
-async function saveSettings(event) {
-  event.preventDefault();
-  const dictionary = activeDictionary();
-  if (!dictionary) {
-    showToast(t("createDictionaryFirstToast"));
-    return;
+async function confirmUnsavedChanges(message, actions = {}) {
+  const action = await appEditSwitchPrompt(message);
+  if (action === "cancel" || action === false) {
+    return false;
   }
+  try {
+    if (action === "save") {
+      const saved = await actions.save?.();
+      return saved !== false;
+    }
+    if (action === "discard") {
+      await actions.discard?.();
+      return true;
+    }
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+  return true;
+}
 
+function discardDocsDraft() {
+  clearTimeout(docsSaveTimer);
+  docsDraftState = null;
+}
+
+function discardCorpusDraft() {
+  clearTimeout(corpusSaveTimer);
+  corpusSaveTimer = null;
+  corpusSaveRequested = false;
+  corpusDraftState = null;
+}
+
+function invalidSettingsRenderPatternInput() {
   const renderPatternInputs = [
     elements.corpusUnitCardRenderPatternInput,
     elements.corpusUnitRenderPatternInput,
     elements.entryExampleRenderPatternInput,
   ];
-  const invalidRenderPatternInput = renderPatternInputs.find((input) => parseCorpusRenderPattern(input.value).error);
-  if (invalidRenderPatternInput) {
-    await appConfirm(t("invalidCorpusRenderPattern"), {
-      title: t("corpusRenderError"),
-      alert: true,
-    });
-    invalidRenderPatternInput.focus();
-    return;
-  }
+  return renderPatternInputs.find((input) => parseCorpusRenderPattern(input.value).error) || null;
+}
 
+function collectDictionarySettingsFromForm(existing = {}) {
   const {
     glossSmallCaps,
     glossFontFamily,
@@ -5616,9 +5924,9 @@ async function saveSettings(event) {
     partialEditPageSwitchAction,
     fullEditPageSwitchAction,
     ...existingSettings
-  } = dictionary.settings || {};
+  } = existing || {};
 
-  dictionary.settings = {
+  return {
     ...existingSettings,
     glossStyles: collectGlossStyleForm(),
     corpusUnitCardRenderPattern: elements.corpusUnitCardRenderPatternInput.value.trim(),
@@ -5630,6 +5938,9 @@ async function saveSettings(event) {
     corpusAutoSave: elements.corpusAutoSaveInput.checked,
     docsAutoSave: elements.docsAutoSaveInput.checked,
     tagDisplayMap: parseTagDisplayMap(elements.tagDisplayMapInput.value),
+    manualPartOfSpeechTags: elements.manualPartOfSpeechTagsInput.checked,
+    partOfSpeechTags: normalizeTagList(elements.partOfSpeechTagsInput.value),
+    tagSortOrder: normalizeTagList(elements.tagSortOrderInput.value),
     redHighlightTags: normalizeRedHighlightTags(elements.tagRedHighlightInput.value),
     entryListTagFiltering: elements.entryListTagFilteringInput.checked,
     entryListPolysemyDisplay: elements.entryListPolysemyInput.checked,
@@ -5646,6 +5957,27 @@ async function saveSettings(event) {
     ipaKeyboard: normalizeIpaKeyboard(elements.ipaKeyboardInput.value),
     toolNavOrder: collectToolNavOrder(),
   };
+}
+
+async function saveSettings(event) {
+  event.preventDefault();
+  const dictionary = activeDictionary();
+  if (!dictionary) {
+    showToast(t("createDictionaryFirstToast"));
+    return false;
+  }
+
+  const invalidRenderPatternInput = invalidSettingsRenderPatternInput();
+  if (invalidRenderPatternInput) {
+    await appConfirm(t("invalidCorpusRenderPattern"), {
+      title: t("corpusRenderError"),
+      alert: true,
+    });
+    invalidRenderPatternInput.focus();
+    return false;
+  }
+
+  dictionary.settings = collectDictionarySettingsFromForm(dictionary.settings);
   if (!dictionary.settings.docsAutoSave) {
     clearTimeout(docsSaveTimer);
   }
@@ -5655,6 +5987,61 @@ async function saveSettings(event) {
   dictionary.updatedAt = new Date().toISOString();
   await persistDictionary(dictionary);
   showToast(t("dictionarySaved"));
+  return true;
+}
+
+async function applyTagSortOrder() {
+  const dictionary = activeDictionary();
+  if (!dictionary) {
+    showToast(t("createDictionaryFirstToast"));
+    return;
+  }
+
+  const order = normalizeTagList(elements.tagSortOrderInput.value);
+  if (!order.length) {
+    await appConfirm(t("tagOrderEmpty"), {
+      title: t("tagOrderSettings"),
+      alert: true,
+    });
+    elements.tagSortOrderInput.focus();
+    return;
+  }
+
+  const invalidRenderPatternInput = invalidSettingsRenderPatternInput();
+  if (invalidRenderPatternInput) {
+    await appConfirm(t("invalidCorpusRenderPattern"), {
+      title: t("corpusRenderError"),
+      alert: true,
+    });
+    invalidRenderPatternInput.focus();
+    return;
+  }
+
+  const confirmed = await appConfirm(t("tagOrderConfirm"), {
+    title: t("tagOrderSettings"),
+  });
+  if (!confirmed) {
+    return;
+  }
+
+  const now = new Date().toISOString();
+  let changedEntries = 0;
+  dictionary.settings = collectDictionarySettingsFromForm(dictionary.settings);
+  dictionary.entries = (dictionary.entries || []).map((entry) => {
+    const sortedTags = arrangeTagsByOrder(entry.tags || [], order);
+    if (stableJson(sortedTags) === stableJson(entry.tags || [])) {
+      return entry;
+    }
+    changedEntries += 1;
+    return {
+      ...entry,
+      tags: sortedTags,
+      updatedAt: now,
+    };
+  });
+  dictionary.updatedAt = now;
+  await persistDictionary(dictionary);
+  showToast(`${t("tagOrderApplied")}${changedEntries ? ` · ${changedEntries} ${t("entries")}` : ""}`);
 }
 
 function renderLanguageDocs(dictionary) {
@@ -6834,7 +7221,7 @@ async function saveMorphologyConfig(event) {
   const dictionary = activeDictionary();
   if (!dictionary) {
     showToast(t("createDictionaryFirstToast"));
-    return;
+    return false;
   }
   const morphology = normalizeMorphology({ functions: collectMorphologyFunctions(), tables: collectMorphologyTables() });
   const syntaxErrors = validateMorphologyReferenceSyntax(morphology);
@@ -6843,7 +7230,7 @@ async function saveMorphologyConfig(event) {
       title: t("invalidMorphologySyntax"),
       alert: true,
     });
-    return;
+    return false;
   }
   const functionErrors = validateMorphologyFunctionUsage(morphology);
   if (functionErrors.length) {
@@ -6851,12 +7238,13 @@ async function saveMorphologyConfig(event) {
       title: t("invalidMorphologyFunctionObjects"),
       alert: true,
     });
-    return;
+    return false;
   }
   dictionary.morphology = morphology;
   dictionary.updatedAt = new Date().toISOString();
   await persistDictionary(dictionary);
   showToast(t("dictionarySaved"));
+  return true;
 }
 
 function renderMarkdown(markdown) {
@@ -6965,13 +7353,13 @@ async function saveIpaSettings(event) {
   const dictionary = activeDictionary();
   if (!dictionary) {
     showToast(t("createDictionaryFirstToast"));
-    return;
+    return false;
   }
 
   const defaultStress = parseIpaDefaultStressInput();
   if (!Number.isInteger(defaultStress)) {
     showToast(t("ipaDefaultStressInvalid"));
-    return;
+    return false;
   }
 
   dictionary.settings = {
@@ -6992,6 +7380,7 @@ async function saveIpaSettings(event) {
   dictionary.updatedAt = new Date().toISOString();
   await persistDictionary(dictionary);
   showToast(t("ipaSaved"));
+  return true;
 }
 
 function generateIpaFromLemma(lemma, ipaSettings = activeDictionary()?.settings?.ipa) {
@@ -7767,7 +8156,7 @@ async function saveDictionary(event) {
 
   if (!payload.name) {
     showToast(t("name"));
-    return;
+    return false;
   }
 
   try {
@@ -7797,9 +8186,11 @@ async function saveDictionary(event) {
     }
 
     await refreshState();
+    return true;
   } catch (error) {
     showToast(t("dictionarySaveFailed"));
     console.error(error);
+    return false;
   }
 }
 
@@ -8018,19 +8409,27 @@ async function showView(view) {
 
 async function confirmLeaveUnsavedConfigView() {
   if (state.activeView === "manager" && dictionaryFormIsDirty()) {
-    return appConfirm(t("unsavedDictionaryConfirm"));
+    return confirmUnsavedChanges(t("unsavedDictionaryConfirm"), {
+      save: () => saveDictionary({ preventDefault() {} }),
+    });
   }
   if (!activeDictionary()) {
     return true;
   }
   if (state.activeView === "settings" && settingsFormIsDirty()) {
-    return appConfirm(t("unsavedSettingsConfirm"));
+    return confirmUnsavedChanges(t("unsavedSettingsConfirm"), {
+      save: () => saveSettings({ preventDefault() {} }),
+    });
   }
   if (state.activeView === "ipa" && ipaFormIsDirty()) {
-    return appConfirm(t("unsavedIpaConfirm"));
+    return confirmUnsavedChanges(t("unsavedIpaConfirm"), {
+      save: () => saveIpaSettings({ preventDefault() {} }),
+    });
   }
   if (state.activeView === "morphology" && morphologyFormIsDirty()) {
-    return appConfirm(t("unsavedMorphologyConfirm"));
+    return confirmUnsavedChanges(t("unsavedMorphologyConfirm"), {
+      save: () => saveMorphologyConfig({ preventDefault() {} }),
+    });
   }
   const settings = normalizeDictionarySettings(activeDictionary().settings);
   if (state.activeView === "docs" && docsFormIsDirty()) {
@@ -8042,12 +8441,10 @@ async function confirmLeaveUnsavedConfigView() {
         return false;
       }
     }
-    const confirmed = await appConfirm(t("unsavedDocsConfirm"));
-    if (confirmed) {
-      clearTimeout(docsSaveTimer);
-      docsDraftState = null;
-    }
-    return confirmed;
+    return confirmUnsavedChanges(t("unsavedDocsConfirm"), {
+      save: () => saveLanguageDocs(false),
+      discard: discardDocsDraft,
+    });
   }
   if (state.activeView === "corpus" && corpusFormIsDirty()) {
     if (settings.corpusAutoSave) {
@@ -8058,12 +8455,10 @@ async function confirmLeaveUnsavedConfigView() {
         return false;
       }
     }
-    const confirmed = await appConfirm(t("unsavedCorpusConfirm"));
-    if (confirmed) {
-      clearTimeout(corpusSaveTimer);
-      corpusDraftState = null;
-    }
-    return confirmed;
+    return confirmUnsavedChanges(t("unsavedCorpusConfirm"), {
+      save: () => saveCorpus(false),
+      discard: discardCorpusDraft,
+    });
   }
   return true;
 }
@@ -8366,6 +8761,14 @@ elements.ipaOpenDictionaryManagerButton.addEventListener("click", () => showView
 elements.newEntryButton.addEventListener("click", () => beginNewEntry());
 elements.editEntryButton.addEventListener("click", beginEditEntry);
 elements.analysisPanel.addEventListener("click", (event) => {
+  const qualityInfoButton = event.target.closest('[data-action="quality-filter-info"]');
+  if (qualityInfoButton) {
+    appConfirm(t("qualityFilterInfoBody"), {
+      title: t("qualityFilterInfo"),
+      alert: true,
+    });
+    return;
+  }
   const pageButton = event.target.closest("[data-analysis-page]");
   if (pageButton) {
     rememberProcessScroll();
@@ -8439,6 +8842,14 @@ elements.tagsInput.addEventListener("input", () => {
   }
 });
 elements.settingsForm.addEventListener("submit", saveSettings);
+elements.manualPartOfSpeechTagsInput.addEventListener("change", syncPartOfSpeechTagSettingsControls);
+elements.tagOrderInfoButton.addEventListener("click", () => {
+  appConfirm(t("tagOrderInfoBody"), {
+    title: t("tagOrderSettings"),
+    alert: true,
+  });
+});
+elements.applyTagSortOrderButton.addEventListener("click", applyTagSortOrder);
 elements.toolNavOrderList.addEventListener("dragstart", (event) => {
   const card = event.target.closest(".tool-order-card");
   if (!card) {

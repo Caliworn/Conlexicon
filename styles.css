@@ -394,11 +394,21 @@ fieldset {
   flex: 0 0 auto;
   border: 1px solid color-mix(in srgb, var(--accent) 48%, transparent);
   border-radius: 999px;
+  padding: 0;
   background: var(--surface);
   color: var(--accent-strong);
   font: inherit;
+  font-size: 0;
   line-height: 1;
   cursor: pointer;
+}
+
+.advanced-filter-cycle::before {
+  content: "⇄";
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1;
+  transform: translateX(-0.75px);
 }
 
 .advanced-filter-cycle:hover {
@@ -754,12 +764,39 @@ label span {
 }
 
 .part-badge {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-height: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
+.part-badge-item {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 4px 10px;
+  background: var(--surface-2);
+  font-weight: 800;
+}
+
+.part-badge-item[data-entry-tag-index] {
+  cursor: pointer;
+}
+
+.part-badge-item[data-entry-tag-index]:hover {
+  color: var(--accent-strong);
+}
+
 .part-badge.highlight-tag,
+.part-badge-item.highlight-tag,
 .outline-chip.highlight-tag,
 .chip.highlight-tag {
   border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line));
@@ -1609,6 +1646,16 @@ dialog {
   background: color-mix(in srgb, var(--surface) 90%, var(--bg));
 }
 
+.settings-section input:disabled,
+.settings-section textarea:disabled,
+.settings-section select:disabled {
+  border-color: color-mix(in srgb, var(--line) 70%, var(--bg));
+  background: color-mix(in srgb, var(--surface-2) 65%, var(--bg));
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
 .gloss-render-contexts {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2076,6 +2123,24 @@ dialog {
   gap: 8px;
 }
 
+.analysis-subpage-tab-groups {
+  display: grid;
+  gap: 10px;
+}
+
+.analysis-subpage-tab-group {
+  display: grid;
+  gap: 6px;
+}
+
+.analysis-subpage-tab-group > span,
+.analysis-filter-group > span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
 .analysis-page-tabs button,
 .analysis-subpage-tabs button {
   border: 1px solid var(--line);
@@ -2103,6 +2168,63 @@ dialog {
 .analysis-page-body {
   display: grid;
   gap: 18px;
+}
+
+.analysis-filter-strip {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--bg));
+}
+
+.analysis-filter-strip > div:first-child,
+.analysis-filter-actions,
+.analysis-filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.analysis-filter-group {
+  align-items: flex-start;
+}
+
+.analysis-filter-group > span {
+  min-width: 84px;
+  padding-top: 9px;
+}
+
+.analysis-filter-strip strong {
+  font-size: 0.9rem;
+}
+
+.analysis-filter-actions .secondary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 0.82rem;
+}
+
+.analysis-filter-actions .secondary-button span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  min-height: 22px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 950;
+}
+
+.analysis-filter-actions .secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
 }
 
 .analysis-grid {
@@ -2637,11 +2759,21 @@ textarea.ipa-single-line::-webkit-scrollbar {
   margin-top: 6px;
 }
 
+.tag-order-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .subsection-title h3 {
   margin: 4px 0 0;
   color: var(--ink);
   font-size: 1.2rem;
   font-weight: 900;
+}
+
+.tag-order-control .secondary-button {
+  white-space: nowrap;
 }
 
 .form-actions {
