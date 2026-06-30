@@ -338,9 +338,24 @@ fieldset {
   top: 20px;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  height: calc(100vh - 172px);
+  align-self: start;
+  height: var(--entry-browser-height, calc(100vh - 172px));
   min-height: 0;
   overflow: hidden;
+}
+
+@media (min-width: 800px) {
+  .content-grid[data-browser-state="expanded"] .entry-browser {
+    position: fixed;
+    left: var(--entry-browser-fixed-left, 0px);
+    top: var(--entry-browser-fixed-top, 20px);
+    z-index: 4;
+    width: var(--entry-browser-fixed-width, 340px);
+  }
+
+  .content-grid[data-browser-state="expanded"] .entry-detail-panel {
+    grid-column: 2;
+  }
 }
 
 .filter-row {

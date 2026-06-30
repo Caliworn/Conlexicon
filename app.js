@@ -45,6 +45,7 @@ const viewScrollMemory = {
   analysisPage: 0,
 };
 let sourceSuggestionIndex = 0;
+let sourceSuggestionHideTimer = 0;
 let networkEntryId = "";
 let networkOpen = false;
 let partialEditSection = "";
@@ -74,6 +75,10 @@ let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
 let draggedToolNavView = "";
 let draggedIpaRuleId = "";
+let entryCardScrollRequestId = 0;
+let entryBrowserHeightFrame = 0;
+let entryBrowserLayoutRefreshFrame = 0;
+let entryBrowserLayoutRefreshUntil = 0;
 const entryVirtualList = createVirtualListState(138);
 const corpusVirtualList = createVirtualListState(74);
 const masonryLayouts = new WeakMap();
@@ -1861,6 +1866,7 @@ function render() {
   renderToolNav();
   renderActiveView();
   restoreProcessScroll();
+  scheduleEntryBrowserHeightUpdate();
 }
 
 function renderActiveView() {
@@ -2154,6 +2160,73 @@ function renderShellEntryBrowser() {
   const controlLabel = t(collapsed ? "expandEntryBrowser" : "collapseEntryBrowser");
   elements.entryBrowserToggleButton.setAttribute("aria-label", controlLabel);
   elements.entryBrowserToggleButton.removeAttribute("title");
+  scheduleEntryBrowserHeightUpdate();
+}
+
+function updateEntryBrowserHeight() {
+  entryBrowserHeightFrame = 0;
+  const browser = elements.entryBrowser;
+  if (!browser || browser.hidden || state.activeView !== "editor" || !desktopNavMediaQuery.matches) {
+    clearEntryBrowserLayoutVariables();
+    return;
+  }
+  const gridRect = elements.contentGrid.getBoundingClientRect();
+  const bottomGap = 20;
+  const stickyTop = 20;
+  const top = Math.max(stickyTop, gridRect.top);
+  const columns = getComputedStyle(elements.contentGrid).gridTemplateColumns.split(/\s+/);
+  const firstColumnWidth = Number.parseFloat(columns[0]) || browser.getBoundingClientRect().width || 340;
+  const availableHeight = Math.max(220, window.innerHeight - top - bottomGap);
+  const nextLeft = `${Math.round(gridRect.left)}px`;
+  const nextTop = `${Math.round(top)}px`;
+  const nextWidth = `${Math.round(firstColumnWidth)}px`;
+  const nextHeight = `${Math.round(availableHeight)}px`;
+  if (
+    browser.style.getPropertyValue("--entry-browser-fixed-left") === nextLeft
+    && browser.style.getPropertyValue("--entry-browser-fixed-top") === nextTop
+    && browser.style.getPropertyValue("--entry-browser-fixed-width") === nextWidth
+    && browser.style.getPropertyValue("--entry-browser-height") === nextHeight
+  ) {
+    return;
+  }
+  browser.style.setProperty("--entry-browser-fixed-left", nextLeft);
+  browser.style.setProperty("--entry-browser-fixed-top", nextTop);
+  browser.style.setProperty("--entry-browser-fixed-width", nextWidth);
+  browser.style.setProperty("--entry-browser-height", nextHeight);
+  remeasureEntryVirtualList();
+}
+
+function clearEntryBrowserLayoutVariables() {
+  const browser = elements.entryBrowser;
+  if (!browser) {
+    return;
+  }
+  browser.style.removeProperty("--entry-browser-fixed-left");
+  browser.style.removeProperty("--entry-browser-fixed-top");
+  browser.style.removeProperty("--entry-browser-fixed-width");
+  browser.style.removeProperty("--entry-browser-height");
+}
+
+function scheduleEntryBrowserHeightUpdate() {
+  if (entryBrowserHeightFrame) {
+    return;
+  }
+  entryBrowserHeightFrame = requestAnimationFrame(updateEntryBrowserHeight);
+}
+
+function scheduleEntryBrowserLayoutRefresh(duration = 240) {
+  entryBrowserLayoutRefreshUntil = Math.max(entryBrowserLayoutRefreshUntil, performance.now() + duration);
+  if (entryBrowserLayoutRefreshFrame) {
+    return;
+  }
+  const refresh = () => {
+    entryBrowserLayoutRefreshFrame = 0;
+    updateEntryBrowserHeight();
+    if (performance.now() < entryBrowserLayoutRefreshUntil) {
+      entryBrowserLayoutRefreshFrame = requestAnimationFrame(refresh);
+    }
+  };
+  entryBrowserLayoutRefreshFrame = requestAnimationFrame(refresh);
 }
 
 function remeasureEntryVirtualList() {
@@ -2166,6 +2239,7 @@ function remeasureEntryVirtualList() {
   entryVirtualList.width = Math.round(container.clientWidth);
   rebuildVirtualListOffsets(entryVirtualList);
   restoreVirtualListAnchor(entryVirtualList, anchor);
+  clampVirtualListScroll(entryVirtualList);
   renderVirtualListWindow(entryVirtualList);
 }
 
@@ -2174,7 +2248,7 @@ function toggleEntryBrowser() {
   shellState.browserCollapsedByView[view] = !effectiveEntryBrowserCollapsed(view);
   renderShellEntryBrowser();
   if (!effectiveEntryBrowserCollapsed(view)) {
-    requestAnimationFrame(remeasureEntryVirtualList);
+    scheduleEntryBrowserHeightUpdate();
   }
 }
 
@@ -2535,6 +2609,89 @@ function scrollVirtualListItemIntoView(virtualList, key, behavior = "smooth") {
   }
   scheduleVirtualListRender(virtualList);
   return true;
+}
+
+function virtualListNearestScrollTop(virtualList, index) {
+  const container = virtualList.container;
+  if (!container) {
+    return 0;
+  }
+  const start = virtualList.offsets[index];
+  const end = virtualList.offsets[index + 1];
+  const viewportStart = container.scrollTop;
+  const viewportEnd = viewportStart + container.clientHeight;
+  if (start < viewportStart) {
+    return start;
+  }
+  if (end > viewportEnd) {
+    return Math.max(0, end - container.clientHeight);
+  }
+  return viewportStart;
+}
+
+function virtualListRowForKey(container, key) {
+  return [...container.querySelectorAll(".virtual-list-row")]
+    .find((row) => row.dataset.virtualKey === key) || null;
+}
+
+function scrollVirtualListItemIntoViewStable(virtualList, key, options = {}) {
+  const index = virtualList.indexByKey.get(key);
+  const container = virtualList.container;
+  if (index === undefined || !container) {
+    return false;
+  }
+  const top = virtualListNearestScrollTop(virtualList, index);
+  if (Math.abs(container.scrollTop - top) > 0.5) {
+    container.scrollTop = top;
+  }
+  clampVirtualListScroll(virtualList);
+  renderVirtualListWindow(virtualList);
+  stabilizeVirtualListItemScroll(virtualList, key, options);
+  return true;
+}
+
+function stabilizeVirtualListItemScroll(virtualList, key, options = {}) {
+  const maxAttempts = options.maxAttempts ?? 8;
+  const attempt = options.attempt ?? 0;
+  if (attempt >= maxAttempts || (options.isCurrent && !options.isCurrent())) {
+    return;
+  }
+  requestAnimationFrame(() => {
+    if (options.isCurrent && !options.isCurrent()) {
+      return;
+    }
+    const container = virtualList.container;
+    const index = virtualList.indexByKey.get(key);
+    if (!container || index === undefined) {
+      return;
+    }
+    const row = virtualListRowForKey(container, key);
+    if (row) {
+      const rowRect = row.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      let delta = 0;
+      if (rowRect.top < containerRect.top) {
+        delta = rowRect.top - containerRect.top;
+      } else if (rowRect.bottom > containerRect.bottom) {
+        delta = rowRect.bottom - containerRect.bottom;
+      }
+      if (Math.abs(delta) > 0.5) {
+        container.scrollTop += delta;
+        clampVirtualListScroll(virtualList);
+      }
+    } else {
+      const top = virtualListNearestScrollTop(virtualList, index);
+      if (Math.abs(container.scrollTop - top) > 0.5) {
+        container.scrollTop = top;
+        clampVirtualListScroll(virtualList);
+      }
+    }
+    renderVirtualListWindow(virtualList);
+    stabilizeVirtualListItemScroll(virtualList, key, {
+      ...options,
+      attempt: attempt + 1,
+    });
+  });
 }
 
 function setupMasonryLayout(container, itemSelector, itemGap) {
@@ -2922,19 +3079,26 @@ function scheduleEntryCardScroll(entryId, options = {}) {
   if (!entryId) {
     return;
   }
+  const requestId = entryCardScrollRequestId += 1;
   requestAnimationFrame(() => {
+    if (requestId !== entryCardScrollRequestId) {
+      return;
+    }
     let key = `entry:${entryId}`;
     if (rootMode && !advancedFilter) {
       key = options.rootId && options.rootId !== entryId
         ? `derived:${options.rootId}:${entryId}`
         : `root:${options.rootId || entryId}`;
     }
-    if (scrollVirtualListItemIntoView(entryVirtualList, key)) {
+    const stableScrollOptions = {
+      isCurrent: () => requestId === entryCardScrollRequestId,
+    };
+    if (scrollVirtualListItemIntoViewStable(entryVirtualList, key, stableScrollOptions)) {
       return;
     }
     const row = entryVirtualList.items.find((item) => item.value?.entry?.id === entryId || item.value?.group?.root?.id === entryId);
     if (row) {
-      scrollVirtualListItemIntoView(entryVirtualList, row.key);
+      scrollVirtualListItemIntoViewStable(entryVirtualList, row.key, stableScrollOptions);
     }
   });
 }
@@ -5894,13 +6058,12 @@ function collectDefinitions() {
     .filter((definition) => definition.meaning || definition.example || definition.note);
 }
 
-function completeSourceAtCursor() {
+function completeSourceAtCursor(input = elements.sourceEntryInput) {
   const dictionary = activeDictionary();
   if (!dictionary) {
     return false;
   }
 
-  const input = elements.sourceEntryInput;
   const value = input.value;
   const segment = sourceSegmentAtCursor(value, input.selectionStart ?? value.length);
   const prefix = segment.prefix;
@@ -5947,15 +6110,44 @@ function sourceCompletionCandidates(prefix, dictionary = activeDictionary()) {
     .map((item) => item.entry);
 }
 
-function renderSourceAutocomplete() {
-  const input = elements.sourceEntryInput;
+function sourceAutocompleteBoxForInput(input = elements.sourceEntryInput) {
+  if (input === elements.sourceEntryInput) {
+    return elements.sourceSuggestionBox;
+  }
+  return input.closest("label")?.querySelector(".source-suggestions") || null;
+}
+
+function cancelSourceSuggestionHide() {
+  if (sourceSuggestionHideTimer) {
+    clearTimeout(sourceSuggestionHideTimer);
+    sourceSuggestionHideTimer = 0;
+  }
+}
+
+function scheduleSourceSuggestionHide(input = elements.sourceEntryInput) {
+  cancelSourceSuggestionHide();
+  sourceSuggestionHideTimer = window.setTimeout(() => {
+    sourceSuggestionHideTimer = 0;
+    const box = sourceAutocompleteBoxForInput(input);
+    if (box && document.activeElement !== input && !box.contains(document.activeElement)) {
+      box.hidden = true;
+    }
+  }, 120);
+}
+
+function renderSourceAutocomplete(input = elements.sourceEntryInput) {
+  cancelSourceSuggestionHide();
+  const box = sourceAutocompleteBoxForInput(input);
+  if (!box) {
+    return;
+  }
   const segment = sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length);
   const candidates = sourceCompletionCandidates(segment.prefix);
   if (sourceSuggestionIndex >= candidates.length) {
     sourceSuggestionIndex = 0;
   }
-  elements.sourceSuggestionBox.innerHTML = "";
-  elements.sourceSuggestionBox.hidden = !candidates.length || document.activeElement !== input;
+  box.innerHTML = "";
+  box.hidden = !candidates.length || document.activeElement !== input;
 
   candidates.forEach((entry, index) => {
     const button = document.createElement("button");
@@ -5964,28 +6156,77 @@ function renderSourceAutocomplete() {
     button.textContent = entry.lemma;
     button.addEventListener("mousedown", (event) => {
       event.preventDefault();
-      fillSourceSegment(entry.lemma);
+      fillSourceSegment(entry.lemma, input);
     });
-    elements.sourceSuggestionBox.append(button);
+    box.append(button);
   });
 }
 
-function selectedSourceCandidate() {
-  const input = elements.sourceEntryInput;
+function selectedSourceCandidate(input = elements.sourceEntryInput) {
   const segment = sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length);
   const candidates = sourceCompletionCandidates(segment.prefix);
   return candidates[sourceSuggestionIndex] || candidates[0] || null;
 }
 
-function fillSourceSegment(value) {
-  const input = elements.sourceEntryInput;
+function fillSourceSegment(value, input = elements.sourceEntryInput) {
   const segment = sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length);
   const replacement = `${segment.leading}${value}${segment.trailing}`;
   input.value = `${input.value.slice(0, segment.start)}${replacement}${input.value.slice(segment.end)}`;
   const nextCursor = segment.start + segment.leading.length + value.length;
   input.focus();
   input.setSelectionRange(nextCursor, nextCursor);
-  renderSourceAutocomplete();
+  renderSourceAutocomplete(input);
+}
+
+function handleSourceAutocompleteKeydown(event) {
+  const input = event.currentTarget;
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    const segment = sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length);
+    const candidates = sourceCompletionCandidates(segment.prefix);
+    if (!candidates.length) {
+      return;
+    }
+    event.preventDefault();
+    sourceSuggestionIndex =
+      event.key === "ArrowDown"
+        ? (sourceSuggestionIndex + 1) % candidates.length
+        : (sourceSuggestionIndex - 1 + candidates.length) % candidates.length;
+    renderSourceAutocomplete(input);
+    return;
+  }
+
+  if (event.key !== "Tab" && event.key !== "Enter") {
+    return;
+  }
+
+  const segment = sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length);
+  if (!segment.prefix) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  const candidate = selectedSourceCandidate(input);
+  if (candidate) {
+    fillSourceSegment(candidate.lemma, input);
+  }
+}
+
+function bindSourceAutocompleteInput(input) {
+  if (!input) {
+    return;
+  }
+  input.addEventListener("keydown", handleSourceAutocompleteKeydown);
+  input.addEventListener("input", () => {
+    sourceSuggestionIndex = 0;
+    renderSourceAutocomplete(input);
+  });
+  input.addEventListener("click", () => {
+    sourceSuggestionIndex = 0;
+    renderSourceAutocomplete(input);
+  });
+  input.addEventListener("focus", () => renderSourceAutocomplete(input));
+  input.addEventListener("blur", () => scheduleSourceSuggestionHide(input));
 }
 
 function sourceSegmentAtCursor(value, cursor) {
@@ -8339,12 +8580,14 @@ async function openPartialEdit(section) {
       <label>
         <span>${escapeHtml(t("sourceEntry"))}</span>
         <input data-field="sources" maxlength="220" value="${escapeHtml((entry.etymology?.sources || []).join("，"))}">
+        <div class="source-suggestions" data-source-suggestions hidden></div>
       </label>
       <label>
         <span>${escapeHtml(t("etymologyDescription"))}</span>
         <textarea data-field="description" rows="4">${escapeHtml(entry.etymology?.description || "")}</textarea>
       </label>
     `;
+    bindSourceAutocompleteInput(body.querySelector('[data-field="sources"]'));
   } else if (section === "notes") {
     body.innerHTML = `
       <label>
@@ -9215,52 +9458,7 @@ elements.entryDisplay.addEventListener("submit", (event) => {
   savePartialEdit(event);
 });
 
-elements.sourceEntryInput.addEventListener("keydown", (event) => {
-  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-    const segment = sourceSegmentAtCursor(event.currentTarget.value, event.currentTarget.selectionStart ?? event.currentTarget.value.length);
-    const candidates = sourceCompletionCandidates(segment.prefix);
-    if (!candidates.length) {
-      return;
-    }
-    event.preventDefault();
-    sourceSuggestionIndex =
-      event.key === "ArrowDown"
-        ? (sourceSuggestionIndex + 1) % candidates.length
-        : (sourceSuggestionIndex - 1 + candidates.length) % candidates.length;
-    renderSourceAutocomplete();
-    return;
-  }
-
-  if (event.key !== "Tab" && event.key !== "Enter") {
-    return;
-  }
-
-  const segment = sourceSegmentAtCursor(event.currentTarget.value, event.currentTarget.selectionStart ?? event.currentTarget.value.length);
-  if (!segment.prefix) {
-    return;
-  }
-
-  event.preventDefault();
-  event.stopPropagation();
-  const candidate = selectedSourceCandidate();
-  if (candidate) {
-    fillSourceSegment(candidate.lemma);
-  }
-});
-elements.sourceEntryInput.addEventListener("input", () => {
-  sourceSuggestionIndex = 0;
-  renderSourceAutocomplete();
-});
-elements.sourceEntryInput.addEventListener("click", () => {
-  sourceSuggestionIndex = 0;
-  renderSourceAutocomplete();
-});
-elements.sourceEntryInput.addEventListener("focus", renderSourceAutocomplete);
-elements.sourceEntryInput.addEventListener("blur", () => {
-  setTimeout(() => {
-    elements.sourceSuggestionBox.hidden = true;
-  }, 120);
-});
+bindSourceAutocompleteInput(elements.sourceEntryInput);
 
 elements.addDefinitionButton.addEventListener("click", () => {
   const definitions = collectDefinitions();
@@ -9299,6 +9497,7 @@ elements.navCollapseButton.addEventListener("click", () => {
   }
   shellState.wideNavCollapsed = !shellState.wideNavCollapsed;
   renderShellNav();
+  scheduleEntryBrowserLayoutRefresh();
 });
 elements.entryBrowserToggleButton.addEventListener("click", toggleEntryBrowser);
 elements.backToEditorButton.addEventListener("click", () => showView("editor"));
@@ -9644,7 +9843,10 @@ elements.docsMarkdownInput.addEventListener("input", () => {
   elements.docsPreview.scrollTop = viewScrollMemory.docsPreview;
   scheduleDocsSave();
 });
-window.addEventListener("scroll", rememberProcessScroll, { passive: true });
+window.addEventListener("scroll", () => {
+  rememberProcessScroll();
+  scheduleEntryBrowserHeightUpdate();
+}, { passive: true });
 elements.docsMarkdownInput.addEventListener("scroll", rememberDocsPaneScroll, { passive: true });
 elements.docsPreview.addEventListener("scroll", rememberDocsPaneScroll, { passive: true });
 elements.saveDocsButton.addEventListener("click", () => saveLanguageDocs(true));
@@ -9917,11 +10119,20 @@ document.addEventListener("visibilitychange", () => {
 desktopNavMediaQuery.addEventListener("change", () => {
   renderShellNav();
   renderShellEntryBrowser();
-  if (!effectiveEntryBrowserCollapsed("editor")) {
-    requestAnimationFrame(remeasureEntryVirtualList);
+  scheduleEntryBrowserLayoutRefresh();
+});
+wideNavMediaQuery.addEventListener("change", () => {
+  renderShellNav();
+  scheduleEntryBrowserLayoutRefresh();
+});
+window.addEventListener("resize", () => {
+  renderShellNav();
+  scheduleEntryBrowserLayoutRefresh(120);
+});
+elements.appShell.addEventListener("transitionend", (event) => {
+  if (event.propertyName === "grid-template-columns") {
+    scheduleEntryBrowserHeightUpdate();
   }
 });
-wideNavMediaQuery.addEventListener("change", renderShellNav);
-window.addEventListener("resize", renderShellNav);
 
 loadState();
