@@ -1322,6 +1322,20 @@ label span {
   min-width: 0;
 }
 
+.entry-card.compact-entry-card {
+  grid-template-rows: auto auto;
+  min-height: 0;
+}
+
+.entry-card.compact-entry-card .entry-card-body {
+  display: none;
+}
+
+.entry-card.compact-entry-card .entry-card-footer {
+  align-self: start;
+  margin-top: 8px;
+}
+
 .entry-card-body {
   display: grid;
   align-content: start;
@@ -1523,12 +1537,13 @@ body.dark-theme .entry-card p {
 }
 
 .entry-quality-issue-tooltip {
-  position: absolute;
+  position: fixed;
   z-index: 20;
-  left: 0;
-  top: calc(100% + 8px);
+  left: var(--entry-quality-tooltip-left, 8px);
+  top: var(--entry-quality-tooltip-top, 8px);
   display: grid;
-  width: min(280px, 100%);
+  width: var(--entry-quality-tooltip-width, min(280px, calc(100vw - 16px)));
+  max-width: calc(100vw - 16px);
   gap: 5px;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -1543,6 +1558,10 @@ body.dark-theme .entry-card p {
   pointer-events: none;
   transform: translateY(-2px);
   transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.entry-quality-issue.show-tooltip-above .entry-quality-issue-tooltip {
+  transform: translateY(2px);
 }
 
 .entry-quality-issue-tooltip strong {
@@ -2339,6 +2358,9 @@ dialog {
 }
 
 .analysis-subpage-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   padding: 7px 10px;
   font-size: 0.78rem;
 }
@@ -2350,22 +2372,35 @@ dialog {
   color: var(--accent-strong);
 }
 
+.analysis-subpage-tabs button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.analysis-tab-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  min-height: 22px;
+  border-radius: 999px;
+  padding: 0 6px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.analysis-subpage-tabs button.active .analysis-tab-count {
+  background: var(--surface);
+  color: var(--accent-strong);
+}
+
 .analysis-page-body {
   display: grid;
   gap: 18px;
 }
 
-.analysis-filter-strip {
-  display: grid;
-  gap: 12px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--surface) 92%, var(--bg));
-}
-
-.analysis-filter-strip > div:first-child,
-.analysis-filter-actions,
 .analysis-filter-group {
   display: flex;
   flex-wrap: wrap;
@@ -2382,32 +2417,34 @@ dialog {
   padding-top: 9px;
 }
 
-.analysis-filter-strip strong {
-  font-size: 0.9rem;
-}
-
-.analysis-filter-actions .secondary-button {
-  display: inline-flex;
+.analysis-quality-current {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px;
-  min-height: 34px;
-  padding: 7px 10px;
-  font-size: 0.82rem;
+  min-width: 0;
+  margin-top: -2px;
 }
 
-.analysis-filter-actions .secondary-button span {
-  display: inline-grid;
-  place-items: center;
-  min-width: 22px;
-  min-height: 22px;
-  border-radius: 999px;
-  background: var(--surface-2);
+.analysis-quality-current strong {
+  font-size: 0.86rem;
+}
+
+.analysis-quality-current > span {
   color: var(--muted);
-  font-size: 0.72rem;
-  font-weight: 950;
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
-.analysis-filter-actions .secondary-button:disabled {
+.analysis-quality-view-button {
+  min-height: 34px;
+  padding: 7px 11px;
+  font-size: 0.82rem;
+  margin-left: 2px;
+}
+
+.analysis-quality-view-button:disabled {
   cursor: not-allowed;
   opacity: 0.52;
 }
@@ -2531,12 +2568,15 @@ dialog {
 button.analysis-bar-label,
 .analysis-issue-list button,
 .analysis-bar-row[data-advanced-filter-id],
+.analysis-bar-row[data-part-filter-value],
 .analysis-bar-row[data-entry-id],
 .analysis-bar-row[data-view-target],
 .analysis-metric[data-advanced-filter-id],
+.analysis-metric[data-part-filter-value],
 .analysis-metric[data-entry-id],
 .analysis-metric[data-view-target],
 .analysis-fact-list div[data-advanced-filter-id],
+.analysis-fact-list div[data-part-filter-value],
 .analysis-fact-list div[data-entry-id],
 .analysis-fact-list div[data-view-target],
 .analysis-issue-list li[data-entry-id] {
@@ -2546,12 +2586,15 @@ button.analysis-bar-label,
 button.analysis-bar-label:hover,
 .analysis-issue-list button:hover,
 .analysis-bar-row[data-advanced-filter-id]:hover .analysis-bar-label,
+.analysis-bar-row[data-part-filter-value]:hover .analysis-bar-label,
 .analysis-bar-row[data-entry-id]:hover .analysis-bar-label,
 .analysis-bar-row[data-view-target]:hover .analysis-bar-label,
 .analysis-metric[data-advanced-filter-id]:hover span,
+.analysis-metric[data-part-filter-value]:hover span,
 .analysis-metric[data-entry-id]:hover span,
 .analysis-metric[data-view-target]:hover span,
 .analysis-fact-list div[data-advanced-filter-id]:hover dt,
+.analysis-fact-list div[data-part-filter-value]:hover dt,
 .analysis-fact-list div[data-entry-id]:hover dt,
 .analysis-fact-list div[data-view-target]:hover dt,
 .analysis-issue-list li[data-entry-id]:hover button {

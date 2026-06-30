@@ -27,6 +27,7 @@ const wideNavMediaQuery = window.matchMedia("(min-width: 1280px)");
 const IPA_STRESS_MARKER = "\uE000";
 const GLOSS_STYLE_KEYS = ["gla", "glb", "glc", "ft"];
 const DEFAULT_ENTRY_EXAMPLE_RENDER_PATTERN = "(\\gla)\n(\\glb)\n(\\glc)\n(\\ft)";
+const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
 let docsViewMode = "split";
 let docsSaveTimer = null;
 let corpusSaveTimer = null;
@@ -149,6 +150,7 @@ const i18n = {
     openDictionaryManager: "打开词典管理",
     searchPlaceholder: "搜索词形、释义、标签",
     allParts: "全部词性",
+    noPart: "无词性",
     rootMode: "词根模式",
     normalMode: "普通模式",
     expandAll: "全部展开",
@@ -158,7 +160,10 @@ const i18n = {
     refreshAdvancedFilter: "刷新高级筛选",
     cycleAdvancedFilter: "切换筛选条件",
     qualityFilterInfo: "查看质量筛选说明",
-    qualityFilterInfoBody: "点击这里的筛选按钮可以启用高级筛选，并在词条列表中查看全部有对应质量问题的词条。词条卡片下方会显示对应的问题类型，悬浮可查看具体问题。按优先度筛选会在全部、高、中、低之间循环；按检查模块筛选会在词形、标签、词源网络、Glossed 例句和其他问题之间循环。",
+    qualityFilterInfoBody: "点击质量类别按钮只会切换本页显示的问题列表；点击“在词条列表查看”才会启用高级筛选，并在词条列表中查看全部有当前类别质量问题的词条。词条卡片下方会显示对应的问题类型，悬浮可查看具体问题。按优先度筛选会在全部、高、中、低之间循环；按检查模块筛选会在词形、标签、IPA、词源网络、Glossed 例句和其他问题之间循环。",
+    qualityCurrentCategory: "当前类别",
+    viewQualityEntries: "在词条列表查看",
+    qualityEntryCount: "个词条",
     sortLemmaAsc: "首字母正序",
     sortLemmaDesc: "首字母倒序",
     sortUpdatedAsc: "编辑时间正序",
@@ -526,6 +531,7 @@ const i18n = {
     openDictionaryManager: "Open Dictionary Manager",
     searchPlaceholder: "Search lemma, definition, tags",
     allParts: "All Parts",
+    noPart: "No Part",
     rootMode: "Root Mode",
     normalMode: "Normal Mode",
     expandAll: "Expand All",
@@ -535,7 +541,10 @@ const i18n = {
     refreshAdvancedFilter: "Refresh Advanced Filter",
     cycleAdvancedFilter: "Cycle Filter Condition",
     qualityFilterInfo: "Show quality filter help",
-    qualityFilterInfoBody: "Click these filter buttons to enable Advanced Filter and review all entries with the corresponding quality issues in the entry list. Entry cards show the matching issue types below the card; hover them to see the concrete issue. Priority filters cycle between all, high, medium, and low priority. Module filters cycle between word-form, tag, etymology network, Glossed example, and other issues.",
+    qualityFilterInfoBody: "Click a quality category button to switch the issue list shown on this page. Click “View in Entry List” to enable Advanced Filter and review all entries with the current category of quality issues in the entry list. Entry cards show the matching issue types below the card; hover them to see the concrete issue. Priority filters cycle between all, high, medium, and low priority. Module filters cycle between word-form, tag, IPA, etymology network, Glossed example, and other issues.",
+    qualityCurrentCategory: "Current Category",
+    viewQualityEntries: "View in Entry List",
+    qualityEntryCount: "entries",
     sortLemmaAsc: "Lemma A-Z",
     sortLemmaDesc: "Lemma Z-A",
     sortUpdatedAsc: "Updated Oldest",
@@ -2271,11 +2280,16 @@ function renderPartFilter() {
   const usedParts = dictionary
     ? [...new Set(dictionary.entries.flatMap((entry) => entryParts(entry, dictionary)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN"))
     : [];
-  const options = ["", ...usedParts];
+  const options = ["", NO_PART_FILTER_VALUE, ...usedParts];
   const current = activePart;
 
   elements.partFilter.innerHTML = options
-    .map((part) => `<option value="${escapeHtml(part)}">${part ? escapeHtml(displayTag(part, dictionary)) : t("allParts")}</option>`)
+    .map((part) => {
+      const label = part === NO_PART_FILTER_VALUE
+        ? t("noPart")
+        : (part ? displayTag(part, dictionary) : t("allParts"));
+      return `<option value="${escapeHtml(part)}">${escapeHtml(label)}</option>`;
+    })
     .join("");
 
   elements.partFilter.value = options.includes(current) ? current : "";
@@ -2321,6 +2335,18 @@ function createVirtualListState(estimatedItemHeight) {
   };
 }
 
+function clampVirtualListScroll(virtualList) {
+  const container = virtualList.container;
+  if (!container) {
+    return;
+  }
+  const totalHeight = virtualList.offsets[virtualList.offsets.length - 1] || 0;
+  const maxScrollTop = Math.max(0, totalHeight - container.clientHeight);
+  if (container.scrollTop > maxScrollTop) {
+    container.scrollTop = maxScrollTop;
+  }
+}
+
 function initializeVirtualList(virtualList, container) {
   if (virtualList.container === container) {
     return;
@@ -2352,6 +2378,7 @@ function initializeVirtualList(virtualList, container) {
     }
     rebuildVirtualListOffsets(virtualList);
     restoreVirtualListAnchor(virtualList, anchor);
+    clampVirtualListScroll(virtualList);
     scheduleVirtualListRender(virtualList);
   });
   virtualList.viewportObserver = new ResizeObserver((entries) => {
@@ -2466,10 +2493,14 @@ function renderVirtualList(container, virtualList, items, options) {
     value,
   }));
   virtualList.indexByKey = new Map(virtualList.items.map((item, index) => [item.key, index]));
+  if (resetScroll) {
+    virtualList.sizes.clear();
+  }
   rebuildVirtualListOffsets(virtualList);
   if (resetScroll) {
     container.scrollTop = 0;
   }
+  clampVirtualListScroll(virtualList);
   renderVirtualListWindow(virtualList);
 }
 
@@ -2604,6 +2635,7 @@ function renderEntries() {
   renderVirtualList(elements.entryList, entryVirtualList, rows, {
     resetToken: entryVirtualResetToken(),
     getKey: (row) => `entry:${row.entry.id}`,
+    getEstimatedHeight: (row) => estimateEntryCardHeight(row.entry),
     renderItem: (row) => createEntryCard(row.entry, { qualityIssues: advancedFilterIssuesForEntry(row.entry.id) }),
   });
 }
@@ -2691,6 +2723,7 @@ function createEntryCard(entry, options = {}) {
   const searchSnippets = renderEntrySearchSnippets(entry);
   const chipHtml = renderChips(entry, 3, true, tagFuzzyEnabled, settings.entryListTagFiltering);
   const qualityIssueHtml = renderEntryQualityIssueBadges(options.qualityIssues || []);
+  const compactEntryCard = shouldUseCompactEntryCard(entry, { meaningSummary, searchSnippets });
   const footerHtml = [
     chipHtml ? `<div class="chip-row">${chipHtml}</div>` : "",
     qualityIssueHtml,
@@ -2702,6 +2735,7 @@ function createEntryCard(entry, options = {}) {
     entry.id === state.selectedEntryId ? "active" : "",
     options.root ? "root-card" : "",
     options.derived ? "derived-entry-card" : "",
+    compactEntryCard ? "compact-entry-card" : "",
   ].filter(Boolean).join(" ");
   button.dataset.entryId = entry.id;
   if (options.rootId) {
@@ -2736,6 +2770,17 @@ function createEntryCard(entry, options = {}) {
   return button;
 }
 
+function shouldUseCompactEntryCard(entry, options = {}) {
+  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
+  const meaningSummary = options.meaningSummary ?? entryDefinitionSummary(entry, settings.entryListPolysemyDisplay);
+  const searchSnippets = options.searchSnippets ?? renderEntrySearchSnippets(entry);
+  return !meaningSummary && !searchSnippets;
+}
+
+function estimateEntryCardHeight(entry) {
+  return shouldUseCompactEntryCard(entry) ? 86 : entryVirtualList.estimatedItemHeight;
+}
+
 function renderEntryQualityIssueBadges(issues = []) {
   if (!issues.length) {
     return "";
@@ -2758,6 +2803,46 @@ function renderEntryQualityIssueBadges(issues = []) {
     `;
   }).join("")}
   </div>`;
+}
+
+function updateEntryQualityIssueTooltipPlacement(issueElement) {
+  const tooltip = issueElement?.querySelector(".entry-quality-issue-tooltip");
+  const scrollContainer = issueElement?.closest(".entry-list") || elements.entryList;
+  if (!tooltip || !scrollContainer) {
+    return;
+  }
+  issueElement.classList.remove("show-tooltip-above");
+  const issueRect = issueElement.getBoundingClientRect();
+  const containerRect = scrollContainer.getBoundingClientRect();
+  const gap = 8;
+  const visibleTop = Math.max(containerRect.top, gap);
+  const visibleBottom = Math.min(containerRect.bottom, window.innerHeight - gap);
+  const tooltipWidth = Math.min(
+    280,
+    Math.max(120, containerRect.width - 16),
+    Math.max(120, window.innerWidth - gap * 2),
+  );
+  tooltip.style.setProperty("--entry-quality-tooltip-width", `${tooltipWidth}px`);
+  tooltip.style.setProperty("--entry-quality-tooltip-left", `${Math.max(gap, Math.min(window.innerWidth - tooltipWidth - gap, issueRect.left))}px`);
+  tooltip.style.setProperty("--entry-quality-tooltip-top", `${issueRect.bottom + gap}px`);
+  const tooltipRect = tooltip.getBoundingClientRect();
+  const belowSpace = visibleBottom - issueRect.bottom - gap;
+  const aboveSpace = issueRect.top - visibleTop - gap;
+  const shouldShowAbove = tooltipRect.height > belowSpace && aboveSpace > belowSpace;
+  const preferredTop = shouldShowAbove
+    ? issueRect.top - tooltipRect.height - gap
+    : issueRect.bottom + gap;
+  const maxTop = Math.max(gap, window.innerHeight - tooltipRect.height - gap);
+  const top = Math.max(gap, Math.min(maxTop, preferredTop));
+  tooltip.style.setProperty("--entry-quality-tooltip-top", `${top}px`);
+  issueElement.classList.toggle("show-tooltip-above", shouldShowAbove);
+}
+
+function updateHoveredEntryQualityIssueTooltipPlacement() {
+  const issue = elements.entryList.querySelector(".entry-quality-issue:hover");
+  if (issue) {
+    updateEntryQualityIssueTooltipPlacement(issue);
+  }
 }
 
 function entryDefinitionMeanings(entry) {
@@ -3161,7 +3246,7 @@ function localizeAdvancedFilterTitle(title) {
 function localizeAdvancedFilterSegment(segment) {
   const text = String(segment || "").trim();
   const labelPairs = [
-    ["词类", "Part of Speech"],
+    ["词性", "Part of Speech"],
     ["标签", "Tag", ["Tags"]],
     ["标签组合", "Tag Combination", ["Tag Combinations"]],
     ["首字母", "Initial Letter", ["Initial Letters"]],
@@ -3212,6 +3297,10 @@ function tagAdvancedFilterAction(tag, options = {}) {
     key: "tag",
     meta: { type: "tag", tag },
   });
+}
+
+function partFilterAction(part) {
+  return { type: "part-filter", part: part || NO_PART_FILTER_VALUE };
 }
 
 function rebuildAdvancedFilterAction(options = {}) {
@@ -3351,7 +3440,9 @@ function entryMatchesSearch(entry, dictionary = activeDictionary(), options = {}
   const tagFuzzyEnabled = options.tagFuzzyEnabled ?? Boolean(settings.tagFuzzySearch);
   const respectPart = options.respectPart ?? true;
   const parts = entryParts(entry, dictionary);
-  const matchesPart = !respectPart || !activePart || parts.includes(activePart);
+  const matchesPart = !respectPart
+    || !activePart
+    || (activePart === NO_PART_FILTER_VALUE ? !parts.length : parts.includes(activePart));
   const tagSearchable = [
     ...parts,
     ...parts.map((part) => displayTag(part, dictionary)),
@@ -4348,7 +4439,7 @@ function renderAnalysisPage(report) {
   const subpage = activeAnalysisSubpage(page);
   return `
     ${analysisPageNav(page)}
-    ${analysisSubpageNav(page, subpage)}
+    ${analysisSubpageNav(page, subpage, report)}
     <section class="analysis-page-body">
       ${analysisPageBody(report, page, subpage)}
     </section>
@@ -4369,13 +4460,13 @@ function analysisPageNav(activePage) {
   `).join("")}</nav>`;
 }
 
-function analysisSubpageNav(page, activeSubpage) {
+function analysisSubpageNav(page, activeSubpage, report = null) {
   if (page === "quality") {
-    return `<div class="analysis-subpage-tab-groups">${analysisQualitySubpageGroups().map((group) => `
+    return `<div class="analysis-subpage-tab-groups quality-subpage-tab-groups">${analysisQualitySubpageGroups().map((group) => `
       <div class="analysis-subpage-tab-group">
         <span>${escapeHtml(group.label)}</span>
         <nav class="analysis-subpage-tabs">${group.subpages.map(([subpage, label]) => `
-          <button type="button" class="${subpage === activeSubpage ? "active" : ""}" data-analysis-subpage="${escapeHtml(subpage)}">${escapeHtml(label)}</button>
+          ${renderAnalysisQualitySubpageButton(subpage, label, activeSubpage, report)}
         `).join("")}</nav>
       </div>
     `).join("")}</div>`;
@@ -4417,6 +4508,14 @@ function analysisSubpages(page) {
   return subpages[page] || [];
 }
 
+function renderAnalysisQualitySubpageButton(subpage, label, activeSubpage, report = null) {
+  const count = report ? analysisQualitySubpageEntryCount(report, subpage) : null;
+  const isActive = subpage === activeSubpage;
+  const disabled = count === 0 && !isActive;
+  const countBadge = count === null ? "" : `<span class="analysis-tab-count">${escapeHtml(count)}</span>`;
+  return `<button type="button" class="${isActive ? "active" : ""}" data-analysis-subpage="${escapeHtml(subpage)}" ${disabled ? "disabled" : ""}>${escapeHtml(label)}${countBadge}</button>`;
+}
+
 function analysisQualitySubpageGroups() {
   return [
     {
@@ -4433,6 +4532,7 @@ function analysisQualitySubpageGroups() {
       subpages: [
         ["lemma", aText("词形问题", "Word Forms")],
         ["tags", aText("标签问题", "Tags")],
+        ["ipa", "IPA"],
         ["network", aText("词源网络", "Etymology")],
         ["gloss", aText("Glossed 例句", "Glossed Examples")],
         ["other", aText("其他问题", "Other")],
@@ -4474,7 +4574,7 @@ function renderAnalysisOverview(report) {
       ${analysisMetricCard(aText("质量问题", "Quality Issues"), report.issues.length, `${highIssueEntryIds.length} ${aText("个高优先级", "high priority")}`, qualityIssueFilterAction(report, "priority", "all"))}
     </section>
     <section class="analysis-grid">
-      ${analysisCard(aText("词类分布", "Part of Speech"), analysisBarList(report.parts, { empty: aText("暂无词类标签", "No part tags yet") }))}
+      ${analysisCard(aText("词性分布", "Part of Speech"), analysisBarList(report.parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") }))}
       ${analysisCard(aText("标签频率", "Tag Frequency"), analysisBarList(report.tags, { empty: aText("暂无标签", "No tags yet") }))}
       ${analysisCard(aText("词根家族排行", "Root Families"), analysisBarList(report.rootFamilies, { empty: aText("暂无衍生关系", "No derivation links yet") }))}
       ${analysisCard(aText("编辑进度", "Editing Progress"), analysisActivityList({
@@ -4506,7 +4606,7 @@ function renderAnalysisEntriesPage(report, subpage) {
     </section>`;
   }
   return `<section class="analysis-detail-grid">
-    ${analysisCard(aText("词类分布", "Part of Speech"), analysisBarList(report.allParts, { empty: aText("暂无词类标签", "No part tags yet") }))}
+    ${analysisCard(aText("词性分布", "Part of Speech"), analysisBarList(report.allParts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") }))}
     ${analysisCard(aText("标签频率", "Tag Frequency"), analysisBarList(report.allTags, { empty: aText("暂无标签", "No tags yet") }))}
     ${analysisCard(aText("标签组合", "Tag Combinations"), analysisBarList(report.allTagCombos, { empty: aText("暂无组合", "No combinations yet") }))}
   </section>`;
@@ -4556,8 +4656,8 @@ function renderAnalysisActivityPage(report, subpage) {
 }
 
 function renderAnalysisQualityPage(report, subpage) {
-  const filterBar = renderAnalysisQualityFilterBar(report);
-  if (["lemma", "tags", "other"].includes(subpage)) {
+  const filterBar = renderAnalysisQualityFilterBar(report, subpage);
+  if (["lemma", "tags", "ipa", "other"].includes(subpage)) {
     const moduleIssues = qualityIssuesByModule(report, subpage);
     return `${filterBar}<section class="analysis-detail-grid">${analysisCard(qualityIssueModuleLabel(subpage), analysisIssueList(moduleIssues, { limit: Infinity }))}</section>`;
   }
@@ -4578,52 +4678,18 @@ function renderAnalysisQualityPage(report, subpage) {
   return `${filterBar}<section class="analysis-detail-grid">${analysisCard(aText("质量检查", "Quality Checks"), analysisIssueList(report.issues, { limit: Infinity }))}</section>`;
 }
 
-function renderAnalysisQualityFilterBar(report) {
-  const issueEntries = qualityIssuesWithEntries(report.issues);
-  const highIssues = issueEntries.filter((issue) => issue.severity === "high");
-  const mediumIssues = issueEntries.filter((issue) => issue.severity === "medium");
-  const lowIssues = issueEntries.filter((issue) => issue.severity === "low");
-  const issueEntryIds = entryIdsFrom(issueEntries.map((issue) => issue.entryId));
-  const highIssueEntryIds = entryIdsFrom(highIssues.map((issue) => issue.entryId));
-  const mediumIssueEntryIds = entryIdsFrom(mediumIssues.map((issue) => issue.entryId));
-  const lowIssueEntryIds = entryIdsFrom(lowIssues.map((issue) => issue.entryId));
-  const moduleItems = ["lemma", "tags", "network", "gloss", "other"].map((module) => ({
-    module,
-    title: qualityIssueModuleFilterTitle(module),
-    label: qualityIssueModuleLabel(module),
-    issues: qualityIssuesWithEntries(qualityIssuesByModule(report, module)),
-    entryIds: qualityIssueEntryIdsByModule(report, module),
-  }));
-  const priorityItems = [
-    [aText("全部问题", "All issues"), issueEntryIds.length, qualityIssueFilterAction(report, "priority", "all")],
-    [aText("高优先级", "High"), highIssueEntryIds.length, qualityIssueFilterAction(report, "priority", "high")],
-    [aText("中优先级", "Medium"), mediumIssueEntryIds.length, qualityIssueFilterAction(report, "priority", "medium")],
-    [aText("低优先级", "Low"), lowIssueEntryIds.length, qualityIssueFilterAction(report, "priority", "low")],
-  ];
-  const moduleFilterItems = moduleItems.map((item) => [item.label, item.entryIds.length, qualityIssueFilterAction(report, "module", item.module)]);
+function renderAnalysisQualityFilterBar(report, subpage) {
+  const label = analysisQualitySubpageLabel(subpage);
+  const count = analysisQualitySubpageEntryCount(report, subpage);
+  const action = analysisQualityFilterActionForSubpage(report, subpage);
+  const attrs = analysisActionAttributes(action);
   return `
-    <section class="analysis-filter-strip" aria-label="${escapeHtml(aText("质量检查高级筛选", "Quality advanced filters"))}">
-      <div>
-        <strong>${escapeHtml(aText("高级筛选入口", "Advanced filter shortcuts"))}</strong>
-        <button class="info-button" type="button" data-action="quality-filter-info" aria-label="${escapeHtml(t("qualityFilterInfo"))}" title="${escapeHtml(t("qualityFilterInfo"))}">i</button>
-      </div>
-      ${renderAnalysisQualityFilterGroup(aText("按优先度", "By priority"), priorityItems)}
-      ${renderAnalysisQualityFilterGroup(aText("按检查模块", "By check module"), moduleFilterItems)}
+    <section class="analysis-quality-current" aria-label="${escapeHtml(aText("质量检查高级筛选", "Quality advanced filters"))}">
+      <strong>${escapeHtml(t("qualityCurrentCategory"))}: ${escapeHtml(label)}</strong>
+      <span>${escapeHtml(count)} ${escapeHtml(t("qualityEntryCount"))}</span>
+      <button class="secondary-button analysis-quality-view-button" type="button"${attrs} ${attrs ? "" : "disabled"}>${escapeHtml(t("viewQualityEntries"))}</button>
+      <button class="info-button" type="button" data-action="quality-filter-info" aria-label="${escapeHtml(t("qualityFilterInfo"))}" title="${escapeHtml(t("qualityFilterInfo"))}">i</button>
     </section>
-  `;
-}
-
-function renderAnalysisQualityFilterGroup(label, items) {
-  return `
-    <div class="analysis-filter-group">
-      <span>${escapeHtml(label)}</span>
-      <div class="analysis-filter-actions">
-        ${items.map(([itemLabel, count, action]) => {
-          const attrs = analysisActionAttributes(action);
-          return `<button class="secondary-button" type="button"${attrs} ${attrs ? "" : "disabled"}>${escapeHtml(itemLabel)}<span>${escapeHtml(count)}</span></button>`;
-        }).join("")}
-      </div>
-    </div>
   `;
 }
 
@@ -4631,10 +4697,42 @@ function qualityIssuesWithEntries(issues = []) {
   return (issues || []).filter((issue) => issue.entryId);
 }
 
+function analysisQualitySubpageKey(subpage) {
+  const priorityMap = {
+    issues: "all",
+    high: "high",
+    medium: "medium",
+    low: "low",
+  };
+  if (priorityMap[subpage]) {
+    return { group: "priority", key: priorityMap[subpage] };
+  }
+  const moduleKeys = new Set(["lemma", "tags", "ipa", "network", "gloss", "other"]);
+  if (moduleKeys.has(subpage)) {
+    return { group: "module", key: subpage };
+  }
+  return { group: "priority", key: "all" };
+}
+
+function analysisQualitySubpageLabel(subpage) {
+  const labels = Object.fromEntries(analysisQualitySubpageGroups().flatMap((group) => group.subpages));
+  return labels[subpage] || labels.issues || aText("全部问题", "All Issues");
+}
+
+function analysisQualitySubpageEntryCount(report, subpage) {
+  const action = analysisQualityFilterActionForSubpage(report, subpage);
+  return action?.entryIds?.length || 0;
+}
+
+function analysisQualityFilterActionForSubpage(report, subpage) {
+  const { group, key } = analysisQualitySubpageKey(subpage);
+  return qualityIssueFilterAction(report, group, key);
+}
+
 function qualityIssueFilterDefinitions(report, group) {
   const issueEntries = qualityIssuesWithEntries(report.issues);
   if (group === "module") {
-    return ["lemma", "tags", "network", "gloss", "other"].map((module) => ({
+    return ["lemma", "tags", "ipa", "network", "gloss", "other"].map((module) => ({
       key: module,
       title: qualityIssueModuleFilterTitle(module),
       issues: qualityIssuesWithEntries(qualityIssuesByModule(report, module)),
@@ -4704,6 +4802,7 @@ function qualityIssueModuleLabel(module) {
   const labels = {
     lemma: aText("词形问题", "Word-form issues"),
     tags: aText("标签问题", "Tag issues"),
+    ipa: aText("IPA 问题", "IPA issues"),
     network: aText("词源网络问题", "Etymology network issues"),
     gloss: aText("Glossed 例句问题", "Glossed example issues"),
     other: aText("其他问题", "Other issues"),
@@ -4722,6 +4821,10 @@ function qualityIssueSeverityLabel(severity) {
 
 function qualityIssueModuleFilterTitle(module) {
   return qualityIssueModuleLabel(module);
+}
+
+function countPrimaryStressMarks(value) {
+  return [...String(value || "")].filter((char) => char === "ˈ" || char === IPA_STRESS_MARKER).length;
 }
 
 function analysisFactRows(report) {
@@ -4797,12 +4900,12 @@ function buildDictionaryAnalysis(dictionary) {
     }
     const entryPartTags = entryParts(entry, dictionary);
     if (entryPartTags.length) {
-      entryPartTags.forEach((part) => incrementEntry(parts, displayTag(part, dictionary), entry));
+      entryPartTags.forEach((part) => incrementEntry(parts, part, entry));
     } else {
-      incrementEntry(parts, aText("无词类", "No part"), entry);
+      incrementEntry(parts, NO_PART_FILTER_VALUE, entry);
     }
     (entry.tags || []).forEach((tag) => {
-      incrementEntry(tags, displayTag(tag, dictionary), entry);
+      incrementEntry(tags, tag, entry);
       const compact = normalize(tag).replace(/[^\p{L}\p{N}]+/gu, "");
       if (compact) {
         mapPush(normalizedTagForms, compact, tag);
@@ -4900,7 +5003,19 @@ function buildDictionaryAnalysis(dictionary) {
       addIssue(issues, "high", entry, aText("缺少释义", "Missing definition"), "");
     }
     if (!entry.pronunciation) {
-      addIssue(issues, "low", entry, aText("缺少 IPA", "Missing IPA"), "");
+      addIssue(issues, "low", entry, aText("缺少 IPA", "Missing IPA"), "", "ipa");
+    } else {
+      const primaryStressCount = countPrimaryStressMarks(entry.pronunciation);
+      if (primaryStressCount > 1) {
+        addIssue(
+          issues,
+          "medium",
+          entry,
+          aText("多个主重音", "Multiple primary stresses"),
+          `${aText("主重音数量", "Primary stress count")}: ${primaryStressCount}`,
+          "ipa",
+        );
+      }
     }
     (entry.tags || []).filter((tag) => Array.from(tag).length > 24).forEach((tag) => {
       addIssue(issues, "low", entry, aText("标签过长", "Long tag"), tag, "tags");
@@ -4983,10 +5098,10 @@ function buildDictionaryAnalysis(dictionary) {
     noIpaEntryIds,
     noMorphologyEntryIds,
     multiSourceEntryIds: [...multiSourceEntryIds],
-    parts: topEntryMapItems(parts, 12, aText("词类", "Part of Speech")),
-    allParts: topEntryMapItems(parts, Number.MAX_SAFE_INTEGER, aText("词类", "Part of Speech")),
-    tags: topEntryMapItems(tags, 16, aText("标签", "Tag")),
-    allTags: topEntryMapItems(tags, Number.MAX_SAFE_INTEGER, aText("标签", "Tag")),
+    parts: partEntryMapItems(parts, 12, dictionary),
+    allParts: partEntryMapItems(parts, Number.MAX_SAFE_INTEGER, dictionary),
+    tags: tagEntryMapItems(tags, 16, dictionary),
+    allTags: tagEntryMapItems(tags, Number.MAX_SAFE_INTEGER, dictionary),
     tagCombos: topEntryMapItems(tagCombos, 10, aText("标签组合", "Tag Combination")),
     allTagCombos: topEntryMapItems(tagCombos, Number.MAX_SAFE_INTEGER, aText("标签组合", "Tag Combination")),
     initialLetters: topEntryMapItems(initialLetters, 14, aText("首字母", "Initial Letter")),
@@ -5405,6 +5520,9 @@ function analysisActionAttributes(action) {
   if (normalized.type === "view" && normalized.view) {
     return ` data-view-target="${escapeHtml(normalized.view)}"`;
   }
+  if (normalized.type === "part-filter") {
+    return ` data-part-filter-value="${escapeHtml(normalized.part || NO_PART_FILTER_VALUE)}"`;
+  }
   if (normalized.type === "advanced-filter" && (normalized.entryIds?.length || normalized.variants?.length)) {
     const id = `filter-${analysisFilterCounter += 1}`;
     analysisFilterRegistry.set(id, normalized);
@@ -5448,6 +5566,34 @@ function topEntryMapItems(map, limit = 12, title = "") {
     .sort((a, b) => b[1].count - a[1].count || String(a[0]).localeCompare(String(b[0]), "zh-CN"))
     .slice(0, limit)
     .map(([label, item]) => [label, item.count, advancedFilterAction(analysisFilterTitle(title, label), [...item.entryIds])]);
+}
+
+function partEntryMapItems(map, limit = 12, dictionary = activeDictionary()) {
+  return [...map.entries()]
+    .sort((a, b) => b[1].count - a[1].count || String(partDisplayLabel(a[0], dictionary)).localeCompare(String(partDisplayLabel(b[0], dictionary)), "zh-CN"))
+    .slice(0, limit)
+    .map(([part, item]) => [partDisplayLabel(part, dictionary), item.count, partFilterAction(part)]);
+}
+
+function tagEntryMapItems(map, limit = 12, dictionary = activeDictionary()) {
+  return [...map.entries()]
+    .sort((a, b) => b[1].count - a[1].count || String(displayTag(a[0], dictionary)).localeCompare(String(displayTag(b[0], dictionary)), "zh-CN"))
+    .slice(0, limit)
+    .map(([tag, item]) => [
+      displayTag(tag, dictionary),
+      item.count,
+      tagIsPartFilterCandidate(tag, dictionary) ? partFilterAction(tag) : tagAdvancedFilterAction(tag),
+    ]);
+}
+
+function partDisplayLabel(part, dictionary = activeDictionary()) {
+  return part === NO_PART_FILTER_VALUE ? t("noPart") : displayTag(part, dictionary);
+}
+
+function tagIsPartFilterCandidate(tag, dictionary = activeDictionary()) {
+  const normalizedTag = normalize(tag);
+  return Boolean(normalizedTag)
+    && (dictionary?.entries || []).some((entry) => entryParts(entry, dictionary).some((part) => normalize(part) === normalizedTag));
 }
 
 function numericMapItems(map) {
@@ -9122,6 +9268,15 @@ elements.addDefinitionButton.addEventListener("click", () => {
   renderDefinitionFormList(definitions);
 });
 
+elements.entryList.addEventListener("pointerover", (event) => {
+  const issue = event.target instanceof Element ? event.target.closest(".entry-quality-issue") : null;
+  if (!issue || !elements.entryList.contains(issue)) {
+    return;
+  }
+  updateEntryQualityIssueTooltipPlacement(issue);
+});
+elements.entryList.addEventListener("scroll", updateHoveredEntryQualityIssueTooltipPlacement, { passive: true });
+
 elements.appTooltipTargets.forEach((button) => {
   button.addEventListener("pointerenter", () => showAppTooltip(button));
   button.addEventListener("pointerleave", () => {
@@ -9199,6 +9354,31 @@ elements.analysisPanel.addEventListener("click", (event) => {
     advancedFilter = null;
     state.activeView = viewTarget.dataset.viewTarget || "editor";
     render();
+    return;
+  }
+  const partFilterTarget = event.target.closest("[data-part-filter-value]");
+  if (partFilterTarget) {
+    advancedFilter = null;
+    rootMode = false;
+    activePart = partFilterTarget.dataset.partFilterValue || "";
+    searchQuery = "";
+    state.activeView = "editor";
+    const dictionary = activeDictionary();
+    const firstEntry = dictionary
+      ? [...dictionary.entries]
+        .filter((entry) => {
+          const parts = entryParts(entry, dictionary);
+          return activePart === NO_PART_FILTER_VALUE ? !parts.length : parts.includes(activePart);
+        })
+        .sort(compareEntries)[0]
+      : null;
+    if (firstEntry) {
+      state.selectedEntryId = firstEntry.id;
+      editorMode = "display";
+      entryDraft = null;
+    }
+    render();
+    scheduleEntryCardScroll(state.selectedEntryId);
     return;
   }
   const filterTarget = event.target.closest("[data-advanced-filter-id]");
