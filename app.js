@@ -154,10 +154,11 @@ const i18n = {
     expandAll: "全部展开",
     collapseAll: "全部收起",
     advancedFilterMode: "高级筛选",
-    exitAdvancedFilter: "退出高级筛选",
+    exitAdvancedFilter: "退出",
+    refreshAdvancedFilter: "刷新高级筛选",
     cycleAdvancedFilter: "切换筛选条件",
     qualityFilterInfo: "查看质量筛选说明",
-    qualityFilterInfoBody: "点击这里的筛选按钮可以启用高级筛选，并在词条列表中查看全部有对应质量问题的词条。按优先度筛选会在全部、高、中、低之间循环；按检查模块筛选会在词形、标签、词源网络、Glossed 例句和其他问题之间循环。",
+    qualityFilterInfoBody: "点击这里的筛选按钮可以启用高级筛选，并在词条列表中查看全部有对应质量问题的词条。词条卡片下方会显示对应的问题类型，悬浮可查看具体问题。按优先度筛选会在全部、高、中、低之间循环；按检查模块筛选会在词形、标签、词源网络、Glossed 例句和其他问题之间循环。",
     sortLemmaAsc: "首字母正序",
     sortLemmaDesc: "首字母倒序",
     sortUpdatedAsc: "编辑时间正序",
@@ -530,10 +531,11 @@ const i18n = {
     expandAll: "Expand All",
     collapseAll: "Collapse All",
     advancedFilterMode: "Advanced Filter",
-    exitAdvancedFilter: "Exit Advanced Filter",
+    exitAdvancedFilter: "Exit",
+    refreshAdvancedFilter: "Refresh Advanced Filter",
     cycleAdvancedFilter: "Cycle Filter Condition",
     qualityFilterInfo: "Show quality filter help",
-    qualityFilterInfoBody: "Click these filter buttons to enable Advanced Filter and review all entries with the corresponding quality issues in the entry list. Priority filters cycle between all, high, medium, and low priority. Module filters cycle between word-form, tag, etymology network, Glossed example, and other issues.",
+    qualityFilterInfoBody: "Click these filter buttons to enable Advanced Filter and review all entries with the corresponding quality issues in the entry list. Entry cards show the matching issue types below the card; hover them to see the concrete issue. Priority filters cycle between all, high, medium, and low priority. Module filters cycle between word-form, tag, etymology network, Glossed example, and other issues.",
     sortLemmaAsc: "Lemma A-Z",
     sortLemmaDesc: "Lemma Z-A",
     sortUpdatedAsc: "Updated Oldest",
@@ -876,7 +878,10 @@ const elements = {
   rootModeToggleButton: document.querySelector("#rootModeToggleButton"),
   expandAllRootsButton: document.querySelector("#expandAllRootsButton"),
   collapseAllRootsButton: document.querySelector("#collapseAllRootsButton"),
+  advancedFilterToolbar: document.querySelector("#advancedFilterToolbar"),
   advancedFilterLabel: document.querySelector("#advancedFilterLabel"),
+  advancedFilterRefreshButton: document.querySelector("#advancedFilterRefreshButton"),
+  advancedFilterCycleButton: document.querySelector("#advancedFilterCycleButton"),
   advancedFilterExitButton: document.querySelector("#advancedFilterExitButton"),
   partFilter: document.querySelector("#partFilter"),
   sortSelect: document.querySelector("#sortSelect"),
@@ -2052,21 +2057,35 @@ function appTooltipEnabledFor(target) {
   if (target.dataset.appTooltip === "always") {
     return true;
   }
+  if (target.dataset.appTooltip === "overflow") {
+    return appTooltipTargetOverflows(target);
+  }
   return elements.appNav.contains(target)
     && (shellState.navCollapsed || target.classList.contains("icon-button"));
+}
+
+function appTooltipTargetOverflows(target) {
+  const content = target.querySelector("[data-tooltip-overflow]") || target;
+  return content.scrollWidth > content.clientWidth + 1
+    || content.scrollHeight > content.clientHeight + 1;
+}
+
+function appTooltipLabelFor(target) {
+  return target.dataset.appTooltipLabel || target.getAttribute("aria-label") || "";
 }
 
 function showAppTooltip(target) {
   if (!appTooltipEnabledFor(target) || target.hidden) {
     return;
   }
-  const label = target.getAttribute("aria-label");
+  const label = appTooltipLabelFor(target);
   if (!label) {
     return;
   }
   hideAppTooltip();
   activeAppTooltipTarget = target;
   elements.appTooltip.textContent = label;
+  elements.appTooltip.classList.toggle("wrap", target.dataset.appTooltipWrap === "true");
   elements.appTooltip.hidden = false;
   target.setAttribute("aria-describedby", "appTooltip");
   requestAnimationFrame(() => {
@@ -2100,6 +2119,7 @@ function hideAppTooltip() {
     activeAppTooltipTarget.removeAttribute("aria-describedby");
   }
   activeAppTooltipTarget = null;
+  elements.appTooltip.classList.remove("wrap");
   elements.appTooltip.hidden = true;
 }
 
@@ -2267,11 +2287,17 @@ function renderPartFilter() {
   elements.rootModeToggleButton.hidden = Boolean(advancedFilter);
   elements.expandAllRootsButton.hidden = !rootMode || Boolean(advancedFilter);
   elements.collapseAllRootsButton.hidden = !rootMode || Boolean(advancedFilter);
-  elements.advancedFilterLabel.hidden = !advancedFilter;
-  elements.advancedFilterExitButton.hidden = !advancedFilter;
-  elements.advancedFilterLabel.innerHTML = advancedFilter
-    ? `<span>${escapeHtml(`${t("advancedFilterMode")}: ${advancedFilter.title}`)}</span>${advancedFilter.variants?.length > 1 ? `<button class="advanced-filter-cycle" type="button" data-action="cycle-advanced-filter" title="${escapeHtml(t("cycleAdvancedFilter"))}" aria-label="${escapeHtml(t("cycleAdvancedFilter"))}">⇄</button>` : ""}`
+  elements.advancedFilterToolbar.hidden = !advancedFilter;
+  elements.advancedFilterCycleButton.hidden = !canCycleAdvancedFilter();
+  const advancedFilterTitle = advancedFilter ? advancedFilterDisplayTitle() : "";
+  elements.advancedFilterLabel.innerHTML = advancedFilterTitle
+    ? `<span data-tooltip-overflow>${escapeHtml(advancedFilterTitle)}</span>`
     : "";
+  if (advancedFilterTitle) {
+    elements.advancedFilterLabel.setAttribute("aria-label", advancedFilterTitle);
+  } else {
+    elements.advancedFilterLabel.removeAttribute("aria-label");
+  }
   const hasRootSearch = Boolean(normalize(searchQuery));
   elements.expandAllRootsButton.disabled = rootMode && hasRootSearch;
   elements.collapseAllRootsButton.disabled = rootMode && hasRootSearch;
@@ -2578,7 +2604,7 @@ function renderEntries() {
   renderVirtualList(elements.entryList, entryVirtualList, rows, {
     resetToken: entryVirtualResetToken(),
     getKey: (row) => `entry:${row.entry.id}`,
-    renderItem: (row) => createEntryCard(row.entry),
+    renderItem: (row) => createEntryCard(row.entry, { qualityIssues: advancedFilterIssuesForEntry(row.entry.id) }),
   });
 }
 
@@ -2613,6 +2639,7 @@ function entryVirtualResetToken() {
     activePart,
     entrySort,
     advancedFilter?.title || "",
+    advancedFilter?.variantIndex ?? "",
   ].join("|");
 }
 
@@ -2662,6 +2689,12 @@ function createEntryCard(entry, options = {}) {
   ].filter(Boolean).join(" · ");
   const meaningSummary = entryDefinitionSummary(entry, settings.entryListPolysemyDisplay);
   const searchSnippets = renderEntrySearchSnippets(entry);
+  const chipHtml = renderChips(entry, 3, true, tagFuzzyEnabled, settings.entryListTagFiltering);
+  const qualityIssueHtml = renderEntryQualityIssueBadges(options.qualityIssues || []);
+  const footerHtml = [
+    chipHtml ? `<div class="chip-row">${chipHtml}</div>` : "",
+    qualityIssueHtml,
+  ].filter(Boolean).join("");
   const button = document.createElement("button");
   button.type = "button";
   button.className = [
@@ -2675,13 +2708,15 @@ function createEntryCard(entry, options = {}) {
     button.dataset.rootId = options.rootId;
   }
   button.innerHTML = `
-    <div>
+    <div class="entry-card-header">
       <strong>${highlightSearchText(entry.lemma, contentFuzzyEnabled)}</strong>
       <small>${subtitle}</small>
     </div>
-    <p>${highlightSearchText(meaningSummary, contentFuzzyEnabled)}</p>
-    <div class="chip-row">${renderChips(entry, 3, true, tagFuzzyEnabled, settings.entryListTagFiltering)}</div>
-    ${searchSnippets}
+    <div class="entry-card-body">
+      ${meaningSummary ? `<p>${highlightSearchText(meaningSummary, contentFuzzyEnabled)}</p>` : ""}
+      ${searchSnippets}
+    </div>
+    ${footerHtml ? `<div class="entry-card-footer">${footerHtml}</div>` : ""}
   `;
   button.addEventListener("click", (event) => {
     const tagTarget = event.target.closest("[data-entry-tag-index]");
@@ -2699,6 +2734,30 @@ function createEntryCard(entry, options = {}) {
     beginDerivedEntry(entry);
   });
   return button;
+}
+
+function renderEntryQualityIssueBadges(issues = []) {
+  if (!issues.length) {
+    return "";
+  }
+  return `<div class="entry-quality-issues" aria-label="${escapeHtml(aText("质量问题", "Quality issues"))}">
+    ${issues.map((issue) => {
+    const severity = issue.severity || "low";
+    const title = issue.title || aText("质量问题", "Quality issue");
+    const detail = issue.detail || title;
+    const moduleLabel = qualityIssueModuleLabel(issue.module || "other");
+    return `
+      <span class="entry-quality-issue ${escapeHtml(severity)}">
+        <span class="entry-quality-issue-label">${escapeHtml(title)}</span>
+        <span class="entry-quality-issue-tooltip" role="tooltip">
+          <strong>${escapeHtml(title)}</strong>
+          <small>${escapeHtml(qualityIssueSeverityLabel(severity))} · ${escapeHtml(moduleLabel)}</small>
+          <span>${escapeHtml(detail)}</span>
+        </span>
+      </span>
+    `;
+  }).join("")}
+  </div>`;
 }
 
 function entryDefinitionMeanings(entry) {
@@ -2908,6 +2967,8 @@ async function enterAdvancedFilter(action) {
   advancedFilter = {
     title: activeVariant.title,
     entryIds: activeVariant.entryIds,
+    issueMap: activeVariant.issueMap,
+    meta: activeVariant.key && action.meta ? { ...action.meta, activeKey: activeVariant.key } : action.meta,
     previous,
     variants,
     variantIndex: 0,
@@ -2952,12 +3013,8 @@ async function applyTagFilter(entry, tagIndex, tag) {
     return;
   }
 
-  const normalizedTag = normalize(tag);
-  const matchingEntryIds = dictionary.entries
-    .filter((candidate) => (candidate.tags || []).some((item) => normalize(item) === normalizedTag))
-    .map((candidate) => candidate.id);
   await enterAdvancedFilter({
-    ...advancedFilterAction(analysisFilterTitle(t("tags"), displayTag(tag, dictionary)), matchingEntryIds),
+    ...tagAdvancedFilterAction(tag),
     preferredEntryId: entry.id,
   });
 }
@@ -2972,32 +3029,310 @@ function exitAdvancedFilter() {
   render();
 }
 
-function normalizeAdvancedFilterVariants(action) {
+function normalizeAdvancedFilterVariants(action, options = {}) {
   const variants = action?.variants?.length
     ? action.variants
     : [{ title: action?.title || t("advancedFilterMode"), entryIds: action?.entryIds || [] }];
   return variants
-    .map((variant) => ({
-      title: variant.title || t("advancedFilterMode"),
-      entryIds: entryIdsFrom(variant.entryIds),
-    }))
-    .filter((variant) => variant.entryIds.length);
+    .map((variant) => {
+      const entryIds = entryIdsFrom(variant.entryIds);
+      return {
+        key: variant.key || "",
+        title: variant.title || t("advancedFilterMode"),
+        entryIds,
+        issueMap: advancedFilterIssueMapFromIssues(variant.issues, entryIds),
+      };
+    })
+    .filter((variant, index) => variant.entryIds.length || (options.keepFirstEmpty && index === 0));
+}
+
+function advancedFilterIssueMapFromIssues(issues = [], entryIds = []) {
+  if (!issues.length) {
+    return {};
+  }
+  const allowedIds = new Set(entryIds);
+  return issues.reduce((map, issue) => {
+    if (!issue?.entryId || !allowedIds.has(issue.entryId)) {
+      return map;
+    }
+    if (!map[issue.entryId]) {
+      map[issue.entryId] = [];
+    }
+    map[issue.entryId].push({
+      severity: issue.severity || "low",
+      title: issue.title || aText("质量问题", "Quality issue"),
+      detail: issue.detail || "",
+      module: issue.module || "other",
+    });
+    return map;
+  }, {});
+}
+
+function advancedFilterIssuesForEntry(entryId) {
+  return advancedFilter?.issueMap?.[entryId] || [];
+}
+
+function advancedFilterDisplayTitle() {
+  if (!advancedFilter) {
+    return "";
+  }
+  const dictionary = activeDictionary();
+  if (advancedFilter.meta?.type === "tag" && advancedFilter.meta.tag) {
+    return analysisFilterTitle(t("tags"), displayTag(advancedFilter.meta.tag, dictionary));
+  }
+  if (advancedFilter.meta?.type === "quality" && dictionary) {
+    const action = qualityIssueFilterAction(
+      buildDictionaryAnalysis(dictionary),
+      advancedFilter.meta.group,
+      advancedFilter.meta.activeKey,
+      { allowEmptyActive: true },
+    );
+    return action?.title || advancedFilter.title;
+  }
+  return localizeAdvancedFilterTitle(advancedFilter.title || t("advancedFilterMode"));
+}
+
+function localizeAdvancedFilterTitle(title) {
+  const text = String(title || "");
+  const pairMatch = text.match(/^(.+?)\s*[:：]\s*(.+)$/);
+  if (pairMatch) {
+    const label = localizeAdvancedFilterSegment(pairMatch[1]);
+    const value = localizeAdvancedFilterValue(pairMatch[1], pairMatch[2]);
+    return analysisFilterTitle(label, value);
+  }
+  const exactTitles = new Map([
+    ["Quality issues", aText("质量问题", "Quality issues")],
+    ["质量问题", aText("质量问题", "Quality issues")],
+    ["High-priority quality issues", aText("高优先级质量问题", "High-priority quality issues")],
+    ["高优先级质量问题", aText("高优先级质量问题", "High-priority quality issues")],
+    ["Medium-priority quality issues", aText("中优先级质量问题", "Medium-priority quality issues")],
+    ["中优先级质量问题", aText("中优先级质量问题", "Medium-priority quality issues")],
+    ["Low-priority quality issues", aText("低优先级质量问题", "Low-priority quality issues")],
+    ["低优先级质量问题", aText("低优先级质量问题", "Low-priority quality issues")],
+    ["Derived entries", aText("衍生词", "Derived entries")],
+    ["衍生词", aText("衍生词", "Derived entries")],
+    ["Has definitions", aText("有释义", "Has definitions")],
+    ["有释义", aText("有释义", "Has definitions")],
+    ["No definitions", aText("无释义", "No definitions")],
+    ["无释义", aText("无释义", "No definitions")],
+    ["Has IPA", aText("有 IPA", "Has IPA")],
+    ["有 IPA", aText("有 IPA", "Has IPA")],
+    ["No IPA", aText("无 IPA", "No IPA")],
+    ["无 IPA", aText("无 IPA", "No IPA")],
+    ["Has morphology table", aText("有形态表格", "Has morphology table")],
+    ["有形态表格", aText("有形态表格", "Has morphology table")],
+    ["No morphology table", aText("无形态表格", "No morphology table")],
+    ["无形态表格", aText("无形态表格", "No morphology table")],
+    ["Empty morphology cells", aText("形态空单元", "Empty morphology cells")],
+    ["形态空单元", aText("形态空单元", "Empty morphology cells")],
+    ["Glossed examples", aText("Glossed 例句", "Glossed examples")],
+    ["Glossed 例句", aText("Glossed 例句", "Glossed examples")],
+    ["Multi-source entries", aText("多来源词条", "Multi-source entries")],
+    ["多来源词条", aText("多来源词条", "Multi-source entries")],
+    ["Has examples", aText("有例句", "Has examples")],
+    ["有例句", aText("有例句", "Has examples")],
+    ["No examples", aText("无例句", "No examples")],
+    ["无例句", aText("无例句", "No examples")],
+    ["Has notes", aText("有备注", "Has notes")],
+    ["有备注", aText("有备注", "Has notes")],
+    ["No notes", aText("无备注", "No notes")],
+    ["无备注", aText("无备注", "No notes")],
+    ["Has sources", aText("有来源", "Has sources")],
+    ["有来源", aText("有来源", "Has sources")],
+    ["No sources", aText("无来源", "No sources")],
+    ["无来源", aText("无来源", "No sources")],
+    ["Auto IPA matches", aText("IPA 自动生成一致", "Auto IPA matches")],
+    ["IPA 自动生成一致", aText("IPA 自动生成一致", "Auto IPA matches")],
+    ["Auto IPA mismatches (loose)", aText("IPA 自动生成不一致（宽松）", "Auto IPA mismatches (loose)")],
+    ["IPA 自动生成不一致（宽松）", aText("IPA 自动生成不一致（宽松）", "Auto IPA mismatches (loose)")],
+    ["Auto IPA mismatches (strict)", aText("IPA 自动生成不一致（严格）", "Auto IPA mismatches (strict)")],
+    ["IPA 自动生成不一致（严格）", aText("IPA 自动生成不一致（严格）", "Auto IPA mismatches (strict)")],
+    ["Word Forms", aText("词形问题", "Word Forms")],
+    ["词形问题", aText("词形问题", "Word Forms")],
+    ["Etymology", aText("词源网络", "Etymology")],
+    ["词源网络", aText("词源网络", "Etymology")],
+    ["Glossed Examples", aText("Glossed 例句", "Glossed Examples")],
+    ["Other", aText("其他问题", "Other")],
+    ["其他问题", aText("其他问题", "Other")],
+  ]);
+  return exactTitles.get(text) || localizeAdvancedFilterSegment(text);
+}
+
+function localizeAdvancedFilterSegment(segment) {
+  const text = String(segment || "").trim();
+  const labelPairs = [
+    ["词类", "Part of Speech"],
+    ["标签", "Tag", ["Tags"]],
+    ["标签组合", "Tag Combination", ["Tag Combinations"]],
+    ["首字母", "Initial Letter", ["Initial Letters"]],
+    ["词长", "Word Length", ["Word Lengths"]],
+    ["正写法字符", "Orthographic Character", ["Orthographic Characters"]],
+    ["正写法双字符组合", "Orthographic Bigram", ["Orthographic Bigrams"]],
+    ["词形", "Lemma"],
+    ["释义", "Definitions", ["Definition"]],
+    ["例句", "Examples", ["Example"]],
+    ["词源", "Etymology"],
+    ["形态形式", "Morphology forms", ["Morphology Forms"]],
+    ["IPA 音位", "IPA Unit", ["IPA Units"]],
+    ["IPA 首音", "IPA Initial", ["IPA Initials"]],
+    ["IPA 尾音", "IPA Final", ["IPA Finals"]],
+    ["音节数", "Syllable Count", ["Syllable Counts"]],
+    ["形态表格", "Morphology Table", ["Morphology Tables", "Morphology table"]],
+    ["搜索字段", "Search Field", ["Current Search Fields"]],
+    ["新增日期", "Created Date"],
+    ["编辑日期", "Updated Date"],
+  ];
+  const normalizedText = normalize(text);
+  const match = labelPairs.find(([zh, en, aliases = []]) =>
+    [zh, en, ...aliases].some((candidate) => normalize(candidate) === normalizedText)
+  );
+  return match ? aText(match[0], match[1]) : text;
+}
+
+function localizeAdvancedFilterValue(label, value) {
+  const normalizedLabel = normalize(String(label || ""));
+  const searchFieldLabels = ["搜索字段", "Search Field", "Current Search Fields"].map(normalize);
+  if (searchFieldLabels.includes(normalizedLabel)) {
+    return localizeAdvancedFilterSegment(value);
+  }
+  return String(value || "").trim();
+}
+
+function tagAdvancedFilterAction(tag, options = {}) {
+  const dictionary = activeDictionary();
+  if (!dictionary || !tag) {
+    return null;
+  }
+  const normalizedTag = normalize(tag);
+  const entryIds = dictionary.entries
+    .filter((candidate) => (candidate.tags || []).some((item) => normalize(item) === normalizedTag))
+    .map((candidate) => candidate.id);
+  return advancedFilterAction(analysisFilterTitle(t("tags"), displayTag(tag, dictionary)), entryIds, {
+    allowEmptyActive: Boolean(options.allowEmptyActive),
+    key: "tag",
+    meta: { type: "tag", tag },
+  });
+}
+
+function rebuildAdvancedFilterAction(options = {}) {
+  const dictionary = activeDictionary();
+  if (!dictionary || !advancedFilter) {
+    return null;
+  }
+  const allowEmptyActive = Boolean(options.allowEmptyActive);
+  if (advancedFilter.meta?.type === "quality") {
+    return qualityIssueFilterAction(
+      buildDictionaryAnalysis(dictionary),
+      advancedFilter.meta.group,
+      advancedFilter.meta.activeKey,
+      { allowEmptyActive },
+    );
+  }
+  if (advancedFilter.meta?.type === "tag") {
+    return tagAdvancedFilterAction(advancedFilter.meta.tag, { allowEmptyActive });
+  }
+  return null;
+}
+
+function applyAdvancedFilterAction(action, options = {}) {
+  if (!advancedFilter || !action) {
+    return false;
+  }
+  const variants = normalizeAdvancedFilterVariants(action, { keepFirstEmpty: Boolean(options.keepFirstEmpty) });
+  const activeVariant = variants[0];
+  if (!activeVariant) {
+    return false;
+  }
+  advancedFilter = {
+    ...advancedFilter,
+    title: activeVariant.title,
+    entryIds: activeVariant.entryIds,
+    issueMap: activeVariant.issueMap,
+    meta: activeVariant.key && action.meta ? { ...action.meta, activeKey: activeVariant.key } : action.meta,
+    variants,
+    variantIndex: 0,
+  };
+  const dictionary = activeDictionary();
+  const ids = new Set(advancedFilter.entryIds || []);
+  if (dictionary && ids.size && !ids.has(state.selectedEntryId)) {
+    state.selectedEntryId = [...dictionary.entries].filter((entry) => ids.has(entry.id)).sort(compareEntries)[0]?.id || state.selectedEntryId;
+    editorMode = "display";
+    entryDraft = null;
+  }
+  return true;
+}
+
+function refreshAdvancedFilterState() {
+  if (!advancedFilter) {
+    return false;
+  }
+  const action = rebuildAdvancedFilterAction({ allowEmptyActive: true });
+  if (action) {
+    return applyAdvancedFilterAction(action, { keepFirstEmpty: true });
+  }
+  const dictionary = activeDictionary();
+  if (!dictionary) {
+    return false;
+  }
+  const existingIds = new Set(dictionary.entries.map((entry) => entry.id));
+  advancedFilter = {
+    ...advancedFilter,
+    entryIds: (advancedFilter.entryIds || []).filter((id) => existingIds.has(id)),
+    variants: (advancedFilter.variants || [])
+      .map((variant) => ({
+        ...variant,
+        entryIds: (variant.entryIds || []).filter((id) => existingIds.has(id)),
+      }))
+      .filter((variant, index) => variant.entryIds.length || index === advancedFilter.variantIndex),
+  };
+  return true;
+}
+
+function refreshAdvancedFilter() {
+  if (!refreshAdvancedFilterState()) {
+    return;
+  }
+  render();
+  if (advancedFilter?.entryIds?.length && advancedFilter.entryIds.includes(state.selectedEntryId)) {
+    scheduleEntryCardScroll(state.selectedEntryId);
+  }
+}
+
+function nextAdvancedFilterVariantIndex() {
+  const variants = advancedFilter?.variants || [];
+  if (variants.length < 2) {
+    return -1;
+  }
+  const currentIndex = Math.max(0, advancedFilter.variantIndex || 0);
+  for (let step = 1; step < variants.length; step += 1) {
+    const index = (currentIndex + step) % variants.length;
+    if (variants[index]?.entryIds?.length) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function canCycleAdvancedFilter() {
+  return nextAdvancedFilterVariantIndex() >= 0;
 }
 
 function cycleAdvancedFilterVariant() {
-  if (!advancedFilter?.variants?.length || advancedFilter.variants.length < 2) {
+  const nextIndex = nextAdvancedFilterVariantIndex();
+  if (nextIndex < 0) {
     return;
   }
   const dictionary = activeDictionary();
   if (!dictionary) {
     return;
   }
-  const nextIndex = (advancedFilter.variantIndex + 1) % advancedFilter.variants.length;
   const next = advancedFilter.variants[nextIndex];
   advancedFilter = {
     ...advancedFilter,
     title: next.title,
     entryIds: next.entryIds,
+    issueMap: next.issueMap,
+    meta: next.key && advancedFilter.meta ? { ...advancedFilter.meta, activeKey: next.key } : advancedFilter.meta,
     variantIndex: nextIndex,
   };
   const ids = new Set(advancedFilter.entryIds);
@@ -4126,10 +4461,9 @@ function analysisPageBody(report, page, subpage) {
 }
 
 function renderAnalysisOverview(report) {
-  const issueEntryIds = entryIdsFrom(report.issues.map((issue) => issue.entryId));
-  const highIssueEntryIds = entryIdsFrom(report.issues.filter((issue) => issue.severity === "high").map((issue) => issue.entryId));
-  const mediumIssueEntryIds = entryIdsFrom(report.issues.filter((issue) => issue.severity === "medium").map((issue) => issue.entryId));
-  const lowIssueEntryIds = entryIdsFrom(report.issues.filter((issue) => issue.severity === "low").map((issue) => issue.entryId));
+  const issueEntries = qualityIssuesWithEntries(report.issues);
+  const highIssues = issueEntries.filter((issue) => issue.severity === "high");
+  const highIssueEntryIds = entryIdsFrom(highIssues.map((issue) => issue.entryId));
   return `
     <section class="analysis-grid analysis-summary-grid">
       ${analysisMetricCard(aText("词条", "Entries"), report.entries.length, `${report.rootCount} ${aText("个词根", "roots")}`, viewAction("editor"))}
@@ -4137,7 +4471,7 @@ function renderAnalysisOverview(report) {
       ${analysisMetricCard(aText("释义覆盖", "Definition Coverage"), percentText(report.coverage.definitions), `${report.definitionCount} ${aText("条释义", "definitions")}`, advancedFilterAction(aText("有释义", "Has definitions"), report.definitionEntryIds, { variants: [{ title: aText("无释义", "No definitions"), entryIds: report.noDefinitionEntryIds }] }))}
       ${analysisMetricCard("IPA", percentText(report.coverage.ipa), `${report.ipa.syllableAverage} ${aText("平均音节", "avg syllables")}`, advancedFilterAction(aText("有 IPA", "Has IPA"), report.ipaEntryIds, { variants: [{ title: aText("无 IPA", "No IPA"), entryIds: report.noIpaEntryIds }] }))}
       ${analysisMetricCard(aText("形态学", "Morphology"), percentText(report.coverage.morphology), `${report.morphology.generatedForms} ${aText("个生成形式", "generated forms")}`, advancedFilterAction(aText("有形态表格", "Has morphology table"), report.morphologyEntryIds, { variants: [{ title: aText("无形态表格", "No morphology table"), entryIds: report.noMorphologyEntryIds }] }))}
-      ${analysisMetricCard(aText("质量问题", "Quality Issues"), report.issues.length, `${highIssueEntryIds.length} ${aText("个高优先级", "high priority")}`, advancedFilterAction(aText("质量问题", "Quality issues"), issueEntryIds, { variants: [{ title: aText("高优先级质量问题", "High-priority quality issues"), entryIds: highIssueEntryIds }, { title: aText("中优先级质量问题", "Medium-priority quality issues"), entryIds: mediumIssueEntryIds }, { title: aText("低优先级质量问题", "Low-priority quality issues"), entryIds: lowIssueEntryIds }] }))}
+      ${analysisMetricCard(aText("质量问题", "Quality Issues"), report.issues.length, `${highIssueEntryIds.length} ${aText("个高优先级", "high priority")}`, qualityIssueFilterAction(report, "priority", "all"))}
     </section>
     <section class="analysis-grid">
       ${analysisCard(aText("词类分布", "Part of Speech"), analysisBarList(report.parts, { empty: aText("暂无词类标签", "No part tags yet") }))}
@@ -4245,35 +4579,28 @@ function renderAnalysisQualityPage(report, subpage) {
 }
 
 function renderAnalysisQualityFilterBar(report) {
-  const issueEntryIds = entryIdsFrom(report.issues.map((issue) => issue.entryId));
-  const highIssueEntryIds = entryIdsFrom(report.issues.filter((issue) => issue.severity === "high").map((issue) => issue.entryId));
-  const mediumIssueEntryIds = entryIdsFrom(report.issues.filter((issue) => issue.severity === "medium").map((issue) => issue.entryId));
-  const lowIssueEntryIds = entryIdsFrom(report.issues.filter((issue) => issue.severity === "low").map((issue) => issue.entryId));
-  const priorityVariants = [
-    { title: aText("质量问题", "Quality issues"), entryIds: issueEntryIds },
-    { title: aText("高优先级质量问题", "High-priority quality issues"), entryIds: highIssueEntryIds },
-    { title: aText("中优先级质量问题", "Medium-priority quality issues"), entryIds: mediumIssueEntryIds },
-    { title: aText("低优先级质量问题", "Low-priority quality issues"), entryIds: lowIssueEntryIds },
-  ];
-  const priorityAction = (title, entryIds) => entryIds.length
-    ? advancedFilterAction(title, entryIds, { variants: priorityVariants.filter((variant) => variant.title !== title) })
-    : null;
+  const issueEntries = qualityIssuesWithEntries(report.issues);
+  const highIssues = issueEntries.filter((issue) => issue.severity === "high");
+  const mediumIssues = issueEntries.filter((issue) => issue.severity === "medium");
+  const lowIssues = issueEntries.filter((issue) => issue.severity === "low");
+  const issueEntryIds = entryIdsFrom(issueEntries.map((issue) => issue.entryId));
+  const highIssueEntryIds = entryIdsFrom(highIssues.map((issue) => issue.entryId));
+  const mediumIssueEntryIds = entryIdsFrom(mediumIssues.map((issue) => issue.entryId));
+  const lowIssueEntryIds = entryIdsFrom(lowIssues.map((issue) => issue.entryId));
   const moduleItems = ["lemma", "tags", "network", "gloss", "other"].map((module) => ({
     module,
     title: qualityIssueModuleFilterTitle(module),
     label: qualityIssueModuleLabel(module),
+    issues: qualityIssuesWithEntries(qualityIssuesByModule(report, module)),
     entryIds: qualityIssueEntryIdsByModule(report, module),
   }));
-  const moduleAction = (title, entryIds) => entryIds.length
-    ? advancedFilterAction(title, entryIds, { variants: moduleItems.filter((item) => item.title !== title).map((item) => ({ title: item.title, entryIds: item.entryIds })) })
-    : null;
   const priorityItems = [
-    [aText("全部问题", "All issues"), issueEntryIds.length, priorityAction(aText("质量问题", "Quality issues"), issueEntryIds)],
-    [aText("高优先级", "High"), highIssueEntryIds.length, priorityAction(aText("高优先级质量问题", "High-priority quality issues"), highIssueEntryIds)],
-    [aText("中优先级", "Medium"), mediumIssueEntryIds.length, priorityAction(aText("中优先级质量问题", "Medium-priority quality issues"), mediumIssueEntryIds)],
-    [aText("低优先级", "Low"), lowIssueEntryIds.length, priorityAction(aText("低优先级质量问题", "Low-priority quality issues"), lowIssueEntryIds)],
+    [aText("全部问题", "All issues"), issueEntryIds.length, qualityIssueFilterAction(report, "priority", "all")],
+    [aText("高优先级", "High"), highIssueEntryIds.length, qualityIssueFilterAction(report, "priority", "high")],
+    [aText("中优先级", "Medium"), mediumIssueEntryIds.length, qualityIssueFilterAction(report, "priority", "medium")],
+    [aText("低优先级", "Low"), lowIssueEntryIds.length, qualityIssueFilterAction(report, "priority", "low")],
   ];
-  const moduleFilterItems = moduleItems.map((item) => [item.label, item.entryIds.length, moduleAction(item.title, item.entryIds)]);
+  const moduleFilterItems = moduleItems.map((item) => [item.label, item.entryIds.length, qualityIssueFilterAction(report, "module", item.module)]);
   return `
     <section class="analysis-filter-strip" aria-label="${escapeHtml(aText("质量检查高级筛选", "Quality advanced filters"))}">
       <div>
@@ -4300,6 +4627,71 @@ function renderAnalysisQualityFilterGroup(label, items) {
   `;
 }
 
+function qualityIssuesWithEntries(issues = []) {
+  return (issues || []).filter((issue) => issue.entryId);
+}
+
+function qualityIssueFilterDefinitions(report, group) {
+  const issueEntries = qualityIssuesWithEntries(report.issues);
+  if (group === "module") {
+    return ["lemma", "tags", "network", "gloss", "other"].map((module) => ({
+      key: module,
+      title: qualityIssueModuleFilterTitle(module),
+      issues: qualityIssuesWithEntries(qualityIssuesByModule(report, module)),
+    }));
+  }
+  return [
+    { key: "all", title: aText("质量问题", "Quality issues"), issues: issueEntries },
+    { key: "high", title: aText("高优先级质量问题", "High-priority quality issues"), issues: issueEntries.filter((issue) => issue.severity === "high") },
+    { key: "medium", title: aText("中优先级质量问题", "Medium-priority quality issues"), issues: issueEntries.filter((issue) => issue.severity === "medium") },
+    { key: "low", title: aText("低优先级质量问题", "Low-priority quality issues"), issues: issueEntries.filter((issue) => issue.severity === "low") },
+  ];
+}
+
+function qualityIssueFilterAction(report, group, activeKey, options = {}) {
+  const definitions = qualityIssueFilterDefinitions(report, group);
+  const active = definitions.find((item) => item.key === activeKey) || definitions[0];
+  if (!active) {
+    return null;
+  }
+  return qualityIssueAdvancedFilterAction(
+    active.title,
+    active.issues,
+    definitions.filter((item) => item.key !== active.key),
+    {
+      key: active.key,
+      meta: { type: "quality", group, activeKey: active.key },
+      allowEmptyActive: Boolean(options.allowEmptyActive),
+    },
+  );
+}
+
+function refreshAdvancedFilterLocalization() {
+  refreshAdvancedFilterState();
+}
+
+function qualityIssueAdvancedFilterAction(title, issues = [], variants = [], options = {}) {
+  const activeIssues = qualityIssuesWithEntries(issues);
+  const entryIds = entryIdsFrom(activeIssues.map((issue) => issue.entryId));
+  return entryIds.length || options.allowEmptyActive
+    ? advancedFilterAction(title, entryIds, {
+      key: options.key || "",
+      issues: activeIssues,
+      variants: variants.map((variant) => {
+        const variantIssues = qualityIssuesWithEntries(variant.issues);
+        return {
+          key: variant.key || "",
+          title: variant.title,
+          entryIds: entryIdsFrom(variantIssues.map((issue) => issue.entryId)),
+          issues: variantIssues,
+        };
+      }),
+      meta: options.meta || null,
+      allowEmptyActive: Boolean(options.allowEmptyActive),
+    })
+    : null;
+}
+
 function qualityIssuesByModule(report, module) {
   return (report.issues || []).filter((issue) => (issue.module || "other") === module);
 }
@@ -4317,6 +4709,15 @@ function qualityIssueModuleLabel(module) {
     other: aText("其他问题", "Other issues"),
   };
   return labels[module] || labels.other;
+}
+
+function qualityIssueSeverityLabel(severity) {
+  const labels = {
+    high: aText("高优先度", "High priority"),
+    medium: aText("中优先度", "Medium priority"),
+    low: aText("低优先度", "Low priority"),
+  };
+  return labels[severity] || labels.low;
 }
 
 function qualityIssueModuleFilterTitle(module) {
@@ -4506,9 +4907,8 @@ function buildDictionaryAnalysis(dictionary) {
     });
     (entry.etymology?.sources || []).forEach((sourceName) => {
       if (!resolveSourceEntry(sourceName, dictionary)) {
-        const detail = `${aText("未解析来源", "Unresolved source")}: ${sourceName}`;
-        addIssue(networkIssues, "medium", entry, detail, "", "network");
-        addIssue(issues, "medium", entry, detail, "", "network");
+        addIssue(networkIssues, "medium", entry, aText("未解析来源", "Unresolved source"), sourceName, "network");
+        addIssue(issues, "medium", entry, aText("未解析来源", "Unresolved source"), sourceName, "network");
       }
     });
     const cycle = sourceCycleForEntry(entry, dictionary);
@@ -4959,17 +5359,20 @@ function binaryCoverageFilterAction(activeTitle, activeEntryIds, alternateTitle,
 function advancedFilterAction(title, items, options = {}) {
   const entryIds = entryIdsFrom(items);
   const variants = [
-    { title, entryIds },
+    { key: options.key || "", title, entryIds, issues: options.issues || [] },
     ...(options.variants || []).map((variant) => ({
+      key: variant.key || "",
       title: variant.title,
       entryIds: entryIdsFrom(variant.entryIds),
+      issues: variant.issues || [],
     })),
-  ].filter((variant) => variant.entryIds.length);
+  ].filter((variant, index) => variant.entryIds.length || (index === 0 && options.allowEmptyActive));
   return {
     type: "advanced-filter",
     title,
     entryIds,
     variants,
+    meta: options.meta || null,
   };
 }
 
@@ -8812,15 +9215,8 @@ elements.analysisPanel.addEventListener("click", (event) => {
   advancedFilter = null;
   switchToEntry(target.dataset.entryId);
 });
-elements.advancedFilterLabel.addEventListener("click", (event) => {
-  const button = event.target.closest('[data-action="cycle-advanced-filter"]');
-  if (!button) {
-    return;
-  }
-  event.preventDefault();
-  event.stopPropagation();
-  cycleAdvancedFilterVariant();
-});
+elements.advancedFilterRefreshButton.addEventListener("click", refreshAdvancedFilter);
+elements.advancedFilterCycleButton.addEventListener("click", cycleAdvancedFilterVariant);
 elements.advancedFilterExitButton.addEventListener("click", exitAdvancedFilter);
 elements.openLexicalNetworkButton.addEventListener("click", openLexicalNetwork);
 elements.closeLexicalNetworkButton.addEventListener("click", closeLexicalNetwork);
@@ -9202,6 +9598,7 @@ elements.languageToggleButton.addEventListener("click", async () => {
   const nextLanguage = currentLanguage === "zh" ? "en" : "zh";
   currentLanguage = nextLanguage;
   state.uiLanguage = nextLanguage;
+  refreshAdvancedFilterLocalization();
   render();
   if (!backendAvailable) {
     return;
@@ -9217,6 +9614,7 @@ elements.languageToggleButton.addEventListener("click", async () => {
   } catch (error) {
     currentLanguage = previousLanguage;
     state.uiLanguage = previousLanguage;
+    refreshAdvancedFilterLocalization();
     render();
     showToast(t("languageSaveFailed"));
     console.error(error);
