@@ -707,6 +707,8 @@ const i18n = {
     meaning: "Definition",
     example: "Example",
     definitionNote: "Definition Note",
+    addExample: "Add Example",
+    addDefinitionNote: "Add Definition Note",
     removeDefinition: "Remove Definition",
     none: "None",
     wholeEntryNote: "Whole Entry Note",
@@ -862,6 +864,9 @@ const i18n = {
     closeNetwork: "Close Network",
   },
 };
+
+i18n.zh.addExample = "添加例句";
+i18n.zh.addDefinitionNote = "添加释义备注";
 
 const elements = {
   appShell: document.querySelector("#appShell"),
@@ -6317,30 +6322,80 @@ function collectPartialMorphologyOverrides() {
   ));
 }
 
+function definitionFormStateFromCard(card) {
+  return {
+    id: card.dataset.definitionId || uid("def"),
+    meaning: card.querySelector('[data-field="meaning"]')?.value.trim() || "",
+    example: card.querySelector('[data-field="example"]')?.value.trim() || "",
+    note: card.querySelector('[data-field="note"]')?.value.trim() || "",
+    showExample: Boolean(card.querySelector('[data-field="example"]')),
+    showNote: Boolean(card.querySelector('[data-field="note"]')),
+  };
+}
+
+function definitionFormStates(list) {
+  return [...(list?.querySelectorAll(".definition-form-card") || [])].map(definitionFormStateFromCard);
+}
+
+function definitionFormValue(definition, field) {
+  return String(definition?.[field] || "");
+}
+
+function definitionOptionalFieldHtml(field, labelKey, value) {
+  return `
+    <label>
+      <span>${escapeHtml(t(labelKey))}</span>
+      <textarea data-field="${field}" rows="2">${escapeHtml(value)}</textarea>
+    </label>
+  `;
+}
+
+function definitionOptionalActionHtml(field, labelKey) {
+  return `<button class="secondary-button additive-button" type="button" data-action="add-definition-optional" data-optional-definition-field="${field}">${escapeHtml(t(labelKey))}</button>`;
+}
+
+function definitionOptionalFieldsHtml(definition = {}) {
+  const example = definitionFormValue(definition, "example");
+  const note = definitionFormValue(definition, "note");
+  const showExample = Boolean(example || definition.showExample);
+  const showNote = Boolean(note || definition.showNote);
+  const fields = [
+    showExample ? definitionOptionalFieldHtml("example", "example", example) : "",
+    showNote ? definitionOptionalFieldHtml("note", "definitionNote", note) : "",
+  ].filter(Boolean);
+  const actions = [
+    showExample ? "" : definitionOptionalActionHtml("example", "addExample"),
+    showNote ? "" : definitionOptionalActionHtml("note", "addDefinitionNote"),
+  ].filter(Boolean);
+  return `
+    <div class="definition-optional-fields">
+      ${fields.join("")}
+      ${actions.length ? `<div class="definition-optional-actions">${actions.join("")}</div>` : ""}
+    </div>
+  `;
+}
+
+function definitionFormCardHtml(definition, index, removeAction) {
+  return `
+    <div class="definition-form-header">
+      <strong>${escapeHtml(t("definitions"))} ${index + 1}</strong>
+      <button class="danger-ghost" type="button" data-action="${removeAction}">${escapeHtml(t("removeDefinition"))}</button>
+    </div>
+    <label>
+      <span>${escapeHtml(t("meaning"))}</span>
+      <textarea data-field="meaning" rows="3">${escapeHtml(definitionFormValue(definition, "meaning"))}</textarea>
+    </label>
+    ${definitionOptionalFieldsHtml(definition)}
+  `;
+}
+
 function renderDefinitionFormList(definitions) {
   elements.definitionFormList.innerHTML = "";
   definitions.forEach((definition, index) => {
     const block = document.createElement("article");
     block.className = "definition-form-card";
     block.dataset.definitionId = definition.id || uid("def");
-    block.innerHTML = `
-      <div class="definition-form-header">
-        <strong>${escapeHtml(t("definitions"))} ${index + 1}</strong>
-        <button class="danger-ghost" type="button" data-action="remove-definition">${escapeHtml(t("removeDefinition"))}</button>
-      </div>
-      <label>
-        <span>${escapeHtml(t("meaning"))}</span>
-        <textarea data-field="meaning" rows="3">${escapeHtml(definition.meaning)}</textarea>
-      </label>
-      <label>
-        <span>${escapeHtml(t("example"))}</span>
-        <textarea data-field="example" rows="2">${escapeHtml(definition.example)}</textarea>
-      </label>
-      <label>
-        <span>${escapeHtml(t("definitionNote"))}</span>
-        <textarea data-field="note" rows="2">${escapeHtml(definition.note)}</textarea>
-      </label>
-    `;
+    block.innerHTML = definitionFormCardHtml(definition, index, "remove-definition");
     elements.definitionFormList.append(block);
   });
   updateRemoveDefinitionButtons();
@@ -6353,14 +6408,35 @@ function updateRemoveDefinitionButtons() {
   });
 }
 
+function renderDefinitionFormCardInPlace(card, fieldToShow) {
+  const list = card?.parentElement;
+  if (!card || !list) {
+    return;
+  }
+  const isPartial = list.dataset.partialDefinitions === "true";
+  const definition = definitionFormStateFromCard(card);
+  if (fieldToShow === "example") {
+    definition.showExample = true;
+  } else if (fieldToShow === "note") {
+    definition.showNote = true;
+  }
+  const index = [...list.querySelectorAll(".definition-form-card")].indexOf(card);
+  card.innerHTML = definitionFormCardHtml(
+    definition,
+    Math.max(0, index),
+    isPartial ? "remove-partial-definition" : "remove-definition",
+  );
+  if (isPartial) {
+    updatePartialRemoveDefinitionButtons(list);
+  } else {
+    updateRemoveDefinitionButtons();
+  }
+  card.querySelector(`[data-field="${fieldToShow}"]`)?.focus();
+}
+
 function collectDefinitions() {
-  return [...elements.definitionFormList.querySelectorAll(".definition-form-card")]
-    .map((card) => ({
-      id: card.dataset.definitionId || uid("def"),
-      meaning: card.querySelector('[data-field="meaning"]').value.trim(),
-      example: card.querySelector('[data-field="example"]').value.trim(),
-      note: card.querySelector('[data-field="note"]').value.trim(),
-    }))
+  return definitionFormStates(elements.definitionFormList)
+    .map(({ id, meaning, example, note }) => ({ id, meaning, example, note }))
     .filter((definition) => definition.meaning || definition.example || definition.note);
 }
 
@@ -8877,7 +8953,7 @@ async function openPartialEdit(section) {
     renderPartialDefinitionList(entry.definitions || [normalizeDefinition()]);
     const addButton = document.createElement("button");
     addButton.type = "button";
-    addButton.className = "secondary-button";
+    addButton.className = "secondary-button additive-button";
     addButton.dataset.action = "add-partial-definition";
     addButton.textContent = t("addDefinition");
     body.append(addButton);
@@ -8940,28 +9016,15 @@ function renderPartialDefinitionList(definitions) {
     const card = document.createElement("article");
     card.className = "definition-form-card";
     card.dataset.definitionId = definition.id || uid("def");
-    card.innerHTML = `
-      <div class="definition-form-header">
-        <strong>${escapeHtml(t("definitions"))} ${index + 1}</strong>
-        <button class="danger-ghost" type="button" data-action="remove-partial-definition">${escapeHtml(t("removeDefinition"))}</button>
-      </div>
-      <label>
-        <span>${escapeHtml(t("meaning"))}</span>
-        <textarea data-field="meaning" rows="3">${escapeHtml(definition.meaning)}</textarea>
-      </label>
-      <label>
-        <span>${escapeHtml(t("example"))}</span>
-        <textarea data-field="example" rows="2">${escapeHtml(definition.example)}</textarea>
-      </label>
-      <label>
-        <span>${escapeHtml(t("definitionNote"))}</span>
-        <textarea data-field="note" rows="2">${escapeHtml(definition.note)}</textarea>
-      </label>
-    `;
+    card.innerHTML = definitionFormCardHtml(definition, index, "remove-partial-definition");
     list.append(card);
   });
 
-  const cards = list.querySelectorAll(".definition-form-card");
+  updatePartialRemoveDefinitionButtons(list);
+}
+
+function updatePartialRemoveDefinitionButtons(list = partialEditBody()?.querySelector('[data-partial-definitions="true"]')) {
+  const cards = list?.querySelectorAll(".definition-form-card") || [];
   cards.forEach((card) => {
     card.querySelector('[data-action="remove-partial-definition"]').hidden = cards.length <= 1;
   });
@@ -8994,13 +9057,9 @@ function entryDefinitionsRequirementMessage(entry, dictionary = activeDictionary
 }
 
 function collectPartialDefinitions() {
-  return [...(partialEditBody()?.querySelectorAll(".definition-form-card") || [])]
-    .map((card) => ({
-      id: card.dataset.definitionId || uid("def"),
-      meaning: card.querySelector('[data-field="meaning"]').value.trim(),
-      example: card.querySelector('[data-field="example"]').value.trim(),
-      note: card.querySelector('[data-field="note"]').value.trim(),
-    }))
+  const list = partialEditBody()?.querySelector('[data-partial-definitions="true"]');
+  return definitionFormStates(list)
+    .map(({ id, meaning, example, note }) => ({ id, meaning, example, note }))
     .filter((definition) => definition.meaning || definition.example || definition.note);
 }
 
@@ -9171,6 +9230,8 @@ async function saveEntry(event) {
   const now = new Date().toISOString();
   const entryId = elements.entryId.value || uniqueDictionaryEntityId("entry", dictionary);
   const existing = dictionary.entries.find((entry) => entry.id === entryId);
+  const wasNewEntry = !existing;
+  const previousLemma = existing?.lemma || "";
   const definitions = collectDefinitions();
   const entry = {
     id: entryId,
@@ -9208,6 +9269,9 @@ async function saveEntry(event) {
   entryDraft = null;
   editorMode = "display";
   await persistDictionary(dictionary);
+  if (wasNewEntry || previousLemma !== entry.lemma) {
+    scheduleEntryCardScroll(entry.id, prepareRootModeEntryNavigation(entry.id));
+  }
   showToast(t("savedEntry"));
   return true;
 }
@@ -9703,12 +9767,21 @@ elements.toolButtons.forEach((button) => {
 });
 
 elements.definitionFormList.addEventListener("click", (event) => {
+  const optionalButton = event.target.closest('[data-action="add-definition-optional"]');
+  if (optionalButton) {
+    renderDefinitionFormCardInPlace(
+      optionalButton.closest(".definition-form-card"),
+      optionalButton.dataset.optionalDefinitionField,
+    );
+    return;
+  }
+
   const button = event.target.closest('[data-action="remove-definition"]');
   if (!button) {
     return;
   }
   button.closest(".definition-form-card").remove();
-  updateRemoveDefinitionButtons();
+  renderDefinitionFormList(definitionFormStates(elements.definitionFormList));
 });
 
 elements.entryDisplay.addEventListener("contextmenu", (event) => {
@@ -9754,9 +9827,19 @@ elements.entryDisplay.addEventListener("click", (event) => {
 
   const addButton = event.target.closest('[data-action="add-partial-definition"]');
   if (addButton) {
-    const definitions = collectPartialDefinitions();
+    const list = partialEditBody()?.querySelector('[data-partial-definitions="true"]');
+    const definitions = definitionFormStates(list);
     definitions.push(normalizeDefinition());
     renderPartialDefinitionList(definitions);
+    return;
+  }
+
+  const optionalButton = event.target.closest('[data-action="add-definition-optional"]');
+  if (optionalButton) {
+    renderDefinitionFormCardInPlace(
+      optionalButton.closest(".definition-form-card"),
+      optionalButton.dataset.optionalDefinitionField,
+    );
     return;
   }
 
@@ -9765,7 +9848,7 @@ elements.entryDisplay.addEventListener("click", (event) => {
     return;
   }
   removeButton.closest(".definition-form-card").remove();
-  renderPartialDefinitionList(collectPartialDefinitions());
+  renderPartialDefinitionList(definitionFormStates(partialEditBody()?.querySelector('[data-partial-definitions="true"]')));
 });
 
 elements.entryDisplay.addEventListener("submit", (event) => {
@@ -9778,7 +9861,7 @@ elements.entryDisplay.addEventListener("submit", (event) => {
 bindSourceAutocompleteInput(elements.sourceEntryInput);
 
 elements.addDefinitionButton.addEventListener("click", () => {
-  const definitions = collectDefinitions();
+  const definitions = definitionFormStates(elements.definitionFormList);
   definitions.push(normalizeDefinition());
   renderDefinitionFormList(definitions);
 });

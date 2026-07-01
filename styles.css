@@ -1897,6 +1897,30 @@ dialog {
   gap: 12px;
 }
 
+.definition-optional-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.definition-optional-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.additive-button {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: transparent;
+}
+
+.additive-button:hover,
+.additive-button:focus-visible {
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
