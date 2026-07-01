@@ -50,6 +50,15 @@ body.dark-theme {
   display: none !important;
 }
 
+body.app-booting .app-shell {
+  visibility: hidden;
+}
+
+body.app-booting :where(.app-shell, .content-grid, .dictionary-panel, .entry-browser-toggle-icon, .nav-collapse-arrow),
+body.app-boot-settling :where(.app-shell, .content-grid, .dictionary-panel, .entry-browser-toggle-icon, .nav-collapse-arrow) {
+  transition: none !important;
+}
+
 button,
 input,
 select,
@@ -332,12 +341,12 @@ fieldset {
 }
 
 @media (min-width: 800px) {
-  .content-grid[data-browser-state="expanded"] .entry-browser {
+  .content-grid[data-browser-state="expanded"][data-browser-layout="ready"] .entry-browser {
     position: fixed;
-    left: var(--entry-browser-fixed-left, 0px);
-    top: var(--entry-browser-fixed-top, 20px);
+    left: var(--entry-browser-fixed-left);
+    top: var(--entry-browser-fixed-top);
     z-index: 4;
-    width: var(--entry-browser-fixed-width, 340px);
+    width: var(--entry-browser-fixed-width);
   }
 
   .content-grid[data-browser-state="expanded"] .entry-detail-panel {

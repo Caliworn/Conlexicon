@@ -17,6 +17,7 @@ let toastTimer = null;
 let editorMode = "display";
 let currentTheme = "light";
 let currentLanguage = "zh";
+const UI_PREFERENCES_STORAGE_KEY = "conlexicon:ui-preferences";
 const shellState = {
   navCollapsed: false,
   wideNavCollapsed: false,
@@ -1081,6 +1082,53 @@ function normalizeUiTheme(value) {
   return value === "dark" ? "dark" : "light";
 }
 
+function readCachedUiPreferences() {
+  try {
+    const raw = localStorage.getItem(UI_PREFERENCES_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+    const preferences = JSON.parse(raw);
+    return {
+      ...(preferences.uiTheme === "dark" || preferences.uiTheme === "light"
+        ? { uiTheme: preferences.uiTheme }
+        : {}),
+    };
+  } catch (error) {
+    return {};
+  }
+}
+
+function cacheUiPreferences(preferences = {}) {
+  const cached = readCachedUiPreferences();
+  const next = {
+    uiTheme: normalizeUiTheme(preferences.uiTheme ?? cached.uiTheme ?? currentTheme),
+  };
+  try {
+    localStorage.setItem(UI_PREFERENCES_STORAGE_KEY, JSON.stringify(next));
+  } catch (error) {
+    // Ignore storage failures; server-side preferences remain authoritative.
+  }
+}
+
+function hydrateInitialUiPreferences() {
+  const cached = readCachedUiPreferences();
+  currentTheme = normalizeUiTheme(cached.uiTheme ?? currentTheme);
+  state.uiTheme = currentTheme;
+  document.body.classList.toggle("dark-theme", currentTheme === "dark");
+}
+
+function finishAppBoot() {
+  requestAnimationFrame(() => {
+    updateEntryBrowserHeight();
+    document.body.classList.remove("app-booting");
+    document.body.classList.add("app-boot-settling");
+    requestAnimationFrame(() => {
+      document.body.classList.remove("app-boot-settling");
+    });
+  });
+}
+
 function formatText(key, values = {}) {
   return Object.entries(values).reduce(
     (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
@@ -1207,6 +1255,7 @@ async function loadState() {
     backendMessage = "";
     currentLanguage = normalizeUiLanguage(serverState.uiLanguage);
     currentTheme = normalizeUiTheme(serverState.uiTheme);
+    cacheUiPreferences({ uiTheme: currentTheme });
     state = normalizeState({
       ...serverState,
       selectedEntryId: state.selectedEntryId,
@@ -1220,6 +1269,7 @@ async function loadState() {
   }
 
   render();
+  finishAppBoot();
 }
 
 function normalizeState(source) {
@@ -2286,6 +2336,7 @@ function updateEntryBrowserHeight() {
     && browser.style.getPropertyValue("--entry-browser-fixed-width") === nextWidth
     && browser.style.getPropertyValue("--entry-browser-height") === nextHeight
   ) {
+    elements.contentGrid.dataset.browserLayout = "ready";
     return;
   }
   const scrollPin = entryVirtualListScrollPin();
@@ -2293,6 +2344,7 @@ function updateEntryBrowserHeight() {
   browser.style.setProperty("--entry-browser-fixed-top", nextTop);
   browser.style.setProperty("--entry-browser-fixed-width", nextWidth);
   browser.style.setProperty("--entry-browser-height", nextHeight);
+  elements.contentGrid.dataset.browserLayout = "ready";
   syncEntryVirtualListAfterBrowserLayoutChange({ widthChanged, scrollPin });
 }
 
@@ -2305,6 +2357,7 @@ function clearEntryBrowserLayoutVariables() {
   browser.style.removeProperty("--entry-browser-fixed-top");
   browser.style.removeProperty("--entry-browser-fixed-width");
   browser.style.removeProperty("--entry-browser-height");
+  elements.contentGrid.dataset.browserLayout = "pending";
 }
 
 function scheduleEntryBrowserHeightUpdate() {
@@ -10268,6 +10321,7 @@ elements.themeToggleButton.addEventListener("click", async () => {
   const nextTheme = currentTheme === "dark" ? "light" : "dark";
   currentTheme = nextTheme;
   state.uiTheme = nextTheme;
+  cacheUiPreferences({ uiTheme: nextTheme });
   render();
   if (!backendAvailable) {
     return;
@@ -10280,10 +10334,12 @@ elements.themeToggleButton.addEventListener("click", async () => {
     });
     currentTheme = normalizeUiTheme(saved.uiTheme);
     state.uiTheme = currentTheme;
+    cacheUiPreferences({ uiTheme: currentTheme });
     render();
   } catch (error) {
     currentTheme = previousTheme;
     state.uiTheme = previousTheme;
+    cacheUiPreferences({ uiTheme: previousTheme });
     render();
     showToast(t("themeSaveFailed"));
     console.error(error);
@@ -10503,4 +10559,7 @@ elements.appShell.addEventListener("transitionend", (event) => {
   }
 });
 
+hydrateInitialUiPreferences();
+applyLocale();
+applyTheme();
 loadState();

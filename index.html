@@ -6,7 +6,20 @@
     <title>Conlexicon</title>
     <link rel="stylesheet" href="styles.css">
   </head>
-  <body>
+  <body class="app-booting">
+    <script>
+      (() => {
+        try {
+          const raw = localStorage.getItem("conlexicon:ui-preferences");
+          const preferences = raw ? JSON.parse(raw) : {};
+          if (preferences.uiTheme === "dark") {
+            document.body.classList.add("dark-theme");
+          }
+        } catch (error) {
+          document.body.classList.remove("dark-theme");
+        }
+      })();
+    </script>
     <div class="app-shell" id="appShell" data-nav-state="expanded" data-browser-state="expanded">
       <aside class="dictionary-panel app-nav" id="appNav" data-i18n-aria-label="toolNavigation" aria-label="工具导航">
         <div class="brand-row">
