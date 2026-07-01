@@ -87,7 +87,7 @@ const masonryLayouts = new WeakMap();
 
 const i18n = {
   zh: {
-    appTitle: "人造语言词典",
+    appTitle: "构典",
     toolNavigation: "工具导航",
     collapseNavigation: "收起工具导航",
     expandNavigation: "展开工具导航",
@@ -867,7 +867,6 @@ const elements = {
   appNav: document.querySelector("#appNav"),
   navCollapseButton: document.querySelector("#navCollapseButton"),
   appTooltip: document.querySelector("#appTooltip"),
-  appTooltipTargets: [...document.querySelectorAll("#appNav button, [data-app-tooltip]")],
   editorView: document.querySelector("#editorView"),
   editorTopBar: document.querySelector("#editorTopBar"),
   entryBrowserToggleButton: document.querySelector("#entryBrowserToggleButton"),
@@ -1714,7 +1713,7 @@ function normalizeIpaSettings(ipa = {}) {
       complexPhonemes: normalizeClusterList(ipa.syllable?.complexPhonemes),
     },
     defaultStress: Number.isInteger(defaultStress) ? defaultStress : -2,
-    unstressMonosyllables: Boolean(ipa.unstressMonosyllables),
+    unstressMonosyllables: ipa.unstressMonosyllables !== false,
   };
 }
 
@@ -2078,15 +2077,6 @@ function applyLocale() {
   document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
     node.placeholder = t(node.dataset.i18nPlaceholder);
   });
-  document.querySelectorAll("[data-i18n-title]").forEach((node) => {
-    const text = t(node.dataset.i18nTitle);
-    if (node.dataset.appTooltip) {
-      node.removeAttribute("title");
-    } else {
-      node.title = text;
-    }
-    node.setAttribute("aria-label", text);
-  });
   document.querySelectorAll("[data-i18n-aria-label]").forEach((node) => {
     node.setAttribute("aria-label", t(node.dataset.i18nAriaLabel));
   });
@@ -2096,10 +2086,10 @@ function applyLocale() {
   elements.languageToggleButton.textContent = currentLanguage === "zh" ? "EN" : "中";
   const nextThemeLabel = currentTheme === "dark" ? t("lightMode") : t("darkMode");
   elements.themeToggleLabel.textContent = nextThemeLabel;
-  elements.themeToggleButton.title = nextThemeLabel;
+  elements.themeToggleButton.removeAttribute("title");
   elements.themeToggleButton.setAttribute("aria-label", nextThemeLabel);
   const nextLanguageLabel = currentLanguage === "zh" ? "English" : "中文";
-  elements.languageToggleButton.title = nextLanguageLabel;
+  elements.languageToggleButton.removeAttribute("title");
   elements.languageToggleButton.setAttribute("aria-label", nextLanguageLabel);
 }
 
@@ -2125,11 +2115,6 @@ function renderShellNav() {
   elements.navCollapseButton.setAttribute("aria-expanded", String(!collapsed));
   const controlLabel = t(collapsed ? "expandNavigation" : "collapseNavigation");
   elements.navCollapseButton.setAttribute("aria-label", controlLabel);
-  elements.appTooltipTargets.forEach((button) => {
-    if (elements.appNav.contains(button)) {
-      button.removeAttribute("title");
-    }
-  });
 }
 
 function appTooltipEnabledFor(target) {
@@ -10359,7 +10344,52 @@ document.addEventListener("input", (event) => {
   field.setSelectionRange(nextStart, nextEnd);
 }, true);
 
+function isEditableShortcutTarget(target) {
+  return Boolean(target?.closest?.("input, textarea, select, [contenteditable='true'], [contenteditable=''], [role='textbox']"));
+}
+
+function isNewEntryShortcutEvent(event) {
+  return (event.ctrlKey || event.metaKey)
+    && !event.altKey
+    && !event.shiftKey
+    && event.key === "Enter";
+}
+
+async function triggerNewEntryShortcut() {
+  if (!backendAvailable) {
+    return;
+  }
+  if (state.activeView !== "editor") {
+    await showView("editor");
+    if (state.activeView !== "editor") {
+      return;
+    }
+  }
+  await beginNewEntry();
+}
+
+function handleNewEntryShortcut(event) {
+  if (!isNewEntryShortcutEvent(event)) {
+    return false;
+  }
+  event.preventDefault();
+  event.stopPropagation();
+  if (confirmDialogResolver || !elements.infoDialog.hidden || isEditableShortcutTarget(event.target)) {
+    return true;
+  }
+  if (!event.repeat) {
+    triggerNewEntryShortcut().catch((error) => console.error(error));
+  }
+  return true;
+}
+
+window.addEventListener("keydown", handleNewEntryShortcut, { capture: true });
+
 document.addEventListener("keydown", (event) => {
+  if (event.defaultPrevented) {
+    return;
+  }
+
   if (event.target.matches?.("textarea.ipa-single-line") && event.key === "Enter" && !event.isComposing) {
     event.preventDefault();
     event.target.form?.requestSubmit();
@@ -10376,7 +10406,14 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  const isSaveShortcut = (event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === "s";
+  if (handleNewEntryShortcut(event)) {
+    return;
+  }
+
+  const isSaveShortcut = (event.ctrlKey || event.metaKey)
+    && !event.altKey
+    && !event.shiftKey
+    && event.key.toLocaleLowerCase() === "s";
   if (!isSaveShortcut) {
     return;
   }

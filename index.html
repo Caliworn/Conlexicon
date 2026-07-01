@@ -12,10 +12,10 @@
         <div class="brand-row">
           <div class="brand-copy">
             <p class="eyebrow" id="brandEyebrow">Conlexicon</p>
-            <h1 data-i18n="appTitle">人造语言词典</h1>
+            <h1 data-i18n="appTitle">构典</h1>
           </div>
           <div class="brand-actions">
-            <button class="icon-button nav-collapse-button" id="navCollapseButton" type="button" aria-controls="appNav" aria-expanded="true" aria-label="收起工具导航" title="收起工具导航">
+            <button class="icon-button nav-collapse-button" id="navCollapseButton" type="button" aria-controls="appNav" aria-expanded="true" aria-label="收起工具导航">
               <svg class="nav-icon nav-collapse-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <rect x="3" y="4" width="18" height="16" rx="2"></rect>
                 <path d="M9 4v16"></path>
@@ -26,35 +26,35 @@
         </div>
 
         <nav class="tool-list" data-i18n-aria-label="toolNavigation" aria-label="工具导航">
-          <button class="tool-button active" type="button" data-view="editor" data-i18n-title="entryEditor">
+          <button class="tool-button active" type="button" data-view="editor" data-i18n-aria-label="entryEditor">
             <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"></path></svg></span>
             <span class="tool-label" data-i18n="entryEditor">词条编辑</span>
           </button>
-          <button class="tool-button" type="button" data-view="docs" data-i18n-title="languageDocs">
+          <button class="tool-button" type="button" data-view="docs" data-i18n-aria-label="languageDocs">
             <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path><path d="M14 2v6h6M8 13h8M8 17h6"></path></svg></span>
             <span class="tool-label" data-i18n="languageDocs">语言文档</span>
           </button>
-          <button class="tool-button" type="button" data-view="corpus" data-i18n-title="corpus">
+          <button class="tool-button" type="button" data-view="corpus" data-i18n-aria-label="corpus">
             <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5Z"></path><path d="m3 12 9 5 9-5M3 17l9 5 9-5"></path></svg></span>
             <span class="tool-label" data-i18n="corpus">语料库</span>
           </button>
-          <button class="tool-button" type="button" data-view="analysis" data-i18n-title="analysis">
+          <button class="tool-button" type="button" data-view="analysis" data-i18n-aria-label="analysis">
             <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19V3"></path></svg></span>
             <span class="tool-label" data-i18n="analysis">数据分析</span>
           </button>
-          <button class="tool-button" type="button" data-view="ipa" data-i18n-title="ipaConfig">
+          <button class="tool-button" type="button" data-view="ipa" data-i18n-aria-label="ipaConfig">
             <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 10v4M7 7v10M11 4v16M15 8v8M19 6v12M23 10v4"></path></svg></span>
             <span class="tool-label" data-i18n="ipaConfig">自动 IPA 标注</span>
           </button>
-          <button class="tool-button" type="button" data-view="morphology" data-i18n-title="morphologyConfig">
+          <button class="tool-button" type="button" data-view="morphology" data-i18n-aria-label="morphologyConfig">
             <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 10h18M9 4v16M15 4v16"></path></svg></span>
             <span class="tool-label" data-i18n="morphologyConfig">自动形态学</span>
           </button>
-          <button class="tool-button" type="button" data-view="settings" data-i18n-title="otherSettings">
+          <button class="tool-button" type="button" data-view="settings" data-i18n-aria-label="otherSettings">
             <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"></path></svg></span>
             <span class="tool-label" data-i18n="otherSettings">其他设置</span>
           </button>
-          <button class="tool-button" type="button" data-view="manager" data-i18n-title="dictionaryManager">
+          <button class="tool-button" type="button" data-view="manager" data-i18n-aria-label="dictionaryManager">
             <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M8 7h11m0 0-3-3m3 3-3 3M16 17H5m0 0 3 3m-3-3 3-3"></path></svg></span>
             <span class="tool-label" data-i18n="dictionaryManager">词典管理</span>
           </button>
@@ -65,7 +65,7 @@
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"></path></svg>
             <span class="utility-label" id="themeToggleLabel">暗黑模式</span>
           </button>
-          <button class="secondary-button utility-button language-toggle" id="languageToggleButton" type="button" aria-label="English" title="English">EN</button>
+          <button class="secondary-button utility-button language-toggle" id="languageToggleButton" type="button" aria-label="English">EN</button>
         </div>
       </aside>
 
@@ -429,66 +429,66 @@
                 <div class="gloss-style-list">
                   <div class="gloss-style-row" data-gloss-style="gla">
                     <code>\gla</code>
-                    <select data-gloss-style-font data-app-tooltip="always" data-i18n-title="glossFontFamily">
+                    <select data-gloss-style-font data-app-tooltip="always" data-i18n-aria-label="glossFontFamily">
                       <option value="serif" data-i18n="fontSerif">衬线</option>
                       <option value="sans" data-i18n="fontSans">无衬线</option>
                       <option value="mono" data-i18n="fontMono">等宽</option>
                     </select>
-                    <select data-gloss-style-size data-app-tooltip="always" data-i18n-title="glossFontSize">
+                    <select data-gloss-style-size data-app-tooltip="always" data-i18n-aria-label="glossFontSize">
                       <option value="small" data-i18n="fontSizeSmall">小</option>
                       <option value="medium" data-i18n="fontSizeMedium">中</option>
                       <option value="large" data-i18n="fontSizeLarge">大</option>
                     </select>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-title="glossStyleBold"><input type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-title="glossStyleItalic"><input type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
+                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
+                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
                     <span class="gloss-style-toggle-placeholder" aria-hidden="true"></span>
                   </div>
                   <div class="gloss-style-row" data-gloss-style="glb">
                     <code>\glb</code>
-                    <select data-gloss-style-font data-app-tooltip="always" data-i18n-title="glossFontFamily">
+                    <select data-gloss-style-font data-app-tooltip="always" data-i18n-aria-label="glossFontFamily">
                       <option value="serif" data-i18n="fontSerif">衬线</option>
                       <option value="sans" data-i18n="fontSans">无衬线</option>
                       <option value="mono" data-i18n="fontMono">等宽</option>
                     </select>
-                    <select data-gloss-style-size data-app-tooltip="always" data-i18n-title="glossFontSize">
+                    <select data-gloss-style-size data-app-tooltip="always" data-i18n-aria-label="glossFontSize">
                       <option value="small" data-i18n="fontSizeSmall">小</option>
                       <option value="medium" data-i18n="fontSizeMedium">中</option>
                       <option value="large" data-i18n="fontSizeLarge">大</option>
                     </select>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-title="glossStyleBold"><input type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-title="glossStyleItalic"><input type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
-                    <label class="gloss-style-toggle smallcaps-toggle" data-app-tooltip="always" data-i18n-title="glossStyleSmallCaps"><input id="glbSmallCapsInput" type="checkbox" data-gloss-style-smallcaps><span aria-hidden="true">SC</span></label>
+                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
+                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
+                    <label class="gloss-style-toggle smallcaps-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleSmallCaps"><input id="glbSmallCapsInput" type="checkbox" data-gloss-style-smallcaps><span aria-hidden="true">SC</span></label>
                   </div>
                   <div class="gloss-style-row" data-gloss-style="glc">
                     <code>\glc</code>
-                    <select data-gloss-style-font data-app-tooltip="always" data-i18n-title="glossFontFamily">
+                    <select data-gloss-style-font data-app-tooltip="always" data-i18n-aria-label="glossFontFamily">
                       <option value="serif" data-i18n="fontSerif">衬线</option>
                       <option value="sans" data-i18n="fontSans">无衬线</option>
                       <option value="mono" data-i18n="fontMono">等宽</option>
                     </select>
-                    <select data-gloss-style-size data-app-tooltip="always" data-i18n-title="glossFontSize">
+                    <select data-gloss-style-size data-app-tooltip="always" data-i18n-aria-label="glossFontSize">
                       <option value="small" data-i18n="fontSizeSmall">小</option>
                       <option value="medium" data-i18n="fontSizeMedium">中</option>
                       <option value="large" data-i18n="fontSizeLarge">大</option>
                     </select>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-title="glossStyleBold"><input type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-title="glossStyleItalic"><input type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
+                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
+                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
                     <span class="gloss-style-toggle-placeholder" aria-hidden="true"></span>
                   </div>
                   <div class="gloss-style-row" data-gloss-style="ft">
                     <code>\ft</code>
-                    <select data-gloss-style-font data-app-tooltip="always" data-i18n-title="glossFontFamily">
+                    <select data-gloss-style-font data-app-tooltip="always" data-i18n-aria-label="glossFontFamily">
                       <option value="serif" data-i18n="fontSerif">衬线</option>
                       <option value="sans" data-i18n="fontSans">无衬线</option>
                       <option value="mono" data-i18n="fontMono">等宽</option>
                     </select>
-                    <select data-gloss-style-size data-app-tooltip="always" data-i18n-title="glossFontSize">
+                    <select data-gloss-style-size data-app-tooltip="always" data-i18n-aria-label="glossFontSize">
                       <option value="small" data-i18n="fontSizeSmall">小</option>
                       <option value="medium" data-i18n="fontSizeMedium">中</option>
                       <option value="large" data-i18n="fontSizeLarge">大</option>
                     </select>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-title="glossStyleBold"><input type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-title="glossStyleItalic"><input type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
+                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
+                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
                     <span class="gloss-style-toggle-placeholder" aria-hidden="true"></span>
                   </div>
                 </div>

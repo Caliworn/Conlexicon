@@ -1,4 +1,4 @@
-# Conlexicon / 人造语言词典
+# Conlexicon / 构典
 
 Conlexicon is a local-first web dictionary and editor for constructed languages. It manages multiple dictionaries, supports rich lexical entries, and stores each dictionary in its own JSON file.
 
@@ -39,6 +39,14 @@ Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。
 - Gloss 渲染：语料单元卡片、单元内容名称和词条例句可分别配置渲染对象与对齐，并支持 `\gla`、`\glb`、`\glc`、`\ft` 独立配置字体、字号、粗体和斜体，以及 `\glb` small caps。
 - 词典级界面设置：包括模糊搜索、标签显示替换、红色高亮标签、gloss 渲染、多义项显示、导航时保存/放弃/提示编辑、语料库/文档自动保存、IPA 虚拟键盘符号和左侧导航栏排序。
 - 暗黑模式和中英界面切换；全局界面主题和语言会记忆在 `data/index.json` 中。
+
+## Keyboard Shortcuts / 快捷键
+
+- `Ctrl`/`Cmd` + `S`: save the active edit form or module when saving is available.
+- `Ctrl`/`Cmd` + `Enter`: create a new entry when focus is not inside an input, textarea, select, or other editable field. If an unsaved edit is active, Conlexicon uses the existing save / discard / cancel confirmation flow before opening the new entry draft.
+
+- `Ctrl`/`Cmd` + `S`：在当前表单或模块支持保存时执行保存。
+- `Ctrl`/`Cmd` + `Enter`：当焦点不在输入框、文本框、下拉框或其他可编辑区域内时新建词条；如果当前有未保存编辑，会沿用现有的“保存 / 放弃 / 取消”确认流程，再进入新词条草稿。
 
 ## Run Locally / 本地运行
 

@@ -419,7 +419,7 @@ function normalizeIpaSettings(ipa = {}) {
       complexPhonemes: normalizeClusterList(ipa.syllable?.complexPhonemes),
     },
     defaultStress: Number.isInteger(defaultStress) ? defaultStress : -2,
-    unstressMonosyllables: Boolean(ipa.unstressMonosyllables),
+    unstressMonosyllables: ipa.unstressMonosyllables !== false,
   };
 }
 
