@@ -10,6 +10,7 @@ const indexPath = path.join(dataDir, "index.json");
 const port = Number(process.env.PORT || 4173);
 const GLOSS_STYLE_KEYS = ["gla", "glb", "glc", "ft"];
 const DEFAULT_ENTRY_EXAMPLE_RENDER_PATTERN = "(\\gla)\n(\\glb)\n(\\glc)\n(\\ft)";
+const DEFAULT_INDEX = { activeDictionaryId: "", dictionaryIds: [], uiLanguage: "zh", uiTheme: "light" };
 
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -27,7 +28,7 @@ async function ensureDataStore() {
   try {
     await fs.access(indexPath);
   } catch {
-    await writeJson(indexPath, { activeDictionaryId: "", dictionaryIds: [], uiLanguage: "zh" });
+    await writeJson(indexPath, DEFAULT_INDEX);
   }
 }
 
@@ -492,25 +493,31 @@ function normalizeDictionary(dictionary = {}) {
 }
 
 async function readIndex() {
-  const index = await readJson(indexPath, { activeDictionaryId: "", dictionaryIds: [], uiLanguage: "zh" });
+  const index = await readJson(indexPath, DEFAULT_INDEX);
   return {
     activeDictionaryId: index.activeDictionaryId || "",
     dictionaryIds: Array.isArray(index.dictionaryIds) ? index.dictionaryIds : [],
     uiLanguage: normalizeUiLanguage(index.uiLanguage),
+    uiTheme: normalizeUiTheme(index.uiTheme),
   };
 }
 
 async function writeIndex(index) {
-  const existing = await readJson(indexPath, { activeDictionaryId: "", dictionaryIds: [], uiLanguage: "zh" });
+  const existing = await readJson(indexPath, DEFAULT_INDEX);
   await writeJson(indexPath, {
     activeDictionaryId: index.activeDictionaryId || "",
     dictionaryIds: Array.isArray(index.dictionaryIds) ? index.dictionaryIds : [],
     uiLanguage: normalizeUiLanguage(index.uiLanguage ?? existing.uiLanguage),
+    uiTheme: normalizeUiTheme(index.uiTheme ?? existing.uiTheme),
   });
 }
 
 function normalizeUiLanguage(value) {
   return value === "en" ? "en" : "zh";
+}
+
+function normalizeUiTheme(value) {
+  return value === "dark" ? "dark" : "light";
 }
 
 async function readDictionary(id) {
@@ -578,7 +585,7 @@ async function readState() {
     await writeIndex({ activeDictionaryId, dictionaryIds });
   }
 
-  return { activeDictionaryId, dictionaries, uiLanguage: index.uiLanguage };
+  return { activeDictionaryId, dictionaries, uiLanguage: index.uiLanguage, uiTheme: index.uiTheme };
 }
 
 async function readRequestBody(request) {
@@ -648,12 +655,20 @@ async function routeApi(request, response, url) {
 
   if (request.method === "PUT" && url.pathname === "/api/preferences") {
     const body = await readRequestBody(request);
-    if (!["zh", "en"].includes(body.uiLanguage)) {
+    if (Object.hasOwn(body, "uiLanguage") && !["zh", "en"].includes(body.uiLanguage)) {
       throw Object.assign(new Error("Invalid UI language"), { status: 400 });
     }
+    if (Object.hasOwn(body, "uiTheme") && !["light", "dark"].includes(body.uiTheme)) {
+      throw Object.assign(new Error("Invalid UI theme"), { status: 400 });
+    }
     const index = await readIndex();
-    await writeIndex({ ...index, uiLanguage: body.uiLanguage });
-    sendJson(response, 200, { uiLanguage: body.uiLanguage });
+    const nextIndex = {
+      ...index,
+      ...(Object.hasOwn(body, "uiLanguage") ? { uiLanguage: body.uiLanguage } : {}),
+      ...(Object.hasOwn(body, "uiTheme") ? { uiTheme: body.uiTheme } : {}),
+    };
+    await writeIndex(nextIndex);
+    sendJson(response, 200, { uiLanguage: nextIndex.uiLanguage, uiTheme: nextIndex.uiTheme });
     return true;
   }
 

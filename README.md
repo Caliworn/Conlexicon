@@ -21,7 +21,7 @@ Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。
 - Paged data analysis for overview, entries/tags, IPA, morphology, editing activity, quality checks, etymology checks, and glossed examples.
 - Gloss rendering for `\gla`, `\glb`, `\glc`, and `\ft`, with independent render-object and alignment settings for corpus unit cards, unit content headings, and entry examples, plus per-object font, size, bold, italic, and `\glb` small-caps styles.
 - Per-dictionary UI/settings options, including fuzzy search, label display replacement, highlighted tags, gloss rendering, polysemy display, save/discard/prompt handling for edits during navigation, corpus/docs auto-save, IPA keyboard symbols, and left navigation order.
-- Dark mode and Chinese/English UI switching, with the global interface language remembered in `data/index.json`.
+- Dark mode and Chinese/English UI switching, with the global interface theme and language remembered in `data/index.json`.
 
 - 多词典管理：新建、切换、导入、导出、配置和删除词典；导入相同词典 ID 的词典前会明确确认是否覆盖。
 - 词典级 JSON 保存：词条、语料库、设置、语言文档、IPA 规则、形态学规则和界面选项都会随当前词典保存。
@@ -38,7 +38,7 @@ Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。
 - 分页式数据分析：包括总览、词条与标签、IPA、形态学、编辑进度、质量检查、词源检查和 glossed 例句检查。
 - Gloss 渲染：语料单元卡片、单元内容名称和词条例句可分别配置渲染对象与对齐，并支持 `\gla`、`\glb`、`\glc`、`\ft` 独立配置字体、字号、粗体和斜体，以及 `\glb` small caps。
 - 词典级界面设置：包括模糊搜索、标签显示替换、红色高亮标签、gloss 渲染、多义项显示、导航时保存/放弃/提示编辑、语料库/文档自动保存、IPA 虚拟键盘符号和左侧导航栏排序。
-- 暗黑模式和中英界面切换；全局界面语言会记忆在 `data/index.json` 中。
+- 暗黑模式和中英界面切换；全局界面主题和语言会记忆在 `data/index.json` 中。
 
 ## Run Locally / 本地运行
 
@@ -70,9 +70,9 @@ data/index.json
 data/dictionaries/*.json
 ```
 
-`data/index.json` stores the dictionary index, active dictionary ID, and global interface language. Per-dictionary content and settings remain in `data/dictionaries/*.json`.
+`data/index.json` stores the dictionary index, active dictionary ID, global interface language, and global interface theme. Per-dictionary content and settings remain in `data/dictionaries/*.json`.
 
-`data/index.json` 保存词典索引、当前词典 ID 和全局界面语言；各词典的内容与设置仍分别保存在 `data/dictionaries/*.json` 中。
+`data/index.json` 保存词典索引、当前词典 ID、全局界面语言和全局界面主题；各词典的内容与设置仍分别保存在 `data/dictionaries/*.json` 中。
 
 The `data/` directory is intentionally ignored by Git so personal dictionaries are not committed to the repository.
 

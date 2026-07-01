@@ -4,6 +4,7 @@ let state = {
   selectedDictionaryConfigId: "",
   activeView: "editor",
   uiLanguage: "zh",
+  uiTheme: "light",
   dictionaries: [],
 };
 
@@ -69,7 +70,7 @@ const defaultAnalysisViewState = {
 const analysisViewStates = new Map();
 const corpusViewStates = new Map();
 let corpusDraftState = null;
-const DEFAULT_TOOL_NAV_ORDER = ["editor", "docs", "corpus", "analysis", "ipa", "morphology", "settings"];
+const DEFAULT_TOOL_NAV_ORDER = ["editor", "docs", "corpus", "analysis", "ipa", "morphology", "settings", "manager"];
 let advancedFilter = null;
 let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
@@ -79,6 +80,7 @@ let entryCardScrollRequestId = 0;
 let entryBrowserHeightFrame = 0;
 let entryBrowserLayoutRefreshFrame = 0;
 let entryBrowserLayoutRefreshUntil = 0;
+let activeEntryContextMenu = null;
 const entryVirtualList = createVirtualListState(138);
 const corpusVirtualList = createVirtualListState(74);
 const masonryLayouts = new WeakMap();
@@ -144,6 +146,8 @@ const i18n = {
     darkMode: "暗黑模式",
     lightMode: "浅色模式",
     newEntry: "新建词条",
+    quickNewEntryTooltip: "新建词条",
+    insertSymbol: "插入 {symbol}",
     backendOffline: "后端未连接",
     openViaServer: "请通过本地服务打开 Conlexicon",
     backendFileMessage: "当前是 file:// 页面，无法调用后端 API。",
@@ -165,6 +169,7 @@ const i18n = {
     refreshAdvancedFilter: "刷新高级筛选",
     cycleAdvancedFilter: "切换筛选条件",
     qualityFilterInfo: "查看质量筛选说明",
+    qualityFilterInfoTitle: "质量筛选说明",
     qualityFilterInfoBody: "点击质量类别按钮只会切换本页显示的问题列表；点击“在词条列表查看”才会启用高级筛选，并在词条列表中查看全部有当前类别质量问题的词条。词条卡片下方会显示对应的问题类型，悬浮可查看具体问题。按优先度筛选会在全部、高、中、低之间循环；按检查模块筛选会在词形、标签、IPA、词源网络、Glossed 例句和其他问题之间循环。",
     qualityCurrentCategory: "当前类别",
     viewQualityEntries: "在词条列表查看",
@@ -176,6 +181,8 @@ const i18n = {
     sortCreatedAsc: "创建时间正序",
     sortCreatedDesc: "创建时间倒序",
     editEntry: "编辑词条",
+    entryContextMenu: "词条操作",
+    createDerivedEntry: "新建衍生条目",
     partialEdit: "局部编辑",
     definitions: "释义",
     etymology: "词源",
@@ -336,6 +343,7 @@ const i18n = {
     imported: "数据已导入",
     importFailed: "无法读取这个 JSON 文件",
     languageSaveFailed: "界面语言保存失败",
+    themeSaveFailed: "界面主题保存失败",
     importOverwriteTitle: "词典 ID 已存在",
     importOverwriteMessage: "词典 ID“{id}”已经存在。导入“{name}”将覆盖现有词典及其全部数据。",
     importAndOverwrite: "导入并覆盖",
@@ -525,6 +533,8 @@ const i18n = {
     darkMode: "Dark Mode",
     lightMode: "Light Mode",
     newEntry: "New Entry",
+    quickNewEntryTooltip: "New Entry",
+    insertSymbol: "Insert {symbol}",
     backendOffline: "Backend Offline",
     openViaServer: "Open Conlexicon Through Local Service",
     backendFileMessage: "This file:// page cannot call the backend API.",
@@ -546,6 +556,7 @@ const i18n = {
     refreshAdvancedFilter: "Refresh Advanced Filter",
     cycleAdvancedFilter: "Cycle Filter Condition",
     qualityFilterInfo: "Show quality filter help",
+    qualityFilterInfoTitle: "Quality filter help",
     qualityFilterInfoBody: "Click a quality category button to switch the issue list shown on this page. Click “View in Entry List” to enable Advanced Filter and review all entries with the current category of quality issues in the entry list. Entry cards show the matching issue types below the card; hover them to see the concrete issue. Priority filters cycle between all, high, medium, and low priority. Module filters cycle between word-form, tag, IPA, etymology network, Glossed example, and other issues.",
     qualityCurrentCategory: "Current Category",
     viewQualityEntries: "View in Entry List",
@@ -557,6 +568,8 @@ const i18n = {
     sortCreatedAsc: "Created Oldest",
     sortCreatedDesc: "Created Newest",
     editEntry: "Edit Entry",
+    entryContextMenu: "Entry Actions",
+    createDerivedEntry: "New Derived Entry",
     partialEdit: "Local Edit",
     definitions: "Definitions",
     etymology: "Etymology",
@@ -717,6 +730,7 @@ const i18n = {
     imported: "Data imported",
     importFailed: "Cannot read this JSON file",
     languageSaveFailed: "Failed to save the interface language",
+    themeSaveFailed: "Failed to save the interface theme",
     importOverwriteTitle: "Dictionary ID already exists",
     importOverwriteMessage: "Dictionary ID “{id}” already exists. Importing “{name}” will overwrite the existing dictionary and all of its data.",
     importAndOverwrite: "Import and Overwrite",
@@ -865,7 +879,6 @@ const elements = {
   corpusView: document.querySelector("#corpusView"),
   morphologyView: document.querySelector("#morphologyView"),
   ipaView: document.querySelector("#ipaView"),
-  dictionaryManagerButton: document.querySelector("#dictionaryManagerButton"),
   backToEditorButton: document.querySelector("#backToEditorButton"),
   backToEditorFromSettingsButton: document.querySelector("#backToEditorFromSettingsButton"),
   backToEditorFromAnalysisButton: document.querySelector("#backToEditorFromAnalysisButton"),
@@ -900,6 +913,7 @@ const elements = {
   partFilter: document.querySelector("#partFilter"),
   sortSelect: document.querySelector("#sortSelect"),
   newEntryButton: document.querySelector("#newEntryButton"),
+  entryListNewEntryButton: document.querySelector("#entryListNewEntryButton"),
   exportButton: document.querySelector("#exportButton"),
   importInput: document.querySelector("#importInput"),
   entryDisplay: document.querySelector("#entryDisplay"),
@@ -1016,8 +1030,10 @@ const elements = {
   morphologyTableList: document.querySelector("#morphologyTableList"),
   addMorphologyTableButton: document.querySelector("#addMorphologyTableButton"),
   morphologySyntaxButton: document.querySelector("#morphologySyntaxButton"),
-  morphologySyntaxDialog: document.querySelector("#morphologySyntaxDialog"),
-  closeMorphologySyntaxButton: document.querySelector("#closeMorphologySyntaxButton"),
+  infoDialog: document.querySelector("#infoDialog"),
+  infoDialogTitle: document.querySelector("#infoDialogTitle"),
+  infoDialogBody: document.querySelector("#infoDialogBody"),
+  closeInfoDialogButton: document.querySelector("#closeInfoDialogButton"),
   ipaNoDictionaryNotice: document.querySelector("#ipaNoDictionaryNotice"),
   ipaOpenDictionaryManagerButton: document.querySelector("#ipaOpenDictionaryManagerButton"),
   ipaPanel: document.querySelector("#ipaPanel"),
@@ -1062,6 +1078,10 @@ function normalizeUiLanguage(value) {
   return value === "en" ? "en" : "zh";
 }
 
+function normalizeUiTheme(value) {
+  return value === "dark" ? "dark" : "light";
+}
+
 function formatText(key, values = {}) {
   return Object.entries(values).reduce(
     (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
@@ -1078,6 +1098,45 @@ function closeConfirmDialog(result) {
   const resolver = confirmDialogResolver;
   confirmDialogResolver = null;
   resolver(result);
+}
+
+function closeInfoDialog() {
+  elements.infoDialog.hidden = true;
+  elements.infoDialogTitle.textContent = "";
+  elements.infoDialogBody.innerHTML = "";
+}
+
+function infoDialogTextHtml(text) {
+  return String(text || "")
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, "<br>")}</p>`)
+    .join("");
+}
+
+function morphologySyntaxInfoHtml() {
+  return `
+    <div class="syntax-help">
+      <p>${escapeHtml(t("morphologySyntaxIntro"))}</p>
+      <ul>
+        <li>${escapeHtml(t("morphologySyntaxLemma"))}</li>
+        <li>${escapeHtml(t("morphologySyntaxReplace"))}</li>
+        <li>${escapeHtml(t("morphologySyntaxCondition"))}</li>
+        <li>${escapeHtml(t("morphologySyntaxContext"))}</li>
+        <li>${escapeHtml(t("morphologySyntaxElse"))}</li>
+        <li>${escapeHtml(t("morphologySyntaxSpacing"))}</li>
+      </ul>
+      <p>${escapeHtml(t("morphologySyntaxExamples"))}</p>
+    </div>
+  `;
+}
+
+function appInfoDialog(title, options = {}) {
+  elements.infoDialogTitle.textContent = title;
+  elements.infoDialogBody.innerHTML = options.html || infoDialogTextHtml(options.text);
+  elements.infoDialog.hidden = false;
+  elements.closeInfoDialogButton.focus();
 }
 
 function appConfirm(message, options = {}) {
@@ -1148,6 +1207,7 @@ async function loadState() {
     backendAvailable = true;
     backendMessage = "";
     currentLanguage = normalizeUiLanguage(serverState.uiLanguage);
+    currentTheme = normalizeUiTheme(serverState.uiTheme);
     state = normalizeState({
       ...serverState,
       selectedEntryId: state.selectedEntryId,
@@ -1170,6 +1230,7 @@ function normalizeState(source) {
     selectedDictionaryConfigId: source.selectedDictionaryConfigId || source.activeDictionaryId || "",
     activeView: source.activeView || "editor",
     uiLanguage: normalizeUiLanguage(source.uiLanguage),
+    uiTheme: normalizeUiTheme(source.uiTheme),
     dictionaries: Array.isArray(source.dictionaries) ? source.dictionaries.map(normalizeDictionary) : [],
   };
 }
@@ -1355,6 +1416,7 @@ function toolNavLabel(view) {
     ipa: t("ipaConfig"),
     morphology: t("morphologyConfig"),
     settings: t("otherSettings"),
+    manager: t("dictionaryManager"),
   };
   return labels[view] || view;
 }
@@ -1855,6 +1917,7 @@ function splitSourceText(value) {
 }
 
 function render() {
+  closeEntryContextMenu();
   ensureValidSelection();
   applyLocale();
   applyTheme();
@@ -2017,7 +2080,11 @@ function applyLocale() {
   });
   document.querySelectorAll("[data-i18n-title]").forEach((node) => {
     const text = t(node.dataset.i18nTitle);
-    node.title = text;
+    if (node.dataset.appTooltip) {
+      node.removeAttribute("title");
+    } else {
+      node.title = text;
+    }
     node.setAttribute("aria-label", text);
   });
   document.querySelectorAll("[data-i18n-aria-label]").forEach((node) => {
@@ -2089,6 +2156,27 @@ function appTooltipLabelFor(target) {
   return target.dataset.appTooltipLabel || target.getAttribute("aria-label") || "";
 }
 
+function appTooltipHtmlFor(target) {
+  return target.dataset.appTooltipHtml || "";
+}
+
+function appTooltipTargetIsVisible(target) {
+  return Boolean(target)
+    && target.isConnected
+    && !target.hidden
+    && target.getClientRects().length > 0;
+}
+
+function appTooltipTargetHasKeyboardFocus(target) {
+  return document.activeElement === target && target.matches(":focus-visible");
+}
+
+function appTooltipTargetFromEvent(event) {
+  return event.target instanceof Element
+    ? event.target.closest("#appNav button, [data-app-tooltip]")
+    : null;
+}
+
 function showAppTooltip(target) {
   if (!appTooltipEnabledFor(target) || target.hidden) {
     return;
@@ -2099,12 +2187,21 @@ function showAppTooltip(target) {
   }
   hideAppTooltip();
   activeAppTooltipTarget = target;
-  elements.appTooltip.textContent = label;
+  const html = appTooltipHtmlFor(target);
+  if (html) {
+    elements.appTooltip.innerHTML = html;
+  } else {
+    elements.appTooltip.textContent = label;
+  }
   elements.appTooltip.classList.toggle("wrap", target.dataset.appTooltipWrap === "true");
   elements.appTooltip.hidden = false;
   target.setAttribute("aria-describedby", "appTooltip");
   requestAnimationFrame(() => {
     if (activeAppTooltipTarget !== target || elements.appTooltip.hidden) {
+      return;
+    }
+    if (!appTooltipTargetIsVisible(target)) {
+      hideAppTooltip();
       return;
     }
     const targetRect = target.getBoundingClientRect();
@@ -2135,7 +2232,23 @@ function hideAppTooltip() {
   }
   activeAppTooltipTarget = null;
   elements.appTooltip.classList.remove("wrap");
+  elements.appTooltip.textContent = "";
   elements.appTooltip.hidden = true;
+}
+
+function syncAppTooltipVisibility() {
+  const target = activeAppTooltipTarget;
+  if (!target) {
+    return;
+  }
+  if (!appTooltipTargetIsVisible(target) || !appTooltipEnabledFor(target)) {
+    hideAppTooltip();
+    return;
+  }
+  if (target.matches(":hover") || appTooltipTargetHasKeyboardFocus(target)) {
+    return;
+  }
+  hideAppTooltip();
 }
 
 function effectiveEntryBrowserCollapsed(view = state.activeView) {
@@ -2181,6 +2294,7 @@ function updateEntryBrowserHeight() {
   const nextTop = `${Math.round(top)}px`;
   const nextWidth = `${Math.round(firstColumnWidth)}px`;
   const nextHeight = `${Math.round(availableHeight)}px`;
+  const widthChanged = browser.style.getPropertyValue("--entry-browser-fixed-width") !== nextWidth;
   if (
     browser.style.getPropertyValue("--entry-browser-fixed-left") === nextLeft
     && browser.style.getPropertyValue("--entry-browser-fixed-top") === nextTop
@@ -2189,11 +2303,12 @@ function updateEntryBrowserHeight() {
   ) {
     return;
   }
+  const scrollPin = entryVirtualListScrollPin();
   browser.style.setProperty("--entry-browser-fixed-left", nextLeft);
   browser.style.setProperty("--entry-browser-fixed-top", nextTop);
   browser.style.setProperty("--entry-browser-fixed-width", nextWidth);
   browser.style.setProperty("--entry-browser-height", nextHeight);
-  remeasureEntryVirtualList();
+  syncEntryVirtualListAfterBrowserLayoutChange({ widthChanged, scrollPin });
 }
 
 function clearEntryBrowserLayoutVariables() {
@@ -2235,10 +2350,47 @@ function remeasureEntryVirtualList() {
     return;
   }
   const anchor = virtualListAnchor(entryVirtualList);
-  entryVirtualList.sizes.clear();
-  entryVirtualList.width = Math.round(container.clientWidth);
+  const width = Math.round(container.clientWidth);
+  if (entryVirtualList.width && width && entryVirtualList.width !== width) {
+    entryVirtualList.sizes.clear();
+  }
+  entryVirtualList.width = width;
   rebuildVirtualListOffsets(entryVirtualList);
   restoreVirtualListAnchor(entryVirtualList, anchor);
+  clampVirtualListScroll(entryVirtualList);
+  renderVirtualListWindow(entryVirtualList);
+}
+
+function entryVirtualListScrollPin() {
+  const container = entryVirtualList.container;
+  if (!container) {
+    return null;
+  }
+  const totalHeight = entryVirtualList.offsets[entryVirtualList.offsets.length - 1] || 0;
+  const maxScrollTop = Math.max(0, totalHeight - container.clientHeight);
+  return {
+    scrollTop: container.scrollTop,
+    wasAtBottom: maxScrollTop > 0 && container.scrollTop >= maxScrollTop - 2,
+  };
+}
+
+function syncEntryVirtualListAfterBrowserLayoutChange(options = {}) {
+  const container = entryVirtualList.container;
+  if (!container || container.offsetParent === null) {
+    return;
+  }
+  const scrollPin = options.scrollPin || entryVirtualListScrollPin();
+  if (options.widthChanged) {
+    const anchor = virtualListAnchor(entryVirtualList);
+    entryVirtualList.sizes.clear();
+    entryVirtualList.width = Math.round(container.clientWidth);
+    rebuildVirtualListOffsets(entryVirtualList);
+    restoreVirtualListAnchor(entryVirtualList, anchor);
+  } else if (scrollPin?.wasAtBottom) {
+    container.scrollTop = Math.max(0, (entryVirtualList.offsets[entryVirtualList.offsets.length - 1] || 0) - container.clientHeight);
+  } else {
+    container.scrollTop = scrollPin?.scrollTop || 0;
+  }
   clampVirtualListScroll(entryVirtualList);
   renderVirtualListWindow(entryVirtualList);
 }
@@ -2276,7 +2428,7 @@ function renderAvailability() {
   elements.batchIpaMissingButton.disabled = !backendAvailable || !hasDictionary;
   elements.editorTopBar.hidden = !backendAvailable || !hasDictionary;
   elements.contentGrid.hidden = !backendAvailable || !hasDictionary;
-  elements.toolList.hidden = !backendAvailable || !hasDictionary;
+  elements.toolList.hidden = !backendAvailable;
   elements.managerGrid.hidden = !backendAvailable;
   elements.newEntryButton.hidden = !backendAvailable || !hasDictionary;
   elements.addDictionaryButton.disabled = !backendAvailable;
@@ -2309,7 +2461,6 @@ function renderToolNav() {
       elements.toolList.append(button);
     }
   });
-  elements.dictionaryManagerButton.hidden = state.activeView === "manager";
   elements.toolButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.view === state.activeView);
   });
@@ -2318,6 +2469,7 @@ function renderToolNav() {
 function renderHeader() {
   const dictionary = activeDictionary();
   elements.newEntryButton.disabled = !dictionary;
+  elements.entryListNewEntryButton.disabled = !dictionary;
 
   if (!backendAvailable) {
     elements.dictionaryTitle.textContent = t("backendOffline");
@@ -2497,15 +2649,25 @@ function virtualListAnchor(virtualList) {
   if (!virtualList.container || !virtualList.items.length) {
     return null;
   }
+  const totalHeight = virtualList.offsets[virtualList.offsets.length - 1] || 0;
+  const maxScrollTop = Math.max(0, totalHeight - virtualList.container.clientHeight);
+  const stickToBottom = maxScrollTop > 0 && virtualList.container.scrollTop >= maxScrollTop - 2;
   const index = virtualListIndexAt(virtualList.offsets, virtualList.container.scrollTop);
   return {
     key: virtualList.items[index]?.key || "",
     offset: virtualList.container.scrollTop - virtualList.offsets[index],
+    bottomOffset: totalHeight - (virtualList.container.scrollTop + virtualList.container.clientHeight),
+    stickToBottom,
   };
 }
 
 function restoreVirtualListAnchor(virtualList, anchor) {
   if (!anchor?.key || !virtualList.container) {
+    return;
+  }
+  if (anchor.stickToBottom) {
+    const totalHeight = virtualList.offsets[virtualList.offsets.length - 1] || 0;
+    virtualList.container.scrollTop = Math.max(0, totalHeight - virtualList.container.clientHeight - Math.max(0, anchor.bottomOffset || 0));
     return;
   }
   const index = virtualList.indexByKey.get(anchor.key);
@@ -2849,7 +3011,7 @@ function renderRootModeRow(row) {
     const toggle = document.createElement("button");
     toggle.type = "button";
     toggle.className = `root-toggle-button${expanded ? " expanded" : ""}`;
-    toggle.title = expanded ? t("collapse") : t("expand");
+    toggle.dataset.appTooltip = "always";
     toggle.setAttribute("aria-label", expanded ? t("collapse") : t("expand"));
     toggle.innerHTML = '<span class="chevron-icon" aria-hidden="true"></span>';
     toggle.addEventListener("click", (event) => {
@@ -2922,7 +3084,7 @@ function createEntryCard(entry, options = {}) {
   button.addEventListener("contextmenu", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    beginDerivedEntry(entry);
+    showEntryContextMenu(event, entry, { rootId: options.rootId || "" });
   });
   return button;
 }
@@ -2936,6 +3098,98 @@ function shouldUseCompactEntryCard(entry, options = {}) {
 
 function estimateEntryCardHeight(entry) {
   return shouldUseCompactEntryCard(entry) ? 86 : entryVirtualList.estimatedItemHeight;
+}
+
+function closeEntryContextMenu() {
+  if (!activeEntryContextMenu) {
+    return;
+  }
+  activeEntryContextMenu.cleanup?.forEach((cleanup) => cleanup());
+  activeEntryContextMenu.element.remove();
+  activeEntryContextMenu = null;
+}
+
+function positionEntryContextMenu(menu, x, y) {
+  const gap = 8;
+  const rect = menu.getBoundingClientRect();
+  const left = Math.max(gap, Math.min(window.innerWidth - rect.width - gap, x));
+  const top = Math.max(gap, Math.min(window.innerHeight - rect.height - gap, y));
+  menu.style.left = `${left}px`;
+  menu.style.top = `${top}px`;
+}
+
+function showEntryContextMenu(event, entry, options = {}) {
+  closeEntryContextMenu();
+  const menu = document.createElement("div");
+  menu.className = "entry-context-menu";
+  menu.setAttribute("role", "menu");
+  menu.setAttribute("aria-label", t("entryContextMenu"));
+  const actions = [
+    {
+      key: "edit",
+      label: t("editEntry"),
+      handler: () => editEntryFromContextMenu(entry.id, options),
+    },
+    {
+      key: "derived",
+      label: t("createDerivedEntry"),
+      handler: () => beginDerivedEntry(entry),
+    },
+    {
+      key: "delete",
+      label: t("delete"),
+      danger: true,
+      handler: () => deleteEntryById(entry.id),
+    },
+  ];
+  actions.forEach((action) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.entryContextAction = action.key;
+    button.className = action.danger ? "danger" : "";
+    button.setAttribute("role", "menuitem");
+    button.textContent = action.label;
+    button.addEventListener("click", async () => {
+      closeEntryContextMenu();
+      await action.handler();
+    });
+    menu.append(button);
+  });
+  document.body.append(menu);
+  positionEntryContextMenu(menu, event.clientX, event.clientY);
+
+  const closeOnPointerDown = (pointerEvent) => {
+    if (!menu.contains(pointerEvent.target)) {
+      closeEntryContextMenu();
+    }
+  };
+  const closeOnKeydown = (keyEvent) => {
+    if (keyEvent.key === "Escape") {
+      closeEntryContextMenu();
+    }
+  };
+  const closeOnScroll = () => closeEntryContextMenu();
+  document.addEventListener("pointerdown", closeOnPointerDown, true);
+  document.addEventListener("keydown", closeOnKeydown);
+  window.addEventListener("scroll", closeOnScroll, { passive: true });
+  elements.entryList.addEventListener("scroll", closeOnScroll, { passive: true });
+  activeEntryContextMenu = {
+    element: menu,
+    cleanup: [
+      () => document.removeEventListener("pointerdown", closeOnPointerDown, true),
+      () => document.removeEventListener("keydown", closeOnKeydown),
+      () => window.removeEventListener("scroll", closeOnScroll),
+      () => elements.entryList.removeEventListener("scroll", closeOnScroll),
+    ],
+  };
+  menu.querySelector("button")?.focus();
+}
+
+async function editEntryFromContextMenu(entryId, options = {}) {
+  await switchToEntry(entryId, options);
+  if (state.selectedEntryId === entryId) {
+    await beginEditEntry();
+  }
 }
 
 function renderEntryQualityIssueBadges(issues = []) {
@@ -4027,12 +4281,19 @@ async function openLexicalNetwork() {
 }
 
 function closeLexicalNetwork() {
+  let targetEntryId = "";
+  let navigationOptions = {};
   if (networkEntryId) {
-    state.selectedEntryId = networkEntryId;
+    targetEntryId = networkEntryId;
+    navigationOptions = prepareRootModeEntryNavigation(targetEntryId);
+    state.selectedEntryId = targetEntryId;
     editorMode = "display";
   }
   networkOpen = false;
   render();
+  if (targetEntryId) {
+    scheduleEntryCardScroll(targetEntryId, navigationOptions);
+  }
 }
 
 function navigateLexicalNetwork(entryId) {
@@ -4217,8 +4478,15 @@ function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = Boolean
   const hiddenTagTitle = hasHiddenTags
     ? tags.slice(visibleLimit).map((tag) => displayTag(tag)).join(", ")
     : "";
+  const hiddenTagTooltipHtml = hasHiddenTags
+    ? `<span class="app-tooltip-chip-list">${tags.slice(visibleLimit).map((tag, offset) => {
+      const index = visibleLimit + offset;
+      const classes = ["chip", entryTagIsPart(entry, index, tag) ? "part-chip" : "", tagIsRedHighlighted(tag) ? "highlight-tag" : ""].filter(Boolean).join(" ");
+      return `<span class="${classes}">${escapeHtml(displayTag(tag))}</span>`;
+    }).join("")}</span>`
+    : "";
   const ellipsisChip = hasHiddenTags
-    ? `<span class="chip ellipsis-chip" title="${escapeHtml(hiddenTagTitle)}" aria-label="${escapeHtml(hiddenTagTitle)}">...</span>`
+    ? `<span class="chip ellipsis-chip" data-app-tooltip="always" data-app-tooltip-wrap="true" data-app-tooltip-html="${escapeHtml(hiddenTagTooltipHtml)}" tabindex="0" aria-label="${escapeHtml(hiddenTagTitle)}">...</span>`
     : "";
   return `${chips}${ellipsisChip}`;
 }
@@ -4852,7 +5120,7 @@ function renderAnalysisQualityFilterBar(report, subpage) {
       <strong>${escapeHtml(t("qualityCurrentCategory"))}: ${escapeHtml(label)}</strong>
       <span>${escapeHtml(count)} ${escapeHtml(t("qualityEntryCount"))}</span>
       <button class="secondary-button analysis-quality-view-button" type="button"${attrs} ${attrs ? "" : "disabled"}>${escapeHtml(t("viewQualityEntries"))}</button>
-      <button class="info-button" type="button" data-action="quality-filter-info" aria-label="${escapeHtml(t("qualityFilterInfo"))}" title="${escapeHtml(t("qualityFilterInfo"))}">i</button>
+      <button class="info-button" type="button" data-action="quality-filter-info" data-app-tooltip="always" aria-label="${escapeHtml(t("qualityFilterInfo"))}">i</button>
     </section>
   `;
 }
@@ -6387,7 +6655,7 @@ function renderIpaKeyboard(dictionary = activeDictionary()) {
     button.type = "button";
     button.className = "ipa-key";
     button.textContent = symbol;
-    button.title = symbol;
+    button.setAttribute("aria-label", formatText("insertSymbol", { symbol }));
     button.addEventListener("click", () => insertPronunciationSymbol(symbol));
     elements.ipaKeyboard.append(button);
   });
@@ -6405,7 +6673,7 @@ function renderPartialIpaKeyboard(dictionary = activeDictionary()) {
     button.type = "button";
     button.className = "ipa-key";
     button.textContent = symbol;
-    button.title = symbol;
+    button.setAttribute("aria-label", formatText("insertSymbol", { symbol }));
     button.addEventListener("click", () => insertSymbolIntoInput(symbol, input));
     keyboard.append(button);
   });
@@ -6449,12 +6717,12 @@ function createIpaRuleCard(rule = normalizeIpaRule()) {
   card.dataset.ruleId = rule.id || uid("ipa");
   card.innerHTML = `
     <div class="ipa-rule-grid">
-      <button class="ipa-rule-drag-handle" type="button" draggable="true" aria-label="${escapeHtml(t("reorderIpaRule"))}" title="${escapeHtml(t("reorderIpaRule"))}">⋮⋮</button>
+      <button class="ipa-rule-drag-handle" type="button" draggable="true" data-app-tooltip="always" aria-label="${escapeHtml(t("reorderIpaRule"))}">⋮⋮</button>
       <textarea class="ipa-single-line" rows="1" data-field="from" aria-label="${escapeHtml(t("ruleFrom"))}" placeholder="${escapeHtml(t("ruleFrom"))}">${escapeHtml(rule.from)}</textarea>
       <textarea class="ipa-single-line" rows="1" data-field="to" aria-label="${escapeHtml(t("ruleTo"))}" placeholder="${escapeHtml(t("ruleTo"))}">${escapeHtml(rule.to)}</textarea>
       <textarea class="ipa-single-line" rows="1" data-field="before" aria-label="${escapeHtml(t("ruleBefore"))}" placeholder="${escapeHtml(t("ruleBefore"))}">${escapeHtml(rule.before)}</textarea>
       <textarea class="ipa-single-line" rows="1" data-field="after" aria-label="${escapeHtml(t("ruleAfter"))}" placeholder="${escapeHtml(t("ruleAfter"))}">${escapeHtml(rule.after)}</textarea>
-      <button class="icon-danger-button" type="button" data-action="remove-ipa-rule" aria-label="${escapeHtml(t("removeRule"))}" title="${escapeHtml(t("removeRule"))}">🗑</button>
+      <button class="icon-danger-button" type="button" data-action="remove-ipa-rule" data-app-tooltip="always" aria-label="${escapeHtml(t("removeRule"))}">🗑</button>
     </div>
   `;
   return card;
@@ -7429,7 +7697,7 @@ function renderCorpusAttributeRow(key = "", value = "") {
     <div class="corpus-attribute-row">
       <input data-field="attribute-key" aria-label="${escapeHtml(t("attributeName"))}" placeholder="${escapeHtml(t("attributeName"))}" value="${escapeHtml(key)}">
       <input data-field="attribute-value" aria-label="${escapeHtml(t("attributeValue"))}" placeholder="${escapeHtml(t("attributeValue"))}" value="${escapeHtml(value)}">
-      <button class="corpus-icon-button danger" type="button" data-action="remove-corpus-attribute" title="${escapeHtml(t("removeAttribute"))}" aria-label="${escapeHtml(t("removeAttribute"))}">×</button>
+      <button class="corpus-icon-button danger" type="button" data-action="remove-corpus-attribute" data-app-tooltip="always" aria-label="${escapeHtml(t("removeAttribute"))}">×</button>
     </div>
   `;
 }
@@ -7485,9 +7753,9 @@ function renderCorpusLayerEditor(block, layer, index, corpus) {
       <div class="corpus-layer-header">
         <div><p class="eyebrow">${escapeHtml(t("corpusLayer"))} ${index + 1}</p><strong>${escapeHtml(layer.name || t("corpusLayerFallback"))}</strong></div>
         <div class="corpus-order-actions">
-          <button class="corpus-icon-button" type="button" data-action="move-corpus-layer-up" title="${escapeHtml(t("moveUp"))}" aria-label="${escapeHtml(t("moveUp"))}" ${index === 0 ? "disabled" : ""}>↑</button>
-          <button class="corpus-icon-button" type="button" data-action="move-corpus-layer-down" title="${escapeHtml(t("moveDown"))}" aria-label="${escapeHtml(t("moveDown"))}" ${index === block.layers.length - 1 ? "disabled" : ""}>↓</button>
-          <button class="corpus-icon-button danger" type="button" data-action="delete-corpus-layer" title="${escapeHtml(t("deleteCorpusLayer"))}" aria-label="${escapeHtml(t("deleteCorpusLayer"))}">×</button>
+          <button class="corpus-icon-button" type="button" data-action="move-corpus-layer-up" data-app-tooltip="always" aria-label="${escapeHtml(t("moveUp"))}" ${index === 0 ? "disabled" : ""}>↑</button>
+          <button class="corpus-icon-button" type="button" data-action="move-corpus-layer-down" data-app-tooltip="always" aria-label="${escapeHtml(t("moveDown"))}" ${index === block.layers.length - 1 ? "disabled" : ""}>↓</button>
+          <button class="corpus-icon-button danger" type="button" data-action="delete-corpus-layer" data-app-tooltip="always" aria-label="${escapeHtml(t("deleteCorpusLayer"))}">×</button>
         </div>
       </div>
       <div class="form-grid">
@@ -7513,9 +7781,9 @@ function renderCorpusLinkedUnits(unitIds, ownerKey, corpus) {
       <li data-linked-unit-id="${escapeHtml(unitId)}">
         <div class="corpus-unit-name-host${unit ? "" : " missing"}">${unit ? renderCorpusUnitNameHtml(unit, "card") : escapeHtml(unitId)}</div>
         <div class="corpus-order-actions">
-          <button class="corpus-icon-button" type="button" data-action="move-corpus-unit-up" title="${escapeHtml(t("moveUp"))}" aria-label="${escapeHtml(t("moveUp"))}" ${index === 0 ? "disabled" : ""}>↑</button>
-          <button class="corpus-icon-button" type="button" data-action="move-corpus-unit-down" title="${escapeHtml(t("moveDown"))}" aria-label="${escapeHtml(t("moveDown"))}" ${index === unitIds.length - 1 ? "disabled" : ""}>↓</button>
-          <button class="corpus-icon-button danger" type="button" data-action="unlink-corpus-unit" title="${escapeHtml(t("unlink"))}" aria-label="${escapeHtml(t("unlink"))}">×</button>
+          <button class="corpus-icon-button" type="button" data-action="move-corpus-unit-up" data-app-tooltip="always" aria-label="${escapeHtml(t("moveUp"))}" ${index === 0 ? "disabled" : ""}>↑</button>
+          <button class="corpus-icon-button" type="button" data-action="move-corpus-unit-down" data-app-tooltip="always" aria-label="${escapeHtml(t("moveDown"))}" ${index === unitIds.length - 1 ? "disabled" : ""}>↓</button>
+          <button class="corpus-icon-button danger" type="button" data-action="unlink-corpus-unit" data-app-tooltip="always" aria-label="${escapeHtml(t("unlink"))}">×</button>
         </div>
       </li>
     `;
@@ -8907,23 +9175,33 @@ async function saveEntry(event) {
 }
 
 async function deleteSelectedEntry() {
+  await deleteEntryById(selectedEntry()?.id);
+}
+
+async function deleteEntryById(entryId) {
   const dictionary = activeDictionary();
-  const entry = selectedEntry();
+  const entry = dictionary?.entries.find((item) => item.id === entryId);
   if (!dictionary || !entry) {
-    return;
+    return false;
   }
 
   const confirmed = await appConfirm(`${t("deleteConfirmEntry")} “${entry.lemma}”?`, { danger: true });
   if (!confirmed) {
-    return;
+    return false;
   }
 
   dictionary.entries = dictionary.entries.filter((item) => item.id !== entry.id);
   dictionary.updatedAt = new Date().toISOString();
-  state.selectedEntryId = firstLemmaEntry(dictionary)?.id || "";
-  editorMode = "display";
+  if (state.selectedEntryId === entry.id || !dictionary.entries.some((item) => item.id === state.selectedEntryId)) {
+    state.selectedEntryId = firstLemmaEntry(dictionary)?.id || "";
+    editorMode = "display";
+    entryDraft = null;
+    cancelPartialEdit();
+  }
   await persistDictionary(dictionary);
+  render();
   showToast(t("deletedEntry"));
+  return true;
 }
 
 async function prepareNewDictionary() {
@@ -9175,6 +9453,7 @@ async function refreshState() {
   backendAvailable = true;
   backendMessage = "";
   currentLanguage = normalizeUiLanguage(serverState.uiLanguage);
+  currentTheme = normalizeUiTheme(serverState.uiTheme);
   state = normalizeState({
     ...serverState,
     selectedEntryId: state.selectedEntryId,
@@ -9475,22 +9754,52 @@ elements.entryList.addEventListener("pointerover", (event) => {
 });
 elements.entryList.addEventListener("scroll", updateHoveredEntryQualityIssueTooltipPlacement, { passive: true });
 
-elements.appTooltipTargets.forEach((button) => {
-  button.addEventListener("pointerenter", () => showAppTooltip(button));
-  button.addEventListener("pointerleave", () => {
-    if (document.activeElement !== button) {
-      hideAppTooltip();
-    }
-  });
-  button.addEventListener("focus", () => showAppTooltip(button));
-  button.addEventListener("blur", () => {
-    if (!button.matches(":hover")) {
-      hideAppTooltip();
-    }
-  });
+document.addEventListener("pointerover", (event) => {
+  const target = appTooltipTargetFromEvent(event);
+  if (!target || activeAppTooltipTarget === target) {
+    return;
+  }
+  showAppTooltip(target);
+});
+document.addEventListener("pointerout", (event) => {
+  const target = appTooltipTargetFromEvent(event);
+  if (!target || activeAppTooltipTarget !== target) {
+    return;
+  }
+  if (event.relatedTarget instanceof Node && target.contains(event.relatedTarget)) {
+    return;
+  }
+  if (!appTooltipTargetHasKeyboardFocus(target)) {
+    hideAppTooltip();
+  }
+});
+document.addEventListener("pointermove", syncAppTooltipVisibility, { passive: true });
+document.addEventListener("pointercancel", hideAppTooltip);
+document.addEventListener("mouseleave", hideAppTooltip);
+window.addEventListener("blur", hideAppTooltip);
+window.addEventListener("resize", hideAppTooltip);
+window.addEventListener("scroll", hideAppTooltip, { passive: true });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    hideAppTooltip();
+  }
+});
+document.addEventListener("focusin", (event) => {
+  const target = appTooltipTargetFromEvent(event);
+  if (target) {
+    showAppTooltip(target);
+  }
+});
+document.addEventListener("focusout", (event) => {
+  const target = appTooltipTargetFromEvent(event);
+  if (!target || activeAppTooltipTarget !== target) {
+    return;
+  }
+  if (!target.matches(":hover")) {
+    hideAppTooltip();
+  }
 });
 elements.toolList.addEventListener("scroll", hideAppTooltip);
-elements.dictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.navCollapseButton.addEventListener("click", () => {
   if (!wideNavMediaQuery.matches) {
     return;
@@ -9516,13 +9825,13 @@ elements.corpusOpenDictionaryManagerButton.addEventListener("click", () => showV
 elements.morphologyOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.ipaOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.newEntryButton.addEventListener("click", () => beginNewEntry());
+elements.entryListNewEntryButton.addEventListener("click", () => beginNewEntry());
 elements.editEntryButton.addEventListener("click", beginEditEntry);
 elements.analysisPanel.addEventListener("click", (event) => {
   const qualityInfoButton = event.target.closest('[data-action="quality-filter-info"]');
   if (qualityInfoButton) {
-    appConfirm(t("qualityFilterInfoBody"), {
-      title: t("qualityFilterInfo"),
-      alert: true,
+    appInfoDialog(t("qualityFilterInfoTitle"), {
+      text: t("qualityFilterInfoBody"),
     });
     return;
   }
@@ -9619,9 +9928,8 @@ elements.tagsInput.addEventListener("input", () => {
 elements.settingsForm.addEventListener("submit", saveSettings);
 elements.manualPartOfSpeechTagsInput.addEventListener("change", syncPartOfSpeechTagSettingsControls);
 elements.tagOrderInfoButton.addEventListener("click", () => {
-  appConfirm(t("tagOrderInfoBody"), {
-    title: t("tagOrderSettings"),
-    alert: true,
+  appInfoDialog(t("tagOrderSettings"), {
+    text: t("tagOrderInfoBody"),
   });
 });
 elements.applyTagSortOrderButton.addEventListener("click", applyTagSortOrder);
@@ -9852,14 +10160,14 @@ elements.docsPreview.addEventListener("scroll", rememberDocsPaneScroll, { passiv
 elements.saveDocsButton.addEventListener("click", () => saveLanguageDocs(true));
 elements.morphologyForm.addEventListener("submit", saveMorphologyConfig);
 elements.morphologySyntaxButton.addEventListener("click", () => {
-  elements.morphologySyntaxDialog.hidden = false;
+  appInfoDialog(t("morphologySyntaxTitle"), {
+    html: morphologySyntaxInfoHtml(),
+  });
 });
-elements.closeMorphologySyntaxButton.addEventListener("click", () => {
-  elements.morphologySyntaxDialog.hidden = true;
-});
-elements.morphologySyntaxDialog.addEventListener("click", (event) => {
-  if (event.target === elements.morphologySyntaxDialog) {
-    elements.morphologySyntaxDialog.hidden = true;
+elements.closeInfoDialogButton.addEventListener("click", closeInfoDialog);
+elements.infoDialog.addEventListener("click", (event) => {
+  if (event.target === elements.infoDialog) {
+    closeInfoDialog();
   }
 });
 elements.confirmCancelButton.addEventListener("click", () => closeConfirmDialog(confirmDialogResults.cancel));
@@ -9915,9 +10223,8 @@ elements.docsModeControl.addEventListener("click", (event) => {
 });
 elements.ipaForm.addEventListener("submit", saveIpaSettings);
 elements.ipaSyllableHelpButton.addEventListener("click", () => {
-  appConfirm(t("ipaSyllableHelpBody"), {
-    title: t("ipaSyllableHelpTitle"),
-    alert: true,
+  appInfoDialog(t("ipaSyllableHelpTitle"), {
+    text: t("ipaSyllableHelpBody"),
   });
 });
 elements.batchIpaAllButton.addEventListener("click", () => batchGenerateIpa("all"));
@@ -9971,9 +10278,33 @@ elements.activateDictionaryButton.addEventListener("click", () => activateDictio
 elements.deleteDictionaryButton.addEventListener("click", deleteSelectedDictionary);
 elements.exportButton.addEventListener("click", exportData);
 elements.importInput.addEventListener("change", importData);
-elements.themeToggleButton.addEventListener("click", () => {
-  currentTheme = currentTheme === "dark" ? "light" : "dark";
+elements.themeToggleButton.addEventListener("click", async () => {
+  const previousTheme = currentTheme;
+  const nextTheme = currentTheme === "dark" ? "light" : "dark";
+  currentTheme = nextTheme;
+  state.uiTheme = nextTheme;
   render();
+  if (!backendAvailable) {
+    return;
+  }
+  elements.themeToggleButton.disabled = true;
+  try {
+    const saved = await api("/api/preferences", {
+      method: "PUT",
+      body: JSON.stringify({ uiTheme: nextTheme }),
+    });
+    currentTheme = normalizeUiTheme(saved.uiTheme);
+    state.uiTheme = currentTheme;
+    render();
+  } catch (error) {
+    currentTheme = previousTheme;
+    state.uiTheme = previousTheme;
+    render();
+    showToast(t("themeSaveFailed"));
+    console.error(error);
+  } finally {
+    elements.themeToggleButton.disabled = false;
+  }
 });
 elements.languageToggleButton.addEventListener("click", async () => {
   const previousLanguage = currentLanguage;
@@ -10040,8 +10371,8 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (event.key === "Escape" && !elements.morphologySyntaxDialog.hidden) {
-    elements.morphologySyntaxDialog.hidden = true;
+  if (event.key === "Escape" && !elements.infoDialog.hidden) {
+    closeInfoDialog();
     return;
   }
 

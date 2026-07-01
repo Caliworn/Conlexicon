@@ -187,19 +187,6 @@ body.english-locale .brand-row h1 {
   font-weight: 950;
 }
 
-@media (min-width: 800px) {
-  body.english-locale .app-nav:not([data-nav-state="rail"]) .brand-row {
-    gap: 8px;
-  }
-
-  body.english-locale .app-nav:not([data-nav-state="rail"]) .brand-row h1 {
-    font-size: clamp(0.9rem, 0.5rem + 0.8vw, 1.35rem);
-    letter-spacing: -0.02em;
-    line-height: 1;
-    white-space: nowrap;
-  }
-}
-
 .top-bar h2 {
   font-size: clamp(1.5rem, 2vw, 2rem);
 }
@@ -360,7 +347,7 @@ fieldset {
 
 .filter-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px;
   gap: 10px;
   margin-bottom: 0;
   padding-bottom: 12px;
@@ -373,6 +360,46 @@ fieldset {
 .filter-row input {
   grid-column: 1 / -1;
   min-width: 0;
+}
+
+.filter-row select {
+  min-width: 0;
+}
+
+.secondary-button.entry-list-new-button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  max-width: 40px;
+  min-height: 40px;
+  max-height: 40px;
+  box-sizing: border-box;
+  border-color: color-mix(in srgb, var(--accent) 58%, transparent);
+  padding: 0;
+  align-items: center;
+  justify-items: center;
+  place-items: center;
+  background: var(--surface);
+  color: var(--accent-strong);
+  line-height: 1;
+  aspect-ratio: 1;
+}
+
+.secondary-button.entry-list-new-button .nav-icon {
+  grid-area: 1 / 1;
+  display: block;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  transform: translateZ(0);
+}
+
+.secondary-button.entry-list-new-button:hover,
+.secondary-button.entry-list-new-button:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--surface);
 }
 
 .root-mode-controls {
@@ -1594,6 +1621,52 @@ body.dark-theme .entry-card p {
 .entry-quality-issue:hover .entry-quality-issue-tooltip {
   opacity: 1;
   transform: translateY(0);
+}
+
+.entry-context-menu {
+  position: fixed;
+  z-index: 80;
+  display: grid;
+  min-width: 180px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 6px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+.entry-context-menu button {
+  min-height: 34px;
+  border: 0;
+  border-radius: 7px;
+  padding: 0 10px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.82rem;
+  font-weight: 850;
+  text-align: left;
+}
+
+.entry-context-menu button:hover,
+.entry-context-menu button:focus-visible {
+  outline: none;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.entry-context-menu button.danger {
+  margin-top: 5px;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 7px 7px;
+  padding-top: 5px;
+  color: var(--danger);
+}
+
+.entry-context-menu button.danger:hover,
+.entry-context-menu button.danger:focus-visible {
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 .chip {
@@ -3202,6 +3275,24 @@ dialog::backdrop {
   line-height: 1.35;
 }
 
+.app-tooltip-chip-list {
+  display: flex;
+  max-width: 100%;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.app-tooltip .chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+  text-overflow: clip;
+}
+
 @keyframes appTooltipIn {
   from {
     opacity: 0;
@@ -3279,6 +3370,10 @@ dialog::backdrop {
   width: min(520px, calc(100vw - 48px));
 }
 
+.info-panel {
+  width: min(720px, calc(100vw - 48px));
+}
+
 .confirm-dialog-message {
   margin: 0;
   color: var(--muted);
@@ -3290,11 +3385,20 @@ dialog::backdrop {
   justify-content: flex-end;
 }
 
-.syntax-help {
+.info-dialog-body {
   display: grid;
   gap: 12px;
   color: var(--ink);
   line-height: 1.65;
+}
+
+.info-dialog-body p {
+  margin: 0;
+}
+
+.syntax-help {
+  display: grid;
+  gap: 12px;
 }
 
 .syntax-help p,
@@ -3654,7 +3758,6 @@ dialog::backdrop {
     flex: 1;
   }
 
-  .filter-row,
   .form-grid,
   .inline-field-action,
   .analysis-grid,
