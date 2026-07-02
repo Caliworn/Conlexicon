@@ -29,6 +29,9 @@ const wideNavMediaQuery = window.matchMedia("(min-width: 1280px)");
 const IPA_STRESS_MARKER = "\uE000";
 const GLOSS_STYLE_KEYS = ["gla", "glb", "glc", "ft"];
 const DEFAULT_ENTRY_EXAMPLE_RENDER_PATTERN = "(\\gla)\n(\\glb)\n(\\glc)\n(\\ft)";
+const DEFAULT_ENTRY_LIST_TAG_DISPLAY_LIMIT = 3;
+const MIN_ENTRY_LIST_TAG_DISPLAY_LIMIT = 2;
+const MAX_ENTRY_LIST_TAG_DISPLAY_LIMIT = 10;
 const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
 let docsViewMode = "split";
 let docsSaveTimer = null;
@@ -260,6 +263,12 @@ const i18n = {
     entryTagSettings: "词条标签",
     tagDisplayReplacement: "标签显示替换",
     tagDisplayReplacementHelp: "每行一条，格式为 原标签 = 显示文本。仅影响查看模式中的显示，不改变词条数据。",
+    entryListRawTagDisplay: "词条列表中显示原始标签",
+    entryListTagDisplayLimit: "词条列表中标签显示上限",
+    entryListTagDisplayLimitHelp: "设为 n 时，超过 n 个标签会显示前 n-1 个和省略号。默认为 3。",
+    entryListTagDisplayLimitInvalid: "词条列表标签显示上限必须是 2 到 10 之间的整数。",
+    tagTooltipRawTag: "原始标签",
+    tagTooltipDisplayReplacement: "显示替换",
     partOfSpeechTagSettings: "词性标签",
     manualPartOfSpeechTags: "手动配置词性标签",
     partOfSpeechTagsHelp: "开启后，仅这里列出的标签会被识别为词性；多个标签用逗号分隔。关闭时仍保留内容，但使用第一个词条标签作为词性。",
@@ -647,6 +656,12 @@ const i18n = {
     entryTagSettings: "Entry Tags",
     tagDisplayReplacement: "Tag Display Replacement",
     tagDisplayReplacementHelp: "One per line, in the format Original Tag = Display Text. Only affects display mode; entry data is unchanged.",
+    entryListRawTagDisplay: "Show raw tags in the entry list",
+    entryListTagDisplayLimit: "Entry list tag display limit",
+    entryListTagDisplayLimitHelp: "Set to n: entries with more than n tags show the first n-1 tags and an ellipsis. Default: 3.",
+    entryListTagDisplayLimitInvalid: "Entry list tag display limit must be an integer from 2 to 10.",
+    tagTooltipRawTag: "Raw tag",
+    tagTooltipDisplayReplacement: "Display",
     partOfSpeechTagSettings: "Part-of-Speech Tags",
     manualPartOfSpeechTags: "Manually configure part-of-speech tags",
     partOfSpeechTagsHelp: "When enabled, only tags listed here are recognized as parts of speech. Separate tags with commas. When disabled, the value is kept but the first entry tag is used as the part of speech.",
@@ -739,6 +754,7 @@ const i18n = {
     importAndOverwrite: "Import and Overwrite",
     updatedAt: "Updated",
     source: "Source",
+    createSourceEntry: "Create Source Entry: {source}",
     derivedEntries: "Derived",
     ipaNeedDictionary: "Auto IPA rules are saved in the current dictionary file.",
     orthographyModule: "Orthography Recognition",
@@ -867,6 +883,7 @@ const i18n = {
 
 i18n.zh.addExample = "添加例句";
 i18n.zh.addDefinitionNote = "添加释义备注";
+i18n.zh.createSourceEntry = "新建来源词条：{source}";
 
 const elements = {
   appShell: document.querySelector("#appShell"),
@@ -987,6 +1004,8 @@ const elements = {
   entryExampleRenderPatternInput: document.querySelector("#entryExampleRenderPatternInput"),
   entryExampleGlossAlignInput: document.querySelector("#entryExampleGlossAlignInput"),
   tagDisplayMapInput: document.querySelector("#tagDisplayMapInput"),
+  entryListRawTagDisplayInput: document.querySelector("#entryListRawTagDisplayInput"),
+  entryListTagDisplayLimitInput: document.querySelector("#entryListTagDisplayLimitInput"),
   manualPartOfSpeechTagsInput: document.querySelector("#manualPartOfSpeechTagsInput"),
   partOfSpeechTagsInput: document.querySelector("#partOfSpeechTagsInput"),
   tagSortOrderInput: document.querySelector("#tagSortOrderInput"),
@@ -1388,6 +1407,8 @@ function normalizeDictionarySettings(settings = {}) {
     corpusAutoSave: Boolean(settings.corpusAutoSave ?? true),
     docsAutoSave: Boolean(settings.docsAutoSave ?? true),
     tagDisplayMap: normalizeTagDisplayMap(settings.tagDisplayMap),
+    entryListRawTagDisplay: Boolean(settings.entryListRawTagDisplay),
+    entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(settings.entryListTagDisplayLimit),
     manualPartOfSpeechTags: Boolean(settings.manualPartOfSpeechTags),
     partOfSpeechTags: normalizeTagList(settings.partOfSpeechTags),
     tagSortOrder: normalizeTagList(settings.tagSortOrder),
@@ -1514,6 +1535,26 @@ function normalizeTagList(value) {
       }
   });
   return unique;
+}
+
+function normalizeEntryListTagDisplayLimit(value) {
+  const number = Number.parseInt(value, 10);
+  if (!Number.isFinite(number)) {
+    return DEFAULT_ENTRY_LIST_TAG_DISPLAY_LIMIT;
+  }
+  return Math.min(MAX_ENTRY_LIST_TAG_DISPLAY_LIMIT, Math.max(MIN_ENTRY_LIST_TAG_DISPLAY_LIMIT, number));
+}
+
+function entryListTagDisplayLimitInputIsValid() {
+  const raw = elements.entryListTagDisplayLimitInput.value.trim();
+  if (!raw) {
+    return true;
+  }
+  if (!/^\d+$/.test(raw)) {
+    return false;
+  }
+  const value = Number.parseInt(raw, 10);
+  return value >= MIN_ENTRY_LIST_TAG_DISPLAY_LIMIT && value <= MAX_ENTRY_LIST_TAG_DISPLAY_LIMIT;
 }
 
 function tagOrderRankMap(order) {
@@ -1946,6 +1987,11 @@ function displayTag(tag, dictionary = activeDictionary()) {
   return dictionary?.settings?.tagDisplayMap?.[value] || value;
 }
 
+function entryListDisplayTag(tag, settings = normalizeDictionarySettings(activeDictionary()?.settings)) {
+  const value = String(tag || "");
+  return settings.entryListRawTagDisplay ? value : displayTag(value);
+}
+
 function tagIsRedHighlighted(tag, dictionary = activeDictionary()) {
   const settings = normalizeDictionarySettings(dictionary?.settings);
   const candidates = new Set(settings.redHighlightTags.map(normalize));
@@ -2234,6 +2280,8 @@ function showAppTooltip(target) {
     elements.appTooltip.textContent = label;
   }
   elements.appTooltip.classList.toggle("wrap", target.dataset.appTooltipWrap === "true");
+  elements.appTooltip.classList.toggle("chip-list-tooltip", target.dataset.appTooltipVariant === "chip-list");
+  elements.appTooltip.classList.toggle("tag-info-tooltip", target.dataset.appTooltipVariant === "tag-info");
   elements.appTooltip.hidden = false;
   target.setAttribute("aria-describedby", "appTooltip");
   requestAnimationFrame(() => {
@@ -2272,6 +2320,8 @@ function hideAppTooltip() {
   }
   activeAppTooltipTarget = null;
   elements.appTooltip.classList.remove("wrap");
+  elements.appTooltip.classList.remove("chip-list-tooltip");
+  elements.appTooltip.classList.remove("tag-info-tooltip");
   elements.appTooltip.textContent = "";
   elements.appTooltip.hidden = true;
 }
@@ -3083,7 +3133,7 @@ function createEntryCard(entry, options = {}) {
   ].filter(Boolean).join(" · ");
   const meaningSummary = entryDefinitionSummary(entry, settings.entryListPolysemyDisplay);
   const searchSnippets = renderEntrySearchSnippets(entry);
-  const chipHtml = renderChips(entry, 3, true, tagFuzzyEnabled, settings.entryListTagFiltering);
+  const chipHtml = renderChips(entry, settings.entryListTagDisplayLimit, true, tagFuzzyEnabled, settings.entryListTagFiltering);
   const qualityIssueHtml = renderEntryQualityIssueBadges(options.qualityIssues || []);
   const compactEntryCard = shouldUseCompactEntryCard(entry, { meaningSummary, searchSnippets });
   const footerHtml = [
@@ -4271,9 +4321,12 @@ function renderEtymology(entry) {
         button.addEventListener("click", () => switchToEntry(source.id));
         sourceRow.append(button);
       } else {
-        const pending = document.createElement("span");
+        const pending = document.createElement("button");
+        pending.type = "button";
         pending.className = "source-link pending-source";
         pending.textContent = sourceName;
+        pending.setAttribute("aria-label", formatText("createSourceEntry", { source: sourceName }));
+        pending.addEventListener("click", () => beginSourceEntry(sourceName));
         sourceRow.append(pending);
       }
     });
@@ -4285,6 +4338,14 @@ function renderEtymology(entry) {
     paragraph.textContent = description;
     elements.displayEtymology.append(paragraph);
   }
+}
+
+async function beginSourceEntry(sourceName) {
+  const lemma = String(sourceName || "").trim();
+  if (!lemma) {
+    return false;
+  }
+  return beginNewEntry({ lemma });
 }
 
 function renderDerivedEntries(entry) {
@@ -4505,33 +4566,58 @@ function renderSmallCaps(value) {
 
 function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = Boolean(activeDictionary()?.settings?.tagFuzzySearch), clickable = false) {
   const tags = entry.tags || [];
+  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
   const hasHiddenTags = tags.length > limit;
   const visibleLimit = hasHiddenTags ? Math.max(1, limit - 1) : limit;
   const chips = tags
     .slice(0, visibleLimit)
     .map((tag, index) => {
-      const text = displayTag(tag);
+      const text = entryListDisplayTag(tag, settings);
       const classes = ["chip", entryTagIsPart(entry, index, tag) ? "part-chip" : "", tagIsRedHighlighted(tag) ? "highlight-tag" : ""].filter(Boolean).join(" ");
       const tagAttributes = clickable
         ? ` data-entry-tag-index="${index}" data-entry-tag-value="${escapeHtml(tag)}"`
         : "";
-      return `<span class="${classes}"${tagAttributes}>${highlight ? highlightSearchText(text, fuzzyEnabled) : escapeHtml(text)}</span>`;
+      const tooltipHtml = renderEntryListTagTooltipHtml(tag, classes);
+      const tooltipAttributes = ` data-app-tooltip="always" data-app-tooltip-wrap="true" data-app-tooltip-variant="tag-info" data-app-tooltip-html="${escapeHtml(tooltipHtml)}" aria-label="${escapeHtml(text)}"`;
+      const contentHtml = highlight ? highlightSearchText(text, fuzzyEnabled) : escapeHtml(text);
+      return `<span class="${classes}"${tagAttributes}${tooltipAttributes}><span class="chip-label">${contentHtml}</span></span>`;
     })
     .join("");
   const hiddenTagTitle = hasHiddenTags
-    ? tags.slice(visibleLimit).map((tag) => displayTag(tag)).join(", ")
+    ? tags.slice(visibleLimit).map((tag) => entryListDisplayTag(tag, settings)).join(", ")
     : "";
   const hiddenTagTooltipHtml = hasHiddenTags
     ? `<span class="app-tooltip-chip-list">${tags.slice(visibleLimit).map((tag, offset) => {
       const index = visibleLimit + offset;
       const classes = ["chip", entryTagIsPart(entry, index, tag) ? "part-chip" : "", tagIsRedHighlighted(tag) ? "highlight-tag" : ""].filter(Boolean).join(" ");
-      return `<span class="${classes}">${escapeHtml(displayTag(tag))}</span>`;
+      return `<span class="${classes}">${escapeHtml(entryListDisplayTag(tag, settings))}</span>`;
     }).join("")}</span>`
     : "";
   const ellipsisChip = hasHiddenTags
-    ? `<span class="chip ellipsis-chip" data-app-tooltip="always" data-app-tooltip-wrap="true" data-app-tooltip-html="${escapeHtml(hiddenTagTooltipHtml)}" tabindex="0" aria-label="${escapeHtml(hiddenTagTitle)}">...</span>`
+    ? `<span class="chip ellipsis-chip" data-app-tooltip="always" data-app-tooltip-wrap="true" data-app-tooltip-variant="chip-list" data-app-tooltip-html="${escapeHtml(hiddenTagTooltipHtml)}" tabindex="0" aria-label="${escapeHtml(hiddenTagTitle)}">...</span>`
     : "";
   return `${chips}${ellipsisChip}`;
+}
+
+function renderEntryListTagTooltipHtml(tag, chipClasses) {
+  const raw = String(tag || "");
+  const replacement = displayTag(raw);
+  const rows = [
+    renderTagTooltipRow(t("tagTooltipRawTag"), raw, chipClasses),
+  ];
+  if (replacement !== raw) {
+    rows.push(renderTagTooltipRow(t("tagTooltipDisplayReplacement"), replacement, chipClasses));
+  }
+  return `<span class="app-tooltip-tag-info">${rows.join("")}</span>`;
+}
+
+function renderTagTooltipRow(label, value, chipClasses) {
+  return `
+    <span class="tag-tooltip-row">
+      <span class="tag-tooltip-label">${escapeHtml(label)}</span>
+      <span class="${chipClasses}">${escapeHtml(value)}</span>
+    </span>
+  `;
 }
 
 function morphologyTables(dictionary = activeDictionary()) {
@@ -6695,6 +6781,8 @@ function fillSettingsForm(dictionary) {
   elements.entryExampleRenderPatternInput.value = settings.entryExampleRenderPattern;
   elements.entryExampleGlossAlignInput.checked = settings.entryExampleGlossAlign;
   elements.tagDisplayMapInput.value = serializeTagDisplayMap(settings.tagDisplayMap);
+  elements.entryListRawTagDisplayInput.checked = settings.entryListRawTagDisplay;
+  elements.entryListTagDisplayLimitInput.value = settings.entryListTagDisplayLimit;
   elements.manualPartOfSpeechTagsInput.checked = settings.manualPartOfSpeechTags;
   elements.partOfSpeechTagsInput.value = settings.partOfSpeechTags.join(", ");
   syncPartOfSpeechTagSettingsControls();
@@ -6920,6 +7008,8 @@ function settingsFormSnapshot() {
     corpusAutoSave: elements.corpusAutoSaveInput.checked,
     docsAutoSave: elements.docsAutoSaveInput.checked,
     tagDisplayMap: normalizeTagDisplayMap(parseTagDisplayMap(elements.tagDisplayMapInput.value)),
+    entryListRawTagDisplay: elements.entryListRawTagDisplayInput.checked,
+    entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(elements.entryListTagDisplayLimitInput.value),
     manualPartOfSpeechTags: elements.manualPartOfSpeechTagsInput.checked,
     partOfSpeechTags: normalizeTagList(elements.partOfSpeechTagsInput.value),
     tagSortOrder: normalizeTagList(elements.tagSortOrderInput.value),
@@ -6954,6 +7044,8 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     corpusAutoSave: settings.corpusAutoSave,
     docsAutoSave: settings.docsAutoSave,
     tagDisplayMap: settings.tagDisplayMap,
+    entryListRawTagDisplay: settings.entryListRawTagDisplay,
+    entryListTagDisplayLimit: settings.entryListTagDisplayLimit,
     manualPartOfSpeechTags: settings.manualPartOfSpeechTags,
     partOfSpeechTags: settings.partOfSpeechTags,
     tagSortOrder: settings.tagSortOrder,
@@ -7110,6 +7202,8 @@ function collectDictionarySettingsFromForm(existing = {}) {
     corpusAutoSave: elements.corpusAutoSaveInput.checked,
     docsAutoSave: elements.docsAutoSaveInput.checked,
     tagDisplayMap: parseTagDisplayMap(elements.tagDisplayMapInput.value),
+    entryListRawTagDisplay: elements.entryListRawTagDisplayInput.checked,
+    entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(elements.entryListTagDisplayLimitInput.value),
     manualPartOfSpeechTags: elements.manualPartOfSpeechTagsInput.checked,
     partOfSpeechTags: normalizeTagList(elements.partOfSpeechTagsInput.value),
     tagSortOrder: normalizeTagList(elements.tagSortOrderInput.value),
@@ -7136,6 +7230,12 @@ async function saveSettings(event) {
   const dictionary = activeDictionary();
   if (!dictionary) {
     showToast(t("createDictionaryFirstToast"));
+    return false;
+  }
+
+  if (!entryListTagDisplayLimitInputIsValid()) {
+    showToast(t("entryListTagDisplayLimitInvalid"));
+    elements.entryListTagDisplayLimitInput.focus();
     return false;
   }
 
@@ -8531,6 +8631,7 @@ async function saveIpaSettings(event) {
   const defaultStress = parseIpaDefaultStressInput();
   if (!Number.isInteger(defaultStress)) {
     showToast(t("ipaDefaultStressInvalid"));
+    elements.ipaDefaultStressInput.focus();
     return false;
   }
 
@@ -8854,6 +8955,7 @@ async function batchGenerateIpa(mode) {
   const defaultStress = parseIpaDefaultStressInput();
   if (!Number.isInteger(defaultStress)) {
     showToast(t("ipaDefaultStressInvalid"));
+    elements.ipaDefaultStressInput.focus();
     return;
   }
   const ipaSettings = ipaSettingsFromForm();
@@ -9073,6 +9175,7 @@ async function savePartialEdit(event) {
   }
 
   const now = new Date().toISOString();
+  const previousLemma = entry.lemma || "";
 
   if (partialEditSection === "basic") {
     const lemma = body.querySelector('[data-field="lemma"]').value.trim();
@@ -9115,8 +9218,12 @@ async function savePartialEdit(event) {
 
   entry.updatedAt = now;
   dictionary.updatedAt = now;
+  const shouldScrollAfterSave = partialEditSection === "basic" && previousLemma !== entry.lemma;
   await persistDictionary(dictionary);
   cancelPartialEdit();
+  if (shouldScrollAfterSave) {
+    scheduleEntryCardScroll(entry.id, prepareRootModeEntryNavigation(entry.id));
+  }
   showToast(t("savedEntry"));
   return true;
 }

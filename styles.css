@@ -30,6 +30,7 @@ body {
 }
 
 body.dark-theme {
+  color-scheme: dark;
   --bg: #151a1d;
   --surface: #1f282d;
   --surface-2: #263238;
@@ -1127,6 +1128,13 @@ label span {
   background: var(--surface-2);
 }
 
+button.pending-source:hover,
+button.pending-source:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
 .gloss-block {
   display: grid;
   gap: 8px;
@@ -1689,6 +1697,21 @@ body.dark-theme .entry-card p {
   color: var(--accent-strong);
   font-size: 0.74rem;
   font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip[data-app-tooltip] {
+  display: inline-flex;
+  align-items: center;
+}
+
+.chip-label {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3306,6 +3329,42 @@ dialog::backdrop {
   overflow-wrap: anywhere;
   word-break: break-word;
   line-height: 1.35;
+}
+
+.app-tooltip.chip-list-tooltip,
+.app-tooltip.tag-info-tooltip {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+
+body.dark-theme .app-tooltip.chip-list-tooltip,
+body.dark-theme .app-tooltip.tag-info-tooltip {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: #10181c;
+  color: #f8fbfa;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+}
+
+.app-tooltip-tag-info {
+  display: grid;
+  gap: 7px;
+  min-width: 190px;
+}
+
+.tag-tooltip-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.tag-tooltip-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 850;
+  white-space: nowrap;
 }
 
 .app-tooltip-chip-list {

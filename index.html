@@ -395,7 +395,7 @@
           </section>
 
           <section class="editor-panel tool-config-panel" id="settingsPanel">
-            <form id="settingsForm" autocomplete="off">
+            <form id="settingsForm" autocomplete="off" novalidate>
               <section class="settings-section">
                 <div class="form-heading compact-heading">
                   <div>
@@ -516,6 +516,17 @@
                 <label>
                   <span data-i18n="tagDisplayReplacementHelp">每行一条，格式为 原标签 = 显示文本。仅影响查看模式中的显示，不改变词条数据。</span>
                   <textarea id="tagDisplayMapInput" rows="6"></textarea>
+                </label>
+                <label class="toggle-row">
+                  <span data-i18n="entryListRawTagDisplay">词条列表中显示原始标签</span>
+                  <input id="entryListRawTagDisplayInput" type="checkbox">
+                </label>
+                <div class="subsection-title">
+                  <h3 data-i18n="entryListTagDisplayLimit">词条列表中标签显示上限</h3>
+                </div>
+                <label>
+                  <span data-i18n="entryListTagDisplayLimitHelp">设为 n 时，超过 n 个标签会显示前 n-1 个和省略号。默认为 3。</span>
+                  <input id="entryListTagDisplayLimitInput" type="text" inputmode="numeric" placeholder="3">
                 </label>
                 <div class="subsection-title">
                   <h3 data-i18n="partOfSpeechTagSettings">词性标签</h3>
@@ -824,7 +835,7 @@
 
           <section class="editor-panel ipa-layout tool-config-panel" id="ipaPanel">
             <div class="ipa-config-column">
-              <form id="ipaForm" autocomplete="off">
+              <form id="ipaForm" autocomplete="off" novalidate>
               <section class="settings-section">
                 <div class="form-heading compact-heading">
                   <div>
@@ -888,7 +899,7 @@
                 </div>
                 <label>
                   <span data-i18n="defaultStressHelp">整数。正数为正数第几音节，负数为倒数第几音节；0 表示不标默认重音。词更短时落在可达到的最远位置。</span>
-                  <input id="ipaDefaultStressInput" type="number" step="1">
+                  <input id="ipaDefaultStressInput" type="text" inputmode="numeric">
                 </label>
                 <label class="toggle-row">
                   <span data-i18n="unstressMonosyllables">单音节词不标重音</span>

@@ -10,6 +10,9 @@ const indexPath = path.join(dataDir, "index.json");
 const port = Number(process.env.PORT || 4173);
 const GLOSS_STYLE_KEYS = ["gla", "glb", "glc", "ft"];
 const DEFAULT_ENTRY_EXAMPLE_RENDER_PATTERN = "(\\gla)\n(\\glb)\n(\\glc)\n(\\ft)";
+const DEFAULT_ENTRY_LIST_TAG_DISPLAY_LIMIT = 3;
+const MIN_ENTRY_LIST_TAG_DISPLAY_LIMIT = 2;
+const MAX_ENTRY_LIST_TAG_DISPLAY_LIMIT = 10;
 const DEFAULT_INDEX = { activeDictionaryId: "", dictionaryIds: [], uiLanguage: "zh", uiTheme: "light" };
 
 const contentTypes = {
@@ -243,6 +246,8 @@ function normalizeDictionarySettings(settings = {}) {
     corpusAutoSave: Boolean(settings.corpusAutoSave ?? true),
     docsAutoSave: Boolean(settings.docsAutoSave ?? true),
     tagDisplayMap: normalizeTagDisplayMap(settings.tagDisplayMap),
+    entryListRawTagDisplay: Boolean(settings.entryListRawTagDisplay),
+    entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(settings.entryListTagDisplayLimit),
     redHighlightTags: normalizeRedHighlightTags(settings.redHighlightTags),
     entryListPolysemyDisplay: Boolean(settings.entryListPolysemyDisplay),
     networkPolysemyDisplay: Boolean(settings.networkPolysemyDisplay),
@@ -437,6 +442,14 @@ function normalizeRedHighlightTags(value) {
       }
     });
   return unique;
+}
+
+function normalizeEntryListTagDisplayLimit(value) {
+  const number = Number.parseInt(value, 10);
+  if (!Number.isFinite(number)) {
+    return DEFAULT_ENTRY_LIST_TAG_DISPLAY_LIMIT;
+  }
+  return Math.min(MAX_ENTRY_LIST_TAG_DISPLAY_LIMIT, Math.max(MIN_ENTRY_LIST_TAG_DISPLAY_LIMIT, number));
 }
 
 function normalizeClusterList(value) {
