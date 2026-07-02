@@ -1805,6 +1805,15 @@ body.dark-theme .entry-card p {
   gap: 8px;
 }
 
+.current-dictionary-button:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.current-dictionary-button:disabled:hover {
+  background: var(--accent);
+}
+
 .editor-panel,
 dialog {
   background: var(--surface);
@@ -3239,13 +3248,6 @@ textarea.ipa-single-line::-webkit-scrollbar {
   width: 20px;
   height: 20px;
   flex: 0 0 auto;
-}
-
-.manager-data-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding-top: 4px;
 }
 
 .file-trigger {

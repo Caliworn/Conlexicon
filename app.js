@@ -310,7 +310,6 @@ const i18n = {
     description: "描述",
     exportJson: "导出 JSON",
     importJson: "导入 JSON",
-    setCurrentDictionary: "设为当前词典",
     saveConfig: "保存配置",
     unnamedDictionary: "未命名词典",
     dictionary: "词典",
@@ -703,7 +702,6 @@ const i18n = {
     description: "Description",
     exportJson: "Export JSON",
     importJson: "Import JSON",
-    setCurrentDictionary: "Set Current",
     saveConfig: "Save Config",
     unnamedDictionary: "Untitled Dictionary",
     dictionary: "Dictionary",
@@ -936,7 +934,6 @@ const elements = {
   sortSelect: document.querySelector("#sortSelect"),
   newEntryButton: document.querySelector("#newEntryButton"),
   entryListNewEntryButton: document.querySelector("#entryListNewEntryButton"),
-  exportButton: document.querySelector("#exportButton"),
   importInput: document.querySelector("#importInput"),
   entryDisplay: document.querySelector("#entryDisplay"),
   displayLemma: document.querySelector("#displayLemma"),
@@ -981,7 +978,6 @@ const elements = {
   dictionaryNameInput: document.querySelector("#dictionaryNameInput"),
   dictionaryLanguageInput: document.querySelector("#dictionaryLanguageInput"),
   dictionaryDescriptionInput: document.querySelector("#dictionaryDescriptionInput"),
-  activateDictionaryButton: document.querySelector("#activateDictionaryButton"),
   deleteDictionaryButton: document.querySelector("#deleteDictionaryButton"),
   backendNotice: document.querySelector("#backendNotice"),
   backendNoticeText: document.querySelector("#backendNoticeText"),
@@ -2525,7 +2521,6 @@ function renderAvailability() {
   elements.managerGrid.hidden = !backendAvailable;
   elements.newEntryButton.hidden = !backendAvailable || !hasDictionary;
   elements.addDictionaryButton.disabled = !backendAvailable;
-  elements.exportButton.disabled = !backendAvailable || !hasDictionary;
   elements.importInput.disabled = !backendAvailable;
 
   if (!backendAvailable) {
@@ -6211,12 +6206,15 @@ function renderDictionaryManager() {
     card.innerHTML = `
       <div>
         <strong>${escapeHtml(dictionary.name)}</strong>
-        <small>${escapeHtml(dictionaryStatsText(dictionary))}${isActive ? ` · ${t("current")}` : ""}</small>
+        <small>${escapeHtml(dictionaryStatsText(dictionary))}</small>
       </div>
       <p>${escapeHtml(dictionary.description || t("noDescription"))}</p>
       <div class="card-actions">
         <button class="secondary-button" type="button" data-action="config">${escapeHtml(t("config"))}</button>
-        ${isActive ? "" : `<button class="secondary-button" type="button" data-action="activate">${escapeHtml(t("setCurrent"))}</button>`}
+        <button class="secondary-button" type="button" data-action="export">${escapeHtml(t("exportJson"))}</button>
+        ${isActive
+          ? `<button class="primary-button current-dictionary-button" type="button" aria-current="true" disabled>${escapeHtml(t("current"))}</button>`
+          : `<button class="secondary-button" type="button" data-action="activate">${escapeHtml(t("setCurrent"))}</button>`}
       </div>
     `;
     card.querySelector('[data-action="config"]').addEventListener("click", async () => {
@@ -6233,6 +6231,7 @@ function renderDictionaryManager() {
       }
       await activateDictionary(dictionary.id);
     });
+    card.querySelector('[data-action="export"]').addEventListener("click", () => exportDictionary(dictionary.id));
     elements.dictionaryManagerList.append(card);
   });
 }
@@ -6734,7 +6733,6 @@ function fillDictionaryForm(dictionary) {
   elements.dictionaryNameInput.value = dictionary?.name || "";
   elements.dictionaryLanguageInput.value = dictionary?.language || "";
   elements.dictionaryDescriptionInput.value = dictionary?.description || "";
-  elements.activateDictionaryButton.hidden = !isExisting || dictionary.id === state.activeDictionaryId;
   elements.deleteDictionaryButton.hidden = !isExisting;
 }
 
@@ -9568,13 +9566,12 @@ async function deleteSelectedDictionary() {
   }
 }
 
-function exportData() {
-  const dictionary = activeDictionary();
-  if (!dictionary) {
+function exportDictionary(dictionaryId) {
+  if (!dictionaryId) {
     showToast(t("createDictionaryFirstToast"));
     return;
   }
-  window.location.href = `/api/export?dictionaryId=${encodeURIComponent(dictionary.id)}`;
+  window.location.href = `/api/export?dictionaryId=${encodeURIComponent(dictionaryId)}`;
 }
 
 function isDictionaryImportPayload(payload) {
@@ -10502,9 +10499,7 @@ elements.ipaForm.addEventListener("click", (event) => {
   button.closest(".ipa-rule-card").remove();
   renderIpaSandbox();
 });
-elements.activateDictionaryButton.addEventListener("click", () => activateDictionary(elements.dictionaryId.value));
 elements.deleteDictionaryButton.addEventListener("click", deleteSelectedDictionary);
-elements.exportButton.addEventListener("click", exportData);
 elements.importInput.addEventListener("change", importData);
 elements.themeToggleButton.addEventListener("click", async () => {
   const previousTheme = currentTheme;
