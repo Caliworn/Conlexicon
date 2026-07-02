@@ -20,7 +20,28 @@
         }
       })();
     </script>
-    <div class="app-shell" id="appShell" data-nav-state="expanded" data-browser-state="expanded">
+    <div class="app-shell" id="appShell" data-nav-state="expanded" data-browser-state="expanded" data-nav-drawer="closed" data-browser-drawer="closed">
+      <header class="mobile-app-bar" id="mobileAppBar">
+        <button class="mobile-app-bar-button" id="mobileNavButton" type="button" aria-controls="appNav" aria-expanded="false" data-i18n-aria-label="openToolNavigation" aria-label="打开工具导航">
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"></path>
+          </svg>
+        </button>
+        <span class="mobile-app-bar-title" id="mobileCurrentViewLabel">词条编辑</span>
+        <div class="mobile-app-bar-actions">
+          <button class="mobile-app-bar-button" id="mobileEntryListButton" type="button" aria-controls="entryBrowser" aria-expanded="false" data-i18n-aria-label="openEntryList" aria-label="打开词条列表">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M8 6h12M8 12h12M8 18h12"></path>
+              <path d="M4 6h.01M4 12h.01M4 18h.01"></path>
+            </svg>
+          </button>
+          <button class="mobile-app-bar-button mobile-new-entry-button" id="mobileNewEntryButton" type="button" data-i18n-aria-label="newEntry" aria-label="新建词条">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 5v14M5 12h14"></path>
+            </svg>
+          </button>
+        </div>
+      </header>
       <aside class="dictionary-panel app-nav" id="appNav" data-i18n-aria-label="toolNavigation" aria-label="工具导航">
         <div class="brand-row">
           <div class="brand-copy">
@@ -81,6 +102,8 @@
           <button class="secondary-button utility-button language-toggle" id="languageToggleButton" type="button" aria-label="English">EN</button>
         </div>
       </aside>
+
+      <div class="mobile-drawer-backdrop" id="mobileDrawerBackdrop" hidden></div>
 
       <main class="workspace">
         <section class="view active" id="editorView" aria-label="词条编辑">

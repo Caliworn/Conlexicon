@@ -21,7 +21,9 @@ const UI_PREFERENCES_STORAGE_KEY = "conlexicon:ui-preferences";
 const shellState = {
   navCollapsed: false,
   wideNavCollapsed: false,
+  navDrawerOpen: false,
   browserCollapsedByView: {},
+  browserDrawerOpen: false,
 };
 let activeAppTooltipTarget = null;
 const desktopNavMediaQuery = window.matchMedia("(min-width: 800px)");
@@ -81,6 +83,7 @@ const analysisFilterRegistry = new Map();
 let draggedToolNavView = "";
 let draggedIpaRuleId = "";
 let entryCardScrollRequestId = 0;
+let pendingEntryCardScroll = null;
 let entryBrowserHeightFrame = 0;
 let entryBrowserLayoutRefreshFrame = 0;
 let entryBrowserLayoutRefreshUntil = 0;
@@ -95,9 +98,13 @@ const i18n = {
     toolNavigation: "工具导航",
     collapseNavigation: "收起工具导航",
     expandNavigation: "展开工具导航",
+    openToolNavigation: "打开工具导航",
+    closeToolNavigation: "关闭工具导航",
     entryBrowser: "词条列表",
     collapseEntryBrowser: "收起词条列表",
     expandEntryBrowser: "展开词条列表",
+    openEntryList: "打开词条列表",
+    closeEntryList: "关闭词条列表",
     entryEditor: "词条编辑",
     current: "当前",
     planned: "待实装",
@@ -487,9 +494,13 @@ const i18n = {
     toolNavigation: "Tool navigation",
     collapseNavigation: "Collapse tool navigation",
     expandNavigation: "Expand tool navigation",
+    openToolNavigation: "Open tool navigation",
+    closeToolNavigation: "Close tool navigation",
     entryBrowser: "Entry list",
     collapseEntryBrowser: "Collapse entry list",
     expandEntryBrowser: "Expand entry list",
+    openEntryList: "Open entry list",
+    closeEntryList: "Close entry list",
     entryEditor: "Entries",
     current: "Current",
     planned: "Planned",
@@ -885,6 +896,12 @@ i18n.zh.createSourceEntry = "新建来源词条：{source}";
 
 const elements = {
   appShell: document.querySelector("#appShell"),
+  mobileAppBar: document.querySelector("#mobileAppBar"),
+  mobileNavButton: document.querySelector("#mobileNavButton"),
+  mobileCurrentViewLabel: document.querySelector("#mobileCurrentViewLabel"),
+  mobileEntryListButton: document.querySelector("#mobileEntryListButton"),
+  mobileNewEntryButton: document.querySelector("#mobileNewEntryButton"),
+  mobileDrawerBackdrop: document.querySelector("#mobileDrawerBackdrop"),
   appNav: document.querySelector("#appNav"),
   navCollapseButton: document.querySelector("#navCollapseButton"),
   appTooltip: document.querySelector("#appTooltip"),
@@ -2021,6 +2038,7 @@ function render() {
   renderView();
   renderAvailability();
   renderShellEntryBrowser();
+  renderMobileAppBar();
   renderHeader();
   renderToolNav();
   renderActiveView();
@@ -2194,6 +2212,122 @@ function applyTheme() {
   document.body.classList.toggle("dark-theme", currentTheme === "dark");
 }
 
+function mobileShellMode() {
+  return !desktopNavMediaQuery.matches;
+}
+
+function syncMobileDrawerBodyState() {
+  const drawerOpen = mobileShellMode() && (shellState.navDrawerOpen || shellState.browserDrawerOpen);
+  document.body.classList.toggle("mobile-drawer-open", drawerOpen);
+  elements.appShell.dataset.navDrawer = shellState.navDrawerOpen ? "open" : "closed";
+  elements.appShell.dataset.browserDrawer = shellState.browserDrawerOpen ? "open" : "closed";
+  elements.mobileDrawerBackdrop.hidden = !drawerOpen;
+}
+
+function closeMobileDrawers() {
+  if (!shellState.navDrawerOpen && !shellState.browserDrawerOpen) {
+    syncMobileDrawerBodyState();
+    return false;
+  }
+  shellState.navDrawerOpen = false;
+  shellState.browserDrawerOpen = false;
+  renderShellNav();
+  renderShellEntryBrowser();
+  renderMobileAppBar();
+  return true;
+}
+
+function openMobileNavDrawer() {
+  if (!mobileShellMode()) {
+    return;
+  }
+  shellState.navDrawerOpen = true;
+  shellState.browserDrawerOpen = false;
+  renderShellNav();
+  renderShellEntryBrowser();
+  renderMobileAppBar();
+}
+
+function openMobileEntryBrowserDrawer() {
+  if (!mobileShellMode() || state.activeView !== "editor" || !activeDictionary()) {
+    return;
+  }
+  shellState.browserDrawerOpen = true;
+  shellState.navDrawerOpen = false;
+  renderShellNav();
+  renderShellEntryBrowser();
+  renderMobileAppBar();
+  requestAnimationFrame(() => {
+    remeasureEntryVirtualList();
+    flushPendingEntryCardScroll();
+  });
+}
+
+function closeMobileEntryBrowserDrawer() {
+  if (!shellState.browserDrawerOpen) {
+    return;
+  }
+  shellState.browserDrawerOpen = false;
+  renderShellEntryBrowser();
+  renderMobileAppBar();
+}
+
+function entryBrowserCanScrollNow() {
+  const container = entryVirtualList.container;
+  return Boolean(
+    container
+    && !elements.entryBrowser.hidden
+    && container.offsetParent !== null
+    && container.clientHeight > 0
+  );
+}
+
+function flushPendingEntryCardScroll() {
+  if (!pendingEntryCardScroll) {
+    return;
+  }
+  scheduleEntryCardScroll(pendingEntryCardScroll.entryId, pendingEntryCardScroll.options);
+}
+
+function revealEntryBrowserForResults() {
+  if (!activeDictionary()) {
+    return;
+  }
+  if (mobileShellMode()) {
+    shellState.navDrawerOpen = false;
+    shellState.browserDrawerOpen = true;
+    return;
+  }
+  shellState.browserCollapsedByView.editor = false;
+  shellState.browserDrawerOpen = false;
+}
+
+function renderMobileAppBar() {
+  const isMobile = mobileShellMode();
+  elements.mobileAppBar.hidden = !isMobile;
+  if (!isMobile) {
+    shellState.navDrawerOpen = false;
+    shellState.browserDrawerOpen = false;
+    syncMobileDrawerBodyState();
+    return;
+  }
+
+  const hasDictionary = Boolean(activeDictionary());
+  const canOpenEntryList = backendAvailable && hasDictionary && state.activeView === "editor";
+  const navLabel = t(shellState.navDrawerOpen ? "closeToolNavigation" : "openToolNavigation");
+  const listLabel = t(shellState.browserDrawerOpen ? "closeEntryList" : "openEntryList");
+  elements.mobileCurrentViewLabel.textContent = toolNavLabel(state.activeView);
+  elements.mobileNavButton.setAttribute("aria-expanded", String(shellState.navDrawerOpen));
+  elements.mobileNavButton.setAttribute("aria-label", navLabel);
+  elements.mobileEntryListButton.hidden = state.activeView !== "editor";
+  elements.mobileEntryListButton.disabled = !canOpenEntryList;
+  elements.mobileEntryListButton.setAttribute("aria-expanded", String(shellState.browserDrawerOpen));
+  elements.mobileEntryListButton.setAttribute("aria-label", listLabel);
+  elements.mobileNewEntryButton.hidden = state.activeView !== "editor";
+  elements.mobileNewEntryButton.disabled = !backendAvailable || !hasDictionary;
+  syncMobileDrawerBodyState();
+}
+
 function effectiveNavCollapsed() {
   if (!desktopNavMediaQuery.matches) {
     return false;
@@ -2203,15 +2337,28 @@ function effectiveNavCollapsed() {
 
 function renderShellNav() {
   hideAppTooltip();
+  if (mobileShellMode()) {
+    const navState = "drawer";
+    elements.appShell.dataset.navState = navState;
+    elements.appNav.dataset.navState = navState;
+    elements.appNav.hidden = !shellState.navDrawerOpen;
+    elements.navCollapseButton.hidden = true;
+    elements.mobileNavButton.setAttribute("aria-expanded", String(shellState.navDrawerOpen));
+    syncMobileDrawerBodyState();
+    return;
+  }
   const collapsed = effectiveNavCollapsed();
   shellState.navCollapsed = collapsed;
   const navState = collapsed ? "rail" : "expanded";
   elements.appShell.dataset.navState = navState;
   elements.appNav.dataset.navState = navState;
+  elements.appNav.hidden = false;
+  shellState.navDrawerOpen = false;
   elements.navCollapseButton.hidden = !wideNavMediaQuery.matches;
   elements.navCollapseButton.setAttribute("aria-expanded", String(!collapsed));
   const controlLabel = t(collapsed ? "expandNavigation" : "collapseNavigation");
   elements.navCollapseButton.setAttribute("aria-label", controlLabel);
+  syncMobileDrawerBodyState();
 }
 
 function appTooltipEnabledFor(target) {
@@ -2345,6 +2492,27 @@ function effectiveEntryBrowserCollapsed(view = state.activeView) {
 
 function renderShellEntryBrowser() {
   hideAppTooltip();
+  if (mobileShellMode()) {
+    const canOpenDrawer = backendAvailable && Boolean(activeDictionary()) && state.activeView === "editor";
+    if (!canOpenDrawer) {
+      shellState.browserDrawerOpen = false;
+    }
+    elements.appShell.dataset.browserState = shellState.browserDrawerOpen ? "drawer" : "expanded";
+    elements.contentGrid.dataset.browserState = "expanded";
+    elements.entryBrowser.hidden = !canOpenDrawer || !shellState.browserDrawerOpen;
+    elements.entryBrowserToggleButton.hidden = true;
+    elements.mobileEntryListButton.setAttribute("aria-expanded", String(shellState.browserDrawerOpen));
+    elements.mobileEntryListButton.setAttribute("aria-label", t(shellState.browserDrawerOpen ? "closeEntryList" : "openEntryList"));
+    syncMobileDrawerBodyState();
+    if (shellState.browserDrawerOpen) {
+      requestAnimationFrame(() => {
+        remeasureEntryVirtualList();
+        flushPendingEntryCardScroll();
+      });
+    }
+    return;
+  }
+  shellState.browserDrawerOpen = false;
   const canToggle = desktopNavMediaQuery.matches
     && backendAvailable
     && Boolean(activeDictionary())
@@ -2359,6 +2527,7 @@ function renderShellEntryBrowser() {
   const controlLabel = t(collapsed ? "expandEntryBrowser" : "collapseEntryBrowser");
   elements.entryBrowserToggleButton.setAttribute("aria-label", controlLabel);
   elements.entryBrowserToggleButton.removeAttribute("title");
+  syncMobileDrawerBodyState();
   scheduleEntryBrowserHeightUpdate();
 }
 
@@ -2490,6 +2659,7 @@ function toggleEntryBrowser() {
   renderShellEntryBrowser();
   if (!effectiveEntryBrowserCollapsed(view)) {
     scheduleEntryBrowserHeightUpdate();
+    requestAnimationFrame(() => flushPendingEntryCardScroll());
   }
 }
 
@@ -3387,6 +3557,7 @@ async function switchToEntry(entryId, options = {}) {
   const navigationOptions = prepareRootModeEntryNavigation(entryId, options);
   render();
   scheduleEntryCardScroll(entryId, navigationOptions);
+  closeMobileEntryBrowserDrawer();
 }
 
 function prepareRootModeEntryNavigation(entryId, options = {}) {
@@ -3421,9 +3592,16 @@ function scheduleEntryCardScroll(entryId, options = {}) {
   if (!entryId) {
     return;
   }
+  pendingEntryCardScroll = {
+    entryId,
+    options: { ...options },
+  };
   const requestId = entryCardScrollRequestId += 1;
   requestAnimationFrame(() => {
     if (requestId !== entryCardScrollRequestId) {
+      return;
+    }
+    if (!entryBrowserCanScrollNow()) {
       return;
     }
     let key = `entry:${entryId}`;
@@ -3436,11 +3614,17 @@ function scheduleEntryCardScroll(entryId, options = {}) {
       isCurrent: () => requestId === entryCardScrollRequestId,
     };
     if (scrollVirtualListItemIntoViewStable(entryVirtualList, key, stableScrollOptions)) {
+      if (pendingEntryCardScroll?.entryId === entryId) {
+        pendingEntryCardScroll = null;
+      }
       return;
     }
     const row = entryVirtualList.items.find((item) => item.value?.entry?.id === entryId || item.value?.group?.root?.id === entryId);
     if (row) {
-      scrollVirtualListItemIntoViewStable(entryVirtualList, row.key, stableScrollOptions);
+      const scrolled = scrollVirtualListItemIntoViewStable(entryVirtualList, row.key, stableScrollOptions);
+      if (scrolled && pendingEntryCardScroll?.entryId === entryId) {
+        pendingEntryCardScroll = null;
+      }
     }
   });
 }
@@ -3568,6 +3752,7 @@ async function enterAdvancedFilter(action) {
   activePart = "";
   searchQuery = "";
   state.activeView = "editor";
+  revealEntryBrowserForResults();
   const ids = new Set(advancedFilter.entryIds);
   const filteredEntries = [...dictionary.entries].filter((entry) => ids.has(entry.id)).sort(compareEntries);
   const preferredEntry = action.preferredEntryId
@@ -3598,8 +3783,11 @@ async function applyTagFilter(entry, tagIndex, tag) {
     advancedFilter = null;
     rootMode = false;
     activePart = tag;
+    revealEntryBrowserForResults();
     renderPartFilter();
     renderEntries();
+    renderShellEntryBrowser();
+    renderMobileAppBar();
     scheduleEntryCardScroll(entry.id);
     return;
   }
@@ -3887,6 +4075,7 @@ function refreshAdvancedFilter() {
   if (!refreshAdvancedFilterState()) {
     return;
   }
+  revealEntryBrowserForResults();
   render();
   if (advancedFilter?.entryIds?.length && advancedFilter.entryIds.includes(state.selectedEntryId)) {
     scheduleEntryCardScroll(state.selectedEntryId);
@@ -3935,6 +4124,7 @@ function cycleAdvancedFilterVariant() {
     const firstEntry = [...dictionary.entries].filter((entry) => ids.has(entry.id)).sort(compareEntries)[0];
     state.selectedEntryId = firstEntry?.id || state.selectedEntryId;
   }
+  revealEntryBrowserForResults();
   render();
   scheduleEntryCardScroll(state.selectedEntryId);
 }
@@ -9682,6 +9872,7 @@ async function showView(view) {
   }
   state.activeView = view;
   render();
+  closeMobileDrawers();
 }
 
 async function confirmLeaveUnsavedConfigView() {
@@ -10033,6 +10224,26 @@ elements.navCollapseButton.addEventListener("click", () => {
   renderShellNav();
   scheduleEntryBrowserLayoutRefresh();
 });
+elements.mobileNavButton.addEventListener("click", () => {
+  if (shellState.navDrawerOpen) {
+    closeMobileDrawers();
+    return;
+  }
+  openMobileNavDrawer();
+});
+elements.mobileEntryListButton.addEventListener("click", () => {
+  if (shellState.browserDrawerOpen) {
+    closeMobileEntryBrowserDrawer();
+    return;
+  }
+  openMobileEntryBrowserDrawer();
+});
+elements.mobileNewEntryButton.addEventListener("click", async () => {
+  if (await beginNewEntry()) {
+    closeMobileDrawers();
+  }
+});
+elements.mobileDrawerBackdrop.addEventListener("click", closeMobileDrawers);
 elements.entryBrowserToggleButton.addEventListener("click", toggleEntryBrowser);
 elements.backToEditorButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromSettingsButton.addEventListener("click", () => showView("editor"));
@@ -10050,7 +10261,11 @@ elements.corpusOpenDictionaryManagerButton.addEventListener("click", () => showV
 elements.morphologyOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.ipaOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.newEntryButton.addEventListener("click", () => beginNewEntry());
-elements.entryListNewEntryButton.addEventListener("click", () => beginNewEntry());
+elements.entryListNewEntryButton.addEventListener("click", async () => {
+  if (await beginNewEntry()) {
+    closeMobileEntryBrowserDrawer();
+  }
+});
 elements.editEntryButton.addEventListener("click", beginEditEntry);
 elements.analysisPanel.addEventListener("click", (event) => {
   const qualityInfoButton = event.target.closest('[data-action="quality-filter-info"]');
@@ -10086,6 +10301,9 @@ elements.analysisPanel.addEventListener("click", (event) => {
   if (viewTarget) {
     advancedFilter = null;
     state.activeView = viewTarget.dataset.viewTarget || "editor";
+    if (state.activeView === "editor") {
+      revealEntryBrowserForResults();
+    }
     render();
     return;
   }
@@ -10096,6 +10314,7 @@ elements.analysisPanel.addEventListener("click", (event) => {
     activePart = partFilterTarget.dataset.partFilterValue || "";
     searchQuery = "";
     state.activeView = "editor";
+    revealEntryBrowserForResults();
     const dictionary = activeDictionary();
     const firstEntry = dictionary
       ? [...dictionary.entries]
@@ -10647,6 +10866,10 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
+  if (event.key === "Escape" && closeMobileDrawers()) {
+    return;
+  }
+
   if (handleNewEntryShortcut(event)) {
     return;
   }
@@ -10728,14 +10951,17 @@ document.addEventListener("visibilitychange", () => {
 desktopNavMediaQuery.addEventListener("change", () => {
   renderShellNav();
   renderShellEntryBrowser();
+  renderMobileAppBar();
   scheduleEntryBrowserLayoutRefresh();
 });
 wideNavMediaQuery.addEventListener("change", () => {
   renderShellNav();
+  renderMobileAppBar();
   scheduleEntryBrowserLayoutRefresh();
 });
 window.addEventListener("resize", () => {
   renderShellNav();
+  renderMobileAppBar();
   scheduleEntryBrowserLayoutRefresh(120);
 });
 elements.appShell.addEventListener("transitionend", (event) => {

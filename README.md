@@ -11,6 +11,7 @@ Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。
 - Lexical entry editing with lemma, pronunciation, tags, multiple definitions, examples, notes, etymology, sources, and derived-entry backlinks.
 - Tag-first part-of-speech logic: the first tag is treated as the part of speech and is used for display/filtering.
 - Display mode and edit mode: saved entries open in a clean reading view, with full editing and inline section editing available.
+- Responsive application shell with collapsible tool navigation, a collapsible entry list, and mobile drawer controls for navigation, entry browsing, and creating entries.
 - Advanced filtering from analytics: click analytic rows to filter the entry browser, with reversible filter variants for coverage, IPA, morphology, and quality checks.
 - Root mode entry browsing: derived entries can be nested under their roots, with expand/collapse controls and quick derived-entry creation.
 - Lexical network view for source and derived relationships, including hover cards and navigation between connected entries.
@@ -28,6 +29,7 @@ Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。
 - 词条编辑：支持词形、发音、标签、多条释义、例句、备注、词源、来源以及反向衍生链接。
 - 标签即词性：第一个标签会被视为词性，用于显示和筛选。
 - 查看模式与编辑模式：保存后的词条会进入整洁的阅读界面，也支持完整编辑和栏目局部编辑。
+- 响应式应用外壳：支持可收起工具导航、可收起词条列表，以及移动端用于导航、浏览词条和新建词条的抽屉控件。
 - 数据分析高级筛选：点击统计行可以筛选词条浏览栏，并支持释义覆盖、IPA、形态学、质量检查等项目的筛选条件切换。
 - 词根模式浏览：衍生词可以嵌套显示在词根下方，支持展开、收起和快速创建衍生词。
 - 词汇网络：展示来源与衍生关系，支持悬浮信息卡和在关联词条之间导航。
