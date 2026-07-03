@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
@@ -32,6 +33,31 @@ async function assertRejectStatus(promise, status, label) {
     return;
   }
   assert.fail(`${label}: expected rejection with status ${status}`);
+}
+
+function withPatchedRandomUUID(values, callback) {
+  const originalRandomUUID = crypto.randomUUID;
+  const queue = [...values];
+  crypto.randomUUID = () => {
+    if (!queue.length) {
+      throw new Error("randomUUID test queue exhausted");
+    }
+    return queue.shift();
+  };
+  const restore = () => {
+    crypto.randomUUID = originalRandomUUID;
+  };
+  try {
+    const result = callback();
+    if (result && typeof result.then === "function") {
+      return result.finally(restore);
+    }
+    restore();
+    return result;
+  } catch (error) {
+    restore();
+    throw error;
+  }
 }
 
 function checkModelNormalization() {
@@ -87,6 +113,81 @@ function checkModelNormalization() {
     },
     (error) => error.status === 409,
   );
+
+  assert.throws(
+    () => {
+      const duplicate = normalizeDictionary({
+        entries: [
+          {
+            id: "entry-one",
+            lemma: "a",
+            definitions: [{ id: "shared-definition-id", meaning: "a" }],
+          },
+          {
+            id: "entry-two",
+            lemma: "b",
+            definitions: [{ id: "shared-definition-id", meaning: "b" }],
+          },
+        ],
+      });
+      assertUniqueDictionaryEntityIds(duplicate);
+    },
+    (error) => error.status === 409,
+  );
+
+  assert.throws(
+    () => {
+      const duplicate = normalizeDictionary({
+        entries: [{ id: "shared-config-id", lemma: "a" }],
+        morphology: { tables: [{ id: "shared-config-id", name: "A" }] },
+      });
+      assertUniqueDictionaryEntityIds(duplicate);
+    },
+    (error) => error.status === 409,
+  );
+
+  assert.throws(
+    () => {
+      const duplicate = normalizeDictionary({
+        entries: [{ id: "shared-ipa-id", lemma: "a" }],
+        settings: { ipa: { mappings: [{ id: "shared-ipa-id", from: "a", to: "b" }] } },
+      });
+      assertUniqueDictionaryEntityIds(duplicate);
+    },
+    (error) => error.status === 409,
+  );
+
+  withPatchedRandomUUID(["collision", "fresh"], () => {
+    const normalized = normalizeDictionary({
+      id: "dict-static",
+      entries: [
+        {
+          id: "def-collision",
+          lemma: "a",
+          definitions: [{ meaning: "a" }],
+        },
+      ],
+    });
+    assert.equal(normalized.entries[0].definitions[0].id, "def-fresh");
+  });
+
+  withPatchedRandomUUID(["collision", "fresh"], () => {
+    const normalized = normalizeDictionary({
+      id: "dict-static",
+      entries: [{ id: "morph-collision", lemma: "a" }],
+      morphology: { tables: [{ name: "A" }] },
+    });
+    assert.equal(normalized.morphology.tables[0].id, "morph-fresh");
+  });
+
+  withPatchedRandomUUID(["collision", "fresh"], () => {
+    const normalized = normalizeDictionary({
+      id: "dict-static",
+      entries: [{ id: "ipa-collision", lemma: "a" }],
+      settings: { ipa: { mappings: [{ from: "a", to: "b" }] } },
+    });
+    assert.equal(normalized.settings.ipa.mappings[0].id, "ipa-fresh");
+  });
 }
 
 async function checkJsonRepository() {
@@ -143,6 +244,17 @@ async function checkJsonRepository() {
 
     await assertRejectStatus(repository.activateDictionary(first.id), 404, "activate deleted dictionary");
     await assertRejectStatus(repository.exportDictionary(first.id), 404, "export deleted dictionary");
+
+    await repository.createDictionary({ id: "dict-collision", name: "Collision" });
+    const generated = withPatchedRandomUUID(["collision", "fresh"], () => repository.createDictionary({ name: "Generated" }));
+    assert.equal((await generated).id, "dict-fresh");
+
+    await assertRejectStatus(repository.importDictionary({ id: "bad id", name: "Bad" }), 400, "invalid dictionary id import");
+    const regeneratedImport = withPatchedRandomUUID(
+      ["collision", "imported"],
+      () => repository.importDictionary({ id: "bad id", name: "Regenerated" }, { regenerateId: true }),
+    );
+    assert.equal((await regeneratedImport).id, "dict-imported");
   } finally {
     await fs.rm(dataDir, { recursive: true, force: true });
   }

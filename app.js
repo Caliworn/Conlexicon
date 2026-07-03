@@ -363,6 +363,9 @@ const i18n = {
     importOverwriteTitle: "词典 ID 已存在",
     importOverwriteMessage: "词典 ID“{id}”已经存在。导入“{name}”将覆盖现有词典及其全部数据。",
     importAndOverwrite: "导入并覆盖",
+    importInvalidIdTitle: "词典 ID 格式无效",
+    importInvalidIdMessage: "词典 ID“{id}”格式无效。是否作为新词典导入并重新生成 ID？",
+    importAndRegenerateId: "重新生成 ID 并导入",
     updatedAt: "修订日期",
     source: "来源",
     derivedEntries: "衍生",
@@ -477,8 +480,12 @@ const i18n = {
     corpusDuplicateLink: "父级“{parent}”重复引用了单元“{unit}”",
     corpusDuplicateEntityId: "语料 ID“{id}”被多个对象使用：{types}",
     duplicateEntityIdsTitle: "检测到重复 ID",
-    duplicateEntityIdsMessage: "以下 ID 被多个条目或语料对象使用，保存或导入已停止：\n{details}",
+    duplicateEntityIdsMessage: "以下 ID 被多个词典对象使用，保存或导入已停止：\n{details}",
     entryEntity: "词条",
+    definitionEntity: "释义",
+    morphologyTableEntity: "形态表",
+    ipaRuleEntity: "IPA 规则",
+    ipaStressRuleEntity: "IPA 重音规则",
     corpusBlockFallback: "未命名块",
     corpusLayerFallback: "未命名层",
     corpusUnitFallback: "空单元",
@@ -761,6 +768,9 @@ const i18n = {
     importOverwriteTitle: "Dictionary ID already exists",
     importOverwriteMessage: "Dictionary ID “{id}” already exists. Importing “{name}” will overwrite the existing dictionary and all of its data.",
     importAndOverwrite: "Import and Overwrite",
+    importInvalidIdTitle: "Invalid Dictionary ID",
+    importInvalidIdMessage: "Dictionary ID “{id}” is invalid. Import it as a new dictionary and generate a new ID?",
+    importAndRegenerateId: "Generate New ID and Import",
     updatedAt: "Updated",
     source: "Source",
     createSourceEntry: "Create Source Entry: {source}",
@@ -876,8 +886,12 @@ const i18n = {
     corpusDuplicateLink: "Parent “{parent}” references unit “{unit}” more than once",
     corpusDuplicateEntityId: "Corpus ID “{id}” is used by multiple objects: {types}",
     duplicateEntityIdsTitle: "Duplicate IDs detected",
-    duplicateEntityIdsMessage: "These IDs are used by multiple entries or corpus objects. Saving or importing has been stopped:\n{details}",
+    duplicateEntityIdsMessage: "These IDs are used by multiple dictionary objects. Saving or importing has been stopped:\n{details}",
     entryEntity: "Entry",
+    definitionEntity: "Definition",
+    morphologyTableEntity: "Morphology table",
+    ipaRuleEntity: "IPA rule",
+    ipaStressRuleEntity: "IPA stress rule",
     corpusBlockFallback: "Untitled Block",
     corpusLayerFallback: "Untitled Layer",
     corpusUnitFallback: "Empty Unit",
@@ -1327,37 +1341,40 @@ function normalizeDictionary(dictionary) {
     ? dictionary.entries.map((entry) => normalizeEntry({
       ...entry,
       id: reserveEntityId(entry.id, "entry", usedEntityIds),
-    }))
+    }, usedEntityIds))
     : [];
   return {
     id: dictionary.id || uid("dict"),
     name: dictionary.name || t("unnamedDictionary"),
     language: dictionary.language || "",
     description: dictionary.description || "",
-    settings: normalizeDictionarySettings(dictionary.settings),
+    settings: normalizeDictionarySettings(dictionary.settings, usedEntityIds),
     docs: normalizeDocs(dictionary.docs),
     corpus: normalizeCorpus(dictionary.corpus, usedEntityIds),
-    morphology: normalizeMorphology(dictionary.morphology),
+    morphology: normalizeMorphology(dictionary.morphology, usedEntityIds),
     createdAt: dictionary.createdAt || new Date().toISOString(),
     updatedAt: dictionary.updatedAt || new Date().toISOString(),
     entries,
   };
 }
 
-function normalizeEntry(entry) {
+function normalizeEntry(entry, usedIds = new Set()) {
   const tags = Array.isArray(entry.tags) ? entry.tags.filter(Boolean) : [];
   if (entry.partOfSpeech && tags[0] !== entry.partOfSpeech) {
     tags.unshift(entry.partOfSpeech);
   }
 
   const definitions = Array.isArray(entry.definitions) && entry.definitions.length
-    ? entry.definitions.map(normalizeDefinition)
+    ? entry.definitions.map((definition) => normalizeDefinition(definition, usedIds))
     : [
-        normalizeDefinition({
-          meaning: entry.meaning || "",
-          example: entry.example || "",
-          note: "",
-        }),
+        normalizeDefinition(
+          {
+            meaning: entry.meaning || "",
+            example: entry.example || "",
+            note: "",
+          },
+          usedIds,
+        ),
       ];
 
   const migratedEtymology = [entry.roots, entry.variant].filter(Boolean).join("\n");
@@ -1386,16 +1403,16 @@ function normalizeEntry(entry) {
   };
 }
 
-function normalizeDefinition(definition = {}) {
+function normalizeDefinition(definition = {}, usedIds = new Set()) {
   return {
-    id: definition.id || uid("def"),
+    id: reserveEntityId(definition.id, "def", usedIds),
     meaning: definition.meaning || "",
     example: definition.example || "",
     note: definition.note || "",
   };
 }
 
-function normalizeDictionarySettings(settings = {}) {
+function normalizeDictionarySettings(settings = {}, usedIds = new Set()) {
   const {
     glossSmallCaps,
     glossFontFamily,
@@ -1445,7 +1462,7 @@ function normalizeDictionarySettings(settings = {}) {
     allowEmptyTags: Boolean(settings.allowEmptyTags ?? true),
     allowEmptyDefinitions: Boolean(settings.allowEmptyDefinitions ?? true),
     ipaKeyboard: normalizeIpaKeyboard(settings.ipaKeyboard),
-    ipa: normalizeIpaSettings(settings.ipa),
+    ipa: normalizeIpaSettings(settings.ipa, usedIds),
     toolNavOrder: normalizeToolNavOrder(settings.toolNavOrder),
   };
 }
@@ -1699,10 +1716,10 @@ function normalizeCorpusUnitIds(unitIds = []) {
     : [];
 }
 
-function normalizeMorphology(morphology = {}) {
+function normalizeMorphology(morphology = {}, usedIds = new Set()) {
   return {
     functions: normalizeMorphologyFunctions(morphology.functions),
-    tables: Array.isArray(morphology.tables) ? morphology.tables.map(normalizeMorphologyTable) : [],
+    tables: Array.isArray(morphology.tables) ? morphology.tables.map((table) => normalizeMorphologyTable(table, usedIds)) : [],
   };
 }
 
@@ -1727,7 +1744,7 @@ function uniqueList(value) {
   return unique;
 }
 
-function normalizeMorphologyTable(table = {}) {
+function normalizeMorphologyTable(table = {}, usedIds = new Set()) {
   const rows = Math.max(1, Number.parseInt(table.rows, 10) || 2);
   const cols = Math.max(1, Number.parseInt(table.cols, 10) || 2);
   const rowLabels = Array.from({ length: rows }, (_, index) => String(table.rowLabels?.[index] || `${index + 1}`));
@@ -1740,7 +1757,7 @@ function normalizeMorphologyTable(table = {}) {
     }
   }
   return {
-    id: table.id || uid("morph"),
+    id: reserveEntityId(table.id, "morph", usedIds),
     name: String(table.name || t("morphologyTable")),
     rows,
     cols,
@@ -1803,11 +1820,11 @@ function splitKeyboardSymbols(value) {
     .filter(Boolean);
 }
 
-function normalizeIpaSettings(ipa = {}) {
+function normalizeIpaSettings(ipa = {}, usedIds = new Set()) {
   const defaultStress = Number.parseInt(ipa.defaultStress, 10);
   const mappings = [
-    ...normalizeIpaRuleList(ipa.mappings),
-    ...normalizeIpaRuleList(ipa.stressMappings).map((rule) => ({
+    ...normalizeIpaRuleList(ipa.mappings, usedIds),
+    ...normalizeIpaRuleList(ipa.stressMappings, usedIds).map((rule) => ({
       ...rule,
       to: hasStressOutput(rule.to) ? rule.to : `ˈ${rule.to || rule.from}`,
     })),
@@ -1841,15 +1858,15 @@ function hasStressOutput(value) {
   return output.startsWith("'") || output.includes("ˈ");
 }
 
-function normalizeIpaRuleList(rules) {
+function normalizeIpaRuleList(rules, usedIds = new Set()) {
   return Array.isArray(rules)
-    ? rules.map(normalizeIpaRule).filter((rule) => rule.from || rule.to || rule.before || rule.after)
+    ? rules.map((rule) => normalizeIpaRule(rule, usedIds)).filter((rule) => rule.from || rule.to || rule.before || rule.after)
     : [];
 }
 
-function normalizeIpaRule(rule = {}) {
+function normalizeIpaRule(rule = {}, usedIds = new Set()) {
   return {
-    id: rule.id || uid("ipa"),
+    id: reserveEntityId(rule.id, "ipa", usedIds),
     from: String(rule.from || ""),
     to: String(rule.to || ""),
     before: String(rule.before || ""),
@@ -1890,13 +1907,39 @@ function corpusEntityIdRecords(corpus = {}) {
 }
 
 function dictionaryEntityIdRecords(dictionary = {}) {
-  return [
-    ...(dictionary.entries || []).map((entry) => ({
+  const records = [];
+  (dictionary.entries || []).forEach((entry) => {
+    records.push({
       id: String(entry.id || "").trim(),
       typeKey: "entryEntity",
-    })),
-    ...corpusEntityIdRecords(dictionary.corpus),
-  ].filter((record) => record.id);
+    });
+    (entry.definitions || []).forEach((definition) => {
+      records.push({
+        id: String(definition.id || "").trim(),
+        typeKey: "definitionEntity",
+      });
+    });
+  });
+  (dictionary.morphology?.tables || []).forEach((table) => {
+    records.push({
+      id: String(table.id || "").trim(),
+      typeKey: "morphologyTableEntity",
+    });
+  });
+  (dictionary.settings?.ipa?.mappings || []).forEach((rule) => {
+    records.push({
+      id: String(rule.id || "").trim(),
+      typeKey: "ipaRuleEntity",
+    });
+  });
+  (dictionary.settings?.ipa?.stressMappings || []).forEach((rule) => {
+    records.push({
+      id: String(rule.id || "").trim(),
+      typeKey: "ipaStressRuleEntity",
+    });
+  });
+  records.push(...corpusEntityIdRecords(dictionary.corpus));
+  return records.filter((record) => record.id);
 }
 
 function duplicateEntityIdGroups(records) {
@@ -9783,6 +9826,10 @@ function dictionaryFromImportPayload(payload) {
   return payload && typeof payload === "object" && !Array.isArray(payload) ? payload : null;
 }
 
+function isValidDictionaryId(id) {
+  return /^dict-[a-z0-9-]+$/i.test(String(id || "").trim());
+}
+
 function importData(event) {
   const file = event.target.files[0];
   if (!file) {
@@ -9800,11 +9847,25 @@ function importData(event) {
       if (!validateDictionaryEntityIds(normalizeDictionary(dictionary))) {
         return;
       }
-      const existing = state.dictionaries.find((item) => item.id === dictionary.id);
+      const dictionaryId = String(dictionary.id || "").trim();
+      let regenerateId = false;
+      if (dictionaryId && !isValidDictionaryId(dictionaryId)) {
+        regenerateId = await appConfirm(formatText("importInvalidIdMessage", {
+          id: dictionaryId,
+        }), {
+          title: t("importInvalidIdTitle"),
+          confirmText: t("importAndRegenerateId"),
+          cancelText: t("cancel"),
+        });
+        if (!regenerateId) {
+          return;
+        }
+      }
+      const existing = !regenerateId ? state.dictionaries.find((item) => item.id === dictionaryId) : null;
       let overwrite = false;
       if (existing) {
         overwrite = await appConfirm(formatText("importOverwriteMessage", {
-          id: dictionary.id,
+          id: dictionaryId,
           name: dictionary.name || t("unnamedDictionary"),
         }), {
           title: t("importOverwriteTitle"),
@@ -9816,7 +9877,15 @@ function importData(event) {
           return;
         }
       }
-      await api(`/api/import${overwrite ? "?overwrite=true" : ""}`, {
+      const query = new URLSearchParams();
+      if (overwrite) {
+        query.set("overwrite", "true");
+      }
+      if (regenerateId) {
+        query.set("regenerateId", "true");
+      }
+      const importUrl = `/api/import${query.toString() ? `?${query}` : ""}`;
+      await api(importUrl, {
         method: "POST",
         body: JSON.stringify(imported),
       });
