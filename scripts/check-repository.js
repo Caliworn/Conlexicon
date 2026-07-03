@@ -3,6 +3,7 @@ const crypto = require("node:crypto");
 const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
+const { Readable } = require("node:stream");
 
 const {
   DEFAULT_INDEX,
@@ -12,6 +13,7 @@ const {
   normalizeUiLanguage,
   normalizeUiTheme,
 } = require("../lib/dictionary-model");
+const { createApiRouter } = require("../lib/api-routes");
 const { JsonDictionaryRepository } = require("../lib/json-dictionary-repository");
 
 function createRepository(dataDir) {
@@ -58,6 +60,32 @@ function withPatchedRandomUUID(values, callback) {
     restore();
     throw error;
   }
+}
+
+async function callApi(repository, method, urlPath, body) {
+  const chunks = body === undefined ? [] : [Buffer.from(JSON.stringify(body))];
+  const request = Readable.from(chunks);
+  request.method = method;
+  let statusCode = 0;
+  let payload = "";
+  const response = {
+    writeHead(status) {
+      statusCode = status;
+    },
+    end(value) {
+      payload = value || "";
+    },
+  };
+  const handled = await createApiRouter({ repository })(
+    request,
+    response,
+    new URL(urlPath, "http://localhost"),
+  );
+  return {
+    handled,
+    statusCode,
+    body: payload ? JSON.parse(payload) : null,
+  };
 }
 
 function checkModelNormalization() {
@@ -215,6 +243,15 @@ async function checkJsonRepository() {
     const activeExport = await repository.exportDictionary();
     assert.equal(activeExport.id, first.id);
 
+    let apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/meta`, {
+      name: "First Renamed",
+      language: "renamed",
+      description: "meta only",
+    });
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.name, "First Renamed");
+    assert.equal(apiResult.body.language, "renamed");
+
     const updated = await repository.updateDictionary(first.id, {
       name: "First Updated",
       entries: [{ lemma: "root", partOfSpeech: "n", meaning: "root meaning" }],
@@ -225,7 +262,83 @@ async function checkJsonRepository() {
 
     const savedWithNewEntry = await repository.saveEntry(first.id, { lemma: "new entry", definitions: [{ meaning: "new" }] });
     assert.equal(savedWithNewEntry.entries.length, 2);
-    assert.equal((await repository.getEntry(first.id, savedWithNewEntry.entries.at(-1).id)).lemma, "new entry");
+    const repositoryEntryId = savedWithNewEntry.entries.at(-1).id;
+    assert.equal((await repository.getEntry(first.id, repositoryEntryId)).lemma, "new entry");
+
+    apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entries`);
+    assert.equal(apiResult.handled, true);
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.length, 2);
+
+    apiResult = await callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(first.id)}/entries`, {
+      lemma: "api entry",
+      definitions: [{ meaning: "created through API" }],
+    });
+    assert.equal(apiResult.statusCode, 201);
+    assert.match(apiResult.body.id, /^entry-/);
+    assert.equal(apiResult.body.lemma, "api entry");
+    const apiEntryId = apiResult.body.id;
+
+    apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entries/${encodeURIComponent(apiEntryId)}`);
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.definitions[0].meaning, "created through API");
+
+    apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/entries/${encodeURIComponent(apiEntryId)}`, {
+      ...apiResult.body,
+      lemma: "api entry updated",
+    });
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.lemma, "api entry updated");
+
+    apiResult = await callApi(repository, "DELETE", `/api/dictionaries/${encodeURIComponent(first.id)}/entries/${encodeURIComponent(apiEntryId)}`);
+    assert.equal(apiResult.statusCode, 200);
+    await assertRejectStatus(
+      callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entries/${encodeURIComponent(apiEntryId)}`),
+      404,
+      "deleted entry lookup",
+    );
+
+    apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/settings`, {
+      allowEmptyTags: false,
+      docsAutoSave: true,
+    });
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.settings.allowEmptyTags, false);
+    assert.equal(apiResult.body.settings.docsAutoSave, true);
+
+    apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/docs`, {
+      markdown: "# Notes",
+    });
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.docs.markdown, "# Notes");
+
+    apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/corpus`, {
+      units: [{ content: "corpus unit" }],
+    });
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.corpus.units[0].content, "corpus unit");
+    assert.match(apiResult.body.corpus.units[0].id, /^corpus-unit-/);
+
+    apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/morphology`, {
+      tables: [{ name: "Nouns" }],
+    });
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.morphology.tables[0].name, "Nouns");
+    assert.match(apiResult.body.morphology.tables[0].id, /^morph-/);
+
+    apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/settings/ipa`, {
+      mappings: [{ from: "a", to: "ɑ" }],
+    });
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.settings.ipa.mappings[0].to, "ɑ");
+
+    apiResult = await callApi(repository, "PATCH", `/api/dictionaries/${encodeURIComponent(first.id)}/entries`, {
+      settings: { allowEmptyDefinitions: false },
+      updates: [{ id: repositoryEntryId, patch: { tags: ["n", "root"] } }],
+    });
+    assert.equal(apiResult.statusCode, 200);
+    assert.deepEqual(apiResult.body.entries.find((entry) => entry.id === repositoryEntryId).tags, ["n", "root"]);
+    assert.equal(apiResult.body.settings.allowEmptyDefinitions, false);
 
     const preferences = await repository.updatePreferences({ uiLanguage: "en", uiTheme: "dark" });
     assert.deepEqual(preferences, { uiLanguage: "en", uiTheme: "dark" });

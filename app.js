@@ -284,8 +284,10 @@ const i18n = {
     tagOrderInfo: "查看标签排序逻辑",
     tagOrderInfoBody: "点击刷新后，系统会按输入框中的统一顺序重排每个词条的标签。统一顺序里有而某个词条没有的标签会被跳过；某个词条里有但统一顺序里没有的标签会保留在末尾，多个额外标签保持原始相对顺序。这里应填写原始标签；显示替换只影响界面显示，不参与匹配。",
     tagOrderConfirm: "将按照当前输入的统一顺序重排当前词典中所有词条的标签，并立即保存。继续吗？",
+    tagOrderUnsavedSettingsConfirm: "当前其他设置有未保存更改。请先保存设置后再自动整理标签顺序。",
     tagOrderApplied: "标签顺序已整理",
     tagOrderEmpty: "请先输入至少一个标签。",
+    saveAndApply: "保存并应用",
     applyTags: "应用",
     tagDisplaySettings: "标签突出显示",
     tagRedHighlightHelp: "配置后，这些标签会在词条浏览栏和查看界面中以红色显示。多个标签用逗号、空格或换行分隔。",
@@ -396,6 +398,8 @@ const i18n = {
     batchIpaMissing: "补全空发音",
     batchIpaAllConfirm: "将为当前词典所有有词形的词条重新生成发音，并覆盖已有发音。确定继续吗？",
     batchIpaMissingConfirm: "将为当前词典所有尚未填写发音且有词形的词条生成发音。确定继续吗？",
+    batchIpaUnsavedSettingsConfirm: "当前自动 IPA 设置有未保存更改。请先保存设置后再批量生成。",
+    saveAndGenerate: "保存并生成",
     batchIpaUpdated: "已更新发音",
     batchIpaNoMissing: "当前词典无发音为空的条目",
     ruleFrom: "输入",
@@ -687,8 +691,10 @@ const i18n = {
     tagOrderInfo: "Show tag ordering logic",
     tagOrderInfoBody: "After you click Refresh, each entry's tags are reordered by the unified order in this field. Tags in the unified order that an entry does not have are skipped. Tags on an entry that are not in the unified order are kept at the end, and multiple extra tags keep their original relative order. Use raw tags here; display replacements only affect how tags are shown.",
     tagOrderConfirm: "This will reorder tags for every entry in the current dictionary using the current unified order and save immediately. Continue?",
+    tagOrderUnsavedSettingsConfirm: "Other Settings have unsaved changes. Save the settings before arranging tag order.",
     tagOrderApplied: "Tag order arranged",
     tagOrderEmpty: "Enter at least one tag first.",
+    saveAndApply: "Save and Apply",
     applyTags: "Apply",
     tagDisplaySettings: "Tag Highlighting",
     tagRedHighlightHelp: "Configured tags are shown in red in the entry browser and display mode. Separate tags with commas, spaces, or line breaks.",
@@ -802,6 +808,8 @@ const i18n = {
     batchIpaMissing: "Fill Missing Pronunciations",
     batchIpaAllConfirm: "Regenerate pronunciations for every entry with a lemma in the current dictionary, overwriting existing pronunciations. Continue?",
     batchIpaMissingConfirm: "Generate pronunciations for entries with a lemma and no pronunciation in the current dictionary. Continue?",
+    batchIpaUnsavedSettingsConfirm: "Auto IPA settings have unsaved changes. Save the settings before batch generation.",
+    saveAndGenerate: "Save and Generate",
     batchIpaUpdated: "Pronunciations updated",
     batchIpaNoMissing: "No entries with empty pronunciation in the current dictionary",
     ruleFrom: "Input",
@@ -7456,7 +7464,7 @@ function collectDictionarySettingsFromForm(existing = {}) {
   };
 }
 
-async function saveSettings(event) {
+async function saveSettings(event, options = {}) {
   event.preventDefault();
   const dictionary = activeDictionary();
   if (!dictionary) {
@@ -7480,27 +7488,32 @@ async function saveSettings(event) {
     return false;
   }
 
-  dictionary.settings = collectDictionarySettingsFromForm(dictionary.settings);
-  if (!dictionary.settings.docsAutoSave) {
+  const settings = collectDictionarySettingsFromForm(dictionary.settings);
+  if (!settings.docsAutoSave) {
     clearTimeout(docsSaveTimer);
   }
-  if (!dictionary.settings.corpusAutoSave) {
+  if (!settings.corpusAutoSave) {
     clearTimeout(corpusSaveTimer);
   }
-  dictionary.updatedAt = new Date().toISOString();
-  await persistDictionary(dictionary);
-  showToast(t("dictionarySaved"));
+  await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/settings`, {
+    method: "PUT",
+    body: JSON.stringify(settings),
+  });
+  await refreshState();
+  if (options.showToast !== false) {
+    showToast(t("dictionarySaved"));
+  }
   return true;
 }
 
 async function applyTagSortOrder() {
-  const dictionary = activeDictionary();
+  let dictionary = activeDictionary();
   if (!dictionary) {
     showToast(t("createDictionaryFirstToast"));
     return;
   }
 
-  const order = normalizeTagList(elements.tagSortOrderInput.value);
+  let order = normalizeTagList(elements.tagSortOrderInput.value);
   if (!order.length) {
     await appConfirm(t("tagOrderEmpty"), {
       title: t("tagOrderSettings"),
@@ -7520,6 +7533,23 @@ async function applyTagSortOrder() {
     return;
   }
 
+  if (settingsFormIsDirty()) {
+    const shouldSave = await appConfirm(t("tagOrderUnsavedSettingsConfirm"), {
+      title: t("tagOrderSettings"),
+      confirmText: t("saveAndApply"),
+      cancelText: t("cancel"),
+    });
+    if (!shouldSave) {
+      return;
+    }
+    const saved = await saveSettings({ preventDefault() {} }, { showToast: false });
+    if (!saved) {
+      return;
+    }
+    dictionary = activeDictionary();
+    order = normalizeTagList(dictionary.settings?.tagSortOrder);
+  }
+
   const confirmed = await appConfirm(t("tagOrderConfirm"), {
     title: t("tagOrderSettings"),
   });
@@ -7527,23 +7557,24 @@ async function applyTagSortOrder() {
     return;
   }
 
-  const now = new Date().toISOString();
   let changedEntries = 0;
-  dictionary.settings = collectDictionarySettingsFromForm(dictionary.settings);
-  dictionary.entries = (dictionary.entries || []).map((entry) => {
+  const settings = dictionary.settings;
+  const updates = (dictionary.entries || []).map((entry) => {
     const sortedTags = arrangeTagsByOrder(entry.tags || [], order);
     if (stableJson(sortedTags) === stableJson(entry.tags || [])) {
-      return entry;
+      return null;
     }
     changedEntries += 1;
     return {
-      ...entry,
-      tags: sortedTags,
-      updatedAt: now,
+      id: entry.id,
+      patch: { tags: sortedTags },
     };
+  }).filter(Boolean);
+  await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`, {
+    method: "PATCH",
+    body: JSON.stringify({ settings, updates }),
   });
-  dictionary.updatedAt = now;
-  await persistDictionary(dictionary);
+  await refreshState();
   showToast(`${t("tagOrderApplied")}${changedEntries ? ` · ${changedEntries} ${t("entries")}` : ""}`);
 }
 
@@ -7595,7 +7626,11 @@ async function saveLanguageDocs(showSavedToast = true) {
     ...(dictionary.docs || {}),
     markdown: draft.markdown,
   };
-  await persistDictionaryPatch(dictionary.id, { docs, updatedAt: new Date().toISOString() });
+  await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/docs`, {
+    method: "PUT",
+    body: JSON.stringify(docs),
+  });
+  await refreshState();
   docsDraftState = null;
   renderLanguageDocs(activeDictionary());
   if (showSavedToast) {
@@ -8379,18 +8414,19 @@ async function runCorpusSaveQueue() {
     }
     syncCorpusEditorToDraft();
     const snapshot = cloneCorpus(ensureCorpusDraft(dictionary));
-    const saved = await persistDictionaryPatch(dictionary.id, {
-      corpus: snapshot,
-      updatedAt: new Date().toISOString(),
-    }, { refresh: false });
+    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/corpus`, {
+      method: "PUT",
+      body: JSON.stringify(snapshot),
+    });
+    const normalized = replaceDictionaryInState(saved);
     savedAny = true;
     clearTimeout(corpusSaveTimer);
     corpusSaveTimer = null;
 
     // Input may have changed the live draft while this snapshot was being saved.
     if (
-      corpusDraftState?.dictionaryId === saved.id
-      && stableJson(corpusDraftState.corpus) !== stableJson(saved.corpus)
+      corpusDraftState?.dictionaryId === normalized.id
+      && stableJson(corpusDraftState.corpus) !== stableJson(normalized.corpus)
     ) {
       corpusSaveRequested = true;
     }
@@ -8743,9 +8779,11 @@ async function saveMorphologyConfig(event) {
     });
     return false;
   }
-  dictionary.morphology = morphology;
-  dictionary.updatedAt = new Date().toISOString();
-  await persistDictionary(dictionary);
+  await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/morphology`, {
+    method: "PUT",
+    body: JSON.stringify(morphology),
+  });
+  await refreshState();
   showToast(t("dictionarySaved"));
   return true;
 }
@@ -8851,7 +8889,7 @@ function parseIpaDefaultStressInput() {
   return Number.parseInt(value, 10);
 }
 
-async function saveIpaSettings(event) {
+async function saveIpaSettings(event, options = {}) {
   event.preventDefault();
   const dictionary = activeDictionary();
   if (!dictionary) {
@@ -8866,24 +8904,15 @@ async function saveIpaSettings(event) {
     return false;
   }
 
-  dictionary.settings = {
-    ...(dictionary.settings || {}),
-    ipa: normalizeIpaSettings({
-      mappings: collectIpaRuleList(elements.ipaMappingList),
-      syllable: {
-        vowels: elements.ipaVowelsInput.value.trim() || "aeiouAEIOU",
-        separator: elements.ipaSyllableSeparatorInput.value.trim() || ".",
-        onsetClusters: normalizeClusterList(elements.ipaOnsetClustersInput.value),
-        codaClusters: normalizeClusterList(elements.ipaCodaClustersInput.value),
-        complexPhonemes: normalizeClusterList(elements.ipaComplexPhonemesInput.value),
-      },
-      defaultStress,
-      unstressMonosyllables: elements.ipaUnstressMonosyllablesInput.checked,
-    }),
-  };
-  dictionary.updatedAt = new Date().toISOString();
-  await persistDictionary(dictionary);
-  showToast(t("ipaSaved"));
+  const ipa = ipaSettingsFromForm();
+  await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/settings/ipa`, {
+    method: "PUT",
+    body: JSON.stringify(ipa),
+  });
+  await refreshState();
+  if (options.showToast !== false) {
+    showToast(t("ipaSaved"));
+  }
   return true;
 }
 
@@ -9178,7 +9207,7 @@ function applyAutoIpa(targetInput = elements.pronunciationInput, lemmaInput = el
 }
 
 async function batchGenerateIpa(mode) {
-  const dictionary = activeDictionary();
+  let dictionary = activeDictionary();
   if (!dictionary) {
     showToast(t("createDictionaryFirstToast"));
     return;
@@ -9189,7 +9218,22 @@ async function batchGenerateIpa(mode) {
     elements.ipaDefaultStressInput.focus();
     return;
   }
-  const ipaSettings = ipaSettingsFromForm();
+  if (ipaFormIsDirty()) {
+    const shouldSave = await appConfirm(t("batchIpaUnsavedSettingsConfirm"), {
+      title: t("autoIpa"),
+      confirmText: t("saveAndGenerate"),
+      cancelText: t("cancel"),
+    });
+    if (!shouldSave) {
+      return;
+    }
+    const saved = await saveIpaSettings({ preventDefault() {} }, { showToast: false });
+    if (!saved) {
+      return;
+    }
+    dictionary = activeDictionary();
+  }
+  const ipaSettings = dictionary.settings?.ipa;
   const overwrite = mode === "all";
   const targets = dictionary.entries.filter((entry) => entry.lemma && (overwrite || !entry.pronunciation));
   if (!targets.length) {
@@ -9202,13 +9246,14 @@ async function batchGenerateIpa(mode) {
   if (!confirmed) {
     return;
   }
-  const now = new Date().toISOString();
-  targets.forEach((entry) => {
-    entry.pronunciation = generateIpaFromLemma(entry.lemma, ipaSettings);
-    entry.updatedAt = now;
+  const updates = targets.map((entry) => ({
+    id: entry.id,
+    patch: { pronunciation: generateIpaFromLemma(entry.lemma, ipaSettings) },
+  }));
+  await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`, {
+    method: "PATCH",
+    body: JSON.stringify({ updates }),
   });
-  dictionary.updatedAt = now;
-  await persistDictionary(dictionary);
   await refreshState();
   showToast(`${t("batchIpaUpdated")} ${targets.length}`);
 }
@@ -9405,13 +9450,13 @@ async function savePartialEdit(event) {
     return false;
   }
 
-  const now = new Date().toISOString();
   const previousLemma = entry.lemma || "";
+  let nextEntry = { ...entry };
 
   if (partialEditSection === "basic") {
     const lemma = body.querySelector('[data-field="lemma"]').value.trim();
     const tags = splitList(body.querySelector('[data-field="tags"]').value);
-    const nextEntry = {
+    nextEntry = {
       ...entry,
       lemma,
       pronunciation: body.querySelector('[data-field="pronunciation"]').value.trim(),
@@ -9422,9 +9467,6 @@ async function savePartialEdit(event) {
       showToast(message);
       return false;
     }
-    entry.lemma = nextEntry.lemma;
-    entry.pronunciation = nextEntry.pronunciation;
-    entry.tags = nextEntry.tags;
   } else if (partialEditSection === "definitions") {
     const definitions = collectPartialDefinitions();
     const message = entryDefinitionsRequirementMessage({ ...entry, definitions }, dictionary);
@@ -9432,31 +9474,46 @@ async function savePartialEdit(event) {
       showToast(message);
       return false;
     }
-    entry.definitions = definitions;
+    nextEntry = { ...entry, definitions };
   } else if (partialEditSection === "etymology") {
-    entry.etymology = {
-      sources: splitSourceText(body.querySelector('[data-field="sources"]').value),
-      description: body.querySelector('[data-field="description"]').value.trim(),
+    nextEntry = {
+      ...entry,
+      etymology: {
+        sources: splitSourceText(body.querySelector('[data-field="sources"]').value),
+        description: body.querySelector('[data-field="description"]').value.trim(),
+      },
     };
   } else if (partialEditSection === "notes") {
-    entry.notes = body.querySelector('[data-field="notes"]').value.trim();
+    nextEntry = { ...entry, notes: body.querySelector('[data-field="notes"]').value.trim() };
   } else if (partialEditSection === "morphology") {
-    entry.morphology = {
-      tableId: body.querySelector('[data-field="morphologyTable"]').value || "auto",
-      overrides: collectPartialMorphologyOverrides(),
+    nextEntry = {
+      ...entry,
+      morphology: {
+        tableId: body.querySelector('[data-field="morphologyTable"]').value || "auto",
+        overrides: collectPartialMorphologyOverrides(),
+      },
     };
   }
 
-  entry.updatedAt = now;
-  dictionary.updatedAt = now;
-  const shouldScrollAfterSave = partialEditSection === "basic" && previousLemma !== entry.lemma;
-  await persistDictionary(dictionary);
-  cancelPartialEdit();
-  if (shouldScrollAfterSave) {
-    scheduleEntryCardScroll(entry.id, prepareRootModeEntryNavigation(entry.id));
+  const shouldScrollAfterSave = partialEditSection === "basic" && previousLemma !== nextEntry.lemma;
+  try {
+    const savedEntry = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entry.id)}`, {
+      method: "PUT",
+      body: JSON.stringify(nextEntry),
+    });
+    state.selectedEntryId = savedEntry.id;
+    cancelPartialEdit();
+    await refreshState();
+    if (shouldScrollAfterSave) {
+      scheduleEntryCardScroll(savedEntry.id, prepareRootModeEntryNavigation(savedEntry.id));
+    }
+    showToast(t("savedEntry"));
+    return true;
+  } catch (error) {
+    showToast(t("saveFailed"));
+    console.error(error);
+    return false;
   }
-  showToast(t("savedEntry"));
-  return true;
 }
 
 function partialEditBody() {
@@ -9596,22 +9653,30 @@ async function saveEntry(event) {
     return false;
   }
 
-  if (existing) {
-    Object.assign(existing, entry);
-  } else {
-    dictionary.entries.push(entry);
+  try {
+    const savedEntry = await api(
+      wasNewEntry
+        ? `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`
+        : `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entry.id)}`,
+      {
+        method: wasNewEntry ? "POST" : "PUT",
+        body: JSON.stringify(entry),
+      },
+    );
+    state.selectedEntryId = savedEntry.id;
+    entryDraft = null;
+    editorMode = "display";
+    await refreshState();
+    if (wasNewEntry || previousLemma !== savedEntry.lemma) {
+      scheduleEntryCardScroll(savedEntry.id, prepareRootModeEntryNavigation(savedEntry.id));
+    }
+    showToast(t("savedEntry"));
+    return true;
+  } catch (error) {
+    showToast(t("saveFailed"));
+    console.error(error);
+    return false;
   }
-
-  dictionary.updatedAt = now;
-  state.selectedEntryId = entry.id;
-  entryDraft = null;
-  editorMode = "display";
-  await persistDictionary(dictionary);
-  if (wasNewEntry || previousLemma !== entry.lemma) {
-    scheduleEntryCardScroll(entry.id, prepareRootModeEntryNavigation(entry.id));
-  }
-  showToast(t("savedEntry"));
-  return true;
 }
 
 async function deleteSelectedEntry() {
@@ -9630,18 +9695,25 @@ async function deleteEntryById(entryId) {
     return false;
   }
 
-  dictionary.entries = dictionary.entries.filter((item) => item.id !== entry.id);
-  dictionary.updatedAt = new Date().toISOString();
-  if (state.selectedEntryId === entry.id || !dictionary.entries.some((item) => item.id === state.selectedEntryId)) {
-    state.selectedEntryId = firstLemmaEntry(dictionary)?.id || "";
-    editorMode = "display";
-    entryDraft = null;
-    cancelPartialEdit();
+  const nextEntries = dictionary.entries.filter((item) => item.id !== entry.id);
+  try {
+    await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entry.id)}`, {
+      method: "DELETE",
+    });
+    if (state.selectedEntryId === entry.id || !nextEntries.some((item) => item.id === state.selectedEntryId)) {
+      state.selectedEntryId = firstLemmaEntry({ ...dictionary, entries: nextEntries })?.id || "";
+      editorMode = "display";
+      entryDraft = null;
+      cancelPartialEdit();
+    }
+    await refreshState();
+    showToast(t("deletedEntry"));
+    return true;
+  } catch (error) {
+    showToast(t("saveFailed"));
+    console.error(error);
+    return false;
   }
-  await persistDictionary(dictionary);
-  render();
-  showToast(t("deletedEntry"));
-  return true;
 }
 
 async function prepareNewDictionary() {
@@ -9671,15 +9743,9 @@ async function saveDictionary(event) {
 
   try {
     if (dictionaryId) {
-      const existing = selectedDictionaryConfig();
-      const updated = {
-        ...existing,
-        ...payload,
-        updatedAt: new Date().toISOString(),
-      };
-      await api(`/api/dictionaries/${encodeURIComponent(dictionaryId)}`, {
+      await api(`/api/dictionaries/${encodeURIComponent(dictionaryId)}/meta`, {
         method: "PUT",
-        body: JSON.stringify(updated),
+        body: JSON.stringify(payload),
       });
       state.selectedDictionaryConfigId = dictionaryId;
       showToast(t("dictionarySaved"));
@@ -9704,42 +9770,13 @@ async function saveDictionary(event) {
   }
 }
 
-async function persistDictionary(dictionary) {
-  try {
-    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}`, {
-      method: "PUT",
-      body: JSON.stringify(dictionary),
-    });
-    await refreshState();
-    return saved;
-  } catch (error) {
-    showToast(t("saveFailed"));
-    console.error(error);
-    throw error;
+function replaceDictionaryInState(saved) {
+  const normalized = normalizeDictionary(saved);
+  const dictionaryIndex = state.dictionaries.findIndex((dictionary) => dictionary.id === normalized.id);
+  if (dictionaryIndex >= 0) {
+    state.dictionaries[dictionaryIndex] = normalized;
   }
-}
-
-async function persistDictionaryPatch(dictionaryId, patch, { refresh = true } = {}) {
-  try {
-    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionaryId)}`, {
-      method: "PUT",
-      body: JSON.stringify(patch),
-    });
-    if (refresh) {
-      await refreshState();
-      return saved;
-    }
-    const normalized = normalizeDictionary(saved);
-    const dictionaryIndex = state.dictionaries.findIndex((dictionary) => dictionary.id === dictionaryId);
-    if (dictionaryIndex >= 0) {
-      state.dictionaries[dictionaryIndex] = normalized;
-    }
-    return normalized;
-  } catch (error) {
-    showToast(t("saveFailed"));
-    console.error(error);
-    throw error;
-  }
+  return normalized;
 }
 
 async function activateDictionary(dictionaryId) {
@@ -10048,8 +10085,8 @@ function flushAutomaticModuleSaves() {
   if (queued) {
     return;
   }
-  fetch(`/api/dictionaries/${encodeURIComponent(dictionary.id)}`, {
-    method: "PUT",
+  fetch(autosavePath, {
+    method: "POST",
     headers: { "Content-Type": "application/json" },
     body: payload,
     keepalive: true,
