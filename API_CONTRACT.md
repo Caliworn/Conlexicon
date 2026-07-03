@@ -1,0 +1,125 @@
+# API Contract
+
+本文记录 Conlexicon 当前本地 HTTP API 的稳定约定。它描述前端可依赖的接口边界，而不是底层存储实现；后端目前使用 JSON repository，后续可替换或补充 SQLite repository，但前端不应直接依赖文件结构。
+
+## 通用约定
+
+- 所有业务 API 位于 `/api/` 下。
+- 请求体和成功响应默认使用 JSON。
+- 失败响应使用结构化错误：
+
+```json
+{
+  "error": {
+    "code": "duplicate_entity_ids",
+    "message": "Duplicate dictionary entity IDs: ...",
+    "details": {}
+  }
+}
+```
+
+- `code` 是前端本地化和分流处理的稳定字段。
+- `message` 保留技术信息，主要用于控制台、诊断和未来错误详情页；普通 toast 不应直接依赖英文 `message`。
+- `details` 可选，当前主要用于重复 ID 和不支持字段等调试信息；暂不承诺前端展示形态。
+- 前端应继续在控制台保留原始错误对象，toast 只显示本地化短信息。
+
+## 当前端点
+
+### 应用状态与全局偏好
+
+| 方法 | 路径 | 用途 | 响应 | 备注 |
+| --- | --- | --- | --- | --- |
+| `GET` | `/api/state` | 读取应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme }` | 当前仍返回完整词典数组；这是启动兼容入口，不代表普通保存也应使用完整快照。 |
+| `PUT` | `/api/preferences` | 保存全局界面偏好 | `{ uiLanguage, uiTheme }` | 目前支持 `uiLanguage` 和 `uiTheme`。 |
+
+### 导入、导出与词典生命周期
+
+| 方法 | 路径 | 用途 | 响应 | 备注 |
+| --- | --- | --- | --- | --- |
+| `GET` | `/api/export?dictionaryId=` | 导出 JSON | 完整词典 JSON | 完整快照交换格式。 |
+| `POST` | `/api/import?overwrite=&regenerateId=` | 导入 JSON | 应用状态 | 完整快照导入；执行全量规范化和实体 ID 检查。 |
+| `POST` | `/api/dictionaries` | 新建词典 | 完整词典 JSON | 创建空词典，并设为当前词典。 |
+| `POST` | `/api/dictionaries/:id/activate` | 切换当前词典 | 应用状态 | 只改 `index.json` 中的当前词典。 |
+| `DELETE` | `/api/dictionaries/:id` | 删除词典 | 应用状态 | 删除词典文件并更新索引。 |
+
+### 完整快照兼容层
+
+| 方法 | 路径 | 用途 | 响应 | 使用限制 |
+| --- | --- | --- | --- | --- |
+| `PUT` | `/api/dictionaries/:id` | 保存完整词典快照 | 完整词典 JSON | 兼容层和低频管理入口。普通运行期保存不应走这里；不要在此端点上叠加复杂冲突合并逻辑。 |
+
+### 词典元数据与模块级保存
+
+| 方法 | 路径 | 用途 | 响应 | 校验范围 |
+| --- | --- | --- | --- | --- |
+| `PUT` | `/api/dictionaries/:id/meta` | 保存词典名称、语言、描述 | 完整词典 JSON | 不做实体 ID 检查。 |
+| `PUT` | `/api/dictionaries/:id/settings` | 保存其他设置 | 完整词典 JSON | 不做实体 ID 检查；会保留既有 IPA 设置。 |
+| `PUT` | `/api/dictionaries/:id/docs` | 保存语言文档 | 完整词典 JSON | 不做实体 ID 检查。 |
+| `PUT` | `/api/dictionaries/:id/corpus` | 保存语料库模块 | 完整词典 JSON | 检查语料范围内实体 ID 冲突。 |
+| `PUT` | `/api/dictionaries/:id/morphology` | 保存自动形态学模块 | 完整词典 JSON | 检查形态表实体 ID 冲突。 |
+| `PUT` | `/api/dictionaries/:id/settings/ipa` | 保存自动 IPA 设置 | 完整词典 JSON | 检查 IPA 规则和重音规则实体 ID 冲突。 |
+| `POST` | `/api/dictionaries/:id/autosave` | 页面卸载时保存文档/语料草稿 | 完整词典 JSON | 当前只分发 `docs` 和 `corpus`；没有有效模块时返回词典快照。 |
+
+### 词条级保存
+
+| 方法 | 路径 | 用途 | 响应 | 校验范围 |
+| --- | --- | --- | --- | --- |
+| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | 词条数组 | 目前无分页；后续可扩展 query/cursor/limit。 |
+| `POST` | `/api/dictionaries/:id/entries` | 新建词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
+| `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
+| `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存单个词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
+| `DELETE` | `/api/dictionaries/:id/entries/:entryId` | 删除单个词条 | `{ id }` | 不因无关历史重复 ID 阻断删除。 |
+| `PATCH` | `/api/dictionaries/:id/entries` | 批量更新词条字段 | 完整词典 JSON | 当前仅允许 patch `tags` 和 `pronunciation`；可附带 `settings` 用于标签排序设置保存。 |
+
+## 实体 ID 校验约定
+
+- 完整快照保存、导入和迁移必须执行全量实体 ID 唯一性检查。
+- 增量保存只检查本次保存范围：
+  - 词条保存检查该词条及其释义等子对象。
+  - IPA 保存检查 IPA 映射规则和重音规则。
+  - 形态保存检查形态表。
+  - 语料保存检查语料块、层和单元。
+  - 元数据、普通设置和语言文档保存不应被无关历史重复 ID 阻断。
+- 跨类型重复仍然视为冲突；后续引入索引后也应保留跨类型比较。
+- 全量重复 ID 诊断和自动修复属于未来诊断/修复模块，不应混入普通保存路径。
+
+## 当前错误码
+
+| code | 含义 |
+| --- | --- |
+| `request_body_too_large` | 请求体超过当前限制。 |
+| `invalid_json_body` | 请求体不是合法 JSON。 |
+| `invalid_ui_language` | 全局界面语言值无效。 |
+| `invalid_ui_theme` | 全局主题值无效。 |
+| `invalid_import_payload` | 导入内容不是可识别词典。 |
+| `invalid_dictionary_id` | 词典 ID 格式无效。 |
+| `dictionary_not_found` | 词典不存在或已被删除。 |
+| `dictionary_id_exists` | 导入词典 ID 已存在且未确认覆盖。 |
+| `duplicate_entity_ids` | 完整词典存在重复实体 ID。 |
+| `duplicate_entity_ids_scoped` | 当前保存范围存在重复实体 ID。 |
+| `invalid_entry_payload` | 词条请求体格式无效。 |
+| `entry_id_exists` | 新建词条 ID 已存在。 |
+| `invalid_entry_updates_payload` | 批量词条更新请求格式无效。 |
+| `entry_not_found` | 词条不存在或已被删除。 |
+| `invalid_settings_payload` | 设置请求体格式无效。 |
+| `invalid_docs_payload` | 语言文档请求体格式无效。 |
+| `invalid_corpus_payload` | 语料请求体格式无效。 |
+| `invalid_morphology_payload` | 形态学请求体格式无效。 |
+| `invalid_ipa_settings_payload` | IPA 设置请求体格式无效。 |
+| `unsupported_entry_patch_fields` | 批量词条 patch 包含不支持字段。 |
+| `entry_patch_tags_invalid` | 批量标签 patch 值不是数组。 |
+| `entry_patch_pronunciation_invalid` | 批量 IPA patch 值不是字符串。 |
+| `system_file_permission` | 文件权限不足。 |
+| `system_disk_full` | 磁盘空间不足。 |
+| `system_file_busy` | 文件被占用。 |
+| `system_file_missing` | 目标文件缺失。 |
+| `system_json_parse` | 本地 JSON 文件无法解析。 |
+| `unknown_error` | 未归类错误。 |
+
+## 后续扩展原则
+
+- 普通保存优先增加细粒度端点，不再回退到完整词典 PUT。
+- `GET /api/state` 可以继续作为启动兼容入口；若启动性能成为瓶颈，再拆成词典索引、当前词典摘要和按需模块读取。
+- 语料库下一步可从整份 corpus 模块保存拆成块、层、单元级 changeset。
+- 搜索、筛选、词源反查和数据分析后续应依赖 repository 查询/索引，不应让前端扫描大型完整快照。
+- 短期不引入词典级 revision。等对象级增量端点稳定后，再基于目标对象 `updatedAt` 做轻量乐观锁。
