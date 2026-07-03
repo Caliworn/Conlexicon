@@ -64,12 +64,19 @@
 
 | 方法 | 路径 | 用途 | 响应 | 校验范围 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | 词条数组 | 目前无分页；后续可扩展 query/cursor/limit。 |
+| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | 无参数时为词条数组；带查询参数时为分页查询对象 | 支持 `q`、`part`、`tags`、`tagMode`、`source`、`derivedFrom`、`sort`、`cursor`、`limit`、`include`。 |
 | `POST` | `/api/dictionaries/:id/entries` | 新建词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
 | `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存单个词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
 | `DELETE` | `/api/dictionaries/:id/entries/:entryId` | 删除单个词条 | `{ id }` | 不因无关历史重复 ID 阻断删除。 |
 | `PATCH` | `/api/dictionaries/:id/entries` | 批量更新词条字段 | 完整词典 JSON | 当前仅允许 patch `tags` 和 `pronunciation`；可附带 `settings` 用于标签排序设置保存。 |
+
+### 读取侧查询
+
+| 方法 | 路径 | 用途 | 响应 | 备注 |
+| --- | --- | --- | --- | --- |
+| `GET` | `/api/dictionaries/:id/facets` | 读取词性和标签统计 | `{ parts, tags, noPartOfSpeechCount }` | 尊重当前词典的词性标签设置和标签显示替换。 |
+| `GET` | `/api/dictionaries/:id/entry-relations/:entryId` | 读取词源/衍生/同根关系 | `{ entryId, sources, derivedEntries, rootGroup }` | 同名 lemma 暂按排序后的第一条匹配，后续可由诊断模块报告歧义。 |
 
 ## 实体 ID 校验约定
 
@@ -123,3 +130,167 @@
 - 语料库下一步可从整份 corpus 模块保存拆成块、层、单元级 changeset。
 - 搜索、筛选、词源反查和数据分析后续应依赖 repository 查询/索引，不应让前端扫描大型完整快照。
 - 短期不引入词典级 revision。等对象级增量端点稳定后，再基于目标对象 `updatedAt` 做轻量乐观锁。
+
+## 计划中的读取 API
+
+阶段 B3 的目标是先建立查询契约，不急于替换全部前端调用。JSON repository 可以暂时用内存扫描实现；后续 SQLite repository 应在不改变前端契约的前提下用索引或 SQL 实现同样语义。
+
+### 启动与词典索引
+
+后续可将当前 `GET /api/state` 拆成轻量启动状态和词典索引：
+
+```text
+GET /api/app
+GET /api/dictionaries
+GET /api/dictionaries/:id/summary
+GET /api/dictionaries/:id/settings
+```
+
+示例：
+
+```js
+GET /api/app
+{
+  activeDictionaryId,
+  uiLanguage,
+  uiTheme
+}
+```
+
+```js
+GET /api/dictionaries
+{
+  dictionaries: [
+    { id, name, language, description, entryCount, rootCount, updatedAt }
+  ]
+}
+```
+
+### 词条列表查询
+
+`GET /api/dictionaries/:id/entries` 保持无参数时返回完整词条数组的兼容行为。带查询参数时返回分页查询对象：
+
+```text
+GET /api/dictionaries/:id/entries?q=&part=&tags=&tagMode=&sort=&source=&derivedFrom=&cursor=&limit=&include=
+```
+
+参数约定：
+
+- `q`：匹配词形、发音、标签、显示替换标签、释义、例句、备注、词源描述和词条备注。
+- `part`：词性筛选；特殊值 `__conlexicon_no_part__` 表示无词性。
+- `tags`：逗号分隔的原始标签列表。
+- `tagMode`：`any` 或 `all`，默认 `any`。
+- `sort`：`lemmaAsc`、`lemmaDesc`、`updatedAsc`、`updatedDesc`、`createdAsc`、`createdDesc`。
+- `source`：筛选具有指定来源文本的词条。
+- `derivedFrom`：筛选从指定词条 ID 或 lemma 派生的词条。
+- `cursor`：不透明分页游标，前端不得解析。
+- `limit`：分页大小，后端可设置上限。
+- `include`：`summary` 或 `full`，默认 `summary`。
+
+返回：
+
+```js
+{
+  items: [
+    {
+      id,
+      lemma,
+      pronunciation,
+      tags,
+      definitionPreview,
+      createdAt,
+      updatedAt,
+      partOfSpeech,
+      parts
+    }
+  ],
+  pageInfo: {
+    nextCursor,
+    hasMore,
+    total
+  }
+}
+```
+
+### 词条 facets
+
+```text
+GET /api/dictionaries/:id/facets
+```
+
+返回当前词典设置语义下的词性和标签统计：
+
+```js
+{
+  parts: [
+    { tag, displayLabel, count }
+  ],
+  tags: [
+    { tag, displayLabel, count, isPartOfSpeech }
+  ],
+  noPartOfSpeechCount
+}
+```
+
+该接口必须尊重：
+
+- 手动词性标签开关；
+- 手动词性标签列表；
+- 标签显示替换；
+- 原始标签显示设置不改变统计键，但可影响前端展示策略。
+
+### 词源与词根关系
+
+```text
+GET /api/dictionaries/:id/entry-relations/:entryId
+```
+
+返回当前词条的来源匹配、衍生词和同根组：
+
+```js
+{
+  entryId,
+  sources: [
+    { sourceText, matchedEntryId, matchedLemma }
+  ],
+  derivedEntries: [
+    { id, lemma, pronunciation, tags, definitionPreview, createdAt, updatedAt }
+  ],
+  rootGroup: {
+    rootKey,
+    entries: [
+      { id, lemma, pronunciation, tags, definitionPreview, createdAt, updatedAt }
+    ]
+  }
+}
+```
+
+`matchedEntryId` 应由 repository 明确解析；如果同名 lemma 存在多条，当前阶段可选择排序后的第一条并在后续诊断模块中报告歧义。
+
+### 语料库读取
+
+语料库读取后续再拆：
+
+```text
+GET /api/dictionaries/:id/corpus/blocks
+GET /api/dictionaries/:id/corpus/blocks/:blockId
+GET /api/dictionaries/:id/corpus/units?q=&blockId=&layerId=&orphan=&cursor=&limit=
+GET /api/dictionaries/:id/corpus/units/:unitId
+```
+
+语料保存下一步可从整份 corpus 模块保存拆成块、层、单元级 changeset。
+
+### 数据分析按需 summary
+
+数据分析后续避免一次生成全量报告，逐步拆成：
+
+```text
+GET /api/dictionaries/:id/analysis/overview
+GET /api/dictionaries/:id/analysis/tags
+GET /api/dictionaries/:id/analysis/quality
+GET /api/dictionaries/:id/analysis/ipa
+GET /api/dictionaries/:id/analysis/morphology
+GET /api/dictionaries/:id/analysis/corpus
+```
+
+点击“在词条列表查看”时，应复用词条查询 filter spec，而不是向前端传递大量 entry IDs。

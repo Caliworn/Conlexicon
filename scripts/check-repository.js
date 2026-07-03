@@ -285,6 +285,7 @@ async function checkJsonRepository() {
     assert.equal(updated.name, "First Updated");
     assert.equal(updated.entries[0].tags[0], "n");
     assert.equal(updated.entries[0].definitions[0].meaning, "root meaning");
+    const rootEntryId = updated.entries[0].id;
 
     const savedWithNewEntry = await repository.saveEntry(first.id, { lemma: "new entry", definitions: [{ meaning: "new" }] });
     assert.equal(savedWithNewEntry.entries.length, 2);
@@ -315,6 +316,47 @@ async function checkJsonRepository() {
     });
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.lemma, "api entry updated");
+
+    apiResult = await callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(first.id)}/entries`, {
+      lemma: "derived smoke",
+      pronunciation: "/derived/",
+      tags: ["v", "derived"],
+      definitions: [{ meaning: "derived from root" }],
+      etymology: { sources: ["root"], description: "" },
+    });
+    assert.equal(apiResult.statusCode, 201);
+    const derivedEntryId = apiResult.body.id;
+
+    apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entries?q=derived&include=summary`);
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.items.length, 1);
+    assert.equal(apiResult.body.items[0].lemma, "derived smoke");
+    assert.equal(apiResult.body.items[0].definitionPreview, "derived from root");
+
+    apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entries?part=v&tags=derived&tagMode=all&limit=1`);
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.items.length, 1);
+    assert.equal(apiResult.body.pageInfo.total, 1);
+
+    apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entries?limit=2&sort=lemmaAsc`);
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.items.length, 2);
+    assert.equal(apiResult.body.pageInfo.hasMore, true);
+    assert.ok(apiResult.body.pageInfo.nextCursor);
+
+    apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/facets`);
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.parts.some((part) => part.tag === "n"), true);
+    assert.equal(apiResult.body.parts.some((part) => part.tag === "v"), true);
+    assert.equal(apiResult.body.tags.some((tag) => tag.tag === "derived" && tag.count === 1), true);
+
+    apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entry-relations/${encodeURIComponent(rootEntryId)}`);
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.derivedEntries.some((entry) => entry.id === derivedEntryId), true);
+
+    apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entry-relations/${encodeURIComponent(derivedEntryId)}`);
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.sources[0].matchedEntryId, rootEntryId);
 
     apiResult = await callApi(repository, "DELETE", `/api/dictionaries/${encodeURIComponent(first.id)}/entries/${encodeURIComponent(apiEntryId)}`);
     assert.equal(apiResult.statusCode, 200);
