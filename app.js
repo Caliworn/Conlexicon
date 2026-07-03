@@ -102,6 +102,8 @@ let entryFacetsState = {
   error: null,
   requestId: 0,
 };
+const lexicalNetworkRelationsCache = new Map();
+let lexicalNetworkRelationsRequestId = 0;
 let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
 let draggedToolNavView = "";
@@ -4245,7 +4247,7 @@ function advancedFilterDisplayTitle() {
   }
   if (advancedFilter.meta?.type === "quality" && dictionary) {
     const action = qualityIssueFilterAction(
-      buildDictionaryAnalysis(dictionary),
+      buildDictionaryAnalysis(dictionary, { includeQuality: true }),
       advancedFilter.meta.group,
       advancedFilter.meta.activeKey,
       { allowEmptyActive: true },
@@ -4389,7 +4391,7 @@ function rebuildAdvancedFilterAction(options = {}) {
   const allowEmptyActive = Boolean(options.allowEmptyActive);
   if (advancedFilter.meta?.type === "quality") {
     return qualityIssueFilterAction(
-      buildDictionaryAnalysis(dictionary),
+      buildDictionaryAnalysis(dictionary, { includeQuality: true }),
       advancedFilter.meta.group,
       advancedFilter.meta.activeKey,
       { allowEmptyActive },
@@ -4958,15 +4960,96 @@ function renderLexicalNetwork() {
 
   networkEntryId = entry.id;
   elements.networkTitle.textContent = entry.lemma;
-  const sources = (entry.etymology?.sources || [])
-    .map((source) => resolveSourceEntry(source, dictionary))
-    .filter(Boolean);
-  const derived = findDerivedEntries(entry, dictionary);
+  const relation = lexicalNetworkRelationForEntry(dictionary, entry);
+  const sources = relation.sources;
+  const derived = relation.derivedEntries;
 
   renderNetworkNodeList(elements.networkSources, sources);
   renderNetworkNodeList(elements.networkDerived, derived);
   elements.networkFocus.innerHTML = "";
   elements.networkFocus.append(createNetworkNode(entry, true));
+}
+
+function lexicalNetworkRelationKey(dictionary, entryId) {
+  return [
+    dictionary?.id || "",
+    entryId || "",
+    stableJson((dictionary?.entries || []).map((entry) => ({
+      id: entry.id,
+      lemma: entry.lemma,
+      pronunciation: entry.pronunciation,
+      tags: entry.tags || [],
+      definitions: (entry.definitions || []).map((definition) => ({
+        id: definition.id,
+        meaning: definition.meaning,
+      })),
+      etymology: {
+        sources: entry.etymology?.sources || [],
+      },
+      updatedAt: entry.updatedAt,
+    }))),
+  ].join("|");
+}
+
+function lexicalNetworkRelationForEntry(dictionary, entry) {
+  const fallback = localLexicalNetworkRelation(entry, dictionary);
+  if (!backendAvailable || !dictionary?.id || !entry?.id) {
+    return fallback;
+  }
+
+  const key = lexicalNetworkRelationKey(dictionary, entry.id);
+  const cached = lexicalNetworkRelationsCache.get(key);
+  if (cached?.status === "success") {
+    return apiLexicalNetworkRelation(cached.relation, dictionary, fallback);
+  }
+  if (!cached || cached.status === "error") {
+    fetchLexicalNetworkRelation(dictionary, entry, key);
+  }
+  return fallback;
+}
+
+function localLexicalNetworkRelation(entry, dictionary = activeDictionary()) {
+  return {
+    sources: (entry.etymology?.sources || [])
+      .map((source) => resolveSourceEntry(source, dictionary))
+      .filter(Boolean),
+    derivedEntries: findDerivedEntries(entry, dictionary),
+  };
+}
+
+function apiLexicalNetworkRelation(relation, dictionary, fallback) {
+  const byId = new Map((dictionary?.entries || []).map((entry) => [entry.id, entry]));
+  return {
+    sources: (relation.sources || [])
+      .map((source) => byId.get(source.matchedEntryId))
+      .filter(Boolean),
+    derivedEntries: (relation.derivedEntries || [])
+      .map((entry) => byId.get(entry.id) || entry)
+      .filter(Boolean),
+    rootGroup: relation.rootGroup || fallback.rootGroup || null,
+  };
+}
+
+function fetchLexicalNetworkRelation(dictionary, entry, key) {
+  const requestId = lexicalNetworkRelationsRequestId += 1;
+  lexicalNetworkRelationsCache.set(key, { status: "loading", relation: null, error: null });
+  api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entry-relations/${encodeURIComponent(entry.id)}`)
+    .then((relation) => {
+      lexicalNetworkRelationsCache.set(key, { status: "success", relation, error: null });
+      if (!networkOpen || networkEntryId !== entry.id || lexicalNetworkRelationKey(activeDictionary(), entry.id) !== key) {
+        return;
+      }
+      renderLexicalNetwork();
+    })
+    .catch((error) => {
+      lexicalNetworkRelationsCache.set(key, { status: "error", relation: null, error });
+      console.warn("Lexical network API unavailable; using local relation fallback.", error);
+    })
+    .finally(() => {
+      if (requestId < lexicalNetworkRelationsRequestId - 20) {
+        lexicalNetworkRelationsCache.clear();
+      }
+    });
 }
 
 function renderNetworkNodeList(container, entries) {
@@ -5001,6 +5084,9 @@ function createNetworkNode(entry, isFocus = false) {
 
 function renderNetworkMeaningHtml(entry, showPolysemy = false) {
   const meanings = entryDefinitionMeanings(entry);
+  if (!meanings.length && entry.definitionPreview) {
+    return `<div class="network-definition-list"><p>${escapeHtml(entry.definitionPreview)}</p></div>`;
+  }
   if (!meanings.length) {
     return "";
   }
@@ -5189,7 +5275,7 @@ function renderQuality(dictionary = activeDictionary()) {
 
   analysisFilterRegistry.clear();
   analysisFilterCounter = 0;
-  const report = buildDictionaryAnalysis(dictionary);
+  const report = buildDictionaryAnalysis(dictionary, { includeQuality: true });
   elements.qualityPanel.innerHTML = renderQualityPage(report);
   setupQualityMasonryLayouts();
 }
@@ -5339,9 +5425,6 @@ function analysisPageBody(report, page, subpage) {
 }
 
 function renderAnalysisOverview(report) {
-  const issueEntries = qualityIssuesWithEntries(report.issues);
-  const highIssues = issueEntries.filter((issue) => issue.severity === "high");
-  const highIssueEntryIds = entryIdsFrom(highIssues.map((issue) => issue.entryId));
   return `
     <section class="analysis-grid analysis-summary-grid">
       ${analysisMetricCard(aText("词条", "Entries"), report.entries.length, `${report.rootCount} ${aText("个词根", "roots")}`, viewAction("editor"))}
@@ -5349,7 +5432,6 @@ function renderAnalysisOverview(report) {
       ${analysisMetricCard(aText("释义覆盖", "Definition Coverage"), percentText(report.coverage.definitions), `${report.definitionCount} ${aText("条释义", "definitions")}`, advancedFilterAction(aText("有释义", "Has definitions"), report.definitionEntryIds, { variants: [{ title: aText("无释义", "No definitions"), entryIds: report.noDefinitionEntryIds }] }))}
       ${analysisMetricCard("IPA", percentText(report.coverage.ipa), `${report.ipa.syllableAverage} ${aText("平均音节", "avg syllables")}`, advancedFilterAction(aText("有 IPA", "Has IPA"), report.ipaEntryIds, { variants: [{ title: aText("无 IPA", "No IPA"), entryIds: report.noIpaEntryIds }] }))}
       ${analysisMetricCard(aText("形态学", "Morphology"), percentText(report.coverage.morphology), `${report.morphology.generatedForms} ${aText("个生成形式", "generated forms")}`, advancedFilterAction(aText("有形态表格", "Has morphology table"), report.morphologyEntryIds, { variants: [{ title: aText("无形态表格", "No morphology table"), entryIds: report.noMorphologyEntryIds }] }))}
-      ${analysisMetricCard(aText("质量问题", "Quality Issues"), report.issues.length, `${highIssueEntryIds.length} ${aText("个高优先级", "high priority")}`, viewAction("quality"))}
     </section>
     <section class="analysis-grid">
       ${analysisCard(aText("词性分布", "Part of Speech"), analysisBarList(report.parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") }))}
@@ -5626,8 +5708,9 @@ function analysisIpaMismatchRows(report) {
   ];
 }
 
-function buildDictionaryAnalysis(dictionary) {
+function buildDictionaryAnalysis(dictionary, options = {}) {
   const entries = dictionary.entries || [];
+  const includeQuality = Boolean(options.includeQuality);
   const total = entries.length || 1;
   const rootGroups = rootModeGroups(dictionary, { query: "" });
   const derivedEntries = entries.filter(entryHasSources);
@@ -5728,10 +5811,12 @@ function buildDictionaryAnalysis(dictionary) {
     }
   });
 
-  const qualityReport = qualityModel.buildQualityReport(dictionary, {
-    text: aText,
-    normalizeText: normalize,
-  });
+  const qualityReport = includeQuality
+    ? qualityModel.buildQualityReport(dictionary, {
+      text: aText,
+      normalizeText: normalize,
+    })
+    : { issues: [], networkIssues: [] };
   const issues = qualityReport.issues;
   const networkIssues = qualityReport.networkIssues;
 
@@ -5830,7 +5915,7 @@ function buildDictionaryAnalysis(dictionary) {
     searchMatches: searchMatchEntries.length,
     searchMatchEntryIds: searchMatchEntries.map((entry) => entry.id),
     searchFields: analyzeSearchFields(entries, dictionary),
-    networkIssues: networkIssues.length ? networkIssues : [{
+    networkIssues: includeQuality && networkIssues.length ? networkIssues : [{
       severity: "ok",
       title: aText("未发现词源网络问题", "No etymology network issues found"),
       detail: `${derivedEntries.length} ${aText("个衍生词", "derived entries")} / ${multiSourceCount} ${aText("个多来源词条", "multi-source entries")}`,
