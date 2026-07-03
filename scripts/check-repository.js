@@ -15,6 +15,21 @@ const {
 } = require("../lib/dictionary-model");
 const { createApiRouter } = require("../lib/api-routes");
 const { JsonDictionaryRepository } = require("../lib/json-dictionary-repository");
+const { morphologySearchStrings } = require("../lib/morphology-model");
+const ipaModel = require("../lib/ipa-model");
+const tagModel = require("../lib/tag-model");
+
+const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
+const ENTRY_SEARCH_FIELDS = new Set([
+  "lemma",
+  "pronunciation",
+  "tags",
+  "definitions",
+  "examples",
+  "notes",
+  "etymology",
+  "morphology",
+]);
 
 function createRepository(dataDir) {
   return new JsonDictionaryRepository({
@@ -88,7 +103,191 @@ async function callApi(repository, method, urlPath, body) {
   };
 }
 
+function testNormalize(value) {
+  return String(value || "").trim().toLocaleLowerCase("zh-CN");
+}
+
+function testDisplayTag(tag, dictionary = {}) {
+  const value = String(tag || "");
+  return dictionary.settings?.tagDisplayMap?.[value] || value;
+}
+
+function testEntryParts(entry = {}, dictionary = {}) {
+  const tags = Array.isArray(entry.tags) ? entry.tags : [];
+  if (!tags.length) {
+    return [];
+  }
+  const settings = dictionary.settings || {};
+  if (!settings.manualPartOfSpeechTags) {
+    return tags[0] ? [tags[0]] : [];
+  }
+  const configuredParts = new Set((settings.partOfSpeechTags || []).map(testNormalize));
+  if (!configuredParts.size) {
+    return [];
+  }
+  return tags.filter((tag) => configuredParts.has(testNormalize(tag)));
+}
+
+function testEntryMatches(entry, dictionary, query = {}) {
+  const parts = testEntryParts(entry, dictionary);
+  const matchesPart = !query.part
+    || (query.part === NO_PART_FILTER_VALUE
+      ? !parts.length
+      : parts.includes(query.part));
+  if (!matchesPart) {
+    return false;
+  }
+  const normalizedQuery = testNormalize(query.q);
+  if (!normalizedQuery) {
+    return true;
+  }
+  const fields = testSearchFields(query.fields || query.searchFields);
+  const values = [];
+  if (fields.has("lemma")) {
+    values.push(entry.lemma);
+  }
+  if (fields.has("pronunciation")) {
+    values.push(entry.pronunciation);
+  }
+  if (fields.has("tags")) {
+    values.push(
+      ...parts,
+      ...parts.map((part) => testDisplayTag(part, dictionary)),
+      ...(entry.tags || []),
+      ...(entry.tags || []).map((tag) => testDisplayTag(tag, dictionary)),
+    );
+  }
+  if (fields.has("definitions")) {
+    values.push(...(entry.definitions || []).map((definition) => definition.meaning));
+  }
+  if (fields.has("examples")) {
+    values.push(...(entry.definitions || []).map((definition) => definition.example));
+  }
+  if (fields.has("notes")) {
+    values.push(entry.notes, ...(entry.definitions || []).map((definition) => definition.note));
+  }
+  if (fields.has("etymology")) {
+    values.push(entry.etymology?.description, ...(entry.etymology?.sources || []));
+  }
+  if (fields.has("morphology")) {
+    values.push(...morphologySearchStrings(entry, dictionary));
+  }
+  return values.map(testNormalize).join(" ").includes(normalizedQuery);
+}
+
+function testSearchFields(value) {
+  const fields = String(value || "")
+    .split(/[,，、\n]/)
+    .map((field) => field.trim().toLowerCase())
+    .filter((field) => ENTRY_SEARCH_FIELDS.has(field));
+  return fields.length ? new Set(fields) : new Set(ENTRY_SEARCH_FIELDS);
+}
+
+function testCompareEntries(sort = "lemmaAsc") {
+  return (a, b) => {
+    const lemmaCompare = String(a.lemma || "").localeCompare(String(b.lemma || ""), "zh-CN");
+    const dateCompare = (left, right) => {
+      const diff = new Date(left || 0).getTime() - new Date(right || 0).getTime();
+      return diff || lemmaCompare;
+    };
+    if (sort === "lemmaDesc") {
+      return -lemmaCompare;
+    }
+    if (sort === "updatedAsc") {
+      return dateCompare(a.updatedAt, b.updatedAt);
+    }
+    if (sort === "updatedDesc") {
+      return -dateCompare(a.updatedAt, b.updatedAt);
+    }
+    if (sort === "createdAsc") {
+      return dateCompare(a.createdAt, b.createdAt);
+    }
+    if (sort === "createdDesc") {
+      return -dateCompare(a.createdAt, b.createdAt);
+    }
+    return lemmaCompare;
+  };
+}
+
+function expectedEntryIds(dictionary, query = {}) {
+  return [...(dictionary.entries || [])]
+    .filter((entry) => testEntryMatches(entry, dictionary, query))
+    .sort(testCompareEntries(query.sort || "lemmaAsc"))
+    .map((entry) => entry.id);
+}
+
+function expectedParts(dictionary) {
+  return [...new Set((dictionary.entries || []).flatMap((entry) => testEntryParts(entry, dictionary)).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "zh-CN"));
+}
+
+function queryString(params = {}) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      query.set(key, String(value));
+    }
+  });
+  return query.toString();
+}
+
+async function apiEntryIds(repository, dictionaryId, params = {}) {
+  const qs = queryString({ ...params, limit: 100, include: "summary" });
+  const apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(dictionaryId)}/entries?${qs}`);
+  assert.equal(apiResult.statusCode, 200);
+  assert.equal(apiResult.body.pageInfo.hasMore, false);
+  return apiResult.body.items.map((entry) => entry.id);
+}
+
+async function assertEntryQueryConsistency(repository, dictionary, params = {}) {
+  assert.deepEqual(
+    await apiEntryIds(repository, dictionary.id, params),
+    expectedEntryIds(dictionary, params),
+    `entry query consistency: ${JSON.stringify(params)}`,
+  );
+}
+
 function checkModelNormalization() {
+  assert.deepEqual(tagModel.normalizeTagList("n，v,n\nadj"), ["n", "v", "adj"]);
+  assert.deepEqual(tagModel.normalizeRedHighlightTags("rare, archaic rare"), ["rare", "archaic"]);
+  assert.equal(tagModel.normalizeEntryListTagDisplayLimit(99), 10);
+  assert.deepEqual(
+    tagModel.entryParts(
+      { tags: ["topic", "n", "v"] },
+      { manualPartOfSpeechTags: true, partOfSpeechTags: ["n", "v"] },
+    ),
+    ["n", "v"],
+  );
+  assert.deepEqual(tagModel.entryParts({ tags: ["topic", "n"] }, { manualPartOfSpeechTags: false }), ["topic"]);
+  assert.equal(tagModel.displayTag("n", { tagDisplayMap: { n: "noun" } }), "noun");
+  assert.equal(ipaModel.normalizeIpaSettings({ stressMappings: [{ from: "a", to: "a" }] }).mappings[0].to, "ˈa");
+  assert.deepEqual(ipaModel.normalizeClusterList("t͡ʃ, t, t͡ʃ"), ["t͡ʃ", "t"]);
+  assert.equal(
+    ipaModel.generateIpaFromLemma("ata", {
+      mappings: [
+        { from: "a", to: "a" },
+        { from: "t", to: "t" },
+      ],
+      syllable: { vowels: "a", separator: ".", onsetClusters: "t" },
+      defaultStress: -2,
+      unstressMonosyllables: true,
+    }),
+    "/ˈa.ta/",
+  );
+  assert.equal(
+    ipaModel.generateIpaFromLemma("a", {
+      mappings: [{ from: "a", to: "a" }],
+      syllable: { vowels: "a", separator: "." },
+      defaultStress: -1,
+      unstressMonosyllables: true,
+    }),
+    "/a/",
+  );
+  assert.deepEqual(
+    ipaModel.tokenizePhonemeUnits("t͡ʃa", ["t͡ʃ"]).map((token) => token.value),
+    ["t͡ʃ", "a"],
+  );
+
   const normalized = normalizeDictionary({
     name: "Legacy",
     entries: [
@@ -244,6 +443,174 @@ function checkModelNormalization() {
   });
 }
 
+async function checkReadApiConsistency(repository) {
+  const previousState = await repository.readState();
+  const dictionary = await repository.createDictionary(normalizeDictionary({
+    id: "dict-read-api-consistency",
+    name: "Read API Consistency",
+    settings: {
+      manualPartOfSpeechTags: true,
+      partOfSpeechTags: ["n", "v", "adj"],
+      tagDisplayMap: {
+        n: "Noun Display",
+        v: "Verb Display",
+        motion: "Motion Display",
+      },
+    },
+    morphology: {
+      functions: { leftV: "a,e,i,o,u", rightV: "a,e,i,o,u" },
+      tables: [
+        {
+          id: "morph-n-table",
+          name: "N table",
+          rows: 1,
+          cols: 2,
+          matchTags: ["n"],
+          cells: {
+            "0,0": { value: "{lemma}-generated" },
+            "0,1": { value: "{a=o}" },
+          },
+        },
+      ],
+    },
+    entries: [
+      {
+        id: "entry-alpha",
+        lemma: "alpha",
+        pronunciation: "/alpha/",
+        tags: ["n", "motion"],
+        definitions: [{ id: "def-alpha", meaning: "mirror meaning", example: "alpha example", note: "alpha note" }],
+        etymology: { sources: ["root"], description: "source note" },
+        notes: "entry note",
+        morphology: { tableId: "auto", overrides: {} },
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-03T00:00:00.000Z",
+      },
+      {
+        id: "entry-beta",
+        lemma: "beta",
+        pronunciation: "/beta/",
+        tags: ["v", "n", "derived"],
+        definitions: [{ id: "def-beta", meaning: "movement" }],
+        morphology: { tableId: "morph-n-table", overrides: { "0,0": "manual-beta-form" } },
+        createdAt: "2026-01-02T00:00:00.000Z",
+        updatedAt: "2026-01-02T00:00:00.000Z",
+      },
+      {
+        id: "entry-gamma",
+        lemma: "gamma",
+        pronunciation: "/gamma/",
+        tags: ["topic"],
+        definitions: [{ id: "def-gamma", meaning: "topic only" }],
+        createdAt: "2026-01-03T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        id: "entry-delta",
+        lemma: "delta",
+        pronunciation: "",
+        tags: [],
+        definitions: [{ id: "def-delta", meaning: "untagged" }],
+        createdAt: "2026-01-04T00:00:00.000Z",
+        updatedAt: "2026-01-04T00:00:00.000Z",
+      },
+      {
+        id: "entry-same-a",
+        lemma: "same",
+        tags: ["adj"],
+        definitions: [{ id: "def-same-a", meaning: "first same lemma" }],
+        createdAt: "2026-01-05T00:00:00.000Z",
+        updatedAt: "2026-01-05T00:00:00.000Z",
+      },
+      {
+        id: "entry-same-b",
+        lemma: "same",
+        tags: ["adj"],
+        definitions: [{ id: "def-same-b", meaning: "second same lemma" }],
+        createdAt: "2026-01-06T00:00:00.000Z",
+        updatedAt: "2026-01-06T00:00:00.000Z",
+      },
+    ],
+  }));
+
+  try {
+    await assertEntryQueryConsistency(repository, dictionary, {});
+    await assertEntryQueryConsistency(repository, dictionary, { q: "mirror" });
+    await assertEntryQueryConsistency(repository, dictionary, { q: "Noun Display" });
+    await assertEntryQueryConsistency(repository, dictionary, { q: "source note" });
+    await assertEntryQueryConsistency(repository, dictionary, { q: "/beta/" });
+    await assertEntryQueryConsistency(repository, dictionary, { q: "alpha-generated" });
+    await assertEntryQueryConsistency(repository, dictionary, { q: "manual-beta-form" });
+    await assertEntryQueryConsistency(repository, dictionary, { q: "olpha" });
+    await assertEntryQueryConsistency(repository, dictionary, { q: "alpha-generated", fields: "morphology" });
+    await assertEntryQueryConsistency(repository, dictionary, { q: "alpha-generated", fields: "definitions" });
+    await assertEntryQueryConsistency(repository, dictionary, { q: "alpha example", fields: "examples" });
+    await assertEntryQueryConsistency(repository, dictionary, { q: "alpha example", fields: "notes" });
+    await assertEntryQueryConsistency(repository, dictionary, { part: "n" });
+    await assertEntryQueryConsistency(repository, dictionary, { part: "v" });
+    await assertEntryQueryConsistency(repository, dictionary, { part: "adj" });
+    await assertEntryQueryConsistency(repository, dictionary, { part: NO_PART_FILTER_VALUE });
+    await assertEntryQueryConsistency(repository, dictionary, { sort: "lemmaDesc" });
+    await assertEntryQueryConsistency(repository, dictionary, { sort: "updatedAsc" });
+    await assertEntryQueryConsistency(repository, dictionary, { sort: "updatedDesc" });
+    await assertEntryQueryConsistency(repository, dictionary, { sort: "createdAsc" });
+    await assertEntryQueryConsistency(repository, dictionary, { sort: "createdDesc" });
+
+    let apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/facets`);
+    assert.equal(apiResult.statusCode, 200);
+    assert.deepEqual(apiResult.body.parts.map((part) => part.tag), expectedParts(dictionary));
+    assert.equal(apiResult.body.parts.find((part) => part.tag === "n")?.displayLabel, "Noun Display");
+    assert.equal(apiResult.body.noPartOfSpeechCount, 2);
+
+    apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries?sort=lemmaAsc&limit=3`);
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.items.length, 3);
+    assert.equal(apiResult.body.pageInfo.hasMore, true);
+    assert.ok(apiResult.body.pageInfo.nextCursor);
+    const nextPage = await callApi(
+      repository,
+      "GET",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries?sort=lemmaAsc&limit=100&cursor=${encodeURIComponent(apiResult.body.pageInfo.nextCursor)}`,
+    );
+    assert.equal(nextPage.statusCode, 200);
+    assert.deepEqual(
+      [...apiResult.body.items, ...nextPage.body.items].map((entry) => entry.id),
+      expectedEntryIds(dictionary, { sort: "lemmaAsc" }),
+    );
+  } finally {
+    await repository.deleteDictionary(dictionary.id);
+    if (previousState.activeDictionaryId) {
+      await repository.activateDictionary(previousState.activeDictionaryId);
+    }
+  }
+
+  const defaultPartDictionary = await repository.createDictionary(normalizeDictionary({
+    id: "dict-read-api-default-part",
+    name: "Read API Default Part",
+    settings: {
+      manualPartOfSpeechTags: false,
+      tagDisplayMap: { topic: "Topic Display" },
+    },
+    entries: [
+      { id: "entry-topic-first", lemma: "topic first", tags: ["topic", "n"], definitions: [{ id: "def-topic", meaning: "topic" }] },
+      { id: "entry-n-first", lemma: "noun first", tags: ["n", "topic"], definitions: [{ id: "def-n", meaning: "noun" }] },
+    ],
+  }));
+
+  try {
+    await assertEntryQueryConsistency(repository, defaultPartDictionary, { part: "topic" });
+    let apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(defaultPartDictionary.id)}/facets`);
+    assert.equal(apiResult.statusCode, 200);
+    assert.deepEqual(apiResult.body.parts.map((part) => part.tag), expectedParts(defaultPartDictionary));
+    assert.equal(apiResult.body.parts.find((part) => part.tag === "topic")?.displayLabel, "Topic Display");
+  } finally {
+    await repository.deleteDictionary(defaultPartDictionary.id);
+    if (previousState.activeDictionaryId) {
+      await repository.activateDictionary(previousState.activeDictionaryId);
+    }
+  }
+}
+
 async function checkJsonRepository() {
   const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "conlexicon-repository-check-"));
   try {
@@ -357,6 +724,8 @@ async function checkJsonRepository() {
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entry-relations/${encodeURIComponent(derivedEntryId)}`);
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.sources[0].matchedEntryId, rootEntryId);
+
+    await checkReadApiConsistency(repository);
 
     apiResult = await callApi(repository, "DELETE", `/api/dictionaries/${encodeURIComponent(first.id)}/entries/${encodeURIComponent(apiEntryId)}`);
     assert.equal(apiResult.statusCode, 200);

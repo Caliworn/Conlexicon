@@ -28,13 +28,16 @@ const shellState = {
 let activeAppTooltipTarget = null;
 const desktopNavMediaQuery = window.matchMedia("(min-width: 800px)");
 const wideNavMediaQuery = window.matchMedia("(min-width: 1280px)");
-const IPA_STRESS_MARKER = "\uE000";
+const ipaModel = window.ConlexiconIpa;
+const IPA_STRESS_MARKER = ipaModel.IPA_STRESS_MARKER;
 const GLOSS_STYLE_KEYS = ["gla", "glb", "glc", "ft"];
 const DEFAULT_ENTRY_EXAMPLE_RENDER_PATTERN = "(\\gla)\n(\\glb)\n(\\glc)\n(\\ft)";
 const DEFAULT_ENTRY_LIST_TAG_DISPLAY_LIMIT = 3;
 const MIN_ENTRY_LIST_TAG_DISPLAY_LIMIT = 2;
 const MAX_ENTRY_LIST_TAG_DISPLAY_LIMIT = 10;
 const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
+const tagModel = window.ConlexiconTags;
+const morphologyModel = window.ConlexiconMorphology;
 let docsViewMode = "split";
 let docsSaveTimer = null;
 let corpusSaveTimer = null;
@@ -78,6 +81,21 @@ const corpusViewStates = new Map();
 let corpusDraftState = null;
 const DEFAULT_TOOL_NAV_ORDER = ["editor", "docs", "corpus", "analysis", "ipa", "morphology", "settings", "manager"];
 let advancedFilter = null;
+let entryQueryState = {
+  key: "",
+  status: "idle",
+  ids: [],
+  pageInfo: null,
+  error: null,
+  requestId: 0,
+};
+let entryFacetsState = {
+  key: "",
+  status: "idle",
+  parts: [],
+  error: null,
+  requestId: 0,
+};
 let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
 let draggedToolNavView = "";
@@ -1648,52 +1666,19 @@ function toolNavLabel(view) {
 }
 
 function normalizeTagDisplayMap(map = {}) {
-  if (!map || typeof map !== "object" || Array.isArray(map)) {
-    return {};
-  }
-  return Object.fromEntries(
-    Object.entries(map)
-      .map(([key, value]) => [String(key).trim(), String(value).trim()])
-      .filter(([key, value]) => key && value),
-  );
+  return tagModel.normalizeTagDisplayMap(map);
 }
 
 function normalizeRedHighlightTags(value) {
-  const items = Array.isArray(value)
-    ? value.map(String)
-    : String(value || "").split(/[\s,，、]+/);
-  const unique = [];
-  items
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .forEach((item) => {
-      if (!unique.includes(item)) {
-        unique.push(item);
-      }
-  });
-  return unique;
+  return tagModel.normalizeRedHighlightTags(value);
 }
 
 function normalizeTagList(value) {
-  const items = Array.isArray(value) ? value.map(String) : splitList(value);
-  const unique = [];
-  items
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .forEach((item) => {
-      if (!unique.includes(item)) {
-        unique.push(item);
-      }
-  });
-  return unique;
+  return tagModel.normalizeTagList(value);
 }
 
 function normalizeEntryListTagDisplayLimit(value) {
-  const number = Number.parseInt(value, 10);
-  if (!Number.isFinite(number)) {
-    return DEFAULT_ENTRY_LIST_TAG_DISPLAY_LIMIT;
-  }
-  return Math.min(MAX_ENTRY_LIST_TAG_DISPLAY_LIMIT, Math.max(MIN_ENTRY_LIST_TAG_DISPLAY_LIMIT, number));
+  return tagModel.normalizeEntryListTagDisplayLimit(value);
 }
 
 function entryListTagDisplayLimitInputIsValid() {
@@ -1838,161 +1823,71 @@ function normalizeCorpusUnitIds(unitIds = []) {
 }
 
 function normalizeMorphology(morphology = {}, usedIds = new Set()) {
-  return {
-    functions: normalizeMorphologyFunctions(morphology.functions),
-    tables: Array.isArray(morphology.tables) ? morphology.tables.map((table) => normalizeMorphologyTable(table, usedIds)) : [],
-  };
+  return morphologyModel.normalizeMorphology(morphology, {
+    usedIds,
+    reserveEntityId,
+    defaultTableName: t("morphologyTable"),
+  });
 }
 
 function normalizeMorphologyFunctions(functions = {}) {
-  return {
-    leftV: uniqueList(functions.leftV),
-    rightV: uniqueList(functions.rightV),
-  };
-}
-
-function uniqueList(value) {
-  const items = Array.isArray(value) ? value.map(String) : splitList(value);
-  const unique = [];
-  items
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .forEach((item) => {
-      if (!unique.includes(item)) {
-        unique.push(item);
-      }
-    });
-  return unique;
+  return morphologyModel.normalizeMorphologyFunctions(functions);
 }
 
 function normalizeMorphologyTable(table = {}, usedIds = new Set()) {
-  const rows = Math.max(1, Number.parseInt(table.rows, 10) || 2);
-  const cols = Math.max(1, Number.parseInt(table.cols, 10) || 2);
-  const rowLabels = Array.from({ length: rows }, (_, index) => String(table.rowLabels?.[index] || `${index + 1}`));
-  const colLabels = Array.from({ length: cols }, (_, index) => String(table.colLabels?.[index] || `${index + 1}`));
-  const cells = {};
-  for (let row = 0; row < rows; row += 1) {
-    for (let col = 0; col < cols; col += 1) {
-      const key = morphologyCellKey(row, col);
-      cells[key] = normalizeMorphologyCell(table.cells?.[key]);
-    }
-  }
-  return {
-    id: reserveEntityId(table.id, "morph", usedIds),
-    name: String(table.name || t("morphologyTable")),
-    rows,
-    cols,
-    rowLabels,
-    colLabels,
-    matchTags: splitList(Array.isArray(table.matchTags) ? table.matchTags.join("，") : table.matchTags || ""),
-    cells,
-  };
+  return morphologyModel.normalizeMorphologyTable(table, {
+    usedIds,
+    reserveEntityId,
+    defaultTableName: t("morphologyTable"),
+  });
 }
 
 function normalizeMorphologyCell(cell = {}) {
-  return {
-    mode: cell.mode === "replace" ? "replace" : "reference",
-    value: String(cell.value || ""),
-  };
+  return morphologyModel.normalizeMorphologyCell(cell);
 }
 
 function normalizeEntryMorphology(morphology = {}) {
-  return {
-    tableId: morphology.tableId || "auto",
-    overrides: normalizeMorphologyOverrides(morphology.overrides),
-  };
+  return morphologyModel.normalizeEntryMorphology(morphology);
 }
 
 function normalizeMorphologyOverrides(overrides = {}) {
-  if (!overrides || typeof overrides !== "object" || Array.isArray(overrides)) {
-    return {};
-  }
-  return Object.fromEntries(
-    Object.entries(overrides)
-      .map(([key, value]) => [key, String(value || "").trim()])
-      .filter(([, value]) => value),
-  );
+  return morphologyModel.normalizeMorphologyOverrides(overrides);
 }
 
 function morphologyCellKey(row, col) {
-  return `${row},${col}`;
+  return morphologyModel.morphologyCellKey(row, col);
 }
 
 function normalizeIpaKeyboard(symbols) {
-  const parsed = Array.isArray(symbols)
-    ? symbols.map(String)
-    : splitKeyboardSymbols(symbols || "ˈ ˌ");
-  const unique = [];
-  parsed
-    .map((symbol) => symbol.trim())
-    .filter(Boolean)
-    .forEach((symbol) => {
-      if (!unique.includes(symbol)) {
-        unique.push(symbol);
-      }
-    });
-  return unique.length ? unique : ["ˈ", "ˌ"];
+  return ipaModel.normalizeIpaKeyboard(symbols);
 }
 
 function splitKeyboardSymbols(value) {
-  return String(value || "")
-    .split(/[\s,，、]+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
+  return ipaModel.splitKeyboardSymbols(value);
 }
 
 function normalizeIpaSettings(ipa = {}, usedIds = new Set()) {
-  const defaultStress = Number.parseInt(ipa.defaultStress, 10);
-  const mappings = [
-    ...normalizeIpaRuleList(ipa.mappings, usedIds),
-    ...normalizeIpaRuleList(ipa.stressMappings, usedIds).map((rule) => ({
-      ...rule,
-      to: hasStressOutput(rule.to) ? rule.to : `ˈ${rule.to || rule.from}`,
-    })),
-  ];
-  return {
-    mappings,
-    syllable: {
-      vowels: ipa.syllable?.vowels || "aeiouAEIOU",
-      separator: ipa.syllable?.separator || ".",
-      onsetClusters: normalizeClusterList(ipa.syllable?.onsetClusters),
-      codaClusters: normalizeClusterList(ipa.syllable?.codaClusters),
-      complexPhonemes: normalizeClusterList(ipa.syllable?.complexPhonemes),
-    },
-    defaultStress: Number.isInteger(defaultStress) ? defaultStress : -2,
-    unstressMonosyllables: ipa.unstressMonosyllables !== false,
-  };
+  return ipaModel.normalizeIpaSettings(ipa, { usedIds, reserveEntityId });
 }
 
 function normalizeClusterList(value) {
-  const clusters = Array.isArray(value) ? value : String(value || "").split(/[,，、]/);
-  return [...new Set(clusters.map((cluster) => String(cluster).trim()).filter(Boolean))]
-    .sort((a, b) => b.length - a.length);
+  return ipaModel.normalizeClusterList(value);
 }
 
 function normalizeOnsetClusters(value) {
-  return normalizeClusterList(value);
+  return ipaModel.normalizeOnsetClusters(value);
 }
 
 function hasStressOutput(value) {
-  const output = String(value || "");
-  return output.startsWith("'") || output.includes("ˈ");
+  return ipaModel.hasStressOutput(value);
 }
 
 function normalizeIpaRuleList(rules, usedIds = new Set()) {
-  return Array.isArray(rules)
-    ? rules.map((rule) => normalizeIpaRule(rule, usedIds)).filter((rule) => rule.from || rule.to || rule.before || rule.after)
-    : [];
+  return ipaModel.normalizeIpaRuleList(rules, { usedIds, reserveEntityId });
 }
 
 function normalizeIpaRule(rule = {}, usedIds = new Set()) {
-  return {
-    id: reserveEntityId(rule.id, "ipa", usedIds),
-    from: String(rule.from || ""),
-    to: String(rule.to || ""),
-    before: String(rule.before || ""),
-    after: String(rule.after || ""),
-  };
+  return ipaModel.normalizeIpaRule(rule, { usedIds, reserveEntityId });
 }
 
 function uid(prefix) {
@@ -2128,19 +2023,7 @@ function entryPart(entry) {
 }
 
 function entryParts(entry, dictionary = activeDictionary()) {
-  const tags = entry?.tags || [];
-  if (!tags.length) {
-    return [];
-  }
-  const settings = normalizeDictionarySettings(dictionary?.settings);
-  if (!settings.manualPartOfSpeechTags) {
-    return tags[0] ? [tags[0]] : [];
-  }
-  const configuredParts = new Set(settings.partOfSpeechTags.map(normalize));
-  if (!configuredParts.size) {
-    return [];
-  }
-  return tags.filter((tag) => configuredParts.has(normalize(tag)));
+  return tagModel.entryParts(entry, normalizeDictionarySettings(dictionary?.settings), { normalizeText: normalize });
 }
 
 function entryPartLabels(entry, dictionary = activeDictionary()) {
@@ -2152,27 +2035,19 @@ function entryPartText(entry, dictionary = activeDictionary()) {
 }
 
 function entryTagIsPart(entry, tagIndex, tag, dictionary = activeDictionary()) {
-  const settings = normalizeDictionarySettings(dictionary?.settings);
-  if (!settings.manualPartOfSpeechTags) {
-    return tagIndex === 0;
-  }
-  return entryParts(entry, dictionary).some((part) => normalize(part) === normalize(tag));
+  return tagModel.entryTagIsPart(entry, tagIndex, tag, normalizeDictionarySettings(dictionary?.settings), { normalizeText: normalize });
 }
 
 function displayTag(tag, dictionary = activeDictionary()) {
-  const value = String(tag || "");
-  return dictionary?.settings?.tagDisplayMap?.[value] || value;
+  return tagModel.displayTag(tag, normalizeDictionarySettings(dictionary?.settings));
 }
 
 function entryListDisplayTag(tag, settings = normalizeDictionarySettings(activeDictionary()?.settings)) {
-  const value = String(tag || "");
-  return settings.entryListRawTagDisplay ? value : displayTag(value);
+  return tagModel.entryListDisplayTag(tag, settings);
 }
 
 function tagIsRedHighlighted(tag, dictionary = activeDictionary()) {
-  const settings = normalizeDictionarySettings(dictionary?.settings);
-  const candidates = new Set(settings.redHighlightTags.map(normalize));
-  return candidates.has(normalize(tag)) || candidates.has(normalize(displayTag(tag, dictionary)));
+  return tagModel.tagIsRedHighlighted(tag, normalizeDictionarySettings(dictionary?.settings), { normalizeText: normalize });
 }
 
 function normalize(value) {
@@ -2184,6 +2059,17 @@ function splitList(value) {
     .split(/[,\n，、]/)
     .map((item) => item.trim())
     .filter(Boolean);
+}
+
+function uniqueList(value) {
+  const unique = [];
+  splitList(Array.isArray(value) ? value.join("，") : value)
+    .forEach((item) => {
+      if (!unique.includes(item)) {
+        unique.push(item);
+      }
+    });
+  return unique;
 }
 
 function splitSourceText(value) {
@@ -2925,9 +2811,9 @@ function renderPartFilter() {
     activePart = "";
     elements.partFilter.value = "";
   }
-  const usedParts = dictionary
-    ? [...new Set(dictionary.entries.flatMap((entry) => entryParts(entry, dictionary)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN"))
-    : [];
+  const localUsedParts = localPartTags(dictionary);
+  startEntryFacetsApiCheck(dictionary, localUsedParts);
+  const usedParts = entryFacetsPartsForRender(dictionary, localUsedParts);
   const options = ["", NO_PART_FILTER_VALUE, ...usedParts];
   const current = activePart;
 
@@ -3356,7 +3242,8 @@ function setupAnalysisMasonryLayouts() {
 }
 
 function renderEntries() {
-  if (!activeDictionary()) {
+  const dictionary = activeDictionary();
+  if (!dictionary) {
     renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noDictionary"), t("emptyDictionaryBody")));
     return;
   }
@@ -3366,7 +3253,9 @@ function renderEntries() {
     return;
   }
 
-  const entries = filteredEntries();
+  const localEntries = filteredEntries();
+  startEntryQueryApiCheck(dictionary, localEntries);
+  const entries = entryQueryEntriesForRender(dictionary, localEntries);
   if (!entries.length) {
     renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noMatch"), t("noMatchBody")));
     return;
@@ -3411,9 +3300,275 @@ function entryVirtualResetToken() {
     normalize(searchQuery),
     activePart,
     entrySort,
+    entryQueryState.status === "success" ? "api" : "local",
     advancedFilter?.title || "",
     advancedFilter?.variantIndex ?? "",
   ].join("|");
+}
+
+function entryQueryCanUseApi(dictionary = activeDictionary()) {
+  return Boolean(
+    backendAvailable
+    && dictionary
+    && !advancedFilter
+    && !rootMode
+  );
+}
+
+function entryQueryApiKey(dictionary = activeDictionary()) {
+  if (!dictionary) {
+    return "";
+  }
+  const settings = normalizeDictionarySettings(dictionary.settings);
+  return [
+    dictionary.id,
+    dictionaryEntriesSignature(dictionary),
+    normalize(searchQuery),
+    activePart,
+    entrySort,
+    stableJson(settings.tagDisplayMap),
+    settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
+    settings.partOfSpeechTags.join(","),
+  ].join("|");
+}
+
+function resetEntryQueryState() {
+  entryQueryState = {
+    key: "",
+    status: "idle",
+    ids: [],
+    pageInfo: null,
+    error: null,
+    requestId: entryQueryState.requestId + 1,
+  };
+}
+
+function entryQueryUrl(dictionary, options = {}) {
+  const params = new URLSearchParams();
+  if (searchQuery.trim()) {
+    params.set("q", searchQuery.trim());
+  }
+  if (activePart) {
+    params.set("part", activePart);
+  }
+  if (entrySort) {
+    params.set("sort", entrySort);
+  }
+  params.set("include", "summary");
+  params.set("limit", "500");
+  Object.entries(options).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      params.set(key, String(value));
+    }
+  });
+  return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries?${params}`;
+}
+
+function entryQueryEntriesForRender(dictionary, fallbackEntries) {
+  const key = entryQueryApiKey(dictionary);
+  if (entryQueryState.status !== "success" || entryQueryState.key !== key || !entryQueryState.ids.length) {
+    return fallbackEntries;
+  }
+  const byId = new Map((dictionary.entries || []).map((entry) => [entry.id, entry]));
+  const entries = entryQueryState.ids.map((id) => byId.get(id)).filter(Boolean);
+  return entries.length === entryQueryState.ids.length ? entries : fallbackEntries;
+}
+
+function startEntryQueryApiCheck(dictionary, localEntries) {
+  if (!entryQueryCanUseApi(dictionary)) {
+    if (entryQueryState.status !== "idle") {
+      resetEntryQueryState();
+    }
+    return;
+  }
+
+  const key = entryQueryApiKey(dictionary);
+  if (entryQueryState.key === key && ["loading", "success", "fallback"].includes(entryQueryState.status)) {
+    return;
+  }
+
+  const requestId = entryQueryState.requestId + 1;
+  entryQueryState = {
+    key,
+    status: "loading",
+    ids: [],
+    pageInfo: null,
+    error: null,
+    requestId,
+  };
+
+  api(entryQueryUrl(dictionary))
+    .then((result) => {
+      if (entryQueryState.requestId !== requestId || entryQueryApiKey(activeDictionary()) !== key) {
+        return;
+      }
+      const apiIds = Array.isArray(result?.items) ? result.items.map((entry) => entry.id).filter(Boolean) : [];
+      const pageInfo = result?.pageInfo || null;
+      const complete = pageInfo && !pageInfo.hasMore && pageInfo.total === apiIds.length;
+      const localIds = localEntries.map((entry) => entry.id);
+      const matchesLocal = complete && stableJson(apiIds) === stableJson(localIds);
+      entryQueryState = {
+        key,
+        status: matchesLocal ? "success" : "fallback",
+        ids: matchesLocal ? apiIds : [],
+        pageInfo,
+        error: null,
+        requestId,
+      };
+      if (matchesLocal) {
+        renderEntries();
+      }
+    })
+    .catch((error) => {
+      if (entryQueryState.requestId !== requestId) {
+        return;
+      }
+      entryQueryState = {
+        key,
+        status: "fallback",
+        ids: [],
+        pageInfo: null,
+        error,
+        requestId,
+      };
+      console.error(error);
+    });
+}
+
+function localPartTags(dictionary = activeDictionary()) {
+  return dictionary
+    ? [...new Set((dictionary.entries || []).flatMap((entry) => entryParts(entry, dictionary)).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, "zh-CN"))
+    : [];
+}
+
+function dictionaryEntriesSignature(dictionary = activeDictionary()) {
+  return stableJson((dictionary?.entries || []).map((entry) => ({
+    id: entry.id,
+    lemma: entry.lemma,
+    pronunciation: entry.pronunciation,
+    notes: entry.notes,
+    createdAt: entry.createdAt,
+    updatedAt: entry.updatedAt,
+    tags: entry.tags || [],
+    etymology: {
+      description: entry.etymology?.description || "",
+    },
+    definitions: (entry.definitions || []).map((definition) => ({
+      id: definition.id,
+      meaning: definition.meaning,
+      example: definition.example,
+      note: definition.note,
+    })),
+    morphologyTables: (entry.morphologyTables || []).map((table) => ({
+      id: table.id,
+      title: table.title,
+      rows: table.rows || [],
+      columns: table.columns || [],
+      cells: table.cells || [],
+    })),
+  })));
+}
+
+function dictionaryPartFacetSignature(dictionary = activeDictionary()) {
+  return stableJson((dictionary?.entries || []).map((entry) => ({
+    id: entry.id,
+    updatedAt: entry.updatedAt,
+    tags: entry.tags || [],
+  })));
+}
+
+function entryFacetsCanUseApi(dictionary = activeDictionary()) {
+  return Boolean(backendAvailable && dictionary);
+}
+
+function entryFacetsApiKey(dictionary = activeDictionary()) {
+  if (!dictionary) {
+    return "";
+  }
+  const settings = normalizeDictionarySettings(dictionary.settings);
+  return [
+    dictionary.id,
+    dictionaryPartFacetSignature(dictionary),
+    stableJson(settings.tagDisplayMap),
+    settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
+    settings.partOfSpeechTags.join(","),
+  ].join("|");
+}
+
+function resetEntryFacetsState() {
+  entryFacetsState = {
+    key: "",
+    status: "idle",
+    parts: [],
+    error: null,
+    requestId: entryFacetsState.requestId + 1,
+  };
+}
+
+function entryFacetsPartsForRender(dictionary, fallbackParts) {
+  const key = entryFacetsApiKey(dictionary);
+  if (entryFacetsState.status !== "success" || entryFacetsState.key !== key) {
+    return fallbackParts;
+  }
+  return entryFacetsState.parts;
+}
+
+function startEntryFacetsApiCheck(dictionary, localParts) {
+  if (!entryFacetsCanUseApi(dictionary)) {
+    if (entryFacetsState.status !== "idle") {
+      resetEntryFacetsState();
+    }
+    return;
+  }
+
+  const key = entryFacetsApiKey(dictionary);
+  if (entryFacetsState.key === key && ["loading", "success", "fallback"].includes(entryFacetsState.status)) {
+    return;
+  }
+
+  const requestId = entryFacetsState.requestId + 1;
+  entryFacetsState = {
+    key,
+    status: "loading",
+    parts: [],
+    error: null,
+    requestId,
+  };
+
+  api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/facets`)
+    .then((result) => {
+      if (entryFacetsState.requestId !== requestId || entryFacetsApiKey(activeDictionary()) !== key) {
+        return;
+      }
+      const apiParts = Array.isArray(result?.parts)
+        ? result.parts.map((part) => part?.tag).filter(Boolean).sort((a, b) => a.localeCompare(b, "zh-CN"))
+        : [];
+      const matchesLocal = stableJson(apiParts) === stableJson(localParts);
+      entryFacetsState = {
+        key,
+        status: matchesLocal ? "success" : "fallback",
+        parts: matchesLocal ? apiParts : [],
+        error: null,
+        requestId,
+      };
+      if (matchesLocal) {
+        renderPartFilter();
+      }
+    })
+    .catch((error) => {
+      if (entryFacetsState.requestId !== requestId) {
+        return;
+      }
+      entryFacetsState = {
+        key,
+        status: "fallback",
+        parts: [],
+        error,
+        requestId,
+      };
+      console.error(error);
+    });
 }
 
 function renderRootModeRow(row) {
@@ -4974,35 +5129,15 @@ function morphologyTables(dictionary = activeDictionary()) {
 }
 
 function resolveEntryMorphologyTable(entry, dictionary = activeDictionary()) {
-  const tables = morphologyTables(dictionary);
-  const selected = entry.morphology?.tableId || "auto";
-  if (selected === "none") {
-    return null;
-  }
-  if (selected && selected !== "auto") {
-    return tables.find((table) => table.id === selected) || null;
-  }
-  const entryTags = new Set((entry.tags || []).map(normalize));
-  return tables.find((table) => table.matchTags.some((tag) => entryTags.has(normalize(tag)))) || null;
+  return morphologyModel.resolveEntryMorphologyTable(entry, dictionary, { normalizeText: normalize });
 }
 
 function morphologyCellValue(entry, table, row, col, dictionary = activeDictionary()) {
-  const key = morphologyCellKey(row, col);
-  const override = entry.morphology?.overrides?.[key];
-  if (override) {
-    return override;
-  }
-  return morphologyCellDefaultValue(entry, table, row, col, dictionary);
+  return morphologyModel.morphologyCellValue(entry, table, row, col, dictionary);
 }
 
 function morphologyCellDefaultValue(entry, table, row, col, dictionary = activeDictionary()) {
-  const key = morphologyCellKey(row, col);
-  const cell = table.cells?.[key] || normalizeMorphologyCell();
-  const rule = cell.value.trim();
-  if (!rule) {
-    return entry.lemma;
-  }
-  return applyMorphologyRuleSyntax(entry.lemma, rule, morphologyFunctionConfig(dictionary));
+  return morphologyModel.morphologyCellDefaultValue(entry, table, row, col, dictionary);
 }
 
 function morphologyFunctionConfig(dictionary = activeDictionary()) {
@@ -5010,320 +5145,11 @@ function morphologyFunctionConfig(dictionary = activeDictionary()) {
 }
 
 function applyMorphologyRuleSyntax(lemma, rule, functions = normalizeMorphologyFunctions()) {
-  const text = expandMorphologyReferences(rule, lemma);
-  let output = "";
-  let index = 0;
-
-  while (index < text.length) {
-    if (text[index] === "/") {
-      const end = text.indexOf("/", index + 1);
-      if (end >= 0) {
-        output += evaluateMorphologyConditionBlock(
-          text.slice(index + 1, end),
-          output,
-          morphologyRightContext(text.slice(end + 1), lemma),
-          lemma,
-          functions
-        );
-        index = end + 1;
-        continue;
-      }
-    }
-
-    output += text[index];
-    index += 1;
-  }
-
-  return output;
-}
-
-function evaluateMorphologyConditionBlock(block, leftContext, rightContext, lemma, functions = normalizeMorphologyFunctions()) {
-  const clauses = String(block || "").split(/;/);
-  for (const clause of clauses) {
-    const parsed = parseMorphologyConditionClause(clause);
-    if (!parsed) {
-      continue;
-    }
-    if (parsed.type === "else" || morphologyConditionMatches(parsed.condition, leftContext, rightContext, functions)) {
-      return renderMorphologyConditionOutput(parsed.output, lemma);
-    }
-  }
-  return "";
-}
-
-function parseMorphologyConditionClause(clause) {
-  const text = String(clause || "").trim();
-  if (!text) {
-    return null;
-  }
-  const equalsIndex = text.indexOf("=");
-  const left = equalsIndex >= 0 ? text.slice(0, equalsIndex).trim() : text.trim();
-  const output = equalsIndex >= 0 ? text.slice(equalsIndex + 1).trim() : "";
-  if (left.toLowerCase() === "else") {
-    return { type: "else", output };
-  }
-  return { type: "condition", condition: left, output };
-}
-
-function morphologyConditionMatches(condition, leftContext, rightContext, functions = normalizeMorphologyFunctions()) {
-  const call = parseMorphologyFunctionCondition(condition);
-  if (!call || !call.options.length || call.invalidOffset) {
-    return false;
-  }
-  if (call.name === "left" || call.name === "right") {
-    const found = nthDirectionalCharacter(call.name === "left" ? leftContext : rightContext, call.name, call.offset);
-    return Boolean(found && call.options.includes(found));
-  }
-
-  const recognized = functions[call.name] || [];
-  if (!recognized.length) {
-    return false;
-  }
-  const nearest = call.name === "rightV"
-    ? nearestRightMatch(rightContext, recognized)
-    : nearestLeftMatch(leftContext, recognized);
-  return Boolean(nearest && call.options.includes(nearest));
-}
-
-function parseMorphologyFunctionCondition(condition) {
-  const match = String(condition || "").match(/^(leftV|rightV|left|right)\(([^()]*)\)(?:\(([^()]*)\))?$/i);
-  if (!match) {
-    return null;
-  }
-  const name = morphologyFunctionName(match[1]);
-  const rawOffset = match[3];
-  const offset = rawOffset === undefined ? 1 : Number.parseInt(rawOffset, 10);
-  const invalidOffset = rawOffset !== undefined && (!/^[1-9]\d*$/.test(rawOffset.trim()) || !Number.isInteger(offset));
-  return {
-    name,
-    options: splitList(match[2]),
-    offset: invalidOffset ? 1 : offset,
-    invalidOffset,
-  };
-}
-
-function morphologyFunctionName(name) {
-  const normalized = String(name || "").toLowerCase();
-  if (normalized === "rightv") {
-    return "rightV";
-  }
-  if (normalized === "left") {
-    return "left";
-  }
-  if (normalized === "right") {
-    return "right";
-  }
-  return "leftV";
-}
-
-function nthDirectionalCharacter(context, direction, offset) {
-  const chars = Array.from(String(context || ""));
-  if (chars.length < offset) {
-    return "";
-  }
-  return direction === "right" ? chars[offset - 1] : chars[chars.length - offset];
-}
-
-function nearestLeftMatch(context, options) {
-  const text = String(context || "");
-  const candidates = [...options].sort((a, b) => b.length - a.length);
-  for (let index = text.length - 1; index >= 0; index -= 1) {
-    const found = candidates.find((candidate) => text.startsWith(candidate, index));
-    if (found) {
-      return found;
-    }
-  }
-  return "";
-}
-
-function nearestRightMatch(context, options) {
-  const text = String(context || "");
-  const candidates = [...options].sort((a, b) => b.length - a.length);
-  for (let index = 0; index < text.length; index += 1) {
-    const found = candidates.find((candidate) => text.startsWith(candidate, index));
-    if (found) {
-      return found;
-    }
-  }
-  return "";
-}
-
-function morphologyRightContext(fragment, lemma) {
-  const text = expandMorphologyReferences(fragment, lemma);
-  let context = "";
-  let index = 0;
-
-  while (index < text.length) {
-    if (text[index] === "/") {
-      const end = text.indexOf("/", index + 1);
-      if (end >= 0) {
-        index = end + 1;
-        continue;
-      }
-    }
-
-    context += text[index];
-    index += 1;
-  }
-
-  return context;
-}
-
-function renderMorphologyConditionOutput(output, lemma) {
-  return expandMorphologyReferences(output, lemma);
-}
-
-function expandMorphologyReferences(value, lemma) {
-  const text = String(value || "");
-  let rendered = "";
-  let index = 0;
-
-  while (index < text.length) {
-    const reference = consumeMorphologyReference(text, index, lemma);
-    if (reference) {
-      rendered += reference.value;
-      index = reference.nextIndex;
-      continue;
-    }
-    rendered += text[index];
-    index += 1;
-  }
-
-  return rendered;
-}
-
-function consumeMorphologyReference(text, index, lemma) {
-  if (text[index] !== "{") {
-    return null;
-  }
-  const end = text.indexOf("}", index + 1);
-  if (end < 0) {
-    return null;
-  }
-  return {
-    value: renderMorphologyReference(text.slice(index + 1, end), lemma),
-    nextIndex: end + 1,
-  };
-}
-
-function renderMorphologyReference(body, lemma) {
-  const text = String(body || "").trim();
-  if (!text || text.toLowerCase() === "lemma") {
-    return lemma;
-  }
-
-  const replacements = text
-    .split(",")
-    .map(parseMorphologyReplacement)
-    .filter((replacement) => replacement?.valid);
-
-  if (!replacements.length) {
-    return lemma;
-  }
-
-  return applyMorphologyReplacements(lemma, replacements);
-}
-
-function parseMorphologyReplacement(item) {
-  const equalsIndex = String(item || "").indexOf("=");
-  if (equalsIndex < 0) {
-    return { valid: false, reason: "missing =" };
-  }
-  const rawTarget = item.slice(0, equalsIndex).trim();
-  const to = item.slice(equalsIndex + 1).trim();
-  const selectorMatch = rawTarget.match(/^(.*?)(?:\[([^\]]*)\])?$/);
-  const from = selectorMatch?.[1]?.trim() || "";
-  const rawSelector = selectorMatch?.[2]?.trim();
-  if (!from) {
-    return { valid: false, reason: "missing target" };
-  }
-  if (rawSelector === "*") {
-    return { valid: true, from, to, selector: "*" };
-  }
-  if (rawSelector === undefined) {
-    return { valid: true, from, to, selector: 1 };
-  }
-  if (rawSelector === "") {
-    return { valid: false, reason: "invalid selector []" };
-  }
-  if (!/^-?[1-9]\d*$/.test(rawSelector)) {
-    return { valid: false, reason: `invalid selector [${rawSelector}]` };
-  }
-  return { valid: true, from, to, selector: Number.parseInt(rawSelector, 10) };
-}
-
-function applyMorphologyReplacements(lemma, replacements) {
-  const scheduled = [];
-  replacements.forEach((replacement, order) => {
-    morphologyReplacementTargets(lemma, replacement).forEach((target) => {
-      for (let index = scheduled.length - 1; index >= 0; index -= 1) {
-        if (rangesOverlap(scheduled[index], target)) {
-          scheduled.splice(index, 1);
-        }
-      }
-      scheduled.push({ ...target, to: replacement.to, order });
-    });
-  });
-
-  if (!scheduled.length) {
-    return lemma;
-  }
-
-  scheduled.sort((a, b) => a.start - b.start || a.order - b.order);
-  let output = "";
-  let cursor = 0;
-  scheduled.forEach((item) => {
-    if (item.start < cursor) {
-      return;
-    }
-    output += lemma.slice(cursor, item.start);
-    output += item.to;
-    cursor = item.end;
-  });
-  return output + lemma.slice(cursor);
-}
-
-function morphologyReplacementTargets(lemma, replacement) {
-  const matches = morphologyReplacementMatches(lemma, replacement.from);
-  if (replacement.selector === "*") {
-    return matches;
-  }
-  const index = replacement.selector > 0
-    ? replacement.selector - 1
-    : matches.length + replacement.selector;
-  return matches[index] ? [matches[index]] : [];
-}
-
-function morphologyReplacementMatches(lemma, target) {
-  const matches = [];
-  let index = 0;
-  while (index <= lemma.length - target.length) {
-    const found = lemma.indexOf(target, index);
-    if (found < 0) {
-      break;
-    }
-    matches.push({ start: found, end: found + target.length });
-    index = found + Math.max(1, target.length);
-  }
-  return matches;
-}
-
-function rangesOverlap(a, b) {
-  return a.start < b.end && b.start < a.end;
+  return morphologyModel.applyMorphologyRuleSyntax(lemma, rule, functions);
 }
 
 function morphologySearchStrings(entry, dictionary = activeDictionary()) {
-  const table = resolveEntryMorphologyTable(entry, dictionary);
-  if (!table) {
-    return [];
-  }
-  const values = [];
-  for (let row = 0; row < table.rows; row += 1) {
-    for (let col = 0; col < table.cols; col += 1) {
-      values.push(morphologyCellValue(entry, table, row, col, dictionary));
-    }
-  }
-  return values;
+  return morphologyModel.morphologySearchStrings(entry, dictionary);
 }
 
 function renderAnalysis(dictionary = activeDictionary()) {
@@ -5734,7 +5560,7 @@ function qualityIssueModuleFilterTitle(module) {
 }
 
 function countPrimaryStressMarks(value) {
-  return [...String(value || "")].filter((char) => char === "ˈ" || char === IPA_STRESS_MARKER).length;
+  return ipaModel.countPrimaryStressMarks(value);
 }
 
 function analysisFactRows(report) {
@@ -6337,14 +6163,11 @@ function sourceCycleForEntry(entry, dictionary) {
 }
 
 function cleanIpaText(value) {
-  return String(value || "")
-    .replace(/[\/\[\]]/g, "")
-    .replace(/[ˈˌ]/g, "")
-    .trim();
+  return ipaModel.cleanIpaText(value);
 }
 
 function normalizeIpaCompare(value) {
-  return cleanIpaText(value).replace(/\s+/g, "");
+  return ipaModel.normalizeIpaCompare(value);
 }
 
 function dateBucket(value) {
@@ -9058,21 +8881,7 @@ async function saveIpaSettings(event, options = {}) {
 }
 
 function generateIpaFromLemma(lemma, ipaSettings = activeDictionary()?.settings?.ipa) {
-  const ipa = normalizeIpaSettings(ipaSettings);
-  const source = String(lemma || "").trim();
-  if (!source) {
-    return "";
-  }
-
-  const mapped = applyIpaMappings(source, ipa);
-  const syllabified = syllabifyIpaOutput(mapped.output, ipa.syllable);
-  const syllables = syllabified.syllables;
-  const stressIndex = resolveIpaStressIndex(syllables, syllabified.stressIndex, ipa);
-  const separator = ipa.syllable.separator || ".";
-  const body = syllables
-    .map((syllable, index) => (index === stressIndex ? `ˈ${syllable}` : syllable))
-    .join(separator);
-  return `/${body}/`;
+  return ipaModel.generateIpaFromLemma(lemma, ipaSettings);
 }
 
 function ipaSettingsFromForm() {
@@ -9092,29 +8901,11 @@ function ipaSettingsFromForm() {
 }
 
 function ipaPipelinePreview(source, ipa = ipaSettingsFromForm()) {
-  const input = String(source || "").trim();
-  if (!input) {
-    return { mapped: "", syllables: "", final: "" };
-  }
-
-  const mapped = applyIpaMappings(input, ipa).output;
-  const syllabified = syllabifyIpaOutput(mapped, ipa.syllable);
-  const syllables = syllabified.syllables;
-  const stressIndex = resolveIpaStressIndex(syllables, syllabified.stressIndex, ipa);
-  const separator = ipa.syllable.separator || ".";
-  const syllableText = syllables.join(separator);
-  const finalBody = syllables
-    .map((syllable, index) => (index === stressIndex ? `ˈ${syllable}` : syllable))
-    .join(separator);
-  return {
-    mapped: displayIpaStage(mapped),
-    syllables: syllableText,
-    final: `/${finalBody}/`,
-  };
+  return ipaModel.ipaPipelinePreview(source, ipa);
 }
 
 function displayIpaStage(value) {
-  return String(value || "").replaceAll(IPA_STRESS_MARKER, "ˈ");
+  return ipaModel.displayIpaStage(value);
 }
 
 function renderIpaSandbox() {
@@ -9128,213 +8919,47 @@ function renderIpaSandbox() {
 }
 
 function applyIpaMappings(source, ipa) {
-  const rules = ipa.mappings.filter((rule) => rule.from);
-
-  const chunks = [];
-  let index = 0;
-
-  while (index < source.length) {
-    const rule = rules.find((candidate) => ruleMatchesAt(source, index, candidate));
-    if (!rule) {
-      chunks.push(source[index]);
-      index += 1;
-      continue;
-    }
-
-    const rawOutput = rule.to || rule.from;
-    let markedOutput = rawOutput.startsWith("'")
-      ? `${IPA_STRESS_MARKER}${rawOutput.slice(1)}`
-      : rawOutput.replaceAll("ˈ", IPA_STRESS_MARKER);
-    chunks.push(markedOutput);
-    index += rule.from.length;
-  }
-
-  return { output: chunks.join("") };
+  return ipaModel.applyIpaMappings(source, ipa);
 }
 
 function ruleMatchesAt(source, index, rule) {
-  if (!source.startsWith(rule.from, index)) {
-    return false;
-  }
-  const before = source.slice(0, index);
-  const after = source.slice(index + rule.from.length);
-  return conditionMatches(before, rule.before, true) && conditionMatches(after, rule.after, false);
+  return ipaModel.ruleMatchesAt(source, index, rule);
 }
 
 function conditionMatches(value, condition, matchEnd) {
-  if (!condition) {
-    return true;
-  }
-  try {
-    const pattern = matchEnd ? `${condition}$` : `^${condition}`;
-    return new RegExp(pattern).test(value);
-  } catch {
-    return matchEnd ? value.endsWith(condition) : value.startsWith(condition);
-  }
+  return ipaModel.conditionMatches(value, condition, matchEnd);
 }
 
 function splitIntoSyllables(value, syllableSettings = {}) {
-  const separator = syllableSettings.separator || ".";
-  const text = String(value || "").replaceAll("ˈ", "");
-  if (!text) {
-    return [""];
-  }
-  if (separator && text.includes(separator)) {
-    return text.split(separator).filter(Boolean);
-  }
-
-  const vowels = new Set(Array.from(String(syllableSettings.vowels || "aeiouAEIOU")));
-  const tokens = tokenizePhonemeUnits(text, syllableSettings.complexPhonemes);
-  const vowelTokenIndexes = tokens.reduce((positions, token, index) => {
-    if (vowels.has(token.value)) {
-      positions.push(index);
-    }
-    return positions;
-  }, []);
-  if (vowelTokenIndexes.length <= 1) {
-    return [text];
-  }
-
-  const syllables = [];
-  let start = 0;
-  vowelTokenIndexes.forEach((tokenIndex, index) => {
-    if (index === vowelTokenIndexes.length - 1) {
-      return;
-    }
-    const currentVowel = tokens[tokenIndex];
-    const nextVowel = tokens[vowelTokenIndexes[index + 1]];
-    const between = text.slice(currentVowel.end, nextVowel.start);
-    const codaCluster = matchingCodaCluster(between, syllableSettings);
-    const onsetCluster = matchingOnsetCluster(between, syllableSettings);
-    const breakAt = codaCluster
-      ? currentVowel.end + codaCluster.length
-      : onsetCluster
-        ? nextVowel.start - onsetCluster.length
-        : middleTokenBreak(currentVowel.end, between, syllableSettings.complexPhonemes);
-    syllables.push(text.slice(start, breakAt));
-    start = breakAt;
-  });
-  syllables.push(text.slice(start));
-  return syllables.filter(Boolean);
+  return ipaModel.splitIntoSyllables(value, syllableSettings);
 }
 
 function tokenizePhonemeUnits(value, complexPhonemes = []) {
-  const phonemes = normalizeClusterList(complexPhonemes);
-  const text = String(value || "");
-  const tokens = [];
-  let index = 0;
-
-  while (index < text.length) {
-    const phoneme = phonemes.find((candidate) => text.startsWith(candidate, index));
-    if (phoneme) {
-      tokens.push({ value: phoneme, start: index, end: index + phoneme.length });
-      index += phoneme.length;
-      continue;
-    }
-
-    const char = Array.from(text.slice(index))[0];
-    tokens.push({ value: char, start: index, end: index + char.length });
-    index += char.length;
-  }
-
-  return tokens;
-}
-
-function tokenBoundaryPrefixes(tokens) {
-  const prefixes = [];
-  let value = "";
-  tokens.forEach((token) => {
-    value += token.value;
-    prefixes.push(value);
-  });
-  return prefixes;
-}
-
-function tokenBoundarySuffixes(tokens) {
-  const suffixes = [];
-  let value = "";
-  [...tokens].reverse().forEach((token) => {
-    value = `${token.value}${value}`;
-    suffixes.push(value);
-  });
-  return suffixes;
+  return ipaModel.tokenizePhonemeUnits(value, complexPhonemes);
 }
 
 function matchingCodaCluster(between, syllableSettings = {}) {
-  const tokens = tokenizePhonemeUnits(between, syllableSettings.complexPhonemes);
-  const prefixes = tokenBoundaryPrefixes(tokens);
-  return normalizeClusterList(syllableSettings.codaClusters).find((cluster) => prefixes.includes(cluster)) || "";
+  return ipaModel.matchingCodaCluster(between, syllableSettings);
 }
 
 function matchingOnsetCluster(between, syllableSettings = {}) {
-  const tokens = tokenizePhonemeUnits(between, syllableSettings.complexPhonemes);
-  const suffixes = tokenBoundarySuffixes(tokens);
-  return normalizeClusterList(syllableSettings.onsetClusters).find((cluster) => suffixes.includes(cluster)) || "";
+  return ipaModel.matchingOnsetCluster(between, syllableSettings);
 }
 
 function middleTokenBreak(start, between, complexPhonemes = []) {
-  const tokens = tokenizePhonemeUnits(between, complexPhonemes);
-  const codaTokenCount = Math.floor(tokens.length / 2);
-  const codaLength = tokens
-    .slice(0, codaTokenCount)
-    .reduce((length, token) => length + token.value.length, 0);
-  return start + codaLength;
+  return ipaModel.middleTokenBreak(start, between, complexPhonemes);
 }
 
 function syllabifyIpaOutput(value, syllableSettings = {}) {
-  const text = String(value || "");
-  let markerIndex = null;
-  let cleanIndex = 0;
-  let cleanText = "";
-
-  for (const char of text) {
-    if (char === IPA_STRESS_MARKER) {
-      if (markerIndex === null) {
-        markerIndex = cleanIndex;
-      }
-      continue;
-    }
-    cleanText += char;
-    cleanIndex += 1;
-  }
-
-  const syllables = splitIntoSyllables(cleanText, syllableSettings);
-  if (markerIndex === null) {
-    return { syllables, stressIndex: null };
-  }
-
-  let offset = 0;
-  const stressIndex = syllables.findIndex((syllable) => {
-    const nextOffset = offset + syllable.length;
-    const contains = markerIndex < nextOffset;
-    offset = nextOffset;
-    return contains;
-  });
-  return {
-    syllables,
-    stressIndex: stressIndex >= 0 ? stressIndex : Math.max(0, syllables.length - 1),
-  };
+  return ipaModel.syllabifyIpaOutput(value, syllableSettings);
 }
 
 function defaultStressIndex(length, defaultStress) {
-  if (length <= 0) {
-    return null;
-  }
-  if (defaultStress === 0) {
-    return null;
-  }
-  if (defaultStress > 0) {
-    return Math.min(defaultStress - 1, length - 1);
-  }
-  return Math.max(length + defaultStress, 0);
+  return ipaModel.defaultStressIndex(length, defaultStress);
 }
 
 function resolveIpaStressIndex(syllables, explicitStressIndex, ipa = normalizeIpaSettings()) {
-  const length = syllables.length;
-  if (length <= 0 || (ipa.unstressMonosyllables && length === 1)) {
-    return null;
-  }
-  return explicitStressIndex ?? defaultStressIndex(length, ipa.defaultStress);
+  return ipaModel.resolveIpaStressIndex(syllables, explicitStressIndex, ipa);
 }
 
 function applyAutoIpa(targetInput = elements.pronunciationInput, lemmaInput = elements.lemmaInput) {
@@ -10097,6 +9722,8 @@ async function refreshState() {
     selectedDictionaryConfigId: state.selectedDictionaryConfigId || serverState.activeDictionaryId,
     activeView: state.activeView,
   });
+  resetEntryQueryState();
+  resetEntryFacetsState();
   render();
 }
 

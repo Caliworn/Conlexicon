@@ -64,7 +64,7 @@
 
 | 方法 | 路径 | 用途 | 响应 | 校验范围 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | 无参数时为词条数组；带查询参数时为分页查询对象 | 支持 `q`、`part`、`tags`、`tagMode`、`source`、`derivedFrom`、`sort`、`cursor`、`limit`、`include`。 |
+| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | 无参数时为词条数组；带查询参数时为分页查询对象 | 支持 `q`、`fields`、`part`、`tags`、`tagMode`、`source`、`derivedFrom`、`sort`、`cursor`、`limit`、`include`。 |
 | `POST` | `/api/dictionaries/:id/entries` | 新建词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
 | `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存单个词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
@@ -171,12 +171,21 @@ GET /api/dictionaries
 `GET /api/dictionaries/:id/entries` 保持无参数时返回完整词条数组的兼容行为。带查询参数时返回分页查询对象：
 
 ```text
-GET /api/dictionaries/:id/entries?q=&part=&tags=&tagMode=&sort=&source=&derivedFrom=&cursor=&limit=&include=
+GET /api/dictionaries/:id/entries?q=&fields=&part=&tags=&tagMode=&sort=&source=&derivedFrom=&cursor=&limit=&include=
 ```
 
 参数约定：
 
-- `q`：匹配词形、发音、标签、显示替换标签、释义、例句、备注、词源描述和词条备注。
+- `q`：搜索关键词；默认匹配全部搜索字段。
+- `fields`：逗号分隔的搜索字段白名单；为空或全部无效时按默认全字段搜索。当前字段包括：
+  - `lemma`：词形；
+  - `pronunciation`：发音 / IPA；
+  - `tags`：原始标签、显示替换标签和按当前设置识别出的词性标签；
+  - `definitions`：释义文本；
+  - `examples`：当前词条内嵌例句；后续例句升级为语料链接后，该字段应继续表示“与词条关联的例句文本”，来源可包含嵌入字段和链接语料；
+  - `notes`：词条备注和释义备注；
+  - `etymology`：词源描述和来源文本；
+  - `morphology`：按当前形态表设置动态生成的形态形式，以及词条级形态 override。
 - `part`：词性筛选；特殊值 `__conlexicon_no_part__` 表示无词性。
 - `tags`：逗号分隔的原始标签列表。
 - `tagMode`：`any` 或 `all`，默认 `any`。
@@ -211,6 +220,8 @@ GET /api/dictionaries/:id/entries?q=&part=&tags=&tagMode=&sort=&source=&derivedF
   }
 }
 ```
+
+形态搜索不是简单读取持久化字段。读取 API 必须使用共享形态模块按以下流程生成搜索对象：先根据词条 `morphology.tableId` 和形态表 `matchTags` 解析适用表格；再逐格读取词条 override；没有 override 时用词形、形态规则和形态函数动态生成默认形式。后续如果引入索引或 SQLite，也必须保持该语义，或在形态配置、词条 lemma、标签或 override 改变时更新对应索引。
 
 ### 词条 facets
 
