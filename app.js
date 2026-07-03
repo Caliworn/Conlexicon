@@ -9442,7 +9442,7 @@ async function openPartialEdit(section) {
     </div>
     <div class="partial-edit-body"></div>
     <div class="form-actions">
-      <button class="primary-button" type="submit">${escapeHtml(t("saveConfig"))}</button>
+      <button class="primary-button" type="submit">${escapeHtml(t("save"))}</button>
     </div>
   `;
   host.append(form);
