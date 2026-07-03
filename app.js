@@ -4247,7 +4247,7 @@ function advancedFilterDisplayTitle() {
   }
   if (advancedFilter.meta?.type === "quality" && dictionary) {
     const action = qualityIssueFilterAction(
-      buildDictionaryAnalysis(dictionary, { includeQuality: true }),
+      buildQualityViewReport(dictionary),
       advancedFilter.meta.group,
       advancedFilter.meta.activeKey,
       { allowEmptyActive: true },
@@ -4391,7 +4391,7 @@ function rebuildAdvancedFilterAction(options = {}) {
   const allowEmptyActive = Boolean(options.allowEmptyActive);
   if (advancedFilter.meta?.type === "quality") {
     return qualityIssueFilterAction(
-      buildDictionaryAnalysis(dictionary, { includeQuality: true }),
+      buildQualityViewReport(dictionary),
       advancedFilter.meta.group,
       advancedFilter.meta.activeKey,
       { allowEmptyActive },
@@ -5275,7 +5275,7 @@ function renderQuality(dictionary = activeDictionary()) {
 
   analysisFilterRegistry.clear();
   analysisFilterCounter = 0;
-  const report = buildDictionaryAnalysis(dictionary, { includeQuality: true });
+  const report = buildQualityViewReport(dictionary);
   elements.qualityPanel.innerHTML = renderQualityPage(report);
   setupQualityMasonryLayouts();
 }
@@ -5708,9 +5708,15 @@ function analysisIpaMismatchRows(report) {
   ];
 }
 
-function buildDictionaryAnalysis(dictionary, options = {}) {
+function buildQualityViewReport(dictionary) {
+  return qualityModel.buildQualityReport(dictionary, {
+    text: aText,
+    normalizeText: normalize,
+  });
+}
+
+function buildDictionaryAnalysis(dictionary) {
   const entries = dictionary.entries || [];
-  const includeQuality = Boolean(options.includeQuality);
   const total = entries.length || 1;
   const rootGroups = rootModeGroups(dictionary, { query: "" });
   const derivedEntries = entries.filter(entryHasSources);
@@ -5811,15 +5817,6 @@ function buildDictionaryAnalysis(dictionary, options = {}) {
     }
   });
 
-  const qualityReport = includeQuality
-    ? qualityModel.buildQualityReport(dictionary, {
-      text: aText,
-      normalizeText: normalize,
-    })
-    : { issues: [], networkIssues: [] };
-  const issues = qualityReport.issues;
-  const networkIssues = qualityReport.networkIssues;
-
   const ipa = analyzeIpa(entries, dictionary);
   const morphology = analyzeMorphology(entries, dictionary);
   const coverage = {
@@ -5911,15 +5908,9 @@ function buildDictionaryAnalysis(dictionary, options = {}) {
     morphology,
     coverage,
     coverageRows,
-    issues,
     searchMatches: searchMatchEntries.length,
     searchMatchEntryIds: searchMatchEntries.map((entry) => entry.id),
     searchFields: analyzeSearchFields(entries, dictionary),
-    networkIssues: includeQuality && networkIssues.length ? networkIssues : [{
-      severity: "ok",
-      title: aText("未发现词源网络问题", "No etymology network issues found"),
-      detail: `${derivedEntries.length} ${aText("个衍生词", "derived entries")} / ${multiSourceCount} ${aText("个多来源词条", "multi-source entries")}`,
-    }],
     activity: analyzeActivity(entries),
   };
 }
