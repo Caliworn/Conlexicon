@@ -15,21 +15,13 @@ const {
 } = require("../lib/dictionary-model");
 const { createApiRouter } = require("../lib/api-routes");
 const { JsonDictionaryRepository } = require("../lib/json-dictionary-repository");
-const { morphologySearchStrings } = require("../lib/morphology-model");
+const morphologyModel = require("../lib/morphology-model");
 const ipaModel = require("../lib/ipa-model");
 const tagModel = require("../lib/tag-model");
+const entrySearchModel = require("../lib/entry-search-model");
+const qualityModel = require("../lib/quality-model");
 
 const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
-const ENTRY_SEARCH_FIELDS = new Set([
-  "lemma",
-  "pronunciation",
-  "tags",
-  "definitions",
-  "examples",
-  "notes",
-  "etymology",
-  "morphology",
-]);
 
 function createRepository(dataDir) {
   return new JsonDictionaryRepository({
@@ -141,46 +133,14 @@ function testEntryMatches(entry, dictionary, query = {}) {
   if (!normalizedQuery) {
     return true;
   }
-  const fields = testSearchFields(query.fields || query.searchFields);
-  const values = [];
-  if (fields.has("lemma")) {
-    values.push(entry.lemma);
-  }
-  if (fields.has("pronunciation")) {
-    values.push(entry.pronunciation);
-  }
-  if (fields.has("tags")) {
-    values.push(
-      ...parts,
-      ...parts.map((part) => testDisplayTag(part, dictionary)),
-      ...(entry.tags || []),
-      ...(entry.tags || []).map((tag) => testDisplayTag(tag, dictionary)),
-    );
-  }
-  if (fields.has("definitions")) {
-    values.push(...(entry.definitions || []).map((definition) => definition.meaning));
-  }
-  if (fields.has("examples")) {
-    values.push(...(entry.definitions || []).map((definition) => definition.example));
-  }
-  if (fields.has("notes")) {
-    values.push(entry.notes, ...(entry.definitions || []).map((definition) => definition.note));
-  }
-  if (fields.has("etymology")) {
-    values.push(entry.etymology?.description, ...(entry.etymology?.sources || []));
-  }
-  if (fields.has("morphology")) {
-    values.push(...morphologySearchStrings(entry, dictionary));
-  }
-  return values.map(testNormalize).join(" ").includes(normalizedQuery);
-}
-
-function testSearchFields(value) {
-  const fields = String(value || "")
-    .split(/[,，、\n]/)
-    .map((field) => field.trim().toLowerCase())
-    .filter((field) => ENTRY_SEARCH_FIELDS.has(field));
-  return fields.length ? new Set(fields) : new Set(ENTRY_SEARCH_FIELDS);
+  return entrySearchModel.entryMatchesSearchText(entry, dictionary, normalizedQuery, {
+    fields: entrySearchModel.normalizeSearchFields(query.fields || query.searchFields),
+    fuzzyFields: entrySearchModel.normalizeFuzzyFields(query.fuzzyFields, {
+      fuzzy: query.fuzzy,
+      tagFuzzy: query.tagFuzzy,
+    }),
+    normalizeText: testNormalize,
+  });
 }
 
 function testCompareEntries(sort = "lemmaAsc") {
@@ -260,6 +220,96 @@ function checkModelNormalization() {
   );
   assert.deepEqual(tagModel.entryParts({ tags: ["topic", "n"] }, { manualPartOfSpeechTags: false }), ["topic"]);
   assert.equal(tagModel.displayTag("n", { tagDisplayMap: { n: "noun" } }), "noun");
+  assert.deepEqual([...entrySearchModel.normalizeSearchFields("lemma,unknown,tags")], ["lemma", "tags"]);
+  assert.deepEqual([...entrySearchModel.normalizeFuzzyFields("", { fuzzy: true })], [
+    "lemma",
+    "pronunciation",
+    "definitions",
+    "examples",
+    "notes",
+    "etymology",
+    "morphology",
+  ]);
+  assert.deepEqual([...entrySearchModel.normalizeFuzzyFields("", { tagFuzzy: true })], ["tags"]);
+  assert.deepEqual([...entrySearchModel.normalizeFuzzyFields("definitions,tags,unknown", { fuzzy: true })], ["definitions", "tags"]);
+  assert.equal(entrySearchModel.textMatches("mirror meaning", "mrmeaning", { fuzzy: true }), true);
+  assert.equal(entrySearchModel.textMatches("mirror meaning", "mrmeaning", { fuzzy: false }), false);
+  assert.equal(entrySearchModel.fieldFuzzyEnabled("tags", { tagFuzzy: true }), true);
+  assert.equal(entrySearchModel.fieldFuzzyEnabled("tags", { fuzzy: true }), false);
+  assert.deepEqual(
+    entrySearchModel.entrySearchFieldValues(
+      { lemma: "acar", pronunciation: "/a/", tags: ["n"], definitions: [{ meaning: "root", example: "example", note: "note" }] },
+      { settings: { tagDisplayMap: { n: "noun" } } },
+      { fields: "tags,definitions" },
+    ),
+    {
+      lemma: [],
+      pronunciation: [],
+      tags: ["n", "noun", "n", "noun"],
+      definitions: ["root"],
+      examples: [],
+      notes: [],
+      etymology: [],
+      morphology: [],
+    },
+  );
+  assert.equal(
+    entrySearchModel.entryMatchesSearchText(
+      { lemma: "acar", definitions: [{ meaning: "root" }] },
+      {},
+      "root",
+      { fields: "definitions" },
+    ),
+    true,
+  );
+  assert.equal(
+    entrySearchModel.entryMatchesSearchText(
+      { lemma: "acar", tags: ["n"], definitions: [{ meaning: "mirror meaning" }] },
+      { settings: { tagDisplayMap: { n: "Noun Display" } } },
+      "mrmeaning",
+      { fuzzyFields: "definitions" },
+    ),
+    true,
+  );
+  assert.equal(
+    entrySearchModel.entryMatchesSearchText(
+      { lemma: "acar", tags: ["n"], definitions: [{ meaning: "mirror meaning" }] },
+      { settings: { tagDisplayMap: { n: "Noun Display" } } },
+      "nd",
+      { fuzzyFields: "definitions" },
+    ),
+    false,
+  );
+  assert.deepEqual(qualityModel.parseGloss("\\gla a b\n\\glb A B\n\\ft test"), {
+    gla: ["a", "b"],
+    glb: ["A", "B"],
+    glc: [],
+    ft: "test",
+  });
+  const qualityReport = qualityModel.buildQualityReport({
+    entries: [
+      {
+        id: "entry-quality-a",
+        lemma: "same",
+        pronunciation: "/ˈaˈb/",
+        tags: ["proper noun", "tag-with-a-very-very-long-name"],
+        definitions: [{ meaning: "a", example: "\\gla a b\n\\glb A\n\\ft test" }],
+        etymology: { sources: ["missing-root"] },
+      },
+      {
+        id: "entry-quality-b",
+        lemma: "same",
+        pronunciation: "",
+        tags: ["proper-noun"],
+        definitions: [],
+      },
+    ],
+  }, { text: (_zh, en) => en, normalizeText: testNormalize });
+  assert.equal(qualityReport.issues.some((issue) => issue.title === "Duplicate lemma" && issue.entryId === "entry-quality-a"), true);
+  assert.equal(qualityReport.issues.some((issue) => issue.title === "Multiple primary stresses"), true);
+  assert.equal(qualityReport.issues.some((issue) => issue.title === "Gloss alignment mismatch"), true);
+  assert.equal(qualityReport.issues.some((issue) => issue.title === "Near-duplicate tags"), true);
+  assert.equal(qualityReport.networkIssues.some((issue) => issue.title === "Unresolved source"), true);
   assert.equal(ipaModel.normalizeIpaSettings({ stressMappings: [{ from: "a", to: "a" }] }).mappings[0].to, "ˈa");
   assert.deepEqual(ipaModel.normalizeClusterList("t͡ʃ, t, t͡ʃ"), ["t͡ʃ", "t"]);
   assert.equal(
@@ -286,6 +336,33 @@ function checkModelNormalization() {
   assert.deepEqual(
     ipaModel.tokenizePhonemeUnits("t͡ʃa", ["t͡ʃ"]).map((token) => token.value),
     ["t͡ʃ", "a"],
+  );
+  assert.deepEqual(
+    morphologyModel.extractMorphologyReferences("{lemma}-{a=o}"),
+    [
+      { body: "lemma", unterminated: false },
+      { body: "a=o", unterminated: false },
+    ],
+  );
+  assert.deepEqual(
+    morphologyModel.extractMorphologyFunctionCalls("/rightV(a)(x)=x;else=y/").map((call) => ({
+      name: call.name,
+      invalidOffset: call.invalidOffset,
+    })),
+    [{ name: "rightV", invalidOffset: true }],
+  );
+  assert.deepEqual(
+    morphologyModel.validateMorphologyReferenceSyntax({
+      tables: [{ name: "Bad", rows: 1, cols: 1, cells: { "0,0": { value: "{a}" } } }],
+    }),
+    ["Bad: 1 / 1: {a} - missing ="],
+  );
+  assert.deepEqual(
+    morphologyModel.validateMorphologyFunctionUsage({
+      functions: { leftV: "a" },
+      tables: [{ name: "BadFn", rows: 1, cols: 1, cells: { "0,0": { value: "/rightV(a)=x/" } } }],
+    }),
+    ["BadFn: rightV not configured"],
   );
 
   const normalized = normalizeDictionary({
@@ -542,6 +619,10 @@ async function checkReadApiConsistency(repository) {
     await assertEntryQueryConsistency(repository, dictionary, { q: "alpha-generated" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "manual-beta-form" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "olpha" });
+    await assertEntryQueryConsistency(repository, dictionary, { q: "mrmeaning", fuzzy: true });
+    await assertEntryQueryConsistency(repository, dictionary, { q: "nd", tagFuzzy: true });
+    await assertEntryQueryConsistency(repository, dictionary, { q: "mrmeaning", fuzzyFields: "definitions" });
+    await assertEntryQueryConsistency(repository, dictionary, { q: "mrmeaning", fuzzyFields: "tags" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "alpha-generated", fields: "morphology" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "alpha-generated", fields: "definitions" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "alpha example", fields: "examples" });
@@ -762,6 +843,13 @@ async function checkJsonRepository() {
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.morphology.tables[0].name, "Nouns");
     assert.match(apiResult.body.morphology.tables[0].id, /^morph-/);
+    await assertRejectStatus(
+      callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/morphology`, {
+        tables: [{ name: "Broken", rows: 1, cols: 1, cells: { "0,0": { value: "{a}" } } }],
+      }),
+      400,
+      "invalid morphology syntax save",
+    );
 
     apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/settings/ipa`, {
       mappings: [{ from: "a", to: "ɑ" }],

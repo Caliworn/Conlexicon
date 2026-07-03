@@ -38,6 +38,8 @@ const MAX_ENTRY_LIST_TAG_DISPLAY_LIMIT = 10;
 const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
 const tagModel = window.ConlexiconTags;
 const morphologyModel = window.ConlexiconMorphology;
+const entrySearchModel = window.ConlexiconEntrySearch;
+const qualityModel = window.ConlexiconQuality;
 let docsViewMode = "split";
 let docsSaveTimer = null;
 let corpusSaveTimer = null;
@@ -72,14 +74,18 @@ const defaultAnalysisViewState = {
     ipa: "distribution",
     morphology: "tables",
     activity: "updated",
-    quality: "issues",
   },
   scrollByRoute: {},
 };
+const defaultQualityViewState = {
+  subpage: "issues",
+  scrollBySubpage: {},
+};
 const analysisViewStates = new Map();
+const qualityViewStates = new Map();
 const corpusViewStates = new Map();
 let corpusDraftState = null;
-const DEFAULT_TOOL_NAV_ORDER = ["editor", "docs", "corpus", "analysis", "ipa", "morphology", "settings", "manager"];
+const DEFAULT_TOOL_NAV_ORDER = ["editor", "docs", "corpus", "analysis", "quality", "ipa", "morphology", "settings", "manager"];
 let advancedFilter = null;
 let entryQueryState = {
   key: "",
@@ -128,11 +134,13 @@ const i18n = {
     planned: "待实装",
     ipaConfig: "自动 IPA 标注",
     analysis: "数据分析",
+    qualityCheck: "质量检查",
     languageDocs: "语言文档",
     corpus: "语料库",
     morphologyConfig: "自动形态学",
     morphologyDisplay: "形态学",
     morphologyNeedDictionary: "自动形态学配置会保存到当前词典文件中。",
+    qualityNeedDictionary: "质量检查会根据当前词典中的词条、标签、词源、IPA 和 Glossed 例句实时生成。",
     morphologyTables: "形态表格",
     morphologyFunctionObjects: "函数识别对象",
     morphologyFunctionObjectsHelp: "为 leftV/rightV 配置它们会识别的对象。函数被规则使用时必须先配置；函数会先找到最近的已配置对象，再判断它是否属于括号中的候选项。多个对象用逗号分隔。",
@@ -564,11 +572,13 @@ const i18n = {
     planned: "Planned",
     ipaConfig: "Auto IPA",
     analysis: "Analytics",
+    qualityCheck: "Quality Checks",
     languageDocs: "Language Docs",
     corpus: "Corpus",
     morphologyConfig: "Auto Morphology",
     morphologyDisplay: "Morphology",
     morphologyNeedDictionary: "Auto morphology config is saved in the current dictionary file.",
+    qualityNeedDictionary: "Quality checks are generated live from the current dictionary's entries, tags, etymology, IPA, and Glossed examples.",
     morphologyTables: "Morphology Tables",
     morphologyFunctionObjects: "Function Recognition Objects",
     morphologyFunctionObjectsHelp: "Configure the objects recognized by leftV/rightV. A function must be configured before rules can use it; the function finds the nearest configured object first, then checks whether it is in the candidates inside parentheses. Separate objects with commas.",
@@ -1009,6 +1019,7 @@ const elements = {
   entryBrowser: document.querySelector("#entryBrowser"),
   dictionaryManagerView: document.querySelector("#dictionaryManagerView"),
   analysisView: document.querySelector("#analysisView"),
+  qualityView: document.querySelector("#qualityView"),
   settingsView: document.querySelector("#settingsView"),
   docsView: document.querySelector("#docsView"),
   corpusView: document.querySelector("#corpusView"),
@@ -1017,6 +1028,7 @@ const elements = {
   backToEditorButton: document.querySelector("#backToEditorButton"),
   backToEditorFromSettingsButton: document.querySelector("#backToEditorFromSettingsButton"),
   backToEditorFromAnalysisButton: document.querySelector("#backToEditorFromAnalysisButton"),
+  backToEditorFromQualityButton: document.querySelector("#backToEditorFromQualityButton"),
   backToEditorFromDocsButton: document.querySelector("#backToEditorFromDocsButton"),
   backToEditorFromCorpusButton: document.querySelector("#backToEditorFromCorpusButton"),
   backToEditorFromMorphologyButton: document.querySelector("#backToEditorFromMorphologyButton"),
@@ -1106,6 +1118,9 @@ const elements = {
   analysisNoDictionaryNotice: document.querySelector("#analysisNoDictionaryNotice"),
   analysisOpenDictionaryManagerButton: document.querySelector("#analysisOpenDictionaryManagerButton"),
   analysisPanel: document.querySelector("#analysisPanel"),
+  qualityNoDictionaryNotice: document.querySelector("#qualityNoDictionaryNotice"),
+  qualityOpenDictionaryManagerButton: document.querySelector("#qualityOpenDictionaryManagerButton"),
+  qualityPanel: document.querySelector("#qualityPanel"),
   settingsForm: document.querySelector("#settingsForm"),
   glossStyleRows: [...document.querySelectorAll("[data-gloss-style]")],
   corpusUnitCardRenderPatternInput: document.querySelector("#corpusUnitCardRenderPatternInput"),
@@ -1657,6 +1672,7 @@ function toolNavLabel(view) {
     docs: t("languageDocs"),
     corpus: t("corpus"),
     analysis: t("analysis"),
+    quality: t("qualityCheck"),
     ipa: t("ipaConfig"),
     morphology: t("morphologyConfig"),
     settings: t("otherSettings"),
@@ -2133,6 +2149,10 @@ function renderActiveView() {
   }
   if (state.activeView === "analysis") {
     renderAnalysis(dictionary);
+    return;
+  }
+  if (state.activeView === "quality") {
+    renderQuality(dictionary);
   }
 }
 
@@ -2142,11 +2162,14 @@ function rememberProcessScroll() {
   } else if (state.activeView === "analysis") {
     const analysisViewState = activeAnalysisViewState();
     analysisViewState.scrollByRoute[analysisRouteKey()] = window.scrollY;
+  } else if (state.activeView === "quality") {
+    const qualityViewState = activeQualityViewState();
+    qualityViewState.scrollBySubpage[qualityViewState.subpage] = window.scrollY;
   }
 }
 
 function restoreProcessScroll() {
-  if (state.activeView !== "docs" && state.activeView !== "analysis") {
+  if (state.activeView !== "docs" && state.activeView !== "analysis" && state.activeView !== "quality") {
     return;
   }
   requestAnimationFrame(() => {
@@ -2157,6 +2180,9 @@ function restoreProcessScroll() {
     } else if (state.activeView === "analysis") {
       const analysisViewState = activeAnalysisViewState();
       window.scrollTo({ top: analysisViewState.scrollByRoute[analysisRouteKey()] || 0, behavior: "auto" });
+    } else if (state.activeView === "quality") {
+      const qualityViewState = activeQualityViewState();
+      window.scrollTo({ top: qualityViewState.scrollBySubpage[qualityViewState.subpage] || 0, behavior: "auto" });
     }
   });
 }
@@ -2185,6 +2211,27 @@ function activeAnalysisViewState() {
 function forgetAnalysisViewState(dictionaryId) {
   if (dictionaryId) {
     analysisViewStates.delete(dictionaryId);
+  }
+}
+
+function createQualityViewState() {
+  return {
+    subpage: defaultQualityViewState.subpage,
+    scrollBySubpage: {},
+  };
+}
+
+function activeQualityViewState() {
+  const dictionaryId = state.activeDictionaryId || "__none__";
+  if (!qualityViewStates.has(dictionaryId)) {
+    qualityViewStates.set(dictionaryId, createQualityViewState());
+  }
+  return qualityViewStates.get(dictionaryId);
+}
+
+function forgetQualityViewState(dictionaryId) {
+  if (dictionaryId) {
+    qualityViewStates.delete(dictionaryId);
   }
 }
 
@@ -2225,7 +2272,7 @@ function ensureValidSelection() {
     state.selectedEntryId = firstLemmaEntry(dictionary)?.id || "";
   }
 
-  if (!["editor", "manager", "analysis", "settings", "docs", "corpus", "morphology", "ipa"].includes(state.activeView)) {
+  if (!["editor", "manager", "analysis", "quality", "settings", "docs", "corpus", "morphology", "ipa"].includes(state.activeView)) {
     state.activeView = "editor";
   }
 
@@ -2723,6 +2770,8 @@ function renderAvailability() {
   elements.settingsPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "settings";
   elements.analysisNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "analysis";
   elements.analysisPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "analysis";
+  elements.qualityNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "quality";
+  elements.qualityPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "quality";
   elements.docsNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "docs";
   elements.docsPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "docs";
   elements.saveDocsButton.hidden = !backendAvailable || !hasDictionary || state.activeView !== "docs" || settings.docsAutoSave;
@@ -2754,6 +2803,7 @@ function renderView() {
   elements.editorView.classList.toggle("active", state.activeView === "editor");
   elements.dictionaryManagerView.classList.toggle("active", state.activeView === "manager");
   elements.analysisView.classList.toggle("active", state.activeView === "analysis");
+  elements.qualityView.classList.toggle("active", state.activeView === "quality");
   elements.settingsView.classList.toggle("active", state.activeView === "settings");
   elements.docsView.classList.toggle("active", state.activeView === "docs");
   elements.corpusView.classList.toggle("active", state.activeView === "corpus");
@@ -3241,6 +3291,12 @@ function setupAnalysisMasonryLayouts() {
   ).forEach((container) => setupMasonryLayout(container, ".analysis-card", 14));
 }
 
+function setupQualityMasonryLayouts() {
+  elements.qualityPanel.querySelectorAll(
+    ".analysis-grid:not(.analysis-summary-grid), .analysis-detail-grid, .analysis-wide-grid",
+  ).forEach((container) => setupMasonryLayout(container, ".analysis-card", 14));
+}
+
 function renderEntries() {
   const dictionary = activeDictionary();
   if (!dictionary) {
@@ -3329,6 +3385,8 @@ function entryQueryApiKey(dictionary = activeDictionary()) {
     stableJson(settings.tagDisplayMap),
     settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
     settings.partOfSpeechTags.join(","),
+    settings.fuzzySearch ? "fuzzy" : "strict",
+    settings.tagFuzzySearch ? "tag-fuzzy" : "tag-strict",
   ].join("|");
 }
 
@@ -3353,6 +3411,13 @@ function entryQueryUrl(dictionary, options = {}) {
   }
   if (entrySort) {
     params.set("sort", entrySort);
+  }
+  const settings = normalizeDictionarySettings(dictionary?.settings);
+  if (settings.fuzzySearch) {
+    params.set("fuzzy", "true");
+  }
+  if (settings.tagFuzzySearch) {
+    params.set("tagFuzzy", "true");
   }
   params.set("include", "summary");
   params.set("limit", "500");
@@ -4458,29 +4523,12 @@ function entryMatchesSearch(entry, dictionary = activeDictionary(), options = {}
   const matchesPart = !respectPart
     || !activePart
     || (activePart === NO_PART_FILTER_VALUE ? !parts.length : parts.includes(activePart));
-  const tagSearchable = [
-    ...parts,
-    ...parts.map((part) => displayTag(part, dictionary)),
-    ...(entry.tags || []),
-    ...(entry.tags || []).map((tag) => displayTag(tag, dictionary)),
-  ]
-    .map(normalize)
-    .join(" ");
-  const contentSearchable = [
-    entry.lemma,
-    entry.pronunciation,
-    entry.notes,
-    entry.etymology?.description,
-    ...entry.definitions.flatMap((definition) => [definition.meaning, definition.example, definition.note]),
-    ...morphologySearchStrings(entry, dictionary),
-  ]
-    .map(normalize)
-    .join(" ");
-  return matchesPart && (
-    !query ||
-    textMatches(tagSearchable, query, tagFuzzyEnabled) ||
-    textMatches(contentSearchable, query, contentFuzzyEnabled)
-  );
+  return matchesPart && entrySearchModel.entryMatchesSearchText(entry, dictionary, query, {
+    normalizeText: normalize,
+    fuzzy: contentFuzzyEnabled,
+    tagFuzzy: tagFuzzyEnabled,
+    fuzzyFields: options.fuzzyFields,
+  });
 }
 
 function dictionaryStatsText(dictionary) {
@@ -4603,13 +4651,10 @@ function compareEntries(a, b) {
 }
 
 function textMatches(text, query, fuzzyEnabled = false) {
-  if (!query) {
-    return true;
-  }
-  if (text.includes(query)) {
-    return true;
-  }
-  return fuzzyEnabled && fuzzyScore(text, query) > 0;
+  return entrySearchModel.textMatches(text, query, {
+    fuzzy: Boolean(fuzzyEnabled),
+    normalizeText: normalize,
+  });
 }
 
 function highlightSearchText(value, fuzzyEnabled = Boolean(activeDictionary()?.settings?.fuzzySearch)) {
@@ -4688,26 +4733,7 @@ function compactSearchSnippet(value) {
 }
 
 function fuzzyScore(value, query) {
-  const text = normalize(value);
-  const needle = normalize(query);
-  if (!needle) {
-    return 0;
-  }
-  if (text.includes(needle)) {
-    return 100 + needle.length;
-  }
-
-  let score = 0;
-  let lastIndex = -1;
-  for (const char of needle) {
-    const index = text.indexOf(char, lastIndex + 1);
-    if (index < 0) {
-      return 0;
-    }
-    score += index === lastIndex + 1 ? 6 : 2;
-    lastIndex = index;
-  }
-  return score - Math.max(0, text.length - needle.length) * 0.02;
+  return entrySearchModel.fuzzyScore(value, query, { normalizeText: normalize });
 }
 
 function renderDetail() {
@@ -4998,8 +5024,7 @@ function findDerivedEntries(entry, dictionary = activeDictionary()) {
 }
 
 function resolveSourceEntry(sourceName, dictionary = activeDictionary()) {
-  const normalized = normalize(sourceName);
-  return dictionary?.entries.find((entry) => normalize(entry.lemma) === normalized || normalize(entry.id) === normalized) || null;
+  return qualityModel.resolveSourceEntry(sourceName, dictionary, { normalizeText: normalize });
 }
 
 function glossStyleClassNames(key, settings) {
@@ -5039,24 +5064,7 @@ function renderExampleHtml(example, rawSettings = {}) {
 }
 
 function parseGloss(example) {
-  const gloss = { gla: [], glb: [], glc: [], ft: "" };
-  let hasGloss = false;
-  String(example || "")
-    .replaceAll("\\n", "\n")
-    .split(/\r?\n/)
-    .forEach((line) => {
-      const match = line.match(/^\\(gla|glb|glc|ft)\s*(.*)$/);
-      if (!match) {
-        return;
-      }
-      hasGloss = true;
-      if (match[1] === "ft") {
-        gloss.ft = match[2].trim();
-      } else {
-        gloss[match[1]] = match[2].trim().split(/\s+/).filter(Boolean);
-      }
-    });
-  return hasGloss ? gloss : null;
+  return qualityModel.parseGloss(example);
 }
 
 function renderSmallCaps(value) {
@@ -5169,9 +5177,29 @@ function renderAnalysis(dictionary = activeDictionary()) {
   setupAnalysisMasonryLayouts();
 }
 
+function renderQuality(dictionary = activeDictionary()) {
+  if (!elements.qualityPanel) {
+    return;
+  }
+  disconnectMasonryLayoutsWithin(elements.qualityPanel);
+  if (!dictionary) {
+    elements.qualityPanel.innerHTML = "";
+    return;
+  }
+
+  analysisFilterRegistry.clear();
+  analysisFilterCounter = 0;
+  const report = buildDictionaryAnalysis(dictionary);
+  elements.qualityPanel.innerHTML = renderQualityPage(report);
+  setupQualityMasonryLayouts();
+}
+
 function renderAnalysisPage(report) {
   const analysisViewState = activeAnalysisViewState();
-  const page = analysisViewState.page || "overview";
+  const page = ["overview", "entries", "ipa", "morphology", "activity"].includes(analysisViewState.page)
+    ? analysisViewState.page
+    : "overview";
+  analysisViewState.page = page;
   const subpage = activeAnalysisSubpage(page);
   return `
     ${analysisPageNav(page)}
@@ -5189,7 +5217,6 @@ function analysisPageNav(activePage) {
     ["ipa", "IPA"],
     ["morphology", aText("形态学", "Morphology")],
     ["activity", aText("编辑进度", "Activity")],
-    ["quality", aText("质量检查", "Quality")],
   ];
   return `<nav class="analysis-page-tabs">${pages.map(([page, label]) => `
     <button type="button" class="${page === activePage ? "active" : ""}" data-analysis-page="${escapeHtml(page)}">${escapeHtml(label)}</button>
@@ -5197,16 +5224,6 @@ function analysisPageNav(activePage) {
 }
 
 function analysisSubpageNav(page, activeSubpage, report = null) {
-  if (page === "quality") {
-    return `<div class="analysis-subpage-tab-groups quality-subpage-tab-groups">${analysisQualitySubpageGroups().map((group) => `
-      <div class="analysis-subpage-tab-group">
-        <span>${escapeHtml(group.label)}</span>
-        <nav class="analysis-subpage-tabs">${group.subpages.map(([subpage, label]) => `
-          ${renderAnalysisQualitySubpageButton(subpage, label, activeSubpage, report)}
-        `).join("")}</nav>
-      </div>
-    `).join("")}</div>`;
-  }
   const subpages = analysisSubpages(page);
   if (!subpages.length) {
     return "";
@@ -5239,20 +5256,48 @@ function analysisSubpages(page) {
       ["created", aText("新增日期", "Created")],
       ["latest", aText("最近修改", "Recent")],
     ],
-    quality: analysisQualitySubpageGroups().flatMap((group) => group.subpages),
   };
   return subpages[page] || [];
 }
 
-function renderAnalysisQualitySubpageButton(subpage, label, activeSubpage, report = null) {
-  const count = report ? analysisQualitySubpageEntryCount(report, subpage) : null;
+function renderQualityPage(report) {
+  const subpage = activeQualitySubpage();
+  return `
+    ${qualitySubpageNav(subpage, report)}
+    <section class="analysis-page-body">
+      ${qualityPageBody(report, subpage)}
+    </section>
+  `;
+}
+
+function qualitySubpageNav(activeSubpage, report = null) {
+  return `<div class="analysis-subpage-tab-groups quality-subpage-tab-groups">${qualitySubpageGroups().map((group) => `
+    <div class="analysis-subpage-tab-group">
+      <span>${escapeHtml(group.label)}</span>
+      <nav class="analysis-subpage-tabs">${group.subpages.map(([subpage, label]) => `
+        ${renderQualitySubpageButton(subpage, label, activeSubpage, report)}
+      `).join("")}</nav>
+    </div>
+  `).join("")}</div>`;
+}
+
+function renderQualitySubpageButton(subpage, label, activeSubpage, report = null) {
+  const count = report ? qualitySubpageEntryCount(report, subpage) : null;
   const isActive = subpage === activeSubpage;
   const disabled = count === 0 && !isActive;
   const countBadge = count === null ? "" : `<span class="analysis-tab-count">${escapeHtml(count)}</span>`;
-  return `<button type="button" class="${isActive ? "active" : ""}" data-analysis-subpage="${escapeHtml(subpage)}" ${disabled ? "disabled" : ""}>${escapeHtml(label)}${countBadge}</button>`;
+  return `<button type="button" class="${isActive ? "active" : ""}" data-quality-subpage="${escapeHtml(subpage)}" ${disabled ? "disabled" : ""}>${escapeHtml(label)}${countBadge}</button>`;
 }
 
-function analysisQualitySubpageGroups() {
+function activeQualitySubpage() {
+  const qualityViewState = activeQualityViewState();
+  const subpages = qualitySubpageGroups().flatMap((group) => group.subpages);
+  return subpages.some(([subpage]) => subpage === qualityViewState.subpage)
+    ? qualityViewState.subpage
+    : subpages[0]?.[0] || "issues";
+}
+
+function qualitySubpageGroups() {
   return [
     {
       label: aText("按优先度", "By priority"),
@@ -5290,9 +5335,6 @@ function analysisPageBody(report, page, subpage) {
   if (page === "activity") {
     return renderAnalysisActivityPage(report, subpage);
   }
-  if (page === "quality") {
-    return renderAnalysisQualityPage(report, subpage);
-  }
   return renderAnalysisOverview(report);
 }
 
@@ -5307,7 +5349,7 @@ function renderAnalysisOverview(report) {
       ${analysisMetricCard(aText("释义覆盖", "Definition Coverage"), percentText(report.coverage.definitions), `${report.definitionCount} ${aText("条释义", "definitions")}`, advancedFilterAction(aText("有释义", "Has definitions"), report.definitionEntryIds, { variants: [{ title: aText("无释义", "No definitions"), entryIds: report.noDefinitionEntryIds }] }))}
       ${analysisMetricCard("IPA", percentText(report.coverage.ipa), `${report.ipa.syllableAverage} ${aText("平均音节", "avg syllables")}`, advancedFilterAction(aText("有 IPA", "Has IPA"), report.ipaEntryIds, { variants: [{ title: aText("无 IPA", "No IPA"), entryIds: report.noIpaEntryIds }] }))}
       ${analysisMetricCard(aText("形态学", "Morphology"), percentText(report.coverage.morphology), `${report.morphology.generatedForms} ${aText("个生成形式", "generated forms")}`, advancedFilterAction(aText("有形态表格", "Has morphology table"), report.morphologyEntryIds, { variants: [{ title: aText("无形态表格", "No morphology table"), entryIds: report.noMorphologyEntryIds }] }))}
-      ${analysisMetricCard(aText("质量问题", "Quality Issues"), report.issues.length, `${highIssueEntryIds.length} ${aText("个高优先级", "high priority")}`, qualityIssueFilterAction(report, "priority", "all"))}
+      ${analysisMetricCard(aText("质量问题", "Quality Issues"), report.issues.length, `${highIssueEntryIds.length} ${aText("个高优先级", "high priority")}`, viewAction("quality"))}
     </section>
     <section class="analysis-grid">
       ${analysisCard(aText("词性分布", "Part of Speech"), analysisBarList(report.parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") }))}
@@ -5391,8 +5433,8 @@ function renderAnalysisActivityPage(report, subpage) {
   return `<section class="analysis-detail-grid">${analysisCard(aText("编辑日期", "Updated Date"), analysisBarList(report.activity.updated, { empty: aText("暂无编辑记录", "No edit records") }))}</section>`;
 }
 
-function renderAnalysisQualityPage(report, subpage) {
-  const filterBar = renderAnalysisQualityFilterBar(report, subpage);
+function qualityPageBody(report, subpage) {
+  const filterBar = renderQualityFilterBar(report, subpage);
   if (["lemma", "tags", "ipa", "other"].includes(subpage)) {
     const moduleIssues = qualityIssuesByModule(report, subpage);
     return `${filterBar}<section class="analysis-detail-grid">${analysisCard(qualityIssueModuleLabel(subpage), analysisIssueList(moduleIssues, { limit: Infinity }))}</section>`;
@@ -5402,10 +5444,7 @@ function renderAnalysisQualityPage(report, subpage) {
   }
   if (subpage === "gloss") {
     const glossIssues = qualityIssuesByModule(report, "gloss");
-    return `${filterBar}<section class="analysis-detail-grid">
-      ${analysisCard(aText("Glossed 例句", "Glossed Examples"), analysisFactList([[aText("Glossed 例句", "Glossed examples"), report.glossExamples, advancedFilterAction(aText("Glossed 例句", "Glossed examples"), report.glossEntryIds)]]))}
-      ${analysisCard(aText("Glossed 例句问题", "Glossed Example Issues"), analysisIssueList(glossIssues, { limit: Infinity }))}
-    </section>`;
+    return `${filterBar}<section class="analysis-detail-grid">${analysisCard(aText("Glossed 例句问题", "Glossed Example Issues"), analysisIssueList(glossIssues, { limit: Infinity }))}</section>`;
   }
   if (["high", "medium", "low"].includes(subpage)) {
     const issues = report.issues.filter((issue) => issue.severity === subpage);
@@ -5414,10 +5453,10 @@ function renderAnalysisQualityPage(report, subpage) {
   return `${filterBar}<section class="analysis-detail-grid">${analysisCard(aText("质量检查", "Quality Checks"), analysisIssueList(report.issues, { limit: Infinity }))}</section>`;
 }
 
-function renderAnalysisQualityFilterBar(report, subpage) {
-  const label = analysisQualitySubpageLabel(subpage);
-  const count = analysisQualitySubpageEntryCount(report, subpage);
-  const action = analysisQualityFilterActionForSubpage(report, subpage);
+function renderQualityFilterBar(report, subpage) {
+  const label = qualitySubpageLabel(subpage);
+  const count = qualitySubpageEntryCount(report, subpage);
+  const action = qualityFilterActionForSubpage(report, subpage);
   const attrs = analysisActionAttributes(action);
   return `
     <section class="analysis-quality-current" aria-label="${escapeHtml(aText("质量检查高级筛选", "Quality advanced filters"))}">
@@ -5430,10 +5469,10 @@ function renderAnalysisQualityFilterBar(report, subpage) {
 }
 
 function qualityIssuesWithEntries(issues = []) {
-  return (issues || []).filter((issue) => issue.entryId);
+  return qualityModel.qualityIssuesWithEntries(issues);
 }
 
-function analysisQualitySubpageKey(subpage) {
+function qualitySubpageKey(subpage) {
   const priorityMap = {
     issues: "all",
     high: "high",
@@ -5450,18 +5489,18 @@ function analysisQualitySubpageKey(subpage) {
   return { group: "priority", key: "all" };
 }
 
-function analysisQualitySubpageLabel(subpage) {
-  const labels = Object.fromEntries(analysisQualitySubpageGroups().flatMap((group) => group.subpages));
+function qualitySubpageLabel(subpage) {
+  const labels = Object.fromEntries(qualitySubpageGroups().flatMap((group) => group.subpages));
   return labels[subpage] || labels.issues || aText("全部问题", "All Issues");
 }
 
-function analysisQualitySubpageEntryCount(report, subpage) {
-  const action = analysisQualityFilterActionForSubpage(report, subpage);
+function qualitySubpageEntryCount(report, subpage) {
+  const action = qualityFilterActionForSubpage(report, subpage);
   return action?.entryIds?.length || 0;
 }
 
-function analysisQualityFilterActionForSubpage(report, subpage) {
-  const { group, key } = analysisQualitySubpageKey(subpage);
+function qualityFilterActionForSubpage(report, subpage) {
+  const { group, key } = qualitySubpageKey(subpage);
   return qualityIssueFilterAction(report, group, key);
 }
 
@@ -5527,11 +5566,11 @@ function qualityIssueAdvancedFilterAction(title, issues = [], variants = [], opt
 }
 
 function qualityIssuesByModule(report, module) {
-  return (report.issues || []).filter((issue) => (issue.module || "other") === module);
+  return qualityModel.qualityIssuesByModule(report, module);
 }
 
 function qualityIssueEntryIdsByModule(report, module) {
-  return entryIdsFrom(qualityIssuesByModule(report, module).map((issue) => issue.entryId));
+  return qualityModel.qualityIssueEntryIdsByModule(report, module);
 }
 
 function qualityIssueModuleLabel(module) {
@@ -5557,10 +5596,6 @@ function qualityIssueSeverityLabel(severity) {
 
 function qualityIssueModuleFilterTitle(module) {
   return qualityIssueModuleLabel(module);
-}
-
-function countPrimaryStressMarks(value) {
-  return ipaModel.countPrimaryStressMarks(value);
 }
 
 function analysisFactRows(report) {
@@ -5605,10 +5640,6 @@ function buildDictionaryAnalysis(dictionary) {
   const wordLengths = new Map();
   const characters = new Map();
   const bigrams = new Map();
-  const issues = [];
-  const networkIssues = [];
-  const duplicateLemmas = new Map();
-  const normalizedTagForms = new Map();
   const definitionEntryIds = new Set();
   const exampleEntryIds = new Set();
   const glossEntryIds = new Set();
@@ -5630,10 +5661,6 @@ function buildDictionaryAnalysis(dictionary) {
   let multiSourceCount = 0;
 
   entries.forEach((entry) => {
-    const lemmaKey = normalize(entry.lemma);
-    if (lemmaKey) {
-      mapPush(duplicateLemmas, lemmaKey, entry);
-    }
     const entryPartTags = entryParts(entry, dictionary);
     if (entryPartTags.length) {
       entryPartTags.forEach((part) => incrementEntry(parts, part, entry));
@@ -5642,10 +5669,6 @@ function buildDictionaryAnalysis(dictionary) {
     }
     (entry.tags || []).forEach((tag) => {
       incrementEntry(tags, tag, entry);
-      const compact = normalize(tag).replace(/[^\p{L}\p{N}]+/gu, "");
-      if (compact) {
-        mapPush(normalizedTagForms, compact, tag);
-      }
     });
     if ((entry.tags || []).length > 1) {
       incrementEntry(tagCombos, entry.tags.map((tag) => displayTag(tag, dictionary)).join(" + "), entry);
@@ -5680,12 +5703,6 @@ function buildDictionaryAnalysis(dictionary) {
       if (gloss) {
         glossExamples += 1;
         glossEntryIds.add(entry.id);
-        const missing = ["gla", "glb", "ft"].filter((key) => key === "ft" ? !gloss.ft : !gloss[key]?.length);
-        if (missing.length) {
-          addIssue(issues, "medium", entry, aText("Gloss 不完整", "Incomplete gloss"), `${aText("缺少", "Missing")}: ${missing.map((key) => `\\${key}`).join(", ")}`, "gloss");
-        } else if (gloss.gla.length !== gloss.glb.length) {
-          addIssue(issues, "medium", entry, aText("Gloss 对齐数量不一致", "Gloss alignment mismatch"), `\\gla ${gloss.gla.length} / \\glb ${gloss.glb.length}`, "gloss");
-        }
       }
     });
 
@@ -5711,64 +5728,12 @@ function buildDictionaryAnalysis(dictionary) {
     }
   });
 
-  duplicateLemmas.forEach((items) => {
-    if (items.length > 1) {
-      items.forEach((entry) => addIssue(issues, "high", entry, aText("重复词形", "Duplicate lemma"), items.map((item) => item.lemma).join(", "), "lemma"));
-    }
+  const qualityReport = qualityModel.buildQualityReport(dictionary, {
+    text: aText,
+    normalizeText: normalize,
   });
-  normalizedTagForms.forEach((forms) => {
-    const unique = [...new Set(forms)];
-    if (unique.length > 1) {
-      issues.push({
-        severity: "low",
-        title: aText("近似标签可能不一致", "Near-duplicate tags"),
-        detail: unique.join(", "),
-        module: "tags",
-      });
-    }
-  });
-
-  entries.forEach((entry) => {
-    if (!entry.lemma) {
-      addIssue(issues, "high", entry, aText("缺少词形", "Missing lemma"), "", "lemma");
-    }
-    if (!(entry.tags || []).length) {
-      addIssue(issues, "high", entry, aText("缺少标签", "Missing tags"), "", "tags");
-    }
-    if (!(entry.definitions || []).some((definition) => definition.meaning)) {
-      addIssue(issues, "high", entry, aText("缺少释义", "Missing definition"), "");
-    }
-    if (!entry.pronunciation) {
-      addIssue(issues, "low", entry, aText("缺少 IPA", "Missing IPA"), "", "ipa");
-    } else {
-      const primaryStressCount = countPrimaryStressMarks(entry.pronunciation);
-      if (primaryStressCount > 1) {
-        addIssue(
-          issues,
-          "medium",
-          entry,
-          aText("多个主重音", "Multiple primary stresses"),
-          `${aText("主重音数量", "Primary stress count")}: ${primaryStressCount}`,
-          "ipa",
-        );
-      }
-    }
-    (entry.tags || []).filter((tag) => Array.from(tag).length > 24).forEach((tag) => {
-      addIssue(issues, "low", entry, aText("标签过长", "Long tag"), tag, "tags");
-    });
-    (entry.etymology?.sources || []).forEach((sourceName) => {
-      if (!resolveSourceEntry(sourceName, dictionary)) {
-        addIssue(networkIssues, "medium", entry, aText("未解析来源", "Unresolved source"), sourceName, "network");
-        addIssue(issues, "medium", entry, aText("未解析来源", "Unresolved source"), sourceName, "network");
-      }
-    });
-    const cycle = sourceCycleForEntry(entry, dictionary);
-    if (cycle.length) {
-      const detail = cycle.map((item) => item.lemma).join(" → ");
-      addIssue(networkIssues, "high", entry, aText("词源循环引用", "Etymology cycle"), detail, "network");
-      addIssue(issues, "high", entry, aText("词源循环引用", "Etymology cycle"), detail, "network");
-    }
-  });
+  const issues = qualityReport.issues;
+  const networkIssues = qualityReport.networkIssues;
 
   const ipa = analyzeIpa(entries, dictionary);
   const morphology = analyzeMorphology(entries, dictionary);
@@ -6016,22 +5981,26 @@ function analyzeSearchFields(entries, dictionary) {
     return [];
   }
   const settings = normalizeDictionarySettings(dictionary.settings);
+  const fuzzyOptions = {
+    fuzzy: settings.fuzzySearch,
+    tagFuzzy: settings.tagFuzzySearch,
+  };
   const counts = new Map();
   entries.forEach((entry) => {
-    const parts = entryParts(entry, dictionary);
+    const fieldValues = entrySearchModel.entrySearchFieldValues(entry, dictionary, { normalizeText: normalize });
     const fieldGroups = [
-      [aText("词形", "Lemma"), [entry.lemma], settings.fuzzySearch],
-      [aText("标签", "Tags"), [...parts, ...parts.map((part) => displayTag(part, dictionary)), ...(entry.tags || []), ...(entry.tags || []).map((tag) => displayTag(tag, dictionary))], settings.tagFuzzySearch],
-      [aText("释义", "Definitions"), (entry.definitions || []).map((definition) => definition.meaning), settings.fuzzySearch],
-      [aText("例句", "Examples"), (entry.definitions || []).map((definition) => definition.example), settings.fuzzySearch],
-      [aText("词源", "Etymology"), [...(entry.etymology?.sources || []), entry.etymology?.description], settings.fuzzySearch],
-      ["IPA", [entry.pronunciation], settings.fuzzySearch],
-      [aText("形态形式", "Morphology forms"), morphologySearchStrings(entry, dictionary), settings.fuzzySearch],
-      [aText("备注", "Notes"), [entry.notes, ...(entry.definitions || []).map((definition) => definition.note)], settings.fuzzySearch],
+      ["lemma", aText("词形", "Lemma"), fieldValues.lemma],
+      ["tags", aText("标签", "Tags"), fieldValues.tags],
+      ["definitions", aText("释义", "Definitions"), fieldValues.definitions],
+      ["examples", aText("例句", "Examples"), fieldValues.examples],
+      ["etymology", aText("词源", "Etymology"), fieldValues.etymology],
+      ["pronunciation", "IPA", fieldValues.pronunciation],
+      ["morphology", aText("形态形式", "Morphology forms"), fieldValues.morphology],
+      ["notes", aText("备注", "Notes"), fieldValues.notes],
     ];
-    fieldGroups.forEach(([label, values, fuzzy]) => {
+    fieldGroups.forEach(([field, label, values]) => {
       const text = values.map(normalize).join(" ");
-      if (textMatches(text, query, Boolean(fuzzy))) {
+      if (textMatches(text, query, entrySearchModel.fieldFuzzyEnabled(field, fuzzyOptions))) {
         incrementEntry(counts, label, entry);
       }
     });
@@ -6122,44 +6091,6 @@ function analysisIssueList(issues, options = {}) {
       </div>
     </li>
   `).join("")}</ul>`;
-}
-
-function addIssue(list, severity, entry, title, detail = "", module = "other") {
-  list.push({
-    severity,
-    entryId: entry?.id || "",
-    entryLemma: entry?.lemma || "",
-    title,
-    detail,
-    module,
-  });
-}
-
-function sourceCycleForEntry(entry, dictionary) {
-  const path = [];
-  const seen = new Set();
-  const visit = (current) => {
-    if (!current) {
-      return [];
-    }
-    if (seen.has(current.id)) {
-      const index = path.findIndex((item) => item.id === current.id);
-      return index >= 0 ? [...path.slice(index), current] : [current];
-    }
-    seen.add(current.id);
-    path.push(current);
-    for (const sourceName of current.etymology?.sources || []) {
-      const source = resolveSourceEntry(sourceName, dictionary);
-      const cycle = visit(source);
-      if (cycle.length) {
-        return cycle;
-      }
-    }
-    path.pop();
-    seen.delete(current.id);
-    return [];
-  };
-  return visit(entry);
 }
 
 function cleanIpaText(value) {
@@ -8595,118 +8526,23 @@ function collectMorphologyFunctions() {
 }
 
 function validateMorphologyFunctionUsage(morphology) {
-  const normalized = normalizeMorphology(morphology);
-  const errors = [];
-  normalized.tables.forEach((table) => {
-    Object.values(table.cells).forEach((cell) => {
-      extractMorphologyFunctionCalls(cell.value).forEach((call) => {
-        if (call.invalidOffset) {
-          errors.push(`${table.name}: ${call.name} offset must be a positive integer`);
-          return;
-        }
-        if (call.name === "left" || call.name === "right") {
-          return;
-        }
-        const configured = normalized.functions[call.name] || [];
-        if (!configured.length) {
-          errors.push(`${table.name}: ${call.name} not configured`);
-          return;
-        }
-        const invalid = call.options.filter((option) => !configured.includes(option));
-        if (invalid.length) {
-          errors.push(`${table.name}: ${call.name}(${invalid.join(", ")})`);
-        }
-      });
-    });
-  });
-  return errors;
+  return morphologyModel.validateMorphologyFunctionUsage(morphology);
 }
 
 function validateMorphologyReferenceSyntax(morphology) {
-  const normalized = normalizeMorphology(morphology);
-  const errors = [];
-  normalized.tables.forEach((table) => {
-    Object.entries(table.cells).forEach(([key, cell]) => {
-      const label = morphologyCellErrorLabel(table, key);
-      extractMorphologyReferences(cell.value).forEach((reference) => {
-        if (reference.unterminated) {
-          errors.push(`${label}: missing }`);
-          return;
-        }
-        const body = reference.body.trim();
-        if (!body || body.toLowerCase() === "lemma") {
-          return;
-        }
-        body.split(",").forEach((part) => {
-          const parsed = parseMorphologyReplacement(part);
-          if (!parsed.valid) {
-            errors.push(`${label}: {${body}} - ${parsed.reason}`);
-          }
-        });
-      });
-    });
-  });
-  return errors;
+  return morphologyModel.validateMorphologyReferenceSyntax(morphology, { labelForCell: morphologyCellErrorLabel });
 }
 
 function extractMorphologyReferences(value) {
-  const references = [];
-  const text = String(value || "");
-  let index = 0;
-  while (index < text.length) {
-    if (text[index] !== "{") {
-      index += 1;
-      continue;
-    }
-    const end = text.indexOf("}", index + 1);
-    if (end < 0) {
-      references.push({ body: text.slice(index + 1), unterminated: true });
-      break;
-    }
-    references.push({ body: text.slice(index + 1, end), unterminated: false });
-    index = end + 1;
-  }
-  return references;
+  return morphologyModel.extractMorphologyReferences(value);
 }
 
 function morphologyCellErrorLabel(table, key) {
-  const match = String(key || "").match(/^r(\d+)c(\d+)$/);
-  if (!match) {
-    return table.name;
-  }
-  const row = Number.parseInt(match[1], 10);
-  const col = Number.parseInt(match[2], 10);
-  const rowLabel = table.rowLabels[row] || `${row + 1}`;
-  const colLabel = table.colLabels[col] || `${col + 1}`;
-  return `${table.name}: ${rowLabel} / ${colLabel}`;
+  return morphologyModel.morphologyCellErrorLabel(table, key);
 }
 
 function extractMorphologyFunctionCalls(rule) {
-  const calls = [];
-  const text = String(rule || "");
-  let index = 0;
-  while (index < text.length) {
-    if (text[index] !== "/") {
-      index += 1;
-      continue;
-    }
-    const end = text.indexOf("/", index + 1);
-    if (end < 0) {
-      break;
-    }
-    String(text.slice(index + 1, end) || "")
-      .split(/;/)
-      .map(parseMorphologyConditionClause)
-      .filter((clause) => clause?.type === "condition")
-      .forEach((clause) => {
-        const call = parseMorphologyFunctionCondition(clause.condition);
-        if (call) {
-          calls.push(call);
-        }
-      });
-    index = end + 1;
-  }
-  return calls;
+  return morphologyModel.extractMorphologyFunctionCalls(rule);
 }
 
 async function saveMorphologyConfig(event) {
@@ -9580,6 +9416,7 @@ async function deleteSelectedDictionary() {
   try {
     await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}`, { method: "DELETE" });
     forgetAnalysisViewState(dictionary.id);
+    forgetQualityViewState(dictionary.id);
     corpusViewStates.delete(dictionary.id);
     if (corpusDraftState?.dictionaryId === dictionary.id) {
       corpusDraftState = null;
@@ -9690,6 +9527,7 @@ function importData(event) {
       if (overwrite) {
         corpusViewStates.delete(dictionary.id);
         forgetAnalysisViewState(dictionary.id);
+        forgetQualityViewState(dictionary.id);
         if (corpusDraftState?.dictionaryId === dictionary.id) {
           corpusDraftState = null;
         }
@@ -10116,6 +9954,7 @@ elements.entryBrowserToggleButton.addEventListener("click", toggleEntryBrowser);
 elements.backToEditorButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromSettingsButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromAnalysisButton.addEventListener("click", () => showView("editor"));
+elements.backToEditorFromQualityButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromDocsButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromCorpusButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromMorphologyButton.addEventListener("click", () => showView("editor"));
@@ -10124,6 +9963,7 @@ elements.addDictionaryButton.addEventListener("click", prepareNewDictionary);
 elements.emptyCreateDictionaryButton.addEventListener("click", () => showView("manager"));
 elements.settingsOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.analysisOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
+elements.qualityOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.docsOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.corpusOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.morphologyOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
@@ -10136,13 +9976,6 @@ elements.entryListNewEntryButton.addEventListener("click", async () => {
 });
 elements.editEntryButton.addEventListener("click", beginEditEntry);
 elements.analysisPanel.addEventListener("click", (event) => {
-  const qualityInfoButton = event.target.closest('[data-action="quality-filter-info"]');
-  if (qualityInfoButton) {
-    appInfoDialog(t("qualityFilterInfoTitle"), {
-      text: t("qualityFilterInfoBody"),
-    });
-    return;
-  }
   const pageButton = event.target.closest("[data-analysis-page]");
   if (pageButton) {
     rememberProcessScroll();
@@ -10162,6 +9995,73 @@ elements.analysisPanel.addEventListener("click", (event) => {
     const analysisViewState = activeAnalysisViewState();
     analysisViewState.subpageByPage[analysisViewState.page] = subpageButton.dataset.analysisSubpage || "";
     renderAnalysis(activeDictionary());
+    restoreProcessScroll();
+    return;
+  }
+  const viewTarget = event.target.closest("[data-view-target]");
+  if (viewTarget) {
+    advancedFilter = null;
+    state.activeView = viewTarget.dataset.viewTarget || "editor";
+    if (state.activeView === "editor") {
+      revealEntryBrowserForResults();
+    }
+    render();
+    return;
+  }
+  const partFilterTarget = event.target.closest("[data-part-filter-value]");
+  if (partFilterTarget) {
+    advancedFilter = null;
+    rootMode = false;
+    activePart = partFilterTarget.dataset.partFilterValue || "";
+    searchQuery = "";
+    state.activeView = "editor";
+    revealEntryBrowserForResults();
+    const dictionary = activeDictionary();
+    const firstEntry = dictionary
+      ? [...dictionary.entries]
+        .filter((entry) => {
+          const parts = entryParts(entry, dictionary);
+          return activePart === NO_PART_FILTER_VALUE ? !parts.length : parts.includes(activePart);
+        })
+        .sort(compareEntries)[0]
+      : null;
+    if (firstEntry) {
+      state.selectedEntryId = firstEntry.id;
+      editorMode = "display";
+      entryDraft = null;
+    }
+    render();
+    scheduleEntryCardScroll(state.selectedEntryId);
+    return;
+  }
+  const filterTarget = event.target.closest("[data-advanced-filter-id]");
+  if (filterTarget) {
+    const action = analysisFilterRegistry.get(filterTarget.dataset.advancedFilterId);
+    enterAdvancedFilter(action);
+    return;
+  }
+  const target = event.target.closest("[data-entry-id]");
+  if (!target) {
+    return;
+  }
+  state.activeView = "editor";
+  advancedFilter = null;
+  switchToEntry(target.dataset.entryId);
+});
+elements.qualityPanel.addEventListener("click", (event) => {
+  const qualityInfoButton = event.target.closest('[data-action="quality-filter-info"]');
+  if (qualityInfoButton) {
+    appInfoDialog(t("qualityFilterInfoTitle"), {
+      text: t("qualityFilterInfoBody"),
+    });
+    return;
+  }
+  const subpageButton = event.target.closest("[data-quality-subpage]");
+  if (subpageButton) {
+    rememberProcessScroll();
+    const qualityViewState = activeQualityViewState();
+    qualityViewState.subpage = subpageButton.dataset.qualitySubpage || "issues";
+    renderQuality(activeDictionary());
     restoreProcessScroll();
     return;
   }

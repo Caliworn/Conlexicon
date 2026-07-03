@@ -56,7 +56,7 @@
 | `PUT` | `/api/dictionaries/:id/settings` | 保存其他设置 | 完整词典 JSON | 不做实体 ID 检查；会保留既有 IPA 设置。 |
 | `PUT` | `/api/dictionaries/:id/docs` | 保存语言文档 | 完整词典 JSON | 不做实体 ID 检查。 |
 | `PUT` | `/api/dictionaries/:id/corpus` | 保存语料库模块 | 完整词典 JSON | 检查语料范围内实体 ID 冲突。 |
-| `PUT` | `/api/dictionaries/:id/morphology` | 保存自动形态学模块 | 完整词典 JSON | 检查形态表实体 ID 冲突。 |
+| `PUT` | `/api/dictionaries/:id/morphology` | 保存自动形态学模块 | 完整词典 JSON | 检查形态表实体 ID 冲突，并使用共享形态模块校验规则引用语法和函数对象配置。 |
 | `PUT` | `/api/dictionaries/:id/settings/ipa` | 保存自动 IPA 设置 | 完整词典 JSON | 检查 IPA 规则和重音规则实体 ID 冲突。 |
 | `POST` | `/api/dictionaries/:id/autosave` | 页面卸载时保存文档/语料草稿 | 完整词典 JSON | 当前只分发 `docs` 和 `corpus`；没有有效模块时返回词典快照。 |
 
@@ -64,7 +64,7 @@
 
 | 方法 | 路径 | 用途 | 响应 | 校验范围 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | 无参数时为词条数组；带查询参数时为分页查询对象 | 支持 `q`、`fields`、`part`、`tags`、`tagMode`、`source`、`derivedFrom`、`sort`、`cursor`、`limit`、`include`。 |
+| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | 无参数时为词条数组；带查询参数时为分页查询对象 | 支持 `q`、`fields`、`fuzzy`、`tagFuzzy`、`fuzzyFields`、`part`、`tags`、`tagMode`、`source`、`derivedFrom`、`sort`、`cursor`、`limit`、`include`。 |
 | `POST` | `/api/dictionaries/:id/entries` | 新建词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
 | `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存单个词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
@@ -77,6 +77,13 @@
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/dictionaries/:id/facets` | 读取词性和标签统计 | `{ parts, tags, noPartOfSpeechCount }` | 尊重当前词典的词性标签设置和标签显示替换。 |
 | `GET` | `/api/dictionaries/:id/entry-relations/:entryId` | 读取词源/衍生/同根关系 | `{ entryId, sources, derivedEntries, rootGroup }` | 同名 lemma 暂按排序后的第一条匹配，后续可由诊断模块报告歧义。 |
+
+#### `GET /api/dictionaries/:id/entries` 查询参数补充
+
+- `fields`：逗号分隔的搜索字段白名单；当前支持 `lemma`、`pronunciation`、`tags`、`definitions`、`examples`、`notes`、`etymology`、`morphology`。为空或全部无效时搜索全部字段。
+- `fuzzy`：兼容现有“词条搜索模糊匹配”开关；为真时对除 `tags` 外的搜索字段启用模糊匹配。
+- `tagFuzzy`：兼容现有“标签模糊匹配”开关；为真时对 `tags` 字段启用模糊匹配。
+- `fuzzyFields`：逗号分隔的字段级模糊匹配白名单。提供有效字段时覆盖 `fuzzy` / `tagFuzzy` 推导结果，用于后续“每个搜索字段单独配置模糊匹配”的界面扩展。
 
 ## 实体 ID 校验约定
 
@@ -171,7 +178,7 @@ GET /api/dictionaries
 `GET /api/dictionaries/:id/entries` 保持无参数时返回完整词条数组的兼容行为。带查询参数时返回分页查询对象：
 
 ```text
-GET /api/dictionaries/:id/entries?q=&fields=&part=&tags=&tagMode=&sort=&source=&derivedFrom=&cursor=&limit=&include=
+GET /api/dictionaries/:id/entries?q=&fields=&fuzzy=&tagFuzzy=&fuzzyFields=&part=&tags=&tagMode=&sort=&source=&derivedFrom=&cursor=&limit=&include=
 ```
 
 参数约定：
@@ -186,6 +193,9 @@ GET /api/dictionaries/:id/entries?q=&fields=&part=&tags=&tagMode=&sort=&source=&
   - `notes`：词条备注和释义备注；
   - `etymology`：词源描述和来源文本；
   - `morphology`：按当前形态表设置动态生成的形态形式，以及词条级形态 override。
+- `fuzzy`：兼容现有全局模糊搜索开关；对除 `tags` 外的字段启用模糊匹配。
+- `tagFuzzy`：兼容现有标签模糊搜索开关；对 `tags` 字段启用模糊匹配。
+- `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；提供有效字段时覆盖 `fuzzy` / `tagFuzzy` 推导结果。
 - `part`：词性筛选；特殊值 `__conlexicon_no_part__` 表示无词性。
 - `tags`：逗号分隔的原始标签列表。
 - `tagMode`：`any` 或 `all`，默认 `any`。

@@ -12,14 +12,14 @@ Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。
 - Tag-first part-of-speech logic: the first tag is treated as the part of speech and is used for display/filtering.
 - Display mode and edit mode: saved entries open in a clean reading view, with full editing and inline section editing available.
 - Responsive application shell with collapsible tool navigation, a collapsible entry list, and mobile drawer controls for navigation, entry browsing, and creating entries.
-- Advanced filtering from analytics: click analytic rows to filter the entry browser, with reversible filter variants for coverage, IPA, morphology, and quality checks.
+- Advanced filtering from analytics and quality checks: click analytic rows or quality categories to filter the entry browser, with reversible filter variants for coverage, IPA, morphology, and quality issues.
 - Root mode entry browsing: derived entries can be nested under their roots, with expand/collapse controls and quick derived-entry creation.
 - Lexical network view for source and derived relationships, including hover cards and navigation between connected entries.
 - Auto IPA rules with mapping, syllabification, onset/coda clusters, complex phonemes, stress settings, sandbox testing, and batch generation.
 - Auto morphology tables with custom rule syntax, function objects, overrides, generated forms, and searchable morphology output.
 - Markdown language documentation with split edit/preview, edit-only, and preview-only modes.
 - Per-dictionary corpus management with ordered blocks, speaker/modality layers, standalone units, inherited attributes, unique entity ID validation, single-parent link validation, and configurable gloss-based unit names with optional render objects.
-- Paged data analysis for overview, entries/tags, IPA, morphology, editing activity, quality checks, etymology checks, and glossed examples.
+- Paged data analysis for overview, entries/tags, IPA, morphology, and editing activity, plus a dedicated quality-check page for priority/module issue review.
 - Gloss rendering for `\gla`, `\glb`, `\glc`, and `\ft`, with independent render-object and alignment settings for corpus unit cards, unit content headings, and entry examples, plus per-object font, size, bold, italic, and `\glb` small-caps styles.
 - Per-dictionary UI/settings options, including fuzzy search, label display replacement, highlighted tags, gloss rendering, polysemy display, save/discard/prompt handling for edits during navigation, corpus/docs auto-save, IPA keyboard symbols, and left navigation order.
 - Dark mode and Chinese/English UI switching, with the global interface theme and language remembered in `data/index.json`.
@@ -30,14 +30,14 @@ Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。
 - 标签即词性：第一个标签会被视为词性，用于显示和筛选。
 - 查看模式与编辑模式：保存后的词条会进入整洁的阅读界面，也支持完整编辑和栏目局部编辑。
 - 响应式应用外壳：支持可收起工具导航、可收起词条列表，以及移动端用于导航、浏览词条和新建词条的抽屉控件。
-- 数据分析高级筛选：点击统计行可以筛选词条浏览栏，并支持释义覆盖、IPA、形态学、质量检查等项目的筛选条件切换。
+- 数据分析与质量检查高级筛选：点击统计行或质量类别可以筛选词条浏览栏，并支持释义覆盖、IPA、形态学、质量问题等项目的筛选条件切换。
 - 词根模式浏览：衍生词可以嵌套显示在词根下方，支持展开、收起和快速创建衍生词。
 - 词汇网络：展示来源与衍生关系，支持悬浮信息卡和在关联词条之间导航。
 - 自动 IPA：支持映射、音节划分、音节首/尾辅音簇、复杂音位、重音设置、沙盒测试和批量生成。
 - 自动形态学：支持自定义形态表格、规则语法、函数识别对象、词条覆盖项、生成形式和搜索生成结果。
 - Markdown 语言文档：支持左右分栏编辑预览、纯编辑和纯查看模式。
 - 词典级语料库：支持有序语料块、发言人/模态语料层、独立语料单元、属性继承、实体 ID 唯一性检查、单父级链接检查，以及带可选渲染对象的 Gloss 单元名渲染。
-- 分页式数据分析：包括总览、词条与标签、IPA、形态学、编辑进度、质量检查、词源检查和 glossed 例句检查。
+- 分页式数据分析：包括总览、词条与标签、IPA、形态学和编辑进度；质量检查拥有独立页面，支持按优先度和检查模块查看问题。
 - Gloss 渲染：语料单元卡片、单元内容名称和词条例句可分别配置渲染对象与对齐，并支持 `\gla`、`\glb`、`\glc`、`\ft` 独立配置字体、字号、粗体和斜体，以及 `\glb` small caps。
 - 词典级界面设置：包括模糊搜索、标签显示替换、红色高亮标签、gloss 渲染、多义项显示、导航时保存/放弃/提示编辑、语料库/文档自动保存、IPA 虚拟键盘符号和左侧导航栏排序。
 - 暗黑模式和中英界面切换；全局界面主题和语言会记忆在 `data/index.json` 中。

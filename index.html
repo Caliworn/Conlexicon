@@ -76,6 +76,10 @@
             <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19V3"></path></svg></span>
             <span class="tool-label" data-i18n="analysis">数据分析</span>
           </button>
+          <button class="tool-button" type="button" data-view="quality" data-i18n-aria-label="qualityCheck">
+            <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 3 3 7v6c0 5 4 8 9 8s9-3 9-8V7Z"></path><path d="M12 8v5"></path><path d="M12 17h.01"></path></svg></span>
+            <span class="tool-label" data-i18n="qualityCheck">质量检查</span>
+          </button>
           <button class="tool-button" type="button" data-view="ipa" data-i18n-aria-label="ipaConfig">
             <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 10v4M7 7v10M11 4v16M15 8v8M19 6v12M23 10v4"></path></svg></span>
             <span class="tool-label" data-i18n="ipaConfig">自动 IPA 标注</span>
@@ -393,6 +397,27 @@
           </section>
 
           <section class="analysis-panel" id="analysisPanel"></section>
+        </section>
+
+        <section class="view" id="qualityView" aria-label="质量检查">
+          <section class="top-bar">
+            <div>
+              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <h2 data-i18n="qualityCheck">质量检查</h2>
+            </div>
+            <div class="top-actions">
+              <button class="secondary-button" id="backToEditorFromQualityButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+            </div>
+          </section>
+
+          <section class="notice-panel" id="qualityNoDictionaryNotice" hidden>
+            <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
+            <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
+            <p data-i18n="qualityNeedDictionary">质量检查会根据当前词典中的词条、标签、词源、IPA 和 Glossed 例句实时生成。</p>
+            <button class="primary-button" id="qualityOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+          </section>
+
+          <section class="analysis-panel" id="qualityPanel"></section>
         </section>
 
         <section class="view" id="settingsView" aria-label="其他设置">
@@ -1014,7 +1039,9 @@
 
     <script src="lib/tag-model.js"></script>
     <script src="lib/morphology-model.js"></script>
+    <script src="lib/entry-search-model.js"></script>
     <script src="lib/ipa-model.js"></script>
+    <script src="lib/quality-model.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
