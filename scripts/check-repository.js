@@ -146,6 +146,32 @@ function checkModelNormalization() {
     () => {
       const duplicate = normalizeDictionary({
         entries: [
+          { id: "shared-entry-id", lemma: "a" },
+          { id: "shared-entry-id", lemma: "b" },
+        ],
+      });
+      assertUniqueDictionaryEntityIds(duplicate);
+    },
+    (error) => error.status === 409,
+  );
+
+  assert.throws(
+    () => {
+      const duplicate = normalizeDictionary({
+        entries: [{ id: "shared-cross-type-id", lemma: "a" }],
+        settings: { ipa: { mappings: [{ id: "shared-cross-type-id", from: "a", to: "b" }] } },
+        morphology: { tables: [{ id: "shared-cross-type-id", name: "A" }] },
+        corpus: { units: [{ id: "shared-cross-type-id", content: "x" }] },
+      });
+      assertUniqueDictionaryEntityIds(duplicate);
+    },
+    (error) => error.status === 409,
+  );
+
+  assert.throws(
+    () => {
+      const duplicate = normalizeDictionary({
+        entries: [
           {
             id: "entry-one",
             lemma: "a",
@@ -339,6 +365,104 @@ async function checkJsonRepository() {
     assert.equal(apiResult.statusCode, 200);
     assert.deepEqual(apiResult.body.entries.find((entry) => entry.id === repositoryEntryId).tags, ["n", "root"]);
     assert.equal(apiResult.body.settings.allowEmptyDefinitions, false);
+    await assertRejectStatus(
+      callApi(repository, "PATCH", `/api/dictionaries/${encodeURIComponent(first.id)}/entries`, {
+        updates: [{ id: repositoryEntryId, patch: { definitions: [] } }],
+      }),
+      400,
+      "unsupported entry patch field",
+    );
+    await assertRejectStatus(
+      callApi(repository, "PATCH", `/api/dictionaries/${encodeURIComponent(first.id)}/entries`, {
+        updates: [{ id: repositoryEntryId, patch: { tags: "n" } }],
+      }),
+      400,
+      "invalid entry patch tags",
+    );
+    await assertRejectStatus(
+      callApi(repository, "PATCH", `/api/dictionaries/${encodeURIComponent(first.id)}/entries`, {
+        updates: [{ id: repositoryEntryId, patch: { pronunciation: ["/n/"] } }],
+      }),
+      400,
+      "invalid entry patch pronunciation",
+    );
+
+    const legacyDuplicateId = "dict-legacy-duplicates";
+    const legacyDuplicate = normalizeDictionary({
+      id: legacyDuplicateId,
+      name: "Legacy Duplicates",
+      entries: [
+        {
+          id: "entry-legacy-a",
+          lemma: "legacy a",
+          definitions: [{ id: "def-shared-legacy", meaning: "a" }],
+        },
+        {
+          id: "entry-legacy-b",
+          lemma: "legacy b",
+          definitions: [{ id: "def-shared-legacy", meaning: "b" }],
+        },
+        {
+          id: "entry-legacy-ok",
+          lemma: "legacy ok",
+          definitions: [{ id: "def-legacy-ok", meaning: "ok" }],
+        },
+      ],
+    });
+    await repository.writeJson(path.join(dataDir, "dictionaries", `${legacyDuplicateId}.json`), legacyDuplicate);
+    await repository.writeIndex({
+      activeDictionaryId: legacyDuplicateId,
+      dictionaryIds: [...(await repository.readIndex()).dictionaryIds, legacyDuplicateId],
+    });
+    await assertRejectStatus(
+      repository.updateDictionary(legacyDuplicateId, { name: "Full Save Blocked" }),
+      409,
+      "full snapshot still rejects duplicate ids",
+    );
+
+    apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(legacyDuplicateId)}/settings`, {
+      allowEmptyTags: false,
+    });
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.settings.allowEmptyTags, false);
+
+    apiResult = await callApi(repository, "PATCH", `/api/dictionaries/${encodeURIComponent(legacyDuplicateId)}/entries`, {
+      updates: [{ id: "entry-legacy-ok", patch: { tags: ["checked"] } }],
+    });
+    assert.equal(apiResult.statusCode, 200);
+    assert.deepEqual(apiResult.body.entries.find((entry) => entry.id === "entry-legacy-ok").tags, ["checked"]);
+
+    apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(legacyDuplicateId)}/docs`, {
+      markdown: "legacy docs",
+    });
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.docs.markdown, "legacy docs");
+
+    apiResult = await callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(legacyDuplicateId)}/autosave`, {
+      docs: { markdown: "autosaved docs" },
+      corpus: { units: [{ content: "autosaved corpus" }] },
+    });
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.docs.markdown, "autosaved docs");
+    assert.equal(apiResult.body.corpus.units[0].content, "autosaved corpus");
+
+    await assertRejectStatus(
+      callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(legacyDuplicateId)}/entries/entry-legacy-a`, {
+        id: "entry-legacy-a",
+        lemma: "legacy a edited",
+        definitions: [{ id: "def-shared-legacy", meaning: "a" }],
+      }),
+      409,
+      "entry save rejects conflicts in saved scope",
+    );
+    await assertRejectStatus(
+      callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(legacyDuplicateId)}/settings/ipa`, {
+        mappings: [{ id: "entry-legacy-ok", from: "a", to: "b" }],
+      }),
+      409,
+      "IPA save rejects conflicts in saved scope",
+    );
+    await repository.deleteDictionary(legacyDuplicateId);
 
     const preferences = await repository.updatePreferences({ uiLanguage: "en", uiTheme: "dark" });
     assert.deepEqual(preferences, { uiLanguage: "en", uiTheme: "dark" });
@@ -361,6 +485,31 @@ async function checkJsonRepository() {
     await repository.createDictionary({ id: "dict-collision", name: "Collision" });
     const generated = withPatchedRandomUUID(["collision", "fresh"], () => repository.createDictionary({ name: "Generated" }));
     assert.equal((await generated).id, "dict-fresh");
+
+    await assertRejectStatus(
+      repository.importDictionary(normalizeDictionary({
+        id: "dict-duplicate-entry-import",
+        name: "Duplicate Entry Import",
+        entries: [
+          { id: "entry-import-duplicate", lemma: "a" },
+          { id: "entry-import-duplicate", lemma: "b" },
+        ],
+      })),
+      409,
+      "duplicate entry id import",
+    );
+    await assertRejectStatus(
+      repository.importDictionary(normalizeDictionary({
+        id: "dict-cross-type-import",
+        name: "Cross Type Import",
+        entries: [{ id: "shared-import-id", lemma: "a" }],
+        settings: { ipa: { mappings: [{ id: "shared-import-id", from: "a", to: "b" }] } },
+        morphology: { tables: [{ id: "shared-import-id", name: "A" }] },
+        corpus: { units: [{ id: "shared-import-id", content: "x" }] },
+      })),
+      409,
+      "cross type duplicate id import",
+    );
 
     await assertRejectStatus(repository.importDictionary({ id: "bad id", name: "Bad" }), 400, "invalid dictionary id import");
     const regeneratedImport = withPatchedRandomUUID(

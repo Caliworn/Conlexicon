@@ -1,6 +1,7 @@
 const http = require("node:http");
 const path = require("node:path");
 const { createApiRouter } = require("./lib/api-routes");
+const { serializeApiError } = require("./lib/api-error");
 const {
   DEFAULT_INDEX,
   assertUniqueDictionaryEntityIds,
@@ -8,7 +9,7 @@ const {
   normalizeUiLanguage,
   normalizeUiTheme,
 } = require("./lib/dictionary-model");
-const { sendText } = require("./lib/http-utils");
+const { sendJson, sendText } = require("./lib/http-utils");
 const { JsonDictionaryRepository } = require("./lib/json-dictionary-repository");
 const { createStaticFileServer } = require("./lib/static-server");
 
@@ -38,6 +39,10 @@ async function handleRequest(request, response) {
     await serveStatic(request, response, url);
   } catch (error) {
     console.error(error);
+    if (url.pathname.startsWith("/api/")) {
+      sendJson(response, error.status || 500, serializeApiError(error));
+      return;
+    }
     sendText(response, error.status || 500, error.message || "Internal server error");
   }
 }

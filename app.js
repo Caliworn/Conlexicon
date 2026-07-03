@@ -362,6 +362,35 @@ const i18n = {
     importFailed: "无法读取这个 JSON 文件",
     languageSaveFailed: "界面语言保存失败",
     themeSaveFailed: "界面主题保存失败",
+    apiErrorRequestBodyTooLarge: "保存内容过大",
+    apiErrorInvalidJsonBody: "请求内容不是有效 JSON",
+    apiErrorInvalidUiLanguage: "界面语言值无效",
+    apiErrorInvalidUiTheme: "界面主题值无效",
+    apiErrorInvalidImportPayload: "导入文件格式无效",
+    apiErrorInvalidDictionaryId: "词典 ID 格式无效",
+    apiErrorDictionaryNotFound: "词典不存在或已被删除",
+    apiErrorDictionaryIdExists: "词典 ID 已存在，需要确认覆盖",
+    apiErrorDuplicateEntityIds: "词典中存在重复 ID",
+    apiErrorDuplicateEntityIdsScoped: "当前保存范围存在重复 ID",
+    apiErrorInvalidEntryPayload: "词条保存请求格式无效",
+    apiErrorEntryIdExists: "词条 ID 已存在",
+    apiErrorInvalidEntryUpdatesPayload: "批量词条更新格式无效",
+    apiErrorEntryNotFound: "词条不存在或已被删除",
+    apiErrorInvalidSettingsPayload: "设置保存请求格式无效",
+    apiErrorInvalidDocsPayload: "语言文档保存请求格式无效",
+    apiErrorInvalidCorpusPayload: "语料库保存请求格式无效",
+    apiErrorInvalidMorphologyPayload: "形态学保存请求格式无效",
+    apiErrorInvalidIpaSettingsPayload: "IPA 设置保存请求格式无效",
+    apiErrorUnsupportedEntryPatchFields: "批量词条更新包含不支持的字段",
+    apiErrorEntryPatchTagsInvalid: "批量标签更新格式无效",
+    apiErrorEntryPatchPronunciationInvalid: "批量 IPA 更新格式无效",
+    apiErrorSystemFilePermission: "文件权限不足，无法写入",
+    apiErrorSystemDiskFull: "磁盘空间不足，无法保存",
+    apiErrorSystemFileBusy: "文件正被占用，无法保存",
+    apiErrorSystemFileMissing: "目标文件不存在或已被移动",
+    apiErrorSystemJsonParse: "本地 JSON 文件损坏或无法解析",
+    apiErrorNetwork: "无法连接到本地服务",
+    apiErrorUnknown: "发生未知错误",
     importOverwriteTitle: "词典 ID 已存在",
     importOverwriteMessage: "词典 ID“{id}”已经存在。导入“{name}”将覆盖现有词典及其全部数据。",
     importAndOverwrite: "导入并覆盖",
@@ -771,6 +800,35 @@ const i18n = {
     importFailed: "Cannot read this JSON file",
     languageSaveFailed: "Failed to save the interface language",
     themeSaveFailed: "Failed to save the interface theme",
+    apiErrorRequestBodyTooLarge: "Saved content is too large",
+    apiErrorInvalidJsonBody: "Request body is not valid JSON",
+    apiErrorInvalidUiLanguage: "Invalid interface language value",
+    apiErrorInvalidUiTheme: "Invalid interface theme value",
+    apiErrorInvalidImportPayload: "Invalid import file format",
+    apiErrorInvalidDictionaryId: "Invalid dictionary ID",
+    apiErrorDictionaryNotFound: "Dictionary not found or already deleted",
+    apiErrorDictionaryIdExists: "Dictionary ID already exists and needs overwrite confirmation",
+    apiErrorDuplicateEntityIds: "The dictionary contains duplicate IDs",
+    apiErrorDuplicateEntityIdsScoped: "The current save scope contains duplicate IDs",
+    apiErrorInvalidEntryPayload: "Invalid entry save request",
+    apiErrorEntryIdExists: "Entry ID already exists",
+    apiErrorInvalidEntryUpdatesPayload: "Invalid batch entry update request",
+    apiErrorEntryNotFound: "Entry not found or already deleted",
+    apiErrorInvalidSettingsPayload: "Invalid settings save request",
+    apiErrorInvalidDocsPayload: "Invalid language docs save request",
+    apiErrorInvalidCorpusPayload: "Invalid corpus save request",
+    apiErrorInvalidMorphologyPayload: "Invalid morphology save request",
+    apiErrorInvalidIpaSettingsPayload: "Invalid IPA settings save request",
+    apiErrorUnsupportedEntryPatchFields: "Batch entry update contains unsupported fields",
+    apiErrorEntryPatchTagsInvalid: "Invalid batch tag update format",
+    apiErrorEntryPatchPronunciationInvalid: "Invalid batch IPA update format",
+    apiErrorSystemFilePermission: "File permission denied; cannot save",
+    apiErrorSystemDiskFull: "Disk is full; cannot save",
+    apiErrorSystemFileBusy: "File is busy; cannot save",
+    apiErrorSystemFileMissing: "Target file is missing or was moved",
+    apiErrorSystemJsonParse: "Local JSON file is damaged or cannot be parsed",
+    apiErrorNetwork: "Cannot connect to the local service",
+    apiErrorUnknown: "An unknown error occurred",
     importOverwriteTitle: "Dictionary ID already exists",
     importOverwriteMessage: "Dictionary ID “{id}” already exists. Importing “{name}” will overwrite the existing dictionary and all of its data.",
     importAndOverwrite: "Import and Overwrite",
@@ -1286,6 +1344,51 @@ function appEditSwitchPrompt(message) {
   });
 }
 
+const API_ERROR_TOAST_KEYS = {
+  request_body_too_large: "apiErrorRequestBodyTooLarge",
+  invalid_json_body: "apiErrorInvalidJsonBody",
+  invalid_ui_language: "apiErrorInvalidUiLanguage",
+  invalid_ui_theme: "apiErrorInvalidUiTheme",
+  invalid_import_payload: "apiErrorInvalidImportPayload",
+  invalid_dictionary_id: "apiErrorInvalidDictionaryId",
+  dictionary_not_found: "apiErrorDictionaryNotFound",
+  dictionary_id_exists: "apiErrorDictionaryIdExists",
+  duplicate_entity_ids: "apiErrorDuplicateEntityIds",
+  duplicate_entity_ids_scoped: "apiErrorDuplicateEntityIdsScoped",
+  invalid_entry_payload: "apiErrorInvalidEntryPayload",
+  entry_id_exists: "apiErrorEntryIdExists",
+  invalid_entry_updates_payload: "apiErrorInvalidEntryUpdatesPayload",
+  entry_not_found: "apiErrorEntryNotFound",
+  invalid_settings_payload: "apiErrorInvalidSettingsPayload",
+  invalid_docs_payload: "apiErrorInvalidDocsPayload",
+  invalid_corpus_payload: "apiErrorInvalidCorpusPayload",
+  invalid_morphology_payload: "apiErrorInvalidMorphologyPayload",
+  invalid_ipa_settings_payload: "apiErrorInvalidIpaSettingsPayload",
+  unsupported_entry_patch_fields: "apiErrorUnsupportedEntryPatchFields",
+  entry_patch_tags_invalid: "apiErrorEntryPatchTagsInvalid",
+  entry_patch_pronunciation_invalid: "apiErrorEntryPatchPronunciationInvalid",
+  system_file_permission: "apiErrorSystemFilePermission",
+  system_disk_full: "apiErrorSystemDiskFull",
+  system_file_busy: "apiErrorSystemFileBusy",
+  system_file_missing: "apiErrorSystemFileMissing",
+  system_json_parse: "apiErrorSystemJsonParse",
+  unknown_error: "apiErrorUnknown",
+};
+
+function apiErrorToastMessage(error, fallbackKey = "saveFailed") {
+  const key = API_ERROR_TOAST_KEYS[error?.code] || (error instanceof TypeError ? "apiErrorNetwork" : "");
+  const detail = key ? t(key) : "";
+  if (!detail) {
+    return t(fallbackKey);
+  }
+  return `${t(fallbackKey)}：${detail}`;
+}
+
+function showApiErrorToast(error, fallbackKey = "saveFailed") {
+  showToast(apiErrorToastMessage(error, fallbackKey));
+  console.error(error);
+}
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     ...options,
@@ -1296,8 +1399,18 @@ async function api(path, options = {}) {
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new Error(message || `HTTP ${response.status}`);
+    const text = await response.text();
+    let payload = null;
+    try {
+      payload = text ? JSON.parse(text) : null;
+    } catch (error) {
+      payload = null;
+    }
+    const apiError = new Error(payload?.error?.message || text || `HTTP ${response.status}`);
+    apiError.status = response.status;
+    apiError.code = payload?.error?.code || "";
+    apiError.details = payload?.error?.details;
+    throw apiError;
   }
 
   if (response.status === 204) {
@@ -7495,15 +7608,20 @@ async function saveSettings(event, options = {}) {
   if (!settings.corpusAutoSave) {
     clearTimeout(corpusSaveTimer);
   }
-  await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/settings`, {
-    method: "PUT",
-    body: JSON.stringify(settings),
-  });
-  await refreshState();
-  if (options.showToast !== false) {
-    showToast(t("dictionarySaved"));
+  try {
+    await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/settings`, {
+      method: "PUT",
+      body: JSON.stringify(settings),
+    });
+    await refreshState();
+    if (options.showToast !== false) {
+      showToast(t("dictionarySaved"));
+    }
+    return true;
+  } catch (error) {
+    showApiErrorToast(error, "dictionarySaveFailed");
+    return false;
   }
-  return true;
 }
 
 async function applyTagSortOrder() {
@@ -7570,12 +7688,16 @@ async function applyTagSortOrder() {
       patch: { tags: sortedTags },
     };
   }).filter(Boolean);
-  await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`, {
-    method: "PATCH",
-    body: JSON.stringify({ settings, updates }),
-  });
-  await refreshState();
-  showToast(`${t("tagOrderApplied")}${changedEntries ? ` · ${changedEntries} ${t("entries")}` : ""}`);
+  try {
+    await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`, {
+      method: "PATCH",
+      body: JSON.stringify({ settings, updates }),
+    });
+    await refreshState();
+    showToast(`${t("tagOrderApplied")}${changedEntries ? ` · ${changedEntries} ${t("entries")}` : ""}`);
+  } catch (error) {
+    showApiErrorToast(error, "saveFailed");
+  }
 }
 
 function renderLanguageDocs(dictionary) {
@@ -7626,17 +7748,26 @@ async function saveLanguageDocs(showSavedToast = true) {
     ...(dictionary.docs || {}),
     markdown: draft.markdown,
   };
-  await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/docs`, {
-    method: "PUT",
-    body: JSON.stringify(docs),
-  });
-  await refreshState();
-  docsDraftState = null;
-  renderLanguageDocs(activeDictionary());
-  if (showSavedToast) {
-    showToast(t("docsSaved"));
+  try {
+    await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/docs`, {
+      method: "PUT",
+      body: JSON.stringify(docs),
+    });
+    await refreshState();
+    docsDraftState = null;
+    renderLanguageDocs(activeDictionary());
+    if (showSavedToast) {
+      showToast(t("docsSaved"));
+    }
+    return true;
+  } catch (error) {
+    if (showSavedToast) {
+      showApiErrorToast(error, "saveFailed");
+    } else {
+      console.error(error);
+    }
+    return false;
   }
-  return true;
 }
 
 function scheduleDocsSave() {
@@ -8441,10 +8572,7 @@ function saveCorpus(showSavedToast = true) {
     return Promise.resolve(false);
   }
   syncCorpusEditorToDraft();
-  const corpus = ensureCorpusDraft(dictionary);
-  if (!validateDictionaryEntityIds({ ...dictionary, corpus })) {
-    return Promise.resolve(false);
-  }
+  ensureCorpusDraft(dictionary);
   clearTimeout(corpusSaveTimer);
   corpusSaveTimer = null;
   corpusSaveRequested = true;
@@ -8462,6 +8590,9 @@ function saveCorpus(showSavedToast = true) {
       showToast(t("corpusSaved"));
     }
     return saved;
+  }).catch((error) => {
+    showApiErrorToast(error, "saveFailed");
+    return false;
   });
 }
 
@@ -8779,13 +8910,18 @@ async function saveMorphologyConfig(event) {
     });
     return false;
   }
-  await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/morphology`, {
-    method: "PUT",
-    body: JSON.stringify(morphology),
-  });
-  await refreshState();
-  showToast(t("dictionarySaved"));
-  return true;
+  try {
+    await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/morphology`, {
+      method: "PUT",
+      body: JSON.stringify(morphology),
+    });
+    await refreshState();
+    showToast(t("dictionarySaved"));
+    return true;
+  } catch (error) {
+    showApiErrorToast(error, "dictionarySaveFailed");
+    return false;
+  }
 }
 
 function renderMarkdown(markdown) {
@@ -8905,15 +9041,20 @@ async function saveIpaSettings(event, options = {}) {
   }
 
   const ipa = ipaSettingsFromForm();
-  await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/settings/ipa`, {
-    method: "PUT",
-    body: JSON.stringify(ipa),
-  });
-  await refreshState();
-  if (options.showToast !== false) {
-    showToast(t("ipaSaved"));
+  try {
+    await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/settings/ipa`, {
+      method: "PUT",
+      body: JSON.stringify(ipa),
+    });
+    await refreshState();
+    if (options.showToast !== false) {
+      showToast(t("ipaSaved"));
+    }
+    return true;
+  } catch (error) {
+    showApiErrorToast(error, "dictionarySaveFailed");
+    return false;
   }
-  return true;
 }
 
 function generateIpaFromLemma(lemma, ipaSettings = activeDictionary()?.settings?.ipa) {
@@ -9250,12 +9391,16 @@ async function batchGenerateIpa(mode) {
     id: entry.id,
     patch: { pronunciation: generateIpaFromLemma(entry.lemma, ipaSettings) },
   }));
-  await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`, {
-    method: "PATCH",
-    body: JSON.stringify({ updates }),
-  });
-  await refreshState();
-  showToast(`${t("batchIpaUpdated")} ${targets.length}`);
+  try {
+    await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`, {
+      method: "PATCH",
+      body: JSON.stringify({ updates }),
+    });
+    await refreshState();
+    showToast(`${t("batchIpaUpdated")} ${targets.length}`);
+  } catch (error) {
+    showApiErrorToast(error, "saveFailed");
+  }
 }
 
 function emptyState(title, body) {
@@ -9510,8 +9655,7 @@ async function savePartialEdit(event) {
     showToast(t("savedEntry"));
     return true;
   } catch (error) {
-    showToast(t("saveFailed"));
-    console.error(error);
+    showApiErrorToast(error, "saveFailed");
     return false;
   }
 }
@@ -9618,9 +9762,6 @@ async function saveEntry(event) {
     showToast(t("createDictionaryFirstToast"));
     return false;
   }
-  if (!validateDictionaryEntityIds(dictionary)) {
-    return false;
-  }
 
   const now = new Date().toISOString();
   const entryId = elements.entryId.value || uniqueDictionaryEntityId("entry", dictionary);
@@ -9673,8 +9814,7 @@ async function saveEntry(event) {
     showToast(t("savedEntry"));
     return true;
   } catch (error) {
-    showToast(t("saveFailed"));
-    console.error(error);
+    showApiErrorToast(error, "saveFailed");
     return false;
   }
 }
@@ -9710,8 +9850,7 @@ async function deleteEntryById(entryId) {
     showToast(t("deletedEntry"));
     return true;
   } catch (error) {
-    showToast(t("saveFailed"));
-    console.error(error);
+    showApiErrorToast(error, "saveFailed");
     return false;
   }
 }
@@ -9764,8 +9903,7 @@ async function saveDictionary(event) {
     await refreshState();
     return true;
   } catch (error) {
-    showToast(t("dictionarySaveFailed"));
-    console.error(error);
+    showApiErrorToast(error, "dictionarySaveFailed");
     return false;
   }
 }
@@ -9799,8 +9937,7 @@ async function activateDictionary(dictionaryId) {
     await refreshState();
     showToast(`${t("switchedTo")} “${dictionary.name}”`);
   } catch (error) {
-    showToast(t("dictionarySwitchFailed"));
-    console.error(error);
+    showApiErrorToast(error, "dictionarySwitchFailed");
   }
 }
 
@@ -9831,8 +9968,7 @@ async function deleteSelectedDictionary() {
     await refreshState();
     showToast(t("dictionaryDeleted"));
   } catch (error) {
-    showToast(t("dictionaryDeleteFailed"));
-    console.error(error);
+    showApiErrorToast(error, "dictionaryDeleteFailed");
   }
 }
 
@@ -9941,8 +10077,7 @@ function importData(event) {
       await refreshState();
       showToast(t("imported"));
     } catch (error) {
-      showToast(t("importFailed"));
-      console.error(error);
+      showApiErrorToast(error, "importFailed");
     } finally {
       elements.importInput.value = "";
     }
@@ -10851,8 +10986,7 @@ elements.themeToggleButton.addEventListener("click", async () => {
     state.uiTheme = previousTheme;
     cacheUiPreferences({ uiTheme: previousTheme });
     render();
-    showToast(t("themeSaveFailed"));
-    console.error(error);
+    showApiErrorToast(error, "themeSaveFailed");
   } finally {
     elements.themeToggleButton.disabled = false;
   }
@@ -10880,8 +11014,7 @@ elements.languageToggleButton.addEventListener("click", async () => {
     state.uiLanguage = previousLanguage;
     refreshAdvancedFilterLocalization();
     render();
-    showToast(t("languageSaveFailed"));
-    console.error(error);
+    showApiErrorToast(error, "languageSaveFailed");
   } finally {
     elements.languageToggleButton.disabled = false;
   }
