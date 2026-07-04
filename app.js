@@ -28,6 +28,7 @@ const shellState = {
 let activeAppTooltipTarget = null;
 const desktopNavMediaQuery = window.matchMedia("(min-width: 800px)");
 const wideNavMediaQuery = window.matchMedia("(min-width: 1280px)");
+const entryRelationsModel = window.ConlexiconEntryRelations;
 const ipaModel = window.ConlexiconIpa;
 const IPA_STRESS_MARKER = ipaModel.IPA_STRESS_MARKER;
 const GLOSS_STYLE_KEYS = ["gla", "glb", "glc", "ft"];
@@ -104,6 +105,8 @@ let entryFacetsState = {
 };
 const lexicalNetworkRelationsCache = new Map();
 let lexicalNetworkRelationsRequestId = 0;
+const analysisSliceCache = new Map();
+let qualityReportCache = null;
 let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
 let draggedToolNavView = "";
@@ -4247,7 +4250,7 @@ function advancedFilterDisplayTitle() {
   }
   if (advancedFilter.meta?.type === "quality" && dictionary) {
     const action = qualityIssueFilterAction(
-      buildQualityViewReport(dictionary),
+      getQualityViewReport(dictionary),
       advancedFilter.meta.group,
       advancedFilter.meta.activeKey,
       { allowEmptyActive: true },
@@ -4391,7 +4394,7 @@ function rebuildAdvancedFilterAction(options = {}) {
   const allowEmptyActive = Boolean(options.allowEmptyActive);
   if (advancedFilter.meta?.type === "quality") {
     return qualityIssueFilterAction(
-      buildQualityViewReport(dictionary),
+      getQualityViewReport(dictionary),
       advancedFilter.meta.group,
       advancedFilter.meta.activeKey,
       { allowEmptyActive },
@@ -4556,78 +4559,20 @@ function rootModeGroups(dictionary = activeDictionary(), options = {}) {
     tagFuzzyEnabled: Boolean(settings.tagFuzzySearch),
     respectPart: false,
   };
-  const entries = [...dictionary.entries].sort(compareEntries);
-  const groups = new Map();
-
-  entries.forEach((entry) => {
-    if (!entryHasSources(entry)) {
-      ensureRootGroup(groups, entry);
-    }
+  return entryRelationsModel.rootModeGroups(dictionary, {
+    query,
+    normalizeText: normalize,
+    compareEntries,
+    matchesEntry: (entry) => entryMatchesSearch(entry, dictionary, matchOptions),
   });
-
-  entries.forEach((entry) => {
-    if (!entryHasSources(entry)) {
-      return;
-    }
-    const roots = sourceRootEntries(entry, dictionary);
-    if (!roots.length) {
-      ensureRootGroup(groups, entry);
-      return;
-    }
-    roots.forEach((root) => {
-      const group = ensureRootGroup(groups, root);
-      if (!group.derived.some((item) => item.id === entry.id)) {
-        group.derived.push(entry);
-      }
-    });
-  });
-
-  return [...groups.values()]
-    .map((group) => {
-      const rootMatches = entryMatchesSearch(group.root, dictionary, matchOptions);
-      const matchedDerived = group.derived.filter((entry) => entryMatchesSearch(entry, dictionary, matchOptions));
-      return {
-        ...group,
-        derived: (query && !rootMatches ? matchedDerived : group.derived).sort(compareEntries),
-        matchedDerived,
-        rootMatches,
-      };
-    })
-    .filter((group) => !query || group.rootMatches || group.matchedDerived.length)
-    .sort((a, b) => compareEntries(a.root, b.root));
-}
-
-function ensureRootGroup(groups, entry) {
-  if (!groups.has(entry.id)) {
-    groups.set(entry.id, { root: entry, derived: [], matchedDerived: [] });
-  }
-  return groups.get(entry.id);
 }
 
 function entryHasSources(entry) {
-  return Boolean(entry?.etymology?.sources?.length);
+  return entryRelationsModel.entryHasSources(entry);
 }
 
 function sourceRootEntries(entry, dictionary = activeDictionary(), seen = new Set()) {
-  const roots = [];
-  (entry.etymology?.sources || []).forEach((sourceName) => {
-    const source = resolveSourceEntry(sourceName, dictionary);
-    if (!source || seen.has(source.id)) {
-      return;
-    }
-    seen.add(source.id);
-    if (!entryHasSources(source)) {
-      roots.push(source);
-      return;
-    }
-    const ancestors = sourceRootEntries(source, dictionary, seen);
-    if (ancestors.length) {
-      roots.push(...ancestors);
-    } else {
-      roots.push(source);
-    }
-  });
-  return roots;
+  return entryRelationsModel.sourceRootEntries(entry, dictionary, { normalizeText: normalize, compareEntries }, seen);
 }
 
 function compareEntries(a, b) {
@@ -5009,11 +4954,13 @@ function lexicalNetworkRelationForEntry(dictionary, entry) {
 }
 
 function localLexicalNetworkRelation(entry, dictionary = activeDictionary()) {
+  const relationIndex = entryRelationsModel.buildEntryRelationIndex(dictionary, { normalizeText: normalize, compareEntries });
   return {
     sources: (entry.etymology?.sources || [])
-      .map((source) => resolveSourceEntry(source, dictionary))
+      .map((source) => entryRelationsModel.resolveSourceEntry(source, dictionary, { index: relationIndex }))
       .filter(Boolean),
-    derivedEntries: findDerivedEntries(entry, dictionary),
+    derivedEntries: entryRelationsModel.findDerivedEntries(entry, dictionary, { index: relationIndex }),
+    rootGroup: null,
   };
 }
 
@@ -5098,19 +5045,11 @@ function renderNetworkMeaningHtml(entry, showPolysemy = false) {
 }
 
 function findDerivedEntries(entry, dictionary = activeDictionary()) {
-  const currentKeys = new Set([normalize(entry.id), normalize(entry.lemma)].filter(Boolean));
-  return (dictionary?.entries || [])
-    .filter((candidate) => {
-      if (candidate.id === entry.id) {
-        return false;
-      }
-      return (candidate.etymology?.sources || []).some((source) => currentKeys.has(normalize(source)));
-    })
-    .sort((a, b) => a.lemma.localeCompare(b.lemma, "zh-CN"));
+  return entryRelationsModel.findDerivedEntries(entry, dictionary, { normalizeText: normalize, compareEntries });
 }
 
 function resolveSourceEntry(sourceName, dictionary = activeDictionary()) {
-  return qualityModel.resolveSourceEntry(sourceName, dictionary, { normalizeText: normalize });
+  return entryRelationsModel.resolveSourceEntry(sourceName, dictionary, { normalizeText: normalize, compareEntries });
 }
 
 function glossStyleClassNames(key, settings) {
@@ -5258,9 +5197,63 @@ function renderAnalysis(dictionary = activeDictionary()) {
 
   analysisFilterRegistry.clear();
   analysisFilterCounter = 0;
-  const report = buildDictionaryAnalysis(dictionary);
-  elements.analysisPanel.innerHTML = renderAnalysisPage(report);
+  const page = activeAnalysisPage();
+  const subpage = activeAnalysisSubpage(page);
+  const report = getAnalysisReport(dictionary, { page, subpage });
+  elements.analysisPanel.innerHTML = renderAnalysisPage(report, page, subpage);
   setupAnalysisMasonryLayouts();
+}
+
+function activeAnalysisPage() {
+  const analysisViewState = activeAnalysisViewState();
+  const page = ["overview", "entries", "ipa", "morphology", "activity"].includes(analysisViewState.page)
+    ? analysisViewState.page
+    : "overview";
+  analysisViewState.page = page;
+  return page;
+}
+
+function getAnalysisReport(dictionary, route = {}) {
+  const page = route.page || activeAnalysisPage();
+  const subpage = route.subpage ?? activeAnalysisSubpage(page);
+  return buildAnalysisReportForRoute(dictionary, page, subpage);
+}
+
+function analysisBaseCacheKey(dictionary) {
+  return stableJson({
+    dictionaryId: dictionary?.id || "",
+    dictionaryUpdatedAt: dictionary?.updatedAt || "",
+    language: currentLanguage,
+    settings: dictionary?.settings || {},
+    morphology: dictionary?.morphology || {},
+    entries: (dictionary?.entries || []).map((entry) => ({
+      id: entry.id || "",
+      lemma: entry.lemma || "",
+      pronunciation: entry.pronunciation || "",
+      tags: entry.tags || [],
+      definitions: (entry.definitions || []).map((definition) => ({
+        id: definition.id || "",
+        meaning: definition.meaning || "",
+        example: definition.example || "",
+      })),
+      notes: entry.notes || "",
+      etymology: {
+        sources: entry.etymology?.sources || [],
+      },
+      morphology: entry.morphology || null,
+      createdAt: entry.createdAt || "",
+      updatedAt: entry.updatedAt || "",
+    })),
+  });
+}
+
+function analysisSliceCacheKey(context, dep) {
+  return stableJson({
+    base: context.cacheBaseKey,
+    dep,
+    searchQuery: dep === "search" ? normalize(searchQuery) : "",
+    entrySort: dep === "relation" ? entrySort : "",
+  });
 }
 
 function renderQuality(dictionary = activeDictionary()) {
@@ -5275,18 +5268,48 @@ function renderQuality(dictionary = activeDictionary()) {
 
   analysisFilterRegistry.clear();
   analysisFilterCounter = 0;
-  const report = buildQualityViewReport(dictionary);
+  const report = getQualityViewReport(dictionary);
   elements.qualityPanel.innerHTML = renderQualityPage(report);
   setupQualityMasonryLayouts();
 }
 
-function renderAnalysisPage(report) {
-  const analysisViewState = activeAnalysisViewState();
-  const page = ["overview", "entries", "ipa", "morphology", "activity"].includes(analysisViewState.page)
-    ? analysisViewState.page
-    : "overview";
-  analysisViewState.page = page;
-  const subpage = activeAnalysisSubpage(page);
+function getQualityViewReport(dictionary) {
+  const key = qualityReportCacheKey(dictionary);
+  if (qualityReportCache?.key === key) {
+    return qualityReportCache.report;
+  }
+  const report = buildQualityViewReport(dictionary);
+  qualityReportCache = { key, report };
+  return report;
+}
+
+function qualityReportCacheKey(dictionary) {
+  return stableJson({
+    dictionaryId: dictionary?.id || "",
+    dictionaryUpdatedAt: dictionary?.updatedAt || "",
+    language: currentLanguage,
+    settings: {
+      ipa: dictionary?.settings?.ipa || {},
+    },
+    entries: (dictionary?.entries || []).map((entry) => ({
+      id: entry.id || "",
+      lemma: entry.lemma || "",
+      pronunciation: entry.pronunciation || "",
+      tags: entry.tags || [],
+      definitions: (entry.definitions || []).map((definition) => ({
+        id: definition.id || "",
+        meaning: definition.meaning || "",
+        example: definition.example || "",
+      })),
+      etymology: {
+        sources: entry.etymology?.sources || [],
+      },
+      updatedAt: entry.updatedAt || "",
+    })),
+  });
+}
+
+function renderAnalysisPage(report, page = activeAnalysisPage(), subpage = activeAnalysisSubpage(page)) {
   return `
     ${analysisPageNav(page)}
     ${analysisSubpageNav(page, subpage, report)}
@@ -5715,20 +5738,265 @@ function buildQualityViewReport(dictionary) {
   });
 }
 
+const DEFAULT_ANALYSIS_OVERVIEW_WIDGETS = [
+  "entryCounts",
+  "derivedCounts",
+  "definitionCoverage",
+  "ipaCoverage",
+  "morphologyCoverage",
+  "partDistribution",
+  "tagFrequency",
+  "rootFamilies",
+  "activityPreview",
+];
+const ANALYSIS_OVERVIEW_WIDGETS = {
+  entryCounts: { deps: ["relation"] },
+  derivedCounts: { deps: ["relation"] },
+  definitionCoverage: { deps: ["coverage"] },
+  ipaCoverage: { deps: ["coverage", "ipa"] },
+  morphologyCoverage: { deps: ["coverage", "morphology"] },
+  partDistribution: { deps: ["tags"] },
+  tagFrequency: { deps: ["tags"] },
+  rootFamilies: { deps: ["relation"] },
+  activityPreview: { deps: ["activity"] },
+};
+
+function analysisSliceDepsForOverviewWidgets(widgets = DEFAULT_ANALYSIS_OVERVIEW_WIDGETS) {
+  return [...new Set((widgets || [])
+    .flatMap((widget) => ANALYSIS_OVERVIEW_WIDGETS[widget]?.deps || []))];
+}
+
+function analysisSliceDepsForPage(page = "overview", subpage = "") {
+  if (page === "overview") {
+    return analysisSliceDepsForOverviewWidgets();
+  }
+  if (page === "entries") {
+    if (subpage === "forms") {
+      return ["forms"];
+    }
+    if (subpage === "roots") {
+      return ["relation"];
+    }
+    if (subpage === "coverage") {
+      return ["coverage", "relation", "search"];
+    }
+    return ["tags"];
+  }
+  if (page === "ipa") {
+    return subpage === "units" || subpage === "mismatches"
+      ? ["ipa"]
+      : ["ipa", "coverage"];
+  }
+  if (page === "morphology") {
+    return subpage === "overrides" || subpage === "generated"
+      ? ["morphology"]
+      : ["morphology", "coverage"];
+  }
+  if (page === "activity") {
+    return ["activity"];
+  }
+  return ["relation", "coverage", "tags", "forms", "ipa", "morphology", "search", "activity"];
+}
+
 function buildDictionaryAnalysis(dictionary) {
-  const entries = dictionary.entries || [];
-  const total = entries.length || 1;
+  return buildAnalysisReportForRoute(dictionary, "all", "");
+}
+
+function buildAnalysisReportForRoute(dictionary, page = "overview", subpage = "") {
+  const context = buildAnalysisContext(dictionary);
+  const slices = buildRequiredAnalysisSlices(context, analysisSliceDepsForPage(page, subpage));
+  return composeLegacyAnalysisReport(context, slices);
+}
+
+function buildAnalysisContext(dictionary) {
+  return {
+    dictionary,
+    entries: dictionary.entries || [],
+    total: (dictionary.entries || []).length || 1,
+    cacheBaseKey: analysisBaseCacheKey(dictionary),
+  };
+}
+
+function composeLegacyAnalysisReport(context, slices) {
+  return {
+    entries: context.entries,
+    ...slices.relation,
+    ...slices.coverage,
+    ...slices.tags,
+    ...slices.forms,
+    ipa: slices.ipa,
+    morphology: slices.morphology,
+    ...slices.search,
+    activity: slices.activity,
+  };
+}
+
+function emptyAnalysisSlices() {
+  const emptyCoverage = {
+    definitions: 0,
+    examples: 0,
+    notes: 0,
+    sources: 0,
+    ipa: 0,
+    morphology: 0,
+  };
+  return {
+    relation: {
+      rootCount: 0,
+      derivedCount: 0,
+      derivedEntryIds: [],
+      isolatedRootCount: 0,
+      multiSourceCount: 0,
+      multiSourceEntryIds: [],
+      rootFamilies: [],
+      allRootFamilies: [],
+    },
+    coverage: {
+      definitionCount: 0,
+      examples: 0,
+      glossExamples: 0,
+      definitionEntryIds: [],
+      exampleEntryIds: [],
+      glossEntryIds: [],
+      noteEntryIds: [],
+      sourceEntryIds: [],
+      ipaEntryIds: [],
+      morphologyEntryIds: [],
+      noDefinitionEntryIds: [],
+      noExampleEntryIds: [],
+      noNoteEntryIds: [],
+      noSourceEntryIds: [],
+      noIpaEntryIds: [],
+      noMorphologyEntryIds: [],
+      coverage: emptyCoverage,
+      coverageRows: [],
+    },
+    tags: {
+      parts: [],
+      allParts: [],
+      tags: [],
+      allTags: [],
+      tagCombos: [],
+      allTagCombos: [],
+    },
+    forms: {
+      initialLetters: [],
+      allInitialLetters: [],
+      wordLengths: [],
+      allWordLengths: [],
+      characters: [],
+      allCharacters: [],
+      bigrams: [],
+      allBigrams: [],
+    },
+    ipa: {
+      units: [],
+      allUnits: [],
+      initials: [],
+      allInitials: [],
+      finals: [],
+      allFinals: [],
+      syllableCounts: [],
+      allSyllableCounts: [],
+      syllableAverage: "0",
+      generatedMatch: 0,
+      generatedMatchEntryIds: [],
+      generatedMismatch: 0,
+      generatedMismatchEntryIds: [],
+      generatedMismatchStrict: 0,
+      generatedMismatchStrictEntryIds: [],
+    },
+    morphology: {
+      tables: [],
+      allTables: [],
+      overrides: [],
+      allOverrides: [],
+      generatedForms: 0,
+      emptyCells: 0,
+      emptyCellEntryIds: [],
+    },
+    search: {
+      searchMatches: 0,
+      searchMatchEntryIds: [],
+      searchFields: [],
+    },
+    activity: {
+      created: [],
+      updated: [],
+      latest: [],
+    },
+  };
+}
+
+function buildRequiredAnalysisSlices(context, deps = []) {
+  const slices = emptyAnalysisSlices();
+  [...new Set(deps)].forEach((dep) => {
+    const slice = getAnalysisSlice(context, dep);
+    if (slice) {
+      slices[dep] = slice;
+    }
+  });
+  return slices;
+}
+
+function analysisSliceBuilders() {
+  return {
+    relation: buildAnalysisRelationSlice,
+    coverage: buildAnalysisCoverageSlice,
+    tags: buildAnalysisTagSlice,
+    forms: buildAnalysisFormSlice,
+    ipa: buildAnalysisIpaSlice,
+    morphology: buildAnalysisMorphologySlice,
+    search: buildAnalysisSearchSlice,
+    activity: buildAnalysisActivitySlice,
+  };
+}
+
+function getAnalysisSlice(context, dep) {
+  const builder = analysisSliceBuilders()[dep];
+  if (!builder) {
+    return null;
+  }
+  const key = analysisSliceCacheKey(context, dep);
+  if (analysisSliceCache.has(key)) {
+    return analysisSliceCache.get(key);
+  }
+  const slice = builder(context);
+  analysisSliceCache.set(key, slice);
+  if (analysisSliceCache.size > 24) {
+    analysisSliceCache.delete(analysisSliceCache.keys().next().value);
+  }
+  return slice;
+}
+
+function buildAnalysisRelationSlice(context) {
+  const { dictionary, entries } = context;
   const rootGroups = rootModeGroups(dictionary, { query: "" });
   const derivedEntries = entries.filter(entryHasSources);
   const derivedIdSet = new Set(derivedEntries.map((entry) => entry.id));
   const isolatedRootCount = rootGroups.filter((group) => !group.derived.length && !derivedIdSet.has(group.root.id)).length;
-  const parts = new Map();
-  const tags = new Map();
-  const tagCombos = new Map();
-  const initialLetters = new Map();
-  const wordLengths = new Map();
-  const characters = new Map();
-  const bigrams = new Map();
+  const multiSourceEntries = entries.filter((entry) => (entry.etymology?.sources || []).length > 1);
+  const rootFamilyGroups = rootGroups
+    .filter((group) => group.derived.length)
+    .sort((a, b) => b.derived.length - a.derived.length);
+
+  return {
+    rootCount: rootGroups.length,
+    derivedCount: derivedEntries.length,
+    derivedEntryIds: derivedEntries.map((entry) => entry.id),
+    isolatedRootCount,
+    multiSourceCount: multiSourceEntries.length,
+    multiSourceEntryIds: multiSourceEntries.map((entry) => entry.id),
+    rootFamilies: rootFamilyGroups
+      .slice(0, 12)
+      .map((group) => [group.root.lemma, group.derived.length, directEntryAction(group.root.id)]),
+    allRootFamilies: rootFamilyGroups
+      .map((group) => [group.root.lemma, group.derived.length, directEntryAction(group.root.id)]),
+  };
+}
+
+function buildAnalysisCoverageSlice(context) {
+  const { dictionary, entries, total } = context;
   const definitionEntryIds = new Set();
   const exampleEntryIds = new Set();
   const glossEntryIds = new Set();
@@ -5736,54 +6004,18 @@ function buildDictionaryAnalysis(dictionary) {
   const sourceEntryIds = new Set();
   const ipaEntryIds = new Set();
   const morphologyEntryIds = new Set();
-  const multiSourceEntryIds = new Set();
-
   let definitionCount = 0;
   let examples = 0;
   let glossExamples = 0;
-  let entriesWithDefinition = 0;
-  let entriesWithExample = 0;
-  let entriesWithNotes = 0;
-  let entriesWithSource = 0;
-  let entriesWithIpa = 0;
-  let entriesWithMorphology = 0;
-  let multiSourceCount = 0;
 
   entries.forEach((entry) => {
-    const entryPartTags = entryParts(entry, dictionary);
-    if (entryPartTags.length) {
-      entryPartTags.forEach((part) => incrementEntry(parts, part, entry));
-    } else {
-      incrementEntry(parts, NO_PART_FILTER_VALUE, entry);
-    }
-    (entry.tags || []).forEach((tag) => {
-      incrementEntry(tags, tag, entry);
-    });
-    if ((entry.tags || []).length > 1) {
-      incrementEntry(tagCombos, entry.tags.map((tag) => displayTag(tag, dictionary)).join(" + "), entry);
-    }
-
-    const lemma = String(entry.lemma || "");
-    if (lemma) {
-      incrementEntry(wordLengths, String(Array.from(lemma).length), entry);
-      incrementEntry(initialLetters, Array.from(lemma.trim())[0] || "", entry);
-      Array.from(lemma.replace(/\s+/g, "")).forEach((char) => incrementEntry(characters, char, entry));
-      Array.from(lemma.replace(/\s+/g, "")).forEach((char, index, chars) => {
-        if (index < chars.length - 1) {
-          incrementEntry(bigrams, `${char}${chars[index + 1]}`, entry);
-        }
-      });
-    }
-
     const definitions = entry.definitions || [];
     const meaningfulDefinitions = definitions.filter((definition) => definition.meaning);
     definitionCount += meaningfulDefinitions.length;
     if (meaningfulDefinitions.length) {
-      entriesWithDefinition += 1;
       definitionEntryIds.add(entry.id);
     }
     if (definitions.some((definition) => definition.example)) {
-      entriesWithExample += 1;
       exampleEntryIds.add(entry.id);
     }
     examples += definitions.filter((definition) => definition.example).length;
@@ -5794,39 +6026,20 @@ function buildDictionaryAnalysis(dictionary) {
         glossEntryIds.add(entry.id);
       }
     });
-
     if (entry.notes) {
-      entriesWithNotes += 1;
       noteEntryIds.add(entry.id);
     }
     if (entryHasSources(entry)) {
-      entriesWithSource += 1;
       sourceEntryIds.add(entry.id);
     }
-    if ((entry.etymology?.sources || []).length > 1) {
-      multiSourceCount += 1;
-      multiSourceEntryIds.add(entry.id);
-    }
     if (entry.pronunciation) {
-      entriesWithIpa += 1;
       ipaEntryIds.add(entry.id);
     }
     if (resolveEntryMorphologyTable(entry, dictionary)) {
-      entriesWithMorphology += 1;
       morphologyEntryIds.add(entry.id);
     }
   });
 
-  const ipa = analyzeIpa(entries, dictionary);
-  const morphology = analyzeMorphology(entries, dictionary);
-  const coverage = {
-    definitions: entriesWithDefinition / total,
-    examples: entriesWithExample / total,
-    notes: entriesWithNotes / total,
-    sources: entriesWithSource / total,
-    ipa: entriesWithIpa / total,
-    morphology: entriesWithMorphology / total,
-  };
   const noDefinitionEntryIds = entries
     .filter((entry) => !(entry.definitions || []).some((definition) => definition.meaning))
     .map((entry) => entry.id);
@@ -5845,6 +6058,14 @@ function buildDictionaryAnalysis(dictionary) {
   const noMorphologyEntryIds = entries
     .filter((entry) => !resolveEntryMorphologyTable(entry, dictionary))
     .map((entry) => entry.id);
+  const coverage = {
+    definitions: definitionEntryIds.size / total,
+    examples: exampleEntryIds.size / total,
+    notes: noteEntryIds.size / total,
+    sources: sourceEntryIds.size / total,
+    ipa: ipaEntryIds.size / total,
+    morphology: morphologyEntryIds.size / total,
+  };
   const coverageRows = [
     [aText("有释义", "Definitions"), coverage.definitions, binaryCoverageFilterAction(aText("有释义", "Has definitions"), [...definitionEntryIds], aText("无释义", "No definitions"), noDefinitionEntryIds)],
     [aText("有例句", "Examples"), coverage.examples, binaryCoverageFilterAction(aText("有例句", "Has examples"), [...exampleEntryIds], aText("无例句", "No examples"), noExampleEntryIds)],
@@ -5853,20 +6074,11 @@ function buildDictionaryAnalysis(dictionary) {
     ["IPA", coverage.ipa, binaryCoverageFilterAction(aText("有 IPA", "Has IPA"), [...ipaEntryIds], aText("无 IPA", "No IPA"), noIpaEntryIds)],
     [aText("形态表格", "Morphology table"), coverage.morphology, binaryCoverageFilterAction(aText("有形态表格", "Has morphology table"), [...morphologyEntryIds], aText("无形态表格", "No morphology table"), noMorphologyEntryIds)],
   ];
-  const searchMatchEntries = normalize(searchQuery)
-    ? entries.filter((entry) => entryMatchesSearch(entry, dictionary))
-    : entries;
 
   return {
-    entries,
-    rootCount: rootGroups.length,
-    derivedCount: derivedEntries.length,
-    derivedEntryIds: derivedEntries.map((entry) => entry.id),
-    isolatedRootCount,
     definitionCount,
     examples,
     glossExamples,
-    multiSourceCount,
     definitionEntryIds: [...definitionEntryIds],
     exampleEntryIds: [...exampleEntryIds],
     glossEntryIds: [...glossEntryIds],
@@ -5880,13 +6092,65 @@ function buildDictionaryAnalysis(dictionary) {
     noSourceEntryIds,
     noIpaEntryIds,
     noMorphologyEntryIds,
-    multiSourceEntryIds: [...multiSourceEntryIds],
+    coverage,
+    coverageRows,
+  };
+}
+
+function buildAnalysisTagSlice(context) {
+  const { dictionary, entries } = context;
+  const parts = new Map();
+  const tags = new Map();
+  const tagCombos = new Map();
+
+  entries.forEach((entry) => {
+    const entryPartTags = entryParts(entry, dictionary);
+    if (entryPartTags.length) {
+      entryPartTags.forEach((part) => incrementEntry(parts, part, entry));
+    } else {
+      incrementEntry(parts, NO_PART_FILTER_VALUE, entry);
+    }
+    (entry.tags || []).forEach((tag) => {
+      incrementEntry(tags, tag, entry);
+    });
+    if ((entry.tags || []).length > 1) {
+      incrementEntry(tagCombos, entry.tags.map((tag) => displayTag(tag, dictionary)).join(" + "), entry);
+    }
+  });
+
+  return {
     parts: partEntryMapItems(parts, 12, dictionary),
     allParts: partEntryMapItems(parts, Number.MAX_SAFE_INTEGER, dictionary),
     tags: tagEntryMapItems(tags, 16, dictionary),
     allTags: tagEntryMapItems(tags, Number.MAX_SAFE_INTEGER, dictionary),
     tagCombos: topEntryMapItems(tagCombos, 10, aText("标签组合", "Tag Combination")),
     allTagCombos: topEntryMapItems(tagCombos, Number.MAX_SAFE_INTEGER, aText("标签组合", "Tag Combination")),
+  };
+}
+
+function buildAnalysisFormSlice(context) {
+  const { entries } = context;
+  const initialLetters = new Map();
+  const wordLengths = new Map();
+  const characters = new Map();
+  const bigrams = new Map();
+
+  entries.forEach((entry) => {
+    const lemma = String(entry.lemma || "");
+    if (!lemma) {
+      return;
+    }
+    incrementEntry(wordLengths, String(Array.from(lemma).length), entry);
+    incrementEntry(initialLetters, Array.from(lemma.trim())[0] || "", entry);
+    Array.from(lemma.replace(/\s+/g, "")).forEach((char) => incrementEntry(characters, char, entry));
+    Array.from(lemma.replace(/\s+/g, "")).forEach((char, index, chars) => {
+      if (index < chars.length - 1) {
+        incrementEntry(bigrams, `${char}${chars[index + 1]}`, entry);
+      }
+    });
+  });
+
+  return {
     initialLetters: topEntryMapItems(initialLetters, 14, aText("首字母", "Initial Letter")),
     allInitialLetters: topEntryMapItems(initialLetters, Number.MAX_SAFE_INTEGER, aText("首字母", "Initial Letter")),
     wordLengths: numericEntryMapItems(wordLengths, aText("词长", "Word Length")),
@@ -5895,24 +6159,31 @@ function buildDictionaryAnalysis(dictionary) {
     allCharacters: topEntryMapItems(characters, Number.MAX_SAFE_INTEGER, aText("正写法字符", "Orthographic Character")),
     bigrams: topEntryMapItems(bigrams, 16, aText("正写法双字符组合", "Orthographic Bigram")),
     allBigrams: topEntryMapItems(bigrams, Number.MAX_SAFE_INTEGER, aText("正写法双字符组合", "Orthographic Bigram")),
-    rootFamilies: rootGroups
-      .filter((group) => group.derived.length)
-      .sort((a, b) => b.derived.length - a.derived.length)
-      .slice(0, 12)
-      .map((group) => [group.root.lemma, group.derived.length, directEntryAction(group.root.id)]),
-    allRootFamilies: rootGroups
-      .filter((group) => group.derived.length)
-      .sort((a, b) => b.derived.length - a.derived.length)
-      .map((group) => [group.root.lemma, group.derived.length, directEntryAction(group.root.id)]),
-    ipa,
-    morphology,
-    coverage,
-    coverageRows,
+  };
+}
+
+function buildAnalysisIpaSlice(context) {
+  return analyzeIpa(context.entries, context.dictionary);
+}
+
+function buildAnalysisMorphologySlice(context) {
+  return analyzeMorphology(context.entries, context.dictionary);
+}
+
+function buildAnalysisSearchSlice(context) {
+  const { dictionary, entries } = context;
+  const searchMatchEntries = normalize(searchQuery)
+    ? entries.filter((entry) => entryMatchesSearch(entry, dictionary))
+    : entries;
+  return {
     searchMatches: searchMatchEntries.length,
     searchMatchEntryIds: searchMatchEntries.map((entry) => entry.id),
     searchFields: analyzeSearchFields(entries, dictionary),
-    activity: analyzeActivity(entries),
   };
+}
+
+function buildAnalysisActivitySlice(context) {
+  return analyzeActivity(context.entries);
 }
 
 function analyzeIpa(entries, dictionary) {

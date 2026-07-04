@@ -288,6 +288,39 @@ GET /api/dictionaries/:id/entry-relations/:entryId
 
 `matchedEntryId` 应由 repository 明确解析；如果同名 lemma 存在多条，当前阶段可选择排序后的第一条并在后续诊断模块中报告歧义。
 
+当前只有词汇网络详情视图接入了该 API。词根模式的列表渲染仍由前端根据完整词条数组本地计算，但词根组、来源解析和衍生关系语义已经抽入共享关系模块，后续 API 化时前后端应复用同一套语义。
+
+词根模式后续可新增独立读取端点：
+
+```text
+GET /api/dictionaries/:id/root-groups?q=&fuzzy=&tagFuzzy=&fuzzyFields=&sort=&cursor=&limit=&include=
+```
+
+建议返回分页后的词根组，而不是向前端一次返回全部分组：
+
+```js
+{
+  items: [
+    {
+      root: { id, lemma, pronunciation, tags, definitionPreview, createdAt, updatedAt },
+      derivedEntries: [
+        { id, lemma, pronunciation, tags, definitionPreview, createdAt, updatedAt }
+      ],
+      matchedDerivedIds: [],
+      rootMatches: true
+    }
+  ],
+  pageInfo: { nextCursor, hasMore, total }
+}
+```
+
+性能优化方向：
+
+- repository 层为一次请求构建临时关系索引：`id -> entry`、`normalized lemma -> first entry`、`source key -> derived entries`，避免每个来源重复扫描全词条。
+- `entry-relations/:entryId`、`root-groups`、`entries?derivedFrom=` 和后续质量检查中的词源问题应共享同一套关系索引。
+- JSON 文件后端可先做请求级临时索引；如果后续切到 SQLite，则用 `entry_sources(source_key, entry_id)` 或等价表/索引支持 `derivedFrom`、词根分组和词汇网络查询。
+- 前端保留本地 fallback，只有当 API 返回顺序和语义通过一致性检查后才可逐步替代本地 root mode 计算。
+
 ### 语料库读取
 
 语料库读取后续再拆：
@@ -308,7 +341,6 @@ GET /api/dictionaries/:id/corpus/units/:unitId
 ```text
 GET /api/dictionaries/:id/analysis/overview
 GET /api/dictionaries/:id/analysis/tags
-GET /api/dictionaries/:id/analysis/quality
 GET /api/dictionaries/:id/analysis/ipa
 GET /api/dictionaries/:id/analysis/morphology
 GET /api/dictionaries/:id/analysis/corpus
