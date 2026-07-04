@@ -28,6 +28,7 @@ const shellState = {
 let activeAppTooltipTarget = null;
 const desktopNavMediaQuery = window.matchMedia("(min-width: 800px)");
 const wideNavMediaQuery = window.matchMedia("(min-width: 1280px)");
+const analysisModel = window.ConlexiconAnalysis;
 const entryRelationsModel = window.ConlexiconEntryRelations;
 const ipaModel = window.ConlexiconIpa;
 const IPA_STRESS_MARKER = ipaModel.IPA_STRESS_MARKER;
@@ -105,7 +106,6 @@ let entryFacetsState = {
 };
 const lexicalNetworkRelationsCache = new Map();
 let lexicalNetworkRelationsRequestId = 0;
-const analysisSliceCache = new Map();
 let qualityReportCache = null;
 let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
@@ -4544,7 +4544,7 @@ function dictionaryStatsText(dictionary) {
 }
 
 function dictionaryRootCount(dictionary) {
-  return rootModeGroups(dictionary, { query: "" }).length;
+  return entryRelationsModel.rootCount(dictionary, { normalizeText: normalize, compareEntries });
 }
 
 function rootModeGroups(dictionary = activeDictionary(), options = {}) {
@@ -5738,74 +5738,18 @@ function buildQualityViewReport(dictionary) {
   });
 }
 
-const DEFAULT_ANALYSIS_OVERVIEW_WIDGETS = [
-  "entryCounts",
-  "derivedCounts",
-  "definitionCoverage",
-  "ipaCoverage",
-  "morphologyCoverage",
-  "partDistribution",
-  "tagFrequency",
-  "rootFamilies",
-  "activityPreview",
-];
-const ANALYSIS_OVERVIEW_WIDGETS = {
-  entryCounts: { deps: ["relation"] },
-  derivedCounts: { deps: ["relation"] },
-  definitionCoverage: { deps: ["coverage"] },
-  ipaCoverage: { deps: ["coverage", "ipa"] },
-  morphologyCoverage: { deps: ["coverage", "morphology"] },
-  partDistribution: { deps: ["tags"] },
-  tagFrequency: { deps: ["tags"] },
-  rootFamilies: { deps: ["relation"] },
-  activityPreview: { deps: ["activity"] },
-};
-
-function analysisSliceDepsForOverviewWidgets(widgets = DEFAULT_ANALYSIS_OVERVIEW_WIDGETS) {
-  return [...new Set((widgets || [])
-    .flatMap((widget) => ANALYSIS_OVERVIEW_WIDGETS[widget]?.deps || []))];
-}
-
-function analysisSliceDepsForPage(page = "overview", subpage = "") {
-  if (page === "overview") {
-    return analysisSliceDepsForOverviewWidgets();
-  }
-  if (page === "entries") {
-    if (subpage === "forms") {
-      return ["forms"];
-    }
-    if (subpage === "roots") {
-      return ["relation"];
-    }
-    if (subpage === "coverage") {
-      return ["coverage", "relation", "search"];
-    }
-    return ["tags"];
-  }
-  if (page === "ipa") {
-    return subpage === "units" || subpage === "mismatches"
-      ? ["ipa"]
-      : ["ipa", "coverage"];
-  }
-  if (page === "morphology") {
-    return subpage === "overrides" || subpage === "generated"
-      ? ["morphology"]
-      : ["morphology", "coverage"];
-  }
-  if (page === "activity") {
-    return ["activity"];
-  }
-  return ["relation", "coverage", "tags", "forms", "ipa", "morphology", "search", "activity"];
-}
-
 function buildDictionaryAnalysis(dictionary) {
   return buildAnalysisReportForRoute(dictionary, "all", "");
 }
 
 function buildAnalysisReportForRoute(dictionary, page = "overview", subpage = "") {
-  const context = buildAnalysisContext(dictionary);
-  const slices = buildRequiredAnalysisSlices(context, analysisSliceDepsForPage(page, subpage));
-  return composeLegacyAnalysisReport(context, slices);
+  return analysisModel.buildReportForRoute(dictionary, { page, subpage }, {
+    buildContext: buildAnalysisContext,
+    builders: analysisSliceBuilders(),
+    composeReport: composeLegacyAnalysisReport,
+    maxCacheEntries: 24,
+    sliceCacheKey: analysisSliceCacheKey,
+  });
 }
 
 function buildAnalysisContext(dictionary) {
@@ -5831,114 +5775,6 @@ function composeLegacyAnalysisReport(context, slices) {
   };
 }
 
-function emptyAnalysisSlices() {
-  const emptyCoverage = {
-    definitions: 0,
-    examples: 0,
-    notes: 0,
-    sources: 0,
-    ipa: 0,
-    morphology: 0,
-  };
-  return {
-    relation: {
-      rootCount: 0,
-      derivedCount: 0,
-      derivedEntryIds: [],
-      isolatedRootCount: 0,
-      multiSourceCount: 0,
-      multiSourceEntryIds: [],
-      rootFamilies: [],
-      allRootFamilies: [],
-    },
-    coverage: {
-      definitionCount: 0,
-      examples: 0,
-      glossExamples: 0,
-      definitionEntryIds: [],
-      exampleEntryIds: [],
-      glossEntryIds: [],
-      noteEntryIds: [],
-      sourceEntryIds: [],
-      ipaEntryIds: [],
-      morphologyEntryIds: [],
-      noDefinitionEntryIds: [],
-      noExampleEntryIds: [],
-      noNoteEntryIds: [],
-      noSourceEntryIds: [],
-      noIpaEntryIds: [],
-      noMorphologyEntryIds: [],
-      coverage: emptyCoverage,
-      coverageRows: [],
-    },
-    tags: {
-      parts: [],
-      allParts: [],
-      tags: [],
-      allTags: [],
-      tagCombos: [],
-      allTagCombos: [],
-    },
-    forms: {
-      initialLetters: [],
-      allInitialLetters: [],
-      wordLengths: [],
-      allWordLengths: [],
-      characters: [],
-      allCharacters: [],
-      bigrams: [],
-      allBigrams: [],
-    },
-    ipa: {
-      units: [],
-      allUnits: [],
-      initials: [],
-      allInitials: [],
-      finals: [],
-      allFinals: [],
-      syllableCounts: [],
-      allSyllableCounts: [],
-      syllableAverage: "0",
-      generatedMatch: 0,
-      generatedMatchEntryIds: [],
-      generatedMismatch: 0,
-      generatedMismatchEntryIds: [],
-      generatedMismatchStrict: 0,
-      generatedMismatchStrictEntryIds: [],
-    },
-    morphology: {
-      tables: [],
-      allTables: [],
-      overrides: [],
-      allOverrides: [],
-      generatedForms: 0,
-      emptyCells: 0,
-      emptyCellEntryIds: [],
-    },
-    search: {
-      searchMatches: 0,
-      searchMatchEntryIds: [],
-      searchFields: [],
-    },
-    activity: {
-      created: [],
-      updated: [],
-      latest: [],
-    },
-  };
-}
-
-function buildRequiredAnalysisSlices(context, deps = []) {
-  const slices = emptyAnalysisSlices();
-  [...new Set(deps)].forEach((dep) => {
-    const slice = getAnalysisSlice(context, dep);
-    if (slice) {
-      slices[dep] = slice;
-    }
-  });
-  return slices;
-}
-
 function analysisSliceBuilders() {
   return {
     relation: buildAnalysisRelationSlice,
@@ -5950,23 +5786,6 @@ function analysisSliceBuilders() {
     search: buildAnalysisSearchSlice,
     activity: buildAnalysisActivitySlice,
   };
-}
-
-function getAnalysisSlice(context, dep) {
-  const builder = analysisSliceBuilders()[dep];
-  if (!builder) {
-    return null;
-  }
-  const key = analysisSliceCacheKey(context, dep);
-  if (analysisSliceCache.has(key)) {
-    return analysisSliceCache.get(key);
-  }
-  const slice = builder(context);
-  analysisSliceCache.set(key, slice);
-  if (analysisSliceCache.size > 24) {
-    analysisSliceCache.delete(analysisSliceCache.keys().next().value);
-  }
-  return slice;
 }
 
 function buildAnalysisRelationSlice(context) {
