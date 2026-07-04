@@ -128,6 +128,8 @@ let activeEntryContextMenu = null;
 const entryVirtualList = createVirtualListState(145);
 const corpusVirtualList = createVirtualListState(74);
 const masonryLayouts = new WeakMap();
+const VIRTUAL_LIST_RESIZE_EPSILON = 0.5;
+const VIRTUAL_LIST_ACTIVE_SCROLL_MS = 180;
 
 const i18n = {
   zh: {
@@ -2933,7 +2935,9 @@ function createVirtualListState(estimatedItemHeight) {
     scrollHandler: null,
     lastScrollAt: 0,
     resizeFrame: 0,
+    resizeIdleTimer: 0,
     pendingResizeAnchor: null,
+    pendingSizeUpdates: new Map(),
   };
 }
 
@@ -2962,11 +2966,19 @@ function initializeVirtualList(virtualList, container) {
     cancelAnimationFrame(virtualList.resizeFrame);
     virtualList.resizeFrame = 0;
   }
+  if (virtualList.resizeIdleTimer) {
+    clearTimeout(virtualList.resizeIdleTimer);
+    virtualList.resizeIdleTimer = 0;
+  }
   virtualList.pendingResizeAnchor = null;
+  virtualList.pendingSizeUpdates.clear();
   virtualList.container = container;
   virtualList.lastScrollAt = 0;
   virtualList.scrollHandler = () => {
     virtualList.lastScrollAt = performance.now();
+    if (virtualList.pendingSizeUpdates.size) {
+      scheduleVirtualListResizeIdleFlush(virtualList);
+    }
     scheduleVirtualListRender(virtualList);
   };
   container.addEventListener("scroll", virtualList.scrollHandler, { passive: true });
@@ -2974,17 +2986,28 @@ function initializeVirtualList(virtualList, container) {
     return;
   }
   virtualList.resizeObserver = new ResizeObserver((entries) => {
-    const anchor = virtualListAnchor(virtualList);
+    const activelyScrolling = virtualListIsActivelyScrolling(virtualList);
+    const anchor = activelyScrolling ? null : virtualListAnchor(virtualList);
     let changed = false;
     entries.forEach((entry) => {
       const key = entry.target.dataset.virtualKey;
       const height = entry.borderBoxSize?.[0]?.blockSize || entry.target.getBoundingClientRect().height;
-      if (key && height > 0 && Math.abs((virtualList.sizes.get(key) || 0) - height) > 0.5) {
+      const current = virtualList.pendingSizeUpdates.get(key) || virtualList.sizes.get(key) || 0;
+      if (key && height > 0 && Math.abs(current - height) > VIRTUAL_LIST_RESIZE_EPSILON) {
+        if (activelyScrolling) {
+          virtualList.pendingSizeUpdates.set(key, height);
+          changed = true;
+          return;
+        }
         virtualList.sizes.set(key, height);
         changed = true;
       }
     });
     if (!changed) {
+      return;
+    }
+    if (activelyScrolling) {
+      scheduleVirtualListResizeIdleFlush(virtualList);
       return;
     }
     scheduleVirtualListResizeUpdate(virtualList, anchor);
@@ -2993,12 +3016,45 @@ function initializeVirtualList(virtualList, container) {
     const width = Math.round(entries[0]?.contentRect?.width || container.clientWidth);
     if (virtualList.width && width && width !== virtualList.width) {
       virtualList.sizes.clear();
+      virtualList.pendingSizeUpdates.clear();
       rebuildVirtualListOffsets(virtualList);
     }
     virtualList.width = width;
     scheduleVirtualListRender(virtualList);
   });
   virtualList.viewportObserver.observe(container);
+}
+
+function virtualListIsActivelyScrolling(virtualList) {
+  return performance.now() - (virtualList.lastScrollAt || 0) < VIRTUAL_LIST_ACTIVE_SCROLL_MS;
+}
+
+function applyVirtualListPendingSizeUpdates(virtualList) {
+  if (!virtualList.pendingSizeUpdates.size) {
+    return false;
+  }
+  let changed = false;
+  virtualList.pendingSizeUpdates.forEach((height, key) => {
+    if (key && height > 0 && Math.abs((virtualList.sizes.get(key) || 0) - height) > VIRTUAL_LIST_RESIZE_EPSILON) {
+      virtualList.sizes.set(key, height);
+      changed = true;
+    }
+  });
+  virtualList.pendingSizeUpdates.clear();
+  return changed;
+}
+
+function scheduleVirtualListResizeIdleFlush(virtualList) {
+  if (virtualList.resizeIdleTimer) {
+    clearTimeout(virtualList.resizeIdleTimer);
+  }
+  virtualList.resizeIdleTimer = setTimeout(() => {
+    virtualList.resizeIdleTimer = 0;
+    if (!virtualList.pendingSizeUpdates.size) {
+      return;
+    }
+    scheduleVirtualListResizeUpdate(virtualList, virtualListAnchor(virtualList));
+  }, VIRTUAL_LIST_ACTIVE_SCROLL_MS);
 }
 
 function scheduleVirtualListResizeUpdate(virtualList, anchor) {
@@ -3012,9 +3068,9 @@ function scheduleVirtualListResizeUpdate(virtualList, anchor) {
     virtualList.resizeFrame = 0;
     const pendingAnchor = virtualList.pendingResizeAnchor;
     virtualList.pendingResizeAnchor = null;
+    applyVirtualListPendingSizeUpdates(virtualList);
     rebuildVirtualListOffsets(virtualList);
-    const activelyScrolling = performance.now() - (virtualList.lastScrollAt || 0) < 180;
-    if (!activelyScrolling) {
+    if (!virtualListIsActivelyScrolling(virtualList)) {
       restoreVirtualListAnchor(virtualList, pendingAnchor);
     }
     clampVirtualListScroll(virtualList);
@@ -3127,6 +3183,11 @@ function renderVirtualList(container, virtualList, items, options) {
     virtualList.resizeFrame = 0;
     virtualList.pendingResizeAnchor = null;
   }
+  if (virtualList.resizeIdleTimer) {
+    clearTimeout(virtualList.resizeIdleTimer);
+    virtualList.resizeIdleTimer = 0;
+  }
+  virtualList.pendingSizeUpdates.clear();
   container.classList.add("virtualized-list");
   const resetScroll = virtualList.resetToken !== options.resetToken;
   virtualList.resetToken = options.resetToken;
@@ -3139,6 +3200,7 @@ function renderVirtualList(container, virtualList, items, options) {
   virtualList.indexByKey = new Map(virtualList.items.map((item, index) => [item.key, index]));
   if (resetScroll) {
     virtualList.sizes.clear();
+    virtualList.pendingSizeUpdates.clear();
   }
   rebuildVirtualListOffsets(virtualList);
   if (resetScroll) {
@@ -3155,6 +3217,11 @@ function renderVirtualListEmpty(container, virtualList, content) {
     virtualList.resizeFrame = 0;
     virtualList.pendingResizeAnchor = null;
   }
+  if (virtualList.resizeIdleTimer) {
+    clearTimeout(virtualList.resizeIdleTimer);
+    virtualList.resizeIdleTimer = 0;
+  }
+  virtualList.pendingSizeUpdates.clear();
   virtualList.resizeObserver?.disconnect();
   virtualList.items = [];
   virtualList.indexByKey.clear();
