@@ -19,6 +19,7 @@ const morphologyModel = require("../lib/morphology-model");
 const ipaModel = require("../lib/ipa-model");
 const tagModel = require("../lib/tag-model");
 const entrySearchModel = require("../lib/entry-search-model");
+const entryRelationsModel = require("../lib/entry-relations-model");
 const qualityModel = require("../lib/quality-model");
 
 const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
@@ -131,7 +132,7 @@ function testEntryMatches(entry, dictionary, query = {}) {
   }
   const normalizedQuery = testNormalize(query.q);
   if (!normalizedQuery) {
-    return true;
+    return testEntryMatchesDerivedFrom(entry, dictionary, query);
   }
   return entrySearchModel.entryMatchesSearchText(entry, dictionary, normalizedQuery, {
     fields: entrySearchModel.normalizeSearchFields(query.fields || query.searchFields),
@@ -140,7 +141,20 @@ function testEntryMatches(entry, dictionary, query = {}) {
       tagFuzzy: query.tagFuzzy,
     }),
     normalizeText: testNormalize,
-  });
+  }) && testEntryMatchesDerivedFrom(entry, dictionary, query);
+}
+
+function testEntryMatchesDerivedFrom(entry, dictionary, query = {}) {
+  const sourceName = testNormalize(query.derivedFrom);
+  if (!sourceName) {
+    return true;
+  }
+  const index = entryRelationsModel.buildEntryRelationIndex(dictionary, { normalizeText: testNormalize });
+  const target = entryRelationsModel.resolveSourceEntry(sourceName, dictionary, { normalizeText: testNormalize, index });
+  const derivedEntries = target
+    ? entryRelationsModel.findDerivedEntries(target, dictionary, { normalizeText: testNormalize, index })
+    : index.derivedBySourceKey.get(sourceName) || [];
+  return derivedEntries.some((candidate) => candidate.id === entry.id);
 }
 
 function testCompareEntries(sort = "lemmaAsc") {
@@ -207,6 +221,44 @@ async function assertEntryQueryConsistency(repository, dictionary, params = {}) 
   );
 }
 
+function expectedRootGroupSnapshot(dictionary, query = {}) {
+  return entryRelationsModel.rootModeGroups(dictionary, {
+    query: testNormalize(query.q || query.query),
+    normalizeText: testNormalize,
+    compareEntries: testCompareEntries(query.sort || "lemmaAsc"),
+    matchesEntry: (entry) => entrySearchModel.entryMatchesSearchText(entry, dictionary, query.q || query.query || "", {
+      fields: entrySearchModel.normalizeSearchFields(query.fields || query.searchFields),
+      fuzzyFields: entrySearchModel.normalizeFuzzyFields(query.fuzzyFields, {
+        fuzzy: query.fuzzy,
+        tagFuzzy: query.tagFuzzy,
+      }),
+      normalizeText: testNormalize,
+    }),
+  }).map((group) => ({
+    rootId: group.root.id,
+    derivedIds: group.derived.map((entry) => entry.id),
+    matchedDerivedIds: group.matchedDerived.map((entry) => entry.id),
+    rootMatches: Boolean(group.rootMatches),
+  }));
+}
+
+async function assertRootGroupQueryConsistency(repository, dictionary, params = {}) {
+  const qs = queryString({ ...params, limit: 100, include: "summary" });
+  const apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups?${qs}`);
+  assert.equal(apiResult.statusCode, 200);
+  assert.equal(apiResult.body.pageInfo.hasMore, false);
+  assert.deepEqual(
+    apiResult.body.items.map((group) => ({
+      rootId: group.root.id,
+      derivedIds: group.derivedEntries.map((entry) => entry.id),
+      matchedDerivedIds: group.matchedDerivedIds,
+      rootMatches: Boolean(group.rootMatches),
+    })),
+    expectedRootGroupSnapshot(dictionary, params),
+    `root group query consistency: ${JSON.stringify(params)}`,
+  );
+}
+
 function checkModelNormalization() {
   assert.deepEqual(tagModel.normalizeTagList("n，v,n\nadj"), ["n", "v", "adj"]);
   assert.deepEqual(tagModel.normalizeRedHighlightTags("rare, archaic rare"), ["rare", "archaic"]);
@@ -236,6 +288,19 @@ function checkModelNormalization() {
   assert.equal(entrySearchModel.textMatches("mirror meaning", "mrmeaning", { fuzzy: false }), false);
   assert.equal(entrySearchModel.fieldFuzzyEnabled("tags", { tagFuzzy: true }), true);
   assert.equal(entrySearchModel.fieldFuzzyEnabled("tags", { fuzzy: true }), false);
+  const relationDictionary = {
+    entries: [
+      { id: "entry-root", lemma: "root" },
+      { id: "entry-derived-lemma", lemma: "derived lemma", etymology: { sources: ["root", "root"] } },
+      { id: "entry-derived-id", lemma: "derived id", etymology: { sources: ["entry-root"] } },
+    ],
+  };
+  const relationIndex = entryRelationsModel.buildEntryRelationIndex(relationDictionary, { normalizeText: testNormalize });
+  assert.equal(relationIndex.derivedBySourceKey.get("root").length, 1);
+  assert.deepEqual(
+    entryRelationsModel.findDerivedEntries(relationDictionary.entries[0], relationDictionary, { index: relationIndex }).map((entry) => entry.id),
+    ["entry-derived-id", "entry-derived-lemma"],
+  );
   assert.deepEqual(
     entrySearchModel.entrySearchFieldValues(
       { lemma: "acar", pronunciation: "/a/", tags: ["n"], definitions: [{ meaning: "root", example: "example", note: "note" }] },
@@ -569,6 +634,7 @@ async function checkReadApiConsistency(repository) {
         pronunciation: "/beta/",
         tags: ["v", "n", "derived"],
         definitions: [{ id: "def-beta", meaning: "movement" }],
+        etymology: { sources: ["alpha"], description: "" },
         morphology: { tableId: "morph-n-table", overrides: { "0,0": "manual-beta-form" } },
         createdAt: "2026-01-02T00:00:00.000Z",
         updatedAt: "2026-01-02T00:00:00.000Z",
@@ -627,6 +693,8 @@ async function checkReadApiConsistency(repository) {
     await assertEntryQueryConsistency(repository, dictionary, { q: "alpha-generated", fields: "definitions" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "alpha example", fields: "examples" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "alpha example", fields: "notes" });
+    await assertEntryQueryConsistency(repository, dictionary, { derivedFrom: "alpha" });
+    await assertEntryQueryConsistency(repository, dictionary, { derivedFrom: "root" });
     await assertEntryQueryConsistency(repository, dictionary, { part: "n" });
     await assertEntryQueryConsistency(repository, dictionary, { part: "v" });
     await assertEntryQueryConsistency(repository, dictionary, { part: "adj" });
@@ -636,6 +704,11 @@ async function checkReadApiConsistency(repository) {
     await assertEntryQueryConsistency(repository, dictionary, { sort: "updatedDesc" });
     await assertEntryQueryConsistency(repository, dictionary, { sort: "createdAsc" });
     await assertEntryQueryConsistency(repository, dictionary, { sort: "createdDesc" });
+    await assertRootGroupQueryConsistency(repository, dictionary, {});
+    await assertRootGroupQueryConsistency(repository, dictionary, { q: "movement" });
+    await assertRootGroupQueryConsistency(repository, dictionary, { q: "manual-beta-form" });
+    await assertRootGroupQueryConsistency(repository, dictionary, { q: "mrmeaning", fuzzy: true });
+    await assertRootGroupQueryConsistency(repository, dictionary, { sort: "lemmaDesc" });
 
     let apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/facets`);
     assert.equal(apiResult.statusCode, 200);
@@ -657,6 +730,22 @@ async function checkReadApiConsistency(repository) {
     assert.deepEqual(
       [...apiResult.body.items, ...nextPage.body.items].map((entry) => entry.id),
       expectedEntryIds(dictionary, { sort: "lemmaAsc" }),
+    );
+
+    apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups?sort=lemmaAsc&limit=2`);
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.items.length, 2);
+    assert.equal(apiResult.body.pageInfo.hasMore, true);
+    assert.ok(apiResult.body.pageInfo.nextCursor);
+    const nextRootGroupPage = await callApi(
+      repository,
+      "GET",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups?sort=lemmaAsc&limit=100&cursor=${encodeURIComponent(apiResult.body.pageInfo.nextCursor)}`,
+    );
+    assert.equal(nextRootGroupPage.statusCode, 200);
+    assert.deepEqual(
+      [...apiResult.body.items, ...nextRootGroupPage.body.items].map((group) => group.root.id),
+      expectedRootGroupSnapshot(dictionary, { sort: "lemmaAsc" }).map((group) => group.rootId),
     );
   } finally {
     await repository.deleteDictionary(dictionary.id);
@@ -805,6 +894,13 @@ async function checkJsonRepository() {
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entry-relations/${encodeURIComponent(derivedEntryId)}`);
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.sources[0].matchedEntryId, rootEntryId);
+
+    apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/root-groups?q=derived&limit=100`);
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.items.length, 1);
+    assert.equal(apiResult.body.items[0].root.id, rootEntryId);
+    assert.deepEqual(apiResult.body.items[0].derivedEntries.map((entry) => entry.id), [derivedEntryId]);
+    assert.deepEqual(apiResult.body.items[0].matchedDerivedIds, [derivedEntryId]);
 
     await checkReadApiConsistency(repository);
 

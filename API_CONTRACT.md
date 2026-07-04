@@ -64,7 +64,7 @@
 
 | 方法 | 路径 | 用途 | 响应 | 校验范围 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | 无参数时为词条数组；带查询参数时为分页查询对象 | 支持 `q`、`fields`、`fuzzy`、`tagFuzzy`、`fuzzyFields`、`part`、`tags`、`tagMode`、`source`、`derivedFrom`、`sort`、`cursor`、`limit`、`include`。 |
+| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | 无参数时为词条数组；带查询参数时为分页查询对象 | 支持 `q`、`fields`、`fuzzy`、`tagFuzzy`、`fuzzyFields`、`part`、`tags`、`tagMode`、`source`、`derivedFrom`、`sort`、`cursor`、`limit`、`include`。前端普通词条列表正常路径以该 API 为准，不再每次本地筛选完整列表做一致性校验。 |
 | `POST` | `/api/dictionaries/:id/entries` | 新建词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
 | `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存单个词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
@@ -75,8 +75,9 @@
 
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/dictionaries/:id/facets` | 读取词性和标签统计 | `{ parts, tags, noPartOfSpeechCount }` | 尊重当前词典的词性标签设置和标签显示替换。 |
+| `GET` | `/api/dictionaries/:id/facets` | 读取词性和标签统计 | `{ parts, tags, noPartOfSpeechCount }` | 尊重当前词典的词性标签设置和标签显示替换。前端词性筛选选项正常路径以该 API 为准，不再每次本地统计完整词性集合做一致性校验。 |
 | `GET` | `/api/dictionaries/:id/entry-relations/:entryId` | 读取词源/衍生/同根关系 | `{ entryId, sources, derivedEntries, rootGroup }` | 同名 lemma 暂按排序后的第一条匹配，后续可由诊断模块报告歧义。 |
+| `GET` | `/api/dictionaries/:id/root-groups` | 读取词根模式分组 | `{ items, pageInfo }` | 支持 `q`、`fields`、`fuzzy`、`tagFuzzy`、`fuzzyFields`、`sort`、`cursor`、`limit`、`include`。前端词根模式正常路径以该 API 为准，不再用前端本地完整分组兜底。 |
 
 #### `GET /api/dictionaries/:id/entries` 查询参数补充
 
@@ -206,6 +207,8 @@ GET /api/dictionaries/:id/entries?q=&fields=&fuzzy=&tagFuzzy=&fuzzyFields=&part=
 - `limit`：分页大小，后端可设置上限。
 - `include`：`summary` 或 `full`，默认 `summary`。
 
+前端普通词条列表当前直接使用该 API 返回的顺序；请求失败时显示失败状态。现阶段为避免未接入列表窗口化前截断 1k/10k 压测词典，前端会请求较大的 `limit`，后端临时上限为 10000。后续进入真正分页/窗口化后，应降低单次请求规模并用 `cursor` 拉取窗口，不应恢复前端本地全量筛选作为运行期兜底。
+
 返回：
 
 ```js
@@ -288,15 +291,15 @@ GET /api/dictionaries/:id/entry-relations/:entryId
 
 `matchedEntryId` 应由 repository 明确解析；如果同名 lemma 存在多条，当前阶段可选择排序后的第一条并在后续诊断模块中报告歧义。
 
-当前只有词汇网络详情视图接入了该 API。词根模式的列表渲染仍由前端根据完整词条数组本地计算，但词根组、来源解析和衍生关系语义已经抽入共享关系模块，后续 API 化时前后端应复用同一套语义。
+词汇网络详情视图已接入该 API。词根组、来源解析和衍生关系语义抽入共享关系模块，词根模式也通过独立读取端点预备接线。
 
-词根模式后续可新增独立读取端点：
+词根模式读取端点：
 
 ```text
-GET /api/dictionaries/:id/root-groups?q=&fuzzy=&tagFuzzy=&fuzzyFields=&sort=&cursor=&limit=&include=
+GET /api/dictionaries/:id/root-groups?q=&fields=&fuzzy=&tagFuzzy=&fuzzyFields=&sort=&cursor=&limit=&include=
 ```
 
-建议返回分页后的词根组，而不是向前端一次返回全部分组：
+返回分页后的词根组，而不是向前端一次返回全部分组：
 
 ```js
 {
@@ -316,10 +319,11 @@ GET /api/dictionaries/:id/root-groups?q=&fuzzy=&tagFuzzy=&fuzzyFields=&sort=&cur
 
 性能优化方向：
 
-- repository 层为一次请求构建临时关系索引：`id -> entry`、`normalized lemma -> first entry`、`source key -> derived entries`，避免每个来源重复扫描全词条。
+- repository 层为一次请求构建临时关系索引：`id -> entry`、`normalized lemma -> first entry`、`source key -> derived entries`，避免每个来源或衍生查询重复扫描全词条。
 - `entry-relations/:entryId`、`root-groups`、`entries?derivedFrom=` 和后续质量检查中的词源问题应共享同一套关系索引。
 - JSON 文件后端可先做请求级临时索引；如果后续切到 SQLite，则用 `entry_sources(source_key, entry_id)` 或等价表/索引支持 `derivedFrom`、词根分组和词汇网络查询。
-- 前端保留本地 fallback，只有当 API 返回顺序和语义通过一致性检查后才可逐步替代本地 root mode 计算。
+- 前端词根模式当前正常路径以 `/root-groups` 为准；请求失败时显示失败状态，API 结果被分页截断时先渲染已返回页面并保留 `pageInfo`。后续分页/窗口化实装后，应继续用 `cursor` 拉取后续页面，而不是回退前端本地完整分组。
+- 词根模式分页/窗口化 UI 暂时搁置到后端关系索引或 SQLite 评估之后；不要在现阶段用简单无限滚动冒充完整列表滚动条，因为那会让滚动条只代表已加载页面，而不是完整词根组集合。
 
 ### 语料库读取
 

@@ -1447,6 +1447,12 @@ button.pending-source:focus-visible {
   min-height: 0;
 }
 
+.entry-card.body-only-entry-card {
+  grid-template-rows: auto auto;
+  align-content: start;
+  min-height: 0;
+}
+
 .entry-card.compact-entry-card .entry-card-body {
   display: none;
 }

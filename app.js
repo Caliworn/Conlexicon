@@ -104,6 +104,14 @@ let entryFacetsState = {
   error: null,
   requestId: 0,
 };
+let rootGroupsQueryState = {
+  key: "",
+  status: "idle",
+  groups: [],
+  pageInfo: null,
+  error: null,
+  requestId: 0,
+};
 const lexicalNetworkRelationsCache = new Map();
 let lexicalNetworkRelationsRequestId = 0;
 let qualityReportCache = null;
@@ -117,7 +125,7 @@ let entryBrowserHeightFrame = 0;
 let entryBrowserLayoutRefreshFrame = 0;
 let entryBrowserLayoutRefreshUntil = 0;
 let activeEntryContextMenu = null;
-const entryVirtualList = createVirtualListState(138);
+const entryVirtualList = createVirtualListState(145);
 const corpusVirtualList = createVirtualListState(74);
 const masonryLayouts = new WeakMap();
 
@@ -2866,9 +2874,8 @@ function renderPartFilter() {
     activePart = "";
     elements.partFilter.value = "";
   }
-  const localUsedParts = localPartTags(dictionary);
-  startEntryFacetsApiCheck(dictionary, localUsedParts);
-  const usedParts = entryFacetsPartsForRender(dictionary, localUsedParts);
+  startEntryFacetsApiCheck(dictionary);
+  const usedParts = entryFacetsPartsForRender(dictionary) || localPartTags(dictionary);
   const options = ["", NO_PART_FILTER_VALUE, ...usedParts];
   const current = activePart;
 
@@ -2902,7 +2909,10 @@ function renderPartFilter() {
     elements.advancedFilterLabel.removeAttribute("aria-label");
   }
   const hasRootSearch = Boolean(normalize(searchQuery));
-  elements.expandAllRootsButton.disabled = rootMode && hasRootSearch;
+  const rootGroupsFullyLoaded = rootMode
+    && rootGroupsQueryState.status === "success"
+    && !rootGroupsQueryState.pageInfo?.hasMore;
+  elements.expandAllRootsButton.disabled = rootMode && (hasRootSearch || !rootGroupsFullyLoaded);
   elements.collapseAllRootsButton.disabled = rootMode && hasRootSearch;
 }
 
@@ -2921,6 +2931,9 @@ function createVirtualListState(estimatedItemHeight) {
     resizeObserver: null,
     viewportObserver: null,
     scrollHandler: null,
+    lastScrollAt: 0,
+    resizeFrame: 0,
+    pendingResizeAnchor: null,
   };
 }
 
@@ -2945,8 +2958,17 @@ function initializeVirtualList(virtualList, container) {
   }
   virtualList.resizeObserver?.disconnect();
   virtualList.viewportObserver?.disconnect();
+  if (virtualList.resizeFrame) {
+    cancelAnimationFrame(virtualList.resizeFrame);
+    virtualList.resizeFrame = 0;
+  }
+  virtualList.pendingResizeAnchor = null;
   virtualList.container = container;
-  virtualList.scrollHandler = () => scheduleVirtualListRender(virtualList);
+  virtualList.lastScrollAt = 0;
+  virtualList.scrollHandler = () => {
+    virtualList.lastScrollAt = performance.now();
+    scheduleVirtualListRender(virtualList);
+  };
   container.addEventListener("scroll", virtualList.scrollHandler, { passive: true });
   if (typeof ResizeObserver === "undefined") {
     return;
@@ -2965,10 +2987,7 @@ function initializeVirtualList(virtualList, container) {
     if (!changed) {
       return;
     }
-    rebuildVirtualListOffsets(virtualList);
-    restoreVirtualListAnchor(virtualList, anchor);
-    clampVirtualListScroll(virtualList);
-    scheduleVirtualListRender(virtualList);
+    scheduleVirtualListResizeUpdate(virtualList, anchor);
   });
   virtualList.viewportObserver = new ResizeObserver((entries) => {
     const width = Math.round(entries[0]?.contentRect?.width || container.clientWidth);
@@ -2980,6 +2999,27 @@ function initializeVirtualList(virtualList, container) {
     scheduleVirtualListRender(virtualList);
   });
   virtualList.viewportObserver.observe(container);
+}
+
+function scheduleVirtualListResizeUpdate(virtualList, anchor) {
+  if (!virtualList.pendingResizeAnchor) {
+    virtualList.pendingResizeAnchor = anchor;
+  }
+  if (virtualList.resizeFrame) {
+    return;
+  }
+  virtualList.resizeFrame = requestAnimationFrame(() => {
+    virtualList.resizeFrame = 0;
+    const pendingAnchor = virtualList.pendingResizeAnchor;
+    virtualList.pendingResizeAnchor = null;
+    rebuildVirtualListOffsets(virtualList);
+    const activelyScrolling = performance.now() - (virtualList.lastScrollAt || 0) < 180;
+    if (!activelyScrolling) {
+      restoreVirtualListAnchor(virtualList, pendingAnchor);
+    }
+    clampVirtualListScroll(virtualList);
+    scheduleVirtualListRender(virtualList);
+  });
 }
 
 function rebuildVirtualListOffsets(virtualList) {
@@ -3082,6 +3122,11 @@ function renderVirtualListWindow(virtualList) {
 
 function renderVirtualList(container, virtualList, items, options) {
   initializeVirtualList(virtualList, container);
+  if (virtualList.resizeFrame) {
+    cancelAnimationFrame(virtualList.resizeFrame);
+    virtualList.resizeFrame = 0;
+    virtualList.pendingResizeAnchor = null;
+  }
   container.classList.add("virtualized-list");
   const resetScroll = virtualList.resetToken !== options.resetToken;
   virtualList.resetToken = options.resetToken;
@@ -3105,6 +3150,11 @@ function renderVirtualList(container, virtualList, items, options) {
 
 function renderVirtualListEmpty(container, virtualList, content) {
   initializeVirtualList(virtualList, container);
+  if (virtualList.resizeFrame) {
+    cancelAnimationFrame(virtualList.resizeFrame);
+    virtualList.resizeFrame = 0;
+    virtualList.pendingResizeAnchor = null;
+  }
   virtualList.resizeObserver?.disconnect();
   virtualList.items = [];
   virtualList.indexByKey.clear();
@@ -3314,25 +3364,68 @@ function renderEntries() {
     return;
   }
 
-  const localEntries = filteredEntries();
-  startEntryQueryApiCheck(dictionary, localEntries);
-  const entries = entryQueryEntriesForRender(dictionary, localEntries);
+  if (!advancedFilter && entryQueryCanUseApi(dictionary)) {
+    startEntryQueryApiCheck(dictionary);
+    const apiEntries = entryQueryEntriesForRender(dictionary);
+    if (!apiEntries) {
+      if (entryQueryState.status === "loading") {
+        renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(aText("加载中", "Loading"), ""));
+        return;
+      }
+      renderVirtualListEmpty(
+        elements.entryList,
+        entryVirtualList,
+        emptyState(aText("无法加载词条列表", "Could not load entries"), aText("请刷新或稍后重试。", "Refresh or try again later.")),
+      );
+      return;
+    }
+    renderEntryRows(apiEntries);
+    return;
+  }
+
+  const entries = filteredEntries();
+  renderEntryRows(entries);
+}
+
+function renderEntryRows(entries = []) {
   if (!entries.length) {
     renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noMatch"), t("noMatchBody")));
     return;
   }
 
-  const rows = entries.map((entry) => ({ kind: "entry", entry }));
+  const rows = entries.map((entry) => ({
+    kind: "entry",
+    entry,
+    qualityIssues: advancedFilterIssuesForEntry(entry.id),
+  }));
   renderVirtualList(elements.entryList, entryVirtualList, rows, {
     resetToken: entryVirtualResetToken(),
     getKey: (row) => `entry:${row.entry.id}`,
-    getEstimatedHeight: (row) => estimateEntryCardHeight(row.entry),
-    renderItem: (row) => createEntryCard(row.entry, { qualityIssues: advancedFilterIssuesForEntry(row.entry.id) }),
+    getEstimatedHeight: (row) => estimateEntryCardHeight(row.entry, { qualityIssues: row.qualityIssues }),
+    renderItem: (row) => createEntryCard(row.entry, { qualityIssues: row.qualityIssues }),
   });
 }
 
 function renderRootModeEntries() {
-  const groups = rootModeGroups();
+  const dictionary = activeDictionary();
+  startRootGroupsQueryApiCheck(dictionary);
+  const groups = rootGroupsQueryForRender(dictionary);
+  if (!groups) {
+    if (rootGroupsQueryState.status === "loading") {
+      renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(aText("加载中", "Loading"), ""));
+      return;
+    }
+    renderVirtualListEmpty(
+      elements.entryList,
+      entryVirtualList,
+      emptyState(aText("无法加载词根模式", "Could not load root mode"), aText("请刷新或稍后重试。", "Refresh or try again later.")),
+    );
+    return;
+  }
+  renderRootModeGroups(groups);
+}
+
+function renderRootModeGroups(groups = []) {
   if (!groups.length) {
     renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noMatch"), t("noMatchBody")));
     return;
@@ -3362,9 +3455,170 @@ function entryVirtualResetToken() {
     activePart,
     entrySort,
     entryQueryState.status === "success" ? "api" : "local",
+    rootGroupsQueryState.status === "success" ? "root-api" : "root-local",
     advancedFilter?.title || "",
     advancedFilter?.variantIndex ?? "",
   ].join("|");
+}
+
+function rootGroupsQueryCanUseApi(dictionary = activeDictionary()) {
+  return Boolean(
+    backendAvailable
+    && dictionary
+    && rootMode
+    && !advancedFilter
+  );
+}
+
+function rootGroupsQueryApiKey(dictionary = activeDictionary()) {
+  if (!dictionary) {
+    return "";
+  }
+  const settings = normalizeDictionarySettings(dictionary.settings);
+  return [
+    dictionary.id,
+    dictionaryEntriesSignature(dictionary),
+    normalize(searchQuery),
+    entrySort,
+    stableJson(dictionary.morphology || {}),
+    stableJson(settings.tagDisplayMap),
+    settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
+    settings.partOfSpeechTags.join(","),
+    settings.fuzzySearch ? "fuzzy" : "strict",
+    settings.tagFuzzySearch ? "tag-fuzzy" : "tag-strict",
+  ].join("|");
+}
+
+function resetRootGroupsQueryState() {
+  rootGroupsQueryState = {
+    key: "",
+    status: "idle",
+    groups: [],
+    pageInfo: null,
+    error: null,
+    requestId: rootGroupsQueryState.requestId + 1,
+  };
+}
+
+function rootGroupsQueryUrl(dictionary, options = {}) {
+  const params = new URLSearchParams();
+  if (searchQuery.trim()) {
+    params.set("q", searchQuery.trim());
+  }
+  if (entrySort) {
+    params.set("sort", entrySort);
+  }
+  const settings = normalizeDictionarySettings(dictionary?.settings);
+  if (settings.fuzzySearch) {
+    params.set("fuzzy", "true");
+  }
+  if (settings.tagFuzzySearch) {
+    params.set("tagFuzzy", "true");
+  }
+  params.set("include", "summary");
+  params.set("limit", "2000");
+  Object.entries(options).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      params.set(key, String(value));
+    }
+  });
+  return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups?${params}`;
+}
+
+function rootGroupsQueryForRender(dictionary) {
+  const key = rootGroupsQueryApiKey(dictionary);
+  if (rootGroupsQueryState.status !== "success" || rootGroupsQueryState.key !== key) {
+    return null;
+  }
+  const byId = new Map((dictionary?.entries || []).map((entry) => [entry.id, entry]));
+  const groups = rootGroupsQueryState.groups.map((group) => {
+    const root = byId.get(group.rootId);
+    if (!root) {
+      return null;
+    }
+    const derived = group.derivedIds.map((id) => byId.get(id)).filter(Boolean);
+    const matchedDerived = group.matchedDerivedIds.map((id) => byId.get(id)).filter(Boolean);
+    if (derived.length !== group.derivedIds.length || matchedDerived.length !== group.matchedDerivedIds.length) {
+      return null;
+    }
+    return {
+      root,
+      derived,
+      matchedDerived,
+      rootMatches: group.rootMatches,
+    };
+  });
+  return groups.every(Boolean) ? groups : null;
+}
+
+function startRootGroupsQueryApiCheck(dictionary) {
+  if (!rootGroupsQueryCanUseApi(dictionary)) {
+    if (rootGroupsQueryState.status !== "idle") {
+      resetRootGroupsQueryState();
+    }
+    return;
+  }
+
+  const key = rootGroupsQueryApiKey(dictionary);
+  if (rootGroupsQueryState.key === key && ["loading", "success", "error"].includes(rootGroupsQueryState.status)) {
+    return;
+  }
+
+  const requestId = rootGroupsQueryState.requestId + 1;
+  rootGroupsQueryState = {
+    key,
+    status: "loading",
+    groups: [],
+    pageInfo: null,
+    error: null,
+    requestId,
+  };
+
+  api(rootGroupsQueryUrl(dictionary))
+    .then((result) => {
+      if (rootGroupsQueryState.requestId !== requestId || rootGroupsQueryApiKey(activeDictionary()) !== key) {
+        return;
+      }
+      const apiGroups = Array.isArray(result?.items)
+        ? result.items.map((group) => ({
+          rootId: group.root?.id || "",
+          derivedIds: Array.isArray(group.derivedEntries)
+            ? group.derivedEntries.map((entry) => entry.id).filter(Boolean)
+            : [],
+          matchedDerivedIds: Array.isArray(group.matchedDerivedIds)
+            ? group.matchedDerivedIds.filter(Boolean)
+            : [],
+          rootMatches: Boolean(group.rootMatches),
+        })).filter((group) => group.rootId)
+        : [];
+      const pageInfo = result?.pageInfo || null;
+      rootGroupsQueryState = {
+        key,
+        status: "success",
+        groups: apiGroups,
+        pageInfo,
+        error: null,
+        requestId,
+      };
+      renderPartFilter();
+      renderEntries();
+    })
+    .catch((error) => {
+      if (rootGroupsQueryState.requestId !== requestId) {
+        return;
+      }
+      rootGroupsQueryState = {
+        key,
+        status: "error",
+        groups: [],
+        pageInfo: null,
+        error,
+        requestId,
+      };
+      console.error(error);
+      renderPartFilter();
+      renderEntries();
+    });
 }
 
 function entryQueryCanUseApi(dictionary = activeDictionary()) {
@@ -3425,7 +3679,7 @@ function entryQueryUrl(dictionary, options = {}) {
     params.set("tagFuzzy", "true");
   }
   params.set("include", "summary");
-  params.set("limit", "500");
+  params.set("limit", String(Math.min(Math.max((dictionary?.entries || []).length, 500), 10000)));
   Object.entries(options).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") {
       params.set(key, String(value));
@@ -3434,17 +3688,17 @@ function entryQueryUrl(dictionary, options = {}) {
   return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries?${params}`;
 }
 
-function entryQueryEntriesForRender(dictionary, fallbackEntries) {
+function entryQueryEntriesForRender(dictionary) {
   const key = entryQueryApiKey(dictionary);
-  if (entryQueryState.status !== "success" || entryQueryState.key !== key || !entryQueryState.ids.length) {
-    return fallbackEntries;
+  if (entryQueryState.status !== "success" || entryQueryState.key !== key) {
+    return null;
   }
   const byId = new Map((dictionary.entries || []).map((entry) => [entry.id, entry]));
   const entries = entryQueryState.ids.map((id) => byId.get(id)).filter(Boolean);
-  return entries.length === entryQueryState.ids.length ? entries : fallbackEntries;
+  return entries.length === entryQueryState.ids.length ? entries : null;
 }
 
-function startEntryQueryApiCheck(dictionary, localEntries) {
+function startEntryQueryApiCheck(dictionary) {
   if (!entryQueryCanUseApi(dictionary)) {
     if (entryQueryState.status !== "idle") {
       resetEntryQueryState();
@@ -3453,7 +3707,7 @@ function startEntryQueryApiCheck(dictionary, localEntries) {
   }
 
   const key = entryQueryApiKey(dictionary);
-  if (entryQueryState.key === key && ["loading", "success", "fallback"].includes(entryQueryState.status)) {
+  if (entryQueryState.key === key && ["loading", "success", "error"].includes(entryQueryState.status)) {
     return;
   }
 
@@ -3474,20 +3728,15 @@ function startEntryQueryApiCheck(dictionary, localEntries) {
       }
       const apiIds = Array.isArray(result?.items) ? result.items.map((entry) => entry.id).filter(Boolean) : [];
       const pageInfo = result?.pageInfo || null;
-      const complete = pageInfo && !pageInfo.hasMore && pageInfo.total === apiIds.length;
-      const localIds = localEntries.map((entry) => entry.id);
-      const matchesLocal = complete && stableJson(apiIds) === stableJson(localIds);
       entryQueryState = {
         key,
-        status: matchesLocal ? "success" : "fallback",
-        ids: matchesLocal ? apiIds : [],
+        status: "success",
+        ids: apiIds,
         pageInfo,
         error: null,
         requestId,
       };
-      if (matchesLocal) {
-        renderEntries();
-      }
+      renderEntries();
     })
     .catch((error) => {
       if (entryQueryState.requestId !== requestId) {
@@ -3495,13 +3744,14 @@ function startEntryQueryApiCheck(dictionary, localEntries) {
       }
       entryQueryState = {
         key,
-        status: "fallback",
+        status: "error",
         ids: [],
         pageInfo: null,
         error,
         requestId,
       };
       console.error(error);
+      renderEntries();
     });
 }
 
@@ -3523,6 +3773,7 @@ function dictionaryEntriesSignature(dictionary = activeDictionary()) {
     tags: entry.tags || [],
     etymology: {
       description: entry.etymology?.description || "",
+      sources: entry.etymology?.sources || [],
     },
     definitions: (entry.definitions || []).map((definition) => ({
       id: definition.id,
@@ -3576,15 +3827,15 @@ function resetEntryFacetsState() {
   };
 }
 
-function entryFacetsPartsForRender(dictionary, fallbackParts) {
+function entryFacetsPartsForRender(dictionary) {
   const key = entryFacetsApiKey(dictionary);
   if (entryFacetsState.status !== "success" || entryFacetsState.key !== key) {
-    return fallbackParts;
+    return null;
   }
   return entryFacetsState.parts;
 }
 
-function startEntryFacetsApiCheck(dictionary, localParts) {
+function startEntryFacetsApiCheck(dictionary) {
   if (!entryFacetsCanUseApi(dictionary)) {
     if (entryFacetsState.status !== "idle") {
       resetEntryFacetsState();
@@ -3593,7 +3844,7 @@ function startEntryFacetsApiCheck(dictionary, localParts) {
   }
 
   const key = entryFacetsApiKey(dictionary);
-  if (entryFacetsState.key === key && ["loading", "success", "fallback"].includes(entryFacetsState.status)) {
+  if (entryFacetsState.key === key && ["loading", "success", "error"].includes(entryFacetsState.status)) {
     return;
   }
 
@@ -3614,17 +3865,14 @@ function startEntryFacetsApiCheck(dictionary, localParts) {
       const apiParts = Array.isArray(result?.parts)
         ? result.parts.map((part) => part?.tag).filter(Boolean).sort((a, b) => a.localeCompare(b, "zh-CN"))
         : [];
-      const matchesLocal = stableJson(apiParts) === stableJson(localParts);
       entryFacetsState = {
         key,
-        status: matchesLocal ? "success" : "fallback",
-        parts: matchesLocal ? apiParts : [],
+        status: "success",
+        parts: apiParts,
         error: null,
         requestId,
       };
-      if (matchesLocal) {
-        renderPartFilter();
-      }
+      renderPartFilter();
     })
     .catch((error) => {
       if (entryFacetsState.requestId !== requestId) {
@@ -3632,12 +3880,13 @@ function startEntryFacetsApiCheck(dictionary, localParts) {
       }
       entryFacetsState = {
         key,
-        status: "fallback",
+        status: "error",
         parts: [],
         error,
         requestId,
       };
       console.error(error);
+      renderPartFilter();
     });
 }
 
@@ -3694,6 +3943,7 @@ function createEntryCard(entry, options = {}) {
     chipHtml ? `<div class="chip-row">${chipHtml}</div>` : "",
     qualityIssueHtml,
   ].filter(Boolean).join("");
+  const bodyOnlyEntryCard = !compactEntryCard && !footerHtml;
   const button = document.createElement("button");
   button.type = "button";
   button.className = [
@@ -3702,6 +3952,7 @@ function createEntryCard(entry, options = {}) {
     options.root ? "root-card" : "",
     options.derived ? "derived-entry-card" : "",
     compactEntryCard ? "compact-entry-card" : "",
+    bodyOnlyEntryCard ? "body-only-entry-card" : "",
   ].filter(Boolean).join(" ");
   button.dataset.entryId = entry.id;
   if (options.rootId) {
@@ -3710,7 +3961,7 @@ function createEntryCard(entry, options = {}) {
   button.innerHTML = `
     <div class="entry-card-header">
       <strong>${highlightSearchText(entry.lemma, contentFuzzyEnabled)}</strong>
-      <small>${subtitle}</small>
+      ${subtitle ? `<small>${subtitle}</small>` : ""}
     </div>
     <div class="entry-card-body">
       ${meaningSummary ? `<p>${highlightSearchText(meaningSummary, contentFuzzyEnabled)}</p>` : ""}
@@ -3743,8 +3994,66 @@ function shouldUseCompactEntryCard(entry, options = {}) {
   return !meaningSummary && !searchSnippets;
 }
 
-function estimateEntryCardHeight(entry) {
-  return shouldUseCompactEntryCard(entry) ? 86 : entryVirtualList.estimatedItemHeight;
+const ENTRY_CARD_HEIGHT_ESTIMATES = {
+  compactNoFooter: 89,
+  compactFirstFooterLine: 33,
+  bodyNoFooter: 115,
+  bodyFirstFooterLine: 145,
+  noSubtitleReduction: 23,
+  noSubtitleWithFooterReduction: 7,
+  extraFooterLine: 30,
+  extraBodyLine: 23,
+};
+
+function estimateEntryQualityIssueLines(issues = []) {
+  if (!issues.length) {
+    return 0;
+  }
+  const listWidth = Math.max(0, entryVirtualList.container?.clientWidth || elements.entryList?.clientWidth || 340);
+  const basePerLine = listWidth < 300 ? 2 : listWidth < 420 ? 3 : 4;
+  const longestTitle = Math.max(
+    ...issues.map((issue) => String(issue.title || aText("质量问题", "Quality issue")).length),
+  );
+  const perLine = longestTitle > 18 ? Math.max(1, basePerLine - 1) : basePerLine;
+  return Math.max(1, Math.ceil(issues.length / perLine));
+}
+
+function estimateSearchSnippetCount(searchSnippets = "") {
+  return (String(searchSnippets).match(/class="search-snippet"/g) || []).length;
+}
+
+function estimateEntryCardHeight(entry, options = {}) {
+  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
+  const meaningSummary = options.meaningSummary ?? entryDefinitionSummary(entry, settings.entryListPolysemyDisplay);
+  const searchSnippets = options.searchSnippets ?? renderEntrySearchSnippets(entry);
+  const hasBody = Boolean(meaningSummary || searchSnippets);
+  const hasSubtitle = Boolean(entry.pronunciation || entryPartText(entry));
+  const hasTagFooter = Boolean((entry.tags || []).length && settings.entryListTagDisplayLimit > 0);
+  const qualityIssueLines = estimateEntryQualityIssueLines(options.qualityIssues || []);
+  const footerLines = (hasTagFooter ? 1 : 0) + qualityIssueLines;
+  const searchSnippetCount = estimateSearchSnippetCount(searchSnippets);
+  const bodyLines = (meaningSummary ? 1 : 0) + searchSnippetCount;
+  const extraBodyLines = hasBody ? Math.max(0, bodyLines - 1) : 0;
+  const bodyHeight = extraBodyLines * ENTRY_CARD_HEIGHT_ESTIMATES.extraBodyLine;
+  if (!hasBody) {
+    const estimated = ENTRY_CARD_HEIGHT_ESTIMATES.compactNoFooter
+      + (footerLines
+        ? ENTRY_CARD_HEIGHT_ESTIMATES.compactFirstFooterLine
+          + Math.max(0, footerLines - 1) * ENTRY_CARD_HEIGHT_ESTIMATES.extraFooterLine
+        : 0);
+    return Math.max(66, estimated - (hasSubtitle ? 0 : ENTRY_CARD_HEIGHT_ESTIMATES.noSubtitleReduction));
+  }
+  const estimated = (footerLines
+    ? ENTRY_CARD_HEIGHT_ESTIMATES.bodyFirstFooterLine
+      + Math.max(0, footerLines - 1) * ENTRY_CARD_HEIGHT_ESTIMATES.extraFooterLine
+    : ENTRY_CARD_HEIGHT_ESTIMATES.bodyNoFooter)
+    + bodyHeight;
+  const subtitleReduction = hasSubtitle
+    ? 0
+    : (footerLines
+      ? ENTRY_CARD_HEIGHT_ESTIMATES.noSubtitleWithFooterReduction
+      : ENTRY_CARD_HEIGHT_ESTIMATES.noSubtitleReduction);
+  return Math.max(footerLines ? 138 : 92, estimated - subtitleReduction);
 }
 
 function closeEntryContextMenu() {
@@ -9893,7 +10202,12 @@ elements.rootModeToggleButton.addEventListener("click", () => {
 });
 
 elements.expandAllRootsButton.addEventListener("click", () => {
-  if (advancedFilter || normalize(searchQuery)) {
+  if (
+    advancedFilter
+    || normalize(searchQuery)
+    || rootGroupsQueryState.status !== "success"
+    || rootGroupsQueryState.pageInfo?.hasMore
+  ) {
     return;
   }
   rootModeGroups().forEach((group) => expandedRootEntries.add(group.root.id));
