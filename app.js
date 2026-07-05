@@ -130,6 +130,12 @@ const corpusVirtualList = createVirtualListState(74);
 const masonryLayouts = new WeakMap();
 const VIRTUAL_LIST_RESIZE_EPSILON = 0.5;
 const VIRTUAL_LIST_ACTIVE_SCROLL_MS = 180;
+const VIRTUAL_LIST_RENDER_THROTTLE_MS = 50;
+const VIRTUAL_LIST_RESIZE_THROTTLE_MS = 500;
+const VIRTUAL_LIST_RESIZE_IDLE_FLUSH_MS = 180;
+const VIRTUAL_LIST_HEIGHT_CACHE_WIDTH_BUCKET = 24;
+const VIRTUAL_LIST_HEIGHT_CACHE_LIMIT = 50000;
+const DEFAULT_ANALYSIS_ROOT_FAMILY_LIMIT = 12;
 
 const i18n = {
   zh: {
@@ -2934,10 +2940,16 @@ function createVirtualListState(estimatedItemHeight) {
     viewportObserver: null,
     scrollHandler: null,
     lastScrollAt: 0,
+    lastRenderAt: 0,
+    lastResizeFlushAt: 0,
+    renderThrottleTimer: 0,
     resizeFrame: 0,
+    resizeThrottleTimer: 0,
     resizeIdleTimer: 0,
     pendingResizeAnchor: null,
     pendingSizeUpdates: new Map(),
+    sizeCacheKeys: new Map(),
+    heightCache: new Map(),
   };
 }
 
@@ -2962,9 +2974,17 @@ function initializeVirtualList(virtualList, container) {
   }
   virtualList.resizeObserver?.disconnect();
   virtualList.viewportObserver?.disconnect();
+  if (virtualList.renderThrottleTimer) {
+    clearTimeout(virtualList.renderThrottleTimer);
+    virtualList.renderThrottleTimer = 0;
+  }
   if (virtualList.resizeFrame) {
     cancelAnimationFrame(virtualList.resizeFrame);
     virtualList.resizeFrame = 0;
+  }
+  if (virtualList.resizeThrottleTimer) {
+    clearTimeout(virtualList.resizeThrottleTimer);
+    virtualList.resizeThrottleTimer = 0;
   }
   if (virtualList.resizeIdleTimer) {
     clearTimeout(virtualList.resizeIdleTimer);
@@ -2974,12 +2994,13 @@ function initializeVirtualList(virtualList, container) {
   virtualList.pendingSizeUpdates.clear();
   virtualList.container = container;
   virtualList.lastScrollAt = 0;
+  virtualList.lastResizeFlushAt = 0;
   virtualList.scrollHandler = () => {
     virtualList.lastScrollAt = performance.now();
     if (virtualList.pendingSizeUpdates.size) {
       scheduleVirtualListResizeIdleFlush(virtualList);
     }
-    scheduleVirtualListRender(virtualList);
+    scheduleVirtualListThrottledRender(virtualList);
   };
   container.addEventListener("scroll", virtualList.scrollHandler, { passive: true });
   if (typeof ResizeObserver === "undefined") {
@@ -2991,11 +3012,20 @@ function initializeVirtualList(virtualList, container) {
     let changed = false;
     entries.forEach((entry) => {
       const key = entry.target.dataset.virtualKey;
+      const sizeCacheKey = entry.target.dataset.virtualSizeKey || "";
+      const item = virtualListItemByKey(virtualList, key);
+      if (!item || (sizeCacheKey && item.sizeCacheKey !== sizeCacheKey)) {
+        return;
+      }
       const height = entry.borderBoxSize?.[0]?.blockSize || entry.target.getBoundingClientRect().height;
-      const current = virtualList.pendingSizeUpdates.get(key) || virtualList.sizes.get(key) || 0;
+      const pendingUpdate = virtualList.pendingSizeUpdates.get(key);
+      const current = (typeof pendingUpdate === "number" ? pendingUpdate : pendingUpdate?.height)
+        || virtualList.sizes.get(key)
+        || 0;
       if (key && height > 0 && Math.abs(current - height) > VIRTUAL_LIST_RESIZE_EPSILON) {
+        rememberVirtualListHeight(virtualList, item.sizeCacheKey, height);
         if (activelyScrolling) {
-          virtualList.pendingSizeUpdates.set(key, height);
+          virtualList.pendingSizeUpdates.set(key, { height, sizeCacheKey: item.sizeCacheKey });
           changed = true;
           return;
         }
@@ -3015,14 +3045,70 @@ function initializeVirtualList(virtualList, container) {
   virtualList.viewportObserver = new ResizeObserver((entries) => {
     const width = Math.round(entries[0]?.contentRect?.width || container.clientWidth);
     if (virtualList.width && width && width !== virtualList.width) {
+      virtualList.width = width;
       virtualList.sizes.clear();
       virtualList.pendingSizeUpdates.clear();
+      refreshVirtualListCachedSizes(virtualList);
       rebuildVirtualListOffsets(virtualList);
+    } else {
+      virtualList.width = width;
     }
-    virtualList.width = width;
     scheduleVirtualListRender(virtualList);
   });
   virtualList.viewportObserver.observe(container);
+}
+
+function virtualListWidthBucket(virtualList, container = virtualList.container) {
+  const width = Math.round(virtualList.width || container?.clientWidth || 0);
+  if (!width) {
+    return 0;
+  }
+  return Math.max(0, Math.round(width / VIRTUAL_LIST_HEIGHT_CACHE_WIDTH_BUCKET) * VIRTUAL_LIST_HEIGHT_CACHE_WIDTH_BUCKET);
+}
+
+function virtualListSizeCacheKey(virtualList, rawKey, container = virtualList.container) {
+  if (!rawKey) {
+    return "";
+  }
+  return `${virtualListWidthBucket(virtualList, container)}|${rawKey}`;
+}
+
+function virtualListItemByKey(virtualList, key) {
+  const index = virtualList.indexByKey.get(key);
+  return index === undefined ? null : virtualList.items[index] || null;
+}
+
+function rememberVirtualListHeight(virtualList, sizeCacheKey, height) {
+  if (!sizeCacheKey || !(height > 0)) {
+    return;
+  }
+  if (virtualList.heightCache.has(sizeCacheKey)) {
+    virtualList.heightCache.delete(sizeCacheKey);
+  }
+  virtualList.heightCache.set(sizeCacheKey, height);
+  while (virtualList.heightCache.size > VIRTUAL_LIST_HEIGHT_CACHE_LIMIT) {
+    const oldestKey = virtualList.heightCache.keys().next().value;
+    virtualList.heightCache.delete(oldestKey);
+  }
+}
+
+function cachedVirtualListHeight(virtualList, sizeCacheKey) {
+  const height = virtualList.heightCache.get(sizeCacheKey);
+  return height > 0 ? height : 0;
+}
+
+function refreshVirtualListCachedSizes(virtualList) {
+  virtualList.sizeCacheKeys.clear();
+  virtualList.items.forEach((item) => {
+    item.sizeCacheKey = virtualListSizeCacheKey(virtualList, item.rawSizeCacheKey);
+    if (item.sizeCacheKey) {
+      virtualList.sizeCacheKeys.set(item.key, item.sizeCacheKey);
+      const cachedHeight = cachedVirtualListHeight(virtualList, item.sizeCacheKey);
+      if (cachedHeight) {
+        virtualList.sizes.set(item.key, cachedHeight);
+      }
+    }
+  });
 }
 
 function virtualListIsActivelyScrolling(virtualList) {
@@ -3034,9 +3120,15 @@ function applyVirtualListPendingSizeUpdates(virtualList) {
     return false;
   }
   let changed = false;
-  virtualList.pendingSizeUpdates.forEach((height, key) => {
+  virtualList.pendingSizeUpdates.forEach((update, key) => {
+    const height = typeof update === "number" ? update : update?.height;
+    const sizeCacheKey = typeof update === "number" ? virtualList.sizeCacheKeys.get(key) : update?.sizeCacheKey;
+    if (key && height > 0 && sizeCacheKey && virtualList.sizeCacheKeys.get(key) !== sizeCacheKey) {
+      return;
+    }
     if (key && height > 0 && Math.abs((virtualList.sizes.get(key) || 0) - height) > VIRTUAL_LIST_RESIZE_EPSILON) {
       virtualList.sizes.set(key, height);
+      rememberVirtualListHeight(virtualList, sizeCacheKey, height);
       changed = true;
     }
   });
@@ -3045,6 +3137,10 @@ function applyVirtualListPendingSizeUpdates(virtualList) {
 }
 
 function scheduleVirtualListResizeIdleFlush(virtualList) {
+  if (!virtualList.pendingSizeUpdates.size) {
+    return;
+  }
+  const now = performance.now();
   if (virtualList.resizeIdleTimer) {
     clearTimeout(virtualList.resizeIdleTimer);
   }
@@ -3053,8 +3149,33 @@ function scheduleVirtualListResizeIdleFlush(virtualList) {
     if (!virtualList.pendingSizeUpdates.size) {
       return;
     }
+    if (virtualList.resizeThrottleTimer) {
+      clearTimeout(virtualList.resizeThrottleTimer);
+      virtualList.resizeThrottleTimer = 0;
+    }
+    virtualList.lastResizeFlushAt = performance.now();
     scheduleVirtualListResizeUpdate(virtualList, virtualListAnchor(virtualList));
-  }, VIRTUAL_LIST_ACTIVE_SCROLL_MS);
+  }, VIRTUAL_LIST_RESIZE_IDLE_FLUSH_MS);
+  const elapsed = virtualList.lastResizeFlushAt ? now - virtualList.lastResizeFlushAt : 0;
+  const wait = virtualList.lastResizeFlushAt
+    ? Math.max(0, VIRTUAL_LIST_RESIZE_THROTTLE_MS - elapsed)
+    : VIRTUAL_LIST_RESIZE_THROTTLE_MS;
+  if (wait <= 0) {
+    virtualList.lastResizeFlushAt = now;
+    scheduleVirtualListResizeUpdate(virtualList, virtualListAnchor(virtualList));
+    return;
+  }
+  if (virtualList.resizeThrottleTimer) {
+    return;
+  }
+  virtualList.resizeThrottleTimer = setTimeout(() => {
+    virtualList.resizeThrottleTimer = 0;
+    if (!virtualList.pendingSizeUpdates.size) {
+      return;
+    }
+    virtualList.lastResizeFlushAt = performance.now();
+    scheduleVirtualListResizeUpdate(virtualList, virtualListAnchor(virtualList));
+  }, wait);
 }
 
 function scheduleVirtualListResizeUpdate(virtualList, anchor) {
@@ -3141,8 +3262,24 @@ function scheduleVirtualListRender(virtualList) {
   }
   virtualList.frame = requestAnimationFrame(() => {
     virtualList.frame = 0;
+    virtualList.lastRenderAt = performance.now();
     renderVirtualListWindow(virtualList);
   });
+}
+
+function scheduleVirtualListThrottledRender(virtualList) {
+  const elapsed = performance.now() - (virtualList.lastRenderAt || 0);
+  if (elapsed >= VIRTUAL_LIST_RENDER_THROTTLE_MS) {
+    scheduleVirtualListRender(virtualList);
+    return;
+  }
+  if (virtualList.renderThrottleTimer) {
+    return;
+  }
+  virtualList.renderThrottleTimer = setTimeout(() => {
+    virtualList.renderThrottleTimer = 0;
+    scheduleVirtualListRender(virtualList);
+  }, Math.max(0, VIRTUAL_LIST_RENDER_THROTTLE_MS - elapsed));
 }
 
 function renderVirtualListWindow(virtualList) {
@@ -3164,6 +3301,9 @@ function renderVirtualListWindow(virtualList) {
     const row = document.createElement("div");
     row.className = "virtual-list-row";
     row.dataset.virtualKey = item.key;
+    if (item.sizeCacheKey) {
+      row.dataset.virtualSizeKey = item.sizeCacheKey;
+    }
     row.append(virtualList.renderItem(item.value));
     fragment.append(row);
   }
@@ -3178,10 +3318,18 @@ function renderVirtualListWindow(virtualList) {
 
 function renderVirtualList(container, virtualList, items, options) {
   initializeVirtualList(virtualList, container);
+  if (virtualList.renderThrottleTimer) {
+    clearTimeout(virtualList.renderThrottleTimer);
+    virtualList.renderThrottleTimer = 0;
+  }
   if (virtualList.resizeFrame) {
     cancelAnimationFrame(virtualList.resizeFrame);
     virtualList.resizeFrame = 0;
     virtualList.pendingResizeAnchor = null;
+  }
+  if (virtualList.resizeThrottleTimer) {
+    clearTimeout(virtualList.resizeThrottleTimer);
+    virtualList.resizeThrottleTimer = 0;
   }
   if (virtualList.resizeIdleTimer) {
     clearTimeout(virtualList.resizeIdleTimer);
@@ -3192,15 +3340,37 @@ function renderVirtualList(container, virtualList, items, options) {
   const resetScroll = virtualList.resetToken !== options.resetToken;
   virtualList.resetToken = options.resetToken;
   virtualList.renderItem = options.renderItem;
-  virtualList.items = items.map((value) => ({
-    key: String(options.getKey(value)),
-    estimatedHeight: options.getEstimatedHeight?.(value) || virtualList.estimatedItemHeight,
-    value,
-  }));
+  const previousSizeCacheKeys = virtualList.sizeCacheKeys;
+  const nextSizeCacheKeys = new Map();
+  virtualList.items = items.map((value) => {
+    const key = String(options.getKey(value));
+    const estimatedHeight = options.getEstimatedHeight?.(value) || virtualList.estimatedItemHeight;
+    const rawSizeCacheKey = String(options.getSizeCacheKey?.(value, key) || `${options.resetToken}|${key}|${estimatedHeight}`);
+    const sizeCacheKey = virtualListSizeCacheKey(virtualList, rawSizeCacheKey, container);
+    nextSizeCacheKeys.set(key, sizeCacheKey);
+    const previousSizeCacheKey = previousSizeCacheKeys.get(key);
+    if (previousSizeCacheKey !== sizeCacheKey) {
+      virtualList.sizes.delete(key);
+      virtualList.pendingSizeUpdates.delete(key);
+    }
+    const cachedHeight = cachedVirtualListHeight(virtualList, sizeCacheKey);
+    if (cachedHeight && (!virtualList.sizes.get(key) || previousSizeCacheKey !== sizeCacheKey)) {
+      virtualList.sizes.set(key, cachedHeight);
+    }
+    return {
+      key,
+      estimatedHeight,
+      rawSizeCacheKey,
+      sizeCacheKey,
+      value,
+    };
+  });
+  virtualList.sizeCacheKeys = nextSizeCacheKeys;
   virtualList.indexByKey = new Map(virtualList.items.map((item, index) => [item.key, index]));
   if (resetScroll) {
     virtualList.sizes.clear();
     virtualList.pendingSizeUpdates.clear();
+    refreshVirtualListCachedSizes(virtualList);
   }
   rebuildVirtualListOffsets(virtualList);
   if (resetScroll) {
@@ -3212,10 +3382,18 @@ function renderVirtualList(container, virtualList, items, options) {
 
 function renderVirtualListEmpty(container, virtualList, content) {
   initializeVirtualList(virtualList, container);
+  if (virtualList.renderThrottleTimer) {
+    clearTimeout(virtualList.renderThrottleTimer);
+    virtualList.renderThrottleTimer = 0;
+  }
   if (virtualList.resizeFrame) {
     cancelAnimationFrame(virtualList.resizeFrame);
     virtualList.resizeFrame = 0;
     virtualList.pendingResizeAnchor = null;
+  }
+  if (virtualList.resizeThrottleTimer) {
+    clearTimeout(virtualList.resizeThrottleTimer);
+    virtualList.resizeThrottleTimer = 0;
   }
   if (virtualList.resizeIdleTimer) {
     clearTimeout(virtualList.resizeIdleTimer);
@@ -3225,6 +3403,7 @@ function renderVirtualListEmpty(container, virtualList, content) {
   virtualList.resizeObserver?.disconnect();
   virtualList.items = [];
   virtualList.indexByKey.clear();
+  virtualList.sizeCacheKeys.clear();
   virtualList.offsets = [0];
   container.classList.remove("virtualized-list");
   container.replaceChildren(content);
@@ -3465,10 +3644,16 @@ function renderEntryRows(entries = []) {
     entry,
     qualityIssues: advancedFilterIssuesForEntry(entry.id),
   }));
+  const settingsSizeSignature = entryCardSettingsSizeSignature();
   renderVirtualList(elements.entryList, entryVirtualList, rows, {
     resetToken: entryVirtualResetToken(),
     getKey: (row) => `entry:${row.entry.id}`,
     getEstimatedHeight: (row) => estimateEntryCardHeight(row.entry, { qualityIssues: row.qualityIssues }),
+    getSizeCacheKey: (row) => entryCardSizeCacheKey(row.entry, {
+      qualityIssues: row.qualityIssues,
+      role: "entry",
+      settingsSizeSignature,
+    }),
     renderItem: (row) => createEntryCard(row.entry, { qualityIssues: row.qualityIssues }),
   });
 }
@@ -3506,10 +3691,19 @@ function renderRootModeGroups(groups = []) {
       group.derived.forEach((entry) => rows.push({ kind: "derived", entry, rootId: group.root.id }));
     }
   });
+  const settingsSizeSignature = entryCardSettingsSizeSignature();
   renderVirtualList(elements.entryList, entryVirtualList, rows, {
     resetToken: entryVirtualResetToken(),
     getKey: (row) => row.kind === "root" ? `root:${row.group.root.id}` : `derived:${row.rootId}:${row.entry.id}`,
     getEstimatedHeight: (row) => row.kind === "root" ? 156 : 116,
+    getSizeCacheKey: (row) => row.kind === "root"
+      ? entryCardSizeCacheKey(row.group.root, {
+        role: "root",
+        expanded: row.expanded,
+        derivedCount: row.group.derived.length,
+        settingsSizeSignature,
+      })
+      : entryCardSizeCacheKey(row.entry, { role: "derived", rootId: row.rootId, settingsSizeSignature }),
     renderItem: renderRootModeRow,
   });
 }
@@ -3526,6 +3720,71 @@ function entryVirtualResetToken() {
     advancedFilter?.title || "",
     advancedFilter?.variantIndex ?? "",
   ].join("|");
+}
+
+function virtualListSignaturePart(value) {
+  return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function entryCardSettingsSizeSignature() {
+  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
+  return [
+    currentLanguage,
+    settings.entryListPolysemyDisplay,
+    settings.entryListTagDisplayLimit,
+    settings.entryListRawTagDisplay ? "raw-tags" : "display-tags",
+    settings.entryListTagFiltering ? "tag-filtering" : "no-tag-filtering",
+    settings.fuzzySearch ? "fuzzy" : "strict",
+    settings.tagFuzzySearch ? "tag-fuzzy" : "tag-strict",
+    settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
+    settings.partOfSpeechTags.join(","),
+    stableJson(settings.tagDisplayMap),
+    stableJson(settings.redHighlightTags),
+  ].map(virtualListSignaturePart).join(";");
+}
+
+function entryCardContentSizeSignature(entry) {
+  return [
+    entry.id,
+    entry.updatedAt,
+    entry.lemma,
+    entry.pronunciation,
+    entryPartText(entry),
+    (entry.tags || []).join(","),
+    (entry.definitions || []).map((definition) => [
+      definition.id,
+      definition.meaning,
+      definition.example,
+      definition.note,
+    ].map(virtualListSignaturePart).join("~")).join("^"),
+  ].map(virtualListSignaturePart).join(";");
+}
+
+function entryCardSizeCacheKey(entry, options = {}) {
+  const issueSignature = (options.qualityIssues || [])
+    .map((issue) => [
+      issue.type,
+      issue.priority,
+      issue.module,
+      issue.title,
+    ].map(virtualListSignaturePart).join("~"))
+    .join("^");
+  return [
+    "entry-card",
+    state.activeDictionaryId,
+    rootMode ? "root-mode" : "entry-mode",
+    normalize(searchQuery),
+    activePart,
+    advancedFilter?.title || "",
+    advancedFilter?.variantIndex ?? "",
+    options.role || "entry",
+    options.rootId || "",
+    options.expanded ? "expanded" : "collapsed",
+    options.derivedCount ?? "",
+    options.settingsSizeSignature || entryCardSettingsSizeSignature(),
+    entryCardContentSizeSignature(entry),
+    issueSignature,
+  ].map(virtualListSignaturePart).join("|");
 }
 
 function rootGroupsQueryCanUseApi(dictionary = activeDictionary()) {
@@ -5628,8 +5887,13 @@ function analysisSliceCacheKey(context, dep) {
     base: context.cacheBaseKey,
     dep,
     searchQuery: dep === "search" ? normalize(searchQuery) : "",
-    entrySort: dep === "relation" ? entrySort : "",
+    entrySort: dep === "relation" || dep === "rootFamilies" ? entrySort : "",
+    rootFamilyLimit: dep === "rootFamilies" ? analysisRootFamilyLimit() : "",
   });
+}
+
+function analysisRootFamilyLimit() {
+  return DEFAULT_ANALYSIS_ROOT_FAMILY_LIMIT;
 }
 
 function renderQuality(dictionary = activeDictionary()) {
@@ -5834,8 +6098,7 @@ function renderAnalysisOverview(report) {
     </section>
     <section class="analysis-grid">
       ${analysisCard(aText("词性分布", "Part of Speech"), analysisBarList(report.parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") }))}
-      ${analysisCard(aText("标签频率", "Tag Frequency"), analysisBarList(report.tags, { empty: aText("暂无标签", "No tags yet") }))}
-      ${analysisCard(aText("词根家族排行", "Root Families"), analysisBarList(report.rootFamilies, { empty: aText("暂无衍生关系", "No derivation links yet") }))}
+      ${analysisCard(aText("覆盖率", "Coverage"), analysisCoverageList(report.coverageRows))}
       ${analysisCard(aText("编辑进度", "Editing Progress"), analysisActivityList({
         created: report.activity.created.slice(-10),
         updated: report.activity.updated.slice(-10),
@@ -6141,6 +6404,7 @@ function composeLegacyAnalysisReport(context, slices) {
   return {
     entries: context.entries,
     ...slices.relation,
+    ...slices.rootFamilies,
     ...slices.coverage,
     ...slices.tags,
     ...slices.forms,
@@ -6154,6 +6418,7 @@ function composeLegacyAnalysisReport(context, slices) {
 function analysisSliceBuilders() {
   return {
     relation: buildAnalysisRelationSlice,
+    rootFamilies: buildAnalysisRootFamiliesSlice,
     coverage: buildAnalysisCoverageSlice,
     tags: buildAnalysisTagSlice,
     forms: buildAnalysisFormSlice,
@@ -6165,16 +6430,11 @@ function analysisSliceBuilders() {
 }
 
 function buildAnalysisRelationSlice(context) {
-  const { dictionary, entries } = context;
-  const rootGroups = rootModeGroups(dictionary, { query: "" });
-  const derivedEntries = entries.filter(entryHasSources);
+  const { rootGroups, derivedEntries, multiSourceEntries } = buildAnalysisRelationMetrics(context);
   const derivedIdSet = new Set(derivedEntries.map((entry) => entry.id));
-  const isolatedRootCount = rootGroups.filter((group) => !group.derived.length && !derivedIdSet.has(group.root.id)).length;
-  const multiSourceEntries = entries.filter((entry) => (entry.etymology?.sources || []).length > 1);
-  const rootFamilyGroups = rootGroups
-    .filter((group) => group.derived.length)
-    .sort((a, b) => b.derived.length - a.derived.length);
-
+  const isolatedRootCount = rootGroups
+    .filter((group) => !group.derivedCount && !derivedIdSet.has(group.root.id))
+    .length;
   return {
     rootCount: rootGroups.length,
     derivedCount: derivedEntries.length,
@@ -6182,11 +6442,79 @@ function buildAnalysisRelationSlice(context) {
     isolatedRootCount,
     multiSourceCount: multiSourceEntries.length,
     multiSourceEntryIds: multiSourceEntries.map((entry) => entry.id),
+  };
+}
+
+function buildAnalysisRootFamiliesSlice(context) {
+  const { rootGroups } = buildAnalysisRelationMetrics(context);
+  const rootFamilyLimit = analysisRootFamilyLimit();
+  const rootFamilyGroups = rootGroups
+    .filter((group) => group.derivedCount)
+    .sort((a, b) => b.derivedCount - a.derivedCount || compareEntries(a.root, b.root));
+  const familyRow = (group) => [group.root.lemma, group.derivedCount, directEntryAction(group.root.id)];
+  return {
     rootFamilies: rootFamilyGroups
-      .slice(0, 12)
-      .map((group) => [group.root.lemma, group.derived.length, directEntryAction(group.root.id)]),
-    allRootFamilies: rootFamilyGroups
-      .map((group) => [group.root.lemma, group.derived.length, directEntryAction(group.root.id)]),
+      .slice(0, rootFamilyLimit)
+      .map(familyRow),
+    allRootFamilies: rootFamilyGroups.map(familyRow),
+  };
+}
+
+function buildAnalysisRelationMetrics(context) {
+  const { dictionary, entries } = context;
+  const relationIndex = entryRelationsModel.buildEntryRelationIndex(dictionary, {
+    normalizeText: normalize,
+    compareEntries,
+  });
+  const derivedEntries = entries.filter(entryHasSources);
+  const multiSourceEntries = entries.filter((entry) => (entry.etymology?.sources || []).length > 1);
+  const groups = new Map();
+  const ensureGroup = (root) => {
+    if (!root?.id) {
+      return null;
+    }
+    if (!groups.has(root.id)) {
+      groups.set(root.id, { root, derivedCount: 0, derivedIds: new Set() });
+    }
+    return groups.get(root.id);
+  };
+
+  relationIndex.entries.forEach((entry) => {
+    if (!entryHasSources(entry)) {
+      ensureGroup(entry);
+    }
+  });
+
+  derivedEntries.forEach((entry) => {
+    const roots = entryRelationsModel.sourceRootEntries(entry, dictionary, {
+      normalizeText: normalize,
+      compareEntries,
+      index: relationIndex,
+    });
+    if (!roots.length) {
+      ensureGroup(entry);
+      return;
+    }
+    const rootIds = new Set();
+    roots.forEach((root) => {
+      if (!root?.id || rootIds.has(root.id)) {
+        return;
+      }
+      rootIds.add(root.id);
+      const group = ensureGroup(root);
+      if (group && !group.derivedIds.has(entry.id)) {
+        group.derivedIds.add(entry.id);
+        group.derivedCount += 1;
+      }
+    });
+  });
+
+  const rootGroups = [...groups.values()]
+    .sort((a, b) => compareEntries(a.root, b.root));
+  return {
+    rootGroups,
+    derivedEntries,
+    multiSourceEntries,
   };
 }
 
@@ -8512,6 +8840,7 @@ function renderCorpusItemList(corpus, viewState) {
     renderVirtualList(elements.corpusItemList, corpusVirtualList, blocks, {
       resetToken: corpusVirtualResetToken(viewState),
       getKey: (block) => `block:${block.id}`,
+      getSizeCacheKey: (block) => corpusItemSizeCacheKey("block", block, viewState),
       renderItem: (block) => createCorpusBlockCard(block, viewState),
     });
     return;
@@ -8532,12 +8861,38 @@ function renderCorpusItemList(corpus, viewState) {
     resetToken: corpusVirtualResetToken(viewState),
     getKey: (unit) => `unit:${unit.id}`,
     getEstimatedHeight: () => 92,
+    getSizeCacheKey: (unit) => corpusItemSizeCacheKey("unit", unit, viewState),
     renderItem: (unit) => createCorpusUnitCard(unit, corpus, viewState),
   });
 }
 
 function corpusVirtualResetToken(viewState) {
   return [state.activeDictionaryId, viewState.mode, normalize(viewState.query)].join("|");
+}
+
+function corpusItemSizeCacheKey(kind, item, viewState) {
+  return [
+    `corpus-${kind}`,
+    state.activeDictionaryId,
+    currentLanguage,
+    normalize(viewState.query),
+    viewState.mode,
+    item.id,
+    item.updatedAt,
+    item.title,
+    item.content,
+    item.notes,
+    (item.tags || []).join(","),
+    stableJson(item.attributes || {}),
+    kind === "block" ? stableJson((item.layers || []).map((layer) => ({
+      id: layer.id,
+      name: layer.name,
+      speaker: layer.speaker,
+      modality: layer.modality,
+      notes: layer.notes,
+      tags: layer.tags || [],
+    }))) : "",
+  ].map(virtualListSignaturePart).join("|");
 }
 
 function createCorpusBlockCard(block, viewState) {
