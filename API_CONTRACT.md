@@ -372,6 +372,8 @@ Feature Services
 }
 ```
 
+当前已落地最小共享实现：`lib/dictionary-query-model.js` 提供前后端可复用的 `createDictionaryQueryContext()`，第一批只接管 `getEntryById()` / `getEntriesByIds()`、relation index、relation summary 和 root family 查询；覆盖率、标签、活动和 corpus placement 仍按原模块逐步迁移。
+
 JSON repository 阶段可为一次请求构建临时 `Map` / `Set` / prefix data；SQLite 阶段用 SQL、持久索引、视图或临时表实现相同接口。上层服务不应依赖底层是完整 JSON 扫描还是 SQLite 查询。
 
 #### 共享 relation/query 能力

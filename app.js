@@ -30,6 +30,7 @@ const desktopNavMediaQuery = window.matchMedia("(min-width: 800px)");
 const wideNavMediaQuery = window.matchMedia("(min-width: 1280px)");
 const analysisModel = window.ConlexiconAnalysis;
 const entryRelationsModel = window.ConlexiconEntryRelations;
+const dictionaryQueryModel = window.ConlexiconDictionaryQuery;
 const ipaModel = window.ConlexiconIpa;
 const IPA_STRESS_MARKER = ipaModel.IPA_STRESS_MARKER;
 const GLOSS_STYLE_KEYS = ["gla", "glb", "glc", "ft"];
@@ -6392,10 +6393,16 @@ function buildAnalysisReportForRoute(dictionary, page = "overview", subpage = ""
 }
 
 function buildAnalysisContext(dictionary) {
+  const entries = dictionary.entries || [];
   return {
     dictionary,
-    entries: dictionary.entries || [],
-    total: (dictionary.entries || []).length || 1,
+    entries,
+    total: entries.length || 1,
+    query: dictionaryQueryModel.createDictionaryQueryContext(dictionary, {
+      normalizeText: normalize,
+      compareEntries,
+      entryHasSources,
+    }),
     cacheBaseKey: analysisBaseCacheKey(dictionary),
   };
 }
@@ -6430,91 +6437,18 @@ function analysisSliceBuilders() {
 }
 
 function buildAnalysisRelationSlice(context) {
-  const { rootGroups, derivedEntries, multiSourceEntries } = buildAnalysisRelationMetrics(context);
-  const derivedIdSet = new Set(derivedEntries.map((entry) => entry.id));
-  const isolatedRootCount = rootGroups
-    .filter((group) => !group.derivedCount && !derivedIdSet.has(group.root.id))
-    .length;
-  return {
-    rootCount: rootGroups.length,
-    derivedCount: derivedEntries.length,
-    derivedEntryIds: derivedEntries.map((entry) => entry.id),
-    isolatedRootCount,
-    multiSourceCount: multiSourceEntries.length,
-    multiSourceEntryIds: multiSourceEntries.map((entry) => entry.id),
-  };
+  return context.query.relationSummary();
 }
 
 function buildAnalysisRootFamiliesSlice(context) {
-  const { rootGroups } = buildAnalysisRelationMetrics(context);
-  const rootFamilyLimit = analysisRootFamilyLimit();
-  const rootFamilyGroups = rootGroups
-    .filter((group) => group.derivedCount)
-    .sort((a, b) => b.derivedCount - a.derivedCount || compareEntries(a.root, b.root));
-  const familyRow = (group) => [group.root.lemma, group.derivedCount, directEntryAction(group.root.id)];
+  const rootFamilyGroups = context.query.rootFamilies({
+    limit: analysisRootFamilyLimit(),
+    includeAll: true,
+  });
+  const familyRow = (group) => [group.lemma, group.derivedCount, directEntryAction(group.rootId)];
   return {
-    rootFamilies: rootFamilyGroups
-      .slice(0, rootFamilyLimit)
-      .map(familyRow),
-    allRootFamilies: rootFamilyGroups.map(familyRow),
-  };
-}
-
-function buildAnalysisRelationMetrics(context) {
-  const { dictionary, entries } = context;
-  const relationIndex = entryRelationsModel.buildEntryRelationIndex(dictionary, {
-    normalizeText: normalize,
-    compareEntries,
-  });
-  const derivedEntries = entries.filter(entryHasSources);
-  const multiSourceEntries = entries.filter((entry) => (entry.etymology?.sources || []).length > 1);
-  const groups = new Map();
-  const ensureGroup = (root) => {
-    if (!root?.id) {
-      return null;
-    }
-    if (!groups.has(root.id)) {
-      groups.set(root.id, { root, derivedCount: 0, derivedIds: new Set() });
-    }
-    return groups.get(root.id);
-  };
-
-  relationIndex.entries.forEach((entry) => {
-    if (!entryHasSources(entry)) {
-      ensureGroup(entry);
-    }
-  });
-
-  derivedEntries.forEach((entry) => {
-    const roots = entryRelationsModel.sourceRootEntries(entry, dictionary, {
-      normalizeText: normalize,
-      compareEntries,
-      index: relationIndex,
-    });
-    if (!roots.length) {
-      ensureGroup(entry);
-      return;
-    }
-    const rootIds = new Set();
-    roots.forEach((root) => {
-      if (!root?.id || rootIds.has(root.id)) {
-        return;
-      }
-      rootIds.add(root.id);
-      const group = ensureGroup(root);
-      if (group && !group.derivedIds.has(entry.id)) {
-        group.derivedIds.add(entry.id);
-        group.derivedCount += 1;
-      }
-    });
-  });
-
-  const rootGroups = [...groups.values()]
-    .sort((a, b) => compareEntries(a.root, b.root));
-  return {
-    rootGroups,
-    derivedEntries,
-    multiSourceEntries,
+    rootFamilies: rootFamilyGroups.rows.map(familyRow),
+    allRootFamilies: rootFamilyGroups.allRows.map(familyRow),
   };
 }
 
