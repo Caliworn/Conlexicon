@@ -6,6 +6,15 @@
 
 ### 新增
 
+- SQLite repository 骨架新增 `queryRootGroups()`，支持词根分组的搜索、排序、分页和 full/summary 返回语义；当前仍基于完整词条 JSON 和共享关系模块计算，尚未切为 SQL 查询。
+- SQLite repository 骨架新增 `getEntryRelations()`，按现有响应格式返回来源匹配、衍生条目和同根组；当前仍基于完整词条 JSON 和共享关系模块计算，尚未切为 SQL 查询。
+- SQLite repository 骨架新增 `getEntryFacets()`，支持词性 facets、标签频率和无词性计数的现有语义；当前仍基于完整词条 JSON 计算，尚未切为 SQL 聚合。
+- SQLite repository 骨架的 `queryEntries()` 新增搜索、词性/标签/来源派生筛选、排序、分页和 summary/full 返回语义；当前仍复用共享 JS 语义过滤完整词条 JSON，尚未切为 SQL 查询。
+- SQLite repository 骨架新增 metadata、settings、docs、corpus、morphology 和 IPA 模块级保存方法；当前仍通过 module blob/projection 重写保证语义，尚未接入主服务。
+- SQLite repository 骨架新增 skeleton 级词条 CRUD，支持无筛选 `queryEntries()`、`getEntry()`、`saveEntry()` 和 `deleteEntry()`；当前仍采用重写 projection 的保守策略，尚未接入主服务。
+- SQLite repository 骨架新增最小词典生命周期方法，覆盖创建、导入、导出、激活、删除、偏好保存和 state 读取，仍未接入主服务。
+- SQLite repository 骨架新增 JSON ↔ SQLite 最小无损往返：导入时写入完整词条 JSON、模块 blob 和核心查询 projection，导出时还原完整词典 JSON。
+- 新增未接入主流程的 `SqliteDictionaryRepository` 骨架和 SQLite schema 初始化检查脚本，先验证 `.sqlite` 文件、schema migrations、核心词条表、模块 blob 表和第一批索引可在临时目录创建。
 - 新增 `SQLITE_BACKEND_PLAN.md`，明确 SQLite 作为后续主存储的草案、schema 初稿、迁移顺序，并反推启动、词条查询、facets、词根关系、数据分析、质量检查、保存返回值和诊断修复等关键 API 契约。
 - 新增 repository/model 轻量检查脚本，使用临时数据目录验证词典规范化、导入解析、JSON repository 的创建、更新、导入覆盖、导出、删除、偏好保存和错误状态。
 - 阶段 B2 开始接入词条级 API：新增词条列表、单条读取、单条保存和删除端点，并在 repository 检查脚本中覆盖这些端点。
@@ -17,6 +26,8 @@
 
 ### 改进
 
+- Repository 契约测试 runner 新增早停阶段；SQLite repository 现在可复用同一套契约检查并通过到 `entryCrud` 阶段。
+- Repository 检查脚本拆分为可复用契约测试 runner 和 JSON repository 入口，为后续 SQLite repository 复用同一套 API/保存/导入导出语义检查做准备。
 - 建立最小共享 query 层，先接管数据分析中的词根/衍生关系统计和词根家族查询，为后续 API 化与共享索引查询打基础。
 - 阶段 B 开始建立数据访问层边界：新增 `JsonDictionaryRepository`、词典模型规范化模块、API 路由模块、HTTP 工具模块和静态文件服务模块，将词典索引、词典 JSON 快照、导入、导出、创建、激活、删除、偏好设置、导入解析、数据规范化、API 分发和静态文件响应从 `server.js` 中抽离；`server.js` 现在只负责组装 repository、路由、静态服务并启动 HTTP 服务器，为后续索引、分页和 SQLite 评估保留兼容入口。
 - 词典实体 ID 唯一性检查扩展覆盖释义、形态表和 IPA 映射规则；前端保存/导入提示与后端 repository 校验现在会一起识别这些对象的重复 ID，缺失 ID 的规范化补齐也会对这些对象和新词典 ID 执行静默防撞。
