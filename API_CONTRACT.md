@@ -1,6 +1,6 @@
 # API Contract
 
-本文记录 Conlexicon 当前本地 HTTP API 的稳定约定。它描述前端可依赖的接口边界，而不是底层存储实现；后端目前使用 JSON repository，后续会替换为 SQLite repository，但前端不应直接依赖文件结构。SQLite 化的存储草案与由此反推的关键 API 契约见 `SQLITE_BACKEND_PLAN.md`。
+本文记录 Conlexicon 当前本地 HTTP API 的稳定约定。它描述前端可依赖的接口边界，而不是底层存储实现；后端默认使用 JSON repository，也可通过 `CONLEXICON_REPOSITORY=sqlite` 显式启动实验性 SQLite repository，但前端不应直接依赖文件结构。SQLite 化的存储草案与由此反推的关键 API 契约见 `SQLITE_BACKEND_PLAN.md`。
 
 ## 通用约定
 
@@ -154,6 +154,8 @@ GET /api/dictionaries/:id/summary
 GET /api/dictionaries/:id/settings
 ```
 
+SQLite repository 已验证 `readState()` / `listDictionaries()` 可只返回词典 metadata；服务端可通过 `CONLEXICON_REPOSITORY=sqlite` 进入实验性 SQLite 模式，但默认仍是 JSON repository。正式切换前还需要把前端启动流程改为“先读轻量索引，再按需加载 active dictionary”。
+
 示例：
 
 ```js
@@ -169,7 +171,17 @@ GET /api/app
 GET /api/dictionaries
 {
   dictionaries: [
-    { id, name, language, description, entryCount, rootCount, updatedAt }
+    {
+      id,
+      name,
+      language,
+      description,
+      updatedAt,
+      summary: {
+        entryCount,
+        rootCount
+      }
+    }
   ]
 }
 ```

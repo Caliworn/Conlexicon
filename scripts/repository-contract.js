@@ -1128,6 +1128,7 @@ async function runRepositoryContractTests(options = {}) {
       () => repository.importDictionary({ id: "bad id", name: "Regenerated" }, { regenerateId: true }),
     );
     assert.equal((await regeneratedImport).id, "dict-imported");
+    return { completedStage: "all" };
   } finally {
     await cleanup();
   }

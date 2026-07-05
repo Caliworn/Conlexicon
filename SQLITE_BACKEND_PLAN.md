@@ -349,7 +349,37 @@ POST /api/dictionaries/:id/diagnostics/fix
 
 当前已开始落地第 5 项：`scripts/repository-contract.js` 提供 repository/API 契约测试 runner，`scripts/check-repository.js` 只是 JSON repository 的实例入口。后续新增 SQLite repository 时，应优先接入同一套 runner，而不是另写一套独立 smoke。
 
-当前也已开始落地第 6 项的第一小步：`lib/sqlite-dictionary-repository.js` 提供未接入主流程的 SQLite repository 骨架，使用 `node:sqlite` 初始化 `.sqlite` 文件、schema migrations、核心词条表、`module_blobs` 和第一批索引；`scripts/check-sqlite-repository.js` 只在临时目录验证 schema 初始化、JSON ↔ SQLite 往返、最小词典生命周期方法（创建、导入、导出、激活、删除、偏好保存和 state 读取）、skeleton 级词条 CRUD、metadata/settings/docs/corpus/morphology/IPA 模块保存、`queryEntries()` 的搜索/筛选/排序/分页语义、`getEntryFacets()`、`getEntryRelations()` 和 `queryRootGroups()`。`scripts/repository-contract.js` 已支持早停阶段，`scripts/check-sqlite-contract.js` 目前让 SQLite repository 跑通共享契约到 `readApi`。当前词条 CRUD 和模块保存仍通过导出当前词典、修改对应对象、再重写 projection/blob 的保守策略保证语义正确；带筛选的 `queryEntries()`、facets、词汇关系和词根分组目前也先复用共享 JS 语义读取完整词条 JSON，尚未改为真正 SQL 查询。该骨架尚未接入主服务。
+当前也已开始落地第 6 项的第一小步：`lib/sqlite-dictionary-repository.js` 提供 SQLite repository 骨架，使用 `node:sqlite` 初始化 `.sqlite` 文件、schema migrations、核心词条表、`module_blobs` 和第一批索引；`scripts/check-sqlite-repository.js` 只在临时目录验证 schema 初始化、JSON ↔ SQLite 往返、最小词典生命周期方法（创建、导入、导出、激活、删除、偏好保存和 state 读取）、skeleton 级词条 CRUD、metadata/settings/docs/corpus/morphology/IPA 模块保存、批量词条 patch、`queryEntries()` 的搜索/筛选/排序/分页语义、`getEntryFacets()`、`getEntryRelations()` 和 `queryRootGroups()`。`scripts/repository-contract.js` 已支持早停阶段，`scripts/check-sqlite-contract.js` 目前让 SQLite repository 跑通完整共享契约。当前 `saveEntry()`、`deleteEntry()`、`patchEntries()`、metadata/settings/docs/corpus/morphology/IPA 模块保存都已改为 SQL 级写入，只更新目标词条行、相关 projection 行、`dictionary_meta`、对应 `module_blobs` 和词典更新时间；无全文搜索的 `queryEntries()` 已下推到 `entries`、`entry_tags` 和 `entry_sources` projection 表执行结构化筛选、排序和分页，`getEntryFacets()` 已使用 SQL 聚合，`getEntryRelations()` 已使用 SQL 来源索引查询来源和衍生条目，无搜索 `queryRootGroups()` 已使用 SQL projection rows 构建词根分组、排序和分页。全文/模糊/动态形态搜索以及带搜索条件的 `queryRootGroups()` 目前仍复用共享 JS 语义读取完整词条 JSON，尚未改为真正 SQL/FTS 查询。`server.js` 已支持 `CONLEXICON_REPOSITORY=sqlite` 实验性可选启动，但默认仍是 JSON repository；正式切换前仍需调整前端启动流程和迁移策略。
+
+### 8.1 SQLite repository 当前状态审计
+
+这张表记录的是 `SqliteDictionaryRepository` 当前实现状态。`server.js` 已支持通过 `CONLEXICON_REPOSITORY=sqlite` 显式启用 SQLite repository；默认仍是 JSON repository。
+
+| 范围 | 当前 SQLite 实现状态 | 是否仍依赖完整 JSON/JS 全量逻辑 | 后续处理 |
+|---|---|---|---|
+| Schema 初始化 | 已实现 `.sqlite` 文件、`schema_migrations`、`dictionary_meta`、`module_blobs`、`entries`、`definitions`、`entry_tags`、`entry_sources` 和第一批索引 | 否 | 后续按迁移版本扩展，不盲目分表 |
+| JSON 导入 / 导出 | 已实现 JSON → SQLite projection/blob 写入，以及 SQLite → JSON 无损导出 | 导出本身需要组装完整 JSON，这是预期兼容能力 | 保留为导入、导出、迁移和兼容层 |
+| 词典生命周期 | 创建、导入、导出、激活、删除、偏好保存、`hasDictionary()`、`requireDictionary()` 已实现 | 导入和导出会组装完整词典，这是预期兼容能力 | 后续接主服务时补正式迁移和备份流程 |
+| `readState()` / `listDictionaries()` | SQLite repository 已改成只读 `dictionary_meta`，并即时 SQL 计算 `summary.entryCount/rootCount`；这些派生统计不写入 metadata | 否 | 接主服务前需要同步前端启动流程：state 只做索引，active dictionary 另行按需加载 |
+| `getDictionarySnapshot()` / `saveDictionarySnapshot()` / `updateDictionary()` | 已实现完整快照兼容层 | 是 | 保留为低频管理、导入覆盖和迁移入口；普通运行期不应依赖 |
+| `updateMetadata()` | 已改为直接更新 `dictionary_meta` | 返回值仍组装完整 snapshot | 写入侧已达当前目标；后续可收窄响应体 |
+| `updateSettings()` / `updateIpaSettings()` | 已改为直接更新 `module_blobs.settings`，IPA 只替换 settings 内的 `ipa`；IPA 保存仍做局部实体 ID 校验 | 返回值仍组装完整 snapshot | 写入侧已达当前目标；后续如增加 IPA 搜索/质量索引，再同步刷新索引 |
+| `saveDocs()` | 已改为直接更新 `module_blobs.docs` | 返回值仍组装完整 snapshot | 写入侧已达当前目标 |
+| `saveMorphology()` | 已保留形态语法校验，并改为直接更新 `module_blobs.morphology`；形态保存仍做局部实体 ID 校验 | 返回值仍组装完整 snapshot | 若未来需要形态搜索索引，再同步刷新索引 |
+| `saveCorpusChanges()` / `queryCorpusUnits()` / `getCorpusBlock()` | 保存已改为直接更新 `module_blobs.corpus`，语料读取仍从 corpus blob 取值；语料保存仍做局部实体 ID 校验 | 语料内容仍是 blob，不是关系表 | 第一版可暂保留；真正大语料阶段再独立 SQL 化 |
+| `saveEntry()` | 已改为 SQL 增量写入，只更新目标 entry、definitions、tags、sources projection 和词典更新时间 | 返回值仍组装完整 snapshot | 写入侧已达当前目标；后续可收窄响应体 |
+| `deleteEntry()` | 已改为 SQL 增量删除目标 entry 及其 projection | 返回值仍组装完整 snapshot | 写入侧已达当前目标；后续可收窄响应体 |
+| `patchEntries()` | 已改为 SQL 增量更新目标词条 projection；携带 settings 时直接更新 settings blob | 返回值仍组装完整 snapshot | 写入侧已达当前目标；后续可收窄响应体 |
+| `getEntry()` | 已直接按 `entries.id` 读取单条 `entry_json` | 否 | 可继续保留 |
+| 无参数 `queryEntries()` | 已直接读取 `entries` 表并按 position 排序 | 否 | 可继续保留；后续接窗口化/分页 |
+| 结构化 `queryEntries()` | 无全文搜索时已下推到 SQL，覆盖词性、标签、来源、`derivedFrom`、排序和分页 | 否 | 可继续扩展更多 SQL 条件 |
+| 全文 / fuzzy / 动态形态搜索 | 为保持现有共享语义，仍回退完整 snapshot + JS 搜索 | 是 | 需要 FTS 或预计算搜索索引；不能简单用 `LIKE` 替代 |
+| `getEntryFacets()` | 已改为 SQL 聚合，覆盖词性、标签频率和无词性计数 | 否 | 后续如增加筛选上下文 facets，再扩展 SQL |
+| `getEntryRelations()` | 已使用 `entry_sources` 和 `entries` projection 查询来源、直接衍生和 rootGroup 小范围关系 | 基本否 | 更复杂的完整词根模式仍在 `queryRootGroups()` 中处理 |
+| `queryRootGroups()` | 无搜索场景已使用 SQL projection rows 构建词根分组、排序和分页；带搜索条件时仍回退共享 JS 语义 | 搜索型 rootGroups 仍需要完整 snapshot；无搜索不需要 | 后续结合 FTS/搜索索引处理全文、fuzzy 和动态形态搜索 |
+| 质量检查 / 数据分析 | 还没有直接接 SQLite repository 查询层 | 多数仍依赖前端或共享 JS 切片 | 等基础 repository 稳定后，再做按需 API + SQL/query planner |
+| 契约测试 | SQLite repository 已跑通完整共享 repository contract | 否 | 每次改 repository 语义都继续跑 JSON 与 SQLite contract |
+| 主服务接入 | 已加 `CONLEXICON_REPOSITORY=sqlite` feature flag；默认仍使用 JSON repository | SQLite 模式的前端启动流程仍未完成 | 用临时数据目录做服务 smoke；正式默认切换前补 active dictionary 按需加载、迁移和回滚策略 |
 
 ## 9. 第一批 SQLite 实装建议
 

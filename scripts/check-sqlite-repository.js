@@ -178,6 +178,10 @@ async function main() {
       first.id,
       second.id,
     ]);
+    const roundtripMeta = state.dictionaries.find((dictionary) => dictionary.id === sourceDictionary.id);
+    assert.equal(roundtripMeta.entries, undefined);
+    assert.deepEqual(roundtripMeta.summary, { entryCount: 2, rootCount: 1 });
+    assert.deepEqual(state.dictionaries.find((dictionary) => dictionary.id === first.id).summary, { entryCount: 0, rootCount: 0 });
 
     await repository.activateDictionary(first.id);
     state = await repository.readState();

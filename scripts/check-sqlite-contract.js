@@ -40,7 +40,7 @@ async function main() {
   const result = await runRepositoryContractTests({
     name: "sqlite",
     createRepository: createSqliteRepositoryContractContext,
-    stopAfter: "readApi",
+    stopAfter: "all",
   });
   console.log(`SQLite repository contract checks passed through ${result.completedStage}.`);
 }

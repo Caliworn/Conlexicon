@@ -60,6 +60,22 @@ Conlexicon 目前使用一个小型 Node.js 后端，不需要安装额外依赖
 node server.js
 ```
 
+By default the server uses the JSON repository. An experimental SQLite repository can be selected explicitly:
+
+默认情况下，服务端使用 JSON repository。也可以显式选择实验性的 SQLite repository：
+
+```bash
+CONLEXICON_REPOSITORY=sqlite node server.js
+```
+
+When testing SQLite, prefer a temporary data directory so existing JSON dictionaries are not touched:
+
+测试 SQLite 时，建议配合临时数据目录，避免影响现有 JSON 词典：
+
+```bash
+CONLEXICON_REPOSITORY=sqlite CONLEXICON_DATA_DIR=/tmp/conlexicon-sqlite node server.js
+```
+
 Then open:
 
 然后打开：
@@ -84,6 +100,10 @@ data/dictionaries/*.json
 
 `data/index.json` 保存词典索引、当前词典 ID、全局界面语言和全局界面主题；各词典的内容与设置仍分别保存在 `data/dictionaries/*.json` 中。
 
+In experimental SQLite mode, dictionaries are stored as `.sqlite` files under `data/dictionaries/`. This mode is not the default storage backend yet.
+
+在实验性 SQLite 模式下，词典会以 `.sqlite` 文件保存在 `data/dictionaries/` 下；该模式目前还不是默认存储后端。
+
 The `data/` directory is intentionally ignored by Git so personal dictionaries are not committed to the repository.
 
 `data/` 目录已被 Git 忽略，用于避免把个人词库提交到仓库。
@@ -93,7 +113,7 @@ The `data/` directory is intentionally ignored by Git so personal dictionaries a
 ```text
 index.html   Main UI / 主界面
 app.js       Frontend logic / 前端逻辑
-server.js    Local backend and JSON persistence / 本地后端与 JSON 保存逻辑
+server.js    Local backend with selectable repository / 可选择 repository 的本地后端
 styles.css   Application styling / 应用样式
 ```
 

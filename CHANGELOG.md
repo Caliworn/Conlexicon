@@ -6,12 +6,13 @@
 
 ### 新增
 
-- SQLite repository 骨架新增 `queryRootGroups()`，支持词根分组的搜索、排序、分页和 full/summary 返回语义；当前仍基于完整词条 JSON 和共享关系模块计算，尚未切为 SQL 查询。
-- SQLite repository 骨架新增 `getEntryRelations()`，按现有响应格式返回来源匹配、衍生条目和同根组；当前仍基于完整词条 JSON 和共享关系模块计算，尚未切为 SQL 查询。
-- SQLite repository 骨架新增 `getEntryFacets()`，支持词性 facets、标签频率和无词性计数的现有语义；当前仍基于完整词条 JSON 计算，尚未切为 SQL 聚合。
-- SQLite repository 骨架的 `queryEntries()` 新增搜索、词性/标签/来源派生筛选、排序、分页和 summary/full 返回语义；当前仍复用共享 JS 语义过滤完整词条 JSON，尚未切为 SQL 查询。
+- SQLite repository 骨架新增 `patchEntries()`，补齐批量词条 patch 语义，支持 `tags`、`pronunciation` 字段更新和同步 settings 合并。
+- SQLite repository 骨架新增 `queryRootGroups()`，支持词根分组的搜索、排序、分页和 full/summary 返回语义；无搜索场景已使用 SQL projection 构建词根分组，搜索型请求仍保留完整共享语义回退。
+- SQLite repository 骨架新增 `getEntryRelations()`，按现有响应格式返回来源匹配、衍生条目和同根组；来源和衍生查询已使用 SQL projection。
+- SQLite repository 骨架新增 `getEntryFacets()`，支持词性 facets、标签频率和无词性计数的现有语义；当前已使用 SQL 聚合。
+- SQLite repository 骨架的 `queryEntries()` 新增搜索、词性/标签/来源派生筛选、排序、分页和 summary/full 返回语义；结构化筛选、排序和分页已使用 SQL，下阶段再处理全文/模糊/动态形态搜索索引。
 - SQLite repository 骨架新增 metadata、settings、docs、corpus、morphology 和 IPA 模块级保存方法；当前仍通过 module blob/projection 重写保证语义，尚未接入主服务。
-- SQLite repository 骨架新增 skeleton 级词条 CRUD，支持无筛选 `queryEntries()`、`getEntry()`、`saveEntry()` 和 `deleteEntry()`；当前仍采用重写 projection 的保守策略，尚未接入主服务。
+- SQLite repository 骨架新增 skeleton 级词条 CRUD，支持无筛选 `queryEntries()`、`getEntry()`、`saveEntry()` 和 `deleteEntry()`，尚未接入主服务。
 - SQLite repository 骨架新增最小词典生命周期方法，覆盖创建、导入、导出、激活、删除、偏好保存和 state 读取，仍未接入主服务。
 - SQLite repository 骨架新增 JSON ↔ SQLite 最小无损往返：导入时写入完整词条 JSON、模块 blob 和核心查询 projection，导出时还原完整词典 JSON。
 - 新增未接入主流程的 `SqliteDictionaryRepository` 骨架和 SQLite schema 初始化检查脚本，先验证 `.sqlite` 文件、schema migrations、核心词条表、模块 blob 表和第一批索引可在临时目录创建。
@@ -26,6 +27,14 @@
 
 ### 改进
 
+- `server.js` 新增 `CONLEXICON_REPOSITORY=json|sqlite` feature flag，默认继续使用 JSON repository；显式设置为 `sqlite` 时会启动实验性 SQLite repository，README、API 契约和 SQLite 计划同步记录该运行方式。
+- `SQLITE_BACKEND_PLAN.md` 新增 SQLite repository 当前状态审计表，区分已 SQL 增量写入、已 SQL 查询下推、仍走完整快照/JS 全量逻辑和主服务尚未接入的部分。
+- SQLite repository 的 metadata、settings、IPA、docs、morphology 和 corpus 模块保存改为 SQL 级写入，直接更新 `dictionary_meta` 或对应 `module_blobs`，并保留 IPA、形态和语料的局部实体 ID 校验。
+- SQLite repository 的 `saveEntry()`、`deleteEntry()` 和 `patchEntries()` 改为真正 SQL 增量写入：只更新目标词条、释义 projection、标签 projection、来源 projection、相关 settings blob 和词典更新时间，不再为这些操作重写整库 projection。
+- SQLite repository 的结构化读取开始下推到 SQL：无全文搜索的 `queryEntries()` 直接使用 `entries`、`entry_tags` 和 `entry_sources` projection 表完成词性、标签、来源、derivedFrom、排序和分页；`getEntryFacets()` 改为 SQL 聚合；`getEntryRelations()` 改为使用 SQL 来源索引查询来源和衍生条目。
+- SQLite repository 的无搜索 `queryRootGroups()` 改为使用 SQL projection rows 构建词根分组、排序和分页，不再为普通词根模式入口导出完整词典；带全文、fuzzy 或动态形态搜索的 root groups 暂时继续回退共享 JS 语义。
+- SQLite repository 的 `readState()` / `listDictionaries()` 改为只读取 `dictionary_meta` 并返回轻量词典 metadata 列表，附带即时 SQL 计算的 `summary.entryCount/rootCount`，避免启动索引阶段导出每个完整词典且不把派生统计写入 metadata；`API_CONTRACT.md` 同步记录正式接主服务前还需要前端按需加载 active dictionary。
+- SQLite repository 的共享契约检查推进到完整契约，覆盖模块保存、批量词条 patch、偏好、导入覆盖、删除和错误状态。
 - SQLite repository 的共享契约检查从 `entryCrud` 推进到 `readApi`，确认基础读取 API、facets、词汇关系、词根分组和读取一致性矩阵已与 JSON repository 当前语义对齐。
 - Repository 契约测试 runner 新增早停阶段；SQLite repository 现在可复用同一套契约检查并通过到 `entryCrud` 阶段。
 - Repository 检查脚本拆分为可复用契约测试 runner 和 JSON repository 入口，为后续 SQLite repository 复用同一套 API/保存/导入导出语义检查做准备。
