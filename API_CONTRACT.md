@@ -338,16 +338,223 @@ GET /api/dictionaries/:id/corpus/units/:unitId
 
 语料保存下一步可从整份 corpus 模块保存拆成块、层、单元级 changeset。
 
-### 数据分析按需 summary
+### 共享查询索引与分析 planner 草案
 
-数据分析后续避免一次生成全量报告，逐步拆成：
+数据分析 API 化不应只服务“数据分析”页面。词典标题、词典管理、词根模式、词汇网络、质量检查、高级筛选和未来诊断修复都会用到相同的统计、关系解析和索引能力。后续应先建立共享查询层，再在其上实现不同 UI 端点。
+
+建议分三层：
 
 ```text
-GET /api/dictionaries/:id/analysis/overview
-GET /api/dictionaries/:id/analysis/tags
-GET /api/dictionaries/:id/analysis/ipa
-GET /api/dictionaries/:id/analysis/morphology
-GET /api/dictionaries/:id/analysis/corpus
+Repository
+  JsonDictionaryRepository / future SqliteDictionaryRepository
+
+DictionaryQueryContext
+  请求级或持久化索引、基础查询和聚合能力
+
+Feature Services
+  AnalysisService / QualityService / DiagnosticsService / RelationService / EntrySearchService
 ```
 
-点击“在词条列表查看”时，应复用词条查询 filter spec，而不是向前端传递大量 entry IDs。
+`DictionaryQueryContext` 应提供稳定能力，而不是暴露 JSON 文件结构：
+
+```js
+{
+  getDictionarySummary(),
+  getEntryById(id),
+  getEntriesByIds(ids),
+  queryEntries(filter, options),
+  getEntityIndex(),
+  getRelationIndex(),
+  getTagStats(options),
+  getCoverageSummary(options),
+  getActivitySummary(options),
+  getCorpusPlacementIndex()
+}
+```
+
+JSON repository 阶段可为一次请求构建临时 `Map` / `Set` / prefix data；SQLite 阶段用 SQL、持久索引、视图或临时表实现相同接口。上层服务不应依赖底层是完整 JSON 扫描还是 SQLite 查询。
+
+#### 共享 relation/query 能力
+
+以下能力应共享同一套 relation/index 语义：
+
+- 词典标题的 `rootCount`。
+- 词典管理列表中的 `rootCount`。
+- 数据分析 relation summary 与 root family widgets。
+- `/root-groups` 词根模式。
+- `/entry-relations/:entryId` 词汇网络详情。
+- `/entries?derivedFrom=` 衍生词查询。
+- 质量检查中的词源网络问题。
+- 未来高级筛选的 relation filter descriptor。
+
+建议拆分为可复用任务：
+
+```text
+relationSummary
+  rootCount
+  derivedCount
+  isolatedRootCount
+  multiSourceCount
+
+rootFamilies
+  top N root families
+  paginated full root family ranking
+
+entryRelations
+  单个词条的来源、衍生词和同根组
+
+sourceResolution
+  source string -> matched entry / ambiguity / unresolved
+
+derivedFrom
+  source entry/key -> derived entries
+```
+
+`sourceResolution` 可被质量检查使用，但“未解析来源”和“来源循环”仍属于质量检查/词源网络问题，不归入诊断修复。
+
+#### Analysis widget query
+
+总览后续应作为可配置 dashboard，而不是固定页面报告。前端提交 widget 声明，后端 planner 合并 widget 依赖，避免多个卡片重复遍历词典。
+
+建议端点：
+
+```text
+POST /api/dictionaries/:id/analysis/query
+```
+
+请求：
+
+```js
+{
+  widgets: [
+    { id: "entry-count", type: "entryCount" },
+    { id: "parts", type: "partDistribution", limit: 8 },
+    { id: "coverage", type: "coverageBreakdown" },
+    { id: "roots", type: "topRootFamilies", limit: 12 },
+    { id: "activity", type: "activityPreview", limit: 6 }
+  ],
+  options: {
+    language: "zh",
+    includeActions: true
+  }
+}
+```
+
+响应返回结构化 widget data，不返回 HTML：
+
+```js
+{
+  dictionaryId,
+  cacheKey,
+  widgets: {
+    "entry-count": {
+      type: "metric",
+      title: "词条",
+      value: 10000,
+      note: "8147 个词根",
+      action: { type: "view", target: "editor" }
+    },
+    "coverage": {
+      type: "barList",
+      title: "覆盖率",
+      rows: [
+        { label: "IPA", value: 0.94, action: { type: "filter", filter: { kind: "coverage", field: "ipa", value: "present" } } }
+      ]
+    }
+  },
+  diagnostics: {
+    computedTasks: ["relationSummary", "coverageStats", "tagStats", "activityPreview"],
+    elapsedMs: 0
+  }
+}
+```
+
+Widget 不应直接绑定前端旧 report 字段；应通过任务依赖生成：
+
+| Widget | 典型任务 |
+| --- | --- |
+| `entryCount` | `entrySummary`, `relationSummary` |
+| `derivedCount` | `relationSummary` |
+| `coverageBreakdown` | `coverageStats` |
+| `partDistribution` | `tagStats` |
+| `tagFrequency` | `tagStats` |
+| `topRootFamilies` | `rootFamilies` |
+| `activityPreview` | `activityStats` |
+| `ipaAverageSyllables` | `ipaLightStats` |
+| `ipaUnitFrequency` | `ipaFullStats` |
+| `morphologyCoverage` | `coverageStats` |
+| `morphologyGeneratedForms` | `morphologyFullStats` |
+
+Planner 应把多个 widgets 合并为尽量少的任务。例如 `entryCount`、`coverageBreakdown` 和 `partDistribution` 可以共享一次基础 entry scan；`topRootFamilies` 和 `/root-groups` 可共享 relation index。
+
+#### Light / full 任务边界
+
+为避免总览卡片触发重型计算，任务应区分 light/full：
+
+```text
+ipaLightStats
+  IPA 覆盖、平均音节等轻量信息
+
+ipaFullStats
+  音位频率、首音/尾音、自动生成一致性等完整统计
+
+morphologyLightStats
+  是否有形态表格、表格覆盖等轻量信息
+
+morphologyFullStats
+  生成形式数量、空单元、override 排行等重型统计
+
+activityPreview
+  最近 N 条和少量日期桶
+
+activityFull
+  完整最近修改列表和完整日期分布
+```
+
+用户将重型 widget 放入总览时，API 可以返回 `status: "deferred"` 或要求点击后计算；不要默认让总览触发所有 full 任务。
+
+#### Filter descriptor
+
+分析卡片和质量卡片不应长期传递大量 `entryIds`。建议逐步改成 filter descriptor：
+
+```js
+{
+  type: "filter",
+  count: 608,
+  filter: {
+    kind: "coverage",
+    field: "ipa",
+    value: "missing"
+  }
+}
+```
+
+点击“在词条列表查看”时，词条列表使用 descriptor 调用 `/entries` 或后续 query endpoint 获取匹配项。这样总览 API 只返回 `count` 和可复用 filter spec，避免大词典下把大量 ID 塞进 dashboard 响应。
+
+#### 诊断修复边界
+
+未来诊断修复可以共享 `DictionaryQueryContext`，但只处理结构、存储、迁移和可自动修复问题，例如：
+
+- 重复 ID、缺失 ID、格式错误 ID。
+- 词典索引与实际文件不一致。
+- 引用已删除对象。
+- 孤儿语料单元、多父级语料单元。
+- 语料块、层、单元顺序缺失或重复。
+- 批量修复前的影响范围预览。
+
+以下仍属于质量检查，不应重复归入诊断修复：
+
+- 未解析来源。
+- 来源循环。
+- 缺少释义、缺少标签、缺少 IPA。
+- 多个主重音。
+- Glossed 例句缺字段。
+- 近似标签可能不一致。
+
+#### 最小落地顺序
+
+1. 抽出 repository 共享 query/index context，先用 JSON 请求级临时索引实现。
+2. 将 `listDictionaries()`、词典标题 root count、数据分析 relation summary 统一到同一 relation summary helper。
+3. 实装 `POST /analysis/query` 的 light widgets：`entryCount`、`coverageBreakdown`、`partDistribution`、`activityPreview`。
+4. 总览切到 widget query；重型 IPA / morphology / root family widgets 后续按需接入。
+5. 高级筛选逐步支持 filter descriptor，而不是只支持 materialized entry IDs。

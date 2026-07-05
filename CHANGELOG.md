@@ -11,6 +11,7 @@
 - 新增设置、文档、语料、自动形态学、自动 IPA 与批量词条 patch 的模块级 API，为继续拆分完整词典保存路径做准备。
 - 新增 `API_CONTRACT.md`，记录当前本地 HTTP API、完整快照兼容层、增量保存端点、实体 ID 校验范围和结构化错误码；`AGENTS.md` 增加同步维护 API 契约的长期规则。
 - `API_CONTRACT.md` 新增阶段 B3 读取 API 草案，覆盖轻量启动状态、词条查询、facets、词源关系、语料读取和数据分析按需 summary 的后续契约方向。
+- `API_CONTRACT.md` 补充共享查询索引、数据分析 widget query、planner、filter descriptor、诊断修复边界和 SQLite 兼容设计，作为后续数据分析 API 化与通用查询层抽取的草案。
 - 新增第一批读取侧 API：词条列表查询参数、词条 facets 和词源/衍生/同根关系端点，并在 repository 检查脚本中覆盖。
 
 ### 改进
