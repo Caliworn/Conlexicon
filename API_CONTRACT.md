@@ -1,6 +1,6 @@
 # API Contract
 
-本文记录 Conlexicon 当前本地 HTTP API 的稳定约定。它描述前端可依赖的接口边界，而不是底层存储实现；后端目前使用 JSON repository，后续可替换或补充 SQLite repository，但前端不应直接依赖文件结构。
+本文记录 Conlexicon 当前本地 HTTP API 的稳定约定。它描述前端可依赖的接口边界，而不是底层存储实现；后端目前使用 JSON repository，后续会替换为 SQLite repository，但前端不应直接依赖文件结构。SQLite 化的存储草案与由此反推的关键 API 契约见 `SQLITE_BACKEND_PLAN.md`。
 
 ## 通用约定
 
