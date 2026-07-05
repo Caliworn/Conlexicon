@@ -349,7 +349,7 @@ POST /api/dictionaries/:id/diagnostics/fix
 
 当前已开始落地第 5 项：`scripts/repository-contract.js` 提供 repository/API 契约测试 runner，`scripts/check-repository.js` 只是 JSON repository 的实例入口。后续新增 SQLite repository 时，应优先接入同一套 runner，而不是另写一套独立 smoke。
 
-当前也已开始落地第 6 项的第一小步：`lib/sqlite-dictionary-repository.js` 提供未接入主流程的 SQLite repository 骨架，使用 `node:sqlite` 初始化 `.sqlite` 文件、schema migrations、核心词条表、`module_blobs` 和第一批索引；`scripts/check-sqlite-repository.js` 只在临时目录验证 schema 初始化、JSON ↔ SQLite 往返、最小词典生命周期方法（创建、导入、导出、激活、删除、偏好保存和 state 读取）、skeleton 级词条 CRUD、metadata/settings/docs/corpus/morphology/IPA 模块保存、`queryEntries()` 的搜索/筛选/排序/分页语义、`getEntryFacets()`、`getEntryRelations()` 和 `queryRootGroups()`。`scripts/repository-contract.js` 已支持早停阶段，`scripts/check-sqlite-contract.js` 目前让 SQLite repository 跑通共享契约到 `entryCrud`。当前词条 CRUD 和模块保存仍通过导出当前词典、修改对应对象、再重写 projection/blob 的保守策略保证语义正确；带筛选的 `queryEntries()`、facets、词汇关系和词根分组目前也先复用共享 JS 语义读取完整词条 JSON，尚未改为真正 SQL 查询。该骨架尚未接入主服务。
+当前也已开始落地第 6 项的第一小步：`lib/sqlite-dictionary-repository.js` 提供未接入主流程的 SQLite repository 骨架，使用 `node:sqlite` 初始化 `.sqlite` 文件、schema migrations、核心词条表、`module_blobs` 和第一批索引；`scripts/check-sqlite-repository.js` 只在临时目录验证 schema 初始化、JSON ↔ SQLite 往返、最小词典生命周期方法（创建、导入、导出、激活、删除、偏好保存和 state 读取）、skeleton 级词条 CRUD、metadata/settings/docs/corpus/morphology/IPA 模块保存、`queryEntries()` 的搜索/筛选/排序/分页语义、`getEntryFacets()`、`getEntryRelations()` 和 `queryRootGroups()`。`scripts/repository-contract.js` 已支持早停阶段，`scripts/check-sqlite-contract.js` 目前让 SQLite repository 跑通共享契约到 `readApi`。当前词条 CRUD 和模块保存仍通过导出当前词典、修改对应对象、再重写 projection/blob 的保守策略保证语义正确；带筛选的 `queryEntries()`、facets、词汇关系和词根分组目前也先复用共享 JS 语义读取完整词条 JSON，尚未改为真正 SQL 查询。该骨架尚未接入主服务。
 
 ## 9. 第一批 SQLite 实装建议
 

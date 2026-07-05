@@ -26,6 +26,7 @@
 
 ### 改进
 
+- SQLite repository 的共享契约检查从 `entryCrud` 推进到 `readApi`，确认基础读取 API、facets、词汇关系、词根分组和读取一致性矩阵已与 JSON repository 当前语义对齐。
 - Repository 契约测试 runner 新增早停阶段；SQLite repository 现在可复用同一套契约检查并通过到 `entryCrud` 阶段。
 - Repository 检查脚本拆分为可复用契约测试 runner 和 JSON repository 入口，为后续 SQLite repository 复用同一套 API/保存/导入导出语义检查做准备。
 - 建立最小共享 query 层，先接管数据分析中的词根/衍生关系统计和词根家族查询，为后续 API 化与共享索引查询打基础。
