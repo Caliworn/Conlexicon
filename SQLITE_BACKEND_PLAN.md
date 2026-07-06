@@ -108,8 +108,7 @@ entries(
   notes TEXT,
   created_at TEXT,
   updated_at TEXT,
-  sort_key TEXT,
-  entry_json TEXT NOT NULL
+  sort_key TEXT
 )
 
 definitions(
@@ -147,7 +146,7 @@ entry_sources(
 - 局部编辑可以暂时仍是“词条级增量”，但 API 契约要允许未来升级为 definition/tag/source 子对象 patch。
 - 删除词条必须由后端在事务中删除定义、标签、来源、形态 override 等子对象。
 
-第一版 SQLite 中，`entries.entry_json` 保存完整词条 JSON，`definitions`、`entry_tags` 和 `entry_sources` 是查询 projection。这样可以先保证 JSON 导入/导出无损，同时让词条查询、facets 和来源关系获得 SQL 索引。后续如果某个子对象需要独立编辑或更强一致性，再把对应 projection 升级为主数据表。
+当前 SQLite 开发线中，`entries`、`definitions`、`entry_tags`、`entry_sources` 和 `entry_morphology_tables` 是词条主结构；不再用 `entries.entry_json` 保存完整词条副本。JSON 导入会写入这些 SQL 表，JSON 导出则从 SQL 表重新组装完整词典对象。后续如果某个子对象需要独立编辑或更强一致性，应继续在 SQL 主结构上扩展，而不是恢复完整词条 JSON 存储。
 
 ### 5.3 暂缓 SQL 化的模块
 
@@ -349,7 +348,7 @@ POST /api/dictionaries/:id/diagnostics/fix
 
 当前已开始落地第 5 项：`scripts/repository-contract.js` 提供 repository/API 契约测试 runner，`scripts/check-repository.js` 只是 JSON repository 的实例入口。后续新增 SQLite repository 时，应优先接入同一套 runner，而不是另写一套独立 smoke。
 
-当前也已开始落地第 6 项的第一小步：`lib/sqlite-dictionary-repository.js` 提供 SQLite repository 骨架，使用 `node:sqlite` 初始化 `.sqlite` 文件、schema migrations、核心词条表、`module_blobs` 和第一批索引；`scripts/check-sqlite-repository.js` 只在临时目录验证 schema 初始化、JSON ↔ SQLite 往返、最小词典生命周期方法（创建、导入、导出、激活、删除、偏好保存和 state 读取）、skeleton 级词条 CRUD、metadata/settings/docs/corpus/morphology/IPA 模块保存、批量词条 patch、`queryEntries()` 的搜索/筛选/排序/分页语义、`getEntryFacets()`、`getEntryRelations()` 和 `queryRootGroups()`。`scripts/repository-contract.js` 已支持早停阶段，`scripts/check-sqlite-contract.js` 目前让 SQLite repository 跑通完整共享契约。当前 `saveEntry()`、`deleteEntry()`、`patchEntries()`、metadata/settings/docs/corpus/morphology/IPA 模块保存都已改为 SQL 级写入，只更新目标词条行、相关 projection 行、`dictionary_meta`、对应 `module_blobs` 和词典更新时间；无全文搜索的 `queryEntries()` 已下推到 `entries`、`entry_tags` 和 `entry_sources` projection 表执行结构化筛选、排序和分页，`getEntryFacets()` 已使用 SQL 聚合，`getEntryRelations()` 已使用 SQL 来源索引查询来源和衍生条目，无搜索 `queryRootGroups()` 已使用 SQL projection rows 构建词根分组、排序和分页。全文/模糊/动态形态搜索以及带搜索条件的 `queryRootGroups()` 目前仍复用共享 JS 语义读取完整词条 JSON，尚未改为真正 SQL/FTS 查询。`server.js` 已支持 `CONLEXICON_REPOSITORY=sqlite` 实验性可选启动，但默认仍是 JSON repository；正式切换前仍需调整前端启动流程和迁移策略。
+当前也已开始落地第 6 项的第一小步：`lib/sqlite-dictionary-repository.js` 提供 SQLite repository 骨架，使用 `node:sqlite` 初始化 `.sqlite` 文件、schema migrations、核心词条表、`module_blobs` 和第一批索引；开发期 schema 已为 `entries` 增加 `etymology_description` 投影列，并新增 `entry_morphology_tables`，用于从 SQL 表重建完整词条和未来一词条多形态表实例。当前 SQLite 开发中间态不承诺兼容迁移；测试 SQLite 目录如与代码不匹配，应直接从 JSON 重新生成。SQLite 检查脚本已按职责拆分：`check-sqlite-schema.js` 只验证 schema/projection/SQL 重建，`check-sqlite-lifecycle.js` 只验证 SQLite repository 的最小生命周期 smoke，`check-sqlite-repository.js` 是薄聚合入口；完整对外行为一致性继续交给共享 `repository-contract` 和 `check-sqlite-contract.js`。当前 `saveEntry()`、`deleteEntry()`、`patchEntries()`、metadata/settings/docs/corpus/morphology/IPA 模块保存都已改为 SQL 级写入，只更新目标词条行、相关 projection 行、`dictionary_meta`、对应 `module_blobs` 和词典更新时间；单条读取、列表读取、导出快照、词源关系和无搜索词根分组已从 SQL 表重建 entry，`entries.entry_json` 已移除。无全文搜索的 `queryEntries()` 已下推到 `entries`、`entry_tags` 和 `entry_sources` projection 表执行结构化筛选、排序和分页，`getEntryFacets()` 已使用 SQL 聚合，`getEntryRelations()` 已使用 SQL 来源索引查询来源和衍生条目，无搜索 `queryRootGroups()` 已使用 SQL projection rows 构建词根分组、排序和分页。全文/模糊/动态形态搜索以及带搜索条件的 `queryRootGroups()` 目前仍复用共享 JS 语义，但词条对象已由 SQL 表组装；尚未改为真正 SQL/FTS 查询。`server.js` 已支持 `CONLEXICON_REPOSITORY=sqlite` 实验性可选启动，但默认仍是 JSON repository；正式切换前仍需调整前端启动流程和迁移策略。
 
 ### 8.1 SQLite repository 当前状态审计
 
@@ -357,7 +356,7 @@ POST /api/dictionaries/:id/diagnostics/fix
 
 | 范围 | 当前 SQLite 实现状态 | 是否仍依赖完整 JSON/JS 全量逻辑 | 后续处理 |
 |---|---|---|---|
-| Schema 初始化 | 已实现 `.sqlite` 文件、`schema_migrations`、`dictionary_meta`、`module_blobs`、`entries`、`definitions`、`entry_tags`、`entry_sources` 和第一批索引 | 否 | 后续按迁移版本扩展，不盲目分表 |
+| Schema 初始化 | 已实现 `.sqlite` 文件、`schema_migrations`、`dictionary_meta`、`module_blobs`、`entries`、`definitions`、`entry_tags`、`entry_sources`、`entry_morphology_tables` 和第一批索引；当前开发期 schema 已投影 `etymology_description`，并移除 `entry_json` | 否 | 测试库不匹配时从 JSON 重迁；正式固化前不做中间态兼容迁移 |
 | JSON 导入 / 导出 | 已实现 JSON → SQLite projection/blob 写入，以及 SQLite → JSON 无损导出 | 导出本身需要组装完整 JSON，这是预期兼容能力 | 保留为导入、导出、迁移和兼容层 |
 | 词典生命周期 | 创建、导入、导出、激活、删除、偏好保存、`hasDictionary()`、`requireDictionary()` 已实现 | 导入和导出会组装完整词典，这是预期兼容能力 | 后续接主服务时补正式迁移和备份流程 |
 | `readState()` / `listDictionaries()` | SQLite repository 已改成只读 `dictionary_meta`，并即时 SQL 计算 `summary.entryCount/rootCount`；这些派生统计不写入 metadata | 否 | 接主服务前需要同步前端启动流程：state 只做索引，active dictionary 另行按需加载 |
@@ -370,7 +369,7 @@ POST /api/dictionaries/:id/diagnostics/fix
 | `saveEntry()` | 已改为 SQL 增量写入，只更新目标 entry、definitions、tags、sources projection 和词典更新时间 | 返回值仍组装完整 snapshot | 写入侧已达当前目标；后续可收窄响应体 |
 | `deleteEntry()` | 已改为 SQL 增量删除目标 entry 及其 projection | 返回值仍组装完整 snapshot | 写入侧已达当前目标；后续可收窄响应体 |
 | `patchEntries()` | 已改为 SQL 增量更新目标词条 projection；携带 settings 时直接更新 settings blob | 返回值仍组装完整 snapshot | 写入侧已达当前目标；后续可收窄响应体 |
-| `getEntry()` | 已直接按 `entries.id` 读取单条 `entry_json` | 否 | 可继续保留 |
+| `getEntry()` | 已按 `entries.id` 读取 SQL 表并组装完整 entry | 否 | 可继续保留 |
 | 无参数 `queryEntries()` | 已直接读取 `entries` 表并按 position 排序 | 否 | 可继续保留；后续接窗口化/分页 |
 | 结构化 `queryEntries()` | 无全文搜索时已下推到 SQL，覆盖词性、标签、来源、`derivedFrom`、排序和分页 | 否 | 可继续扩展更多 SQL 条件 |
 | 全文 / fuzzy / 动态形态搜索 | 为保持现有共享语义，仍回退完整 snapshot + JS 搜索 | 是 | 需要 FTS 或预计算搜索索引；不能简单用 `LIKE` 替代 |

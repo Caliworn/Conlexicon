@@ -2,26 +2,13 @@ const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
 
-const {
-  DEFAULT_INDEX,
-  assertUniqueDictionaryEntityIds,
-  normalizeDictionary,
-  normalizeUiLanguage,
-  normalizeUiTheme,
-} = require("../lib/dictionary-model");
 const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
 const { runRepositoryContractTests } = require("./repository-contract");
+const { sqliteRepositoryOptions } = require("./sqlite-check-utils");
 
 async function createSqliteRepositoryContractContext() {
   const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "conlexicon-sqlite-contract-"));
-  const repository = new SqliteDictionaryRepository({
-    dataDir,
-    defaultIndex: DEFAULT_INDEX,
-    normalizeDictionary,
-    normalizeUiLanguage,
-    normalizeUiTheme,
-    validateDictionary: assertUniqueDictionaryEntityIds,
-  });
+  const repository = new SqliteDictionaryRepository(sqliteRepositoryOptions(dataDir));
   return {
     repository,
     async cleanup() {

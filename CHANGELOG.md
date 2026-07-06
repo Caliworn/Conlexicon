@@ -32,6 +32,9 @@
 
 ### 改进
 
+- SQLite 开发期 schema 新增 `entries.etymology_description` 投影列和 `entry_morphology_tables` 表，为从 SQL projection 重建完整词条和未来一词条多形态表实例做准备；当前 SQL 开发中间态不做兼容迁移，测试 SQLite 目录需从 JSON 重新生成。
+- SQLite repository 移除 `entries.entry_json` 存储字段；词条写入、单条读取、列表读取、词源关系、词根分组和导出快照现在都以 SQL projection 表为主结构，JSON 导出由 SQL 表组装生成。
+- SQLite 检查脚本拆分职责：新增 schema/projection 检查、lifecycle smoke 和共享 SQLite 检查工具，`check-sqlite-repository.js` 改为薄聚合入口，完整行为一致性继续由 `check-sqlite-contract.js` 负责。
 - `server.js` 新增 `CONLEXICON_REPOSITORY=json|sqlite` feature flag，默认继续使用 JSON repository；显式设置为 `sqlite` 时会启动实验性 SQLite repository，README、API 契约和 SQLite 计划同步记录该运行方式。
 - 前端启动流程改为先读取轻量 `/api/state`，再按需通过 `/api/dictionaries/:id` 加载当前词典完整快照；已加载且 `updatedAt` 未变化的词典会复用本地 snapshot，避免轻量 state 刷新时把前端词典内容覆盖为空。
 - API 新增 `GET /api/dictionaries/:id` 完整词典快照读取端点，供启动、切换词典和兼容层按需加载使用；`API_CONTRACT.md` 同步记录轻量 state 与 active dictionary snapshot 的边界。
