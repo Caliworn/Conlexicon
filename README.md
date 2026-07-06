@@ -104,6 +104,18 @@ In experimental SQLite mode, dictionaries are stored as `.sqlite` files under `d
 
 在实验性 SQLite 模式下，词典会以 `.sqlite` 文件保存在 `data/dictionaries/` 下；该模式目前还不是默认存储后端。
 
+For migration testing, use the explicit JSON-to-SQLite migration script with separate source and target data directories:
+
+如需测试迁移，可使用显式的 JSON 到 SQLite 迁移脚本，并为源目录和目标目录指定不同位置：
+
+```bash
+node scripts/migrate-json-data-to-sqlite.js --from /path/to/json-data --to /path/to/sqlite-data
+```
+
+The script refuses to write into a non-empty target directory and does not modify the source directory.
+
+该脚本会拒绝写入非空目标目录，并且不会修改源目录。
+
 The `data/` directory is intentionally ignored by Git so personal dictionaries are not committed to the repository.
 
 `data/` 目录已被 Git 忽略，用于避免把个人词库提交到仓库。

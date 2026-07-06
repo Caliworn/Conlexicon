@@ -8260,11 +8260,13 @@ async function saveSettings(event, options = {}) {
     clearTimeout(corpusSaveTimer);
   }
   try {
-    await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/settings`, {
+    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/settings`, {
       method: "PUT",
       body: JSON.stringify(settings),
     });
-    await refreshState();
+    applyDictionaryModulePayload(saved);
+    resetEntryReadStateAfterSave();
+    render();
     if (options.showToast !== false) {
       showToast(t("dictionarySaved"));
     }
@@ -8340,11 +8342,13 @@ async function applyTagSortOrder() {
     };
   }).filter(Boolean);
   try {
-    await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`, {
+    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`, {
       method: "PATCH",
       body: JSON.stringify({ settings, updates }),
     });
-    await refreshState();
+    applyEntryPatchPayload(saved);
+    resetEntryReadStateAfterSave();
+    render();
     showToast(`${t("tagOrderApplied")}${changedEntries ? ` · ${changedEntries} ${t("entries")}` : ""}`);
   } catch (error) {
     showApiErrorToast(error, "saveFailed");
@@ -8400,12 +8404,13 @@ async function saveLanguageDocs(showSavedToast = true) {
     markdown: draft.markdown,
   };
   try {
-    await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/docs`, {
+    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/docs`, {
       method: "PUT",
       body: JSON.stringify(docs),
     });
-    await refreshState();
+    applyDictionaryModulePayload(saved);
     docsDraftState = null;
+    render();
     renderLanguageDocs(activeDictionary());
     if (showSavedToast) {
       showToast(t("docsSaved"));
@@ -9227,7 +9232,7 @@ async function runCorpusSaveQueue() {
       method: "PUT",
       body: JSON.stringify(snapshot),
     });
-    const normalized = replaceDictionaryInState(saved);
+    const normalized = applyDictionaryModulePayload(saved);
     savedAny = true;
     clearTimeout(corpusSaveTimer);
     corpusSaveTimer = null;
@@ -9494,11 +9499,13 @@ async function saveMorphologyConfig(event) {
     return false;
   }
   try {
-    await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/morphology`, {
+    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/morphology`, {
       method: "PUT",
       body: JSON.stringify(morphology),
     });
-    await refreshState();
+    applyDictionaryModulePayload(saved);
+    resetEntryReadStateAfterSave();
+    render();
     showToast(t("dictionarySaved"));
     return true;
   } catch (error) {
@@ -9625,11 +9632,13 @@ async function saveIpaSettings(event, options = {}) {
 
   const ipa = ipaSettingsFromForm();
   try {
-    await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/settings/ipa`, {
+    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/settings/ipa`, {
       method: "PUT",
       body: JSON.stringify(ipa),
     });
-    await refreshState();
+    applyDictionaryModulePayload(saved);
+    resetEntryReadStateAfterSave();
+    render();
     if (options.showToast !== false) {
       showToast(t("ipaSaved"));
     }
@@ -9777,11 +9786,13 @@ async function batchGenerateIpa(mode) {
     patch: { pronunciation: generateIpaFromLemma(entry.lemma, ipaSettings) },
   }));
   try {
-    await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`, {
+    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`, {
       method: "PATCH",
       body: JSON.stringify({ updates }),
     });
-    await refreshState();
+    applyEntryPatchPayload(saved);
+    resetEntryReadStateAfterSave();
+    render();
     showToast(`${t("batchIpaUpdated")} ${targets.length}`);
   } catch (error) {
     showApiErrorToast(error, "saveFailed");
@@ -10031,9 +10042,11 @@ async function savePartialEdit(event) {
       method: "PUT",
       body: JSON.stringify(nextEntry),
     });
+    upsertEntryInDictionary(dictionary.id, savedEntry);
     state.selectedEntryId = savedEntry.id;
     cancelPartialEdit();
-    await refreshState();
+    resetEntryReadStateAfterSave();
+    render();
     if (shouldScrollAfterSave) {
       scheduleEntryCardScroll(savedEntry.id, prepareRootModeEntryNavigation(savedEntry.id));
     }
@@ -10189,10 +10202,12 @@ async function saveEntry(event) {
         body: JSON.stringify(entry),
       },
     );
+    upsertEntryInDictionary(dictionary.id, savedEntry);
     state.selectedEntryId = savedEntry.id;
     entryDraft = null;
     editorMode = "display";
-    await refreshState();
+    resetEntryReadStateAfterSave();
+    render();
     if (wasNewEntry || previousLemma !== savedEntry.lemma) {
       scheduleEntryCardScroll(savedEntry.id, prepareRootModeEntryNavigation(savedEntry.id));
     }
@@ -10222,16 +10237,18 @@ async function deleteEntryById(entryId) {
 
   const nextEntries = dictionary.entries.filter((item) => item.id !== entry.id);
   try {
-    await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entry.id)}`, {
+    const deleted = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entry.id)}`, {
       method: "DELETE",
     });
+    removeEntryFromDictionary(dictionary.id, entry.id, deleted);
     if (state.selectedEntryId === entry.id || !nextEntries.some((item) => item.id === state.selectedEntryId)) {
       state.selectedEntryId = firstLemmaEntry({ ...dictionary, entries: nextEntries })?.id || "";
       editorMode = "display";
       entryDraft = null;
       cancelPartialEdit();
     }
-    await refreshState();
+    resetEntryReadStateAfterSave();
+    render();
     showToast(t("deletedEntry"));
     return true;
   } catch (error) {
@@ -10267,11 +10284,13 @@ async function saveDictionary(event) {
 
   try {
     if (dictionaryId) {
-      await api(`/api/dictionaries/${encodeURIComponent(dictionaryId)}/meta`, {
+      const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionaryId)}/meta`, {
         method: "PUT",
         body: JSON.stringify(payload),
       });
+      updateDictionaryMetadataInState(saved);
       state.selectedDictionaryConfigId = dictionaryId;
+      render();
       showToast(t("dictionarySaved"));
     } else {
       const created = await api("/api/dictionaries", {
@@ -10303,6 +10322,143 @@ function replaceDictionaryInState(saved) {
   }
   loadedDictionaryIds.add(normalized.id);
   return normalized;
+}
+
+function replaceLoadedDictionarySource(dictionaryId, source) {
+  const dictionaryIndex = state.dictionaries.findIndex((dictionary) => dictionary.id === dictionaryId);
+  if (dictionaryIndex < 0) {
+    return null;
+  }
+  const normalized = normalizeDictionary(source);
+  state.dictionaries[dictionaryIndex] = normalized;
+  loadedDictionaryIds.add(normalized.id);
+  return normalized;
+}
+
+function updateDictionarySummaryFromEntries(dictionary, options = {}) {
+  const previousSummary = normalizeDictionarySummary(dictionary.summary);
+  return {
+    entryCount: dictionary.entries.length,
+    rootCount: options.recomputeRootCount === false
+      ? previousSummary?.rootCount ?? null
+      : dictionaryRootCount(dictionary),
+  };
+}
+
+function updateDictionaryMetadataInState(payload) {
+  if (!payload?.id) {
+    return null;
+  }
+  const dictionaryIndex = state.dictionaries.findIndex((dictionary) => dictionary.id === payload.id);
+  if (dictionaryIndex < 0) {
+    return null;
+  }
+  const current = state.dictionaries[dictionaryIndex];
+  const next = {
+    ...current,
+    ...(Object.hasOwn(payload, "name") ? { name: payload.name } : {}),
+    ...(Object.hasOwn(payload, "language") ? { language: payload.language } : {}),
+    ...(Object.hasOwn(payload, "description") ? { description: payload.description } : {}),
+    ...(Object.hasOwn(payload, "createdAt") ? { createdAt: payload.createdAt } : {}),
+    ...(Object.hasOwn(payload, "updatedAt") ? { updatedAt: payload.updatedAt } : {}),
+    ...(Object.hasOwn(payload, "summary") ? { summary: normalizeDictionarySummary(payload.summary) } : {}),
+  };
+  state.dictionaries[dictionaryIndex] = next;
+  return next;
+}
+
+function applyDictionaryModulePayload(payload) {
+  if (!payload?.id) {
+    return null;
+  }
+  const dictionary = state.dictionaries.find((item) => item.id === payload.id);
+  if (!dictionary) {
+    return null;
+  }
+  const next = {
+    ...dictionary,
+    ...(Object.hasOwn(payload, "updatedAt") ? { updatedAt: payload.updatedAt } : {}),
+    ...(Object.hasOwn(payload, "settings") ? { settings: payload.settings } : {}),
+    ...(Object.hasOwn(payload, "docs") ? { docs: payload.docs } : {}),
+    ...(Object.hasOwn(payload, "corpus") ? { corpus: payload.corpus } : {}),
+    ...(Object.hasOwn(payload, "morphology") ? { morphology: payload.morphology } : {}),
+  };
+  const normalized = replaceLoadedDictionarySource(payload.id, next);
+  if (normalized) {
+    normalized.summary = normalizeDictionarySummary(dictionary.summary);
+  }
+  return normalized;
+}
+
+function upsertEntryInDictionary(dictionaryId, entry, options = {}) {
+  if (!entry?.id) {
+    return null;
+  }
+  const dictionary = state.dictionaries.find((item) => item.id === dictionaryId);
+  if (!dictionary) {
+    return null;
+  }
+  const entries = [...dictionary.entries];
+  const entryIndex = entries.findIndex((item) => item.id === entry.id);
+  if (entryIndex >= 0) {
+    entries[entryIndex] = entry;
+  } else {
+    entries.push(entry);
+  }
+  const normalized = replaceLoadedDictionarySource(dictionaryId, {
+    ...dictionary,
+    updatedAt: options.updatedAt || entry.updatedAt || dictionary.updatedAt,
+    entries,
+  });
+  if (normalized) {
+    normalized.summary = updateDictionarySummaryFromEntries(normalized, { recomputeRootCount: options.recomputeRootCount });
+  }
+  return normalized?.entries.find((item) => item.id === entry.id) || null;
+}
+
+function removeEntryFromDictionary(dictionaryId, entryId, payload = {}) {
+  const dictionary = state.dictionaries.find((item) => item.id === dictionaryId);
+  if (!dictionary) {
+    return null;
+  }
+  const normalized = replaceLoadedDictionarySource(dictionaryId, {
+    ...dictionary,
+    updatedAt: payload.updatedAt || dictionary.updatedAt,
+    entries: dictionary.entries.filter((entry) => entry.id !== entryId),
+  });
+  if (normalized) {
+    normalized.summary = updateDictionarySummaryFromEntries(normalized);
+  }
+  return normalized;
+}
+
+function applyEntryPatchPayload(payload) {
+  if (!payload?.id) {
+    return null;
+  }
+  const dictionary = state.dictionaries.find((item) => item.id === payload.id);
+  if (!dictionary) {
+    return null;
+  }
+  const changedEntries = Array.isArray(payload.entries) ? payload.entries : [];
+  const changedById = new Map(changedEntries.map((entry) => [entry.id, entry]));
+  const nextEntries = dictionary.entries.map((entry) => changedById.get(entry.id) || entry);
+  const normalized = replaceLoadedDictionarySource(payload.id, {
+    ...dictionary,
+    updatedAt: payload.updatedAt || dictionary.updatedAt,
+    ...(Object.hasOwn(payload, "settings") ? { settings: payload.settings } : {}),
+    entries: nextEntries,
+  });
+  if (normalized) {
+    normalized.summary = updateDictionarySummaryFromEntries(normalized, { recomputeRootCount: false });
+  }
+  return normalized;
+}
+
+function resetEntryReadStateAfterSave() {
+  resetEntryQueryState();
+  resetEntryFacetsState();
+  lexicalNetworkRelationsCache.clear();
 }
 
 async function activateDictionary(dictionaryId) {

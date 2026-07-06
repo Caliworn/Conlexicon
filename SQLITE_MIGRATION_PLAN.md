@@ -1,0 +1,280 @@
+# SQLite 正式迁移与 JSON 兼容层设计
+
+本文记录 Conlexicon 从 JSON 词典文件过渡到 SQLite 主存储时的迁移、转换、兼容导入和导出设计。它补充 `SQLITE_BACKEND_PLAN.md`：后者关注 SQLite schema 和 API 反推，本文关注“如何安全地从旧数据进入新存储，以及以后如何把数据导出为不同交换格式”。
+
+## 1. 总原则
+
+- SQLite 是未来唯一的 canonical storage。应用运行期读写、查询、索引、分析和质量检查最终都应以 SQLite 为准。
+- JSON 不再作为长期主存储格式继续演化；它退位为 legacy import source 和 export profile。
+- 前端只依赖 HTTP API，不感知当前词典来自旧 JSON、SQLite、兼容导出还是其他格式。
+- 不长期双写 JSON 与 SQLite。双写会制造两个真相来源，并让错误恢复、版本检查和用户解释都变复杂。
+- 不静默原地迁移用户真实 `data/`。正式迁移必须有备份、报告和可解释的失败路径。
+
+## 2. 术语
+
+| 名称 | 含义 |
+| --- | --- |
+| Canonical SQLite dictionary | 应用正式使用的 `.sqlite` 词典文件。 |
+| Legacy JSON dictionary | 旧版 Conlexicon 直接存储和读取的 JSON 词典文件。 |
+| Normalized dictionary | 经过当前 `normalizeDictionary()`、旧字段兼容、ID 补齐和校验后的内存词典对象。 |
+| Import adapter | 把某种外部格式解析成 normalized dictionary 或可诊断中间结构的模块。 |
+| Export profile | 从 canonical SQLite dictionary 生成某种导出格式的规则，例如 legacy JSON、portable JSON、compact JSON、XLSX。 |
+| Migration report | 迁移或导入过程生成的结构化报告，记录成功项、警告、修复和失败原因。 |
+
+## 3. 目标形态
+
+长期目标不是“JSON repository 与 SQLite repository 平级存在”，而是：
+
+```text
+应用运行期
+  HTTP API
+    ↓
+  SQLite repository / query services
+    ↓
+  *.sqlite canonical dictionary
+
+兼容输入
+  Legacy JSON / future XLSX / other dictionaries
+    ↓
+  import adapters
+    ↓
+  normalized dictionary
+    ↓
+  SQLite writer
+
+兼容输出
+  SQLite reader
+    ↓
+  export profiles
+    ↓
+  JSON / XLSX / other exchange formats
+```
+
+JSON repository 在迁移完成后可以保留为：
+
+- 旧数据读取和迁移工具的一部分。
+- 契约测试参考实现，直到 SQLite 完全接管。
+- legacy JSON 导出 profile 的参考。
+- 紧急回退工具，但不作为普通运行期主路径。
+
+## 4. 标准转换服务
+
+建议新增独立转换层，例如 `lib/dictionary-conversion-service.js`。它不属于前端，也不属于某个 UI 页面；它是后端数据层的标准入口。
+
+第一批接口可以是概念上的：
+
+```js
+parseLegacyJsonDictionary(payload, options)
+normalizeImportedDictionary(source, options)
+buildImportReport(source, normalized, diagnostics)
+writeNormalizedDictionaryToSqlite(normalized, options)
+exportSqliteDictionary(dictionaryId, profile, options)
+migrateJsonDataDirectoryToSqlite(sourceDataDir, targetDataDir, options)
+```
+
+其中 `SqliteDictionaryRepository.importDictionarySnapshot()` 可以继续承担“把 normalized dictionary 写入 SQLite”的底层能力；转换服务负责更高层的格式判断、报告、备份策略和 profile 选择。
+
+## 5. 导入流程
+
+Legacy JSON 导入应分为几个明确阶段：
+
+1. 解析 payload。
+   - 判断是不是可识别词典。
+   - 拒绝非对象、空对象或明显不是词典的结构。
+2. legacy 兼容迁移。
+   - 处理旧字段，例如旧 IPA 重音规则字段、旧释义/例句字段、旧来源文本字段。
+   - 记录发生过的 legacy 字段转换。
+3. 规范化。
+   - 补齐缺失 ID。
+   - 规范化 settings、docs、corpus、morphology、IPA、entries、definitions、sources、tags。
+   - 对错误词典 ID 提供“作为新词典导入并重新生成 ID”的路径。
+4. 校验。
+   - 完整实体 ID 唯一性。
+   - 语料父子关系、顺序字段、模块结构。
+   - 形态语法、IPA 映射规则等已有模块校验。
+5. 写入 SQLite。
+   - 创建或覆盖目标 `.sqlite`。
+   - 写入 module blobs、entry JSON、projection tables 和索引。
+6. 生成 report。
+   - 成功词典 ID。
+   - 入口来源。
+   - 自动修复项。
+   - 警告。
+   - 失败项和错误码。
+
+导入相同词典 ID 时仍必须保留“导入并覆盖 / 取消”确认，不能静默覆盖。
+
+## 6. 正式迁移流程
+
+正式迁移是“把现有 JSON data directory 转换成 SQLite data directory”，不是普通导入单个文件。
+
+建议第一版先实现脚本，不先做 UI：
+
+```bash
+node scripts/migrate-json-data-to-sqlite.js --from <json-data-dir> --to <sqlite-data-dir>
+```
+
+脚本默认只允许写入不存在或为空的目标目录，不直接覆盖源目录，也不允许源目录和目标目录互相嵌套。正式接入产品时再加入 UI 或启动向导。
+
+当前脚本会输出 JSON migration report，并已有 `scripts/check-sqlite-migration.js` 使用临时目录验证源目录不被修改、目标 SQLite 可读、active dictionary 和 UI 偏好被保留。
+
+### 6.1 迁移步骤
+
+1. 读取源 `index.json`。
+2. 枚举源词典文件。
+3. 对每本词典执行导入流程。
+4. 写入目标 `index.json`。
+5. 写入目标 `.sqlite` 词典文件。
+6. 输出迁移报告。
+7. 可选执行导出 roundtrip 检查。
+
+### 6.2 备份策略
+
+正式产品内迁移时必须有备份：
+
+```text
+data/
+data-backup-before-sqlite-YYYYMMDD-HHMMSS/
+```
+
+或采用新目录写入：
+
+```text
+data-json-legacy/
+data/
+```
+
+推荐默认采用“新目录写入 + 原目录保留”的策略。它比原地改写更容易解释，也更容易回滚。
+
+### 6.3 不建议的策略
+
+- 不建议启动时发现 JSON 就自动覆盖成 SQLite。
+- 不建议没有报告地自动修复重复 ID。
+- 不建议同时维护 JSON 与 SQLite 两份实时可写数据。
+
+## 7. 导出 profile
+
+未来导出不应只有“把内部结构原样吐成 JSON”这一种。
+
+建议先把 JSON 导出也视为 profile：
+
+| profile | 目标 | 说明 |
+| --- | --- | --- |
+| `legacy-json` | 尽量兼容旧 Conlexicon JSON | 用于旧版回退或人工查看；不承诺永久等同内部结构。 |
+| `portable-json` | 新版推荐交换格式 | 可包含 schemaVersion、exportedAt、profile 等元数据；更适合长期交换。 |
+| `compact-json` | 备份或版本管理 | 可裁剪派生字段、排序稳定、体积较小。 |
+| `xlsx` | 表格交换 | 适合词条、释义、标签、来源、IPA 等扁平化导出；复杂模块可能拆成多 sheet。 |
+| `fieldwork` / `interlinear` | 后续田野或语料交换 | 预留给语料和 gloss 工具升级后设计。 |
+
+`GET /api/export` 后续可以扩展参数：
+
+```text
+GET /api/export?dictionaryId=...&format=json&profile=portable-json
+GET /api/export?dictionaryId=...&format=xlsx
+```
+
+导出 profile 的输出结构可以与旧内部 JSON 不完全一致，但必须有文档和版本号。
+
+## 8. `index.json` 的未来职责
+
+迁移后 `index.json` 仍可保留为全局索引和 UI 偏好文件，但不保存词典内容。
+
+建议未来字段方向：
+
+```json
+{
+  "activeDictionaryId": "dict-...",
+  "uiLanguage": "zh",
+  "uiTheme": "light",
+  "storageVersion": 2,
+  "dictionaries": [
+    {
+      "id": "dict-...",
+      "storage": "sqlite",
+      "path": "dictionaries/dict-....sqlite",
+      "name": "构典词典",
+      "language": "...",
+      "description": "...",
+      "createdAt": "...",
+      "updatedAt": "..."
+    }
+  ]
+}
+```
+
+真实 `entryCount/rootCount` 这类随时变化的统计不应写死在 index metadata 中；运行时可以从 SQLite 轻量查询。
+
+## 9. 失败与诊断
+
+迁移和导入失败应尽量结构化：
+
+| 类型 | 处理 |
+| --- | --- |
+| 词典 JSON 无法解析 | 拒绝导入，报告文件和解析错误。 |
+| 词典 ID 格式无效 | 提示作为新词典导入并重新生成 ID。 |
+| 词典 ID 已存在 | 需要覆盖确认。 |
+| 实体 ID 重复 | 拒绝迁移该词典，报告重复类型和位置；后续诊断修复模块可提供修复。 |
+| legacy 字段被转换 | 迁移成功但写入 warning。 |
+| 语料结构错误 | 拒绝或降级为 warning 需谨慎，默认拒绝更安全。 |
+| 未识别字段 | 默认保留在 normalized/exportable 结构中或记录 warning；不要静默丢弃。 |
+
+诊断修复模块可以复用迁移 report 的结构，但不要把未解析来源等普通质量检查问题塞进迁移诊断。迁移诊断只处理“会影响数据能否安全进入 canonical storage”的问题。
+
+在语料库尚未正式 SQL 化之前，`corpus` 仍作为 module blob 保存，但其 block、layer、unit ID 仍属于全局实体 ID 命名空间。完整导入、迁移、词条保存和语料模块保存都必须把 corpus blob 内部 ID 纳入防撞；普通设置和文档保存则不应因为无关的历史 corpus ID 问题被阻断。repository contract 已覆盖 corpus ID 与词条/释义 ID 互撞、corpus 内部重复 ID 等场景，避免后续 SQLite 下推或语料库重构时绕过该规则。
+
+## 10. 测试要求
+
+正式迁移前至少需要：
+
+- JSON repository 与 SQLite repository 现有契约测试继续通过。
+- 新增转换服务测试：
+  - 旧 JSON → normalized dictionary。
+  - normalized dictionary → SQLite。
+  - SQLite → legacy-json。
+  - SQLite → portable-json。
+- 新增目录迁移脚本测试：
+  - 使用临时数据目录。
+  - 覆盖多词典、当前词典、无词典、坏词典、重复 ID、无效词典 ID。
+  - 确认源目录不被修改。
+- 新增 roundtrip 检查：
+  - legacy JSON 输入迁移到 SQLite 后，导出 profile 能通过对应格式校验。
+
+所有测试数据必须放在临时目录，不使用真实 `data/`。
+
+## 11. 分阶段实施建议
+
+### M0：文档与契约
+
+- 确认 SQLite 是 canonical storage。
+- 明确 JSON 是 legacy import/export profile。
+- 明确导出 profile 与旧内部 JSON 可以分离。
+
+### M1：转换服务骨架
+
+- 抽 `dictionary-conversion-service`。
+- 把现有 import/normalize/export 调用通过该服务集中。
+- 暂时不改变 UI。
+
+### M2：迁移脚本
+
+- 新增 `scripts/migrate-json-data-to-sqlite.js`。
+- 只操作临时或显式指定目录。
+- 输出机器可读和人可读 report。
+- 当前已实现第一版 CLI 和临时目录检查脚本；后续可继续扩展 report 详情、失败项定位和产品内迁移入口。
+
+### M3：导出 profile
+
+- 把现有 JSON 导出命名为 `legacy-json` 或 `portable-json` 的一个明确 profile。
+- 为 XLSX 导出预留 adapter 位置。
+
+### M4：产品内迁移入口
+
+- 启动时检测旧 JSON data。
+- 显示迁移说明、备份路径和迁移报告。
+- 允许取消，不静默覆盖。
+
+### M5：切换默认后端
+
+- 默认 repository 改为 SQLite。
+- JSON repository 降级为 legacy reader/reference。
+- 继续保留显式兼容导出。

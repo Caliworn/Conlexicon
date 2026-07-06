@@ -11,6 +11,7 @@ const {
   normalizeUiTheme,
 } = require("../lib/dictionary-model");
 const { createApiRouter } = require("../lib/api-routes");
+const { createDictionaryConversionService } = require("../lib/dictionary-conversion-service");
 const morphologyModel = require("../lib/morphology-model");
 const ipaModel = require("../lib/ipa-model");
 const tagModel = require("../lib/tag-model");
@@ -86,6 +87,75 @@ async function callApi(repository, method, urlPath, body) {
     statusCode,
     body: payload ? JSON.parse(payload) : null,
   };
+}
+
+async function checkCorpusIdCollisionInvariants(repository) {
+  const dictionary = await repository.createDictionary(normalizeDictionary({
+    id: "dict-corpus-id-collision-contract",
+    name: "Corpus ID Collision Contract",
+    entries: [
+      {
+        id: "entry-corpus-contract",
+        lemma: "corpus contract",
+        definitions: [{ id: "def-corpus-contract", meaning: "contract" }],
+      },
+    ],
+    corpus: {
+      units: [{ id: "corpus-unit-contract", content: "corpus unit" }],
+    },
+  }));
+
+  try {
+    await assertRejectStatus(
+      repository.saveEntry(dictionary.id, {
+        id: "corpus-unit-contract",
+        lemma: "entry collides with corpus",
+        definitions: [{ meaning: "collision" }],
+      }),
+      409,
+      "entry save rejects entry id colliding with corpus blob id",
+    );
+    await assertRejectStatus(
+      repository.saveEntry(dictionary.id, {
+        lemma: "definition collides with corpus",
+        definitions: [{ id: "corpus-unit-contract", meaning: "collision" }],
+      }),
+      409,
+      "entry save rejects definition id colliding with corpus blob id",
+    );
+    await assertRejectStatus(
+      repository.saveCorpusChanges(dictionary.id, {
+        units: [{ id: "entry-corpus-contract", content: "corpus collides with entry" }],
+      }),
+      409,
+      "corpus save rejects corpus id colliding with existing entry id",
+    );
+    await assertRejectStatus(
+      repository.saveCorpusChanges(dictionary.id, {
+        units: [{ id: "def-corpus-contract", content: "corpus collides with definition" }],
+      }),
+      409,
+      "corpus save rejects corpus id colliding with existing definition id",
+    );
+    await assertRejectStatus(
+      repository.saveCorpusChanges(dictionary.id, {
+        units: [
+          { id: "corpus-duplicate-contract", content: "one" },
+          { id: "corpus-duplicate-contract", content: "two" },
+        ],
+      }),
+      409,
+      "corpus save rejects duplicate ids inside corpus blob",
+    );
+  } finally {
+    try {
+      await repository.deleteDictionary(dictionary.id);
+    } catch (error) {
+      if (error.status !== 404) {
+        throw error;
+      }
+    }
+  }
 }
 
 function testNormalize(value) {
@@ -459,6 +529,23 @@ function checkModelNormalization() {
   assert.equal(imported.id, "dict-11111111-1111-4111-8111-111111111111");
   assert.equal(imported.entries[0].lemma, "item");
 
+  const conversionService = createDictionaryConversionService();
+  const convertedImport = conversionService.importDictionaryFromJsonPayload({
+    id: "dict-22222222-2222-4222-8222-222222222222",
+    name: "Converted",
+    entries: [{ lemma: "converted", definitions: [{ meaning: "ok" }] }],
+  });
+  assert.equal(convertedImport.dictionary.id, "dict-22222222-2222-4222-8222-222222222222");
+  assert.equal(convertedImport.report.sourceProfile, "legacy-json");
+  const convertedExport = conversionService.exportDictionarySnapshot(convertedImport.dictionary, {
+    format: "json",
+    profile: "portable-json",
+  });
+  assert.equal(convertedExport.format, "json");
+  assert.equal(convertedExport.profile, "portable-json");
+  assert.equal(convertedExport.extension, "json");
+  assert.equal(convertedExport.payload.id, convertedImport.dictionary.id);
+
   assert.throws(
     () => importDictionaryFromPayload({ unrelated: true }),
     (error) => error.status === 400,
@@ -811,11 +898,19 @@ async function runRepositoryContractTests(options = {}) {
 
     const activeExport = await repository.exportDictionary();
     assert.equal(activeExport.id, first.id);
+    let apiResult = await callApi(repository, "GET", `/api/export?dictionaryId=${encodeURIComponent(first.id)}&profile=portable-json`);
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.id, first.id);
+    await assertRejectStatus(
+      callApi(repository, "GET", `/api/export?dictionaryId=${encodeURIComponent(first.id)}&format=xlsx`),
+      400,
+      "unsupported export format",
+    );
     if (shouldStopAfter("lifecycle")) {
       return { completedStage: "lifecycle" };
     }
 
-    let apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/meta`, {
+    apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/meta`, {
       name: "First Renamed",
       language: "renamed",
       description: "meta only",
@@ -976,7 +1071,9 @@ async function runRepositoryContractTests(options = {}) {
       updates: [{ id: repositoryEntryId, patch: { tags: ["n", "root"] } }],
     });
     assert.equal(apiResult.statusCode, 200);
-    assert.deepEqual(apiResult.body.entries.find((entry) => entry.id === repositoryEntryId).tags, ["n", "root"]);
+    assert.equal(apiResult.body.entries.length, 1);
+    assert.equal(apiResult.body.entries[0].id, repositoryEntryId);
+    assert.deepEqual(apiResult.body.entries[0].tags, ["n", "root"]);
     assert.equal(apiResult.body.settings.allowEmptyDefinitions, false);
     await assertRejectStatus(
       callApi(repository, "PATCH", `/api/dictionaries/${encodeURIComponent(first.id)}/entries`, {
@@ -999,6 +1096,8 @@ async function runRepositoryContractTests(options = {}) {
       400,
       "invalid entry patch pronunciation",
     );
+
+    await checkCorpusIdCollisionInvariants(repository);
 
     const legacyDuplicateId = "dict-legacy-duplicates";
     const legacyDuplicate = normalizeDictionary({
@@ -1040,7 +1139,9 @@ async function runRepositoryContractTests(options = {}) {
         updates: [{ id: "entry-legacy-ok", patch: { tags: ["checked"] } }],
       });
       assert.equal(apiResult.statusCode, 200);
-      assert.deepEqual(apiResult.body.entries.find((entry) => entry.id === "entry-legacy-ok").tags, ["checked"]);
+      assert.equal(apiResult.body.entries.length, 1);
+      assert.equal(apiResult.body.entries[0].id, "entry-legacy-ok");
+      assert.deepEqual(apiResult.body.entries[0].tags, ["checked"]);
 
       apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(legacyDuplicateId)}/docs`, {
         markdown: "legacy docs",

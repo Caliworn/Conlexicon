@@ -1,6 +1,6 @@
 # API Contract
 
-本文记录 Conlexicon 当前本地 HTTP API 的稳定约定。它描述前端可依赖的接口边界，而不是底层存储实现；后端默认使用 JSON repository，也可通过 `CONLEXICON_REPOSITORY=sqlite` 显式启动实验性 SQLite repository，但前端不应直接依赖文件结构。SQLite 化的存储草案与由此反推的关键 API 契约见 `SQLITE_BACKEND_PLAN.md`。
+本文记录 Conlexicon 当前本地 HTTP API 的稳定约定。它描述前端可依赖的接口边界，而不是底层存储实现；后端默认使用 JSON repository，也可通过 `CONLEXICON_REPOSITORY=sqlite` 显式启动实验性 SQLite repository，但前端不应直接依赖文件结构。SQLite 化的存储草案与由此反推的关键 API 契约见 `SQLITE_BACKEND_PLAN.md`；正式迁移、JSON 兼容导入/导出和 export profile 设计见 `SQLITE_MIGRATION_PLAN.md`。
 
 ## 通用约定
 
@@ -36,8 +36,8 @@
 
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/export?dictionaryId=` | 导出 JSON | 完整词典 JSON | 完整快照交换格式。 |
-| `POST` | `/api/import?overwrite=&regenerateId=` | 导入 JSON | 应用状态 | 完整快照导入；执行全量规范化和实体 ID 检查。 |
+| `GET` | `/api/export?dictionaryId=&format=&profile=` | 导出数据 | 当前支持 JSON 完整词典 payload | 默认 `format=json&profile=legacy-json`；`profile=portable-json` 当前仍输出兼容完整 JSON，后续由转换服务扩展。 |
+| `POST` | `/api/import?overwrite=&regenerateId=&profile=` | 导入 JSON | 应用状态 | 默认 `profile=legacy-json`；完整快照导入会通过转换服务执行 legacy 兼容解析、规范化和实体 ID 检查。 |
 | `POST` | `/api/dictionaries` | 新建词典 | 完整词典 JSON | 创建空词典，并设为当前词典。 |
 | `GET` | `/api/dictionaries/:id` | 读取完整词典快照 | 完整词典 JSON | 前端启动、切换当前词典和兼容旧完整状态逻辑时按需调用；普通列表、搜索和 facets 仍优先使用专用读取 API。 |
 | `POST` | `/api/dictionaries/:id/activate` | 切换当前词典 | 应用状态 | 只改 `index.json` 中的当前词典。 |
@@ -53,13 +53,13 @@
 
 | 方法 | 路径 | 用途 | 响应 | 校验范围 |
 | --- | --- | --- | --- | --- |
-| `PUT` | `/api/dictionaries/:id/meta` | 保存词典名称、语言、描述 | 完整词典 JSON | 不做实体 ID 检查。 |
-| `PUT` | `/api/dictionaries/:id/settings` | 保存其他设置 | 完整词典 JSON | 不做实体 ID 检查；会保留既有 IPA 设置。 |
-| `PUT` | `/api/dictionaries/:id/docs` | 保存语言文档 | 完整词典 JSON | 不做实体 ID 检查。 |
-| `PUT` | `/api/dictionaries/:id/corpus` | 保存语料库模块 | 完整词典 JSON | 检查语料范围内实体 ID 冲突。 |
-| `PUT` | `/api/dictionaries/:id/morphology` | 保存自动形态学模块 | 完整词典 JSON | 检查形态表实体 ID 冲突，并使用共享形态模块校验规则引用语法和函数对象配置。 |
-| `PUT` | `/api/dictionaries/:id/settings/ipa` | 保存自动 IPA 设置 | 完整词典 JSON | 检查 IPA 规则和重音规则实体 ID 冲突。 |
-| `POST` | `/api/dictionaries/:id/autosave` | 页面卸载时保存文档/语料草稿 | 完整词典 JSON | 当前只分发 `docs` 和 `corpus`；没有有效模块时返回词典快照。 |
+| `PUT` | `/api/dictionaries/:id/meta` | 保存词典名称、语言、描述 | 词典 metadata payload | 不做实体 ID 检查；响应包含 `id/name/language/description/createdAt/updatedAt`。 |
+| `PUT` | `/api/dictionaries/:id/settings` | 保存其他设置 | `{ id, updatedAt, settings }` | 不做实体 ID 检查；会保留既有 IPA 设置。 |
+| `PUT` | `/api/dictionaries/:id/docs` | 保存语言文档 | `{ id, updatedAt, docs }` | 不做实体 ID 检查。 |
+| `PUT` | `/api/dictionaries/:id/corpus` | 保存语料库模块 | `{ id, updatedAt, corpus }` | 检查语料范围内实体 ID 冲突。 |
+| `PUT` | `/api/dictionaries/:id/morphology` | 保存自动形态学模块 | `{ id, updatedAt, morphology }` | 检查形态表实体 ID 冲突，并使用共享形态模块校验规则引用语法和函数对象配置。 |
+| `PUT` | `/api/dictionaries/:id/settings/ipa` | 保存自动 IPA 设置 | `{ id, updatedAt, settings }` | 检查 IPA 规则和重音规则实体 ID 冲突。 |
+| `POST` | `/api/dictionaries/:id/autosave` | 页面卸载时保存文档/语料草稿 | `{ id, updatedAt, docs?, corpus? }` | 当前只分发 `docs` 和 `corpus`；没有有效模块时只返回 `id/updatedAt`。 |
 
 ### 词条级保存
 
@@ -69,8 +69,8 @@
 | `POST` | `/api/dictionaries/:id/entries` | 新建词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
 | `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存单个词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
-| `DELETE` | `/api/dictionaries/:id/entries/:entryId` | 删除单个词条 | `{ id }` | 不因无关历史重复 ID 阻断删除。 |
-| `PATCH` | `/api/dictionaries/:id/entries` | 批量更新词条字段 | 完整词典 JSON | 当前仅允许 patch `tags` 和 `pronunciation`；可附带 `settings` 用于标签排序设置保存。 |
+| `DELETE` | `/api/dictionaries/:id/entries/:entryId` | 删除单个词条 | `{ id, dictionaryId, updatedAt }` | 不因无关历史重复 ID 阻断删除。 |
+| `PATCH` | `/api/dictionaries/:id/entries` | 批量更新词条字段 | `{ id, updatedAt, entries, settings? }` | 当前仅允许 patch `tags` 和 `pronunciation`；`entries` 只包含本次更新的词条；可附带 `settings` 用于标签排序设置保存。 |
 
 ### 读取侧查询
 
@@ -108,6 +108,9 @@
 | `invalid_ui_language` | 全局界面语言值无效。 |
 | `invalid_ui_theme` | 全局主题值无效。 |
 | `invalid_import_payload` | 导入内容不是可识别词典。 |
+| `unsupported_import_profile` | 导入 profile 暂不支持。 |
+| `unsupported_export_format` | 导出格式暂不支持。 |
+| `unsupported_export_profile` | 导出 profile 暂不支持。 |
 | `invalid_dictionary_id` | 词典 ID 格式无效。 |
 | `dictionary_not_found` | 词典不存在或已被删除。 |
 | `dictionary_id_exists` | 导入词典 ID 已存在且未确认覆盖。 |

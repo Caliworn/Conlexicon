@@ -17,6 +17,11 @@
 - SQLite repository 骨架新增 JSON ↔ SQLite 最小无损往返：导入时写入完整词条 JSON、模块 blob 和核心查询 projection，导出时还原完整词典 JSON。
 - 新增未接入主流程的 `SqliteDictionaryRepository` 骨架和 SQLite schema 初始化检查脚本，先验证 `.sqlite` 文件、schema migrations、核心词条表、模块 blob 表和第一批索引可在临时目录创建。
 - 新增 `SQLITE_BACKEND_PLAN.md`，明确 SQLite 作为后续主存储的草案、schema 初稿、迁移顺序，并反推启动、词条查询、facets、词根关系、数据分析、质量检查、保存返回值和诊断修复等关键 API 契约。
+- 新增 `SQLITE_MIGRATION_PLAN.md`，明确 SQLite 作为未来 canonical storage、JSON 退位为 legacy import/export profile，并规划转换服务、目录迁移脚本、导出 profile、备份策略和迁移报告。
+- 新增 `dictionary-conversion-service` 骨架，集中 legacy JSON 导入解析和导出 profile 校验；`/api/import` 与 `/api/export` 已接入该服务，默认行为保持兼容完整 JSON。
+- 新增 `scripts/migrate-json-data-to-sqlite.js` 迁移脚本，可将显式指定的旧 JSON data directory 转换到新的 SQLite data directory；脚本拒绝非空目标目录和嵌套源/目标目录，并输出 JSON migration report。
+- 新增 `scripts/check-sqlite-migration.js`，使用临时目录验证 JSON 到 SQLite 迁移不会修改源目录，并能保留 active dictionary、界面偏好和词典内容。
+- Repository 契约测试新增 corpus blob ID 防撞覆盖，确认未 SQL 化的语料 block/layer/unit ID 仍会与词条、释义等实体共享全局 ID 命名空间。
 - 新增 repository/model 轻量检查脚本，使用临时数据目录验证词典规范化、导入解析、JSON repository 的创建、更新、导入覆盖、导出、删除、偏好保存和错误状态。
 - 阶段 B2 开始接入词条级 API：新增词条列表、单条读取、单条保存和删除端点，并在 repository 检查脚本中覆盖这些端点。
 - 新增设置、文档、语料、自动形态学、自动 IPA 与批量词条 patch 的模块级 API，为继续拆分完整词典保存路径做准备。
@@ -31,6 +36,7 @@
 - 前端启动流程改为先读取轻量 `/api/state`，再按需通过 `/api/dictionaries/:id` 加载当前词典完整快照；已加载且 `updatedAt` 未变化的词典会复用本地 snapshot，避免轻量 state 刷新时把前端词典内容覆盖为空。
 - API 新增 `GET /api/dictionaries/:id` 完整词典快照读取端点，供启动、切换词典和兼容层按需加载使用；`API_CONTRACT.md` 同步记录轻量 state 与 active dictionary snapshot 的边界。
 - 词典管理列表和删除确认的词条/词根统计优先使用 `summary.entryCount/rootCount`，避免轻量 state 下为 metadata-only 词典显示 0 或触发完整词典统计。
+- 保存 API 响应继续收窄：metadata、settings、docs、corpus、morphology、IPA 设置、autosave 和批量词条 patch 现在返回局部 payload；前端保存后直接合并局部响应，不再为普通保存重新拉取 `/api/state` 和 active dictionary snapshot。
 - `SQLITE_BACKEND_PLAN.md` 新增 SQLite repository 当前状态审计表，区分已 SQL 增量写入、已 SQL 查询下推、仍走完整快照/JS 全量逻辑和主服务尚未接入的部分。
 - SQLite repository 的 metadata、settings、IPA、docs、morphology 和 corpus 模块保存改为 SQL 级写入，直接更新 `dictionary_meta` 或对应 `module_blobs`，并保留 IPA、形态和语料的局部实体 ID 校验。
 - SQLite repository 的 `saveEntry()`、`deleteEntry()` 和 `patchEntries()` 改为真正 SQL 增量写入：只更新目标词条、释义 projection、标签 projection、来源 projection、相关 settings blob 和词典更新时间，不再为这些操作重写整库 projection。

@@ -1,6 +1,6 @@
 # SQLite 后端草案与 API 契约反推
 
-本文记录 Conlexicon 已确定 SQLite 化之后的数据层设计草案。它不是立即迁移清单，而是用来反推当前 API 层哪些契约必须尽早稳定、哪些 JSON 专用优化可以停止加码。
+本文记录 Conlexicon 已确定 SQLite 化之后的数据层设计草案。它不是立即迁移清单，而是用来反推当前 API 层哪些契约必须尽早稳定、哪些 JSON 专用优化可以停止加码。正式迁移、JSON 兼容导入/导出和 export profile 的设计见 `SQLITE_MIGRATION_PLAN.md`。
 
 ## 1. 目标
 
