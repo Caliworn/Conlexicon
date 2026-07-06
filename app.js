@@ -17,6 +17,7 @@ let toastTimer = null;
 let editorMode = "display";
 let currentTheme = "light";
 let currentLanguage = "zh";
+let loadedDictionaryIds = new Set();
 const UI_PREFERENCES_STORAGE_KEY = "conlexicon:ui-preferences";
 const shellState = {
   navCollapsed: false,
@@ -1483,7 +1484,7 @@ async function loadState() {
     currentLanguage = normalizeUiLanguage(serverState.uiLanguage);
     currentTheme = normalizeUiTheme(serverState.uiTheme);
     cacheUiPreferences({ uiTheme: currentTheme });
-    state = normalizeState({
+    await applyServerState({
       ...serverState,
       selectedEntryId: state.selectedEntryId,
       selectedDictionaryConfigId: state.selectedDictionaryConfigId || serverState.activeDictionaryId,
@@ -1497,6 +1498,87 @@ async function loadState() {
 
   render();
   finishAppBoot();
+}
+
+function dictionaryHasFullPayload(dictionary) {
+  return Boolean(dictionary && typeof dictionary === "object" && (
+    Array.isArray(dictionary.entries)
+    || Object.hasOwn(dictionary, "settings")
+    || Object.hasOwn(dictionary, "docs")
+    || Object.hasOwn(dictionary, "corpus")
+    || Object.hasOwn(dictionary, "morphology")
+  ));
+}
+
+function normalizeDictionarySummary(summary) {
+  if (!summary || typeof summary !== "object") {
+    return null;
+  }
+  const entryCount = Number(summary.entryCount);
+  const rootCount = Number(summary.rootCount);
+  return {
+    entryCount: Number.isFinite(entryCount) && entryCount >= 0 ? entryCount : null,
+    rootCount: Number.isFinite(rootCount) && rootCount >= 0 ? rootCount : null,
+  };
+}
+
+function mergeDictionaryMetadataSnapshot(previous, metadata) {
+  return {
+    ...previous,
+    id: metadata.id,
+    name: metadata.name,
+    language: metadata.language,
+    description: metadata.description,
+    createdAt: metadata.createdAt,
+    updatedAt: metadata.updatedAt,
+    summary: metadata.summary || previous.summary || null,
+  };
+}
+
+async function fetchDictionarySnapshot(dictionaryId) {
+  return api(`/api/dictionaries/${encodeURIComponent(dictionaryId)}`);
+}
+
+async function ensureDictionarySnapshotLoaded(dictionaryId) {
+  if (!dictionaryId || loadedDictionaryIds.has(dictionaryId)) {
+    return null;
+  }
+  const snapshot = await fetchDictionarySnapshot(dictionaryId);
+  const normalized = replaceDictionaryInState(snapshot);
+  loadedDictionaryIds.add(normalized.id);
+  return normalized;
+}
+
+async function applyServerState(source) {
+  const rawDictionaries = Array.isArray(source.dictionaries) ? source.dictionaries : [];
+  const rawDictionaryById = new Map(rawDictionaries.map((dictionary) => [dictionary.id, dictionary]));
+  const previousLoadedById = new Map(
+    state.dictionaries
+      .filter((dictionary) => loadedDictionaryIds.has(dictionary.id))
+      .map((dictionary) => [dictionary.id, dictionary]),
+  );
+  const normalizedState = normalizeState(source);
+  const nextLoadedDictionaryIds = new Set();
+
+  normalizedState.dictionaries = normalizedState.dictionaries.map((dictionary) => {
+    const rawDictionary = rawDictionaryById.get(dictionary.id);
+    if (dictionaryHasFullPayload(rawDictionary)) {
+      nextLoadedDictionaryIds.add(dictionary.id);
+      return dictionary;
+    }
+
+    const previous = previousLoadedById.get(dictionary.id);
+    if (previous && previous.updatedAt === dictionary.updatedAt) {
+      nextLoadedDictionaryIds.add(dictionary.id);
+      return mergeDictionaryMetadataSnapshot(previous, dictionary);
+    }
+
+    return dictionary;
+  });
+
+  state = normalizedState;
+  loadedDictionaryIds = nextLoadedDictionaryIds;
+  await ensureDictionarySnapshotLoaded(state.activeDictionaryId);
 }
 
 function normalizeState(source) {
@@ -1530,6 +1612,7 @@ function normalizeDictionary(dictionary) {
     morphology: normalizeMorphology(dictionary.morphology, usedEntityIds),
     createdAt: dictionary.createdAt || new Date().toISOString(),
     updatedAt: dictionary.updatedAt || new Date().toISOString(),
+    summary: normalizeDictionarySummary(dictionary.summary),
     entries,
   };
 }
@@ -5176,7 +5259,17 @@ function dictionaryStatsText(dictionary) {
   if (!dictionary) {
     return "";
   }
-  return `${dictionary.entries.length} ${t("entries")} · ${dictionaryRootCount(dictionary)} ${t("roots")}`;
+  return `${dictionaryEntryCount(dictionary)} ${t("entries")} · ${dictionaryRootCountSummary(dictionary)} ${t("roots")}`;
+}
+
+function dictionaryEntryCount(dictionary) {
+  const summaryCount = dictionary?.summary?.entryCount;
+  return Number.isFinite(summaryCount) ? summaryCount : dictionary?.entries?.length || 0;
+}
+
+function dictionaryRootCountSummary(dictionary) {
+  const summaryCount = dictionary?.summary?.rootCount;
+  return Number.isFinite(summaryCount) ? summaryCount : dictionaryRootCount(dictionary);
 }
 
 function dictionaryRootCount(dictionary) {
@@ -10205,7 +10298,10 @@ function replaceDictionaryInState(saved) {
   const dictionaryIndex = state.dictionaries.findIndex((dictionary) => dictionary.id === normalized.id);
   if (dictionaryIndex >= 0) {
     state.dictionaries[dictionaryIndex] = normalized;
+  } else {
+    state.dictionaries.push(normalized);
   }
+  loadedDictionaryIds.add(normalized.id);
   return normalized;
 }
 
@@ -10239,7 +10335,7 @@ async function deleteSelectedDictionary() {
     return;
   }
 
-  const confirmed = await appConfirm(`${t("deleteConfirmDictionary")} “${dictionary.name}” ${t("andItsEntries")} ${dictionary.entries.length} ${t("entries")}?`, { danger: true });
+  const confirmed = await appConfirm(`${t("deleteConfirmDictionary")} “${dictionary.name}” ${t("andItsEntries")} ${dictionaryEntryCount(dictionary)} ${t("entries")}?`, { danger: true });
   if (!confirmed) {
     return;
   }
@@ -10385,7 +10481,7 @@ async function refreshState() {
   backendMessage = "";
   currentLanguage = normalizeUiLanguage(serverState.uiLanguage);
   currentTheme = normalizeUiTheme(serverState.uiTheme);
-  state = normalizeState({
+  await applyServerState({
     ...serverState,
     selectedEntryId: state.selectedEntryId,
     selectedDictionaryConfigId: state.selectedDictionaryConfigId || serverState.activeDictionaryId,

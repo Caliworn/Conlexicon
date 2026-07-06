@@ -28,6 +28,9 @@
 ### 改进
 
 - `server.js` 新增 `CONLEXICON_REPOSITORY=json|sqlite` feature flag，默认继续使用 JSON repository；显式设置为 `sqlite` 时会启动实验性 SQLite repository，README、API 契约和 SQLite 计划同步记录该运行方式。
+- 前端启动流程改为先读取轻量 `/api/state`，再按需通过 `/api/dictionaries/:id` 加载当前词典完整快照；已加载且 `updatedAt` 未变化的词典会复用本地 snapshot，避免轻量 state 刷新时把前端词典内容覆盖为空。
+- API 新增 `GET /api/dictionaries/:id` 完整词典快照读取端点，供启动、切换词典和兼容层按需加载使用；`API_CONTRACT.md` 同步记录轻量 state 与 active dictionary snapshot 的边界。
+- 词典管理列表和删除确认的词条/词根统计优先使用 `summary.entryCount/rootCount`，避免轻量 state 下为 metadata-only 词典显示 0 或触发完整词典统计。
 - `SQLITE_BACKEND_PLAN.md` 新增 SQLite repository 当前状态审计表，区分已 SQL 增量写入、已 SQL 查询下推、仍走完整快照/JS 全量逻辑和主服务尚未接入的部分。
 - SQLite repository 的 metadata、settings、IPA、docs、morphology 和 corpus 模块保存改为 SQL 级写入，直接更新 `dictionary_meta` 或对应 `module_blobs`，并保留 IPA、形态和语料的局部实体 ID 校验。
 - SQLite repository 的 `saveEntry()`、`deleteEntry()` 和 `patchEntries()` 改为真正 SQL 增量写入：只更新目标词条、释义 projection、标签 projection、来源 projection、相关 settings blob 和词典更新时间，不再为这些操作重写整库 projection。

@@ -29,7 +29,7 @@
 
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/state` | 读取应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme }` | 当前仍返回完整词典数组；这是启动兼容入口，不代表普通保存也应使用完整快照。 |
+| `GET` | `/api/state` | 读取轻量应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme }` | `dictionaries` 可只包含词典 metadata 和 `summary.entryCount/rootCount`；前端启动后会按需读取当前词典完整快照。JSON repository 目前仍可返回完整词典。 |
 | `PUT` | `/api/preferences` | 保存全局界面偏好 | `{ uiLanguage, uiTheme }` | 目前支持 `uiLanguage` 和 `uiTheme`。 |
 
 ### 导入、导出与词典生命周期
@@ -39,6 +39,7 @@
 | `GET` | `/api/export?dictionaryId=` | 导出 JSON | 完整词典 JSON | 完整快照交换格式。 |
 | `POST` | `/api/import?overwrite=&regenerateId=` | 导入 JSON | 应用状态 | 完整快照导入；执行全量规范化和实体 ID 检查。 |
 | `POST` | `/api/dictionaries` | 新建词典 | 完整词典 JSON | 创建空词典，并设为当前词典。 |
+| `GET` | `/api/dictionaries/:id` | 读取完整词典快照 | 完整词典 JSON | 前端启动、切换当前词典和兼容旧完整状态逻辑时按需调用；普通列表、搜索和 facets 仍优先使用专用读取 API。 |
 | `POST` | `/api/dictionaries/:id/activate` | 切换当前词典 | 应用状态 | 只改 `index.json` 中的当前词典。 |
 | `DELETE` | `/api/dictionaries/:id` | 删除词典 | 应用状态 | 删除词典文件并更新索引。 |
 
@@ -134,7 +135,7 @@
 ## 后续扩展原则
 
 - 普通保存优先增加细粒度端点，不再回退到完整词典 PUT。
-- `GET /api/state` 可以继续作为启动兼容入口；若启动性能成为瓶颈，再拆成词典索引、当前词典摘要和按需模块读取。
+- `GET /api/state` 是轻量启动状态入口；普通启动只应读取词典 metadata/summary，再通过 `GET /api/dictionaries/:id` 或专用读取端点按需加载当前词典内容。
 - 语料库下一步可从整份 corpus 模块保存拆成块、层、单元级 changeset。
 - 搜索、筛选、词源反查和数据分析后续应依赖 repository 查询/索引，不应让前端扫描大型完整快照。
 - 短期不引入词典级 revision。等对象级增量端点稳定后，再基于目标对象 `updatedAt` 做轻量乐观锁。
@@ -145,7 +146,7 @@
 
 ### 启动与词典索引
 
-后续可将当前 `GET /api/state` 拆成轻量启动状态和词典索引：
+当前 `GET /api/state` 已可作为轻量启动状态和词典索引入口；后续若继续收窄，可以再拆成更细的 app state、词典索引、summary 和模块读取：
 
 ```text
 GET /api/app
@@ -154,7 +155,7 @@ GET /api/dictionaries/:id/summary
 GET /api/dictionaries/:id/settings
 ```
 
-SQLite repository 已验证 `readState()` / `listDictionaries()` 可只返回词典 metadata；服务端可通过 `CONLEXICON_REPOSITORY=sqlite` 进入实验性 SQLite 模式，但默认仍是 JSON repository。正式切换前还需要把前端启动流程改为“先读轻量索引，再按需加载 active dictionary”。
+SQLite repository 的 `readState()` / `listDictionaries()` 已只返回词典 metadata 和 summary；服务端可通过 `CONLEXICON_REPOSITORY=sqlite` 进入实验性 SQLite 模式，但默认仍是 JSON repository。前端启动流程已经改为“先读轻量索引，再按需加载 active dictionary”。
 
 示例：
 
