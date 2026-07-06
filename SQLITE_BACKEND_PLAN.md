@@ -378,7 +378,7 @@ POST /api/dictionaries/:id/diagnostics/fix
 | `queryRootGroups()` | 无搜索场景已使用 SQL projection rows 构建词根分组、排序和分页；带搜索条件时仍回退共享 JS 语义 | 搜索型 rootGroups 仍需要完整 snapshot；无搜索不需要 | 后续结合 FTS/搜索索引处理全文、fuzzy 和动态形态搜索 |
 | 质量检查 / 数据分析 | 还没有直接接 SQLite repository 查询层 | 多数仍依赖前端或共享 JS 切片 | 等基础 repository 稳定后，再做按需 API + SQL/query planner |
 | 契约测试 | SQLite repository 已跑通完整共享 repository contract | 否 | 每次改 repository 语义都继续跑 JSON 与 SQLite contract |
-| 主服务接入 | 已加 `CONLEXICON_REPOSITORY=sqlite` feature flag；默认仍使用 JSON repository | SQLite 模式的前端启动流程仍未完成 | 用临时数据目录做服务 smoke；正式默认切换前补 active dictionary 按需加载、迁移和回滚策略 |
+| 主服务接入 | 已加 `CONLEXICON_REPOSITORY=sqlite` feature flag；默认仍使用 JSON repository；SQLite feature flag 路径已完成 API/UI smoke | 否；默认切换前仍需按清单确认迁移、真实词典、文档和回滚策略 | 按 `SQLITE_MIGRATION_PLAN.md` 的默认切换前清单执行，之后再把默认 repository 改为 SQLite |
 
 ## 9. 第一批 SQLite 实装建议
 

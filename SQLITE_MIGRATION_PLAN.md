@@ -222,7 +222,91 @@ GET /api/export?dictionaryId=...&format=xlsx
 
 在语料库尚未正式 SQL 化之前，`corpus` 仍作为 module blob 保存，但其 block、layer、unit ID 仍属于全局实体 ID 命名空间。完整导入、迁移、词条保存和语料模块保存都必须把 corpus blob 内部 ID 纳入防撞；普通设置和文档保存则不应因为无关的历史 corpus ID 问题被阻断。repository contract 已覆盖 corpus ID 与词条/释义 ID 互撞、corpus 内部重复 ID 等场景，避免后续 SQLite 下推或语料库重构时绕过该规则。
 
-## 10. 测试要求
+## 10. 默认切换前清单
+
+本节是把默认 repository 从 JSON 改为 SQLite 前的 preflight checklist。它关注“能否安全把 SQLite 作为默认运行路径”，不是要求一次性完成所有后续性能优化。
+
+### 10.1 必须满足
+
+- 当前改动已经提交或至少形成清晰 checkpoint；SQLite schema 中间态不做兼容迁移，测试库不匹配时从 JSON 重新生成。
+- 本地没有残留测试服务端口；尤其确认默认端口 `4173` 和最近使用的 smoke 端口没有被旧 `node server.js` 占用。
+- 当前 Node runtime 支持 `node:sqlite`；不支持时必须给出明确启动错误，而不是静默退回 JSON repository。
+- 已用 `scripts/migrate-json-data-to-sqlite.js` 从当前 JSON `data/` 重新生成干净 SQLite 测试目录。
+- SQLite 数据目录至少包含：
+  - `index.json`
+  - 每个词典一个 `dictionaries/<dictionary-id>.sqlite`
+  - `entries` 表无 `entry_json` 列
+  - `entry_morphology_tables` 表存在
+  - `entries.etymology_description` 列存在
+- 下列脚本通过：
+  - `node --check app.js`
+  - `node --check server.js`
+  - `node --check lib/sqlite-dictionary-repository.js`
+  - `node scripts/check-sqlite-schema.js`
+  - `node scripts/check-sqlite-lifecycle.js`
+  - `node scripts/check-sqlite-repository.js`
+  - `node scripts/check-sqlite-contract.js`
+  - `node scripts/check-sqlite-migration.js`
+  - `git diff --check`
+- SQLite feature flag 模式下完成一次 API smoke，至少覆盖：
+  - 轻量 `/api/state`
+  - 当前词典完整 snapshot
+  - entries 列表、单条读取、facets、entry relations、root groups
+  - 普通搜索和带搜索 root groups
+  - 新建、完整编辑保存、批量 patch、删除
+- SQLite feature flag 模式下完成一次 UI smoke，至少覆盖：
+  - 启动页面渲染
+  - 切换/读取当前真实词典
+  - 新建并保存词条
+  - 数据分析页可渲染
+  - 质量检查页可渲染
+  - 浏览器 console 无 error
+- 手动确认真实词典可用：
+  - 第二标准语词典
+  - Stress Test 1k
+  - Stress Test 3k
+  - Stress Test 10k
+- 默认切换前必须更新 `README.md`、`API_CONTRACT.md` 和本文档，明确：
+  - SQLite 是默认 repository。
+  - JSON repository 仅作为 legacy/debug/迁移来源。
+  - 旧 JSON data 需要显式迁移；开发期不静默原地迁移真实 `data/`。
+  - 回滚方式是显式设置 `CONLEXICON_REPOSITORY=json` 并使用原 JSON data 目录。
+
+### 10.2 可暂缓但必须记录
+
+以下项目不是默认切 SQLite 的阻断项，但切换时必须在文档中明确其状态：
+
+- 普通文本搜索、fuzzy 搜索、tag fuzzy、动态形态搜索仍可能从 SQL 表重建完整 dictionary object 后用共享 JS 逻辑扫描；这不依赖 JSON repository，但仍不是纯 SQL/FTS。
+- 带搜索条件的 root groups 仍可能走共享 JS 语义。
+- 数据分析和质量检查仍主要由前端/共享 JS 基于完整 dictionary object 计算，尚未全部 API 化或 SQL 化。
+- 语料库仍作为 `module_blobs.corpus` 保存，尚未正式 SQL 分表。
+- JSON 导入/导出仍返回完整 dictionary-shaped JSON；这是交换/备份路径，不代表存储层仍使用 JSON repo。
+
+### 10.3 切换步骤
+
+1. 确认工作树 checkpoint 干净，或至少已提交当前 SQLite 主结构改造。
+2. 清理测试服务端口，避免旧进程占用默认端口。
+3. 用迁移脚本从当前 JSON `data/` 生成新的 SQLite 数据目录。
+4. 使用 `CONLEXICON_REPOSITORY=sqlite` 和该 SQLite 数据目录跑 API/UI smoke。
+5. 更新文档和 changelog。
+6. 将 `server.js` 的默认 repository 从 JSON 改为 SQLite；保留 `CONLEXICON_REPOSITORY=json` 作为显式 legacy/debug 模式。
+7. 再跑完整脚本检查和一次默认启动 smoke。
+8. 若默认启动依赖特定数据目录策略，更新启动脚本和 README。
+
+### 10.4 回滚步骤
+
+- 如果默认 SQLite 启动失败，先不要修改或删除原 JSON `data/`。
+- 设置：
+
+```bash
+CONLEXICON_REPOSITORY=json
+```
+
+- 使用原 JSON `data/` 目录启动。
+- 若已经生成 SQLite 测试目录，可以直接丢弃并重新迁移；开发期不为中间 SQLite schema 写兼容迁移。
+- 如果失败来自真实数据结构问题，优先记录迁移 report 和错误码，再决定是否加入诊断修复模块，而不是在默认启动路径中静默修复。
+
+## 11. 测试要求
 
 正式迁移前至少需要：
 
@@ -241,7 +325,7 @@ GET /api/export?dictionaryId=...&format=xlsx
 
 所有测试数据必须放在临时目录，不使用真实 `data/`。
 
-## 11. 分阶段实施建议
+## 12. 分阶段实施建议
 
 ### M0：文档与契约
 

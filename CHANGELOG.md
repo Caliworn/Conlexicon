@@ -32,6 +32,7 @@
 
 ### 改进
 
+- `SQLITE_MIGRATION_PLAN.md` 新增 SQLite 默认切换前清单，明确切换前必须完成的 schema 检查、脚本检查、API/UI smoke、真实词典确认、暂缓项、切换步骤和回滚策略。
 - SQLite 开发期 schema 新增 `entries.etymology_description` 投影列和 `entry_morphology_tables` 表，为从 SQL projection 重建完整词条和未来一词条多形态表实例做准备；当前 SQL 开发中间态不做兼容迁移，测试 SQLite 目录需从 JSON 重新生成。
 - SQLite repository 移除 `entries.entry_json` 存储字段；词条写入、单条读取、列表读取、词源关系、词根分组和导出快照现在都以 SQL projection 表为主结构，JSON 导出由 SQL 表组装生成。
 - SQLite 检查脚本拆分职责：新增 schema/projection 检查、lifecycle smoke 和共享 SQLite 检查工具，`check-sqlite-repository.js` 改为薄聚合入口，完整行为一致性继续由 `check-sqlite-contract.js` 负责。
