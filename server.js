@@ -17,7 +17,7 @@ const { createStaticFileServer } = require("./lib/static-server");
 const rootDir = __dirname;
 const dataDir = process.env.CONLEXICON_DATA_DIR ? path.resolve(process.env.CONLEXICON_DATA_DIR) : path.join(rootDir, "data");
 const port = Number(process.env.PORT || 4173);
-const repositoryMode = String(process.env.CONLEXICON_REPOSITORY || "json").trim().toLowerCase();
+const repositoryMode = String(process.env.CONLEXICON_REPOSITORY || "sqlite").trim().toLowerCase();
 
 function repositoryOptions() {
   return {
@@ -36,7 +36,7 @@ function createRepository(mode) {
   }
   if (mode === "sqlite") {
     if (!SqliteDictionaryRepository.isRuntimeAvailable()) {
-      throw new Error("CONLEXICON_REPOSITORY=sqlite requires a Node runtime with node:sqlite support");
+      throw new Error("SQLite repository requires a Node runtime with node:sqlite support");
     }
     return new SqliteDictionaryRepository(repositoryOptions());
   }

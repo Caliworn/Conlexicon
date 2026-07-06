@@ -32,11 +32,12 @@
 
 ### 改进
 
-- `SQLITE_MIGRATION_PLAN.md` 新增 SQLite 默认切换前清单，明确切换前必须完成的 schema 检查、脚本检查、API/UI smoke、真实词典确认、暂缓项、切换步骤和回滚策略。
+- `SQLITE_BACKEND_PLAN.md` 按当前真实 SQLite schema 和默认 SQLite 状态更新，明确 `entry_morphology_tables`、`entries.etymology_description`、已移除 `entry_json`、后续实测事项和优化方向。
+- `SQLITE_MIGRATION_PLAN.md` 更新 SQLite 默认切换清单和当前迁移策略，明确旧 JSON 词典暂时通过词典管理界面的 JSON 导入功能手动迁入 SQLite，自动迁移向导暂缓。
 - SQLite 开发期 schema 新增 `entries.etymology_description` 投影列和 `entry_morphology_tables` 表，为从 SQL projection 重建完整词条和未来一词条多形态表实例做准备；当前 SQL 开发中间态不做兼容迁移，测试 SQLite 目录需从 JSON 重新生成。
 - SQLite repository 移除 `entries.entry_json` 存储字段；词条写入、单条读取、列表读取、词源关系、词根分组和导出快照现在都以 SQL projection 表为主结构，JSON 导出由 SQL 表组装生成。
 - SQLite 检查脚本拆分职责：新增 schema/projection 检查、lifecycle smoke 和共享 SQLite 检查工具，`check-sqlite-repository.js` 改为薄聚合入口，完整行为一致性继续由 `check-sqlite-contract.js` 负责。
-- `server.js` 新增 `CONLEXICON_REPOSITORY=json|sqlite` feature flag，默认继续使用 JSON repository；显式设置为 `sqlite` 时会启动实验性 SQLite repository，README、API 契约和 SQLite 计划同步记录该运行方式。
+- `server.js` 默认 repository 切换为 SQLite；`CONLEXICON_REPOSITORY=json` 保留为 legacy/debug/回滚路径，README、API 契约和 SQLite 计划同步记录手动导入旧 JSON 词典的迁移方式。
 - 前端启动流程改为先读取轻量 `/api/state`，再按需通过 `/api/dictionaries/:id` 加载当前词典完整快照；已加载且 `updatedAt` 未变化的词典会复用本地 snapshot，避免轻量 state 刷新时把前端词典内容覆盖为空。
 - API 新增 `GET /api/dictionaries/:id` 完整词典快照读取端点，供启动、切换词典和兼容层按需加载使用；`API_CONTRACT.md` 同步记录轻量 state 与 active dictionary snapshot 的边界。
 - 词典管理列表和删除确认的词条/词根统计优先使用 `summary.entryCount/rootCount`，避免轻量 state 下为 metadata-only 词典显示 0 或触发完整词典统计。

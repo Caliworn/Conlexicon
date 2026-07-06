@@ -52,28 +52,28 @@ Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。
 
 ## Run Locally / 本地运行
 
-Conlexicon currently uses a small Node.js backend with no external dependencies.
+Conlexicon currently uses a small Node.js backend with no external npm dependencies. The default storage backend is SQLite.
 
-Conlexicon 目前使用一个小型 Node.js 后端，不需要安装额外依赖。
+Conlexicon 目前使用一个小型 Node.js 后端，不需要安装额外 npm 依赖。默认存储后端是 SQLite。
 
 ```bash
 node server.js
 ```
 
-By default the server uses the JSON repository. An experimental SQLite repository can be selected explicitly:
+To use the legacy JSON repository for debugging or old data, select it explicitly:
 
-默认情况下，服务端使用 JSON repository。也可以显式选择实验性的 SQLite repository：
+如需为了调试或旧数据读取使用 legacy JSON repository，可以显式选择：
 
 ```bash
-CONLEXICON_REPOSITORY=sqlite node server.js
+CONLEXICON_REPOSITORY=json node server.js
 ```
 
-When testing SQLite, prefer a temporary data directory so existing JSON dictionaries are not touched:
+When testing or migrating manually, a separate data directory is still recommended:
 
-测试 SQLite 时，建议配合临时数据目录，避免影响现有 JSON 词典：
+测试或手动迁移时，仍建议配合单独的数据目录：
 
 ```bash
-CONLEXICON_REPOSITORY=sqlite CONLEXICON_DATA_DIR=/tmp/conlexicon-sqlite node server.js
+CONLEXICON_DATA_DIR=/tmp/conlexicon-sqlite node server.js
 ```
 
 Then open:
@@ -93,20 +93,20 @@ Dictionary data is stored locally under:
 ```text
 data/
 data/index.json
-data/dictionaries/*.json
+data/dictionaries/*.sqlite
 ```
 
-`data/index.json` stores the dictionary index, active dictionary ID, global interface language, and global interface theme. Per-dictionary content and settings remain in `data/dictionaries/*.json`.
+`data/index.json` stores the dictionary index, active dictionary ID, global interface language, and global interface theme. Per-dictionary content and settings are stored in `data/dictionaries/*.sqlite` by default.
 
-`data/index.json` 保存词典索引、当前词典 ID、全局界面语言和全局界面主题；各词典的内容与设置仍分别保存在 `data/dictionaries/*.json` 中。
+`data/index.json` 保存词典索引、当前词典 ID、全局界面语言和全局界面主题；默认情况下，各词典的内容与设置分别保存在 `data/dictionaries/*.sqlite` 中。
 
-In experimental SQLite mode, dictionaries are stored as `.sqlite` files under `data/dictionaries/`. This mode is not the default storage backend yet.
+Legacy JSON dictionaries are not migrated automatically on startup. To reuse an old JSON dictionary in SQLite mode, import the JSON file from the app's dictionary management UI. For debugging or rollback, start with `CONLEXICON_REPOSITORY=json` and the original JSON data directory.
 
-在实验性 SQLite 模式下，词典会以 `.sqlite` 文件保存在 `data/dictionaries/` 下；该模式目前还不是默认存储后端。
+旧 JSON 词典不会在启动时自动迁移。若要在 SQLite 模式下复用旧 JSON 词典，请在应用的词典管理界面导入对应 JSON 文件。如需调试或回滚，可使用 `CONLEXICON_REPOSITORY=json` 和原 JSON 数据目录启动。
 
-For migration testing, use the explicit JSON-to-SQLite migration script with separate source and target data directories:
+For bulk migration testing, use the explicit JSON-to-SQLite migration script with separate source and target data directories:
 
-如需测试迁移，可使用显式的 JSON 到 SQLite 迁移脚本，并为源目录和目标目录指定不同位置：
+如需测试批量迁移，可使用显式的 JSON 到 SQLite 迁移脚本，并为源目录和目标目录指定不同位置：
 
 ```bash
 node scripts/migrate-json-data-to-sqlite.js --from /path/to/json-data --to /path/to/sqlite-data

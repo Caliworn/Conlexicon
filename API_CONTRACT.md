@@ -1,6 +1,6 @@
 # API Contract
 
-本文记录 Conlexicon 当前本地 HTTP API 的稳定约定。它描述前端可依赖的接口边界，而不是底层存储实现；后端默认使用 JSON repository，也可通过 `CONLEXICON_REPOSITORY=sqlite` 显式启动实验性 SQLite repository，但前端不应直接依赖文件结构。SQLite 化的存储草案与由此反推的关键 API 契约见 `SQLITE_BACKEND_PLAN.md`；正式迁移、JSON 兼容导入/导出和 export profile 设计见 `SQLITE_MIGRATION_PLAN.md`。
+本文记录 Conlexicon 当前本地 HTTP API 的稳定约定。它描述前端可依赖的接口边界，而不是底层存储实现；后端默认使用 SQLite repository，也可通过 `CONLEXICON_REPOSITORY=json` 显式启动 legacy/debug JSON repository，但前端不应直接依赖文件结构。SQLite 后端设计见 `SQLITE_BACKEND_PLAN.md`；JSON 兼容导入/导出和迁移设计见 `SQLITE_MIGRATION_PLAN.md`。
 
 ## 通用约定
 
@@ -158,7 +158,7 @@ GET /api/dictionaries/:id/summary
 GET /api/dictionaries/:id/settings
 ```
 
-SQLite repository 的 `readState()` / `listDictionaries()` 已只返回词典 metadata 和 summary；服务端可通过 `CONLEXICON_REPOSITORY=sqlite` 进入实验性 SQLite 模式，但默认仍是 JSON repository。前端启动流程已经改为“先读轻量索引，再按需加载 active dictionary”。
+SQLite repository 的 `readState()` / `listDictionaries()` 已只返回词典 metadata 和 summary；服务端默认使用 SQLite repository，`CONLEXICON_REPOSITORY=json` 仅作为 legacy/debug 回滚路径。前端启动流程已经改为“先读轻量索引，再按需加载 active dictionary”。
 
 示例：
 
