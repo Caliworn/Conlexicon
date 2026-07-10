@@ -12,6 +12,7 @@ const {
 } = require("../lib/dictionary-model");
 const { createApiRouter } = require("../lib/api-routes");
 const { createDictionaryConversionService } = require("../lib/dictionary-conversion-service");
+const { migrateLegacyDictionary } = require("../lib/legacy-dictionary-migration");
 const morphologyModel = require("../lib/morphology-model");
 const ipaModel = require("../lib/ipa-model");
 const tagModel = require("../lib/tag-model");
@@ -511,7 +512,8 @@ function checkModelNormalization() {
     morphologyModel.morphologySearchStrings({
       lemma: "root",
       tags: ["n"],
-      morphologyGroups: [{ templateGroupId: "auto", overrides: { auto: { "0,0": "roots" } } }],
+      morphologyMode: "auto",
+      morphologyGroups: [{ templateGroupId: "morph-auto", overrides: { "mtable-auto": { "0,0": "roots" } } }],
     }, automaticMorphologyDictionary),
     ["roots"],
   );
@@ -519,10 +521,141 @@ function checkModelNormalization() {
     morphologyModel.morphologySearchStrings({
       lemma: "root",
       tags: ["n"],
-      morphologyGroups: [{ templateGroupId: "none" }],
+      morphologyMode: "none",
     }, automaticMorphologyDictionary),
     [],
   );
+
+  const canonicalMorphologyDictionary = {
+    morphology: {
+      templateGroups: [
+        automaticMorphologyDictionary.morphology.templateGroups[0],
+        {
+          id: "morph-manual",
+          name: "Manual group",
+          matchTags: ["v"],
+          tables: [{
+            id: "mtable-manual",
+            title: "Manual table",
+            rowCount: 1,
+            columnCount: 1,
+            cells: { "0,0": { sourceText: "{lemma}-manual" } },
+          }],
+        },
+      ],
+    },
+  };
+  const autoOverlayEntry = {
+    lemma: "root",
+    tags: ["n"],
+    morphologyMode: "auto",
+    morphologyGroups: [{
+      id: "emorph-auto-overlay",
+      templateGroupId: "morph-auto",
+      title: "Irregular auto group",
+      notes: "Entry-specific note",
+      overrides: { "mtable-auto": { "0,0": "roots" } },
+    }],
+  };
+  const autoOverlayResolution = morphologyModel.resolveCanonicalEntryMorphologyGroups(
+    autoOverlayEntry,
+    canonicalMorphologyDictionary,
+  );
+  assert.equal(autoOverlayResolution.length, 1);
+  assert.equal(autoOverlayResolution[0].templateGroup.id, "morph-auto");
+  assert.equal(autoOverlayResolution[0].entryGroup.title, "Irregular auto group");
+  assert.equal(
+    morphologyModel.morphologyCellValue(
+      autoOverlayEntry,
+      autoOverlayResolution[0].entryGroup,
+      autoOverlayResolution[0].templateGroup.tables[0],
+      0,
+      0,
+      canonicalMorphologyDictionary,
+    ),
+    "roots",
+  );
+  assert.deepEqual(
+    morphologyModel.resolveCanonicalEntryMorphologyGroups({
+      lemma: "root",
+      tags: ["n"],
+      morphologyMode: "manual",
+      morphologyGroups: [{ id: "emorph-manual", templateGroupId: "morph-manual" }],
+    }, canonicalMorphologyDictionary).map(({ templateGroup }) => templateGroup.id),
+    ["morph-manual"],
+  );
+  assert.deepEqual(
+    morphologyModel.resolveCanonicalEntryMorphologyGroups({
+      lemma: "root",
+      tags: ["n"],
+      morphologyMode: "none",
+    }, canonicalMorphologyDictionary),
+    [],
+  );
+  assert.deepEqual(
+    morphologyModel.normalizeEntryMorphologyState({
+      morphologyMode: "auto",
+      morphologyGroups: [
+        { id: "empty-overlay", templateGroupId: "morph-auto" },
+        { id: "real-overlay", templateGroupId: "morph-manual", notes: "keep" },
+      ],
+    }).morphologyGroups.map((group) => group.templateGroupId),
+    ["morph-manual"],
+  );
+  assert.deepEqual(
+    morphologyModel.validateCanonicalEntryMorphology({
+      morphologyMode: "auto",
+      morphologyGroups: [{
+        id: "invalid-override",
+        templateGroupId: "morph-auto",
+        overrides: { "mtable-auto": { "1,0": "out of range" } },
+      }],
+    }, canonicalMorphologyDictionary),
+    ["invalid morphology override cell: mtable-auto:1,0"],
+  );
+  assert.deepEqual(
+    morphologyModel.validateCanonicalEntryMorphology({
+      morphologyMode: "manual",
+      morphologyGroups: [{ id: "invalid-group", templateGroupId: "auto" }],
+    }, canonicalMorphologyDictionary),
+    ["invalid morphology template group: auto"],
+  );
+  const migratedLegacyMorphology = migrateLegacyDictionary({
+    morphology: canonicalMorphologyDictionary.morphology,
+    entries: [
+      {
+        id: "legacy-auto",
+        lemma: "root",
+        tags: ["n"],
+        morphology: { tableId: "auto", overrides: { "0,0": "roots" } },
+      },
+      {
+        id: "legacy-manual",
+        lemma: "root",
+        tags: ["n"],
+        morphology: { tableId: "morph-manual", overrides: { "0,0": "root-manual" } },
+      },
+      {
+        id: "legacy-none",
+        lemma: "root",
+        tags: ["n"],
+        morphology: { tableId: "none" },
+      },
+    ],
+  }).dictionary.entries;
+  assert.deepEqual(
+    migratedLegacyMorphology.map((entry) => entry.morphologyMode),
+    ["auto", "manual", "none"],
+  );
+  assert.deepEqual(
+    migratedLegacyMorphology[0].morphologyGroups[0].overrides,
+    { "mtable-auto": { "0,0": "roots" } },
+  );
+  assert.deepEqual(
+    migratedLegacyMorphology[1].morphologyGroups[0].overrides,
+    { "mtable-manual": { "0,0": "root-manual" } },
+  );
+  assert.equal(Object.hasOwn(migratedLegacyMorphology[0], "morphology"), false);
 
   const normalized = normalizeDictionary({
     name: "Current",

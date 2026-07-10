@@ -74,6 +74,7 @@ function sampleSqliteDictionary() {
         tags: ["n", "root-tag"],
         definitions: [{ id: "def-root", meaning: "root meaning", example: "root example", note: "root note" }],
         notes: "entry note",
+        morphologyMode: "manual",
         morphologyGroups: [{
           id: "emorph-roundtrip",
           templateGroupId: "morph-roundtrip",

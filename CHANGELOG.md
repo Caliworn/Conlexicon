@@ -6,6 +6,10 @@
 
 ### 改进
 
+- 形态表格配置页移除每个子表标题上方重复的“形态表格”眉题，保留可编辑的子表标题。
+- 词条形态模型切换为 `morphologyMode: auto | manual | none`：SQLite `entries` 新增 `morphology_mode`，自动模式的词条级标题、备注和单元格例外按真实 `templateGroupId` / `tableId` 保存为 overlay，手动模式才使用形态组顺序；共享解析、形态搜索、SQLite 读写、当前单表编辑适配与 API 契约已接入该形状，不再把 `"auto"` / `"none"` 写入模板组 ID。
+- 词条完整编辑与局部编辑的形态区改为按形态组和子表显示 override：支持 auto/manual/none 模式、自动命中组的词条级标题/备注/单元格 overlay、手动添加或移除多个模板组，以及手动组的上下调整顺序；旧单表下拉框不再参与保存。
+- 旧 JSON 导入的形态迁移现在负责将旧 `entry.morphology`、`templateGroupId: "auto"` 和 `templateGroupId: "none"` 转换到当前 `morphologyMode` 形状；核心模型、repository 和前端持久化路径不再解释这些旧字段。开发期旧 SQLite 库不做 schema 升级，需从 JSON 重新导入。
 - 新增 `lib/legacy-dictionary-migration.js`，集中处理旧 JSON 字段迁移、旧形态结构迁移和迁移报告；核心词典规范化模块改为只处理当前数据形状的默认值、ID 补齐和当前语义规范化，SQLite repository 不再内联 `morphology.tables` / `entry.morphology` 到新结构的迁移逻辑。
 - 共享 `morphology-model` 正式切换为 `templateGroups`、组内子表、`sourceText` 单元格和词条 `morphologyGroups` / 嵌套 override 的当前结构；规则校验、动态生成和形态搜索均按多子表模型执行，模板组、子表和词条形态组 ID 纳入统一防撞检查。
 - 前端完成形态学数据模型迁移的第一步：启动、词典状态规范化、ID 收集和词条保存改为保留 `templateGroups` / `morphologyGroups`；旧单表界面暂通过局部视图适配运行，避免共享模型升级后被误报为后端 API 断连。

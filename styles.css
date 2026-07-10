@@ -1290,9 +1290,65 @@ button.pending-source:focus-visible {
 .morphology-table-list,
 .morphology-override-grid,
 .morphology-override-list,
+.entry-morphology-controls,
+.partial-morphology-controls,
+.entry-morphology-group-list,
 .morphology-display-groups {
   display: grid;
   gap: 12px;
+}
+
+.entry-morphology-mode-field {
+  max-width: 280px;
+}
+
+.entry-morphology-add-row,
+.entry-morphology-group-heading,
+.entry-morphology-group-fields {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.entry-morphology-add-row select {
+  min-width: min(100%, 240px);
+}
+
+.entry-morphology-group-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 94%, var(--bg));
+}
+
+.entry-morphology-group-heading {
+  justify-content: space-between;
+}
+
+.entry-morphology-group-heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.entry-morphology-group-fields > label {
+  flex: 1 1 240px;
+}
+
+.entry-morphology-override-table {
+  display: grid;
+  gap: 8px;
+}
+
+.entry-morphology-override-table h5 {
+  margin: 0;
+}
+
+.entry-morphology-override-table .morphology-table input {
+  min-width: 9rem;
+  width: 100%;
 }
 
 .morphology-display-group,

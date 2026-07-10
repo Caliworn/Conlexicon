@@ -181,6 +181,7 @@ entry_sources(
 - 函数和集合更像规则库源码，应保存为一段文本，供 parser 派生函数列表、集合列表、依赖图和诊断；不要把每个函数参数、条件分支或输出拆成 SQL 主数据。
 - 生成出的形态形式、解析 AST、错误诊断、函数引用关系可以后续做缓存或索引，但都不是用户数据真相来源。
 - 形态表格不需要 Excel 化；第一版只保存子表标题、大小、行列标签和单元格规则文本，不预设样式、合并单元格、行高列宽等电子表格能力。
+- 词条的 `morphology_mode` 是必要的结构字段：它区分自动分配、显式手动组列表和明确禁用形态；自动模式下的 `entry_morphology_groups` 是按真实模板组 ID 查询的 overlay，`position` 不参与自动展示排序。
 
 当前已落地的 schema：
 
@@ -240,6 +241,7 @@ entry_morphology_cell_overrides(
 
 - `morphology_template_groups.notes` 保留，因为模板组级说明很快会成为前端 UI 需求。
 - `entry_morphology_groups.title` 保留，因为一个词条未来可手动配置多个形态模板组，词条级显示标题需要独立于模板组名称；`notes` 保留用于说明该词条采用此形态组时的特殊信息。模板组自身的 `notes` 不应自动显示在词条详情或词条编辑中。
+- `entries.morphology_mode` 取值为 `auto`、`manual` 或 `none`；`template_group_id` 只保存真实模板组 ID，不使用 `auto` / `none` 伪值。手动模式按 `entry_morphology_groups.position` 排序；自动模式的排序来自自动分配规则，overlay position 没有业务语义。
 - `morphology_template_cells` 暂不设独立 `id`、`mode`、`ast_json`、`diagnostics_json` 或 cell 级时间戳；单元格由 `table_id + row_index + column_index` 定位，规则文本是主数据。
 - `entry_morphology_cell_overrides` 暂不设独立 `id`、`mode`、`notes` 或单条 override 时间戳；存在记录即表示手动覆盖，不存在则走模板规则自动生成。
 - `match_tags_json`、`row_labels_json`、`column_labels_json` 暂时保持 JSON 字段，因为它们当前不需要独立筛选、排序或局部引用。

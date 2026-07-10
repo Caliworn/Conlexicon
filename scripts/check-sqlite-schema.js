@@ -51,7 +51,7 @@ async function runSqliteSchemaCheck() {
       .forEach((table) => assert.equal(tables.has(table), false, `unexpected table: ${table}`));
 
     const entryColumns = new Set(db.prepare("PRAGMA table_info(entries)").all().map((row) => row.name));
-    ["id", "position", "lemma", "pronunciation", "notes", "etymology_description", "created_at", "updated_at", "sort_key"]
+    ["id", "position", "lemma", "pronunciation", "notes", "etymology_description", "morphology_mode", "created_at", "updated_at", "sort_key"]
       .forEach((column) => assert.equal(entryColumns.has(column), true, `missing entries column: ${column}`));
     assert.equal(entryColumns.has("entry_json"), false);
     const entryMorphologyGroupColumns = new Set(db.prepare("PRAGMA table_info(entry_morphology_groups)").all().map((row) => row.name));
@@ -113,6 +113,7 @@ async function runSqliteSchemaCheck() {
 
     const rebuiltEntry = await repository.getEntry(sourceDictionary.id, "entry-root");
     assert.equal(rebuiltEntry.lemma, "root");
+    assert.equal(rebuiltEntry.morphologyMode, "manual");
     assert.equal(rebuiltEntry.definitions[0].meaning, "root meaning");
     assert.equal(rebuiltEntry.morphologyGroups[0].templateGroupId, "morph-roundtrip");
     assert.equal(rebuiltEntry.morphologyGroups[0].notes, "Irregular plural retained for this entry.");

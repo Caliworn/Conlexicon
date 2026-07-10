@@ -198,6 +198,14 @@ const i18n = {
     dragMorphologyTable: "拖动以调整表格排序",
     morphologyAuto: "自动匹配",
     morphologyNone: "不使用表格",
+    morphologyMode: "形态模式",
+    morphologyManual: "手动配置",
+    morphologyManualGroups: "手动形态组",
+    addEntryMorphologyGroup: "添加形态组",
+    removeEntryMorphologyGroup: "移除形态组",
+    entryMorphologyGroupTitle: "组标题覆盖",
+    entryMorphologyGroupNotes: "词条形态备注",
+    useTemplateGroupTitle: "留空则使用表格组标题",
     morphologyOverrideHelp: "留空则使用表格规则；填写内容会覆盖对应栏目。",
     morphologyRuleSyntaxHelp: "使用 {} 引用词形；{a = e} 引用并替换词形；/leftV(a,o,u) = lar; rightV(e,i,ö,ü) = ler; else = / 按最近左侧或右侧音位选择输出；else 可留空。",
     morphologySyntaxTitle: "形态语法",
@@ -646,6 +654,14 @@ const i18n = {
     dragMorphologyTable: "Drag to reorder tables",
     morphologyAuto: "Auto Match",
     morphologyNone: "No Table",
+    morphologyMode: "Morphology Mode",
+    morphologyManual: "Manual Configuration",
+    morphologyManualGroups: "Manual Morphology Groups",
+    addEntryMorphologyGroup: "Add Morphology Group",
+    removeEntryMorphologyGroup: "Remove Morphology Group",
+    entryMorphologyGroupTitle: "Group Title Override",
+    entryMorphologyGroupNotes: "Entry Morphology Notes",
+    useTemplateGroupTitle: "Leave blank to use the template group title",
     morphologyOverrideHelp: "Leave blank to use table rules; filled cells override that slot.",
     morphologyRuleSyntaxHelp: "Use {} to reference the lemma; {a = e} references and replaces inside the lemma; /leftV(a,o,u) = lar; rightV(e,i,ö,ü) = ler; else = / chooses output by the nearest left or right phoneme. Empty else inserts nothing.",
     morphologySyntaxTitle: "Morphology Syntax",
@@ -1134,8 +1150,7 @@ const elements = {
   autoIpaButton: document.querySelector("#autoIpaButton"),
   ipaKeyboard: document.querySelector("#ipaKeyboard"),
   tagsInput: document.querySelector("#tagsInput"),
-  entryMorphologyTableSelect: document.querySelector("#entryMorphologyTableSelect"),
-  entryMorphologyOverrides: document.querySelector("#entryMorphologyOverrides"),
+  entryMorphologyControls: document.querySelector("#entryMorphologyControls"),
   definitionFormList: document.querySelector("#definitionFormList"),
   addDefinitionButton: document.querySelector("#addDefinitionButton"),
   sourceEntryInput: document.querySelector("#sourceEntryInput"),
@@ -1673,7 +1688,7 @@ function normalizeEntry(entry, usedIds = new Set()) {
     sources.push(entry.etymology.sourceEntryId);
   }
 
-  const morphologyGroups = normalizeEntryMorphologyGroups(entry.morphologyGroups, usedIds);
+  const morphologyState = morphologyModel.normalizeEntryMorphologyState(entry, { usedIds, reserveEntityId });
   return {
     id: entry.id || uid("entry"),
     lemma: entry.lemma || "",
@@ -1686,9 +1701,10 @@ function normalizeEntry(entry, usedIds = new Set()) {
     },
     notes: entry.notes || "",
     // `morphology` is a temporary view-model adapter for the old editor UI.
-    // Persistence and all shared calculations use morphologyGroups.
-    morphologyGroups,
-    morphology: normalizeLegacyEntryMorphology(entry.morphology, morphologyGroups),
+    // Persistence and all shared calculations use the canonical state below.
+    morphologyMode: morphologyState.morphologyMode,
+    morphologyGroups: morphologyState.morphologyGroups,
+    morphology: morphologyEditorView(morphologyState),
     createdAt: entry.createdAt || new Date().toISOString(),
     updatedAt: entry.updatedAt || new Date().toISOString(),
   };
@@ -2002,10 +2018,6 @@ function normalizeMorphologyCell(cell = {}) {
   };
 }
 
-function normalizeEntryMorphologyGroups(groups = [], usedIds = new Set()) {
-  return morphologyModel.normalizeEntryMorphologyGroups(groups, { usedIds, reserveEntityId });
-}
-
 function normalizeMorphologyOverrides(overrides = {}) {
   if (!overrides || typeof overrides !== "object" || Array.isArray(overrides)) {
     return {};
@@ -2038,11 +2050,12 @@ function legacyMorphologyTableViews(templateGroups = []) {
   }));
 }
 
-function normalizeLegacyEntryMorphology(morphology = {}, morphologyGroups = []) {
-  const explicitGroup = (morphologyGroups || [])[0];
-  if (explicitGroup?.templateGroupId === "none") {
+function morphologyEditorView({ morphologyMode = "auto", morphologyGroups = [] } = {}) {
+  if (morphologyMode === "none") {
     return { tableId: "none", overrides: {} };
   }
+  const explicitGroup = morphologyMode === "manual" ? morphologyGroups[0] : null;
+  const sourceGroups = explicitGroup ? [explicitGroup] : morphologyGroups;
   if (explicitGroup?.templateGroupId) {
     const overrides = {};
     Object.values(explicitGroup.overrides || {}).forEach((cellMap) => {
@@ -2054,53 +2067,18 @@ function normalizeLegacyEntryMorphology(morphology = {}, morphologyGroups = []) 
     });
     return { tableId: explicitGroup.templateGroupId, overrides };
   }
+  const overrides = {};
+  sourceGroups.forEach((group) => Object.values(group.overrides || {}).forEach((cellMap) => {
+    Object.entries(cellMap || {}).forEach(([key, value]) => {
+      if (!overrides[key] && String(value || "").trim()) {
+        overrides[key] = String(value);
+      }
+    });
+  }));
   return {
-    tableId: ["auto", "none"].includes(morphology?.tableId) ? morphology.tableId : "auto",
-    overrides: normalizeMorphologyOverrides(morphology?.overrides),
+    tableId: "auto",
+    overrides,
   };
-}
-
-function entryMorphologyGroupsFromLegacyForm(existingEntry, legacyMorphology = {}, dictionary = activeDictionary()) {
-  const selected = legacyMorphology?.tableId || "auto";
-  const existingGroups = Array.isArray(existingEntry?.morphologyGroups) ? existingEntry.morphologyGroups : [];
-  if (selected === "auto") {
-    return [];
-  }
-  if (selected === "none") {
-    const current = existingGroups.find((group) => group.templateGroupId === "none");
-    return [{
-      id: current?.id || uniqueDictionaryEntityId("emorph", dictionary),
-      templateGroupId: "none",
-      title: current?.title || "",
-      notes: current?.notes || "",
-      overrides: {},
-      createdAt: current?.createdAt || "",
-      updatedAt: current?.updatedAt || "",
-    }];
-  }
-  const templateGroup = normalizeMorphology(dictionary?.morphology).templateGroups
-    .find((group) => group.id === selected);
-  if (!templateGroup?.tables?.[0]) {
-    return existingGroups;
-  }
-  const current = existingGroups.find((group) => group.templateGroupId === templateGroup.id);
-  const retained = existingGroups.filter((group) => group.templateGroupId !== templateGroup.id && group.templateGroupId !== "none");
-  const firstTableId = templateGroup.tables[0].id;
-  return [
-    ...retained,
-    {
-      id: current?.id || uniqueDictionaryEntityId("emorph", dictionary),
-      templateGroupId: templateGroup.id,
-      title: current?.title || "",
-      notes: current?.notes || "",
-      overrides: {
-        ...(current?.overrides || {}),
-        [firstTableId]: normalizeMorphologyOverrides(legacyMorphology.overrides),
-      },
-      createdAt: current?.createdAt || "",
-      updatedAt: current?.updatedAt || "",
-    },
-  ];
 }
 
 function morphologyCellKey(row, col) {
@@ -4346,6 +4324,7 @@ function dictionaryEntriesSignature(dictionary = activeDictionary()) {
       title: group.title,
       overrides: group.overrides || {},
     })),
+    morphologyMode: entry.morphologyMode || "auto",
   })));
 }
 
@@ -7441,7 +7420,8 @@ function fillEntryForm(entry) {
     tags: [],
     definitions: [normalizeDefinition()],
     etymology: { sources: [], description: "" },
-    morphology: { tableId: "auto", overrides: {} },
+    morphologyMode: "auto",
+    morphologyGroups: [],
     notes: "",
   };
   const formEntry = entry || blankEntry;
@@ -7462,145 +7442,123 @@ function fillEntryForm(entry) {
 }
 
 function renderEntryMorphologyControls(entry) {
-  const tables = morphologyTables();
-  const current = entry.morphology?.tableId || "auto";
-  elements.entryMorphologyTableSelect.innerHTML = [
-    `<option value="auto">${escapeHtml(t("morphologyAuto"))}</option>`,
-    `<option value="none">${escapeHtml(t("morphologyNone"))}</option>`,
-    ...tables.map((table) => `<option value="${escapeHtml(table.id)}">${escapeHtml(table.name)}</option>`),
-  ].join("");
-  elements.entryMorphologyTableSelect.value = ["auto", "none", ...tables.map((table) => table.id)].includes(current) ? current : "auto";
-  renderEntryMorphologyOverrides(entry);
+  renderMorphologyEntryControls(elements.entryMorphologyControls, entry, { full: true });
 }
 
-function selectedEntryMorphologyTableForForm(entry = selectedEntry()) {
-  const dictionary = activeDictionary();
-  const tableId = elements.entryMorphologyTableSelect.value;
-  if (tableId === "none") {
-    return null;
-  }
-  if (tableId === "auto") {
-    const previewEntry = {
-      ...(entry || {}),
-      lemma: elements.lemmaInput.value.trim(),
-      tags: splitList(elements.tagsInput.value),
-      morphology: { tableId: "auto", overrides: {} },
-    };
-    return resolveEntryMorphologyTable(previewEntry, dictionary);
-  }
-  return morphologyTables(dictionary).find((table) => table.id === tableId) || null;
+function morphologyFormPreviewEntry(entry = {}, full = false) {
+  return {
+    ...entry,
+    lemma: full ? elements.lemmaInput.value.trim() : entry.lemma || "",
+    tags: full ? splitList(elements.tagsInput.value) : entry.tags || [],
+  };
 }
 
-function renderEntryMorphologyOverrides(entry = selectedEntry(), keepValues = false) {
-  const previous = keepValues ? collectEntryMorphologyOverrides() : normalizeMorphologyOverrides(entry?.morphology?.overrides);
-  const table = selectedEntryMorphologyTableForForm(entry);
-  elements.entryMorphologyOverrides.innerHTML = "";
-  if (!table) {
+function morphologyEditorResolvedGroups(entry, dictionary) {
+  return morphologyModel.resolveEntryMorphologyGroups(entry, dictionary, { normalizeText: normalize })
+    .filter(({ templateGroup }) => templateGroup.tables.length);
+}
+
+function renderMorphologyEntryControls(host, entry = {}, { full = false } = {}) {
+  if (!host) {
     return;
   }
-  const previewEntry = {
-    ...(entry || {}),
-    lemma: elements.lemmaInput.value.trim() || entry?.lemma || "",
-    tags: splitList(elements.tagsInput.value),
-    morphology: { tableId: elements.entryMorphologyTableSelect.value, overrides: {} },
-  };
-  const help = document.createElement("p");
-  help.className = "field-help";
-  help.textContent = t("morphologyOverrideHelp");
-  elements.entryMorphologyOverrides.append(help);
-  const grid = document.createElement("div");
-  grid.className = "morphology-override-list";
-  for (let row = 0; row < table.rows; row += 1) {
-    for (let col = 0; col < table.cols; col += 1) {
-      const key = morphologyCellKey(row, col);
-      const label = `${table.rowLabels[row]} / ${table.colLabels[col]}`;
-      const defaultValue = morphologyCellDefaultValue(previewEntry, table, row, col);
-      grid.insertAdjacentHTML("beforeend", `
-        <label>
-          <span>${escapeHtml(label)}</span>
-          <input class="morphology-override-input" data-morphology-override="${escapeHtml(key)}" value="${escapeHtml(previous[key] || "")}" placeholder="${escapeHtml(defaultValue)}">
-        </label>
-      `);
-    }
-  }
-  elements.entryMorphologyOverrides.append(grid);
+  const dictionary = activeDictionary();
+  const previewEntry = morphologyFormPreviewEntry(entry, full);
+  const state = morphologyModel.normalizeEntryMorphologyState(entry, { reserveEntityId, usedIds: new Set() });
+  const resolved = morphologyEditorResolvedGroups({ ...previewEntry, ...state }, dictionary);
+  const manualGroups = state.morphologyGroups.map((entryGroup) => ({
+    templateGroup: normalizeMorphology(dictionary?.morphology).templateGroups.find((group) => group.id === entryGroup.templateGroupId),
+    entryGroup,
+  })).filter(({ templateGroup }) => templateGroup);
+  const groups = state.morphologyMode === "manual" ? manualGroups : resolved;
+  const availableGroups = normalizeMorphology(dictionary?.morphology).templateGroups;
+  const canSelectAuto = state.morphologyMode !== "manual" || !state.morphologyGroups.length;
+  host.innerHTML = `
+    <label class="entry-morphology-mode-field">
+      <span>${escapeHtml(t("morphologyMode"))}</span>
+      <select data-field="morphologyMode">
+        ${canSelectAuto ? `<option value="auto" ${state.morphologyMode === "auto" ? "selected" : ""}>${escapeHtml(t("morphologyAuto"))}</option>` : ""}
+        <option value="manual" ${state.morphologyMode === "manual" ? "selected" : ""}>${escapeHtml(t("morphologyManual"))}</option>
+        <option value="none" ${state.morphologyMode === "none" ? "selected" : ""}>${escapeHtml(t("morphologyNone"))}</option>
+      </select>
+    </label>
+    ${state.morphologyMode === "manual" ? `
+      <div class="entry-morphology-add-row">
+        <select data-field="addMorphologyGroup">${availableGroups.map((group) => `<option value="${escapeHtml(group.id)}">${escapeHtml(group.name)}</option>`).join("")}</select>
+        <button class="primary-button" type="button" data-action="add-entry-morphology-group">${escapeHtml(t("addEntryMorphologyGroup"))}</button>
+      </div>` : ""}
+    <p class="field-help">${escapeHtml(t("morphologyOverrideHelp"))}</p>
+    <div class="entry-morphology-group-list">${groups.map(({ templateGroup, entryGroup }, index) => renderEntryMorphologyGroupEditor(templateGroup, entryGroup, previewEntry, state.morphologyMode, index, groups.length)).join("")}</div>
+  `;
 }
 
-function collectEntryMorphologyOverrides() {
-  return normalizeMorphologyOverrides(Object.fromEntries(
-    [...elements.entryMorphologyOverrides.querySelectorAll("[data-morphology-override]")]
-      .map((input) => [input.dataset.morphologyOverride, input.value]),
-  ));
+function renderEntryMorphologyGroupEditor(templateGroup, entryGroup, entry, mode, index = 0, total = 1) {
+  const group = entryGroup || { id: "", templateGroupId: templateGroup.id, title: "", notes: "", overrides: {} };
+  const tables = templateGroup.tables.map((table) => renderEntryMorphologyOverrideTable(table, group, entry)).join("");
+  return `
+    <section class="entry-morphology-group-card" data-template-group-id="${escapeHtml(templateGroup.id)}" data-emorph-id="${escapeHtml(group.id)}">
+      <div class="entry-morphology-group-heading">
+        <div>
+          <strong>${escapeHtml(templateGroup.name)}</strong>
+          <span class="field-help">${escapeHtml(mode === "auto" ? t("morphologyAuto") : t("morphologyManual"))}</span>
+        </div>
+        ${mode === "manual" ? `<div class="panel-actions"><button class="secondary-button" type="button" data-action="move-entry-morphology-group-up" ${index === 0 ? "disabled" : ""}>${escapeHtml(t("moveUp"))}</button><button class="secondary-button" type="button" data-action="move-entry-morphology-group-down" ${index === total - 1 ? "disabled" : ""}>${escapeHtml(t("moveDown"))}</button><button class="danger-ghost" type="button" data-action="remove-entry-morphology-group">${escapeHtml(t("removeEntryMorphologyGroup"))}</button></div>` : ""}
+      </div>
+      <div class="entry-morphology-group-fields">
+        <label><span>${escapeHtml(t("entryMorphologyGroupTitle"))}</span><input data-field="entryMorphologyTitle" value="${escapeHtml(group.title || "")}" placeholder="${escapeHtml(t("useTemplateGroupTitle"))}"></label>
+        <label><span>${escapeHtml(t("entryMorphologyGroupNotes"))}</span><textarea data-field="entryMorphologyNotes" rows="2">${escapeHtml(group.notes || "")}</textarea></label>
+      </div>
+      ${tables}
+    </section>
+  `;
+}
+
+function renderEntryMorphologyOverrideTable(table, entryGroup, entry) {
+  const rows = [`<tr><th></th>${table.columnLabels.map((label) => `<th>${escapeHtml(label)}</th>`).join("")}</tr>`];
+  for (let row = 0; row < table.rowCount; row += 1) {
+    rows.push(`<tr><th>${escapeHtml(table.rowLabels[row])}</th>${Array.from({ length: table.columnCount }, (_, column) => {
+      const key = morphologyCellKey(row, column);
+      const value = entryGroup.overrides?.[table.id]?.[key] || "";
+      const placeholder = morphologyModel.morphologyCellDefaultValue(entry, table, row, column, activeDictionary());
+      return `<td><input class="morphology-override-input" data-morphology-table-id="${escapeHtml(table.id)}" data-morphology-override="${escapeHtml(key)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}"></td>`;
+    }).join("")}</tr>`);
+  }
+  return `<section class="entry-morphology-override-table"><h5>${escapeHtml(table.title)}</h5><div class="morphology-table-scroll"><table class="morphology-table">${rows.join("")}</table></div></section>`;
+}
+
+function collectMorphologyEntryState(host, entry = {}) {
+  const morphologyMode = host?.querySelector('[data-field="morphologyMode"]')?.value || "auto";
+  const visibleGroups = [...(host?.querySelectorAll(".entry-morphology-group-card") || [])].map((card) => {
+    const overrides = {};
+    card.querySelectorAll("[data-morphology-override]").forEach((input) => {
+      const tableId = input.dataset.morphologyTableId;
+      const value = input.value.trim();
+      if (!tableId || !value) {
+        return;
+      }
+      if (!overrides[tableId]) {
+        overrides[tableId] = {};
+      }
+      overrides[tableId][input.dataset.morphologyOverride] = value;
+    });
+    return {
+      id: card.dataset.emorphId || uniqueDictionaryEntityId("emorph", activeDictionary()),
+      templateGroupId: card.dataset.templateGroupId,
+      title: card.querySelector('[data-field="entryMorphologyTitle"]')?.value.trim() || "",
+      notes: card.querySelector('[data-field="entryMorphologyNotes"]')?.value.trim() || "",
+      overrides,
+    };
+  });
+  const previous = entry.morphologyGroups || [];
+  const morphologyGroups = morphologyMode === "auto"
+    ? [...previous.filter((group) => !visibleGroups.some((visible) => visible.templateGroupId === group.templateGroupId)), ...visibleGroups]
+    : visibleGroups;
+  return morphologyModel.normalizeEntryMorphologyState({ morphologyMode, morphologyGroups }, { reserveEntityId, usedIds: new Set() });
 }
 
 function renderPartialMorphologyControls(entry) {
   const body = partialEditBody();
-  const select = body?.querySelector('[data-field="morphologyTable"]');
-  const host = body?.querySelector(".partial-morphology-overrides");
-  if (!select || !host) {
-    return;
-  }
-  const tables = morphologyTables();
-  const current = entry.morphology?.tableId || "auto";
-  select.innerHTML = [
-    `<option value="auto">${escapeHtml(t("morphologyAuto"))}</option>`,
-    `<option value="none">${escapeHtml(t("morphologyNone"))}</option>`,
-    ...tables.map((table) => `<option value="${escapeHtml(table.id)}">${escapeHtml(table.name)}</option>`),
-  ].join("");
-  select.value = ["auto", "none", ...tables.map((table) => table.id)].includes(current) ? current : "auto";
-  select.addEventListener("change", () => renderPartialMorphologyOverrides({}, select.value));
-  renderPartialMorphologyOverrides(entry.morphology?.overrides, select.value);
-}
-
-function partialMorphologyTable(tableId) {
-  if (tableId === "none") {
-    return null;
-  }
-  if (tableId === "auto") {
-    return resolveEntryMorphologyTable({
-      ...(selectedEntry() || {}),
-      morphology: { tableId: "auto", overrides: {} },
-    });
-  }
-  return morphologyTables().find((table) => table.id === tableId) || null;
-}
-
-function renderPartialMorphologyOverrides(overrides = {}, tableId = partialEditBody()?.querySelector('[data-field="morphologyTable"]')?.value || "auto") {
-  const body = partialEditBody();
-  const host = body?.querySelector(".partial-morphology-overrides");
-  if (!host) {
-    return;
-  }
-  const table = partialMorphologyTable(tableId);
-  host.innerHTML = "";
-  if (!table) {
-    return;
-  }
-  host.insertAdjacentHTML("beforeend", `<p class="field-help">${escapeHtml(t("morphologyOverrideHelp"))}</p>`);
-  const grid = document.createElement("div");
-  grid.className = "morphology-override-list";
-  const normalizedOverrides = normalizeMorphologyOverrides(overrides);
-  const previewEntry = selectedEntry() || {};
-  for (let row = 0; row < table.rows; row += 1) {
-    for (let col = 0; col < table.cols; col += 1) {
-      const key = morphologyCellKey(row, col);
-      const defaultValue = morphologyCellDefaultValue(previewEntry, table, row, col);
-      grid.insertAdjacentHTML("beforeend", `
-        <label>
-          <span>${escapeHtml(table.rowLabels[row])} / ${escapeHtml(table.colLabels[col])}</span>
-          <input class="morphology-override-input" data-morphology-override="${escapeHtml(key)}" value="${escapeHtml(normalizedOverrides[key] || "")}" placeholder="${escapeHtml(defaultValue)}">
-        </label>
-      `);
-    }
-  }
-  host.append(grid);
-}
-
-function collectPartialMorphologyOverrides() {
-  return normalizeMorphologyOverrides(Object.fromEntries(
-    [...(partialEditBody()?.querySelectorAll("[data-morphology-override]") || [])]
-      .map((input) => [input.dataset.morphologyOverride, input.value]),
-  ));
+  renderMorphologyEntryControls(body?.querySelector(".partial-morphology-controls"), entry);
 }
 
 function definitionFormStateFromCard(card) {
@@ -9622,10 +9580,9 @@ function createMorphologyTableEditor(table) {
       <div class="morphology-table-title-row">
         <button class="morphology-drag-handle" type="button" draggable="true" data-action="drag-morphology-table" aria-label="${escapeHtml(t("dragMorphologyTable"))}">⋮⋮</button>
         <div>
-          <p class="eyebrow">${escapeHtml(t("morphologyTable"))}</p>
-        <div class="morphology-card-title-row">
-          <input data-field="title" value="${escapeHtml(table.title)}" aria-label="${escapeHtml(t("tableName"))}">
-        </div>
+          <div class="morphology-card-title-row">
+            <input data-field="title" value="${escapeHtml(table.title)}" aria-label="${escapeHtml(t("tableName"))}">
+          </div>
         </div>
       </div>
       <div class="panel-actions">
@@ -10221,11 +10178,7 @@ async function openPartialEdit(section) {
     `;
   } else if (section === "morphology") {
     body.innerHTML = `
-      <label>
-        <span>${escapeHtml(t("morphologyTable"))}</span>
-        <select data-field="morphologyTable"></select>
-      </label>
-      <div class="partial-morphology-overrides"></div>
+      <div class="partial-morphology-controls"></div>
     `;
     renderPartialMorphologyControls(entry);
   } else {
@@ -10298,6 +10251,11 @@ function entryDefinitionsRequirementMessage(entry, dictionary = activeDictionary
   return "";
 }
 
+function entryApiPayload(entry = {}) {
+  const { morphology: _editorMorphology, ...payload } = entry;
+  return payload;
+}
+
 function collectPartialDefinitions() {
   const list = partialEditBody()?.querySelector('[data-partial-definitions="true"]');
   return definitionFormStates(list)
@@ -10350,14 +10308,11 @@ async function savePartialEdit(event) {
   } else if (partialEditSection === "notes") {
     nextEntry = { ...entry, notes: body.querySelector('[data-field="notes"]').value.trim() };
   } else if (partialEditSection === "morphology") {
-    const morphology = {
-      tableId: body.querySelector('[data-field="morphologyTable"]').value || "auto",
-      overrides: collectPartialMorphologyOverrides(),
-    };
+    const morphologyState = collectMorphologyEntryState(body.querySelector(".partial-morphology-controls"), entry);
     nextEntry = {
       ...entry,
-      morphology,
-      morphologyGroups: entryMorphologyGroupsFromLegacyForm(entry, morphology, dictionary),
+      morphologyMode: morphologyState.morphologyMode,
+      morphologyGroups: morphologyState.morphologyGroups,
     };
   }
 
@@ -10365,7 +10320,7 @@ async function savePartialEdit(event) {
   try {
     const savedEntry = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entry.id)}`, {
       method: "PUT",
-      body: JSON.stringify(nextEntry),
+      body: JSON.stringify(entryApiPayload(nextEntry)),
     });
     upsertEntryInDictionary(dictionary.id, savedEntry);
     state.selectedEntryId = savedEntry.id;
@@ -10406,7 +10361,8 @@ function createEntryDraft(overrides = {}) {
     tags: [],
     definitions: [normalizeDefinition()],
     etymology: { sources: [], description: "" },
-    morphology: { tableId: "auto", overrides: {} },
+    morphologyMode: "auto",
+    morphologyGroups: [],
     notes: "",
     ...overrides,
   };
@@ -10492,10 +10448,11 @@ async function saveEntry(event) {
   const wasNewEntry = !existing;
   const previousLemma = existing?.lemma || "";
   const definitions = collectDefinitions();
-  const morphology = {
-    tableId: elements.entryMorphologyTableSelect.value || "auto",
-    overrides: collectEntryMorphologyOverrides(),
-  };
+  const morphologyState = collectMorphologyEntryState(elements.entryMorphologyControls, {
+    ...(existing || {}),
+    lemma: elements.lemmaInput.value.trim(),
+    tags: splitList(elements.tagsInput.value),
+  });
   const entry = {
     id: entryId,
     lemma: elements.lemmaInput.value.trim(),
@@ -10506,8 +10463,8 @@ async function saveEntry(event) {
       sources: splitSourceText(elements.sourceEntryInput.value),
       description: elements.etymologyDescriptionInput.value.trim(),
     },
-    morphology,
-    morphologyGroups: entryMorphologyGroupsFromLegacyForm(existing, morphology, dictionary),
+    morphologyMode: morphologyState.morphologyMode,
+    morphologyGroups: morphologyState.morphologyGroups,
     notes: elements.notesInput.value.trim(),
     createdAt: existing?.createdAt || now,
     updatedAt: now,
@@ -10526,7 +10483,7 @@ async function saveEntry(event) {
         : `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entry.id)}`,
       {
         method: wasNewEntry ? "POST" : "PUT",
-        body: JSON.stringify(entry),
+        body: JSON.stringify(entryApiPayload(entry)),
       },
     );
     upsertEntryInDictionary(dictionary.id, savedEntry);
@@ -11246,6 +11203,36 @@ elements.entryDisplay.addEventListener("click", (event) => {
     return;
   }
 
+  const morphologyAction = event.target.closest("[data-action]")?.dataset.action;
+  if (morphologyAction === "move-entry-morphology-group-up" || morphologyAction === "move-entry-morphology-group-down") {
+    const card = event.target.closest(".entry-morphology-group-card");
+    const list = card?.parentElement;
+    if (card && list) {
+      if (morphologyAction.endsWith("up") && card.previousElementSibling) {
+        list.insertBefore(card, card.previousElementSibling);
+      } else if (morphologyAction.endsWith("down") && card.nextElementSibling) {
+        list.insertBefore(card.nextElementSibling, card);
+      }
+    }
+    return;
+  }
+  if (morphologyAction === "remove-entry-morphology-group") {
+    event.target.closest(".entry-morphology-group-card")?.remove();
+    return;
+  }
+  if (morphologyAction === "add-entry-morphology-group") {
+    const entry = selectedEntry() || {};
+    const host = partialEditBody()?.querySelector(".partial-morphology-controls");
+    const current = collectMorphologyEntryState(host, entry);
+    const selected = host?.querySelector('[data-field="addMorphologyGroup"]')?.value || "";
+    if (selected && !current.morphologyGroups.some((group) => group.templateGroupId === selected)) {
+      current.morphologyGroups.push({ id: uniqueDictionaryEntityId("emorph", activeDictionary()), templateGroupId: selected, title: "", notes: "", overrides: {} });
+    }
+    current.morphologyMode = "manual";
+    renderMorphologyEntryControls(host, { ...entry, ...current });
+    return;
+  }
+
   const addButton = event.target.closest('[data-action="add-partial-definition"]');
   if (addButton) {
     const list = partialEditBody()?.querySelector('[data-partial-definitions="true"]');
@@ -11277,6 +11264,15 @@ elements.entryDisplay.addEventListener("submit", (event) => {
     return;
   }
   savePartialEdit(event);
+});
+elements.entryDisplay.addEventListener("change", (event) => {
+  if (!event.target.matches('[data-field="morphologyMode"]')) {
+    return;
+  }
+  const entry = selectedEntry() || {};
+  const host = partialEditBody()?.querySelector(".partial-morphology-controls");
+  const current = collectMorphologyEntryState(host, entry);
+  renderMorphologyEntryControls(host, { ...entry, ...current });
 });
 
 bindSourceAutocompleteInput(elements.sourceEntryInput);
@@ -11553,11 +11549,54 @@ elements.clearEntryButton.addEventListener("click", clearEntryForm);
 elements.deleteEntryButton.addEventListener("click", deleteSelectedEntry);
 elements.entryForm.addEventListener("submit", saveEntry);
 elements.dictionaryForm.addEventListener("submit", saveDictionary);
-elements.entryMorphologyTableSelect.addEventListener("change", () => renderEntryMorphologyOverrides(null, false));
 elements.tagsInput.addEventListener("input", () => {
-  if (elements.entryMorphologyTableSelect.value === "auto") {
-    renderEntryMorphologyOverrides(null, true);
+  const baseEntry = entryDraft || selectedEntry() || {};
+  const current = collectMorphologyEntryState(elements.entryMorphologyControls, baseEntry);
+  if (current.morphologyMode === "auto") {
+    renderMorphologyEntryControls(elements.entryMorphologyControls, {
+      ...baseEntry,
+      ...current,
+      tags: splitList(elements.tagsInput.value),
+    }, { full: true });
   }
+});
+elements.entryMorphologyControls.addEventListener("change", (event) => {
+  if (!event.target.matches('[data-field="morphologyMode"]')) {
+    return;
+  }
+  const baseEntry = entryDraft || selectedEntry() || {};
+  const current = collectMorphologyEntryState(elements.entryMorphologyControls, baseEntry);
+  renderMorphologyEntryControls(elements.entryMorphologyControls, { ...baseEntry, ...current }, { full: true });
+});
+elements.entryMorphologyControls.addEventListener("click", (event) => {
+  const action = event.target.closest("[data-action]")?.dataset.action;
+  if (action === "move-entry-morphology-group-up" || action === "move-entry-morphology-group-down") {
+    const card = event.target.closest(".entry-morphology-group-card");
+    const list = card?.parentElement;
+    if (card && list) {
+      if (action.endsWith("up") && card.previousElementSibling) {
+        list.insertBefore(card, card.previousElementSibling);
+      } else if (action.endsWith("down") && card.nextElementSibling) {
+        list.insertBefore(card.nextElementSibling, card);
+      }
+    }
+    return;
+  }
+  if (action === "remove-entry-morphology-group") {
+    event.target.closest(".entry-morphology-group-card")?.remove();
+    return;
+  }
+  if (action !== "add-entry-morphology-group") {
+    return;
+  }
+  const baseEntry = entryDraft || selectedEntry() || {};
+  const current = collectMorphologyEntryState(elements.entryMorphologyControls, baseEntry);
+  const selected = elements.entryMorphologyControls.querySelector('[data-field="addMorphologyGroup"]')?.value || "";
+  if (selected && !current.morphologyGroups.some((group) => group.templateGroupId === selected)) {
+    current.morphologyGroups.push({ id: uniqueDictionaryEntityId("emorph", activeDictionary()), templateGroupId: selected, title: "", notes: "", overrides: {} });
+  }
+  current.morphologyMode = "manual";
+  renderMorphologyEntryControls(elements.entryMorphologyControls, { ...baseEntry, ...current }, { full: true });
 });
 elements.settingsForm.addEventListener("submit", saveSettings);
 elements.manualPartOfSpeechTagsInput.addEventListener("change", syncPartOfSpeechTagSettingsControls);
