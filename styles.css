@@ -1330,13 +1330,159 @@ button.pending-source:focus-visible {
   font-size: 0.92rem;
 }
 
-#morphologyForm {
+#morphologyFunctionsForm,
+#morphologyTablesForm {
   display: grid;
   gap: 18px;
 }
 
-#morphologyForm .form-actions {
+#morphologyFunctionsForm .form-actions,
+#morphologyTablesForm .form-actions {
   margin-top: 10px;
+}
+
+.morphology-page-title {
+  align-items: center;
+}
+
+.morphology-table-toolbar {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.morphology-group-card {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-2) 76%, var(--surface));
+  transition: border-color 140ms ease, opacity 140ms ease;
+  container-type: inline-size;
+}
+
+.morphology-group-card.dragging,
+.morphology-config-card.dragging {
+  border-color: var(--accent);
+  border-style: dashed;
+  opacity: 0.45;
+}
+
+.morphology-group-header,
+.morphology-group-title-row,
+.morphology-table-title-row,
+.morphology-group-table-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.morphology-group-table-toolbar {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.morphology-group-title-row > div,
+.morphology-table-title-row > div {
+  min-width: 0;
+}
+
+.morphology-group-title-row input,
+.morphology-card-title-row input {
+  max-width: 320px;
+}
+
+.morphology-group-config-grid {
+  display: grid;
+  grid-template-columns: minmax(300px, 480px) minmax(260px, 1fr) auto;
+  grid-template-areas: "primary notes delete";
+  gap: 16px;
+  align-items: start;
+}
+
+.morphology-group-primary-fields {
+  grid-area: primary;
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.morphology-group-fields {
+  max-width: 440px;
+}
+
+.morphology-group-notes-field textarea {
+  min-height: 96px;
+  height: 96px;
+  resize: vertical;
+}
+
+.morphology-group-notes-field {
+  grid-area: notes;
+}
+
+.morphology-group-delete-action {
+  grid-area: delete;
+  justify-self: end;
+}
+
+@container (max-width: 760px) {
+  .morphology-group-config-grid {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "primary delete"
+      "notes notes";
+  }
+}
+
+@container (max-width: 460px) {
+  .morphology-group-config-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "primary"
+      "delete"
+      "notes";
+  }
+}
+
+.morphology-group-table-toolbar > span {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 900;
+}
+
+.morphology-group-table-list {
+  display: grid;
+  gap: 12px;
+}
+
+.morphology-drag-handle {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 32px;
+  min-height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1rem;
+  font-weight: 900;
+  cursor: grab;
+  user-select: none;
+}
+
+.morphology-drag-handle:hover,
+.morphology-drag-handle:focus-visible {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.morphology-drag-handle:active {
+  cursor: grabbing;
 }
 
 .morphology-config-card {
@@ -1347,7 +1493,8 @@ button.pending-source:focus-visible {
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--surface) 92%, var(--bg));
+  background: var(--surface);
+  transition: border-color 140ms ease, opacity 140ms ease;
 }
 
 .morphology-config-card.is-collapsed {
@@ -1375,15 +1522,6 @@ button.pending-source:focus-visible {
 
 .morphology-card-title-row input {
   max-width: 320px;
-}
-
-.morphology-card-summary {
-  color: var(--muted);
-  font-size: 0.86rem;
-  font-weight: 800;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .morphology-card-body {

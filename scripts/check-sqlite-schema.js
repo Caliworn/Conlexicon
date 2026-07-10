@@ -60,11 +60,16 @@ async function runSqliteSchemaCheck() {
 
     const sourceDictionary = sampleSqliteDictionary();
     await repository.importDictionarySnapshot(sourceDictionary);
+    const savedMorphology = await repository.saveMorphology(sourceDictionary.id, sourceDictionary.morphology);
+    assert.deepEqual(Object.keys(savedMorphology).sort(), ["id", "morphology", "updatedAt"]);
+    assert.equal(Object.hasOwn(savedMorphology, "entries"), false);
+    assert.equal(savedMorphology.morphology.templateGroups[0].id, "morph-roundtrip");
     const exported = repository.exportDictionarySnapshot(sourceDictionary.id);
     assert.equal(exported.id, sourceDictionary.id);
     assert.equal(exported.entries.length, sourceDictionary.entries.length);
     assert.equal(exported.morphology.templateGroups[0].id, "morph-roundtrip");
     assert.equal(exported.morphology.templateGroups[0].tables[0].title, "Nouns");
+    assert.equal(Object.hasOwn(exported.morphology, "tables"), false);
 
     const roundtripDb = repository.openDictionaryDatabase(sourceDictionary.id);
     assert.equal(roundtripDb.prepare("SELECT COUNT(*) AS count FROM entries").get().count, 2);
@@ -111,6 +116,7 @@ async function runSqliteSchemaCheck() {
     assert.equal(rebuiltEntry.definitions[0].meaning, "root meaning");
     assert.equal(rebuiltEntry.morphologyGroups[0].templateGroupId, "morph-roundtrip");
     assert.equal(rebuiltEntry.morphologyGroups[0].notes, "Irregular plural retained for this entry.");
+    assert.equal(Object.hasOwn(rebuiltEntry, "morphology"), false);
   } finally {
     await cleanup();
   }

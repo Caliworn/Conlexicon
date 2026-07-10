@@ -89,7 +89,7 @@ const analysisViewStates = new Map();
 const qualityViewStates = new Map();
 const corpusViewStates = new Map();
 let corpusDraftState = null;
-const DEFAULT_TOOL_NAV_ORDER = ["editor", "docs", "corpus", "analysis", "quality", "ipa", "morphology", "settings", "manager"];
+const DEFAULT_TOOL_NAV_ORDER = ["editor", "docs", "corpus", "analysis", "quality", "ipa", "morphology-functions", "morphology-tables", "settings", "manager"];
 let advancedFilter = null;
 let entryQueryState = {
   key: "",
@@ -121,6 +121,8 @@ let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
 let draggedToolNavView = "";
 let draggedIpaRuleId = "";
+let draggedMorphologyGroupId = "";
+let draggedMorphologyTableId = "";
 let entryCardScrollRequestId = 0;
 let pendingEntryCardScroll = null;
 let entryBrowserHeightFrame = 0;
@@ -161,6 +163,7 @@ const i18n = {
     languageDocs: "语言文档",
     corpus: "语料库",
     morphologyConfig: "自动形态学",
+    morphologyFunctions: "形态函数",
     morphologyDisplay: "形态学",
     morphologyGroup: "形态组",
     morphologyNeedDictionary: "自动形态学配置会保存到当前词典文件中。",
@@ -173,8 +176,12 @@ const i18n = {
     invalidMorphologyFunctionObjects: "形态配置中存在未配置的函数对象",
     invalidMorphologySyntax: "形态配置中存在不合法的替换语法",
     morphologyTable: "形态表格",
+    morphologyTableGroup: "形态表格组",
+    morphologyTableGroupName: "表格组标题",
+    morphologyTableGroupNotes: "表格组备注",
+    addMorphologyTableGroup: "新建表格组",
     addMorphologyTable: "添加表格",
-    tableName: "表格名称",
+    tableName: "表格标题",
     tableSize: "表格尺寸",
     rowCount: "行数",
     columnCount: "列数",
@@ -185,6 +192,10 @@ const i18n = {
     replacementMode: "替换",
     applySize: "应用尺寸",
     removeTable: "删除表格",
+    removeMorphologyTableGroup: "删除表格组",
+    emptyMorphologyTableGroup: "此表格组暂无表格。",
+    dragMorphologyTableGroup: "拖动以调整表格组排序",
+    dragMorphologyTable: "拖动以调整表格排序",
     morphologyAuto: "自动匹配",
     morphologyNone: "不使用表格",
     morphologyOverrideHelp: "留空则使用表格规则；填写内容会覆盖对应栏目。",
@@ -600,6 +611,7 @@ const i18n = {
     languageDocs: "Language Docs",
     corpus: "Corpus",
     morphologyConfig: "Auto Morphology",
+    morphologyFunctions: "Morphology Functions",
     morphologyDisplay: "Morphology",
     morphologyGroup: "Morphology Group",
     morphologyNeedDictionary: "Auto morphology config is saved in the current dictionary file.",
@@ -612,8 +624,12 @@ const i18n = {
     invalidMorphologyFunctionObjects: "Morphology config contains unconfigured function objects",
     invalidMorphologySyntax: "Morphology config contains invalid replacement syntax",
     morphologyTable: "Morphology Table",
+    morphologyTableGroup: "Morphology Table Group",
+    morphologyTableGroupName: "Table Group Title",
+    morphologyTableGroupNotes: "Table Group Notes",
+    addMorphologyTableGroup: "New Table Group",
     addMorphologyTable: "Add Table",
-    tableName: "Table Name",
+    tableName: "Table Title",
     tableSize: "Table Size",
     rowCount: "Rows",
     columnCount: "Columns",
@@ -624,6 +640,10 @@ const i18n = {
     replacementMode: "Replacement",
     applySize: "Apply Size",
     removeTable: "Delete Table",
+    removeMorphologyTableGroup: "Delete Table Group",
+    emptyMorphologyTableGroup: "This table group has no tables yet.",
+    dragMorphologyTableGroup: "Drag to reorder table groups",
+    dragMorphologyTable: "Drag to reorder tables",
     morphologyAuto: "Auto Match",
     morphologyNone: "No Table",
     morphologyOverrideHelp: "Leave blank to use table rules; filled cells override that slot.",
@@ -1048,7 +1068,8 @@ const elements = {
   settingsView: document.querySelector("#settingsView"),
   docsView: document.querySelector("#docsView"),
   corpusView: document.querySelector("#corpusView"),
-  morphologyView: document.querySelector("#morphologyView"),
+  morphologyFunctionsView: document.querySelector("#morphologyFunctionsView"),
+  morphologyTablesView: document.querySelector("#morphologyTablesView"),
   ipaView: document.querySelector("#ipaView"),
   backToEditorButton: document.querySelector("#backToEditorButton"),
   backToEditorFromSettingsButton: document.querySelector("#backToEditorFromSettingsButton"),
@@ -1056,7 +1077,8 @@ const elements = {
   backToEditorFromQualityButton: document.querySelector("#backToEditorFromQualityButton"),
   backToEditorFromDocsButton: document.querySelector("#backToEditorFromDocsButton"),
   backToEditorFromCorpusButton: document.querySelector("#backToEditorFromCorpusButton"),
-  backToEditorFromMorphologyButton: document.querySelector("#backToEditorFromMorphologyButton"),
+  backToEditorFromMorphologyFunctionsButton: document.querySelector("#backToEditorFromMorphologyFunctionsButton"),
+  backToEditorFromMorphologyTablesButton: document.querySelector("#backToEditorFromMorphologyTablesButton"),
   backToEditorFromIpaButton: document.querySelector("#backToEditorFromIpaButton"),
   batchIpaAllButton: document.querySelector("#batchIpaAllButton"),
   batchIpaMissingButton: document.querySelector("#batchIpaMissingButton"),
@@ -1196,14 +1218,18 @@ const elements = {
   corpusSearchInput: document.querySelector("#corpusSearchInput"),
   corpusItemList: document.querySelector("#corpusItemList"),
   corpusEditor: document.querySelector("#corpusEditor"),
-  morphologyNoDictionaryNotice: document.querySelector("#morphologyNoDictionaryNotice"),
-  morphologyOpenDictionaryManagerButton: document.querySelector("#morphologyOpenDictionaryManagerButton"),
-  morphologyPanel: document.querySelector("#morphologyPanel"),
-  morphologyForm: document.querySelector("#morphologyForm"),
+  morphologyFunctionsNoDictionaryNotice: document.querySelector("#morphologyFunctionsNoDictionaryNotice"),
+  morphologyFunctionsOpenDictionaryManagerButton: document.querySelector("#morphologyFunctionsOpenDictionaryManagerButton"),
+  morphologyFunctionsPanel: document.querySelector("#morphologyFunctionsPanel"),
+  morphologyFunctionsForm: document.querySelector("#morphologyFunctionsForm"),
+  morphologyTablesNoDictionaryNotice: document.querySelector("#morphologyTablesNoDictionaryNotice"),
+  morphologyTablesOpenDictionaryManagerButton: document.querySelector("#morphologyTablesOpenDictionaryManagerButton"),
+  morphologyTablesPanel: document.querySelector("#morphologyTablesPanel"),
+  morphologyTablesForm: document.querySelector("#morphologyTablesForm"),
   morphologyLeftVObjectsInput: document.querySelector("#morphologyLeftVObjectsInput"),
   morphologyRightVObjectsInput: document.querySelector("#morphologyRightVObjectsInput"),
   morphologyTableList: document.querySelector("#morphologyTableList"),
-  addMorphologyTableButton: document.querySelector("#addMorphologyTableButton"),
+  addMorphologyTableGroupButton: document.querySelector("#addMorphologyTableGroupButton"),
   morphologySyntaxButton: document.querySelector("#morphologySyntaxButton"),
   infoDialog: document.querySelector("#infoDialog"),
   infoDialogTitle: document.querySelector("#infoDialogTitle"),
@@ -1785,7 +1811,8 @@ function toolNavLabel(view) {
     analysis: t("analysis"),
     quality: t("qualityCheck"),
     ipa: t("ipaConfig"),
-    morphology: t("morphologyConfig"),
+    "morphology-functions": t("morphologyFunctions"),
+    "morphology-tables": t("morphologyTables"),
     settings: t("otherSettings"),
     manager: t("dictionaryManager"),
   };
@@ -1966,30 +1993,6 @@ function normalizeMorphology(morphology = {}, usedIds = new Set()) {
 
 function normalizeMorphologyFunctions(functions = {}) {
   return morphologyModel.normalizeMorphologyFunctions(functions);
-}
-
-function normalizeMorphologyTable(table = {}, usedIds = new Set()) {
-  const rows = Math.max(1, Number.parseInt(table.rows, 10) || 2);
-  const cols = Math.max(1, Number.parseInt(table.cols, 10) || 2);
-  const cells = {};
-  for (let row = 0; row < rows; row += 1) {
-    for (let col = 0; col < cols; col += 1) {
-      const key = morphologyCellKey(row, col);
-      cells[key] = normalizeMorphologyCell(table.cells?.[key]);
-    }
-  }
-  return {
-    id: String(table.id || uid("morph")),
-    templateGroupId: String(table.templateGroupId || table.id || ""),
-    templateTableId: String(table.templateTableId || ""),
-    name: String(table.name || t("morphologyTable")),
-    rows,
-    cols,
-    rowLabels: Array.from({ length: rows }, (_, index) => String(table.rowLabels?.[index] || `${index + 1}`)),
-    colLabels: Array.from({ length: cols }, (_, index) => String(table.colLabels?.[index] || `${index + 1}`)),
-    matchTags: splitList(table.matchTags),
-    cells,
-  };
 }
 
 function normalizeMorphologyCell(cell = {}) {
@@ -2382,8 +2385,12 @@ function renderActiveView() {
     renderCorpus(dictionary);
     return;
   }
-  if (state.activeView === "morphology") {
-    renderMorphologyConfig(dictionary);
+  if (state.activeView === "morphology-functions") {
+    fillMorphologyFunctionsForm(dictionary);
+    return;
+  }
+  if (state.activeView === "morphology-tables") {
+    renderMorphologyTablesConfig(dictionary);
     return;
   }
   if (state.activeView === "ipa") {
@@ -2516,7 +2523,7 @@ function ensureValidSelection() {
     state.selectedEntryId = firstLemmaEntry(dictionary)?.id || "";
   }
 
-  if (!["editor", "manager", "analysis", "quality", "settings", "docs", "corpus", "morphology", "ipa"].includes(state.activeView)) {
+  if (!["editor", "manager", "analysis", "quality", "settings", "docs", "corpus", "morphology-functions", "morphology-tables", "ipa"].includes(state.activeView)) {
     state.activeView = "editor";
   }
 
@@ -3022,8 +3029,10 @@ function renderAvailability() {
   elements.corpusNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "corpus";
   elements.corpusPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "corpus";
   elements.saveCorpusButton.hidden = !backendAvailable || !hasDictionary || state.activeView !== "corpus" || settings.corpusAutoSave;
-  elements.morphologyNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "morphology";
-  elements.morphologyPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "morphology";
+  elements.morphologyFunctionsNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "morphology-functions";
+  elements.morphologyFunctionsPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "morphology-functions";
+  elements.morphologyTablesNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "morphology-tables";
+  elements.morphologyTablesPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "morphology-tables";
   elements.ipaNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "ipa";
   elements.ipaPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "ipa";
   elements.batchIpaAllButton.disabled = !backendAvailable || !hasDictionary;
@@ -3051,7 +3060,8 @@ function renderView() {
   elements.settingsView.classList.toggle("active", state.activeView === "settings");
   elements.docsView.classList.toggle("active", state.activeView === "docs");
   elements.corpusView.classList.toggle("active", state.activeView === "corpus");
-  elements.morphologyView.classList.toggle("active", state.activeView === "morphology");
+  elements.morphologyFunctionsView.classList.toggle("active", state.activeView === "morphology-functions");
+  elements.morphologyTablesView.classList.toggle("active", state.activeView === "morphology-tables");
   elements.ipaView.classList.toggle("active", state.activeView === "ipa");
 }
 
@@ -7366,7 +7376,6 @@ function renderMorphologyDisplay(entry) {
     }).join("");
     group.innerHTML = `
       <div class="morphology-display-group-heading">
-        <span class="eyebrow">${escapeHtml(t("morphologyGroup"))}</span>
         <h4>${escapeHtml(groupTitle)}</h4>
         ${groupNotes ? `<p class="morphology-display-group-note">${escapeHtml(groupNotes)}</p>` : ""}
       </div>
@@ -8274,8 +8283,15 @@ function ipaFormSnapshot() {
   };
 }
 
-function morphologyFormSnapshot() {
-  return morphologyFromLegacyTableEditor(collectMorphologyFunctions(), collectMorphologyTables());
+function morphologyFunctionsFormSnapshot() {
+  return normalizeMorphologyFunctions(collectMorphologyFunctions());
+}
+
+function morphologyTablesFormSnapshot() {
+  return normalizeMorphology({
+    functions: morphologyFunctionConfig(),
+    templateGroups: collectMorphologyTemplateGroups(),
+  });
 }
 
 function savedMorphologySnapshot(dictionary = activeDictionary()) {
@@ -8304,8 +8320,12 @@ function dictionaryFormIsDirty() {
   return stableJson(dictionaryFormSnapshot()) !== stableJson(savedDictionarySnapshot());
 }
 
-function morphologyFormIsDirty() {
-  return stableJson(morphologyFormSnapshot()) !== stableJson(savedMorphologySnapshot());
+function morphologyFunctionsFormIsDirty() {
+  return stableJson(morphologyFunctionsFormSnapshot()) !== stableJson(savedMorphologySnapshot().functions);
+}
+
+function morphologyTablesFormIsDirty() {
+  return stableJson(morphologyTablesFormSnapshot().templateGroups) !== stableJson(savedMorphologySnapshot().templateGroups);
 }
 
 async function confirmLeaveUnsavedDictionaryForm() {
@@ -9521,37 +9541,91 @@ function moveArrayItem(items, index, offset) {
   items.splice(nextIndex, 0, item);
 }
 
-function renderMorphologyConfig(dictionary) {
+function fillMorphologyFunctionsForm(dictionary) {
+  const functions = morphologyFunctionConfig(dictionary);
+  elements.morphologyLeftVObjectsInput.value = functions.leftV.join("，");
+  elements.morphologyRightVObjectsInput.value = functions.rightV.join("，");
+}
+
+function renderMorphologyTablesConfig(dictionary) {
   if (!elements.morphologyTableList) {
     return;
   }
-  const morphology = normalizeMorphology(dictionary?.morphology);
-  const tables = morphologyTables(dictionary);
   elements.morphologyTableList.innerHTML = "";
-  elements.morphologyLeftVObjectsInput.value = morphology.functions.leftV.join("，");
-  elements.morphologyRightVObjectsInput.value = morphology.functions.rightV.join("，");
   if (!dictionary) {
     return;
   }
-  tables.forEach((table) => elements.morphologyTableList.append(createMorphologyTableEditor(table)));
+  const groups = normalizeMorphology(dictionary.morphology).templateGroups;
+  groups.forEach((group, index) => elements.morphologyTableList.append(createMorphologyGroupEditor(group, index)));
+}
+
+function createMorphologyGroupEditor(group, index) {
+  const card = document.createElement("section");
+  card.className = "morphology-group-card";
+  card.dataset.templateGroupId = group.id;
+  card.dataset.groupName = group.name;
+  card.dataset.groupNotes = group.notes || "";
+  card.dataset.groupCreatedAt = group.createdAt || "";
+  card.dataset.groupUpdatedAt = group.updatedAt || "";
+  card.innerHTML = `
+    <div class="morphology-group-config-grid">
+      <div class="morphology-group-primary-fields">
+        <div class="morphology-group-header">
+          <div class="morphology-group-title-row">
+            <button class="morphology-drag-handle" type="button" draggable="true" data-action="drag-morphology-group" aria-label="${escapeHtml(t("dragMorphologyTableGroup"))}">⋮⋮</button>
+            <div>
+              <p class="eyebrow">${escapeHtml(t("morphologyTableGroup"))} ${index + 1}</p>
+              <input data-field="name" value="${escapeHtml(group.name)}" aria-label="${escapeHtml(t("morphologyTableGroupName"))}">
+            </div>
+          </div>
+        </div>
+        <div class="morphology-group-fields">
+          <label>
+            <span>${escapeHtml(t("autoMatchTags"))}</span>
+            <input data-field="matchTags" value="${escapeHtml(group.matchTags.join("，"))}">
+          </label>
+        </div>
+      </div>
+      <label class="morphology-group-notes-field">
+        <span>${escapeHtml(t("morphologyTableGroupNotes"))}</span>
+        <textarea data-field="notes" rows="3">${escapeHtml(group.notes || "")}</textarea>
+      </label>
+      <div class="morphology-group-delete-action">
+        <button class="danger-ghost" type="button" data-action="remove-morphology-group">${escapeHtml(t("removeMorphologyTableGroup"))}</button>
+      </div>
+    </div>
+    <div class="morphology-group-table-toolbar">
+      <span>${escapeHtml(t("morphologyTables"))}</span>
+      <button class="primary-button" type="button" data-action="add-morphology-table">${escapeHtml(t("addMorphologyTable"))}</button>
+    </div>
+    <div class="morphology-group-table-list"></div>
+  `;
+  const tableList = card.querySelector(".morphology-group-table-list");
+  if (group.tables.length) {
+    group.tables.forEach((table) => tableList.append(createMorphologyTableEditor(table)));
+  } else {
+    tableList.append(emptyState(t("morphologyTable"), t("emptyMorphologyTableGroup")));
+  }
+  return card;
 }
 
 function createMorphologyTableEditor(table) {
   const card = document.createElement("article");
   card.className = "morphology-config-card";
-  card.dataset.tableId = table.id;
-  card.dataset.templateGroupId = table.templateGroupId || table.id;
-  card.dataset.templateTableId = table.templateTableId || "";
+  card.dataset.templateTableId = table.id;
+  card.dataset.tableCreatedAt = table.createdAt || "";
+  card.dataset.tableUpdatedAt = table.updatedAt || "";
   const expanded = expandedMorphologyTables.has(table.id);
-  const matchTags = table.matchTags.length ? table.matchTags.join(", ") : t("none");
   card.classList.toggle("is-collapsed", !expanded);
   card.innerHTML = `
     <div class="morphology-card-header">
-      <div>
-        <p class="eyebrow">${escapeHtml(t("morphologyTable"))}</p>
+      <div class="morphology-table-title-row">
+        <button class="morphology-drag-handle" type="button" draggable="true" data-action="drag-morphology-table" aria-label="${escapeHtml(t("dragMorphologyTable"))}">⋮⋮</button>
+        <div>
+          <p class="eyebrow">${escapeHtml(t("morphologyTable"))}</p>
         <div class="morphology-card-title-row">
-          <input data-field="name" value="${escapeHtml(table.name)}" aria-label="${escapeHtml(t("tableName"))}">
-          <span class="morphology-card-summary">${table.rows} × ${table.cols} · ${escapeHtml(matchTags)}</span>
+          <input data-field="title" value="${escapeHtml(table.title)}" aria-label="${escapeHtml(t("tableName"))}">
+        </div>
         </div>
       </div>
       <div class="panel-actions">
@@ -9561,9 +9635,8 @@ function createMorphologyTableEditor(table) {
     </div>
     <div class="morphology-card-body" ${expanded ? "" : "hidden"}>
       <div class="form-grid">
-        <label><span>${escapeHtml(t("rowCount"))}</span><input data-field="rows" type="number" min="1" value="${table.rows}"></label>
-        <label><span>${escapeHtml(t("columnCount"))}</span><input data-field="cols" type="number" min="1" value="${table.cols}"></label>
-        <label><span>${escapeHtml(t("autoMatchTags"))}</span><input data-field="matchTags" value="${escapeHtml(table.matchTags.join("，"))}"></label>
+        <label><span>${escapeHtml(t("rowCount"))}</span><input data-field="rows" type="number" min="1" value="${table.rowCount}"></label>
+        <label><span>${escapeHtml(t("columnCount"))}</span><input data-field="cols" type="number" min="1" value="${table.columnCount}"></label>
       </div>
       <button class="secondary-button" type="button" data-action="resize-morphology-table">${escapeHtml(t("applySize"))}</button>
       <div class="morphology-edit-scroll">${renderMorphologyRuleInputs(table)}</div>
@@ -9577,21 +9650,21 @@ function renderMorphologyRuleInputs(table) {
     <thead>
       <tr>
         <th></th>
-        ${table.colLabels.map((label, col) => `
+        ${table.columnLabels.map((label, col) => `
           <th><input data-col-label="${col}" value="${escapeHtml(label)}" aria-label="${escapeHtml(t("columnLabels"))} ${col + 1}"></th>
         `).join("")}
       </tr>
     </thead>
   `;
   const rows = [];
-  for (let row = 0; row < table.rows; row += 1) {
+  for (let row = 0; row < table.rowCount; row += 1) {
     const cells = [];
-    for (let col = 0; col < table.cols; col += 1) {
+    for (let col = 0; col < table.columnCount; col += 1) {
       const key = morphologyCellKey(row, col);
       const cell = table.cells[key] || normalizeMorphologyCell();
       cells.push(`
         <td class="morphology-rule-cell" data-cell="${escapeHtml(key)}">
-          <textarea data-field="value" rows="2" placeholder="{}">${escapeHtml(cell.value)}</textarea>
+          <textarea data-field="value" rows="2" placeholder="{}">${escapeHtml(cell.sourceText)}</textarea>
         </td>
       `);
     }
@@ -9605,74 +9678,66 @@ function renderMorphologyRuleInputs(table) {
   return `<table class="morphology-edit-table">${header}<tbody>${rows.join("")}</tbody></table>`;
 }
 
-function collectMorphologyTables() {
-  return [...elements.morphologyTableList.querySelectorAll(".morphology-config-card")].map((card) => {
-    const rows = Math.max(1, Number.parseInt(card.querySelector('[data-field="rows"]').value, 10) || 1);
-    const cols = Math.max(1, Number.parseInt(card.querySelector('[data-field="cols"]').value, 10) || 1);
-    const rowLabels = Array.from({ length: rows }, (_, index) => card.querySelector(`[data-row-label="${index}"]`)?.value.trim() || `${index + 1}`);
-    const colLabels = Array.from({ length: cols }, (_, index) => card.querySelector(`[data-col-label="${index}"]`)?.value.trim() || `${index + 1}`);
-    const cells = {};
-    card.querySelectorAll(".morphology-rule-cell").forEach((cellNode) => {
-      cells[cellNode.dataset.cell] = normalizeMorphologyCell({
-        mode: "reference",
-        value: cellNode.querySelector('[data-field="value"]').value,
+function collectMorphologyTemplateGroups() {
+  const groups = [...elements.morphologyTableList.querySelectorAll(".morphology-group-card")].map((groupCard) => ({
+    id: groupCard.dataset.templateGroupId,
+    name: groupCard.querySelector('[data-field="name"]')?.value.trim() || groupCard.dataset.groupName || t("morphologyTableGroup"),
+    matchTags: splitList(groupCard.querySelector('[data-field="matchTags"]')?.value),
+    notes: groupCard.querySelector('[data-field="notes"]')?.value || groupCard.dataset.groupNotes || "",
+    createdAt: groupCard.dataset.groupCreatedAt || "",
+    updatedAt: groupCard.dataset.groupUpdatedAt || "",
+    tables: [...groupCard.querySelectorAll(".morphology-config-card")].map((tableCard) => {
+      const rowCount = Math.max(1, Number.parseInt(tableCard.querySelector('[data-field="rows"]').value, 10) || 1);
+      const columnCount = Math.max(1, Number.parseInt(tableCard.querySelector('[data-field="cols"]').value, 10) || 1);
+      const rowLabels = Array.from({ length: rowCount }, (_, index) => tableCard.querySelector(`[data-row-label="${index}"]`)?.value.trim() || `${index + 1}`);
+      const columnLabels = Array.from({ length: columnCount }, (_, index) => tableCard.querySelector(`[data-col-label="${index}"]`)?.value.trim() || `${index + 1}`);
+      const cells = {};
+      tableCard.querySelectorAll(".morphology-rule-cell").forEach((cellNode) => {
+        cells[cellNode.dataset.cell] = { sourceText: cellNode.querySelector('[data-field="value"]').value };
       });
-    });
-    const normalized = normalizeMorphologyTable({
-      id: card.dataset.tableId,
-      templateGroupId: card.dataset.templateGroupId,
-      templateTableId: card.dataset.templateTableId,
-      name: card.querySelector('[data-field="name"]').value.trim(),
-      rows,
-      cols,
-      rowLabels,
-      colLabels,
-      matchTags: splitList(card.querySelector('[data-field="matchTags"]').value),
-      cells,
-    });
-    return normalized;
-  });
+      return {
+        id: tableCard.dataset.templateTableId,
+        title: tableCard.querySelector('[data-field="title"]').value.trim(),
+        rowCount,
+        columnCount,
+        rowLabels,
+        columnLabels,
+        cells,
+        createdAt: tableCard.dataset.tableCreatedAt || "",
+        updatedAt: tableCard.dataset.tableUpdatedAt || "",
+      };
+    }),
+  }));
+  return normalizeMorphology({ templateGroups: groups }).templateGroups;
 }
 
-function morphologyFromLegacyTableEditor(functions = {}, tables = [], sourceMorphology = activeDictionary()?.morphology) {
-  const sourceGroups = normalizeMorphology(sourceMorphology).templateGroups;
-  const sourceById = new Map(sourceGroups.map((group) => [group.id, group]));
-  const nextById = new Map();
-  (tables || []).forEach((table) => {
-    const groupId = String(table.templateGroupId || table.id || uid("morph"));
-    const sourceGroup = sourceById.get(groupId);
-    if (!nextById.has(groupId)) {
-      nextById.set(groupId, {
-        id: groupId,
-        name: sourceGroup?.name || table.name || t("morphologyTable"),
-        matchTags: table.matchTags || sourceGroup?.matchTags || [],
-        notes: sourceGroup?.notes || "",
-        tables: [],
-        createdAt: sourceGroup?.createdAt || "",
-        updatedAt: sourceGroup?.updatedAt || "",
-      });
-    }
-    const group = nextById.get(groupId);
-    const sourceTable = sourceGroup?.tables?.find((item) => item.id === table.templateTableId) || sourceGroup?.tables?.[0];
-    const cells = Object.fromEntries(Object.entries(table.cells || {}).map(([key, cell]) => [key, {
-      sourceText: String(cell?.value ?? cell?.sourceText ?? ""),
-    }]));
-    group.tables.push({
-      id: table.templateTableId || sourceTable?.id || uid("mtable"),
-      title: table.name || sourceTable?.title || group.name,
-      rowCount: table.rows,
-      columnCount: table.cols,
-      rowLabels: table.rowLabels,
-      columnLabels: table.colLabels,
-      cells,
-      createdAt: sourceTable?.createdAt || "",
-      updatedAt: sourceTable?.updatedAt || "",
-    });
-  });
+function newMorphologyTableGroup(position) {
   return normalizeMorphology({
-    functions,
-    templateGroups: [...nextById.values()],
-  });
+    templateGroups: [{
+      id: uid("morph"),
+      name: `${t("morphologyTableGroup")} ${position + 1}`,
+      matchTags: [],
+      tables: [],
+    }],
+  }).templateGroups[0];
+}
+
+function newMorphologyTemplateTable(position) {
+  return normalizeMorphology({
+    templateGroups: [{
+      id: "morph-editor-preview",
+      tables: [{
+        id: uid("mtable"),
+        title: `${t("morphologyTable")} ${position + 1}`,
+        rowCount: 2,
+        columnCount: 2,
+      }],
+    }],
+  }).templateGroups[0].tables[0];
+}
+
+function applyMorphologyTableSizeChanges() {
+  renderMorphologyTablesConfig({ morphology: morphologyTablesFormSnapshot() });
 }
 
 function collectMorphologyFunctions() {
@@ -9702,26 +9767,56 @@ function extractMorphologyFunctionCalls(rule) {
   return morphologyModel.extractMorphologyFunctionCalls(rule);
 }
 
-async function saveMorphologyConfig(event) {
+async function saveMorphologyFunctions(event) {
   event.preventDefault();
   const dictionary = activeDictionary();
   if (!dictionary) {
     showToast(t("createDictionaryFirstToast"));
     return false;
   }
-  const morphology = morphologyFromLegacyTableEditor(collectMorphologyFunctions(), collectMorphologyTables(), dictionary.morphology);
-  const syntaxErrors = validateMorphologyReferenceSyntax(morphology);
-  if (syntaxErrors.length) {
-    await appConfirm(syntaxErrors.join("\n"), {
-      title: t("invalidMorphologySyntax"),
-      alert: true,
-    });
-    return false;
-  }
+  const morphology = normalizeMorphology({
+    ...dictionary.morphology,
+    functions: collectMorphologyFunctions(),
+  });
   const functionErrors = validateMorphologyFunctionUsage(morphology);
   if (functionErrors.length) {
     await appConfirm(functionErrors.join("\n"), {
       title: t("invalidMorphologyFunctionObjects"),
+      alert: true,
+    });
+    return false;
+  }
+  try {
+    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/morphology`, {
+      method: "PUT",
+      body: JSON.stringify(morphology),
+    });
+    applyDictionaryModulePayload(saved);
+    resetEntryReadStateAfterSave();
+    render();
+    showToast(t("dictionarySaved"));
+    return true;
+  } catch (error) {
+    showApiErrorToast(error, "dictionarySaveFailed");
+    return false;
+  }
+}
+
+async function saveMorphologyTables(event) {
+  event.preventDefault();
+  const dictionary = activeDictionary();
+  if (!dictionary) {
+    showToast(t("createDictionaryFirstToast"));
+    return false;
+  }
+  const morphology = normalizeMorphology({
+    functions: morphologyFunctionConfig(dictionary),
+    templateGroups: collectMorphologyTemplateGroups(),
+  });
+  const syntaxErrors = validateMorphologyReferenceSyntax(morphology);
+  if (syntaxErrors.length) {
+    await appConfirm(syntaxErrors.join("\n"), {
+      title: t("invalidMorphologySyntax"),
       alert: true,
     });
     return false;
@@ -10915,9 +11010,14 @@ async function confirmLeaveUnsavedConfigView() {
       save: () => saveIpaSettings({ preventDefault() {} }),
     });
   }
-  if (state.activeView === "morphology" && morphologyFormIsDirty()) {
+  if (state.activeView === "morphology-functions" && morphologyFunctionsFormIsDirty()) {
     return confirmUnsavedChanges(t("unsavedMorphologyConfirm"), {
-      save: () => saveMorphologyConfig({ preventDefault() {} }),
+      save: () => saveMorphologyFunctions({ preventDefault() {} }),
+    });
+  }
+  if (state.activeView === "morphology-tables" && morphologyTablesFormIsDirty()) {
+    return confirmUnsavedChanges(t("unsavedMorphologyConfirm"), {
+      save: () => saveMorphologyTables({ preventDefault() {} }),
     });
   }
   const settings = normalizeDictionarySettings(activeDictionary().settings);
@@ -11277,7 +11377,8 @@ elements.backToEditorFromAnalysisButton.addEventListener("click", () => showView
 elements.backToEditorFromQualityButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromDocsButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromCorpusButton.addEventListener("click", () => showView("editor"));
-elements.backToEditorFromMorphologyButton.addEventListener("click", () => showView("editor"));
+elements.backToEditorFromMorphologyFunctionsButton.addEventListener("click", () => showView("editor"));
+elements.backToEditorFromMorphologyTablesButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromIpaButton.addEventListener("click", () => showView("editor"));
 elements.addDictionaryButton.addEventListener("click", prepareNewDictionary);
 elements.emptyCreateDictionaryButton.addEventListener("click", () => showView("manager"));
@@ -11286,7 +11387,8 @@ elements.analysisOpenDictionaryManagerButton.addEventListener("click", () => sho
 elements.qualityOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.docsOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.corpusOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
-elements.morphologyOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
+elements.morphologyFunctionsOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
+elements.morphologyTablesOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.ipaOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.newEntryButton.addEventListener("click", () => beginNewEntry());
 elements.entryListNewEntryButton.addEventListener("click", async () => {
@@ -11690,7 +11792,21 @@ window.addEventListener("scroll", () => {
 elements.docsMarkdownInput.addEventListener("scroll", rememberDocsPaneScroll, { passive: true });
 elements.docsPreview.addEventListener("scroll", rememberDocsPaneScroll, { passive: true });
 elements.saveDocsButton.addEventListener("click", () => saveLanguageDocs(true));
-elements.morphologyForm.addEventListener("submit", saveMorphologyConfig);
+elements.morphologyFunctionsForm.addEventListener("submit", saveMorphologyFunctions);
+elements.morphologyTablesForm.addEventListener("submit", saveMorphologyTables);
+elements.morphologyTablesForm.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) {
+    return;
+  }
+  const input = event.target;
+  if (!input?.matches?.("input")) {
+    return;
+  }
+  event.preventDefault();
+  if (input.matches('[data-field="rows"], [data-field="cols"]')) {
+    applyMorphologyTableSizeChanges();
+  }
+});
 elements.morphologySyntaxButton.addEventListener("click", () => {
   appInfoDialog(t("morphologySyntaxTitle"), {
     html: morphologySyntaxInfoHtml(),
@@ -11710,12 +11826,34 @@ elements.confirmDialog.addEventListener("click", (event) => {
     closeConfirmDialog(confirmDialogResults.cancel);
   }
 });
-elements.addMorphologyTableButton.addEventListener("click", () => {
-  const tables = collectMorphologyTables();
-  tables.push(normalizeMorphologyTable({ name: `${t("morphologyTable")} ${tables.length + 1}` }));
-  renderMorphologyConfig({ morphology: morphologyFromLegacyTableEditor(collectMorphologyFunctions(), tables) });
+elements.addMorphologyTableGroupButton.addEventListener("click", () => {
+  const morphology = morphologyTablesFormSnapshot();
+  morphology.templateGroups.push(newMorphologyTableGroup(morphology.templateGroups.length));
+  renderMorphologyTablesConfig({ morphology });
 });
 elements.morphologyTableList.addEventListener("click", (event) => {
+  const addTableButton = event.target.closest('[data-action="add-morphology-table"]');
+  if (addTableButton) {
+    const groupCard = addTableButton.closest(".morphology-group-card");
+    const morphology = morphologyTablesFormSnapshot();
+    const group = morphology.templateGroups.find((item) => item.id === groupCard?.dataset.templateGroupId);
+    if (group) {
+      const table = newMorphologyTemplateTable(group.tables.length);
+      group.tables.push(table);
+      expandedMorphologyTables.add(table.id);
+      renderMorphologyTablesConfig({ morphology });
+    }
+    return;
+  }
+
+  const removeGroupButton = event.target.closest('[data-action="remove-morphology-group"]');
+  if (removeGroupButton) {
+    removeGroupButton.closest(".morphology-group-card")?.querySelectorAll(".morphology-config-card")
+      .forEach((tableCard) => expandedMorphologyTables.delete(tableCard.dataset.templateTableId));
+    removeGroupButton.closest(".morphology-group-card")?.remove();
+    return;
+  }
+
   const toggleButton = event.target.closest('[data-action="toggle-morphology-table"]');
   if (toggleButton) {
     const card = toggleButton.closest(".morphology-config-card");
@@ -11726,24 +11864,96 @@ elements.morphologyTableList.addEventListener("click", (event) => {
     toggleButton.textContent = expanded ? t("collapse") : t("expand");
     toggleButton.setAttribute("aria-expanded", String(expanded));
     if (expanded) {
-      expandedMorphologyTables.add(card.dataset.tableId);
+      expandedMorphologyTables.add(card.dataset.templateTableId);
     } else {
-      expandedMorphologyTables.delete(card.dataset.tableId);
+      expandedMorphologyTables.delete(card.dataset.templateTableId);
     }
     return;
   }
 
   const removeButton = event.target.closest('[data-action="remove-morphology-table"]');
   if (removeButton) {
-    expandedMorphologyTables.delete(removeButton.closest(".morphology-config-card").dataset.tableId);
+    expandedMorphologyTables.delete(removeButton.closest(".morphology-config-card").dataset.templateTableId);
     removeButton.closest(".morphology-config-card").remove();
     return;
   }
   const resizeButton = event.target.closest('[data-action="resize-morphology-table"]');
   if (resizeButton) {
-    const tables = collectMorphologyTables();
-    renderMorphologyConfig({ morphology: morphologyFromLegacyTableEditor(collectMorphologyFunctions(), tables) });
+    applyMorphologyTableSizeChanges();
   }
+});
+elements.morphologyTableList.addEventListener("dragstart", (event) => {
+  const tableHandle = event.target.closest('[data-action="drag-morphology-table"]');
+  if (tableHandle) {
+    const tableCard = tableHandle.closest(".morphology-config-card");
+    if (!tableCard) {
+      event.preventDefault();
+      return;
+    }
+    draggedMorphologyTableId = tableCard.dataset.templateTableId || "";
+    tableCard.classList.add("dragging");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", draggedMorphologyTableId);
+    event.stopPropagation();
+    return;
+  }
+  const groupHandle = event.target.closest('[data-action="drag-morphology-group"]');
+  const groupCard = groupHandle?.closest(".morphology-group-card");
+  if (!groupCard) {
+    event.preventDefault();
+    return;
+  }
+  draggedMorphologyGroupId = groupCard.dataset.templateGroupId || "";
+  groupCard.classList.add("dragging");
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", draggedMorphologyGroupId);
+});
+elements.morphologyTableList.addEventListener("dragover", (event) => {
+  if (draggedMorphologyTableId) {
+    const dragging = elements.morphologyTableList.querySelector(".morphology-config-card.dragging");
+    const target = event.target.closest(".morphology-config-card");
+    const targetList = event.target.closest(".morphology-group-table-list");
+    if (!dragging || !targetList || dragging.parentElement !== targetList || target === dragging) {
+      return;
+    }
+    event.preventDefault();
+    if (target) {
+      const bounds = target.getBoundingClientRect();
+      targetList.insertBefore(dragging, event.clientY < bounds.top + bounds.height / 2 ? target : target.nextSibling);
+    } else {
+      targetList.append(dragging);
+    }
+    return;
+  }
+  if (!draggedMorphologyGroupId) {
+    return;
+  }
+  const dragging = elements.morphologyTableList.querySelector(".morphology-group-card.dragging");
+  const target = event.target.closest(".morphology-group-card");
+  const targetList = event.target.closest(".morphology-table-list");
+  if (!dragging || !targetList || target === dragging) {
+    return;
+  }
+  event.preventDefault();
+  if (target) {
+    const bounds = target.getBoundingClientRect();
+    targetList.insertBefore(dragging, event.clientY < bounds.top + bounds.height / 2 ? target : target.nextSibling);
+  } else {
+    targetList.append(dragging);
+  }
+});
+elements.morphologyTableList.addEventListener("dragend", () => {
+  elements.morphologyTableList.querySelectorAll(".morphology-group-card.dragging, .morphology-config-card.dragging")
+    .forEach((card) => card.classList.remove("dragging"));
+  draggedMorphologyGroupId = "";
+  draggedMorphologyTableId = "";
+});
+elements.morphologyTableList.addEventListener("drop", (event) => {
+  event.preventDefault();
+  elements.morphologyTableList.querySelectorAll(".morphology-group-card.dragging, .morphology-config-card.dragging")
+    .forEach((card) => card.classList.remove("dragging"));
+  draggedMorphologyGroupId = "";
+  draggedMorphologyTableId = "";
 });
 elements.docsModeControl.addEventListener("click", (event) => {
   const button = event.target.closest("[data-doc-mode]");
@@ -12012,9 +12222,15 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (state.activeView === "morphology" && !elements.morphologyForm.hidden) {
+  if (state.activeView === "morphology-functions" && !elements.morphologyFunctionsForm.hidden) {
     event.preventDefault();
-    elements.morphologyForm.requestSubmit();
+    elements.morphologyFunctionsForm.requestSubmit();
+    return;
+  }
+
+  if (state.activeView === "morphology-tables" && !elements.morphologyTablesForm.hidden) {
+    event.preventDefault();
+    elements.morphologyTablesForm.requestSubmit();
   }
 });
 

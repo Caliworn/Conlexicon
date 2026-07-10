@@ -575,6 +575,7 @@ function checkModelNormalization() {
     ],
     settings: {
       ipa: { stressMappings: [{ from: "a", to: "a" }] },
+      toolNavOrder: ["editor", "morphology", "settings"],
     },
   });
   assert.equal(legacyConvertedImport.dictionary.entries[0].tags[0], "n");
@@ -582,6 +583,12 @@ function checkModelNormalization() {
   assert.equal(legacyConvertedImport.dictionary.entries[0].etymology.description, "old source");
   assert.deepEqual(legacyConvertedImport.dictionary.entries[0].etymology.sources, ["entry-source"]);
   assert.equal(legacyConvertedImport.dictionary.settings.ipa.mappings[0].to, "ˈa");
+  assert.deepEqual(legacyConvertedImport.dictionary.settings.toolNavOrder, [
+    "editor",
+    "morphology-functions",
+    "morphology-tables",
+    "settings",
+  ]);
   assert.ok(legacyConvertedImport.report.repairs.length);
 
   const convertedImport = conversionService.importDictionaryFromJsonPayload({
