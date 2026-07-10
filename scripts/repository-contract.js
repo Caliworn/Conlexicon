@@ -480,14 +480,14 @@ function checkModelNormalization() {
   );
   assert.deepEqual(
     morphologyModel.validateMorphologyReferenceSyntax({
-      tables: [{ name: "Bad", rows: 1, cols: 1, cells: { "0,0": { value: "{a}" } } }],
+      templateGroups: [{ name: "Bad", tables: [{ title: "Bad", rowCount: 1, columnCount: 1, cells: { "0,0": { sourceText: "{a}" } } }] }],
     }),
     ["Bad: 1 / 1: {a} - missing ="],
   );
   assert.deepEqual(
     morphologyModel.validateMorphologyFunctionUsage({
       functions: { leftV: "a" },
-      tables: [{ name: "BadFn", rows: 1, cols: 1, cells: { "0,0": { value: "/rightV(a)=x/" } } }],
+      templateGroups: [{ name: "BadFn", tables: [{ title: "BadFn", rowCount: 1, columnCount: 1, cells: { "0,0": { sourceText: "/rightV(a)=x/" } } }] }],
     }),
     ["BadFn: rightV not configured"],
   );
@@ -602,7 +602,7 @@ function checkModelNormalization() {
       const duplicate = normalizeDictionary({
         entries: [{ id: "shared-cross-type-id", lemma: "a" }],
         settings: { ipa: { mappings: [{ id: "shared-cross-type-id", from: "a", to: "b" }] } },
-        morphology: { tables: [{ id: "shared-cross-type-id", name: "A" }] },
+        morphology: { templateGroups: [{ id: "shared-cross-type-id", name: "A", tables: [] }] },
         corpus: { units: [{ id: "shared-cross-type-id", content: "x" }] },
       });
       assertUniqueDictionaryEntityIds(duplicate);
@@ -635,7 +635,7 @@ function checkModelNormalization() {
     () => {
       const duplicate = normalizeDictionary({
         entries: [{ id: "shared-config-id", lemma: "a" }],
-        morphology: { tables: [{ id: "shared-config-id", name: "A" }] },
+        morphology: { templateGroups: [{ id: "shared-config-id", name: "A", tables: [] }] },
       });
       assertUniqueDictionaryEntityIds(duplicate);
     },
@@ -671,9 +671,9 @@ function checkModelNormalization() {
     const normalized = normalizeDictionary({
       id: "dict-static",
       entries: [{ id: "morph-collision", lemma: "a" }],
-      morphology: { tables: [{ name: "A" }] },
+      morphology: { templateGroups: [{ name: "A", tables: [] }] },
     });
-    assert.equal(normalized.morphology.tables[0].id, "morph-fresh");
+    assert.equal(normalized.morphology.templateGroups[0].id, "morph-fresh");
   });
 
   withPatchedRandomUUID(["collision", "fresh"], () => {
@@ -702,17 +702,21 @@ async function checkReadApiConsistency(repository) {
     },
     morphology: {
       functions: { leftV: "a,e,i,o,u", rightV: "a,e,i,o,u" },
-      tables: [
+      templateGroups: [
         {
-          id: "morph-n-table",
+          id: "morph-n-group",
           name: "N table",
-          rows: 1,
-          cols: 2,
           matchTags: ["n"],
-          cells: {
-            "0,0": { value: "{lemma}-generated" },
-            "0,1": { value: "{a=o}" },
-          },
+          tables: [{
+            id: "mtable-n-main",
+            title: "N table",
+            rowCount: 1,
+            columnCount: 2,
+            cells: {
+              "0,0": { sourceText: "{lemma}-generated" },
+              "0,1": { sourceText: "{a=o}" },
+            },
+          }],
         },
       ],
     },
@@ -725,7 +729,6 @@ async function checkReadApiConsistency(repository) {
         definitions: [{ id: "def-alpha", meaning: "mirror meaning", example: "alpha example", note: "alpha note" }],
         etymology: { sources: ["root"], description: "source note" },
         notes: "entry note",
-        morphology: { tableId: "auto", overrides: {} },
         createdAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-03T00:00:00.000Z",
       },
@@ -736,7 +739,11 @@ async function checkReadApiConsistency(repository) {
         tags: ["v", "n", "derived"],
         definitions: [{ id: "def-beta", meaning: "movement" }],
         etymology: { sources: ["alpha"], description: "" },
-        morphology: { tableId: "morph-n-table", overrides: { "0,0": "manual-beta-form" } },
+        morphologyGroups: [{
+          id: "emorph-beta",
+          templateGroupId: "morph-n-group",
+          overrides: { "mtable-n-main": { "0,0": "manual-beta-form" } },
+        }],
         createdAt: "2026-01-02T00:00:00.000Z",
         updatedAt: "2026-01-02T00:00:00.000Z",
       },
@@ -1069,14 +1076,14 @@ async function runRepositoryContractTests(options = {}) {
     assert.match(apiResult.body.corpus.units[0].id, /^corpus-unit-/);
 
     apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/morphology`, {
-      tables: [{ name: "Nouns" }],
+      templateGroups: [{ name: "Nouns", tables: [{ title: "Nouns", rowCount: 2, columnCount: 2 }] }],
     });
     assert.equal(apiResult.statusCode, 200);
-    assert.equal(apiResult.body.morphology.tables[0].name, "Nouns");
-    assert.match(apiResult.body.morphology.tables[0].id, /^morph-/);
+    assert.equal(apiResult.body.morphology.templateGroups[0].name, "Nouns");
+    assert.match(apiResult.body.morphology.templateGroups[0].id, /^morph-/);
     await assertRejectStatus(
       callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/morphology`, {
-        tables: [{ name: "Broken", rows: 1, cols: 1, cells: { "0,0": { value: "{a}" } } }],
+        templateGroups: [{ name: "Broken", tables: [{ title: "Broken", rowCount: 1, columnCount: 1, cells: { "0,0": { sourceText: "{a}" } } }] }],
       }),
       400,
       "invalid morphology syntax save",
@@ -1241,7 +1248,7 @@ async function runRepositoryContractTests(options = {}) {
         name: "Cross Type Import",
         entries: [{ id: "shared-import-id", lemma: "a" }],
         settings: { ipa: { mappings: [{ id: "shared-import-id", from: "a", to: "b" }] } },
-        morphology: { tables: [{ id: "shared-import-id", name: "A" }] },
+        morphology: { templateGroups: [{ id: "shared-import-id", name: "A", tables: [] }] },
         corpus: { units: [{ id: "shared-import-id", content: "x" }] },
       })),
       409,

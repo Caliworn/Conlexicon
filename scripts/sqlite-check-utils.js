@@ -52,7 +52,20 @@ function sampleSqliteDictionary() {
     },
     docs: { markdown: "# Notes" },
     corpus: { units: [{ id: "corpus-unit-roundtrip", content: "unit" }] },
-    morphology: { tables: [{ id: "morph-roundtrip", name: "Nouns" }] },
+    morphology: {
+      templateGroups: [{
+        id: "morph-roundtrip",
+        name: "Nouns",
+        matchTags: ["n"],
+        tables: [{
+          id: "mtable-roundtrip",
+          title: "Nouns",
+          rowCount: 2,
+          columnCount: 2,
+          cells: {},
+        }],
+      }],
+    },
     entries: [
       {
         id: "entry-root",
@@ -61,7 +74,11 @@ function sampleSqliteDictionary() {
         tags: ["n", "root-tag"],
         definitions: [{ id: "def-root", meaning: "root meaning", example: "root example", note: "root note" }],
         notes: "entry note",
-        morphology: { tableId: "morph-roundtrip", overrides: { "0,0": "root-form" } },
+        morphologyGroups: [{
+          id: "emorph-roundtrip",
+          templateGroupId: "morph-roundtrip",
+          overrides: { "mtable-roundtrip": { "0,0": "root-form" } },
+        }],
       },
       {
         id: "entry-derived",

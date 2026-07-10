@@ -6,7 +6,8 @@
 
 ### 改进
 
-- 新增 `lib/legacy-dictionary-migration.js`，集中处理旧 JSON 字段迁移和迁移报告；核心词典规范化模块改为只处理当前数据形状的默认值、ID 补齐和当前语义规范化。
+- 新增 `lib/legacy-dictionary-migration.js`，集中处理旧 JSON 字段迁移、旧形态结构迁移和迁移报告；核心词典规范化模块改为只处理当前数据形状的默认值、ID 补齐和当前语义规范化，SQLite repository 不再内联 `morphology.tables` / `entry.morphology` 到新结构的迁移逻辑。
+- 共享 `morphology-model` 正式切换为 `templateGroups`、组内子表、`sourceText` 单元格和词条 `morphologyGroups` / 嵌套 override 的当前结构；规则校验、动态生成和形态搜索均按多子表模型执行，模板组、子表和词条形态组 ID 纳入统一防撞检查。
 
 ## 2026-07-07
 

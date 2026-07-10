@@ -171,10 +171,7 @@ function buildDictionary() {
         description: chance(0.12) ? `Synthetic derivation note ${index}` : "",
       },
       notes: chance(0.12) ? `Stress-test entry ${index}; generated with deterministic seed.` : "",
-      morphology: {
-        tableId: "",
-        overrides: {},
-      },
+      morphologyGroups: [],
       createdAt: CREATED_AT,
       updatedAt: CREATED_AT,
     };
@@ -234,7 +231,7 @@ function buildDictionary() {
     },
     morphology: {
       functions: {},
-      tables: [],
+      templateGroups: [],
     },
     createdAt: CREATED_AT,
     updatedAt: CREATED_AT,

@@ -250,7 +250,7 @@ GET /api/dictionaries/:id/entries?q=&fields=&fuzzy=&tagFuzzy=&fuzzyFields=&part=
 }
 ```
 
-形态搜索不是简单读取持久化字段。读取 API 必须使用共享形态模块按以下流程生成搜索对象：先根据词条 `morphology.tableId` 和形态表 `matchTags` 解析适用表格；再逐格读取词条 override；没有 override 时用词形、形态规则和形态函数动态生成默认形式。后续如果引入索引或 SQLite，也必须保持该语义，或在形态配置、词条 lemma、标签或 override 改变时更新对应索引。
+形态搜索不是简单读取持久化字段。读取 API 必须使用共享形态模块按以下流程生成搜索对象：若词条具有显式 `morphologyGroups`，按其 `templateGroupId` 解析一个或多个模板组；否则按词条标签与模板组 `matchTags` 选择首个自动适用组。随后遍历组内全部子表，逐格读取以子表 ID 分层的 override；没有 override 时用词形、形态规则和形态函数动态生成默认形式。后续如果引入索引或 SQLite，也必须保持该语义，或在形态配置、词条 lemma、标签或 override 改变时更新对应索引。
 
 ### 词条 facets
 

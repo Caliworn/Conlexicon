@@ -246,12 +246,13 @@ entry_morphology_cell_overrides(
 
 旧数据迁移语义：
 
-- 旧 JSON 字段迁移入口是 `lib/legacy-dictionary-migration.js`；核心 `dictionary-model` 只处理当前形状规范化。形态 SQL projection 的过渡转换仍在 SQLite repository 内部，等形态前端模型迁到模板组/子表后再并入迁移层。
+- 旧 JSON 字段迁移入口是 `lib/legacy-dictionary-migration.js`；核心 `dictionary-model` 与共享 `morphology-model` 只处理当前形状规范化。旧形态结构到新形态结构的迁移归迁移模块负责；SQLite repository 直接消费共享模型规范化后的模板组/词条形态组并写入 SQL projection。
 - 旧版单个 `morphology.tables[n]` 迁移为一个 `morphology_template_group`，其中包含一个 `morphology_template_table`。
 - 旧版 `table.cells` 迁移为 `morphology_template_cells.source_text`。
 - 旧版 `entry.morphology` 迁移为一个 `entry_morphology_group`。
 - 旧版 `overrides_json` 迁移为 `entry_morphology_cell_overrides`；在模板组和子表已经 SQL 化后，不再继续用复杂 JSON key 保存 override。
 - 旧版本 JSON 导入时必须迁移到新形态结构；但不要为了旧前端数据形状额外维护临时兼容层。形态前端应直接迁到新模板组/子表/词条形态组模型，前端因此暴露的问题应在前端修复。
+- 当前 `morphologyFromDatabase()` 仍会临时生成旧 `morphology.tables`，只为了尚未升级的前端；共享形态模块已直接使用 `templateGroups`。前端迁移完成后，应删除这条 legacy tables 回吐路径，以及词条读取中临时生成的旧 `entry.morphology`。
 
 ## 6. 索引与派生表
 

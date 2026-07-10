@@ -60,7 +60,6 @@ async function runSqliteSchemaCheck() {
     const exported = repository.exportDictionarySnapshot(sourceDictionary.id);
     assert.equal(exported.id, sourceDictionary.id);
     assert.equal(exported.entries.length, sourceDictionary.entries.length);
-    assert.equal(exported.morphology.tables[0].id, "morph-roundtrip");
     assert.equal(exported.morphology.templateGroups[0].id, "morph-roundtrip");
     assert.equal(exported.morphology.templateGroups[0].tables[0].title, "Nouns");
 
@@ -78,7 +77,7 @@ async function runSqliteSchemaCheck() {
       WHERE id = 'morph-roundtrip'
     `).get();
     assert.equal(projectedTemplateGroup.name, "Nouns");
-    assert.deepEqual(JSON.parse(projectedTemplateGroup.matchTagsJson), []);
+    assert.deepEqual(JSON.parse(projectedTemplateGroup.matchTagsJson), ["n"]);
     const projectedTemplateTable = roundtripDb.prepare(`
       SELECT id, group_id AS groupId, title, row_count AS rowCount, column_count AS columnCount
       FROM morphology_template_tables
@@ -106,7 +105,6 @@ async function runSqliteSchemaCheck() {
     const rebuiltEntry = await repository.getEntry(sourceDictionary.id, "entry-root");
     assert.equal(rebuiltEntry.lemma, "root");
     assert.equal(rebuiltEntry.definitions[0].meaning, "root meaning");
-    assert.equal(rebuiltEntry.morphology.tableId, "morph-roundtrip");
     assert.equal(rebuiltEntry.morphologyGroups[0].templateGroupId, "morph-roundtrip");
   } finally {
     await cleanup();

@@ -84,7 +84,7 @@ Legacy JSON 导入应分为几个明确阶段：
    - 判断是不是可识别词典。
    - 拒绝非对象、空对象或明显不是词典的结构。
 2. legacy 兼容迁移。
-   - 由 `lib/legacy-dictionary-migration.js` 处理旧字段，例如旧释义/例句字段、旧来源文本字段、旧 corpus 字段、旧 IPA `stressMappings` 和旧设置字段。
+   - 由 `lib/legacy-dictionary-migration.js` 处理旧字段，例如旧释义/例句字段、旧来源文本字段、旧 corpus 字段、旧 IPA `stressMappings`、旧设置字段，以及旧形态 `morphology.tables` / `entry.morphology` 结构。
    - 记录发生过的 legacy 字段转换。
 3. 规范化。
    - 补齐缺失 ID。
