@@ -177,32 +177,20 @@ GET /api/export?dictionaryId=...&format=xlsx
 
 ## 8. `index.json` 的未来职责
 
-迁移后 `index.json` 仍可保留为全局索引和 UI 偏好文件，但不保存词典内容。
+迁移后 `index.json` 仍保留为全局索引和 UI 偏好文件，但不保存词典内容，也不承担 JSON/SQLite 混合存储识别。项目方向是全面 SQLite 化；正式运行期词典文件统一为 `data/dictionaries/<dictionary-id>.sqlite`。
 
-建议未来字段方向：
+当前推荐保持简单结构：
 
 ```json
 {
   "activeDictionaryId": "dict-...",
   "uiLanguage": "zh",
   "uiTheme": "light",
-  "storageVersion": 2,
-  "dictionaries": [
-    {
-      "id": "dict-...",
-      "storage": "sqlite",
-      "path": "dictionaries/dict-....sqlite",
-      "name": "构典词典",
-      "language": "...",
-      "description": "...",
-      "createdAt": "...",
-      "updatedAt": "..."
-    }
-  ]
+  "dictionaryIds": ["dict-..."]
 }
 ```
 
-真实 `entryCount/rootCount` 这类随时变化的统计不应写死在 index metadata 中；运行时可以从 SQLite 轻量查询。
+词典名称、语言、描述、`entryCount/rootCount` 等从 SQLite 轻量查询；不写入 `index.json` 作为第二份真相。除非未来确有启动性能需求，否则不要为了过渡期存储分流给 `index.json` 增加 `storage/path` 字段。
 
 ## 9. 失败与诊断
 
@@ -247,6 +235,7 @@ GET /api/export?dictionaryId=...&format=xlsx
   - `node scripts/check-sqlite-repository.js`
   - `node scripts/check-sqlite-contract.js`
   - `node scripts/check-sqlite-migration.js`
+  - `node scripts/check-default-repository.js`
   - `git diff --check`
 - SQLite 模式下完成一次 API smoke，至少覆盖：
   - 轻量 `/api/state`
@@ -306,19 +295,22 @@ CONLEXICON_REPOSITORY=json
 
 ## 11. 测试要求
 
-正式迁移前至少需要：
+默认 SQLite 后仍需保留以下测试边界：
 
-- JSON repository 与 SQLite repository 现有契约测试继续通过。
-- 新增转换服务测试：
+- SQLite repository 契约测试继续通过。
+- 默认 repository 启动检查继续覆盖：
+  - 无 `CONLEXICON_REPOSITORY` 时启动 SQLite。
+  - `CONLEXICON_REPOSITORY=json` 时仍可显式切回 legacy/debug JSON repository。
+- 转换服务测试覆盖：
   - 旧 JSON → normalized dictionary。
   - normalized dictionary → SQLite。
   - SQLite → legacy-json。
   - SQLite → portable-json。
-- 新增目录迁移脚本测试：
+- 目录迁移脚本测试覆盖：
   - 使用临时数据目录。
   - 覆盖多词典、当前词典、无词典、坏词典、重复 ID、无效词典 ID。
   - 确认源目录不被修改。
-- 新增 roundtrip 检查：
+- roundtrip 检查覆盖：
   - legacy JSON 输入迁移到 SQLite 后，导出 profile 能通过对应格式校验。
 
 所有测试数据必须放在临时目录，不使用真实 `data/`。

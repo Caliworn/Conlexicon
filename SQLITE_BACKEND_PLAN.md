@@ -352,9 +352,9 @@ POST /api/dictionaries/:id/diagnostics/fix
 
 修复必须返回 dry-run 预览和实际应用结果。
 
-## 8. 当前阶段应该继续做什么
+## 8. 当前状态与后续优先级
 
-既然 SQLite repository 的核心读写、schema、迁移脚本和 feature flag smoke 已经落地，并且 `server.js` 已默认使用 SQLite，当前优先级应从“默认切换前收口”转为“默认 SQLite 后的实测与优化”：
+SQLite repository 的核心读写、schema、迁移脚本和 smoke 已经落地，`server.js` 已默认使用 SQLite。当前优先级是默认 SQLite 后的实测与优化：
 
 1. 使用默认 SQLite 路径继续做真实词典实测；旧 JSON 词典暂时通过词典管理界面的 JSON 导入功能手动迁入。
 2. 保留 `CONLEXICON_REPOSITORY=json` 作为显式 legacy/debug/回滚路径，但不要再把 JSON 作为普通开发默认路径。
@@ -379,9 +379,9 @@ POST /api/dictionaries/:id/diagnostics/fix
 | `saveDocs()` | 已改为直接更新 `module_blobs.docs` | 返回值仍组装完整 snapshot | 写入侧已达当前目标 |
 | `saveMorphology()` | 已保留形态语法校验，并改为直接更新 `module_blobs.morphology`；形态保存仍做局部实体 ID 校验 | 返回值仍组装完整 snapshot | 若未来需要形态搜索索引，再同步刷新索引 |
 | `saveCorpusChanges()` / `queryCorpusUnits()` / `getCorpusBlock()` | 保存已改为直接更新 `module_blobs.corpus`，语料读取仍从 corpus blob 取值；语料保存仍做局部实体 ID 校验 | 语料内容仍是 blob，不是关系表 | 第一版可暂保留；真正大语料阶段再独立 SQL 化 |
-| `saveEntry()` | 已改为 SQL 增量写入，只更新目标 entry、definitions、tags、sources projection 和词典更新时间 | 返回值仍组装完整 snapshot | 写入侧已达当前目标；后续可收窄响应体 |
-| `deleteEntry()` | 已改为 SQL 增量删除目标 entry 及其 projection | 返回值仍组装完整 snapshot | 写入侧已达当前目标；后续可收窄响应体 |
-| `patchEntries()` | 已改为 SQL 增量更新目标词条 projection；携带 settings 时直接更新 settings blob | 返回值仍组装完整 snapshot | 写入侧已达当前目标；后续可收窄响应体 |
+| `saveEntry()` | 已改为 SQL 增量写入，只更新目标 entry、definitions、tags、sources、morphology tables projection 和词典更新时间 | 否；repository 返回 `{ id, updatedAt, entry }`，API 返回保存后的词条 | 写入侧和普通 API 响应已达当前目标 |
+| `deleteEntry()` | 已改为 SQL 增量删除目标 entry 及其 definitions/tags/sources/morphology tables projection | 否；repository 返回 `{ id, updatedAt }`，API 返回 `{ updatedAt }` | 写入侧和普通 API 响应已达当前目标 |
+| `patchEntries()` | 已改为 SQL 增量更新目标词条 projection；携带 settings 时直接更新 settings blob | repository 返回值仍组装完整 snapshot；API 已只返回 `{ id, updatedAt, entries, settings? }` | 后续可继续收窄 repository 返回体 |
 | `getEntry()` | 已按 `entries.id` 读取 SQL 表并组装完整 entry | 否 | 可继续保留 |
 | 无参数 `queryEntries()` | 已直接读取 `entries` 表并按 position 排序 | 否 | 可继续保留；后续接窗口化/分页 |
 | 结构化 `queryEntries()` | 无全文搜索时已下推到 SQL，覆盖词性、标签、来源、`derivedFrom`、排序和分页 | 否 | 可继续扩展更多 SQL 条件 |
@@ -391,7 +391,7 @@ POST /api/dictionaries/:id/diagnostics/fix
 | `queryRootGroups()` | 无搜索场景已使用 SQL projection rows 构建词根分组、排序和分页；带搜索条件时仍回退共享 JS 语义 | 搜索型 rootGroups 仍需要完整 snapshot；无搜索不需要 | 后续结合 FTS/搜索索引处理全文、fuzzy 和动态形态搜索 |
 | 质量检查 / 数据分析 | 还没有直接接 SQLite repository 查询层 | 多数仍依赖前端或共享 JS 切片 | 等基础 repository 稳定后，再做按需 API + SQL/query planner |
 | 契约测试 | SQLite repository 已跑通完整共享 repository contract | 否 | 每次改 repository 语义都继续跑 JSON 与 SQLite contract |
-| 主服务接入 | 默认使用 SQLite repository；`CONLEXICON_REPOSITORY=json` 保留为 legacy/debug/回滚路径；SQLite 路径已完成 API/UI smoke | 否；旧 JSON 词典暂时需要手动导入迁入 SQLite | 继续做真实词典实测；后续再设计产品内自动迁移向导 |
+| 主服务接入 | 默认使用 SQLite repository；`CONLEXICON_REPOSITORY=json` 保留为 legacy/debug/回滚路径；SQLite 路径已完成 API/UI smoke；`scripts/check-default-repository.js` 覆盖默认/显式 JSON 启动路径 | 否；旧 JSON 词典暂时需要手动导入迁入 SQLite | 继续做真实词典实测；后续再设计产品内自动迁移向导 |
 
 ## 9. 默认切换后的第一批优化建议
 
@@ -400,7 +400,7 @@ POST /api/dictionaries/:id/diagnostics/fix
 1. 为全文、fuzzy、标签 fuzzy 和动态形态搜索设计 FTS / 预计算搜索索引，减少完整 entry object 扫描。
 2. 将带搜索条件的 `queryRootGroups()` 从共享 JS 回退推进到 SQL/FTS/搜索索引。
 3. 把数据分析和质量检查推进为按需 API + query planner，而不是前端基于完整 snapshot 重算。
-4. 收窄 SQLite repository 中普通保存方法的返回值，减少不必要的完整 snapshot 组装。
+4. 继续收窄 `patchEntries()` 和模块保存方法的 repository 返回值，减少不必要的完整 snapshot 组装。
 5. 语料库进入独立升级阶段后，再把 `module_blobs.corpus` 拆成正式 SQL 表。
 
 ## 10. 需要暂缓的事情

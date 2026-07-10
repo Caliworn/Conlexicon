@@ -231,11 +231,10 @@ class DictionaryRepository {
 }
 ```
 
-第一步可以实现 `JsonDictionaryRepository`，保持现有行为。只有 API 和测试稳定后再加入 `SqliteDictionaryRepository`。
-
 当前进度：
 
-- 已建立 `JsonDictionaryRepository`、词典模型规范化模块、API 路由模块、HTTP 工具模块和静态文件服务模块；`server.js` 只负责组装这些模块并启动服务。
+- 已建立 `JsonDictionaryRepository`、`SqliteDictionaryRepository`、词典模型规范化模块、API 路由模块、HTTP 工具模块和静态文件服务模块；`server.js` 只负责组装这些模块并启动服务。
+- `server.js` 默认使用 SQLite repository；`CONLEXICON_REPOSITORY=json` 仅保留为 legacy/debug/回滚路径。
 - 当前 API 契约记录在 `API_CONTRACT.md`。该文档是前后端接口边界的长期参考；本文只记录阶段状态和后续计划。
 - 普通运行期保存已基本迁移到词条级、模块级或批量 patch API：新建/完整编辑/局部编辑/删除词条走词条级 API；其他设置、语言文档、语料库、自动形态学、自动 IPA、自动整理标签顺序和批量 IPA 生成走模块级或批量词条 API。
 - 词典管理的名称、语言和描述保存已改用词典元数据 API；页面卸载时的文档/语料自动保存兜底统一走 autosave 入口。
@@ -245,177 +244,25 @@ class DictionaryRepository {
 
 ### 5.2 SQLite 化方向
 
-SQLite 已确定为后续主存储方向。详细草案、schema 初稿和关键 API 契约反推见 `SQLITE_BACKEND_PLAN.md`；本节只保留阶段状态和迁移提醒。后续工作重点不再是评估“是否启用 SQLite”，而是继续收紧 API / query / service 边界，避免前端依赖 JSON 结构或完整快照。
+SQLite 已是默认主存储。真实 schema、当前状态审计和后续优化建议见 `SQLITE_BACKEND_PLAN.md`；迁移策略、JSON 导入/导出 profile 和回滚策略见 `SQLITE_MIGRATION_PLAN.md`。本文只保留接手时需要知道的阶段状态：
 
-切换主存储前仍建议建立基准数据：
+- 正式运行期方向是全面 SQLite 化，不设计 JSON/SQLite 存储分流；`index.json` 继续只保存当前词典、词典 ID 列表和 UI 偏好。
+- 旧 JSON 词典暂时通过词典管理界面的 JSON 导入功能手动迁入 SQLite；产品内自动迁移向导暂缓。
+- JSON repository 保留为 legacy/debug/回滚路径和契约参考，不应继续新增普通功能。
+- 当前 SQLite 写入已是 SQL 增量写入；`saveEntry()` / `deleteEntry()` 的普通响应已收窄，`patchEntries()` 和部分模块保存方法仍会为了 repository 返回值组装完整 snapshot，是阶段 B 后续清债项。
+- 搜索 FTS、数据分析/质量检查 API 化、语料 SQL 分表和产品内迁移向导都不是当前默认切换的阻断项。
 
-- 约 10,000 个词条。
-- 约 100,000 个语料单元。
-- 具有多标签、多义项、词源链接、块/层顺序和 Gloss 内容。
+当前前端数据分析已采用按需切片构建和 slice cache。现阶段缓存上限为 24 条 slice 结果，只是防止搜索词、排序、语言或词典版本变化导致缓存无限增长的临时小容量策略，不是长期语义约束。API 化数据分析后，应由 repository/SQLite 索引、服务端 query planner 或更明确的缓存键替代这类前端临时缓存。
 
-测量：
+词根模式已经接入 `/root-groups`，前端正常路径不再本地构建完整词根分组，也不在大词典请求失败或分页截断时回退前端全量计算。当前大词典下如果后端返回 `hasMore=true`，前端只渲染已返回页面；这是临时止血，不是最终浏览体验。真正的窗口化 root group 浏览、增强型滚动条/词典地图和 marker/overview 数据，应等后端稳定提供 `total`、cursor/offset 窗口和关系索引后再设计。
 
-- 冷启动读取时间和峰值内存。
-- 普通搜索、模糊搜索、标签搜索和形态生成搜索。
-- 打开大型语料块、切换块和保存单元。
-- 数据分析首次生成时间。
-- 完整快照保存耗时与阻塞时间。
-
-建议初始性能目标：
-
-- 已加载索引上的普通搜索在输入防抖后约 150ms 内返回。
-- 打开常规语料块约 300ms 内可交互。
-- 单条编辑不重写全部 100,000 单元。
-- 未打开数据分析时不构建完整分析报告。
-
-这些数字应根据基准机实测调整，不应在没有测量时写成硬性承诺。
-
-当前前端数据分析已采用按需切片构建和 slice cache。现阶段缓存上限为 24 条 slice 结果，只是防止搜索词、排序、语言或词典版本变化导致缓存无限增长的临时小容量策略，不是长期语义约束。后续优化时应复核：
-
-- 当前上限是否足够覆盖常见切换路径，或是否需要调为 16/32 等实测值。
-- 是否改为按词典 ID、顶层 `updatedAt`、语言和设置版本清理整组旧 slice，而不是单纯按插入顺序淘汰。
-- API 化数据分析后，是否将同一策略迁移为 `/analysis/...` 响应缓存或直接由 repository/SQLite 索引替代。
-
-词根模式已经接入 `/root-groups`，前端正常路径不再本地构建完整词根分组，也不在大词典请求失败或分页截断时回退前端全量计算。当前大词典下如果后端返回 `hasMore=true`，前端只渲染已返回页面；这是临时止血，不是最终浏览体验。词根模式分页/窗口化 UI 暂时搁置到后端索引、关系查询或 SQLite 评估之后再做，原因是简单“加载更多”会让列表滚动条只代表已加载内容，不能表达相对于完整词根组集合的真实位置。后续推荐在后端能够稳定提供 `total`、cursor/offset 窗口和关系索引后，再设计以下能力：
-
-- 根据滚动窗口请求对应 root group 页面，而不是只在底部追加。
-- 保持排序键稳定，避免搜索、排序或数据变化后 cursor 漂移。
-- 必要时把单个词根下的超大衍生词列表也拆成独立分页。
-- 数据分析里的词根统计继续走轻量 summary/slice，不为了总览构建完整 root group 列表。
-
-后续可评估“增强型滚动条 / 词典地图”作为独立导航功能，不纳入当前虚拟列表跟手修复：
-
-- 底层仍使用真实 scroll container，保留滚轮、触控板、键盘和触摸滚动兼容性；视觉上可隐藏原生 scrollbar 或在旁边叠加自定义导航条。
-- 自定义 thumb 可即时跟随 pointer，列表内容和虚拟窗口节流追随，释放后再精确同步 scrollTop 与可见窗口。
-- 同一右侧控件可在拖动偏移到左侧时悬浮显示首字母索引，偏移到右侧时悬浮显示日期索引；浮层必须 overlay，不应挤压词条列表布局。
-- marker 数据短期可由当前已加载的 `/entries` 结果构建；真正分页/窗口化或更大词典下，应改由后端返回首字母、日期、搜索命中、书签或质量问题等 marker/overview 数据。
-- 不建议完全自研滚动系统；优先采用“原生滚动容器 + 自定义 overview/navigator”的混合方案。
-
-### 5.3 推荐 SQLite 形态
-
-如果采用 SQLite，推荐每个词典一个数据库文件，而不是所有词典共享一个数据库：
-
-```text
-data/index.json
-data/dictionaries/<dictionary-id>.sqlite
-```
-
-优点：
-
-- 与当前“每词典独立存储”一致。
-- 单词典导入、导出、备份和删除边界清晰。
-- 一个词典损坏不会直接影响其他词典。
-
-JSON 继续作为完整交换格式：
-
-- 导入旧 JSON 时，在事务中迁移到数据库。
-- 导出时从数据库生成完整 JSON 快照。
-- 不建议长期同时双写 JSON 与 SQLite；双写失败会产生两个真相来源。
-- `data/index.json` 继续保存词典索引、当前词典 ID 和全局界面偏好（目前包括语言和主题）。
-- 首次迁移必须保留原 JSON 备份，成功校验后才更新索引指向。
-
-Node 运行时优先评估内置 `node:sqlite`，但必须确认桌面 Electron 所用 Node 版本也支持。若使用 `better-sqlite3`，需要提前验证 Windows 打包、原生模块 ABI 和 Electron 重建流程。
-
-### 5.4 建议数据库结构
-
-核心表可采用：
-
-```text
-dictionary_meta
-dictionary_settings
-entries
-definitions
-entry_tags
-etymology_sources
-corpus_blocks
-corpus_layers
-corpus_units
-corpus_block_attributes
-corpus_layer_attributes
-corpus_unit_attributes
-corpus_unit_placement
-language_docs
-migrations
-```
-
-关键字段：
-
-- 所有实体 ID 使用 `TEXT PRIMARY KEY`。
-- 顺序使用显式 `position INTEGER`，不要依赖插入顺序。
-- `corpus_layers.block_id` 外键指向语料块。
-- `corpus_unit_placement.unit_id` 应唯一，以数据库约束保证单父级。
-- 孤立单元在 placement 表中没有记录。
-- placement 记录只能指向块直属位置或某一层，不能同时指向两者。
-- 属性保留原始值；继承后的有效属性运行时计算或建立可失效缓存。
-- 设置、样式等低频复杂对象可暂时使用 JSON 列，避免过度拆表。
-
-### 5.5 索引建议
-
-最少需要：
-
-```text
-entries(normalized_lemma)
-entries(updated_at)
-entry_tags(tag, entry_id)
-definitions(entry_id, position)
-etymology_sources(source_entry_id)
-corpus_layers(block_id, position)
-corpus_unit_placement(block_id, layer_id, position)
-corpus_units(updated_at)
-```
-
-全文搜索可评估 SQLite FTS5：
-
-- 词形、释义、备注和语料内容分别进入合适的 FTS 表。
-- 保留规范化搜索列，用于大小写、Unicode 和标签替换匹配。
-- 现有模糊匹配不应直接假设 FTS 能替代；必要时先由索引缩小候选，再运行现有模糊算法。
-- 索引在保存事务中增量更新，不要在每次打开数据分析时重建。
-- 标签显示替换值搜索仍应同时匹配原始标签和值映射。
-
-### 5.6 API 与并发
-
-当前 API 契约以 `API_CONTRACT.md` 为准。阶段 B 后续不应让前端重新依赖完整词典快照保存；新增保存能力优先走细粒度端点。
-
-已接入的主要增量/模块端点包括：
-
-```text
-PUT  /api/dictionaries/:id/meta
-PUT  /api/dictionaries/:id/settings
-PUT  /api/dictionaries/:id/docs
-PUT  /api/dictionaries/:id/corpus
-PUT  /api/dictionaries/:id/morphology
-PUT  /api/dictionaries/:id/settings/ipa
-POST /api/dictionaries/:id/autosave
-GET  /api/dictionaries/:id/entries
-POST /api/dictionaries/:id/entries
-PATCH /api/dictionaries/:id/entries
-GET  /api/dictionaries/:id/entries/:entryId
-PUT  /api/dictionaries/:id/entries/:entryId
-DELETE /api/dictionaries/:id/entries/:entryId
-```
-
-大数据模式下再逐步加入读取分页、索引查询和更细语料 changeset：
-
-```text
-GET  /api/dictionaries/:id/entries?query=&cursor=&limit=
-GET  /api/dictionaries/:id/corpus/units?query=&cursor=&limit=
-GET  /api/dictionaries/:id/corpus/blocks/:blockId
-PATCH /api/dictionaries/:id/corpus
-```
-
-- 保留现有完整快照端点作为兼容层和导入/导出路径。
-- 短期不引入词典级 revision。等词条、语料单元、设置模块等增量保存端点稳定后，再基于目标对象的 `updatedAt` 做轻量乐观锁，避免两个窗口对同一对象静默覆盖。
-- 完整快照端点即使保留，也只作为兼容层和低频管理入口；不要在其上叠加复杂冲突合并逻辑。
-- 当前实体 ID 重复检查仍会全量扫描词典。后续建立 ID 索引后，跨类型比较应继续保留，但增量保存只检查本次变更对象及其子对象是否和索引冲突；无关历史重复 ID 不应阻断不相关对象的增量保存。全量重复 ID 检查保留给导入、迁移、完整快照保存和诊断/修复工具。
-- 一次用户操作涉及多个表时必须使用事务。
-- API 错误继续使用结构化错误码，由前端映射为本地化 toast 或应用弹窗；控制台可保留技术错误，但前台不泄露原始数据库堆栈。
-
-### 5.7 阶段 B 验收
+### 5.3 阶段 B 验收
 
 - 旧 JSON 可以无损导入并重新导出。
 - 导出 JSON 的词条、定义、顺序、语料链接、设置和文档与迁移前等价。
 - 同 ID、重复父级、缺失引用会被事务拒绝并给出可理解错误。
-- API 层的普通编辑保存不再依赖完整词典 PUT；若仍使用 JSON repository，底层写文件可能仍会序列化整份词典。只有进入 SQLite 或更细文件布局后，才要求单条保存不重写整库。
+- API 层的普通编辑保存不再依赖完整词典 PUT。
+- SQLite repository 的普通词条保存不重写整库，且 `saveEntry()` / `deleteEntry()` 响应已收窄；后续继续收窄 `patchEntries()` 和模块保存返回值。
 - 10k/100k 基准结果记录在文档或 benchmark 输出中。
 - 失败迁移不会删除或修改原始 JSON。
 
@@ -669,14 +516,15 @@ client/
 
 1. 阅读 `AGENTS.md`、`API_CONTRACT.md`、本文、`CHANGELOG.md` 和当前 diff。
 2. 确认当前分支、工作树和最新提交；如果有未提交改动，先判断归属，不要默认回滚。
-3. 如果继续阶段 B2，先做浏览器 smoke check：新建/完整编辑/局部编辑/删除词条、词典元数据保存、其他设置、语言文档、语料库、形态学、IPA 设置、批量 IPA、标签排序、导入/导出和错误 toast。
-4. 再确认是否还有普通运行期保存路径调用完整 `PUT /api/dictionaries/:id`；完整快照端点暂时保留为兼容层和低频管理入口，不要在 B2 内移除。
-5. 若 B2 继续推进，下一批建议聚焦读取侧和索引前准备：
-   - 明确 `GET /api/state` 未来是否拆分为词典索引、当前词典摘要和按需模块读取；
-   - 为词条搜索/筛选/词源反查建立 repository 查询边界；
-   - 评估语料库是否先拆为块/单元级 changeset；
-   - 记录 1k/10k 压力数据下的实际瓶颈，再决定是否进入索引或 SQLite。
+3. 默认后端已经是 SQLite。若涉及启动/存储，先跑 `node scripts/check-default-repository.js`，确认默认 SQLite 和显式 JSON 回滚路径仍正常。
+4. 若继续阶段 B，优先处理默认 SQLite 后的清债项：
+   - 继续收窄 `patchEntries()` 和模块保存的 repository 返回值，避免 SQL 增量写入后又组装完整 snapshot。
+   - 继续减少前端对完整 snapshot 的依赖，普通保存路径不回到完整 `PUT /api/dictionaries/:id`。
+   - 为全文/fuzzy/动态形态搜索设计 FTS 或预计算搜索索引。
+   - 将数据分析、质量检查推进为按需 API + query planner。
+   - 评估语料库是否先拆为块/单元级 changeset，再决定何时 SQL 分表。
+5. 旧 JSON 词典当前通过词典管理界面的 JSON 导入功能手动迁入 SQLite；不要在未设计备份、报告和回滚前加入启动时自动迁移。
 6. 增量保存稳定后，再基于目标对象的 `updatedAt` 做轻量冲突检查；短期不引入词典级 revision。
-7. 不要在同一批改动里同时进行 SQLite 迁移、例句语料迁移和大规模前端模块化。
+7. 不要在同一批改动里同时进行产品内自动迁移、例句语料迁移和大规模前端模块化。
 
 每一阶段独立提交，`CHANGELOG.md` 的 `New` 节随实现更新；重大用户可见行为、运行方式、数据存储或快捷键变化需要检查 README。

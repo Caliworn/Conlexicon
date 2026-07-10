@@ -69,7 +69,7 @@
 | `POST` | `/api/dictionaries/:id/entries` | 新建词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
 | `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存单个词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
-| `DELETE` | `/api/dictionaries/:id/entries/:entryId` | 删除单个词条 | `{ id, dictionaryId, updatedAt }` | 不因无关历史重复 ID 阻断删除。 |
+| `DELETE` | `/api/dictionaries/:id/entries/:entryId` | 删除单个词条 | `{ updatedAt }` | 不因无关历史重复 ID 阻断删除；前端只用更新时间刷新本地词典状态。 |
 | `PATCH` | `/api/dictionaries/:id/entries` | 批量更新词条字段 | `{ id, updatedAt, entries, settings? }` | 当前仅允许 patch `tags` 和 `pronunciation`；`entries` 只包含本次更新的词条；可附带 `settings` 用于标签排序设置保存。 |
 
 ### 读取侧查询
@@ -145,7 +145,7 @@
 
 ## 计划中的读取 API
 
-阶段 B3 的目标是先建立查询契约，不急于替换全部前端调用。JSON repository 可以暂时用内存扫描实现；后续 SQLite repository 应在不改变前端契约的前提下用索引或 SQL 实现同样语义。
+阶段 B3 的目标是继续收紧查询契约，而不是让前端重新扫描大型完整快照。当前默认后端已经是 SQLite；legacy/debug JSON repository 可以继续用内存扫描保持契约参考，但新增能力应优先考虑 SQLite 索引、SQL 查询或共享 query layer。
 
 ### 启动与词典索引
 
@@ -337,7 +337,7 @@ GET /api/dictionaries/:id/root-groups?q=&fields=&fuzzy=&tagFuzzy=&fuzzyFields=&s
 
 - repository 层为一次请求构建临时关系索引：`id -> entry`、`normalized lemma -> first entry`、`source key -> derived entries`，避免每个来源或衍生查询重复扫描全词条。
 - `entry-relations/:entryId`、`root-groups`、`entries?derivedFrom=` 和后续质量检查中的词源问题应共享同一套关系索引。
-- JSON 文件后端可先做请求级临时索引；如果后续切到 SQLite，则用 `entry_sources(source_key, entry_id)` 或等价表/索引支持 `derivedFrom`、词根分组和词汇网络查询。
+- SQLite 后端应继续用 `entry_sources(source_key, entry_id)` 或等价表/索引支持 `derivedFrom`、词根分组和词汇网络查询；legacy/debug JSON repository 只需保持契约参考，不再作为普通性能优化目标。
 - 前端词根模式当前正常路径以 `/root-groups` 为准；请求失败时显示失败状态，API 结果被分页截断时先渲染已返回页面并保留 `pageInfo`。后续分页/窗口化实装后，应继续用 `cursor` 拉取后续页面，而不是回退前端本地完整分组。
 - 词根模式分页/窗口化 UI 暂时搁置到后端关系索引或 SQLite 评估之后；不要在现阶段用简单无限滚动冒充完整列表滚动条，因为那会让滚动条只代表已加载页面，而不是完整词根组集合。
 
@@ -362,7 +362,8 @@ GET /api/dictionaries/:id/corpus/units/:unitId
 
 ```text
 Repository
-  JsonDictionaryRepository / future SqliteDictionaryRepository
+  SqliteDictionaryRepository
+  JsonDictionaryRepository (legacy/debug/reference)
 
 DictionaryQueryContext
   请求级或持久化索引、基础查询和聚合能力
@@ -390,7 +391,7 @@ Feature Services
 
 当前已落地最小共享实现：`lib/dictionary-query-model.js` 提供前后端可复用的 `createDictionaryQueryContext()`，第一批只接管 `getEntryById()` / `getEntriesByIds()`、relation index、relation summary 和 root family 查询；覆盖率、标签、活动和 corpus placement 仍按原模块逐步迁移。
 
-JSON repository 阶段可为一次请求构建临时 `Map` / `Set` / prefix data；SQLite 阶段用 SQL、持久索引、视图或临时表实现相同接口。上层服务不应依赖底层是完整 JSON 扫描还是 SQLite 查询。
+SQLite 默认路径应逐步用 SQL、持久索引、视图或临时表实现相同接口。legacy/debug JSON repository 可继续为一次请求构建临时 `Map` / `Set` / prefix data 作为契约参考，但上层服务不应依赖底层是完整 JSON 扫描还是 SQLite 查询。
 
 #### 共享 relation/query 能力
 

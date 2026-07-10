@@ -4,16 +4,19 @@
 
 ## New
 
+## 2026-07-07
+
 ### 新增
 
+- 新增 `scripts/check-default-repository.js`，通过临时数据目录真实启动 `server.js`，确认无环境变量时默认使用 SQLite repository，且 `CONLEXICON_REPOSITORY=json` 仍可显式切回 JSON repository。
 - SQLite repository 骨架新增 `patchEntries()`，补齐批量词条 patch 语义，支持 `tags`、`pronunciation` 字段更新和同步 settings 合并。
 - SQLite repository 骨架新增 `queryRootGroups()`，支持词根分组的搜索、排序、分页和 full/summary 返回语义；无搜索场景已使用 SQL projection 构建词根分组，搜索型请求仍保留完整共享语义回退。
 - SQLite repository 骨架新增 `getEntryRelations()`，按现有响应格式返回来源匹配、衍生条目和同根组；来源和衍生查询已使用 SQL projection。
 - SQLite repository 骨架新增 `getEntryFacets()`，支持词性 facets、标签频率和无词性计数的现有语义；当前已使用 SQL 聚合。
 - SQLite repository 骨架的 `queryEntries()` 新增搜索、词性/标签/来源派生筛选、排序、分页和 summary/full 返回语义；结构化筛选、排序和分页已使用 SQL，下阶段再处理全文/模糊/动态形态搜索索引。
-- SQLite repository 骨架新增 metadata、settings、docs、corpus、morphology 和 IPA 模块级保存方法；当前仍通过 module blob/projection 重写保证语义，尚未接入主服务。
-- SQLite repository 骨架新增 skeleton 级词条 CRUD，支持无筛选 `queryEntries()`、`getEntry()`、`saveEntry()` 和 `deleteEntry()`，尚未接入主服务。
-- SQLite repository 骨架新增最小词典生命周期方法，覆盖创建、导入、导出、激活、删除、偏好保存和 state 读取，仍未接入主服务。
+- SQLite repository 新增 metadata、settings、docs、corpus、morphology 和 IPA 模块级保存方法；当前已接入默认主服务，低频复杂模块仍通过 module blob 保存。
+- SQLite repository 新增词条 CRUD，支持 `queryEntries()`、`getEntry()`、`saveEntry()` 和 `deleteEntry()`；当前已接入默认主服务，普通词条写入使用 SQL 增量 projection。
+- SQLite repository 新增最小词典生命周期方法，覆盖创建、导入、导出、激活、删除、偏好保存和 state 读取；当前已作为默认 repository 使用。
 - SQLite repository 骨架新增 JSON ↔ SQLite 最小无损往返：导入时写入完整词条 JSON、模块 blob 和核心查询 projection，导出时还原完整词典 JSON。
 - 新增未接入主流程的 `SqliteDictionaryRepository` 骨架和 SQLite schema 初始化检查脚本，先验证 `.sqlite` 文件、schema migrations、核心词条表、模块 blob 表和第一批索引可在临时目录创建。
 - 新增 `SQLITE_BACKEND_PLAN.md`，明确 SQLite 作为后续主存储的草案、schema 初稿、迁移顺序，并反推启动、词条查询、facets、词根关系、数据分析、质量检查、保存返回值和诊断修复等关键 API 契约。
@@ -32,6 +35,7 @@
 
 ### 改进
 
+- 清理 SQLite 默认化后的文档状态：`NEXT_IMPLEMENTATION_HANDOFF.md` 移除过时的候选 SQLite schema 和“如果采用 SQLite”规划，`API_CONTRACT.md` 改为默认 SQLite 视角，`SQLITE_MIGRATION_PLAN.md` 明确 `index.json` 不承担 JSON/SQLite 存储分流。
 - `SQLITE_BACKEND_PLAN.md` 按当前真实 SQLite schema 和默认 SQLite 状态更新，明确 `entry_morphology_tables`、`entries.etymology_description`、已移除 `entry_json`、后续实测事项和优化方向。
 - `SQLITE_MIGRATION_PLAN.md` 更新 SQLite 默认切换清单和当前迁移策略，明确旧 JSON 词典暂时通过词典管理界面的 JSON 导入功能手动迁入 SQLite，自动迁移向导暂缓。
 - SQLite 开发期 schema 新增 `entries.etymology_description` 投影列和 `entry_morphology_tables` 表，为从 SQL projection 重建完整词条和未来一词条多形态表实例做准备；当前 SQL 开发中间态不做兼容迁移，测试 SQLite 目录需从 JSON 重新生成。
@@ -42,6 +46,7 @@
 - API 新增 `GET /api/dictionaries/:id` 完整词典快照读取端点，供启动、切换词典和兼容层按需加载使用；`API_CONTRACT.md` 同步记录轻量 state 与 active dictionary snapshot 的边界。
 - 词典管理列表和删除确认的词条/词根统计优先使用 `summary.entryCount/rootCount`，避免轻量 state 下为 metadata-only 词典显示 0 或触发完整词典统计。
 - 保存 API 响应继续收窄：metadata、settings、docs、corpus、morphology、IPA 设置、autosave 和批量词条 patch 现在返回局部 payload；前端保存后直接合并局部响应，不再为普通保存重新拉取 `/api/state` 和 active dictionary snapshot。
+- 词条保存和删除的 repository/API 返回值继续收窄：`saveEntry()` 返回保存后的词条，`deleteEntry()` 只向 API 暴露更新时间；`patchEntries()` 暂时保持当前兼容路径。
 - `SQLITE_BACKEND_PLAN.md` 新增 SQLite repository 当前状态审计表，区分已 SQL 增量写入、已 SQL 查询下推、仍走完整快照/JS 全量逻辑和主服务尚未接入的部分。
 - SQLite repository 的 metadata、settings、IPA、docs、morphology 和 corpus 模块保存改为 SQL 级写入，直接更新 `dictionary_meta` 或对应 `module_blobs`，并保留 IPA、形态和语料的局部实体 ID 校验。
 - SQLite repository 的 `saveEntry()`、`deleteEntry()` 和 `patchEntries()` 改为真正 SQL 增量写入：只更新目标词条、释义 projection、标签 projection、来源 projection、相关 settings blob 和词典更新时间，不再为这些操作重写整库 projection。
@@ -51,7 +56,7 @@
 - SQLite repository 的共享契约检查推进到完整契约，覆盖模块保存、批量词条 patch、偏好、导入覆盖、删除和错误状态。
 - SQLite repository 的共享契约检查从 `entryCrud` 推进到 `readApi`，确认基础读取 API、facets、词汇关系、词根分组和读取一致性矩阵已与 JSON repository 当前语义对齐。
 - Repository 契约测试 runner 新增早停阶段；SQLite repository 现在可复用同一套契约检查并通过到 `entryCrud` 阶段。
-- Repository 检查脚本拆分为可复用契约测试 runner 和 JSON repository 入口，为后续 SQLite repository 复用同一套 API/保存/导入导出语义检查做准备。
+- Repository 检查脚本拆分为可复用契约测试 runner 和 JSON repository 入口；SQLite repository 已复用同一套 API/保存/导入导出语义检查。
 - 建立最小共享 query 层，先接管数据分析中的词根/衍生关系统计和词根家族查询，为后续 API 化与共享索引查询打基础。
 - 阶段 B 开始建立数据访问层边界：新增 `JsonDictionaryRepository`、词典模型规范化模块、API 路由模块、HTTP 工具模块和静态文件服务模块，将词典索引、词典 JSON 快照、导入、导出、创建、激活、删除、偏好设置、导入解析、数据规范化、API 分发和静态文件响应从 `server.js` 中抽离；`server.js` 现在只负责组装 repository、路由、静态服务并启动 HTTP 服务器，为后续索引、分页和 SQLite 评估保留兼容入口。
 - 词典实体 ID 唯一性检查扩展覆盖释义、形态表和 IPA 映射规则；前端保存/导入提示与后端 repository 校验现在会一起识别这些对象的重复 ID，缺失 ID 的规范化补齐也会对这些对象和新词典 ID 执行静默防撞。

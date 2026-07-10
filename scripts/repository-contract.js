@@ -929,8 +929,9 @@ async function runRepositoryContractTests(options = {}) {
     const rootEntryId = updated.entries[0].id;
 
     const savedWithNewEntry = await repository.saveEntry(first.id, { lemma: "new entry", definitions: [{ meaning: "new" }] });
-    assert.equal(savedWithNewEntry.entries.length, 2);
-    const repositoryEntryId = savedWithNewEntry.entries.at(-1).id;
+    assert.equal(savedWithNewEntry.id, first.id);
+    assert.equal(savedWithNewEntry.entry.lemma, "new entry");
+    const repositoryEntryId = savedWithNewEntry.entry.id;
     assert.equal((await repository.getEntry(first.id, repositoryEntryId)).lemma, "new entry");
 
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entries`);
@@ -1016,6 +1017,8 @@ async function runRepositoryContractTests(options = {}) {
 
     apiResult = await callApi(repository, "DELETE", `/api/dictionaries/${encodeURIComponent(first.id)}/entries/${encodeURIComponent(apiEntryId)}`);
     assert.equal(apiResult.statusCode, 200);
+    assert.deepEqual(Object.keys(apiResult.body), ["updatedAt"]);
+    assert.ok(apiResult.body.updatedAt);
     await assertRejectStatus(
       callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entries/${encodeURIComponent(apiEntryId)}`),
       404,
