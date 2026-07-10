@@ -4,6 +4,10 @@
 
 ## New
 
+### 改进
+
+- 新增 `lib/legacy-dictionary-migration.js`，集中处理旧 JSON 字段迁移和迁移报告；核心词典规范化模块改为只处理当前数据形状的默认值、ID 补齐和当前语义规范化。
+
 ## 2026-07-07
 
 ### 新增
@@ -36,9 +40,9 @@
 ### 改进
 
 - 清理 SQLite 默认化后的文档状态：`NEXT_IMPLEMENTATION_HANDOFF.md` 移除过时的候选 SQLite schema 和“如果采用 SQLite”规划，`API_CONTRACT.md` 改为默认 SQLite 视角，`SQLITE_MIGRATION_PLAN.md` 明确 `index.json` 不承担 JSON/SQLite 存储分流。
-- `SQLITE_BACKEND_PLAN.md` 按当前真实 SQLite schema 和默认 SQLite 状态更新，明确 `entry_morphology_tables`、`entries.etymology_description`、已移除 `entry_json`、后续实测事项和优化方向。
+- `SQLITE_BACKEND_PLAN.md` 按当前真实 SQLite schema 和默认 SQLite 状态更新，明确形态模板组/子表/词条形态组结构化表、`entries.etymology_description`、已移除 `entry_json`、后续实测事项和优化方向。
 - `SQLITE_MIGRATION_PLAN.md` 更新 SQLite 默认切换清单和当前迁移策略，明确旧 JSON 词典暂时通过词典管理界面的 JSON 导入功能手动迁入 SQLite，自动迁移向导暂缓。
-- SQLite 开发期 schema 新增 `entries.etymology_description` 投影列和 `entry_morphology_tables` 表，为从 SQL projection 重建完整词条和未来一词条多形态表实例做准备；当前 SQL 开发中间态不做兼容迁移，测试 SQLite 目录需从 JSON 重新生成。
+- SQLite 开发期 schema 新增 `entries.etymology_description` 投影列，并将形态学结构拆为模板组、子表、单元格、词条形态组和单元格 override 表；旧 `leftV/rightV` 设置暂时继续留在 morphology module blob，当前 SQL 开发中间态不做兼容迁移，测试 SQLite 目录需从 JSON 重新生成。
 - SQLite repository 移除 `entries.entry_json` 存储字段；词条写入、单条读取、列表读取、词源关系、词根分组和导出快照现在都以 SQL projection 表为主结构，JSON 导出由 SQL 表组装生成。
 - SQLite 检查脚本拆分职责：新增 schema/projection 检查、lifecycle smoke 和共享 SQLite 检查工具，`check-sqlite-repository.js` 改为薄聚合入口，完整行为一致性继续由 `check-sqlite-contract.js` 负责。
 - `server.js` 默认 repository 切换为 SQLite；`CONLEXICON_REPOSITORY=json` 保留为 legacy/debug/回滚路径，README、API 契约和 SQLite 计划同步记录手动导入旧 JSON 词典的迁移方式。
@@ -47,6 +51,9 @@
 - 词典管理列表和删除确认的词条/词根统计优先使用 `summary.entryCount/rootCount`，避免轻量 state 下为 metadata-only 词典显示 0 或触发完整词典统计。
 - 保存 API 响应继续收窄：metadata、settings、docs、corpus、morphology、IPA 设置、autosave 和批量词条 patch 现在返回局部 payload；前端保存后直接合并局部响应，不再为普通保存重新拉取 `/api/state` 和 active dictionary snapshot。
 - 词条保存和删除的 repository/API 返回值继续收窄：`saveEntry()` 返回保存后的词条，`deleteEntry()` 只向 API 暴露更新时间；`patchEntries()` 暂时保持当前兼容路径。
+- `SQLITE_BACKEND_PLAN.md` 更新形态学结构化 schema 状态，明确模板组、子表、单元格、词条形态组和 override 的 SQL 化边界，并记录函数/集合 DSL 源码不做函数级主表、生成结果和诊断只作派生缓存或索引。
+- `AGENTS.md` 和 handoff 补充数据模型升级取向：只保证旧版本 JSON 能导入并转换成新格式，除非必要不为旧前端数据形状额外维护临时兼容层。
+- `AGENTS.md`、SQLite 计划和迁移计划明确 JSON repository 冻结为 legacy/debug/迁移参考，不再要求随新增功能、schema 升级、读取优化或前端新数据模型同步更新；同时补充“任何对象 SQL 化前必须先判断必要性”的长期原则。
 - `SQLITE_BACKEND_PLAN.md` 新增 SQLite repository 当前状态审计表，区分已 SQL 增量写入、已 SQL 查询下推、仍走完整快照/JS 全量逻辑和主服务尚未接入的部分。
 - SQLite repository 的 metadata、settings、IPA、docs、morphology 和 corpus 模块保存改为 SQL 级写入，直接更新 `dictionary_meta` 或对应 `module_blobs`，并保留 IPA、形态和语料的局部实体 ID 校验。
 - SQLite repository 的 `saveEntry()`、`deleteEntry()` 和 `patchEntries()` 改为真正 SQL 增量写入：只更新目标词条、释义 projection、标签 projection、来源 projection、相关 settings blob 和词典更新时间，不再为这些操作重写整库 projection。

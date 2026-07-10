@@ -437,7 +437,7 @@ function checkModelNormalization() {
   assert.equal(qualityReport.issues.some((issue) => issue.title === "Gloss alignment mismatch"), true);
   assert.equal(qualityReport.issues.some((issue) => issue.title === "Near-duplicate tags"), true);
   assert.equal(qualityReport.networkIssues.some((issue) => issue.title === "Unresolved source"), true);
-  assert.equal(ipaModel.normalizeIpaSettings({ stressMappings: [{ from: "a", to: "a" }] }).mappings[0].to, "ˈa");
+  assert.equal(ipaModel.normalizeIpaSettings({ mappings: [{ from: "a", to: "ˈa" }] }).mappings[0].to, "ˈa");
   assert.deepEqual(ipaModel.normalizeClusterList("t͡ʃ, t, t͡ʃ"), ["t͡ʃ", "t"]);
   assert.equal(
     ipaModel.generateIpaFromLemma("ata", {
@@ -493,19 +493,18 @@ function checkModelNormalization() {
   );
 
   const normalized = normalizeDictionary({
-    name: "Legacy",
+    name: "Current",
     entries: [
       {
         lemma: "acar",
-        partOfSpeech: "n",
-        meaning: "root",
-        roots: "old source",
-        etymology: { sourceEntryId: "entry-source" },
+        tags: ["n"],
+        definitions: [{ meaning: "root" }],
+        etymology: { sources: ["entry-source"], description: "source note" },
       },
     ],
     settings: {
       entryListTagDisplayLimit: 99,
-      ipa: { stressMappings: [{ from: "a", to: "a" }] },
+      ipa: { mappings: [{ from: "a", to: "ˈa" }] },
     },
   });
 
@@ -513,6 +512,7 @@ function checkModelNormalization() {
   assert.equal(normalized.entries[0].tags[0], "n");
   assert.equal(normalized.entries[0].definitions[0].meaning, "root");
   assert.deepEqual(normalized.entries[0].etymology.sources, ["entry-source"]);
+  assert.equal(normalized.entries[0].etymology.description, "source note");
   assert.equal(normalized.settings.entryListTagDisplayLimit, 10);
   assert.equal(normalized.settings.ipa.mappings[0].to, "ˈa");
 
@@ -530,6 +530,28 @@ function checkModelNormalization() {
   assert.equal(imported.entries[0].lemma, "item");
 
   const conversionService = createDictionaryConversionService();
+  const legacyConvertedImport = conversionService.importDictionaryFromJsonPayload({
+    name: "Legacy",
+    entries: [
+      {
+        lemma: "legacy",
+        partOfSpeech: "n",
+        meaning: "root",
+        roots: "old source",
+        etymology: { sourceEntryId: "entry-source" },
+      },
+    ],
+    settings: {
+      ipa: { stressMappings: [{ from: "a", to: "a" }] },
+    },
+  });
+  assert.equal(legacyConvertedImport.dictionary.entries[0].tags[0], "n");
+  assert.equal(legacyConvertedImport.dictionary.entries[0].definitions[0].meaning, "root");
+  assert.equal(legacyConvertedImport.dictionary.entries[0].etymology.description, "old source");
+  assert.deepEqual(legacyConvertedImport.dictionary.entries[0].etymology.sources, ["entry-source"]);
+  assert.equal(legacyConvertedImport.dictionary.settings.ipa.mappings[0].to, "ˈa");
+  assert.ok(legacyConvertedImport.report.repairs.length);
+
   const convertedImport = conversionService.importDictionaryFromJsonPayload({
     id: "dict-22222222-2222-4222-8222-222222222222",
     name: "Converted",
@@ -921,7 +943,7 @@ async function runRepositoryContractTests(options = {}) {
 
     const updated = await repository.updateDictionary(first.id, {
       name: "First Updated",
-      entries: [{ lemma: "root", partOfSpeech: "n", meaning: "root meaning" }],
+      entries: [{ lemma: "root", tags: ["n"], definitions: [{ meaning: "root meaning" }] }],
     });
     assert.equal(updated.name, "First Updated");
     assert.equal(updated.entries[0].tags[0], "n");

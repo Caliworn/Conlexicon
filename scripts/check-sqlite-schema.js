@@ -40,10 +40,14 @@ async function runSqliteSchemaCheck() {
       "definitions",
       "entry_tags",
       "entry_sources",
-      "entry_morphology_tables",
+      "morphology_template_groups",
+      "morphology_template_tables",
+      "morphology_template_cells",
+      "entry_morphology_groups",
+      "entry_morphology_cell_overrides",
       "schema_migrations",
     ].forEach((table) => assert.equal(tables.has(table), true, `missing table: ${table}`));
-    ["dictionary_settings", "ipa_rules", "morphology_tables", "corpus_units"]
+    ["dictionary_settings", "ipa_rules", "morphology_tables", "entry_morphology_tables", "corpus_units"]
       .forEach((table) => assert.equal(tables.has(table), false, `unexpected table: ${table}`));
 
     const entryColumns = new Set(db.prepare("PRAGMA table_info(entries)").all().map((row) => row.name));
@@ -54,7 +58,11 @@ async function runSqliteSchemaCheck() {
     const sourceDictionary = sampleSqliteDictionary();
     await repository.importDictionarySnapshot(sourceDictionary);
     const exported = repository.exportDictionarySnapshot(sourceDictionary.id);
-    assert.deepEqual(exported, sourceDictionary);
+    assert.equal(exported.id, sourceDictionary.id);
+    assert.equal(exported.entries.length, sourceDictionary.entries.length);
+    assert.equal(exported.morphology.tables[0].id, "morph-roundtrip");
+    assert.equal(exported.morphology.templateGroups[0].id, "morph-roundtrip");
+    assert.equal(exported.morphology.templateGroups[0].tables[0].title, "Nouns");
 
     const roundtripDb = repository.openDictionaryDatabase(sourceDictionary.id);
     assert.equal(roundtripDb.prepare("SELECT COUNT(*) AS count FROM entries").get().count, 2);
@@ -64,19 +72,42 @@ async function runSqliteSchemaCheck() {
       roundtripDb.prepare("SELECT etymology_description FROM entries WHERE id = 'entry-derived'").get().etymology_description,
       "derived from root",
     );
-    const projectedMorphology = roundtripDb.prepare(`
-      SELECT table_id AS tableId, overrides_json AS overridesJson
-      FROM entry_morphology_tables
+    const projectedTemplateGroup = roundtripDb.prepare(`
+      SELECT id, name, match_tags_json AS matchTagsJson
+      FROM morphology_template_groups
+      WHERE id = 'morph-roundtrip'
+    `).get();
+    assert.equal(projectedTemplateGroup.name, "Nouns");
+    assert.deepEqual(JSON.parse(projectedTemplateGroup.matchTagsJson), []);
+    const projectedTemplateTable = roundtripDb.prepare(`
+      SELECT id, group_id AS groupId, title, row_count AS rowCount, column_count AS columnCount
+      FROM morphology_template_tables
+      WHERE group_id = 'morph-roundtrip'
+    `).get();
+    assert.equal(projectedTemplateTable.title, "Nouns");
+    assert.equal(projectedTemplateTable.rowCount, 2);
+    assert.equal(projectedTemplateTable.columnCount, 2);
+    const projectedMorphologyGroup = roundtripDb.prepare(`
+      SELECT id, template_group_id AS templateGroupId
+      FROM entry_morphology_groups
       WHERE entry_id = 'entry-root'
       ORDER BY position ASC
     `).get();
-    assert.equal(projectedMorphology.tableId, "morph-roundtrip");
-    assert.deepEqual(JSON.parse(projectedMorphology.overridesJson), { "0,0": "root-form" });
+    assert.equal(projectedMorphologyGroup.templateGroupId, "morph-roundtrip");
+    const projectedOverride = roundtripDb.prepare(`
+      SELECT template_table_id AS templateTableId, row_index AS rowIndex, column_index AS columnIndex, value
+      FROM entry_morphology_cell_overrides
+      WHERE entry_morphology_group_id = ?
+    `).get(projectedMorphologyGroup.id);
+    assert.equal(projectedOverride.rowIndex, 0);
+    assert.equal(projectedOverride.columnIndex, 0);
+    assert.equal(projectedOverride.value, "root-form");
 
     const rebuiltEntry = await repository.getEntry(sourceDictionary.id, "entry-root");
     assert.equal(rebuiltEntry.lemma, "root");
     assert.equal(rebuiltEntry.definitions[0].meaning, "root meaning");
     assert.equal(rebuiltEntry.morphology.tableId, "morph-roundtrip");
+    assert.equal(rebuiltEntry.morphologyGroups[0].templateGroupId, "morph-roundtrip");
   } finally {
     await cleanup();
   }

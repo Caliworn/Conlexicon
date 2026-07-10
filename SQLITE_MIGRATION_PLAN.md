@@ -16,7 +16,7 @@
 | --- | --- |
 | Canonical SQLite dictionary | 应用正式使用的 `.sqlite` 词典文件。 |
 | Legacy JSON dictionary | 旧版 Conlexicon 直接存储和读取的 JSON 词典文件。 |
-| Normalized dictionary | 经过当前 `normalizeDictionary()`、旧字段兼容、ID 补齐和校验后的内存词典对象。 |
+| Normalized dictionary | 经过当前 `normalizeDictionary()` 的当前形状内存词典对象，只包含当前规范化、ID 补齐和当前语义校验。旧字段兼容应在进入 normalized dictionary 前完成。 |
 | Import adapter | 把某种外部格式解析成 normalized dictionary 或可诊断中间结构的模块。 |
 | Export profile | 从 canonical SQLite dictionary 生成某种导出格式的规则，例如 legacy JSON、portable JSON、compact JSON、XLSX。 |
 | Migration report | 迁移或导入过程生成的结构化报告，记录成功项、警告、修复和失败原因。 |
@@ -53,9 +53,11 @@
 JSON repository 在迁移完成后可以保留为：
 
 - 旧数据读取和迁移工具的一部分。
-- 契约测试参考实现，直到 SQLite 完全接管。
-- legacy JSON 导出 profile 的参考。
+- legacy/debug subset 的基础检查对象。
+- 旧 JSON 导入转换和 legacy JSON 导出 profile 的参考。
 - 紧急回退工具，但不作为普通运行期主路径。
+
+JSON repository 不再作为并行后端追随新增功能。SQLite repository 跑完整当前主契约；JSON repository 只覆盖旧 JSON 导入/转换、基础读取、legacy 导出和显式回滚相关检查。
 
 ## 4. 标准转换服务
 
@@ -72,7 +74,7 @@ exportSqliteDictionary(dictionaryId, profile, options)
 migrateJsonDataDirectoryToSqlite(sourceDataDir, targetDataDir, options)
 ```
 
-其中 `SqliteDictionaryRepository.importDictionarySnapshot()` 可以继续承担“把 normalized dictionary 写入 SQLite”的底层能力；转换服务负责更高层的格式判断、报告、备份策略和 profile 选择。
+其中 `lib/legacy-dictionary-migration.js` 负责旧 JSON 字段迁移和迁移报告，`SqliteDictionaryRepository.importDictionarySnapshot()` 可以继续承担“把 normalized dictionary 写入 SQLite”的底层能力；转换服务负责更高层的格式判断、报告、备份策略和 profile 选择。
 
 ## 5. 导入流程
 
@@ -82,11 +84,11 @@ Legacy JSON 导入应分为几个明确阶段：
    - 判断是不是可识别词典。
    - 拒绝非对象、空对象或明显不是词典的结构。
 2. legacy 兼容迁移。
-   - 处理旧字段，例如旧 IPA 重音规则字段、旧释义/例句字段、旧来源文本字段。
+   - 由 `lib/legacy-dictionary-migration.js` 处理旧字段，例如旧释义/例句字段、旧来源文本字段、旧 corpus 字段、旧 IPA `stressMappings` 和旧设置字段。
    - 记录发生过的 legacy 字段转换。
 3. 规范化。
    - 补齐缺失 ID。
-   - 规范化 settings、docs、corpus、morphology、IPA、entries、definitions、sources、tags。
+   - 规范化当前形状的 settings、docs、corpus、morphology、IPA、entries、definitions、sources、tags。
    - 对错误词典 ID 提供“作为新词典导入并重新生成 ID”的路径。
 4. 校验。
    - 完整实体 ID 唯一性。
@@ -224,7 +226,7 @@ GET /api/export?dictionaryId=...&format=xlsx
   - `index.json`
   - 每个词典一个 `dictionaries/<dictionary-id>.sqlite`
   - `entries` 表无 `entry_json` 列
-  - `entry_morphology_tables` 表存在
+  - `morphology_template_groups/tables/cells` 与 `entry_morphology_groups/cell_overrides` 表存在
   - `entries.etymology_description` 列存在
 - 下列脚本通过：
   - `node --check app.js`
@@ -257,7 +259,7 @@ GET /api/export?dictionaryId=...&format=xlsx
   - Stress Test 10k
 - 默认切换时必须更新 `README.md`、`API_CONTRACT.md` 和本文档，明确：
   - SQLite 是默认 repository。
-  - JSON repository 仅作为 legacy/debug/迁移来源。
+  - JSON repository 仅作为 legacy/debug/迁移来源，不再同步新增普通功能。
   - 旧 JSON data 需要显式导入或显式迁移；开发期不静默原地迁移真实 `data/`。
   - 回滚方式是显式设置 `CONLEXICON_REPOSITORY=json` 并使用原 JSON data 目录。
 
