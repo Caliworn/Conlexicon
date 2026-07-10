@@ -8,6 +8,10 @@
 
 - 新增 `lib/legacy-dictionary-migration.js`，集中处理旧 JSON 字段迁移、旧形态结构迁移和迁移报告；核心词典规范化模块改为只处理当前数据形状的默认值、ID 补齐和当前语义规范化，SQLite repository 不再内联 `morphology.tables` / `entry.morphology` 到新结构的迁移逻辑。
 - 共享 `morphology-model` 正式切换为 `templateGroups`、组内子表、`sourceText` 单元格和词条 `morphologyGroups` / 嵌套 override 的当前结构；规则校验、动态生成和形态搜索均按多子表模型执行，模板组、子表和词条形态组 ID 纳入统一防撞检查。
+- 前端完成形态学数据模型迁移的第一步：启动、词典状态规范化、ID 收集和词条保存改为保留 `templateGroups` / `morphologyGroups`；旧单表界面暂通过局部视图适配运行，避免共享模型升级后被误报为后端 API 断连。
+- 词条详情页的形态展示已改为正式的模板组/子表渲染：一个词条可展示多个形态组及其全部子表，并按子表独立读取 override。兼容旧词典中“自动匹配 + override”的 `templateGroupId: "auto"` 记录，使其在匹配模板组的首个子表上正确生效。
+- 词条形态组新增 `notes` 字段并写入 SQLite；详情页仅在对应形态组下展示该实例备注，模板组自身的备注不会泄露到词条详情或词条编辑界面。
+- 词条详情中的子表标题不再重复写入表格左上角表头；标题仅显示在子表标题区域，左上角保留为空白的行标签表头。
 
 ## 2026-07-07
 

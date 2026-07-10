@@ -491,6 +491,38 @@ function checkModelNormalization() {
     }),
     ["BadFn: rightV not configured"],
   );
+  const automaticMorphologyDictionary = {
+    morphology: {
+      templateGroups: [{
+        id: "morph-auto",
+        name: "Auto group",
+        matchTags: ["n"],
+        tables: [{
+          id: "mtable-auto",
+          title: "Auto table",
+          rowCount: 1,
+          columnCount: 1,
+          cells: { "0,0": { sourceText: "{lemma}-generated" } },
+        }],
+      }],
+    },
+  };
+  assert.deepEqual(
+    morphologyModel.morphologySearchStrings({
+      lemma: "root",
+      tags: ["n"],
+      morphologyGroups: [{ templateGroupId: "auto", overrides: { auto: { "0,0": "roots" } } }],
+    }, automaticMorphologyDictionary),
+    ["roots"],
+  );
+  assert.deepEqual(
+    morphologyModel.morphologySearchStrings({
+      lemma: "root",
+      tags: ["n"],
+      morphologyGroups: [{ templateGroupId: "none" }],
+    }, automaticMorphologyDictionary),
+    [],
+  );
 
   const normalized = normalizeDictionary({
     name: "Current",

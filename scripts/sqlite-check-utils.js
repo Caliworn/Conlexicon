@@ -77,6 +77,7 @@ function sampleSqliteDictionary() {
         morphologyGroups: [{
           id: "emorph-roundtrip",
           templateGroupId: "morph-roundtrip",
+          notes: "Irregular plural retained for this entry.",
           overrides: { "mtable-roundtrip": { "0,0": "root-form" } },
         }],
       },

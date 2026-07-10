@@ -251,7 +251,7 @@ SQLite 已是默认主存储。真实 schema、当前状态审计和后续优化
 - JSON repository 保留为 legacy/debug/回滚路径、旧 JSON 导入迁移参考和基础检查对象；不再作为并行后端追随新增功能、schema 升级、读取优化或前端新数据模型。
 - SQLite repository 跑完整当前主契约；JSON repository 只跑 legacy/debug subset 和旧 JSON 转换相关检查。
 - 当前 SQLite 写入已是 SQL 增量写入；`saveEntry()` / `deleteEntry()` 的普通响应已收窄，`patchEntries()` 和部分模块保存方法仍会为了 repository 返回值组装完整 snapshot，是阶段 B 后续清债项。
-- 形态学结构化 schema 见 `SQLITE_BACKEND_PLAN.md` 5.4：模板组/子表/单元格/词条形态组/override 已 SQL 化；共享 `morphology-model` 已使用当前 `templateGroups` / `morphologyGroups` 结构，旧形态结构迁移集中在 `lib/legacy-dictionary-migration.js`。下一步迁移形态前端，完成后删除 SQLite 读取时临时回吐的旧 `morphology.tables` / `entry.morphology`。旧 `leftV/rightV` 设置暂留 `module_blobs.morphology`，函数、集合和 DSL 源码后续不做函数级主表，生成结果、AST 和诊断只作为派生缓存或索引。
+- 形态学结构化 schema 见 `SQLITE_BACKEND_PLAN.md` 5.4：模板组/子表/单元格/词条形态组/override 已 SQL 化；共享 `morphology-model` 已使用当前 `templateGroups` / `morphologyGroups` 结构，旧形态结构迁移集中在 `lib/legacy-dictionary-migration.js`。`entry_morphology_groups.notes` 已作为词条实例备注接入 SQL、导入导出和详情展示；模板组 `notes` 不应出现在词条详情或词条编辑。前端已完成数据模型迁移与词条详情的多组/多子表展示；旧单表编辑 UI 目前仅经 `app.js` 的临时视图适配运行。下一步迁移形态编辑页面，并拆为导航栏中的两个独立入口：**形态函数**（为后续 DSL 配置预留）与 **形态表格**（模板组、子表、词条级 override、实例备注）。两页迁移完成后，删除 SQLite 读取时临时回吐的旧 `morphology.tables` / `entry.morphology` 和前端单表适配。旧 `leftV/rightV` 设置暂留 `module_blobs.morphology`，函数、集合和 DSL 源码后续不做函数级主表，生成结果、AST 和诊断只作为派生缓存或索引。
 - 数据模型升级时只保证旧版本 JSON 能导入并转换成新格式；除非确有必要，不要为了旧前端数据形状额外维护临时兼容层。旧 JSON 字段迁移集中在 `lib/legacy-dictionary-migration.js`，核心 `dictionary-model` 只处理当前形状规范化。前端因新模型出问题时，优先修前端。
 - 搜索 FTS、数据分析/质量检查 API 化、语料 SQL 分表和产品内迁移向导都不是当前默认切换的阻断项。
 

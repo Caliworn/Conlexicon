@@ -54,6 +54,9 @@ async function runSqliteSchemaCheck() {
     ["id", "position", "lemma", "pronunciation", "notes", "etymology_description", "created_at", "updated_at", "sort_key"]
       .forEach((column) => assert.equal(entryColumns.has(column), true, `missing entries column: ${column}`));
     assert.equal(entryColumns.has("entry_json"), false);
+    const entryMorphologyGroupColumns = new Set(db.prepare("PRAGMA table_info(entry_morphology_groups)").all().map((row) => row.name));
+    ["id", "entry_id", "position", "template_group_id", "title", "notes", "created_at", "updated_at"]
+      .forEach((column) => assert.equal(entryMorphologyGroupColumns.has(column), true, `missing entry morphology group column: ${column}`));
 
     const sourceDictionary = sampleSqliteDictionary();
     await repository.importDictionarySnapshot(sourceDictionary);
@@ -87,12 +90,13 @@ async function runSqliteSchemaCheck() {
     assert.equal(projectedTemplateTable.rowCount, 2);
     assert.equal(projectedTemplateTable.columnCount, 2);
     const projectedMorphologyGroup = roundtripDb.prepare(`
-      SELECT id, template_group_id AS templateGroupId
+      SELECT id, template_group_id AS templateGroupId, notes
       FROM entry_morphology_groups
       WHERE entry_id = 'entry-root'
       ORDER BY position ASC
     `).get();
     assert.equal(projectedMorphologyGroup.templateGroupId, "morph-roundtrip");
+    assert.equal(projectedMorphologyGroup.notes, "Irregular plural retained for this entry.");
     const projectedOverride = roundtripDb.prepare(`
       SELECT template_table_id AS templateTableId, row_index AS rowIndex, column_index AS columnIndex, value
       FROM entry_morphology_cell_overrides
@@ -106,6 +110,7 @@ async function runSqliteSchemaCheck() {
     assert.equal(rebuiltEntry.lemma, "root");
     assert.equal(rebuiltEntry.definitions[0].meaning, "root meaning");
     assert.equal(rebuiltEntry.morphologyGroups[0].templateGroupId, "morph-roundtrip");
+    assert.equal(rebuiltEntry.morphologyGroups[0].notes, "Irregular plural retained for this entry.");
   } finally {
     await cleanup();
   }
