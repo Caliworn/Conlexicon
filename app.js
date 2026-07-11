@@ -90,6 +90,8 @@ const qualityViewStates = new Map();
 const corpusViewStates = new Map();
 let corpusDraftState = null;
 const DEFAULT_TOOL_NAV_ORDER = ["editor", "docs", "corpus", "analysis", "quality", "ipa", "morphology-functions", "morphology-tables", "settings", "manager"];
+const DEFAULT_ENTRY_SECTION_ORDER = ["definitions", "etymology", "derived", "morphology", "notes"];
+const ENTRY_LIST_PART_DISPLAY_OPTIONS = ["subtitle", "chips", "both"];
 let advancedFilter = null;
 let entryQueryState = {
   key: "",
@@ -120,6 +122,7 @@ let qualityReportCache = null;
 let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
 let draggedToolNavView = "";
+let draggedEntrySectionId = "";
 let draggedIpaRuleId = "";
 let draggedMorphologyGroupId = "";
 let draggedMorphologyTableId = "";
@@ -347,6 +350,10 @@ const i18n = {
     entryListTagDisplayLimit: "词条列表中标签显示上限",
     entryListTagDisplayLimitHelp: "设为 n 时，超过 n 个标签会显示前 n-1 个和省略号。默认为 3。",
     entryListTagDisplayLimitInvalid: "词条列表标签显示上限必须是 2 到 10 之间的整数。",
+    entryListPartDisplay: "词条列表中词性显示位置",
+    entryListPartDisplaySubtitle: "副标题",
+    entryListPartDisplayChips: "标签区",
+    entryListPartDisplayBoth: "两者均显示",
     tagTooltipRawTag: "原始标签",
     tagTooltipDisplayReplacement: "显示替换",
     partOfSpeechTagSettings: "词性标签",
@@ -372,6 +379,8 @@ const i18n = {
     networkPolysemyDisplay: "词汇网络悬浮卡片的多义项显示",
     emptyEntrySections: "空栏目",
     showEmptyEntrySections: "在词条浏览界面显示空栏目",
+    entrySectionOrder: "词条栏目排序",
+    entrySectionOrderHelp: "拖动卡片以调整词条详情和完整编辑中栏目顺序。衍生词只在有内容时显示，且不可在完整编辑中修改。",
     ipaKeyboardSettings: "IPA 虚拟键盘",
     ipaKeyboardSymbols: "键盘符号",
     ipaKeyboardHelp: "以空格、逗号或换行分隔。新词典默认包含 ˈ 和 ˌ。",
@@ -809,6 +818,10 @@ const i18n = {
     entryListTagDisplayLimit: "Entry list tag display limit",
     entryListTagDisplayLimitHelp: "Set to n: entries with more than n tags show the first n-1 tags and an ellipsis. Default: 3.",
     entryListTagDisplayLimitInvalid: "Entry list tag display limit must be an integer from 2 to 10.",
+    entryListPartDisplay: "Part-of-speech position in entry list",
+    entryListPartDisplaySubtitle: "Subtitle",
+    entryListPartDisplayChips: "Tag area",
+    entryListPartDisplayBoth: "Both",
     tagTooltipRawTag: "Raw tag",
     tagTooltipDisplayReplacement: "Display",
     partOfSpeechTagSettings: "Part-of-Speech Tags",
@@ -834,6 +847,8 @@ const i18n = {
     networkPolysemyDisplay: "Lexical network hover-card polysemy display",
     emptyEntrySections: "Empty Sections",
     showEmptyEntrySections: "Show empty sections in the entry view",
+    entrySectionOrder: "Entry Section Order",
+    entrySectionOrderHelp: "Drag cards to reorder sections in entry display and full editing. Derived entries appear only when present and remain read-only in full editing.",
     ipaKeyboardSettings: "IPA Virtual Keyboard",
     ipaKeyboardSymbols: "Keyboard Symbols",
     ipaKeyboardHelp: "Separate symbols with spaces, commas, or line breaks. New dictionaries include ˈ and ˌ by default.",
@@ -1119,6 +1134,7 @@ const elements = {
   toolList: document.querySelector(".tool-list"),
   toolButtons: document.querySelectorAll(".tool-button"),
   toolNavOrderList: document.querySelector("#toolNavOrderList"),
+  entrySectionOrderList: document.querySelector("#entrySectionOrderList"),
   dictionaryManagerList: document.querySelector("#dictionaryManagerList"),
   dictionaryMeta: document.querySelector("#dictionaryMeta"),
   dictionaryTitle: document.querySelector("#dictionaryTitle"),
@@ -1164,6 +1180,8 @@ const elements = {
   ipaKeyboard: document.querySelector("#ipaKeyboard"),
   tagsInput: document.querySelector("#tagsInput"),
   entryMorphologyControls: document.querySelector("#entryMorphologyControls"),
+  fullEditDerivedSection: document.querySelector("#fullEditDerivedSection"),
+  fullEditDerived: document.querySelector("#fullEditDerived"),
   definitionFormList: document.querySelector("#definitionFormList"),
   addDefinitionButton: document.querySelector("#addDefinitionButton"),
   sourceEntryInput: document.querySelector("#sourceEntryInput"),
@@ -1207,6 +1225,7 @@ const elements = {
   tagDisplayMapInput: document.querySelector("#tagDisplayMapInput"),
   entryListRawTagDisplayInput: document.querySelector("#entryListRawTagDisplayInput"),
   entryListTagDisplayLimitInput: document.querySelector("#entryListTagDisplayLimitInput"),
+  entryListPartDisplayInput: document.querySelector("#entryListPartDisplayInput"),
   manualPartOfSpeechTagsInput: document.querySelector("#manualPartOfSpeechTagsInput"),
   partOfSpeechTagsInput: document.querySelector("#partOfSpeechTagsInput"),
   tagSortOrderInput: document.querySelector("#tagSortOrderInput"),
@@ -1680,18 +1699,9 @@ function normalizeEntry(entry, usedIds = new Set()) {
     tags.unshift(entry.partOfSpeech);
   }
 
-  const definitions = Array.isArray(entry.definitions) && entry.definitions.length
+  const definitions = Array.isArray(entry.definitions)
     ? entry.definitions.map((definition) => normalizeDefinition(definition, usedIds))
-    : [
-        normalizeDefinition(
-          {
-            meaning: entry.meaning || "",
-            example: entry.example || "",
-            note: "",
-          },
-          usedIds,
-        ),
-      ];
+    : [];
 
   const migratedEtymology = [entry.roots, entry.variant].filter(Boolean).join("\n");
   const sourceText = entry.etymology?.sourceText || entry.etymology?.source || "";
@@ -1760,6 +1770,7 @@ function normalizeDictionarySettings(settings = {}, usedIds = new Set()) {
     tagDisplayMap: normalizeTagDisplayMap(settings.tagDisplayMap),
     entryListRawTagDisplay: Boolean(settings.entryListRawTagDisplay),
     entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(settings.entryListTagDisplayLimit),
+    entryListPartDisplay: normalizeEntryListPartDisplay(settings.entryListPartDisplay),
     manualPartOfSpeechTags: Boolean(settings.manualPartOfSpeechTags),
     partOfSpeechTags: normalizeTagList(settings.partOfSpeechTags),
     tagSortOrder: normalizeTagList(settings.tagSortOrder),
@@ -1768,6 +1779,7 @@ function normalizeDictionarySettings(settings = {}, usedIds = new Set()) {
     entryListPolysemyDisplay: Boolean(settings.entryListPolysemyDisplay),
     networkPolysemyDisplay: Boolean(settings.networkPolysemyDisplay),
     showEmptyEntrySections: Boolean(settings.showEmptyEntrySections),
+    entrySectionOrder: normalizeEntrySectionOrder(settings.entrySectionOrder),
     fuzzySearch: Boolean(settings.fuzzySearch),
     tagFuzzySearch: Boolean(settings.tagFuzzySearch),
     sourceFuzzyCompletion: Boolean(settings.sourceFuzzyCompletion),
@@ -1832,6 +1844,38 @@ function normalizeToolNavOrder(order = []) {
     }
   });
   return result;
+}
+
+function normalizeEntrySectionOrder(order = []) {
+  const source = Array.isArray(order) ? order : [];
+  const result = [];
+  source.forEach((item) => {
+    const section = String(item || "").trim();
+    if (DEFAULT_ENTRY_SECTION_ORDER.includes(section) && !result.includes(section)) {
+      result.push(section);
+    }
+  });
+  DEFAULT_ENTRY_SECTION_ORDER.forEach((section) => {
+    if (!result.includes(section)) {
+      result.push(section);
+    }
+  });
+  return result;
+}
+
+function normalizeEntryListPartDisplay(value) {
+  return ENTRY_LIST_PART_DISPLAY_OPTIONS.includes(value) ? value : "subtitle";
+}
+
+function entrySectionLabel(section) {
+  const labels = {
+    definitions: t("definitions"),
+    etymology: t("etymology"),
+    derived: t("derivedEntries"),
+    morphology: t("morphologyDisplay"),
+    notes: t("entryNotes"),
+  };
+  return labels[section] || section;
 }
 
 function toolNavLabel(view) {
@@ -3955,6 +3999,7 @@ function entryCardSettingsSizeSignature() {
     currentLanguage,
     settings.entryListPolysemyDisplay,
     settings.entryListTagDisplayLimit,
+    settings.entryListPartDisplay,
     settings.entryListRawTagDisplay ? "raw-tags" : "display-tags",
     settings.entryListTagFiltering ? "tag-filtering" : "no-tag-filtering",
     settings.fuzzySearch ? "fuzzy" : "strict",
@@ -4475,8 +4520,8 @@ function renderRootModeRow(row) {
 }
 
 function createEntryCard(entry, options = {}) {
-  const partText = entryPartText(entry);
   const settings = normalizeDictionarySettings(activeDictionary()?.settings);
+  const partText = settings.entryListPartDisplay === "chips" ? "" : entryPartText(entry);
   const contentFuzzyEnabled = Boolean(settings.fuzzySearch);
   const tagFuzzyEnabled = Boolean(settings.tagFuzzySearch);
   const subtitle = [
@@ -4485,7 +4530,9 @@ function createEntryCard(entry, options = {}) {
   ].filter(Boolean).join(" · ");
   const meaningSummary = entryDefinitionSummary(entry, settings.entryListPolysemyDisplay);
   const searchSnippets = renderEntrySearchSnippets(entry);
-  const chipHtml = renderChips(entry, settings.entryListTagDisplayLimit, true, tagFuzzyEnabled, settings.entryListTagFiltering);
+  const chipHtml = renderChips(entry, settings.entryListTagDisplayLimit, true, tagFuzzyEnabled, settings.entryListTagFiltering, {
+    includePartTags: settings.entryListPartDisplay !== "subtitle",
+  });
   const qualityIssueHtml = renderEntryQualityIssueBadges(options.qualityIssues || []);
   const compactEntryCard = shouldUseCompactEntryCard(entry, { meaningSummary, searchSnippets });
   const footerHtml = [
@@ -4576,8 +4623,11 @@ function estimateEntryCardHeight(entry, options = {}) {
   const meaningSummary = options.meaningSummary ?? entryDefinitionSummary(entry, settings.entryListPolysemyDisplay);
   const searchSnippets = options.searchSnippets ?? renderEntrySearchSnippets(entry);
   const hasBody = Boolean(meaningSummary || searchSnippets);
-  const hasSubtitle = Boolean(entry.pronunciation || entryPartText(entry));
-  const hasTagFooter = Boolean((entry.tags || []).length && settings.entryListTagDisplayLimit > 0);
+  const hasSubtitle = Boolean(entry.pronunciation || (settings.entryListPartDisplay !== "chips" && entryPartText(entry)));
+  const hasTagFooter = Boolean(
+    entryListTagItems(entry, { includePartTags: settings.entryListPartDisplay !== "subtitle" }).length
+      && settings.entryListTagDisplayLimit > 0,
+  );
   const qualityIssueLines = estimateEntryQualityIssueLines(options.qualityIssues || []);
   const footerLines = (hasTagFooter ? 1 : 0) + qualityIssueLines;
   const searchSnippetCount = estimateSearchSnippetCount(searchSnippets);
@@ -5647,6 +5697,19 @@ function renderEntryDisplay(entry) {
   renderMorphologyDisplay(entry, showEmptySections);
   elements.displayEntryNotesSection.hidden = !entry.notes && !showEmptySections;
   elements.displayEntryNotes.textContent = entry.notes || "";
+  applyEntryDisplaySectionOrder();
+}
+
+function applyEntryDisplaySectionOrder() {
+  const sections = {
+    definitions: elements.displayDefinitionsSection,
+    etymology: elements.displayEtymologySection,
+    derived: elements.displayDerivedSection,
+    morphology: elements.displayMorphologySection,
+    notes: elements.displayEntryNotesSection,
+  };
+  normalizeEntrySectionOrder(activeDictionary()?.settings?.entrySectionOrder)
+    .forEach((section) => elements.entryDisplay.append(sections[section]));
 }
 
 function renderEtymology(entry, showEmptySections = false) {
@@ -5700,19 +5763,33 @@ function renderDerivedEntries(entry) {
   const dictionary = activeDictionary();
   const derived = findDerivedEntries(entry, dictionary);
   elements.displayDerivedSection.hidden = !derived.length;
-  elements.displayDerived.innerHTML = "";
+  renderDerivedEntryList(elements.displayDerived, derived, dictionary, { interactive: true });
+}
 
+function renderFullEditDerivedEntries(entry) {
+  const dictionary = activeDictionary();
+  const derived = entry?.id ? findDerivedEntries(entry, dictionary) : [];
+  elements.fullEditDerivedSection.hidden = !derived.length;
+  renderDerivedEntryList(elements.fullEditDerived, derived, dictionary, { interactive: false });
+}
+
+function renderDerivedEntryList(container, derived = [], dictionary = activeDictionary(), { interactive = true } = {}) {
+  container.innerHTML = "";
   derived.forEach((derivedEntry) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "derived-link";
+    const card = document.createElement(interactive ? "button" : "div");
+    if (interactive) {
+      card.type = "button";
+    }
+    card.className = interactive ? "derived-link" : "derived-link derived-readonly";
     const partText = entryPartText(derivedEntry, dictionary);
-    button.innerHTML = `
+    card.innerHTML = `
       <strong>${escapeHtml(derivedEntry.lemma)}</strong>
       ${partText ? `<span>${escapeHtml(partText)}</span>` : ""}
     `;
-    button.addEventListener("click", () => switchToEntry(derivedEntry.id));
-    elements.displayDerived.append(button);
+    if (interactive) {
+      card.addEventListener("click", () => switchToEntry(derivedEntry.id));
+    }
+    container.append(card);
   });
 }
 
@@ -5972,14 +6049,20 @@ function renderSmallCaps(value) {
   });
 }
 
-function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = Boolean(activeDictionary()?.settings?.tagFuzzySearch), clickable = false) {
-  const tags = entry.tags || [];
+function entryListTagItems(entry, { includePartTags = true, dictionary = activeDictionary() } = {}) {
+  return (entry.tags || [])
+    .map((tag, index) => ({ tag, index }))
+    .filter(({ tag, index }) => includePartTags || !entryTagIsPart(entry, index, tag, dictionary));
+}
+
+function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = Boolean(activeDictionary()?.settings?.tagFuzzySearch), clickable = false, { includePartTags = true } = {}) {
+  const tags = entryListTagItems(entry, { includePartTags });
   const settings = normalizeDictionarySettings(activeDictionary()?.settings);
   const hasHiddenTags = tags.length > limit;
   const visibleLimit = hasHiddenTags ? Math.max(1, limit - 1) : limit;
   const chips = tags
     .slice(0, visibleLimit)
-    .map((tag, index) => {
+    .map(({ tag, index }) => {
       const text = entryListDisplayTag(tag, settings);
       const classes = ["chip", entryTagIsPart(entry, index, tag) ? "part-chip" : "", tagIsRedHighlighted(tag) ? "highlight-tag" : ""].filter(Boolean).join(" ");
       const tagAttributes = clickable
@@ -5992,11 +6075,10 @@ function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = Boolean
     })
     .join("");
   const hiddenTagTitle = hasHiddenTags
-    ? tags.slice(visibleLimit).map((tag) => entryListDisplayTag(tag, settings)).join(", ")
+    ? tags.slice(visibleLimit).map(({ tag }) => entryListDisplayTag(tag, settings)).join(", ")
     : "";
   const hiddenTagTooltipHtml = hasHiddenTags
-    ? `<span class="app-tooltip-chip-list">${tags.slice(visibleLimit).map((tag, offset) => {
-      const index = visibleLimit + offset;
+    ? `<span class="app-tooltip-chip-list">${tags.slice(visibleLimit).map(({ tag, index }) => {
       const classes = ["chip", entryTagIsPart(entry, index, tag) ? "part-chip" : "", tagIsRedHighlighted(tag) ? "highlight-tag" : ""].filter(Boolean).join(" ");
       return `<span class="${classes}">${escapeHtml(entryListDisplayTag(tag, settings))}</span>`;
     }).join("")}</span>`
@@ -7373,7 +7455,7 @@ function renderMorphologyDisplay(entry, showEmptySections = false) {
         <h4>${escapeHtml(groupTitle)}</h4>
         ${groupNotes ? `<p class="morphology-display-group-note">${escapeHtml(groupNotes)}</p>` : ""}
       </div>
-      ${tableCards}
+      <div class="morphology-display-table-grid">${tableCards}</div>
     `;
     groups.append(group);
   });
@@ -7433,7 +7515,7 @@ function fillEntryForm(entry) {
     lemma: "",
     pronunciation: "",
     tags: [],
-    definitions: [normalizeDefinition()],
+    definitions: [],
     etymology: { sources: [], description: "" },
     morphologyMode: "auto",
     morphologyGroups: [],
@@ -7451,9 +7533,24 @@ function fillEntryForm(entry) {
   elements.notesInput.value = formEntry.notes || "";
   elements.sourceEntryInput.value = (formEntry.etymology?.sources || []).join("，");
   elements.etymologyDescriptionInput.value = formEntry.etymology?.description || "";
-  renderDefinitionFormList(formEntry.definitions || [normalizeDefinition()]);
+  renderDefinitionFormList(formEntry.definitions);
   renderEntryMorphologyControls(formEntry);
+  renderFullEditDerivedEntries(formEntry);
+  applyFullEntrySectionOrder();
   renderIpaKeyboard(activeDictionary());
+}
+
+function applyFullEntrySectionOrder() {
+  const sections = Object.fromEntries(
+    [...elements.entryForm.querySelectorAll("[data-entry-form-section]")]
+      .map((section) => [section.dataset.entryFormSection, section]),
+  );
+  const actions = elements.entryForm.querySelector(".form-actions");
+  if (!actions) {
+    return;
+  }
+  normalizeEntrySectionOrder(activeDictionary()?.settings?.entrySectionOrder)
+    .forEach((section) => actions.before(sections[section]));
 }
 
 function renderEntryMorphologyControls(entry) {
@@ -7669,9 +7766,13 @@ function definitionFormCardHtml(definition, index, removeAction) {
   `;
 }
 
-function renderDefinitionFormList(definitions) {
+function definitionEditorItems(definitions) {
+  return Array.isArray(definitions) && definitions.length ? definitions : [normalizeDefinition()];
+}
+
+function renderDefinitionFormList(definitions = []) {
   elements.definitionFormList.innerHTML = "";
-  definitions.forEach((definition, index) => {
+  definitionEditorItems(definitions).forEach((definition, index) => {
     const block = document.createElement("article");
     block.className = "definition-form-card";
     block.dataset.definitionId = definition.id || uid("def");
@@ -7976,6 +8077,7 @@ function fillSettingsForm(dictionary) {
   elements.tagDisplayMapInput.value = serializeTagDisplayMap(settings.tagDisplayMap);
   elements.entryListRawTagDisplayInput.checked = settings.entryListRawTagDisplay;
   elements.entryListTagDisplayLimitInput.value = settings.entryListTagDisplayLimit;
+  elements.entryListPartDisplayInput.value = settings.entryListPartDisplay;
   elements.manualPartOfSpeechTagsInput.checked = settings.manualPartOfSpeechTags;
   elements.partOfSpeechTagsInput.value = settings.partOfSpeechTags.join(", ");
   syncPartOfSpeechTagSettingsControls();
@@ -7997,6 +8099,7 @@ function fillSettingsForm(dictionary) {
   elements.allowEmptyTagsInput.checked = settings.allowEmptyTags;
   elements.allowEmptyDefinitionsInput.checked = settings.allowEmptyDefinitions;
   elements.ipaKeyboardInput.value = normalizeIpaKeyboard(settings.ipaKeyboard).join(" ");
+  renderEntrySectionOrderEditor(settings.entrySectionOrder);
   renderToolNavOrderEditor(settings.toolNavOrder);
   setupMasonryLayout(elements.settingsForm, ".settings-section, .form-actions", 18);
 }
@@ -8026,13 +8129,48 @@ function renderToolNavOrderEditor(order = DEFAULT_TOOL_NAV_ORDER) {
   });
 }
 
+function renderEntrySectionOrderEditor(order = DEFAULT_ENTRY_SECTION_ORDER) {
+  if (!elements.entrySectionOrderList) {
+    return;
+  }
+  elements.entrySectionOrderList.innerHTML = "";
+  normalizeEntrySectionOrder(order).forEach((section) => {
+    const card = document.createElement("article");
+    card.className = "tool-order-card";
+    card.draggable = true;
+    card.dataset.entrySection = section;
+    card.innerHTML = `
+      <span class="tool-order-handle" aria-hidden="true">⋮⋮</span>
+      <strong>${escapeHtml(entrySectionLabel(section))}</strong>
+    `;
+    elements.entrySectionOrderList.append(card);
+  });
+}
+
 function collectToolNavOrder() {
   return normalizeToolNavOrder([...elements.toolNavOrderList?.querySelectorAll(".tool-order-card") || []]
     .map((card) => card.dataset.view));
 }
 
+function collectEntrySectionOrder() {
+  return normalizeEntrySectionOrder([...elements.entrySectionOrderList?.querySelectorAll(".tool-order-card") || []]
+    .map((card) => card.dataset.entrySection));
+}
+
 function toolOrderInsertBefore(y) {
   const cards = [...(elements.toolNavOrderList?.querySelectorAll(".tool-order-card:not(.dragging)") || [])];
+  return cards.reduce((closest, card) => {
+    const box = card.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) {
+      return { offset, card };
+    }
+    return closest;
+  }, { offset: Number.NEGATIVE_INFINITY, card: null }).card;
+}
+
+function entrySectionOrderInsertBefore(y) {
+  const cards = [...(elements.entrySectionOrderList?.querySelectorAll(".tool-order-card:not(.dragging)") || [])];
   return cards.reduce((closest, card) => {
     const box = card.getBoundingClientRect();
     const offset = y - box.top - box.height / 2;
@@ -8204,6 +8342,7 @@ function settingsFormSnapshot() {
     tagDisplayMap: normalizeTagDisplayMap(parseTagDisplayMap(elements.tagDisplayMapInput.value)),
     entryListRawTagDisplay: elements.entryListRawTagDisplayInput.checked,
     entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(elements.entryListTagDisplayLimitInput.value),
+    entryListPartDisplay: normalizeEntryListPartDisplay(elements.entryListPartDisplayInput.value),
     manualPartOfSpeechTags: elements.manualPartOfSpeechTagsInput.checked,
     partOfSpeechTags: normalizeTagList(elements.partOfSpeechTagsInput.value),
     tagSortOrder: normalizeTagList(elements.tagSortOrderInput.value),
@@ -8212,6 +8351,7 @@ function settingsFormSnapshot() {
     entryListPolysemyDisplay: elements.entryListPolysemyInput.checked,
     networkPolysemyDisplay: elements.networkPolysemyInput.checked,
     showEmptyEntrySections: elements.showEmptyEntrySectionsInput.checked,
+    entrySectionOrder: collectEntrySectionOrder(),
     fuzzySearch: elements.fuzzySearchInput.checked,
     tagFuzzySearch: elements.tagFuzzySearchInput.checked,
     sourceFuzzyCompletion: elements.sourceFuzzyInput.checked,
@@ -8241,6 +8381,7 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     tagDisplayMap: settings.tagDisplayMap,
     entryListRawTagDisplay: settings.entryListRawTagDisplay,
     entryListTagDisplayLimit: settings.entryListTagDisplayLimit,
+    entryListPartDisplay: settings.entryListPartDisplay,
     manualPartOfSpeechTags: settings.manualPartOfSpeechTags,
     partOfSpeechTags: settings.partOfSpeechTags,
     tagSortOrder: settings.tagSortOrder,
@@ -8249,6 +8390,7 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     entryListPolysemyDisplay: settings.entryListPolysemyDisplay,
     networkPolysemyDisplay: settings.networkPolysemyDisplay,
     showEmptyEntrySections: settings.showEmptyEntrySections,
+    entrySectionOrder: settings.entrySectionOrder,
     fuzzySearch: settings.fuzzySearch,
     tagFuzzySearch: settings.tagFuzzySearch,
     sourceFuzzyCompletion: settings.sourceFuzzyCompletion,
@@ -8411,6 +8553,7 @@ function collectDictionarySettingsFromForm(existing = {}) {
     tagDisplayMap: parseTagDisplayMap(elements.tagDisplayMapInput.value),
     entryListRawTagDisplay: elements.entryListRawTagDisplayInput.checked,
     entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(elements.entryListTagDisplayLimitInput.value),
+    entryListPartDisplay: normalizeEntryListPartDisplay(elements.entryListPartDisplayInput.value),
     manualPartOfSpeechTags: elements.manualPartOfSpeechTagsInput.checked,
     partOfSpeechTags: normalizeTagList(elements.partOfSpeechTagsInput.value),
     tagSortOrder: normalizeTagList(elements.tagSortOrderInput.value),
@@ -8419,6 +8562,7 @@ function collectDictionarySettingsFromForm(existing = {}) {
     entryListPolysemyDisplay: elements.entryListPolysemyInput.checked,
     networkPolysemyDisplay: elements.networkPolysemyInput.checked,
     showEmptyEntrySections: elements.showEmptyEntrySectionsInput.checked,
+    entrySectionOrder: collectEntrySectionOrder(),
     fuzzySearch: elements.fuzzySearchInput.checked,
     tagFuzzySearch: elements.tagFuzzySearchInput.checked,
     sourceFuzzyCompletion: elements.sourceFuzzyInput.checked,
@@ -10196,7 +10340,7 @@ async function openPartialEdit(section) {
     list.className = "definition-form-list";
     list.dataset.partialDefinitions = "true";
     body.append(list);
-    renderPartialDefinitionList(entry.definitions || [normalizeDefinition()]);
+    renderPartialDefinitionList(entry.definitions);
     const addButton = document.createElement("button");
     addButton.type = "button";
     addButton.className = "secondary-button additive-button";
@@ -10248,13 +10392,13 @@ function partialEditTitle(section) {
   return titles[section] || t("partialEdit");
 }
 
-function renderPartialDefinitionList(definitions) {
+function renderPartialDefinitionList(definitions = []) {
   const list = partialEditBody()?.querySelector('[data-partial-definitions="true"]');
   if (!list) {
     return;
   }
   list.innerHTML = "";
-  definitions.forEach((definition, index) => {
+  definitionEditorItems(definitions).forEach((definition, index) => {
     const card = document.createElement("article");
     card.className = "definition-form-card";
     card.dataset.definitionId = definition.id || uid("def");
@@ -10406,7 +10550,7 @@ function createEntryDraft(overrides = {}) {
     lemma: "",
     pronunciation: "",
     tags: [],
-    definitions: [normalizeDefinition()],
+    definitions: [],
     etymology: { sources: [], description: "" },
     morphologyMode: "auto",
     morphologyGroups: [],
@@ -11676,6 +11820,38 @@ elements.toolNavOrderList.addEventListener("drop", (event) => {
   event.preventDefault();
   elements.toolNavOrderList.querySelector(".tool-order-card.dragging")?.classList.remove("dragging");
   draggedToolNavView = "";
+});
+elements.entrySectionOrderList.addEventListener("dragstart", (event) => {
+  const card = event.target.closest(".tool-order-card");
+  if (!card) {
+    return;
+  }
+  draggedEntrySectionId = card.dataset.entrySection || "";
+  card.classList.add("dragging");
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", draggedEntrySectionId);
+});
+elements.entrySectionOrderList.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  const dragging = elements.entrySectionOrderList.querySelector(".tool-order-card.dragging");
+  if (!dragging) {
+    return;
+  }
+  const before = entrySectionOrderInsertBefore(event.clientY);
+  if (before) {
+    elements.entrySectionOrderList.insertBefore(dragging, before);
+  } else {
+    elements.entrySectionOrderList.append(dragging);
+  }
+});
+elements.entrySectionOrderList.addEventListener("dragend", () => {
+  elements.entrySectionOrderList.querySelector(".tool-order-card.dragging")?.classList.remove("dragging");
+  draggedEntrySectionId = "";
+});
+elements.entrySectionOrderList.addEventListener("drop", (event) => {
+  event.preventDefault();
+  elements.entrySectionOrderList.querySelector(".tool-order-card.dragging")?.classList.remove("dragging");
+  draggedEntrySectionId = "";
 });
 elements.corpusModeControl.addEventListener("click", (event) => {
   const button = event.target.closest("[data-corpus-mode]");

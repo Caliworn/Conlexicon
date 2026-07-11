@@ -1170,7 +1170,7 @@ label span {
   text-align: left;
 }
 
-.derived-link:hover {
+button.derived-link:hover {
   border-color: var(--accent);
 }
 
@@ -1387,6 +1387,27 @@ button.pending-source:focus-visible {
 .morphology-display-table h5 {
   color: var(--muted);
   font-size: 0.92rem;
+}
+
+/* Each subtable keeps its intrinsic width where possible. Flex wrapping lets a
+   group fill a wide detail panel with as many tables as actually fit, while a
+   narrow panel naturally falls back to one horizontally scrollable table. */
+.morphology-display-table-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: clamp(12px, 1.6vw, 18px);
+  min-width: 0;
+}
+
+.morphology-display-table-grid > .morphology-display-table {
+  flex: 0 1 auto;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.morphology-display-table-grid .morphology-table-scroll {
+  max-width: 100%;
 }
 
 #morphologyFunctionsForm,

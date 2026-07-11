@@ -272,7 +272,7 @@
                   <input id="tagsInput" name="tags" maxlength="180">
                 </label>
 
-                <section class="definition-editor">
+                <section class="definition-editor" data-entry-form-section="definitions">
                   <div class="form-heading compact-heading">
                     <div>
                       <p class="eyebrow" data-i18n="definitions">释义</p>
@@ -282,7 +282,7 @@
                   <div class="definition-form-list" id="definitionFormList"></div>
                 </section>
 
-                <section class="definition-editor">
+                <section class="definition-editor" data-entry-form-section="etymology">
                   <div class="form-heading compact-heading">
                     <div>
                       <p class="eyebrow" data-i18n="etymology">词源</p>
@@ -299,7 +299,16 @@
                   </label>
                 </section>
 
-                <section class="definition-editor">
+                <section class="definition-editor" id="fullEditDerivedSection" data-entry-form-section="derived" hidden>
+                  <div class="form-heading compact-heading">
+                    <div>
+                      <p class="eyebrow" data-i18n="derivedEntries">衍生</p>
+                    </div>
+                  </div>
+                  <div class="derived-list" id="fullEditDerived"></div>
+                </section>
+
+                <section class="definition-editor" data-entry-form-section="morphology">
                   <div class="form-heading compact-heading">
                     <div>
                       <p class="eyebrow" data-i18n="morphologyConfig">自动形态学</p>
@@ -308,10 +317,12 @@
                   <div class="entry-morphology-controls" id="entryMorphologyControls"></div>
                 </section>
 
-                <label>
-                  <span data-i18n="entryNotes">词条整体备注</span>
-                  <textarea id="notesInput" name="notes" rows="4"></textarea>
-                </label>
+                <section class="definition-editor" data-entry-form-section="notes">
+                  <label>
+                    <span data-i18n="entryNotes">词条整体备注</span>
+                    <textarea id="notesInput" name="notes" rows="4"></textarea>
+                  </label>
+                </section>
 
                 <div class="form-actions">
                   <button class="secondary-button" id="cancelEditButton" type="button" data-i18n="cancel">取消</button>
@@ -572,6 +583,14 @@
                   <span data-i18n="entryListTagDisplayLimitHelp">设为 n 时，超过 n 个标签会显示前 n-1 个和省略号。默认为 3。</span>
                   <input id="entryListTagDisplayLimitInput" type="text" inputmode="numeric" placeholder="3">
                 </label>
+                <label>
+                  <span data-i18n="entryListPartDisplay">词条列表中词性显示位置</span>
+                  <select id="entryListPartDisplayInput">
+                    <option value="subtitle" data-i18n="entryListPartDisplaySubtitle">副标题</option>
+                    <option value="chips" data-i18n="entryListPartDisplayChips">标签区</option>
+                    <option value="both" data-i18n="entryListPartDisplayBoth">两者均显示</option>
+                  </select>
+                </label>
                 <div class="subsection-title">
                   <h3 data-i18n="partOfSpeechTagSettings">词性标签</h3>
                 </div>
@@ -631,6 +650,11 @@
                   <span data-i18n="showEmptyEntrySections">在词条浏览界面显示空栏目</span>
                   <input id="showEmptyEntrySectionsInput" type="checkbox">
                 </label>
+                <div class="subsection-title">
+                  <h3 data-i18n="entrySectionOrder">词条栏目排序</h3>
+                </div>
+                <p class="muted-text" data-i18n="entrySectionOrderHelp">拖动卡片以调整词条详情和完整编辑中栏目顺序。衍生词只在有内容时显示，且不可在完整编辑中修改。</p>
+                <div class="tool-order-list" id="entrySectionOrderList"></div>
                 <div class="subsection-title">
                   <h3 data-i18n="toolNavigationOrder">工具导航排序</h3>
                 </div>

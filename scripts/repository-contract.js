@@ -691,6 +691,8 @@ function checkModelNormalization() {
     ],
     settings: {
       entryListTagDisplayLimit: 99,
+      entryListPartDisplay: "chips",
+      entrySectionOrder: ["notes", "derived", "notes", "unknown"],
       ipa: { mappings: [{ from: "a", to: "ˈa" }] },
     },
   });
@@ -701,8 +703,16 @@ function checkModelNormalization() {
   assert.deepEqual(normalized.entries[0].etymology.sources, ["entry-source"]);
   assert.equal(normalized.entries[0].etymology.description, "source note");
   assert.equal(normalized.settings.entryListTagDisplayLimit, 10);
+  assert.equal(normalized.settings.entryListPartDisplay, "chips");
   assert.equal(normalized.settings.showEmptyEntrySections, false);
+  assert.deepEqual(normalized.settings.entrySectionOrder, ["notes", "derived", "definitions", "etymology", "morphology"]);
   assert.equal(normalized.settings.ipa.mappings[0].to, "ˈa");
+
+  const normalizedWithoutDefinitions = normalizeDictionary({
+    name: "Definitionless",
+    entries: [{ lemma: "empty", definitions: [] }],
+  });
+  assert.deepEqual(normalizedWithoutDefinitions.entries[0].definitions, []);
 
   const imported = importDictionaryFromPayload({
     activeDictionaryId: "dict-11111111-1111-4111-8111-111111111111",
@@ -1158,10 +1168,13 @@ async function runRepositoryContractTests(options = {}) {
     const repositoryEntryId = savedWithNewEntry.entry.id;
     assert.equal((await repository.getEntry(first.id, repositoryEntryId)).lemma, "new entry");
 
+    const savedWithoutDefinitions = await repository.saveEntry(first.id, { lemma: "definitionless", definitions: [] });
+    assert.deepEqual(savedWithoutDefinitions.entry.definitions, []);
+
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entries`);
     assert.equal(apiResult.handled, true);
     assert.equal(apiResult.statusCode, 200);
-    assert.equal(apiResult.body.length, 2);
+    assert.equal(apiResult.body.length, 3);
 
     apiResult = await callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(first.id)}/entries`, {
       lemma: "api entry",
