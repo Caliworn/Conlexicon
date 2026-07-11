@@ -100,6 +100,7 @@ let entryQueryState = {
   pageInfo: null,
   error: null,
   requestId: 0,
+  preserveRenderedList: false,
 };
 let entryFacetsState = {
   key: "",
@@ -3884,6 +3885,9 @@ function renderEntries() {
     const apiEntries = entryQueryEntriesForRender(dictionary);
     if (!apiEntries) {
       if (entryQueryState.status === "loading") {
+        if (entryQueryState.preserveRenderedList && entryVirtualList.items.length) {
+          return;
+        }
         renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(aText("加载中", "Loading"), ""));
         return;
       }
@@ -4245,7 +4249,7 @@ function entryQueryApiKey(dictionary = activeDictionary()) {
   ].join("|");
 }
 
-function resetEntryQueryState() {
+function resetEntryQueryState(options = {}) {
   entryQueryState = {
     key: "",
     status: "idle",
@@ -4253,6 +4257,7 @@ function resetEntryQueryState() {
     pageInfo: null,
     error: null,
     requestId: entryQueryState.requestId + 1,
+    preserveRenderedList: Boolean(options.preserveRenderedList && entryVirtualList.items.length),
   };
 }
 
@@ -4308,6 +4313,7 @@ function startEntryQueryApiCheck(dictionary) {
   }
 
   const requestId = entryQueryState.requestId + 1;
+  const preserveRenderedList = entryQueryState.preserveRenderedList;
   entryQueryState = {
     key,
     status: "loading",
@@ -4315,6 +4321,7 @@ function startEntryQueryApiCheck(dictionary) {
     pageInfo: null,
     error: null,
     requestId,
+    preserveRenderedList,
   };
 
   api(entryQueryUrl(dictionary))
@@ -4331,8 +4338,10 @@ function startEntryQueryApiCheck(dictionary) {
         pageInfo,
         error: null,
         requestId,
+        preserveRenderedList: false,
       };
       renderEntries();
+      flushPendingEntryCardScroll();
     })
     .catch((error) => {
       if (entryQueryState.requestId !== requestId) {
@@ -4345,6 +4354,7 @@ function startEntryQueryApiCheck(dictionary) {
         pageInfo: null,
         error,
         requestId,
+        preserveRenderedList: false,
       };
       console.error(error);
       renderEntries();
@@ -10680,7 +10690,7 @@ async function savePartialEdit(event) {
     upsertEntryInDictionary(dictionary.id, savedEntry);
     state.selectedEntryId = savedEntry.id;
     cancelPartialEdit();
-    resetEntryReadStateAfterSave();
+    resetEntryReadStateAfterSave({ preserveEntryList: true });
     render();
     if (shouldScrollAfterSave) {
       scheduleEntryCardScroll(savedEntry.id, prepareRootModeEntryNavigation(savedEntry.id));
@@ -10839,7 +10849,7 @@ async function saveEntry(event) {
     state.selectedEntryId = savedEntry.id;
     entryDraft = null;
     editorMode = "display";
-    resetEntryReadStateAfterSave();
+    resetEntryReadStateAfterSave({ preserveEntryList: true });
     render();
     if (wasNewEntry || previousLemma !== savedEntry.lemma) {
       scheduleEntryCardScroll(savedEntry.id, prepareRootModeEntryNavigation(savedEntry.id));
@@ -11093,8 +11103,8 @@ function applyEntryPatchPayload(payload) {
   return normalized;
 }
 
-function resetEntryReadStateAfterSave() {
-  resetEntryQueryState();
+function resetEntryReadStateAfterSave(options = {}) {
+  resetEntryQueryState({ preserveRenderedList: options.preserveEntryList });
   resetEntryFacetsState();
   lexicalNetworkRelationsCache.clear();
 }
