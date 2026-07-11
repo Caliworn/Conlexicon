@@ -250,7 +250,7 @@ SQLite 已是默认主存储。真实 schema、当前状态审计和后续优化
 - 旧 JSON 词典暂时通过词典管理界面的 JSON 导入功能手动迁入 SQLite；产品内自动迁移向导暂缓。
 - JSON repository 保留为 legacy/debug/回滚路径、旧 JSON 导入迁移参考和基础检查对象；不再作为并行后端追随新增功能、schema 升级、读取优化或前端新数据模型。
 - SQLite repository 跑完整当前主契约；JSON repository 只跑 legacy/debug subset 和旧 JSON 转换相关检查。
-- 当前 SQLite 写入已是 SQL 增量写入；`saveEntry()` / `deleteEntry()` 的普通响应已收窄，`patchEntries()` 和部分模块保存方法仍会为了 repository 返回值组装完整 snapshot，是阶段 B 后续清债项。
+- 当前 SQLite 写入已是 SQL 增量写入；词典元数据、设置、IPA、文档、语料、形态和单词条保存的普通响应均已收窄。`patchEntries()` 仍会为了 repository 返回值组装完整 snapshot，是阶段 B 后续清债项；空 autosave 请求也仍有兼容性完整读取兜底。
 - 形态学结构化 schema 见 `SQLITE_BACKEND_PLAN.md` 5.4：模板组/子表/单元格/词条形态组/override 已 SQL 化；共享 `morphology-model` 已使用当前 `templateGroups` / `morphologyGroups` 结构，旧形态结构迁移集中在 `lib/legacy-dictionary-migration.js`。`entry_morphology_groups.notes` 已作为词条实例备注接入 SQL、导入导出和详情展示；模板组 `notes` 不应出现在词条详情或词条编辑。SQLite 读取与导出已停止回吐旧 `morphology.tables` / `entry.morphology`；**形态表格**页面现按模板组编辑，支持可编辑的组标题、自动匹配标签、空组、组内多个子表、各级排序和独立的子表尺寸。词条完整/局部编辑已使用正式的词条级多组/多子表 override 视图。导航栏已拆为独立的**形态函数**与**形态表格**页面，前者单独保存函数配置，为 DSL 配置预留。旧 `leftV/rightV` 设置暂留 `module_blobs.morphology`，函数、集合和 DSL 源码后续不做函数级主表，生成结果、AST 和诊断只作为派生缓存或索引。
 - 词条形态已切换为 `morphologyMode: auto | manual`：`auto` 由自动规则决定模板组，`morphologyGroups` 仅作为按真实 `templateGroupId` 查找的 overlay；`manual` 按形态组 position 决定展示顺序，空列表即明确不使用形态。自动转手动会将当前自动结果按自动顺序实体化，并在其后保留 dormant overlay；手动转自动须确认并放弃手动配置。SQLite `entries.morphology_mode`、repository 读写、词条 API、共享解析和形态搜索均已接入。完整编辑和局部编辑已改为正式的多组/多子表 override 视图，支持标题 override、词条形态备注、自动 overlay、手动增删组与排序。**已知清债项：数据分析的旧形态统计仍在 `app.js` 通过临时派生的旧式 `morphology.tables` 视图和 `entry.morphology` 读取；它不参与持久化，但无法表达当前多组、多子表和 nested override 语义。后续升级数据分析（以及若质量检查未来加入形态规则时）必须改为直接调用 `morphology-model.resolveEntryMorphologyGroups()` / `morphologyCellValue()`，然后删除该临时视图和全部旧字段读取。**旧 JSON 的 `entry.morphology`、`templateGroupId: "auto"` / `"none"` 只在 `legacy-dictionary-migration` 导入阶段转换；核心模型、repository 与前端持久化路径不再解释旧字段。**不为既有 SQLite schema 写运行时迁移，旧 SQLite 测试库需从 JSON 重新导入。**后续可单独处理表格行列可视化编辑、结构操作下 override 坐标语义和自动分配 DSL。
 - 数据模型升级时只保证旧版本 JSON 能导入并转换成新格式；除非确有必要，不要为了旧前端数据形状额外维护临时兼容层。旧 JSON 字段迁移集中在 `lib/legacy-dictionary-migration.js`，核心 `dictionary-model` 只处理当前形状规范化。前端因新模型出问题时，优先修前端。
@@ -522,7 +522,7 @@ client/
 2. 确认当前分支、工作树和最新提交；如果有未提交改动，先判断归属，不要默认回滚。
 3. 默认后端已经是 SQLite。若涉及启动/存储，先跑 `node scripts/check-default-repository.js`，确认默认 SQLite 和显式 JSON 回滚路径仍正常。
 4. 若继续阶段 B，优先处理默认 SQLite 后的清债项：
-   - 继续收窄 `patchEntries()` 和模块保存的 repository 返回值，避免 SQL 增量写入后又组装完整 snapshot。
+   - 继续收窄 `patchEntries()` 的 repository 返回值，并评估是否移除空 autosave 的完整 snapshot 兜底，避免 SQL 增量写入后又组装完整 snapshot。
    - 继续减少前端对完整 snapshot 的依赖，普通保存路径不回到完整 `PUT /api/dictionaries/:id`。
    - 为全文/fuzzy/动态形态搜索设计 FTS 或预计算搜索索引。
    - 形态学结构化存储已完成；DSL v2、表格结构编辑与 layout 设计暂缓，除明确 bug 外不要继续扩展其 schema。数据分析升级时删除 `app.js` 的旧形态单表适配，改为直接调用共享 morphology model。

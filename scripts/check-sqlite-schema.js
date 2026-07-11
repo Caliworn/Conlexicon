@@ -60,6 +60,39 @@ async function runSqliteSchemaCheck() {
 
     const sourceDictionary = sampleSqliteDictionary();
     await repository.importDictionarySnapshot(sourceDictionary);
+    const savedMetadata = await repository.updateMetadata(sourceDictionary.id, {
+      name: "SQLite Schema Updated",
+      language: "test",
+      description: "metadata response smoke",
+    });
+    assert.deepEqual(Object.keys(savedMetadata).sort(), ["createdAt", "description", "id", "language", "name", "updatedAt"]);
+    assert.equal(Object.hasOwn(savedMetadata, "entries"), false);
+    assert.equal(savedMetadata.name, "SQLite Schema Updated");
+
+    const savedSettings = await repository.updateSettings(sourceDictionary.id, { entryListTagDisplayLimit: 4 });
+    assert.deepEqual(Object.keys(savedSettings).sort(), ["id", "settings", "updatedAt"]);
+    assert.equal(Object.hasOwn(savedSettings, "entries"), false);
+    assert.equal(savedSettings.settings.entryListTagDisplayLimit, 4);
+
+    const savedIpaSettings = await repository.updateIpaSettings(sourceDictionary.id, {
+      mappings: [{ from: "a", to: "ɑ" }],
+    });
+    assert.deepEqual(Object.keys(savedIpaSettings).sort(), ["id", "settings", "updatedAt"]);
+    assert.equal(Object.hasOwn(savedIpaSettings, "entries"), false);
+    assert.equal(savedIpaSettings.settings.ipa.mappings[0].to, "ɑ");
+
+    const savedDocs = await repository.saveDocs(sourceDictionary.id, { markdown: "# SQLite docs" });
+    assert.deepEqual(Object.keys(savedDocs).sort(), ["docs", "id", "updatedAt"]);
+    assert.equal(Object.hasOwn(savedDocs, "entries"), false);
+    assert.equal(savedDocs.docs.markdown, "# SQLite docs");
+
+    const savedCorpus = await repository.saveCorpusChanges(sourceDictionary.id, {
+      units: [{ content: "SQLite corpus" }],
+    });
+    assert.deepEqual(Object.keys(savedCorpus).sort(), ["corpus", "id", "updatedAt"]);
+    assert.equal(Object.hasOwn(savedCorpus, "entries"), false);
+    assert.equal(savedCorpus.corpus.units[0].content, "SQLite corpus");
+
     const savedMorphology = await repository.saveMorphology(sourceDictionary.id, sourceDictionary.morphology);
     assert.deepEqual(Object.keys(savedMorphology).sort(), ["id", "morphology", "updatedAt"]);
     assert.equal(Object.hasOwn(savedMorphology, "entries"), false);

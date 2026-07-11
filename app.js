@@ -427,6 +427,7 @@ const i18n = {
     requiredEntry: "请填写词形",
     missingDefinition: "尚未填写释义",
     savedEntry: "词条已保存",
+    noChangesToSave: "没有需要保存的更改",
     derivedEntryDraft: "已创建衍生词草稿",
     deletedEntry: "词条已删除",
     createDictionaryFirstToast: "请先创建词典",
@@ -897,6 +898,7 @@ const i18n = {
     requiredEntry: "Fill lemma",
     missingDefinition: "No definition yet",
     savedEntry: "Entry saved",
+    noChangesToSave: "No changes to save",
     derivedEntryDraft: "Derived entry draft created",
     deletedEntry: "Entry deleted",
     createDictionaryFirstToast: "Create a dictionary first",
@@ -4936,35 +4938,44 @@ async function closePendingEditsForPageSwitch() {
   const inlineForm = partialEditForm();
   try {
     if (inlineForm) {
-      const action = settings.partialEditPageSwitchAction === "prompt"
-        ? await appEditSwitchPrompt(t("partialEditSwitchPrompt"))
-        : settings.partialEditPageSwitchAction;
-      if (action === "cancel" || action === false) {
-        return false;
-      }
-      if (action === "save") {
-        const saved = await savePartialEdit({ preventDefault() {} });
-        if (!saved) {
+      if (partialEntryFormIsDirty()) {
+        const action = settings.partialEditPageSwitchAction === "prompt"
+          ? await appEditSwitchPrompt(t("partialEditSwitchPrompt"))
+          : settings.partialEditPageSwitchAction;
+        if (action === "cancel" || action === false) {
           return false;
         }
-      } else if (action === "discard") {
+        if (action === "save") {
+          const saved = await savePartialEdit({ preventDefault() {} });
+          if (!saved) {
+            return false;
+          }
+        } else if (action === "discard") {
+          cancelPartialEdit();
+        }
+      } else {
         cancelPartialEdit();
       }
     }
 
     if (state.activeView === "editor" && editorMode === "edit" && !elements.entryForm.hidden) {
-      const action = settings.fullEditPageSwitchAction === "prompt"
-        ? await appEditSwitchPrompt(t("fullEditSwitchPrompt"))
-        : settings.fullEditPageSwitchAction;
-      if (action === "cancel" || action === false) {
-        return false;
-      }
-      if (action === "save") {
-        const saved = await saveEntry({ preventDefault() {} });
-        if (!saved) {
+      if (fullEntryFormIsDirty()) {
+        const action = settings.fullEditPageSwitchAction === "prompt"
+          ? await appEditSwitchPrompt(t("fullEditSwitchPrompt"))
+          : settings.fullEditPageSwitchAction;
+        if (action === "cancel" || action === false) {
           return false;
         }
-      } else if (action === "discard") {
+        if (action === "save") {
+          const saved = await saveEntry({ preventDefault() {} });
+          if (!saved) {
+            return false;
+          }
+        } else if (action === "discard") {
+          entryDraft = null;
+          editorMode = "display";
+        }
+      } else {
         entryDraft = null;
         editorMode = "display";
       }
@@ -7821,6 +7832,80 @@ function collectDefinitions() {
     .filter((definition) => definition.meaning || definition.example || definition.note);
 }
 
+function entrySemanticSnapshot(entry = {}) {
+  const morphologyState = morphologyModel.normalizeEntryMorphologyState(entry);
+  return {
+    lemma: String(entry.lemma || "").trim(),
+    pronunciation: String(entry.pronunciation || "").trim(),
+    tags: Array.isArray(entry.tags)
+      ? entry.tags.map((tag) => String(tag || "").trim()).filter(Boolean)
+      : [],
+    definitions: (entry.definitions || [])
+      .map((definition) => ({
+        id: String(definition?.id || ""),
+        meaning: String(definition?.meaning || "").trim(),
+        example: String(definition?.example || "").trim(),
+        note: String(definition?.note || definition?.notes || "").trim(),
+      }))
+      .filter((definition) => definition.meaning || definition.example || definition.note),
+    etymology: {
+      sources: Array.isArray(entry.etymology?.sources)
+        ? entry.etymology.sources.map((source) => String(source || "").trim()).filter(Boolean)
+        : [],
+      description: String(entry.etymology?.description || "").trim(),
+    },
+    morphologyMode: morphologyState.morphologyMode,
+    morphologyGroups: morphologyState.morphologyGroups.map((group) => ({
+      id: String(group.id || ""),
+      templateGroupId: String(group.templateGroupId || ""),
+      title: String(group.title || "").trim(),
+      notes: String(group.notes || "").trim(),
+      overrides: group.overrides || {},
+    })),
+    notes: String(entry.notes || "").trim(),
+  };
+}
+
+function entriesHaveSameSemantics(left, right) {
+  return stableJson(entrySemanticSnapshot(left)) === stableJson(entrySemanticSnapshot(right));
+}
+
+function fullEntryFormCandidate(existing = selectedEntry()) {
+  const lemma = elements.lemmaInput.value.trim();
+  const tags = splitList(elements.tagsInput.value);
+  const morphologyState = collectMorphologyEntryState(elements.entryMorphologyControls, {
+    ...(existing || {}),
+    lemma,
+    tags,
+  });
+  return {
+    ...(existing || {}),
+    id: existing?.id || "",
+    lemma,
+    pronunciation: elements.pronunciationInput.value.trim(),
+    tags,
+    definitions: collectDefinitions(),
+    etymology: {
+      sources: splitSourceText(elements.sourceEntryInput.value),
+      description: elements.etymologyDescriptionInput.value.trim(),
+    },
+    morphologyMode: morphologyState.morphologyMode,
+    morphologyGroups: morphologyState.morphologyGroups,
+    notes: elements.notesInput.value.trim(),
+  };
+}
+
+function fullEntryFormIsDirty() {
+  if (elements.entryForm.hidden) {
+    return false;
+  }
+  const existing = selectedEntry();
+  const candidate = fullEntryFormCandidate(existing);
+  return existing
+    ? !entriesHaveSameSemantics(candidate, existing)
+    : !entriesHaveSameSemantics(candidate, createEntryDraft());
+}
+
 function completeSourceAtCursor(input = elements.sourceEntryInput) {
   const dictionary = activeDictionary();
   if (!dictionary) {
@@ -8585,6 +8670,13 @@ async function saveSettings(event, options = {}) {
     return false;
   }
 
+  if (!settingsFormIsDirty()) {
+    if (options.showToast !== false) {
+      showToast(t("noChangesToSave"));
+    }
+    return true;
+  }
+
   if (!entryListTagDisplayLimitInputIsValid()) {
     showToast(t("entryListTagDisplayLimitInvalid"));
     elements.entryListTagDisplayLimitInput.focus();
@@ -8747,6 +8839,12 @@ async function saveLanguageDocs(showSavedToast = true) {
     return false;
   }
   clearTimeout(docsSaveTimer);
+  if (!docsFormIsDirty(dictionary)) {
+    if (showSavedToast) {
+      showToast(t("noChangesToSave"));
+    }
+    return true;
+  }
   const draft = ensureDocsDraft(dictionary);
   const docs = {
     ...(dictionary.docs || {}),
@@ -9607,6 +9705,12 @@ function saveCorpus(showSavedToast = true) {
   ensureCorpusDraft(dictionary);
   clearTimeout(corpusSaveTimer);
   corpusSaveTimer = null;
+  if (!corpusFormIsDirty(dictionary)) {
+    if (showSavedToast) {
+      showToast(t("noChangesToSave"));
+    }
+    return Promise.resolve(true);
+  }
   corpusSaveRequested = true;
   if (!corpusSavePromise) {
     corpusSavePromise = runCorpusSaveQueue().finally(() => {
@@ -9922,6 +10026,10 @@ async function saveMorphologyFunctions(event) {
     showToast(t("createDictionaryFirstToast"));
     return false;
   }
+  if (!morphologyFunctionsFormIsDirty()) {
+    showToast(t("noChangesToSave"));
+    return true;
+  }
   const morphology = normalizeMorphology({
     ...dictionary.morphology,
     functions: collectMorphologyFunctions(),
@@ -9956,6 +10064,10 @@ async function saveMorphologyTables(event) {
   if (!dictionary) {
     showToast(t("createDictionaryFirstToast"));
     return false;
+  }
+  if (!morphologyTablesFormIsDirty()) {
+    showToast(t("noChangesToSave"));
+    return true;
   }
   const morphology = normalizeMorphology({
     functions: morphologyFunctionConfig(dictionary),
@@ -10099,6 +10211,13 @@ async function saveIpaSettings(event, options = {}) {
     showToast(t("ipaDefaultStressInvalid"));
     elements.ipaDefaultStressInput.focus();
     return false;
+  }
+
+  if (!ipaFormIsDirty()) {
+    if (options.showToast !== false) {
+      showToast(t("noChangesToSave"));
+    }
+    return true;
   }
 
   const ipa = ipaSettingsFromForm();
@@ -10454,6 +10573,50 @@ function collectPartialDefinitions() {
     .filter((definition) => definition.meaning || definition.example || definition.note);
 }
 
+function partialEntryFormCandidate(entry = selectedEntry(), body = partialEditBody()) {
+  if (!entry || !body) {
+    return null;
+  }
+  if (partialEditSection === "basic") {
+    return {
+      ...entry,
+      lemma: body.querySelector('[data-field="lemma"]').value.trim(),
+      pronunciation: body.querySelector('[data-field="pronunciation"]').value.trim(),
+      tags: splitList(body.querySelector('[data-field="tags"]').value),
+    };
+  }
+  if (partialEditSection === "definitions") {
+    return { ...entry, definitions: collectPartialDefinitions() };
+  }
+  if (partialEditSection === "etymology") {
+    return {
+      ...entry,
+      etymology: {
+        sources: splitSourceText(body.querySelector('[data-field="sources"]').value),
+        description: body.querySelector('[data-field="description"]').value.trim(),
+      },
+    };
+  }
+  if (partialEditSection === "notes") {
+    return { ...entry, notes: body.querySelector('[data-field="notes"]').value.trim() };
+  }
+  if (partialEditSection === "morphology") {
+    const morphologyState = collectMorphologyEntryState(body.querySelector(".partial-morphology-controls"), entry);
+    return {
+      ...entry,
+      morphologyMode: morphologyState.morphologyMode,
+      morphologyGroups: morphologyState.morphologyGroups,
+    };
+  }
+  return { ...entry };
+}
+
+function partialEntryFormIsDirty() {
+  const entry = selectedEntry();
+  const candidate = partialEntryFormCandidate(entry);
+  return Boolean(entry && candidate && !entriesHaveSameSemantics(candidate, entry));
+}
+
 async function savePartialEdit(event) {
   event.preventDefault();
   const dictionary = activeDictionary();
@@ -10464,47 +10627,30 @@ async function savePartialEdit(event) {
   }
 
   const previousLemma = entry.lemma || "";
-  let nextEntry = { ...entry };
+  const nextEntry = partialEntryFormCandidate(entry, body);
+  if (!nextEntry) {
+    return false;
+  }
 
   if (partialEditSection === "basic") {
-    const lemma = body.querySelector('[data-field="lemma"]').value.trim();
-    const tags = splitList(body.querySelector('[data-field="tags"]').value);
-    nextEntry = {
-      ...entry,
-      lemma,
-      pronunciation: body.querySelector('[data-field="pronunciation"]').value.trim(),
-      tags,
-    };
     const message = entryBasicRequirementMessage(nextEntry, dictionary);
     if (message) {
       showToast(message);
       return false;
     }
   } else if (partialEditSection === "definitions") {
-    const definitions = collectPartialDefinitions();
-    const message = entryDefinitionsRequirementMessage({ ...entry, definitions }, dictionary);
+    const message = entryDefinitionsRequirementMessage(nextEntry, dictionary);
     if (message) {
       showToast(message);
       return false;
     }
-    nextEntry = { ...entry, definitions };
-  } else if (partialEditSection === "etymology") {
-    nextEntry = {
-      ...entry,
-      etymology: {
-        sources: splitSourceText(body.querySelector('[data-field="sources"]').value),
-        description: body.querySelector('[data-field="description"]').value.trim(),
-      },
-    };
-  } else if (partialEditSection === "notes") {
-    nextEntry = { ...entry, notes: body.querySelector('[data-field="notes"]').value.trim() };
-  } else if (partialEditSection === "morphology") {
-    const morphologyState = collectMorphologyEntryState(body.querySelector(".partial-morphology-controls"), entry);
-    nextEntry = {
-      ...entry,
-      morphologyMode: morphologyState.morphologyMode,
-      morphologyGroups: morphologyState.morphologyGroups,
-    };
+  }
+
+  if (entriesHaveSameSemantics(nextEntry, entry)) {
+    cancelPartialEdit();
+    render();
+    showToast(t("noChangesToSave"));
+    return true;
   }
 
   const shouldScrollAfterSave = partialEditSection === "basic" && previousLemma !== nextEntry.lemma;
@@ -10633,39 +10779,33 @@ async function saveEntry(event) {
     return false;
   }
 
-  const now = new Date().toISOString();
-  const entryId = elements.entryId.value || uniqueDictionaryEntityId("entry", dictionary);
+  const entryId = elements.entryId.value || "";
   const existing = dictionary.entries.find((entry) => entry.id === entryId);
   const wasNewEntry = !existing;
   const previousLemma = existing?.lemma || "";
-  const definitions = collectDefinitions();
-  const morphologyState = collectMorphologyEntryState(elements.entryMorphologyControls, {
-    ...(existing || {}),
-    lemma: elements.lemmaInput.value.trim(),
-    tags: splitList(elements.tagsInput.value),
-  });
-  const entry = {
-    id: entryId,
-    lemma: elements.lemmaInput.value.trim(),
-    pronunciation: elements.pronunciationInput.value.trim(),
-    tags: splitList(elements.tagsInput.value),
-    definitions,
-    etymology: {
-      sources: splitSourceText(elements.sourceEntryInput.value),
-      description: elements.etymologyDescriptionInput.value.trim(),
-    },
-    morphologyMode: morphologyState.morphologyMode,
-    morphologyGroups: morphologyState.morphologyGroups,
-    notes: elements.notesInput.value.trim(),
-    createdAt: existing?.createdAt || now,
-    updatedAt: now,
-  };
+  const candidate = fullEntryFormCandidate(existing);
 
-  const requirementMessage = entrySaveRequirementMessage(entry, dictionary);
+  const requirementMessage = entrySaveRequirementMessage(candidate, dictionary);
   if (requirementMessage) {
     showToast(requirementMessage);
     return false;
   }
+
+  if (!wasNewEntry && entriesHaveSameSemantics(candidate, existing)) {
+    entryDraft = null;
+    editorMode = "display";
+    render();
+    showToast(t("noChangesToSave"));
+    return true;
+  }
+
+  const now = new Date().toISOString();
+  const entry = {
+    ...candidate,
+    id: entryId || uniqueDictionaryEntityId("entry", dictionary),
+    createdAt: existing?.createdAt || now,
+    updatedAt: now,
+  };
 
   try {
     const savedEntry = await api(
@@ -10755,6 +10895,11 @@ async function saveDictionary(event) {
   if (!payload.name) {
     showToast(t("name"));
     return false;
+  }
+
+  if (dictionaryId && !dictionaryFormIsDirty()) {
+    showToast(t("noChangesToSave"));
+    return true;
   }
 
   try {
