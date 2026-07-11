@@ -1298,8 +1298,11 @@ button.pending-source:focus-visible {
   gap: 12px;
 }
 
-.entry-morphology-mode-field {
-  max-width: 280px;
+.entry-morphology-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .entry-morphology-add-row,

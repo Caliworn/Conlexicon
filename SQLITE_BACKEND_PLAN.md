@@ -241,7 +241,7 @@ entry_morphology_cell_overrides(
 
 - `morphology_template_groups.notes` 保留，因为模板组级说明很快会成为前端 UI 需求。
 - `entry_morphology_groups.title` 保留，因为一个词条未来可手动配置多个形态模板组，词条级显示标题需要独立于模板组名称；`notes` 保留用于说明该词条采用此形态组时的特殊信息。模板组自身的 `notes` 不应自动显示在词条详情或词条编辑中。
-- `entries.morphology_mode` 取值为 `auto`、`manual` 或 `none`；`template_group_id` 只保存真实模板组 ID，不使用 `auto` / `none` 伪值。手动模式按 `entry_morphology_groups.position` 排序；自动模式的排序来自自动分配规则，overlay position 没有业务语义。
+- `entries.morphology_mode` 取值为 `auto` 或 `manual`；`template_group_id` 只保存真实模板组 ID，不使用 `auto` / `none` 伪值。手动模式按 `entry_morphology_groups.position` 排序，空列表即明确不使用形态；自动模式的排序来自自动分配规则，overlay position 没有业务语义。
 - `morphology_template_cells` 暂不设独立 `id`、`mode`、`ast_json`、`diagnostics_json` 或 cell 级时间戳；单元格由 `table_id + row_index + column_index` 定位，规则文本是主数据。
 - `entry_morphology_cell_overrides` 暂不设独立 `id`、`mode`、`notes` 或单条 override 时间戳；存在记录即表示手动覆盖，不存在则走模板规则自动生成。
 - `match_tags_json`、`row_labels_json`、`column_labels_json` 暂时保持 JSON 字段，因为它们当前不需要独立筛选、排序或局部引用。

@@ -250,7 +250,7 @@ GET /api/dictionaries/:id/entries?q=&fields=&fuzzy=&tagFuzzy=&fuzzyFields=&part=
 }
 ```
 
-形态搜索不是简单读取持久化字段。词条使用 `morphologyMode: "auto" | "manual" | "none"`：`auto` 先按自动分配规则得出有序模板组，再按真实 `templateGroupId` 合并该词条的 overlay；`manual` 按词条形态组 position 使用显式模板组；`none` 不生成形态形式。随后遍历组内全部子表，逐格读取以真实子表 ID 分层的 override；没有 override 时用词形、形态规则和形态函数动态生成默认形式。`templateGroupId` 不再接受 `"auto"` 或 `"none"` 伪值；旧 JSON 的转换只发生在导入迁移。后续如果引入索引或 SQLite，也必须保持该语义，或在形态配置、词条 lemma、标签或 override 改变时更新对应索引。
+形态搜索不是简单读取持久化字段。词条使用 `morphologyMode: "auto" | "manual"`：`auto` 先按自动分配规则得出有序模板组，再按真实 `templateGroupId` 合并该词条的 overlay；`manual` 按词条形态组 position 使用显式模板组，空列表表示明确不使用形态。随后遍历组内全部子表，逐格读取以真实子表 ID 分层的 override；没有 override 时用词形、形态规则和形态函数动态生成默认形式。`templateGroupId` 不再接受 `"auto"` 或 `"none"` 伪值；旧 JSON 的转换只发生在导入迁移。后续如果引入索引或 SQLite，也必须保持该语义，或在形态配置、词条 lemma、标签或 override 改变时更新对应索引。
 
 ### 词条 facets
 

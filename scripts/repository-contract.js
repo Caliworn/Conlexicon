@@ -521,7 +521,8 @@ function checkModelNormalization() {
     morphologyModel.morphologySearchStrings({
       lemma: "root",
       tags: ["n"],
-      morphologyMode: "none",
+      morphologyMode: "manual",
+      morphologyGroups: [],
     }, automaticMorphologyDictionary),
     [],
   );
@@ -576,6 +577,16 @@ function checkModelNormalization() {
     "roots",
   );
   assert.deepEqual(
+    morphologyModel.materializeAutomaticMorphologyGroups({
+      ...autoOverlayEntry,
+      morphologyGroups: [
+        ...autoOverlayEntry.morphologyGroups,
+        { id: "emorph-dormant", templateGroupId: "morph-manual", notes: "keep dormant", overrides: {} },
+      ],
+    }, canonicalMorphologyDictionary).map((group) => group.templateGroupId),
+    ["morph-auto", "morph-manual"],
+  );
+  assert.deepEqual(
     morphologyModel.resolveCanonicalEntryMorphologyGroups({
       lemma: "root",
       tags: ["n"],
@@ -588,7 +599,8 @@ function checkModelNormalization() {
     morphologyModel.resolveCanonicalEntryMorphologyGroups({
       lemma: "root",
       tags: ["n"],
-      morphologyMode: "none",
+      morphologyMode: "manual",
+      morphologyGroups: [],
     }, canonicalMorphologyDictionary),
     [],
   );
@@ -645,7 +657,7 @@ function checkModelNormalization() {
   }).dictionary.entries;
   assert.deepEqual(
     migratedLegacyMorphology.map((entry) => entry.morphologyMode),
-    ["auto", "manual", "none"],
+    ["auto", "manual", "manual"],
   );
   assert.deepEqual(
     migratedLegacyMorphology[0].morphologyGroups[0].overrides,

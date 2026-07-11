@@ -200,6 +200,10 @@ const i18n = {
     morphologyNone: "不使用表格",
     morphologyMode: "形态模式",
     morphologyManual: "手动配置",
+    switchToManualMorphology: "改为手动配置",
+    switchToManualMorphologyConfirm: "改为手动配置会保留当前自动命中的形态组，并一并转移当前未显示的形态覆盖。之后若恢复自动匹配，所有这些手动形态组、标题、备注和单元格覆盖都会被清空。是否继续？",
+    restoreAutoMorphology: "恢复自动匹配",
+    restoreAutoMorphologyConfirm: "恢复自动匹配将放弃当前手动形态组及其标题、备注和单元格覆盖。是否继续？",
     morphologyManualGroups: "手动形态组",
     addEntryMorphologyGroup: "添加形态组",
     removeEntryMorphologyGroup: "移除形态组",
@@ -656,6 +660,10 @@ const i18n = {
     morphologyNone: "No Table",
     morphologyMode: "Morphology Mode",
     morphologyManual: "Manual Configuration",
+    switchToManualMorphology: "Switch to Manual",
+    switchToManualMorphologyConfirm: "Switching to manual configuration preserves the currently matched morphology groups and any hidden morphology overlays. Restoring auto matching later will clear all of these manual groups, titles, notes, and cell overrides. Continue?",
+    restoreAutoMorphology: "Restore Auto Match",
+    restoreAutoMorphologyConfirm: "Restoring auto matching will discard the current manual morphology groups, titles, notes, and cell overrides. Continue?",
     morphologyManualGroups: "Manual Morphology Groups",
     addEntryMorphologyGroup: "Add Morphology Group",
     removeEntryMorphologyGroup: "Remove Morphology Group",
@@ -2051,9 +2059,6 @@ function legacyMorphologyTableViews(templateGroups = []) {
 }
 
 function morphologyEditorView({ morphologyMode = "auto", morphologyGroups = [] } = {}) {
-  if (morphologyMode === "none") {
-    return { tableId: "none", overrides: {} };
-  }
   const explicitGroup = morphologyMode === "manual" ? morphologyGroups[0] : null;
   const sourceGroups = explicitGroup ? [explicitGroup] : morphologyGroups;
   if (explicitGroup?.templateGroupId) {
@@ -7472,16 +7477,11 @@ function renderMorphologyEntryControls(host, entry = {}, { full = false } = {}) 
   })).filter(({ templateGroup }) => templateGroup);
   const groups = state.morphologyMode === "manual" ? manualGroups : resolved;
   const availableGroups = normalizeMorphology(dictionary?.morphology).templateGroups;
-  const canSelectAuto = state.morphologyMode !== "manual" || !state.morphologyGroups.length;
   host.innerHTML = `
-    <label class="entry-morphology-mode-field">
-      <span>${escapeHtml(t("morphologyMode"))}</span>
-      <select data-field="morphologyMode">
-        ${canSelectAuto ? `<option value="auto" ${state.morphologyMode === "auto" ? "selected" : ""}>${escapeHtml(t("morphologyAuto"))}</option>` : ""}
-        <option value="manual" ${state.morphologyMode === "manual" ? "selected" : ""}>${escapeHtml(t("morphologyManual"))}</option>
-        <option value="none" ${state.morphologyMode === "none" ? "selected" : ""}>${escapeHtml(t("morphologyNone"))}</option>
-      </select>
-    </label>
+    <div class="entry-morphology-mode-row" data-morphology-mode="${escapeHtml(state.morphologyMode)}">
+      <strong>${escapeHtml(state.morphologyMode === "auto" ? t("morphologyAuto") : t("morphologyManual"))}</strong>
+      <button class="secondary-button" type="button" data-action="toggle-entry-morphology-mode">${escapeHtml(state.morphologyMode === "auto" ? t("switchToManualMorphology") : t("restoreAutoMorphology"))}</button>
+    </div>
     ${state.morphologyMode === "manual" ? `
       <div class="entry-morphology-add-row">
         <select data-field="addMorphologyGroup">${availableGroups.map((group) => `<option value="${escapeHtml(group.id)}">${escapeHtml(group.name)}</option>`).join("")}</select>
@@ -7527,7 +7527,7 @@ function renderEntryMorphologyOverrideTable(table, entryGroup, entry) {
 }
 
 function collectMorphologyEntryState(host, entry = {}) {
-  const morphologyMode = host?.querySelector('[data-field="morphologyMode"]')?.value || "auto";
+  const morphologyMode = host?.querySelector("[data-morphology-mode]")?.dataset.morphologyMode || "auto";
   const visibleGroups = [...(host?.querySelectorAll(".entry-morphology-group-card") || [])].map((card) => {
     const overrides = {};
     card.querySelectorAll("[data-morphology-override]").forEach((input) => {
@@ -7554,6 +7554,37 @@ function collectMorphologyEntryState(host, entry = {}) {
     ? [...previous.filter((group) => !visibleGroups.some((visible) => visible.templateGroupId === group.templateGroupId)), ...visibleGroups]
     : visibleGroups;
   return morphologyModel.normalizeEntryMorphologyState({ morphologyMode, morphologyGroups }, { reserveEntityId, usedIds: new Set() });
+}
+
+async function toggleMorphologyEditorMode(host, entry = {}, { full = false } = {}) {
+  const current = collectMorphologyEntryState(host, entry);
+  const previewEntry = morphologyFormPreviewEntry({ ...entry, ...current }, full);
+  if (current.morphologyMode === "auto") {
+    const confirmed = await appConfirm(t("switchToManualMorphologyConfirm"));
+    if (!confirmed) {
+      return;
+    }
+    const morphologyGroups = morphologyModel.materializeAutomaticMorphologyGroups(
+      previewEntry,
+      activeDictionary(),
+      { normalizeText: normalize, reserveEntityId, usedIds: new Set() },
+    );
+    renderMorphologyEntryControls(host, {
+      ...previewEntry,
+      morphologyMode: "manual",
+      morphologyGroups,
+    }, { full });
+    return;
+  }
+  const confirmed = await appConfirm(t("restoreAutoMorphologyConfirm"), { danger: true });
+  if (!confirmed) {
+    return;
+  }
+  renderMorphologyEntryControls(host, {
+    ...previewEntry,
+    morphologyMode: "auto",
+    morphologyGroups: [],
+  }, { full });
 }
 
 function renderPartialMorphologyControls(entry) {
@@ -11174,7 +11205,7 @@ elements.entryDisplay.addEventListener("contextmenu", (event) => {
   openPartialEdit(section.dataset.editSection);
 });
 
-elements.entryDisplay.addEventListener("click", (event) => {
+elements.entryDisplay.addEventListener("click", async (event) => {
   const tagTarget = event.target.closest("[data-entry-tag-index]");
   if (tagTarget && elements.entryDisplay.contains(tagTarget)) {
     const entry = selectedEntry();
@@ -11204,6 +11235,11 @@ elements.entryDisplay.addEventListener("click", (event) => {
   }
 
   const morphologyAction = event.target.closest("[data-action]")?.dataset.action;
+  if (morphologyAction === "toggle-entry-morphology-mode") {
+    const entry = selectedEntry() || {};
+    await toggleMorphologyEditorMode(partialEditBody()?.querySelector(".partial-morphology-controls"), entry);
+    return;
+  }
   if (morphologyAction === "move-entry-morphology-group-up" || morphologyAction === "move-entry-morphology-group-down") {
     const card = event.target.closest(".entry-morphology-group-card");
     const list = card?.parentElement;
@@ -11264,15 +11300,6 @@ elements.entryDisplay.addEventListener("submit", (event) => {
     return;
   }
   savePartialEdit(event);
-});
-elements.entryDisplay.addEventListener("change", (event) => {
-  if (!event.target.matches('[data-field="morphologyMode"]')) {
-    return;
-  }
-  const entry = selectedEntry() || {};
-  const host = partialEditBody()?.querySelector(".partial-morphology-controls");
-  const current = collectMorphologyEntryState(host, entry);
-  renderMorphologyEntryControls(host, { ...entry, ...current });
 });
 
 bindSourceAutocompleteInput(elements.sourceEntryInput);
@@ -11560,16 +11587,12 @@ elements.tagsInput.addEventListener("input", () => {
     }, { full: true });
   }
 });
-elements.entryMorphologyControls.addEventListener("change", (event) => {
-  if (!event.target.matches('[data-field="morphologyMode"]')) {
+elements.entryMorphologyControls.addEventListener("click", async (event) => {
+  const action = event.target.closest("[data-action]")?.dataset.action;
+  if (action === "toggle-entry-morphology-mode") {
+    await toggleMorphologyEditorMode(elements.entryMorphologyControls, entryDraft || selectedEntry() || {}, { full: true });
     return;
   }
-  const baseEntry = entryDraft || selectedEntry() || {};
-  const current = collectMorphologyEntryState(elements.entryMorphologyControls, baseEntry);
-  renderMorphologyEntryControls(elements.entryMorphologyControls, { ...baseEntry, ...current }, { full: true });
-});
-elements.entryMorphologyControls.addEventListener("click", (event) => {
-  const action = event.target.closest("[data-action]")?.dataset.action;
   if (action === "move-entry-morphology-group-up" || action === "move-entry-morphology-group-down") {
     const card = event.target.closest(".entry-morphology-group-card");
     const list = card?.parentElement;
