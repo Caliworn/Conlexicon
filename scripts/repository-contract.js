@@ -472,6 +472,16 @@ function checkModelNormalization() {
       { body: "a=o", unterminated: false },
     ],
   );
+  assert.equal(
+    morphologyModel.morphologyCellDefaultValue(
+      { lemma: "root" },
+      { rowCount: 1, columnCount: 1, cells: { "0,0": { sourceText: "" } } },
+      0,
+      0,
+      {},
+    ),
+    "",
+  );
   assert.deepEqual(
     morphologyModel.extractMorphologyFunctionCalls("/rightV(a)(x)=x;else=y/").map((call) => ({
       name: call.name,
@@ -691,6 +701,7 @@ function checkModelNormalization() {
   assert.deepEqual(normalized.entries[0].etymology.sources, ["entry-source"]);
   assert.equal(normalized.entries[0].etymology.description, "source note");
   assert.equal(normalized.settings.entryListTagDisplayLimit, 10);
+  assert.equal(normalized.settings.showEmptyEntrySections, false);
   assert.equal(normalized.settings.ipa.mappings[0].to, "ˈa");
 
   const imported = importDictionaryFromPayload({

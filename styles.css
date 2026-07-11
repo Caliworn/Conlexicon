@@ -1453,6 +1453,41 @@ button.pending-source:focus-visible {
   max-width: 320px;
 }
 
+.morphology-table-toggle {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.morphology-table-toggle:hover,
+.morphology-table-toggle:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.morphology-table-toggle-icon {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  transform: rotate(-90deg);
+  transition: transform 160ms ease;
+}
+
+.morphology-table-toggle.is-expanded .morphology-table-toggle-icon {
+  transform: rotate(0deg);
+}
+
 .morphology-group-config-grid {
   display: grid;
   grid-template-columns: minmax(300px, 480px) minmax(260px, 1fr) auto;

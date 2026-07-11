@@ -370,6 +370,8 @@ const i18n = {
     polysemyDisplay: "多义项显示",
     entryListPolysemyDisplay: "词条列表的多义项显示",
     networkPolysemyDisplay: "词汇网络悬浮卡片的多义项显示",
+    emptyEntrySections: "空栏目",
+    showEmptyEntrySections: "在词条浏览界面显示空栏目",
     ipaKeyboardSettings: "IPA 虚拟键盘",
     ipaKeyboardSymbols: "键盘符号",
     ipaKeyboardHelp: "以空格、逗号或换行分隔。新词典默认包含 ˈ 和 ˌ。",
@@ -830,6 +832,8 @@ const i18n = {
     polysemyDisplay: "Polysemy Display",
     entryListPolysemyDisplay: "Entry list polysemy display",
     networkPolysemyDisplay: "Lexical network hover-card polysemy display",
+    emptyEntrySections: "Empty Sections",
+    showEmptyEntrySections: "Show empty sections in the entry view",
     ipaKeyboardSettings: "IPA Virtual Keyboard",
     ipaKeyboardSymbols: "Keyboard Symbols",
     ipaKeyboardHelp: "Separate symbols with spaces, commas, or line breaks. New dictionaries include ˈ and ˌ by default.",
@@ -1138,6 +1142,7 @@ const elements = {
   displayPronunciation: document.querySelector("#displayPronunciation"),
   displayPart: document.querySelector("#displayPart"),
   displayTags: document.querySelector("#displayTags"),
+  displayDefinitionsSection: document.querySelector("#displayDefinitionsSection"),
   displayDefinitions: document.querySelector("#displayDefinitions"),
   displayEtymologySection: document.querySelector("#displayEtymologySection"),
   displayEtymology: document.querySelector("#displayEtymology"),
@@ -1211,6 +1216,7 @@ const elements = {
   entryListTagFilteringInput: document.querySelector("#entryListTagFilteringInput"),
   entryListPolysemyInput: document.querySelector("#entryListPolysemyInput"),
   networkPolysemyInput: document.querySelector("#networkPolysemyInput"),
+  showEmptyEntrySectionsInput: document.querySelector("#showEmptyEntrySectionsInput"),
   fuzzySearchInput: document.querySelector("#fuzzySearchInput"),
   tagFuzzySearchInput: document.querySelector("#tagFuzzySearchInput"),
   sourceFuzzyInput: document.querySelector("#sourceFuzzyInput"),
@@ -1761,6 +1767,7 @@ function normalizeDictionarySettings(settings = {}, usedIds = new Set()) {
     entryListTagFiltering: Boolean(settings.entryListTagFiltering ?? true),
     entryListPolysemyDisplay: Boolean(settings.entryListPolysemyDisplay),
     networkPolysemyDisplay: Boolean(settings.networkPolysemyDisplay),
+    showEmptyEntrySections: Boolean(settings.showEmptyEntrySections),
     fuzzySearch: Boolean(settings.fuzzySearch),
     tagFuzzySearch: Boolean(settings.tagFuzzySearch),
     sourceFuzzyCompletion: Boolean(settings.sourceFuzzyCompletion),
@@ -5580,6 +5587,7 @@ function renderEmptyDetail() {
   delete elements.displayPart.dataset.entryTagIndex;
   delete elements.displayPart.dataset.entryTagValue;
   elements.displayTags.innerHTML = "";
+  elements.displayDefinitionsSection.hidden = false;
   elements.displayDefinitions.innerHTML = "";
   elements.displayDefinitions.append(emptyState(t("noEntries"), t("noEntriesBody")));
   elements.displayEtymologySection.hidden = true;
@@ -5591,6 +5599,7 @@ function renderEmptyDetail() {
 }
 
 function renderEntryDisplay(entry) {
+  const showEmptySections = normalizeDictionarySettings(activeDictionary()?.settings).showEmptyEntrySections;
   const partTags = (entry.tags || [])
     .map((tag, index) => ({ tag, index }))
     .filter(({ tag, index }) => entryTagIsPart(entry, index, tag));
@@ -5615,6 +5624,7 @@ function renderEntryDisplay(entry) {
 
   elements.displayDefinitions.innerHTML = "";
   const visibleDefinitions = (entry.definitions || []).filter((definition) => definition.meaning || definition.example || definition.note);
+  elements.displayDefinitionsSection.hidden = !visibleDefinitions.length && !showEmptySections;
   if (!visibleDefinitions.length) {
     elements.displayDefinitions.append(emptyState(t("missingDefinition"), ""));
   }
@@ -5632,18 +5642,18 @@ function renderEntryDisplay(entry) {
     elements.displayDefinitions.append(item);
   });
 
-  renderEtymology(entry);
+  renderEtymology(entry, showEmptySections);
   renderDerivedEntries(entry);
-  renderMorphologyDisplay(entry);
-  elements.displayEntryNotesSection.hidden = !entry.notes;
+  renderMorphologyDisplay(entry, showEmptySections);
+  elements.displayEntryNotesSection.hidden = !entry.notes && !showEmptySections;
   elements.displayEntryNotes.textContent = entry.notes || "";
 }
 
-function renderEtymology(entry) {
+function renderEtymology(entry, showEmptySections = false) {
   const dictionary = activeDictionary();
   const sources = entry.etymology?.sources || [];
   const description = entry.etymology?.description || "";
-  elements.displayEtymologySection.hidden = !sources.length && !description;
+  elements.displayEtymologySection.hidden = !sources.length && !description && !showEmptySections;
   elements.displayEtymology.innerHTML = "";
 
   if (sources.length) {
@@ -6045,7 +6055,7 @@ function morphologyCellDefaultValue(entry, table, row, col, dictionary = activeD
   const key = morphologyCellKey(row, col);
   const rule = String(table?.cells?.[key]?.value || "").trim();
   if (!rule) {
-    return entry?.lemma || "";
+    return "";
   }
   return applyMorphologyRuleSyntax(entry?.lemma || "", rule, morphologyFunctionConfig(dictionary));
 }
@@ -7325,12 +7335,12 @@ function numericDateEntryItems(map, title = "") {
     .map(([label, item]) => [label, item.count, advancedFilterAction(analysisFilterTitle(title, label), [...item.entryIds])]);
 }
 
-function renderMorphologyDisplay(entry) {
+function renderMorphologyDisplay(entry, showEmptySections = false) {
   const dictionary = activeDictionary();
   const resolvedGroups = morphologyModel
     .resolveEntryMorphologyGroups(entry, dictionary, { normalizeText: normalize })
     .filter(({ templateGroup }) => templateGroup.tables.length);
-  elements.displayMorphologySection.hidden = !resolvedGroups.length;
+  elements.displayMorphologySection.hidden = !resolvedGroups.length && !showEmptySections;
   elements.displayMorphology.innerHTML = "";
   if (!resolvedGroups.length) {
     return;
@@ -7974,6 +7984,7 @@ function fillSettingsForm(dictionary) {
   elements.entryListTagFilteringInput.checked = settings.entryListTagFiltering;
   elements.entryListPolysemyInput.checked = settings.entryListPolysemyDisplay;
   elements.networkPolysemyInput.checked = settings.networkPolysemyDisplay;
+  elements.showEmptyEntrySectionsInput.checked = settings.showEmptyEntrySections;
   elements.fuzzySearchInput.checked = settings.fuzzySearch;
   elements.tagFuzzySearchInput.checked = settings.tagFuzzySearch;
   elements.sourceFuzzyInput.checked = settings.sourceFuzzyCompletion;
@@ -8200,6 +8211,7 @@ function settingsFormSnapshot() {
     entryListTagFiltering: elements.entryListTagFilteringInput.checked,
     entryListPolysemyDisplay: elements.entryListPolysemyInput.checked,
     networkPolysemyDisplay: elements.networkPolysemyInput.checked,
+    showEmptyEntrySections: elements.showEmptyEntrySectionsInput.checked,
     fuzzySearch: elements.fuzzySearchInput.checked,
     tagFuzzySearch: elements.tagFuzzySearchInput.checked,
     sourceFuzzyCompletion: elements.sourceFuzzyInput.checked,
@@ -8236,6 +8248,7 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     entryListTagFiltering: settings.entryListTagFiltering,
     entryListPolysemyDisplay: settings.entryListPolysemyDisplay,
     networkPolysemyDisplay: settings.networkPolysemyDisplay,
+    showEmptyEntrySections: settings.showEmptyEntrySections,
     fuzzySearch: settings.fuzzySearch,
     tagFuzzySearch: settings.tagFuzzySearch,
     sourceFuzzyCompletion: settings.sourceFuzzyCompletion,
@@ -8405,6 +8418,7 @@ function collectDictionarySettingsFromForm(existing = {}) {
     entryListTagFiltering: elements.entryListTagFilteringInput.checked,
     entryListPolysemyDisplay: elements.entryListPolysemyInput.checked,
     networkPolysemyDisplay: elements.networkPolysemyInput.checked,
+    showEmptyEntrySections: elements.showEmptyEntrySectionsInput.checked,
     fuzzySearch: elements.fuzzySearchInput.checked,
     tagFuzzySearch: elements.tagFuzzySearchInput.checked,
     sourceFuzzyCompletion: elements.sourceFuzzyInput.checked,
@@ -9613,11 +9627,13 @@ function createMorphologyTableEditor(table) {
         <div>
           <div class="morphology-card-title-row">
             <input data-field="title" value="${escapeHtml(table.title)}" aria-label="${escapeHtml(t("tableName"))}">
+            <button class="morphology-table-toggle${expanded ? " is-expanded" : ""}" type="button" data-action="toggle-morphology-table" data-app-tooltip="always" aria-expanded="${expanded}" aria-label="${escapeHtml(expanded ? t("collapse") : t("expand"))}">
+              <svg class="morphology-table-toggle-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg>
+            </button>
           </div>
         </div>
       </div>
       <div class="panel-actions">
-        <button class="secondary-button" type="button" data-action="toggle-morphology-table" aria-expanded="${expanded}">${escapeHtml(expanded ? t("collapse") : t("expand"))}</button>
         <button class="danger-ghost" type="button" data-action="remove-morphology-table">${escapeHtml(t("removeTable"))}</button>
       </div>
     </div>
@@ -9652,7 +9668,7 @@ function renderMorphologyRuleInputs(table) {
       const cell = table.cells[key] || normalizeMorphologyCell();
       cells.push(`
         <td class="morphology-rule-cell" data-cell="${escapeHtml(key)}">
-          <textarea data-field="value" rows="2" placeholder="{}">${escapeHtml(cell.sourceText)}</textarea>
+          <textarea data-field="value" rows="2">${escapeHtml(cell.sourceText)}</textarea>
         </td>
       `);
     }
@@ -11923,8 +11939,10 @@ elements.morphologyTableList.addEventListener("click", (event) => {
     const expanded = body.hidden;
     body.hidden = !expanded;
     card.classList.toggle("is-collapsed", !expanded);
-    toggleButton.textContent = expanded ? t("collapse") : t("expand");
+    toggleButton.classList.toggle("is-expanded", expanded);
     toggleButton.setAttribute("aria-expanded", String(expanded));
+    toggleButton.setAttribute("aria-label", expanded ? t("collapse") : t("expand"));
+    hideAppTooltip();
     if (expanded) {
       expandedMorphologyTables.add(card.dataset.templateTableId);
     } else {
