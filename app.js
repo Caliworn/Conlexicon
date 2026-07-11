@@ -10418,6 +10418,7 @@ async function openPartialEdit(section) {
   const form = document.createElement("form");
   form.className = "inline-partial-edit-form";
   form.autocomplete = "off";
+  form.noValidate = true;
   form.innerHTML = `
     <div class="form-heading compact-heading">
       <div>
@@ -10438,7 +10439,7 @@ async function openPartialEdit(section) {
     body.innerHTML = `
       <label>
         <span>${escapeHtml(t("lemma"))}</span>
-        <input data-field="lemma" required maxlength="80" value="${escapeHtml(entry.lemma)}">
+        <input data-field="lemma" aria-required="true" maxlength="80" value="${escapeHtml(entry.lemma)}">
       </label>
       <label>
         <span>${escapeHtml(t("pronunciation"))}</span>
@@ -10535,30 +10536,47 @@ function updatePartialRemoveDefinitionButtons(list = partialEditBody()?.querySel
   });
 }
 
+function joinEntryRequirementMessages(messages) {
+  return messages.join(currentLanguage === "en" ? " · " : "；");
+}
+
 function entrySaveRequirementMessage(entry, dictionary = activeDictionary()) {
-  return entryBasicRequirementMessage(entry, dictionary) || entryDefinitionsRequirementMessage(entry, dictionary);
+  return joinEntryRequirementMessages([
+    ...entryBasicRequirementMessages(entry, dictionary),
+    ...entryDefinitionsRequirementMessages(entry, dictionary),
+  ]);
+}
+
+function entryBasicRequirementMessages(entry, dictionary = activeDictionary()) {
+  const settings = normalizeDictionarySettings(dictionary?.settings);
+  const messages = [];
+  if (!entry.lemma?.trim()) {
+    messages.push(t("requiredEntry"));
+  }
+  if (!settings.allowEmptyPronunciation && !entry.pronunciation?.trim()) {
+    messages.push(t("requiredPronunciation"));
+  }
+  if (!settings.allowEmptyTags && !(entry.tags || []).length) {
+    messages.push(t("requiredTags"));
+  }
+  return messages;
+}
+
+function entryDefinitionsRequirementMessages(entry, dictionary = activeDictionary()) {
+  const settings = normalizeDictionarySettings(dictionary?.settings);
+  const messages = [];
+  if (!settings.allowEmptyDefinitions && !(entry.definitions || []).some((definition) => definition.meaning)) {
+    messages.push(t("requiredDefinition"));
+  }
+  return messages;
 }
 
 function entryBasicRequirementMessage(entry, dictionary = activeDictionary()) {
-  const settings = normalizeDictionarySettings(dictionary?.settings);
-  if (!entry.lemma?.trim()) {
-    return t("requiredEntry");
-  }
-  if (!settings.allowEmptyPronunciation && !entry.pronunciation?.trim()) {
-    return t("requiredPronunciation");
-  }
-  if (!settings.allowEmptyTags && !(entry.tags || []).length) {
-    return t("requiredTags");
-  }
-  return "";
+  return joinEntryRequirementMessages(entryBasicRequirementMessages(entry, dictionary));
 }
 
 function entryDefinitionsRequirementMessage(entry, dictionary = activeDictionary()) {
-  const settings = normalizeDictionarySettings(dictionary?.settings);
-  if (!settings.allowEmptyDefinitions && !(entry.definitions || []).some((definition) => definition.meaning)) {
-    return t("requiredDefinition");
-  }
-  return "";
+  return joinEntryRequirementMessages(entryDefinitionsRequirementMessages(entry, dictionary));
 }
 
 function entryApiPayload(entry = {}) {

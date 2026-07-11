@@ -243,7 +243,7 @@
                 </section>
               </article>
 
-              <form class="editor-panel" id="entryForm" autocomplete="off" hidden>
+              <form class="editor-panel" id="entryForm" autocomplete="off" novalidate hidden>
                 <input id="entryId" type="hidden">
                 <div class="form-heading">
                   <div>
@@ -255,7 +255,7 @@
 
                 <label>
                   <span data-i18n="lemma">词形</span>
-                  <input id="lemmaInput" name="lemma" required maxlength="80">
+                  <input id="lemmaInput" name="lemma" aria-required="true" maxlength="80">
                 </label>
 
                 <label>
