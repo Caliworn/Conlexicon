@@ -69,6 +69,11 @@ async function runSqliteSchemaCheck() {
     assert.equal(Object.hasOwn(savedMetadata, "entries"), false);
     assert.equal(savedMetadata.name, "SQLite Schema Updated");
 
+    const dictionaryMetadata = await repository.getDictionaryMeta(sourceDictionary.id);
+    assert.deepEqual(Object.keys(dictionaryMetadata).sort(), ["createdAt", "description", "id", "language", "name", "summary", "updatedAt"]);
+    assert.equal(Object.hasOwn(dictionaryMetadata, "entries"), false);
+    assert.equal(dictionaryMetadata.summary.entryCount, sourceDictionary.entries.length);
+
     const savedSettings = await repository.updateSettings(sourceDictionary.id, { entryListTagDisplayLimit: 4 });
     assert.deepEqual(Object.keys(savedSettings).sort(), ["id", "settings", "updatedAt"]);
     assert.equal(Object.hasOwn(savedSettings, "entries"), false);
@@ -97,6 +102,20 @@ async function runSqliteSchemaCheck() {
     assert.deepEqual(Object.keys(savedMorphology).sort(), ["id", "morphology", "updatedAt"]);
     assert.equal(Object.hasOwn(savedMorphology, "entries"), false);
     assert.equal(savedMorphology.morphology.templateGroups[0].id, "morph-roundtrip");
+
+    const patchedEntries = await repository.patchEntries(sourceDictionary.id, [{
+      id: "entry-root",
+      patch: { pronunciation: "/patched/" },
+    }], {
+      settings: { entryListTagDisplayLimit: 5 },
+    });
+    assert.deepEqual(Object.keys(patchedEntries).sort(), ["entries", "id", "settings", "updatedAt"]);
+    assert.equal(patchedEntries.entries.length, 1);
+    assert.equal(patchedEntries.entries[0].id, "entry-root");
+    assert.equal(patchedEntries.entries[0].pronunciation, "/patched/");
+    assert.equal(patchedEntries.settings.entryListTagDisplayLimit, 5);
+    assert.equal(Object.hasOwn(patchedEntries, "name"), false);
+
     const exported = repository.exportDictionarySnapshot(sourceDictionary.id);
     assert.equal(exported.id, sourceDictionary.id);
     assert.equal(exported.entries.length, sourceDictionary.entries.length);

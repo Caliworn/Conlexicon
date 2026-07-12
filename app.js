@@ -614,6 +614,8 @@ const i18n = {
     corpusUnitParentLabel: "父级：{parent}",
     lexicalNetwork: "词汇网络",
     closeNetwork: "关闭网络",
+    lexicalNetworkLoading: "正在加载词汇网络",
+    lexicalNetworkLoadFailed: "无法加载词汇网络",
   },
   en: {
     appTitle: "Constructed Language Dictionary",
@@ -1086,6 +1088,8 @@ const i18n = {
     corpusUnitParentLabel: "Parent: {parent}",
     lexicalNetwork: "Lexical Network",
     closeNetwork: "Close Network",
+    lexicalNetworkLoading: "Loading lexical network",
+    lexicalNetworkLoadFailed: "Could not load lexical network",
   },
 };
 
@@ -1579,16 +1583,6 @@ async function loadState() {
   finishAppBoot();
 }
 
-function dictionaryHasFullPayload(dictionary) {
-  return Boolean(dictionary && typeof dictionary === "object" && (
-    Array.isArray(dictionary.entries)
-    || Object.hasOwn(dictionary, "settings")
-    || Object.hasOwn(dictionary, "docs")
-    || Object.hasOwn(dictionary, "corpus")
-    || Object.hasOwn(dictionary, "morphology")
-  ));
-}
-
 function normalizeDictionarySummary(summary) {
   if (!summary || typeof summary !== "object") {
     return null;
@@ -1629,8 +1623,6 @@ async function ensureDictionarySnapshotLoaded(dictionaryId) {
 }
 
 async function applyServerState(source) {
-  const rawDictionaries = Array.isArray(source.dictionaries) ? source.dictionaries : [];
-  const rawDictionaryById = new Map(rawDictionaries.map((dictionary) => [dictionary.id, dictionary]));
   const previousLoadedById = new Map(
     state.dictionaries
       .filter((dictionary) => loadedDictionaryIds.has(dictionary.id))
@@ -1640,12 +1632,6 @@ async function applyServerState(source) {
   const nextLoadedDictionaryIds = new Set();
 
   normalizedState.dictionaries = normalizedState.dictionaries.map((dictionary) => {
-    const rawDictionary = rawDictionaryById.get(dictionary.id);
-    if (dictionaryHasFullPayload(rawDictionary)) {
-      nextLoadedDictionaryIds.add(dictionary.id);
-      return dictionary;
-    }
-
     const previous = previousLoadedById.get(dictionary.id);
     if (previous && previous.updatedAt === dictionary.updatedAt) {
       nextLoadedDictionaryIds.add(dictionary.id);
@@ -1668,7 +1654,19 @@ function normalizeState(source) {
     activeView: source.activeView || "editor",
     uiLanguage: normalizeUiLanguage(source.uiLanguage),
     uiTheme: normalizeUiTheme(source.uiTheme),
-    dictionaries: Array.isArray(source.dictionaries) ? source.dictionaries.map(normalizeDictionary) : [],
+    dictionaries: Array.isArray(source.dictionaries) ? source.dictionaries.map(normalizeDictionaryMetadata) : [],
+  };
+}
+
+function normalizeDictionaryMetadata(dictionary = {}) {
+  return {
+    id: String(dictionary.id || "").trim(),
+    name: String(dictionary.name || t("unnamedDictionary")),
+    language: String(dictionary.language || ""),
+    description: String(dictionary.description || ""),
+    createdAt: String(dictionary.createdAt || ""),
+    updatedAt: String(dictionary.updatedAt || ""),
+    summary: normalizeDictionarySummary(dictionary.summary),
   };
 }
 
@@ -1698,22 +1696,14 @@ function normalizeDictionary(dictionary) {
 
 function normalizeEntry(entry, usedIds = new Set()) {
   const tags = Array.isArray(entry.tags) ? entry.tags.filter(Boolean) : [];
-  if (entry.partOfSpeech && tags[0] !== entry.partOfSpeech) {
-    tags.unshift(entry.partOfSpeech);
-  }
 
   const definitions = Array.isArray(entry.definitions)
     ? entry.definitions.map((definition) => normalizeDefinition(definition, usedIds))
     : [];
 
-  const migratedEtymology = [entry.roots, entry.variant].filter(Boolean).join("\n");
-  const sourceText = entry.etymology?.sourceText || entry.etymology?.source || "";
   const sources = Array.isArray(entry.etymology?.sources)
     ? entry.etymology.sources.map(String).map((item) => item.trim()).filter(Boolean)
-    : splitSourceText(sourceText);
-  if (entry.etymology?.sourceEntryId && !sources.includes(entry.etymology.sourceEntryId)) {
-    sources.push(entry.etymology.sourceEntryId);
-  }
+    : [];
 
   const morphologyState = morphologyModel.normalizeEntryMorphologyState(entry, { usedIds, reserveEntityId });
   return {
@@ -1724,7 +1714,7 @@ function normalizeEntry(entry, usedIds = new Set()) {
     definitions,
     etymology: {
       sources,
-      description: entry.etymology?.description || migratedEtymology,
+      description: entry.etymology?.description || "",
     },
     notes: entry.notes || "",
     // `morphology` is a temporary view-model adapter for the old editor UI.
@@ -1747,25 +1737,13 @@ function normalizeDefinition(definition = {}, usedIds = new Set()) {
 }
 
 function normalizeDictionarySettings(settings = {}, usedIds = new Set()) {
-  const {
-    glossSmallCaps,
-    glossFontFamily,
-    glossFont,
-    corpusGlossAlign,
-    savePartialEditOnSwitch,
-    saveFullEditOnSwitch,
-    savePartialEditOnPageSwitch,
-    saveFullEditOnPageSwitch,
-    ...restSettings
-  } = settings;
-
   return {
-    ...restSettings,
-    glossStyles: normalizeGlossStyles(settings.glossStyles, glossFontFamily || glossFont, glossSmallCaps),
+    ...settings,
+    glossStyles: normalizeGlossStyles(settings.glossStyles),
     corpusUnitCardRenderPattern: String(settings.corpusUnitCardRenderPattern ?? settings.corpusUnitRenderPattern ?? ""),
-    corpusUnitCardGlossAlign: Boolean(settings.corpusUnitCardGlossAlign ?? corpusGlossAlign ?? true),
+    corpusUnitCardGlossAlign: Boolean(settings.corpusUnitCardGlossAlign ?? true),
     corpusUnitRenderPattern: String(settings.corpusUnitRenderPattern || ""),
-    corpusUnitGlossAlign: Boolean(settings.corpusUnitGlossAlign ?? corpusGlossAlign ?? true),
+    corpusUnitGlossAlign: Boolean(settings.corpusUnitGlossAlign ?? true),
     entryExampleRenderPattern: String(settings.entryExampleRenderPattern ?? DEFAULT_ENTRY_EXAMPLE_RENDER_PATTERN),
     entryExampleGlossAlign: Boolean(settings.entryExampleGlossAlign ?? true),
     corpusAutoSave: Boolean(settings.corpusAutoSave ?? true),
@@ -1787,14 +1765,8 @@ function normalizeDictionarySettings(settings = {}, usedIds = new Set()) {
     tagFuzzySearch: Boolean(settings.tagFuzzySearch),
     sourceFuzzyCompletion: Boolean(settings.sourceFuzzyCompletion),
     searchHighlight: Boolean(settings.searchHighlight ?? true),
-    partialEditPageSwitchAction: normalizeEditPageSwitchAction(
-      settings.partialEditPageSwitchAction,
-      savePartialEditOnPageSwitch ?? savePartialEditOnSwitch,
-    ),
-    fullEditPageSwitchAction: normalizeEditPageSwitchAction(
-      settings.fullEditPageSwitchAction,
-      saveFullEditOnPageSwitch ?? saveFullEditOnSwitch,
-    ),
+    partialEditPageSwitchAction: normalizeEditPageSwitchAction(settings.partialEditPageSwitchAction),
+    fullEditPageSwitchAction: normalizeEditPageSwitchAction(settings.fullEditPageSwitchAction),
     allowEmptyPronunciation: Boolean(settings.allowEmptyPronunciation ?? true),
     allowEmptyTags: Boolean(settings.allowEmptyTags ?? true),
     allowEmptyDefinitions: Boolean(settings.allowEmptyDefinitions ?? true),
@@ -1804,10 +1776,10 @@ function normalizeDictionarySettings(settings = {}, usedIds = new Set()) {
   };
 }
 
-function normalizeEditPageSwitchAction(value, legacySaveValue = false) {
+function normalizeEditPageSwitchAction(value) {
   return ["save", "discard", "prompt"].includes(value)
     ? value
-    : (legacySaveValue ? "save" : "discard");
+    : "discard";
 }
 
 function normalizeGlossFontFamily(value) {
@@ -1818,8 +1790,8 @@ function normalizeGlossFontSize(value) {
   return ["small", "medium", "large"].includes(value) ? value : "medium";
 }
 
-function normalizeGlossStyles(styles = {}, legacyFontFamily = "serif", legacySmallCaps = false) {
-  const fallbackFont = normalizeGlossFontFamily(legacyFontFamily);
+function normalizeGlossStyles(styles = {}) {
+  const fallbackFont = normalizeGlossFontFamily("serif");
   return Object.fromEntries(GLOSS_STYLE_KEYS.map((key) => {
     const style = styles?.[key] && typeof styles[key] === "object" ? styles[key] : {};
     return [key, {
@@ -1827,7 +1799,7 @@ function normalizeGlossStyles(styles = {}, legacyFontFamily = "serif", legacySma
       fontSize: normalizeGlossFontSize(style.fontSize),
       bold: Boolean(style.bold),
       italic: Boolean(style.italic ?? (key === "ft")),
-      ...(key === "glb" ? { smallCaps: Boolean(style.smallCaps ?? legacySmallCaps) } : {}),
+      ...(key === "glb" ? { smallCaps: Boolean(style.smallCaps) } : {}),
     }];
   }));
 }
@@ -1998,7 +1970,7 @@ function normalizeCorpusBlock(block = {}, usedIds = new Set()) {
   return {
     ...block,
     id: reserveEntityId(block.id, "corpus-block", usedIds),
-    title: String(block.title || block.name || ""),
+    title: String(block.title || ""),
     attributes: normalizeCorpusAttributes(block.attributes),
     tags: uniqueList(block.tags),
     notes: String(block.notes || ""),
@@ -2028,7 +2000,7 @@ function normalizeCorpusUnit(unit = {}, usedIds = new Set()) {
   return {
     ...unit,
     id: reserveEntityId(unit.id, "corpus-unit", usedIds),
-    content: String(unit.content || unit.text || ""),
+    content: String(unit.content || ""),
     attributes: normalizeCorpusAttributes(unit.attributes),
     tags: uniqueList(unit.tags),
     notes: String(unit.notes || ""),
@@ -5875,11 +5847,9 @@ function renderLexicalNetwork() {
   networkEntryId = entry.id;
   elements.networkTitle.textContent = entry.lemma;
   const relation = lexicalNetworkRelationForEntry(dictionary, entry);
-  const sources = relation.sources;
-  const derived = relation.derivedEntries;
 
-  renderNetworkNodeList(elements.networkSources, sources);
-  renderNetworkNodeList(elements.networkDerived, derived);
+  renderNetworkNodeList(elements.networkSources, relation.sources, relation.status);
+  renderNetworkNodeList(elements.networkDerived, relation.derivedEntries, relation.status);
   elements.networkFocus.innerHTML = "";
   elements.networkFocus.append(createNetworkNode(entry, true));
 }
@@ -5888,52 +5858,32 @@ function lexicalNetworkRelationKey(dictionary, entryId) {
   return [
     dictionary?.id || "",
     entryId || "",
-    stableJson((dictionary?.entries || []).map((entry) => ({
-      id: entry.id,
-      lemma: entry.lemma,
-      pronunciation: entry.pronunciation,
-      tags: entry.tags || [],
-      definitions: (entry.definitions || []).map((definition) => ({
-        id: definition.id,
-        meaning: definition.meaning,
-      })),
-      etymology: {
-        sources: entry.etymology?.sources || [],
-      },
-      updatedAt: entry.updatedAt,
-    }))),
+    dictionary?.updatedAt || "",
   ].join("|");
 }
 
 function lexicalNetworkRelationForEntry(dictionary, entry) {
-  const fallback = localLexicalNetworkRelation(entry, dictionary);
   if (!backendAvailable || !dictionary?.id || !entry?.id) {
-    return fallback;
+    return { status: "error", sources: [], derivedEntries: [], rootGroup: null };
   }
 
   const key = lexicalNetworkRelationKey(dictionary, entry.id);
   const cached = lexicalNetworkRelationsCache.get(key);
   if (cached?.status === "success") {
-    return apiLexicalNetworkRelation(cached.relation, dictionary, fallback);
+    return { status: "success", ...apiLexicalNetworkRelation(cached.relation, dictionary) };
   }
   if (!cached || cached.status === "error") {
     fetchLexicalNetworkRelation(dictionary, entry, key);
   }
-  return fallback;
-}
-
-function localLexicalNetworkRelation(entry, dictionary = activeDictionary()) {
-  const relationIndex = entryRelationsModel.buildEntryRelationIndex(dictionary, { normalizeText: normalize, compareEntries });
   return {
-    sources: (entry.etymology?.sources || [])
-      .map((source) => entryRelationsModel.resolveSourceEntry(source, dictionary, { index: relationIndex }))
-      .filter(Boolean),
-    derivedEntries: entryRelationsModel.findDerivedEntries(entry, dictionary, { index: relationIndex }),
+    status: "loading",
+    sources: [],
+    derivedEntries: [],
     rootGroup: null,
   };
 }
 
-function apiLexicalNetworkRelation(relation, dictionary, fallback) {
+function apiLexicalNetworkRelation(relation, dictionary) {
   const byId = new Map((dictionary?.entries || []).map((entry) => [entry.id, entry]));
   return {
     sources: (relation.sources || [])
@@ -5942,7 +5892,7 @@ function apiLexicalNetworkRelation(relation, dictionary, fallback) {
     derivedEntries: (relation.derivedEntries || [])
       .map((entry) => byId.get(entry.id) || entry)
       .filter(Boolean),
-    rootGroup: relation.rootGroup || fallback.rootGroup || null,
+    rootGroup: relation.rootGroup || null,
   };
 }
 
@@ -5959,7 +5909,10 @@ function fetchLexicalNetworkRelation(dictionary, entry, key) {
     })
     .catch((error) => {
       lexicalNetworkRelationsCache.set(key, { status: "error", relation: null, error });
-      console.warn("Lexical network API unavailable; using local relation fallback.", error);
+      console.error("Lexical network API unavailable.", error);
+      if (networkOpen && networkEntryId === entry.id && lexicalNetworkRelationKey(activeDictionary(), entry.id) === key) {
+        renderLexicalNetwork();
+      }
     })
     .finally(() => {
       if (requestId < lexicalNetworkRelationsRequestId - 20) {
@@ -5968,8 +5921,16 @@ function fetchLexicalNetworkRelation(dictionary, entry, key) {
     });
 }
 
-function renderNetworkNodeList(container, entries) {
+function renderNetworkNodeList(container, entries, status = "success") {
   container.innerHTML = "";
+  if (status === "loading") {
+    container.append(emptyState(t("lexicalNetworkLoading"), ""));
+    return;
+  }
+  if (status === "error") {
+    container.append(emptyState(t("lexicalNetworkLoadFailed"), ""));
+    return;
+  }
   if (!entries.length) {
     container.append(emptyState(t("none"), ""));
     return;
@@ -7855,7 +7816,7 @@ function entrySemanticSnapshot(entry = {}) {
         id: String(definition?.id || ""),
         meaning: String(definition?.meaning || "").trim(),
         example: String(definition?.example || "").trim(),
-        note: String(definition?.note || definition?.notes || "").trim(),
+        note: String(definition?.note || "").trim(),
       }))
       .filter((definition) => definition.meaning || definition.example || definition.note),
     etymology: {
@@ -8619,23 +8580,8 @@ function invalidSettingsRenderPatternInput() {
 }
 
 function collectDictionarySettingsFromForm(existing = {}) {
-  const {
-    glossSmallCaps,
-    glossFontFamily,
-    glossFont,
-    glossStyles,
-    corpusGlossAlign,
-    savePartialEditOnSwitch,
-    saveFullEditOnSwitch,
-    savePartialEditOnPageSwitch,
-    saveFullEditOnPageSwitch,
-    partialEditPageSwitchAction,
-    fullEditPageSwitchAction,
-    ...existingSettings
-  } = existing || {};
-
   return {
-    ...existingSettings,
+    ...(existing || {}),
     glossStyles: collectGlossStyleForm(),
     corpusUnitCardRenderPattern: elements.corpusUnitCardRenderPatternInput.value.trim(),
     corpusUnitCardGlossAlign: elements.corpusUnitCardGlossAlignInput.checked,

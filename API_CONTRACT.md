@@ -59,7 +59,7 @@
 | `PUT` | `/api/dictionaries/:id/corpus` | 保存语料库模块 | `{ id, updatedAt, corpus }` | 检查语料范围内实体 ID 冲突。 |
 | `PUT` | `/api/dictionaries/:id/morphology` | 保存自动形态学模块 | `{ id, updatedAt, morphology }` | 检查形态表实体 ID 冲突，并使用共享形态模块校验规则引用语法和函数对象配置；SQLite 事务提交后只重建并返回形态模块，不重建完整词典 snapshot。 |
 | `PUT` | `/api/dictionaries/:id/settings/ipa` | 保存自动 IPA 设置 | `{ id, updatedAt, settings }` | 检查 IPA 规则和重音规则实体 ID 冲突。 |
-| `POST` | `/api/dictionaries/:id/autosave` | 页面卸载时保存文档/语料草稿 | `{ id, updatedAt, docs?, corpus? }` | 当前只分发 `docs` 和 `corpus`；没有有效模块时只返回 `id/updatedAt`。 |
+| `POST` | `/api/dictionaries/:id/autosave` | 页面卸载时保存文档/语料草稿 | `{ id, updatedAt, docs?, corpus? }` | 当前只分发 `docs` 和 `corpus`；请求至少须携带其中一个有效对象，否则返回 `invalid_autosave_payload`。 |
 
 ### 词条级保存
 
@@ -77,7 +77,7 @@
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/dictionaries/:id/facets` | 读取词性和标签统计 | `{ parts, tags, noPartOfSpeechCount }` | 尊重当前词典的词性标签设置和标签显示替换。前端词性筛选选项正常路径以该 API 为准，不再每次本地统计完整词性集合做一致性校验。 |
-| `GET` | `/api/dictionaries/:id/entry-relations/:entryId` | 读取词源/衍生/同根关系 | `{ entryId, sources, derivedEntries, rootGroup }` | 同名 lemma 暂按排序后的第一条匹配，后续可由诊断模块报告歧义。 |
+| `GET` | `/api/dictionaries/:id/entry-relations/:entryId` | 读取词源/衍生/同根关系 | `{ entryId, sources, derivedEntries, rootGroup }` | SQLite 路径直接读取 `entries` / `entry_sources` projection；同名 lemma 暂按排序后的第一条匹配，后续可由诊断模块报告歧义。 |
 | `GET` | `/api/dictionaries/:id/root-groups` | 读取词根模式分组 | `{ items, pageInfo }` | 支持 `q`、`fields`、`fuzzy`、`tagFuzzy`、`fuzzyFields`、`sort`、`cursor`、`limit`、`include`。前端词根模式正常路径以该 API 为准，不再用前端本地完整分组兜底。 |
 
 #### `GET /api/dictionaries/:id/entries` 查询参数补充
@@ -123,6 +123,7 @@
 | `invalid_settings_payload` | 设置请求体格式无效。 |
 | `invalid_docs_payload` | 语言文档请求体格式无效。 |
 | `invalid_corpus_payload` | 语料请求体格式无效。 |
+| `invalid_autosave_payload` | autosave 请求未携带有效 docs 或 corpus 对象。 |
 | `invalid_morphology_payload` | 形态学请求体格式无效。 |
 | `invalid_ipa_settings_payload` | IPA 设置请求体格式无效。 |
 | `unsupported_entry_patch_fields` | 批量词条 patch 包含不支持字段。 |
@@ -158,7 +159,7 @@ GET /api/dictionaries/:id/summary
 GET /api/dictionaries/:id/settings
 ```
 
-SQLite repository 的 `readState()` / `listDictionaries()` 已只返回词典 metadata 和 summary；服务端默认使用 SQLite repository，`CONLEXICON_REPOSITORY=json` 仅作为 legacy/debug 回滚路径。前端启动流程已经改为“先读轻量索引，再按需加载 active dictionary”。
+SQLite repository 的 `readState()` / `listDictionaries()` 已只返回词典 metadata 和 summary；服务端默认使用 SQLite repository，`CONLEXICON_REPOSITORY=json` 仅作为 legacy/debug 回滚路径。前端启动流程始终将 `/api/state` 的 `dictionaries` 当作 metadata：即使 legacy/debug JSON repository 返回完整对象，也不会读取或保留其中的词典 payload，而是随后按需加载 active dictionary。
 
 示例：
 

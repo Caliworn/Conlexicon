@@ -738,17 +738,37 @@ function checkModelNormalization() {
         roots: "old source",
         etymology: { sourceEntryId: "entry-source" },
       },
+      {
+        lemma: "legacy-note",
+        definitions: [{ meaning: "note", notes: "legacy definition note" }],
+      },
     ],
     settings: {
       ipa: { stressMappings: [{ from: "a", to: "a" }] },
       toolNavOrder: ["editor", "morphology", "settings"],
+      glossFontFamily: "sans",
+      corpusGlossAlign: false,
+      savePartialEditOnSwitch: true,
     },
   });
   assert.equal(legacyConvertedImport.dictionary.entries[0].tags[0], "n");
   assert.equal(legacyConvertedImport.dictionary.entries[0].definitions[0].meaning, "root");
   assert.equal(legacyConvertedImport.dictionary.entries[0].etymology.description, "old source");
   assert.deepEqual(legacyConvertedImport.dictionary.entries[0].etymology.sources, ["entry-source"]);
+  assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.entries[0], "partOfSpeech"), false);
+  assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.entries[0], "meaning"), false);
+  assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.entries[0], "roots"), false);
+  assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.entries[0].etymology, "sourceEntryId"), false);
   assert.equal(legacyConvertedImport.dictionary.settings.ipa.mappings[0].to, "ˈa");
+  assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings.ipa, "stressMappings"), false);
+  assert.equal(legacyConvertedImport.dictionary.settings.glossStyles.gla.fontFamily, "sans");
+  assert.equal(legacyConvertedImport.dictionary.settings.corpusUnitCardGlossAlign, false);
+  assert.equal(legacyConvertedImport.dictionary.settings.partialEditPageSwitchAction, "save");
+  assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "glossFontFamily"), false);
+  assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "corpusGlossAlign"), false);
+  assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "savePartialEditOnSwitch"), false);
+  assert.equal(legacyConvertedImport.dictionary.entries[1].definitions[0].note, "legacy definition note");
+  assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.entries[1].definitions[0], "notes"), false);
   assert.deepEqual(legacyConvertedImport.dictionary.settings.toolNavOrder, [
     "editor",
     "morphology-functions",
@@ -1282,6 +1302,20 @@ async function runRepositoryContractTests(options = {}) {
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.corpus.units[0].content, "corpus unit");
     assert.match(apiResult.body.corpus.units[0].id, /^corpus-unit-/);
+
+    apiResult = await callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(first.id)}/autosave`, {
+      docs: { markdown: "# Autosaved notes" },
+      corpus: { units: [{ content: "autosaved corpus unit" }] },
+    });
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.docs.markdown, "# Autosaved notes");
+    assert.equal(apiResult.body.corpus.units[0].content, "autosaved corpus unit");
+
+    await assertRejectStatus(
+      callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(first.id)}/autosave`, {}),
+      400,
+      "empty autosave payload",
+    );
 
     apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/morphology`, {
       templateGroups: [{ name: "Nouns", tables: [{ title: "Nouns", rowCount: 2, columnCount: 2 }] }],
