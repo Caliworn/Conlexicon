@@ -43,6 +43,7 @@ const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
 const tagModel = window.ConlexiconTags;
 const morphologyModel = window.ConlexiconMorphology;
 const entrySearchModel = window.ConlexiconEntrySearch;
+const ENTRY_SEARCH_FIELD_KEYS = entrySearchModel.ENTRY_SEARCH_FIELD_KEYS;
 const qualityModel = window.ConlexiconQuality;
 let docsViewMode = "split";
 let docsSaveTimer = null;
@@ -315,9 +316,22 @@ const i18n = {
     searchDisplay: "显示",
     save: "保存",
     fuzzySearch: "模糊匹配",
-    fuzzySearchHelp: "在词条搜索中启用模糊匹配",
-    tagFuzzySearchHelp: "在原始标签和替换后标签中启用模糊匹配",
+    searchFields: "搜索字段",
+    searchField: "字段",
+    searchFieldEnabled: "参与搜索",
+    searchFieldFuzzy: "模糊匹配",
+    searchFieldLemma: "词形",
+    searchFieldPronunciation: "IPA",
+    searchFieldTags: "标签",
+    searchFieldDefinitions: "释义",
+    searchFieldExamples: "例句",
+    searchFieldNotes: "备注",
+    searchFieldEtymology: "词源",
+    searchFieldMorphology: "形态学",
+    searchFieldMorphologyHelp: "形态字段由规则动态生成，启用搜索可能明显增加大型词典的搜索耗时。",
+    etymologyAutocomplete: "词源自动补全",
     sourceFuzzyHelp: "在词源来源补全中启用模糊匹配",
+    searchFieldRequired: "请至少启用一个搜索字段。",
     searchHighlightHelp: "搜索时高亮显示匹配结果",
     switchEntrySettings: "切换词条",
     editEntrySettings: "编辑词条",
@@ -786,9 +800,22 @@ const i18n = {
     searchDisplay: "Display",
     save: "Save",
     fuzzySearch: "Fuzzy Matching",
-    fuzzySearchHelp: "Enable fuzzy matching in entry search",
-    tagFuzzySearchHelp: "Enable fuzzy matching for raw and displayed tags",
+    searchFields: "Search Fields",
+    searchField: "Field",
+    searchFieldEnabled: "Search",
+    searchFieldFuzzy: "Fuzzy",
+    searchFieldLemma: "Lemma",
+    searchFieldPronunciation: "IPA",
+    searchFieldTags: "Tags",
+    searchFieldDefinitions: "Definitions",
+    searchFieldExamples: "Examples",
+    searchFieldNotes: "Notes",
+    searchFieldEtymology: "Etymology",
+    searchFieldMorphology: "Morphology",
+    searchFieldMorphologyHelp: "Morphology is generated dynamically; searching it can noticeably slow large dictionaries.",
+    etymologyAutocomplete: "Etymology Autocomplete",
     sourceFuzzyHelp: "Enable fuzzy matching in etymology source completion",
+    searchFieldRequired: "Enable at least one search field.",
     searchHighlightHelp: "Highlight matches while searching",
     switchEntrySettings: "Entry Switching",
     editEntrySettings: "Entry Editing",
@@ -1243,8 +1270,8 @@ const elements = {
   entryListPolysemyInput: document.querySelector("#entryListPolysemyInput"),
   networkPolysemyInput: document.querySelector("#networkPolysemyInput"),
   showEmptyEntrySectionsInput: document.querySelector("#showEmptyEntrySectionsInput"),
-  fuzzySearchInput: document.querySelector("#fuzzySearchInput"),
-  tagFuzzySearchInput: document.querySelector("#tagFuzzySearchInput"),
+  searchFieldEnabledInputs: [...document.querySelectorAll("[data-search-enabled]")],
+  searchFieldFuzzyInputs: [...document.querySelectorAll("[data-search-fuzzy]")],
   sourceFuzzyInput: document.querySelector("#sourceFuzzyInput"),
   searchHighlightInput: document.querySelector("#searchHighlightInput"),
   savePartialOnSwitchInput: document.querySelector("#savePartialOnSwitchInput"),
@@ -1737,6 +1764,7 @@ function normalizeDefinition(definition = {}, usedIds = new Set()) {
 }
 
 function normalizeDictionarySettings(settings = {}, usedIds = new Set()) {
+  const search = entrySearchModel.normalizeEntrySearchSettings(settings.search);
   return {
     ...settings,
     glossStyles: normalizeGlossStyles(settings.glossStyles),
@@ -1761,9 +1789,7 @@ function normalizeDictionarySettings(settings = {}, usedIds = new Set()) {
     networkPolysemyDisplay: Boolean(settings.networkPolysemyDisplay),
     showEmptyEntrySections: Boolean(settings.showEmptyEntrySections),
     entrySectionOrder: normalizeEntrySectionOrder(settings.entrySectionOrder),
-    fuzzySearch: Boolean(settings.fuzzySearch),
-    tagFuzzySearch: Boolean(settings.tagFuzzySearch),
-    sourceFuzzyCompletion: Boolean(settings.sourceFuzzyCompletion),
+    search,
     searchHighlight: Boolean(settings.searchHighlight ?? true),
     partialEditPageSwitchAction: normalizeEditPageSwitchAction(settings.partialEditPageSwitchAction),
     fullEditPageSwitchAction: normalizeEditPageSwitchAction(settings.fullEditPageSwitchAction),
@@ -1774,6 +1800,19 @@ function normalizeDictionarySettings(settings = {}, usedIds = new Set()) {
     ipa: normalizeIpaSettings(settings.ipa, usedIds),
     toolNavOrder: normalizeToolNavOrder(settings.toolNavOrder),
   };
+}
+
+function entrySearchQueryOptions(dictionary = activeDictionary()) {
+  const search = normalizeDictionarySettings(dictionary?.settings).search;
+  return entrySearchModel.searchSettingsQueryOptions(search);
+}
+
+function entrySearchQuerySignature(dictionary = activeDictionary()) {
+  const { fields, fuzzyFields } = entrySearchQueryOptions(dictionary);
+  return [
+    [...fields].join(","),
+    [...fuzzyFields].join(","),
+  ].join("|");
 }
 
 function normalizeEditPageSwitchAction(value) {
@@ -3980,8 +4019,7 @@ function entryCardSettingsSizeSignature() {
     settings.entryListPartDisplay,
     settings.entryListRawTagDisplay ? "raw-tags" : "display-tags",
     settings.entryListTagFiltering ? "tag-filtering" : "no-tag-filtering",
-    settings.fuzzySearch ? "fuzzy" : "strict",
-    settings.tagFuzzySearch ? "tag-fuzzy" : "tag-strict",
+    entrySearchQuerySignature(),
     settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
     settings.partOfSpeechTags.join(","),
     stableJson(settings.tagDisplayMap),
@@ -4056,8 +4094,7 @@ function rootGroupsQueryApiKey(dictionary = activeDictionary()) {
     stableJson(settings.tagDisplayMap),
     settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
     settings.partOfSpeechTags.join(","),
-    settings.fuzzySearch ? "fuzzy" : "strict",
-    settings.tagFuzzySearch ? "tag-fuzzy" : "tag-strict",
+    entrySearchQuerySignature(dictionary),
   ].join("|");
 }
 
@@ -4080,12 +4117,10 @@ function rootGroupsQueryUrl(dictionary, options = {}) {
   if (entrySort) {
     params.set("sort", entrySort);
   }
-  const settings = normalizeDictionarySettings(dictionary?.settings);
-  if (settings.fuzzySearch) {
-    params.set("fuzzy", "true");
-  }
-  if (settings.tagFuzzySearch) {
-    params.set("tagFuzzy", "true");
+  const { fields, fuzzyFields } = entrySearchQueryOptions(dictionary);
+  params.set("fields", [...fields].join(","));
+  if (fuzzyFields.size) {
+    params.set("fuzzyFields", [...fuzzyFields].join(","));
   }
   params.set("include", "summary");
   params.set("limit", "2000");
@@ -4216,8 +4251,7 @@ function entryQueryApiKey(dictionary = activeDictionary()) {
     stableJson(settings.tagDisplayMap),
     settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
     settings.partOfSpeechTags.join(","),
-    settings.fuzzySearch ? "fuzzy" : "strict",
-    settings.tagFuzzySearch ? "tag-fuzzy" : "tag-strict",
+    entrySearchQuerySignature(dictionary),
   ].join("|");
 }
 
@@ -4244,12 +4278,10 @@ function entryQueryUrl(dictionary, options = {}) {
   if (entrySort) {
     params.set("sort", entrySort);
   }
-  const settings = normalizeDictionarySettings(dictionary?.settings);
-  if (settings.fuzzySearch) {
-    params.set("fuzzy", "true");
-  }
-  if (settings.tagFuzzySearch) {
-    params.set("tagFuzzy", "true");
+  const { fields, fuzzyFields } = entrySearchQueryOptions(dictionary);
+  params.set("fields", [...fields].join(","));
+  if (fuzzyFields.size) {
+    params.set("fuzzyFields", [...fuzzyFields].join(","));
   }
   params.set("include", "summary");
   params.set("limit", String(Math.min(Math.max((dictionary?.entries || []).length, 500), 10000)));
@@ -4506,15 +4538,18 @@ function renderRootModeRow(row) {
 function createEntryCard(entry, options = {}) {
   const settings = normalizeDictionarySettings(activeDictionary()?.settings);
   const partText = settings.entryListPartDisplay === "chips" ? "" : entryPartText(entry);
-  const contentFuzzyEnabled = Boolean(settings.fuzzySearch);
-  const tagFuzzyEnabled = Boolean(settings.tagFuzzySearch);
+  const { fields: searchFields, fuzzyFields } = entrySearchQueryOptions();
+  const lemmaSearchEnabled = searchFields.has("lemma");
+  const pronunciationSearchEnabled = searchFields.has("pronunciation");
+  const tagSearchEnabled = searchFields.has("tags");
+  const definitionSearchEnabled = searchFields.has("definitions");
   const subtitle = [
-    entry.pronunciation ? highlightSearchText(entry.pronunciation, contentFuzzyEnabled) : "",
-    partText ? highlightSearchText(partText, tagFuzzyEnabled) : "",
+    entry.pronunciation ? highlightSearchText(entry.pronunciation, fuzzyFields.has("pronunciation"), pronunciationSearchEnabled) : "",
+    partText ? highlightSearchText(partText, fuzzyFields.has("tags"), tagSearchEnabled) : "",
   ].filter(Boolean).join(" · ");
   const meaningSummary = entryDefinitionSummary(entry, settings.entryListPolysemyDisplay);
   const searchSnippets = renderEntrySearchSnippets(entry);
-  const chipHtml = renderChips(entry, settings.entryListTagDisplayLimit, true, tagFuzzyEnabled, settings.entryListTagFiltering, {
+  const chipHtml = renderChips(entry, settings.entryListTagDisplayLimit, tagSearchEnabled, fuzzyFields.has("tags"), settings.entryListTagFiltering, {
     includePartTags: settings.entryListPartDisplay !== "subtitle",
   });
   const qualityIssueHtml = renderEntryQualityIssueBadges(options.qualityIssues || []);
@@ -4540,11 +4575,11 @@ function createEntryCard(entry, options = {}) {
   }
   button.innerHTML = `
     <div class="entry-card-header">
-      <strong>${highlightSearchText(entry.lemma, contentFuzzyEnabled)}</strong>
+      <strong>${highlightSearchText(entry.lemma, fuzzyFields.has("lemma"), lemmaSearchEnabled)}</strong>
       ${subtitle ? `<small>${subtitle}</small>` : ""}
     </div>
     <div class="entry-card-body">
-      ${meaningSummary ? `<p>${highlightSearchText(meaningSummary, contentFuzzyEnabled)}</p>` : ""}
+      ${meaningSummary ? `<p>${highlightSearchText(meaningSummary, fuzzyFields.has("definitions"), definitionSearchEnabled)}</p>` : ""}
       ${searchSnippets}
     </div>
     ${footerHtml ? `<div class="entry-card-footer">${footerHtml}</div>` : ""}
@@ -4982,12 +5017,10 @@ function filteredEntries() {
   }
 
   const query = normalize(searchQuery);
-  const settings = normalizeDictionarySettings(dictionary?.settings);
-  const contentFuzzyEnabled = Boolean(settings.fuzzySearch);
-  const tagFuzzyEnabled = Boolean(settings.tagFuzzySearch);
+  const { fields, fuzzyFields } = entrySearchQueryOptions(dictionary);
 
   return [...dictionary.entries]
-    .filter((entry) => entryMatchesSearch(entry, dictionary, { query, contentFuzzyEnabled, tagFuzzyEnabled, respectPart: true }))
+    .filter((entry) => entryMatchesSearch(entry, dictionary, { query, fields, fuzzyFields, respectPart: true }))
     .sort(compareEntries);
 }
 
@@ -5421,9 +5454,9 @@ function cycleAdvancedFilterVariant() {
 
 function entryMatchesSearch(entry, dictionary = activeDictionary(), options = {}) {
   const query = options.query ?? normalize(searchQuery);
-  const settings = normalizeDictionarySettings(dictionary?.settings);
-  const contentFuzzyEnabled = options.contentFuzzyEnabled ?? Boolean(settings.fuzzySearch);
-  const tagFuzzyEnabled = options.tagFuzzyEnabled ?? Boolean(settings.tagFuzzySearch);
+  const searchOptions = entrySearchQueryOptions(dictionary);
+  const fields = options.fields ?? searchOptions.fields;
+  const fuzzyFields = options.fuzzyFields ?? searchOptions.fuzzyFields;
   const respectPart = options.respectPart ?? true;
   const parts = entryParts(entry, dictionary);
   const matchesPart = !respectPart
@@ -5431,9 +5464,8 @@ function entryMatchesSearch(entry, dictionary = activeDictionary(), options = {}
     || (activePart === NO_PART_FILTER_VALUE ? !parts.length : parts.includes(activePart));
   return matchesPart && entrySearchModel.entryMatchesSearchText(entry, dictionary, query, {
     normalizeText: normalize,
-    fuzzy: contentFuzzyEnabled,
-    tagFuzzy: tagFuzzyEnabled,
-    fuzzyFields: options.fuzzyFields,
+    fields,
+    fuzzyFields,
   });
 }
 
@@ -5463,11 +5495,11 @@ function rootModeGroups(dictionary = activeDictionary(), options = {}) {
     return [];
   }
   const query = normalize(options.query ?? searchQuery);
-  const settings = normalizeDictionarySettings(dictionary.settings);
+  const { fields, fuzzyFields } = entrySearchQueryOptions(dictionary);
   const matchOptions = {
     query,
-    contentFuzzyEnabled: Boolean(settings.fuzzySearch),
-    tagFuzzyEnabled: Boolean(settings.tagFuzzySearch),
+    fields,
+    fuzzyFields,
     respectPart: false,
   };
   return entryRelationsModel.rootModeGroups(dictionary, {
@@ -5515,13 +5547,13 @@ function textMatches(text, query, fuzzyEnabled = false) {
   });
 }
 
-function highlightSearchText(value, fuzzyEnabled = Boolean(activeDictionary()?.settings?.fuzzySearch)) {
+function highlightSearchText(value, fuzzyEnabled = false, searchEnabled = true) {
   const text = String(value || "");
   const query = normalize(searchQuery);
   if (!normalizeDictionarySettings(activeDictionary()?.settings).searchHighlight) {
     return escapeHtml(text);
   }
-  if (!text || !query) {
+  if (!text || !query || !searchEnabled) {
     return escapeHtml(text);
   }
 
@@ -5562,23 +5594,26 @@ function renderEntrySearchSnippets(entry) {
     return "";
   }
   const dictionary = activeDictionary();
-  const fuzzyEnabled = Boolean(dictionary?.settings?.fuzzySearch);
-  const fields = [
-    ...entry.definitions.flatMap((definition) => [
-      [t("example"), definition.example],
-      [t("definitionNote"), definition.note],
-    ]),
-    [t("entryNotes"), entry.notes],
-    [t("etymology"), entry.etymology?.description],
-    ...morphologySearchStrings(entry, dictionary).map((value) => [t("morphologyDisplay"), value]),
-  ];
-  const snippets = fields
-    .filter(([, value]) => value && textMatches(normalize(value), query, fuzzyEnabled))
+  const { fields: searchFields, fuzzyFields } = entrySearchQueryOptions(dictionary);
+  const valuesByField = entrySearchModel.entrySearchFieldValues(entry, dictionary, {
+    fields: searchFields,
+    normalizeText: normalize,
+  });
+  const labels = {
+    definitions: t("meaning"),
+    examples: t("example"),
+    notes: t("entryNotes"),
+    etymology: t("etymology"),
+    morphology: t("morphologyDisplay"),
+  };
+  const snippets = Object.entries(labels)
+    .flatMap(([field, label]) => valuesByField[field].map((value) => ({ field, label, value })))
+    .filter(({ field, value }) => value && textMatches(normalize(value), query, fuzzyFields.has(field)))
     .slice(0, 2)
-    .map(([label, value]) => `
+    .map(({ field, label, value }) => `
       <span class="search-snippet">
         <b>${escapeHtml(label)}</b>
-        ${highlightSearchText(compactSearchSnippet(value), fuzzyEnabled)}
+        ${highlightSearchText(compactSearchSnippet(value), fuzzyFields.has(field), true)}
       </span>
     `)
     .join("");
@@ -6037,7 +6072,7 @@ function entryListTagItems(entry, { includePartTags = true, dictionary = activeD
     .filter(({ tag, index }) => includePartTags || !entryTagIsPart(entry, index, tag, dictionary));
 }
 
-function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = Boolean(activeDictionary()?.settings?.tagFuzzySearch), clickable = false, { includePartTags = true } = {}) {
+function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = false, clickable = false, { includePartTags = true } = {}) {
   const tags = entryListTagItems(entry, { includePartTags });
   const settings = normalizeDictionarySettings(activeDictionary()?.settings);
   const hasHiddenTags = tags.length > limit;
@@ -7099,14 +7134,13 @@ function analyzeSearchFields(entries, dictionary) {
   if (!query) {
     return [];
   }
-  const settings = normalizeDictionarySettings(dictionary.settings);
-  const fuzzyOptions = {
-    fuzzy: settings.fuzzySearch,
-    tagFuzzy: settings.tagFuzzySearch,
-  };
+  const { fields: searchFields, fuzzyFields } = entrySearchQueryOptions(dictionary);
   const counts = new Map();
   entries.forEach((entry) => {
-    const fieldValues = entrySearchModel.entrySearchFieldValues(entry, dictionary, { normalizeText: normalize });
+    const fieldValues = entrySearchModel.entrySearchFieldValues(entry, dictionary, {
+      fields: searchFields,
+      normalizeText: normalize,
+    });
     const fieldGroups = [
       ["lemma", aText("词形", "Lemma"), fieldValues.lemma],
       ["tags", aText("标签", "Tags"), fieldValues.tags],
@@ -7119,7 +7153,7 @@ function analyzeSearchFields(entries, dictionary) {
     ];
     fieldGroups.forEach(([field, label, values]) => {
       const text = values.map(normalize).join(" ");
-      if (textMatches(text, query, entrySearchModel.fieldFuzzyEnabled(field, fuzzyOptions))) {
+      if (textMatches(text, query, fuzzyFields.has(field))) {
         incrementEntry(counts, label, entry);
       }
     });
@@ -7909,7 +7943,7 @@ function sourceCompletionCandidates(prefix, dictionary = activeDictionary()) {
   if (!dictionary || !normalizedPrefix) {
     return [];
   }
-  const fuzzyEnabled = Boolean(dictionary.settings?.sourceFuzzyCompletion);
+  const fuzzyEnabled = normalizeDictionarySettings(dictionary.settings).search.etymologyAutocomplete.fuzzy;
   return dictionary.entries
     .map((entry) => {
       const lemma = normalize(entry.lemma);
@@ -8121,6 +8155,47 @@ function collectGlossStyleForm() {
   return normalizeGlossStyles(styles);
 }
 
+function collectEntrySearchSettingsForm() {
+  const fields = Object.fromEntries(ENTRY_SEARCH_FIELD_KEYS.map((field) => {
+    const enabled = elements.searchFieldEnabledInputs.find((input) => input.dataset.searchEnabled === field);
+    const fuzzy = elements.searchFieldFuzzyInputs.find((input) => input.dataset.searchFuzzy === field);
+    return [field, {
+      enabled: Boolean(enabled?.checked),
+      fuzzy: Boolean(fuzzy?.checked),
+    }];
+  }));
+  return entrySearchModel.normalizeEntrySearchSettings({
+    fields,
+    etymologyAutocomplete: {
+      fuzzy: Boolean(elements.sourceFuzzyInput?.checked),
+    },
+  });
+}
+
+function fillEntrySearchSettingsForm(search) {
+  const normalized = entrySearchModel.normalizeEntrySearchSettings(search);
+  elements.searchFieldEnabledInputs.forEach((input) => {
+    input.checked = normalized.fields[input.dataset.searchEnabled]?.enabled ?? true;
+  });
+  elements.searchFieldFuzzyInputs.forEach((input) => {
+    input.checked = normalized.fields[input.dataset.searchFuzzy]?.fuzzy ?? true;
+  });
+  elements.sourceFuzzyInput.checked = normalized.etymologyAutocomplete.fuzzy;
+  syncEntrySearchSettingsControls();
+}
+
+function syncEntrySearchSettingsControls() {
+  elements.searchFieldEnabledInputs.forEach((enabledInput) => {
+    const field = enabledInput.dataset.searchEnabled;
+    const fuzzyInput = elements.searchFieldFuzzyInputs.find((input) => input.dataset.searchFuzzy === field);
+    const row = enabledInput.closest(".search-field-setting");
+    if (fuzzyInput) {
+      fuzzyInput.disabled = !enabledInput.checked;
+    }
+    row?.classList.toggle("is-search-disabled", !enabledInput.checked);
+  });
+}
+
 function fillSettingsForm(dictionary) {
   const settings = normalizeDictionarySettings(dictionary?.settings);
   fillGlossStyleForm(settings.glossStyles);
@@ -8143,9 +8218,7 @@ function fillSettingsForm(dictionary) {
   elements.entryListPolysemyInput.checked = settings.entryListPolysemyDisplay;
   elements.networkPolysemyInput.checked = settings.networkPolysemyDisplay;
   elements.showEmptyEntrySectionsInput.checked = settings.showEmptyEntrySections;
-  elements.fuzzySearchInput.checked = settings.fuzzySearch;
-  elements.tagFuzzySearchInput.checked = settings.tagFuzzySearch;
-  elements.sourceFuzzyInput.checked = settings.sourceFuzzyCompletion;
+  fillEntrySearchSettingsForm(settings.search);
   elements.searchHighlightInput.checked = settings.searchHighlight;
   elements.savePartialOnSwitchInput.value = settings.partialEditPageSwitchAction;
   elements.saveFullOnSwitchInput.value = settings.fullEditPageSwitchAction;
@@ -8408,9 +8481,7 @@ function settingsFormSnapshot() {
     networkPolysemyDisplay: elements.networkPolysemyInput.checked,
     showEmptyEntrySections: elements.showEmptyEntrySectionsInput.checked,
     entrySectionOrder: collectEntrySectionOrder(),
-    fuzzySearch: elements.fuzzySearchInput.checked,
-    tagFuzzySearch: elements.tagFuzzySearchInput.checked,
-    sourceFuzzyCompletion: elements.sourceFuzzyInput.checked,
+    search: collectEntrySearchSettingsForm(),
     searchHighlight: elements.searchHighlightInput.checked,
     partialEditPageSwitchAction: normalizeEditPageSwitchAction(elements.savePartialOnSwitchInput.value),
     fullEditPageSwitchAction: normalizeEditPageSwitchAction(elements.saveFullOnSwitchInput.value),
@@ -8447,9 +8518,7 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     networkPolysemyDisplay: settings.networkPolysemyDisplay,
     showEmptyEntrySections: settings.showEmptyEntrySections,
     entrySectionOrder: settings.entrySectionOrder,
-    fuzzySearch: settings.fuzzySearch,
-    tagFuzzySearch: settings.tagFuzzySearch,
-    sourceFuzzyCompletion: settings.sourceFuzzyCompletion,
+    search: settings.search,
     searchHighlight: settings.searchHighlight,
     partialEditPageSwitchAction: settings.partialEditPageSwitchAction,
     fullEditPageSwitchAction: settings.fullEditPageSwitchAction,
@@ -8604,9 +8673,7 @@ function collectDictionarySettingsFromForm(existing = {}) {
     networkPolysemyDisplay: elements.networkPolysemyInput.checked,
     showEmptyEntrySections: elements.showEmptyEntrySectionsInput.checked,
     entrySectionOrder: collectEntrySectionOrder(),
-    fuzzySearch: elements.fuzzySearchInput.checked,
-    tagFuzzySearch: elements.tagFuzzySearchInput.checked,
-    sourceFuzzyCompletion: elements.sourceFuzzyInput.checked,
+    search: collectEntrySearchSettingsForm(),
     searchHighlight: elements.searchHighlightInput.checked,
     partialEditPageSwitchAction: normalizeEditPageSwitchAction(elements.savePartialOnSwitchInput.value),
     fullEditPageSwitchAction: normalizeEditPageSwitchAction(elements.saveFullOnSwitchInput.value),
@@ -8636,6 +8703,12 @@ async function saveSettings(event, options = {}) {
   if (!entryListTagDisplayLimitInputIsValid()) {
     showToast(t("entryListTagDisplayLimitInvalid"));
     elements.entryListTagDisplayLimitInput.focus();
+    return false;
+  }
+
+  if (!entrySearchModel.searchSettingsHaveEnabledField(collectEntrySearchSettingsForm())) {
+    showToast(t("searchFieldRequired"));
+    elements.searchFieldEnabledInputs[0]?.focus();
     return false;
   }
 
@@ -11902,6 +11975,9 @@ elements.entryMorphologyControls.addEventListener("click", async (event) => {
 });
 elements.settingsForm.addEventListener("submit", saveSettings);
 elements.manualPartOfSpeechTagsInput.addEventListener("change", syncPartOfSpeechTagSettingsControls);
+elements.searchFieldEnabledInputs.forEach((input) => {
+  input.addEventListener("change", syncEntrySearchSettingsControls);
+});
 elements.tagOrderInfoButton.addEventListener("click", () => {
   appInfoDialog(t("tagOrderSettings"), {
     text: t("tagOrderInfoBody"),

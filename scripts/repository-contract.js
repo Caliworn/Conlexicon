@@ -199,10 +199,7 @@ function testEntryMatches(entry, dictionary, query = {}) {
   }
   return entrySearchModel.entryMatchesSearchText(entry, dictionary, normalizedQuery, {
     fields: entrySearchModel.normalizeSearchFields(query.fields || query.searchFields),
-    fuzzyFields: entrySearchModel.normalizeFuzzyFields(query.fuzzyFields, {
-      fuzzy: query.fuzzy,
-      tagFuzzy: query.tagFuzzy,
-    }),
+    fuzzyFields: entrySearchModel.normalizeFuzzyFields(query.fuzzyFields),
     normalizeText: testNormalize,
   }) && testEntryMatchesDerivedFrom(entry, dictionary, query);
 }
@@ -291,10 +288,7 @@ function expectedRootGroupSnapshot(dictionary, query = {}) {
     compareEntries: testCompareEntries(query.sort || "lemmaAsc"),
     matchesEntry: (entry) => entrySearchModel.entryMatchesSearchText(entry, dictionary, query.q || query.query || "", {
       fields: entrySearchModel.normalizeSearchFields(query.fields || query.searchFields),
-      fuzzyFields: entrySearchModel.normalizeFuzzyFields(query.fuzzyFields, {
-        fuzzy: query.fuzzy,
-        tagFuzzy: query.tagFuzzy,
-      }),
+      fuzzyFields: entrySearchModel.normalizeFuzzyFields(query.fuzzyFields),
       normalizeText: testNormalize,
     }),
   }).map((group) => ({
@@ -336,21 +330,55 @@ function checkModelNormalization() {
   assert.deepEqual(tagModel.entryParts({ tags: ["topic", "n"] }, { manualPartOfSpeechTags: false }), ["topic"]);
   assert.equal(tagModel.displayTag("n", { tagDisplayMap: { n: "noun" } }), "noun");
   assert.deepEqual([...entrySearchModel.normalizeSearchFields("lemma,unknown,tags")], ["lemma", "tags"]);
-  assert.deepEqual([...entrySearchModel.normalizeFuzzyFields("", { fuzzy: true })], [
+  assert.deepEqual([...entrySearchModel.normalizeFuzzyFields("")], []);
+  assert.deepEqual([...entrySearchModel.normalizeFuzzyFields("definitions,tags,unknown")], ["definitions", "tags"]);
+  assert.deepEqual(entrySearchModel.normalizeEntrySearchSettings({
+    fields: { lemma: { enabled: false, fuzzy: false } },
+    etymologyAutocomplete: { fuzzy: false },
+  }), {
+    fields: {
+      lemma: { enabled: false, fuzzy: false },
+      pronunciation: { enabled: true, fuzzy: true },
+      tags: { enabled: true, fuzzy: true },
+      definitions: { enabled: true, fuzzy: true },
+      examples: { enabled: true, fuzzy: true },
+      notes: { enabled: true, fuzzy: true },
+      etymology: { enabled: true, fuzzy: true },
+      morphology: { enabled: true, fuzzy: true },
+    },
+    etymologyAutocomplete: { fuzzy: false },
+  });
+  assert.equal(entrySearchModel.searchSettingsHaveEnabledField({
+    fields: Object.fromEntries(entrySearchModel.ENTRY_SEARCH_FIELD_KEYS.map((field) => [field, { enabled: false }])),
+  }), false);
+  const configuredSearchOptions = entrySearchModel.searchSettingsQueryOptions({
+    fields: {
+      lemma: { enabled: true, fuzzy: false },
+      definitions: { enabled: true, fuzzy: true },
+      morphology: { enabled: false, fuzzy: true },
+    },
+  });
+  assert.deepEqual([...configuredSearchOptions.fields], [
     "lemma",
     "pronunciation",
+    "tags",
     "definitions",
     "examples",
     "notes",
     "etymology",
-    "morphology",
   ]);
-  assert.deepEqual([...entrySearchModel.normalizeFuzzyFields("", { tagFuzzy: true })], ["tags"]);
-  assert.deepEqual([...entrySearchModel.normalizeFuzzyFields("definitions,tags,unknown", { fuzzy: true })], ["definitions", "tags"]);
+  assert.deepEqual([...configuredSearchOptions.fuzzyFields], [
+    "pronunciation",
+    "tags",
+    "definitions",
+    "examples",
+    "notes",
+    "etymology",
+  ]);
   assert.equal(entrySearchModel.textMatches("mirror meaning", "mrmeaning", { fuzzy: true }), true);
   assert.equal(entrySearchModel.textMatches("mirror meaning", "mrmeaning", { fuzzy: false }), false);
-  assert.equal(entrySearchModel.fieldFuzzyEnabled("tags", { tagFuzzy: true }), true);
-  assert.equal(entrySearchModel.fieldFuzzyEnabled("tags", { fuzzy: true }), false);
+  assert.equal(entrySearchModel.fieldFuzzyEnabled("tags", { fuzzyFields: "tags" }), true);
+  assert.equal(entrySearchModel.fieldFuzzyEnabled("tags", { fuzzyFields: "definitions" }), false);
   const relationDictionary = {
     entries: [
       { id: "entry-root", lemma: "root" },
@@ -749,6 +777,9 @@ function checkModelNormalization() {
       glossFontFamily: "sans",
       corpusGlossAlign: false,
       savePartialEditOnSwitch: true,
+      fuzzySearch: false,
+      tagFuzzySearch: false,
+      sourceFuzzyCompletion: false,
     },
   });
   assert.equal(legacyConvertedImport.dictionary.entries[0].tags[0], "n");
@@ -767,6 +798,12 @@ function checkModelNormalization() {
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "glossFontFamily"), false);
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "corpusGlossAlign"), false);
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "savePartialEditOnSwitch"), false);
+  assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "fuzzySearch"), false);
+  assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "tagFuzzySearch"), false);
+  assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "sourceFuzzyCompletion"), false);
+  assert.equal(legacyConvertedImport.dictionary.settings.search.fields.lemma.enabled, true);
+  assert.equal(legacyConvertedImport.dictionary.settings.search.fields.lemma.fuzzy, true);
+  assert.equal(legacyConvertedImport.dictionary.settings.search.etymologyAutocomplete.fuzzy, true);
   assert.equal(legacyConvertedImport.dictionary.entries[1].definitions[0].note, "legacy definition note");
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.entries[1].definitions[0], "notes"), false);
   assert.deepEqual(legacyConvertedImport.dictionary.settings.toolNavOrder, [
@@ -1018,8 +1055,8 @@ async function checkReadApiConsistency(repository) {
     await assertEntryQueryConsistency(repository, dictionary, { q: "alpha-generated" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "manual-beta-form" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "olpha" });
-    await assertEntryQueryConsistency(repository, dictionary, { q: "mrmeaning", fuzzy: true });
-    await assertEntryQueryConsistency(repository, dictionary, { q: "nd", tagFuzzy: true });
+    await assertEntryQueryConsistency(repository, dictionary, { q: "mrmeaning", fuzzyFields: "definitions" });
+    await assertEntryQueryConsistency(repository, dictionary, { q: "nd", fuzzyFields: "tags" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "mrmeaning", fuzzyFields: "definitions" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "mrmeaning", fuzzyFields: "tags" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "alpha-generated", fields: "morphology" });
@@ -1040,7 +1077,7 @@ async function checkReadApiConsistency(repository) {
     await assertRootGroupQueryConsistency(repository, dictionary, {});
     await assertRootGroupQueryConsistency(repository, dictionary, { q: "movement" });
     await assertRootGroupQueryConsistency(repository, dictionary, { q: "manual-beta-form" });
-    await assertRootGroupQueryConsistency(repository, dictionary, { q: "mrmeaning", fuzzy: true });
+    await assertRootGroupQueryConsistency(repository, dictionary, { q: "mrmeaning", fuzzyFields: "definitions" });
     await assertRootGroupQueryConsistency(repository, dictionary, { sort: "lemmaDesc" });
 
     let apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/facets`);

@@ -21,7 +21,7 @@ Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。
 - Per-dictionary corpus management with ordered blocks, speaker/modality layers, standalone units, inherited attributes, unique entity ID validation, single-parent link validation, and configurable gloss-based unit names with optional render objects.
 - Paged data analysis for overview, entries/tags, IPA, morphology, and editing activity, plus a dedicated quality-check page for priority/module issue review.
 - Gloss rendering for `\gla`, `\glb`, `\glc`, and `\ft`, with independent render-object and alignment settings for corpus unit cards, unit content headings, and entry examples, plus per-object font, size, bold, italic, and `\glb` small-caps styles.
-- Per-dictionary UI/settings options, including fuzzy search, label display replacement, highlighted tags, gloss rendering, polysemy display, save/discard/prompt handling for edits during navigation, corpus/docs auto-save, IPA keyboard symbols, and left navigation order.
+- Per-dictionary UI/settings options, including search configuration and etymology autocomplete matching, label display replacement, highlighted tags, gloss rendering, polysemy display, save/discard/prompt handling for edits during navigation, corpus/docs auto-save, IPA keyboard symbols, and left navigation order.
 - Dark mode and Chinese/English UI switching, with the global interface theme and language remembered in `data/index.json`.
 
 - 多词典管理：新建、切换、导入、导出、配置和删除词典；导入相同词典 ID 的词典前会明确确认是否覆盖。

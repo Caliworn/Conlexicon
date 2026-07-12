@@ -2,14 +2,17 @@ const fs = require("fs");
 const path = require("path");
 
 const ROOT = path.resolve(__dirname, "..");
-const DATA_DIR = path.join(ROOT, "data");
+const DATA_DIR = process.env.CONLEXICON_DATA_DIR
+  ? path.resolve(process.env.CONLEXICON_DATA_DIR)
+  : path.join(ROOT, "data");
 const DICTIONARY_DIR = path.join(DATA_DIR, "dictionaries");
 const INDEX_PATH = path.join(DATA_DIR, "index.json");
 
-const DICTIONARY_ID = "dict-7a4f7f2b-71dd-4c9f-8d3f-7bb391000000";
+const DICTIONARY_ID = process.env.CONLEXICON_STRESS_DICTIONARY_ID || "dict-7a4f7f2b-71dd-4c9f-8d3f-7bb391000000";
 const LEGACY_DICTIONARY_IDS = ["stress-test-10k"];
 const ENTRY_COUNT = 10000;
 const CREATED_AT = "2026-07-01T00:00:00.000Z";
+const MORPHOLOGY_STRESS = process.env.CONLEXICON_STRESS_MORPHOLOGY === "1";
 
 function mulberry32(seed) {
   return function random() {
@@ -137,6 +140,64 @@ function makeTags(partOfSpeech) {
   return Array.from(new Set(tags));
 }
 
+function stressMorphologyTemplateGroups() {
+  if (!MORPHOLOGY_STRESS) {
+    return [];
+  }
+  return partsOfSpeech.map((partOfSpeech, index) => {
+    const groupId = deterministicId("morph", 8, index + 1);
+    const tableId = deterministicId("mtable", 8, index + 1);
+    return {
+      id: groupId,
+      name: `${partOfSpeech} stress paradigm`,
+      matchTags: [partOfSpeech],
+      notes: "",
+      tables: [{
+        id: tableId,
+        title: "Generated forms",
+        rowCount: 3,
+        columnCount: 4,
+        rowLabels: ["base", "derived", "extended"],
+        columnLabels: ["A", "B", "C", "D"],
+        cells: {
+          "0,0": { sourceText: "{}" },
+          "0,1": { sourceText: "{}-na" },
+          "0,2": { sourceText: "{}-ta" },
+          "0,3": { sourceText: "{}-sa" },
+          "1,0": { sourceText: "ma-{}" },
+          "1,1": { sourceText: "{}-mi" },
+          "1,2": { sourceText: "{}-nu" },
+          "1,3": { sourceText: "{}-ka" },
+          "2,0": { sourceText: "sa-{}" },
+          "2,1": { sourceText: "{}-li" },
+          "2,2": { sourceText: "{}-ra" },
+          "2,3": { sourceText: "{}-tu" },
+        },
+      }],
+    };
+  });
+}
+
+function stressMorphologyGroups(index, partOfSpeech) {
+  if (!MORPHOLOGY_STRESS || index % 29 !== 0) {
+    return [];
+  }
+  const partIndex = partsOfSpeech.indexOf(partOfSpeech) + 1;
+  const groupId = deterministicId("morph", 8, partIndex);
+  const tableId = deterministicId("mtable", 8, partIndex);
+  return [{
+    id: deterministicId("emorph", 8, index),
+    templateGroupId: groupId,
+    title: "",
+    notes: "",
+    overrides: {
+      [tableId]: {
+        "0,0": `override-${index}`,
+      },
+    },
+  }];
+}
+
 function makeSources(index, lemmas) {
   if (index < 8 || !chance(0.2)) {
     return [];
@@ -171,7 +232,8 @@ function buildDictionary() {
         description: chance(0.12) ? `Synthetic derivation note ${index}` : "",
       },
       notes: chance(0.12) ? `Stress-test entry ${index}; generated with deterministic seed.` : "",
-      morphologyGroups: [],
+      morphologyMode: "auto",
+      morphologyGroups: stressMorphologyGroups(index, partOfSpeech),
       createdAt: CREATED_AT,
       updatedAt: CREATED_AT,
     };
@@ -180,7 +242,7 @@ function buildDictionary() {
 
   return {
     id: DICTIONARY_ID,
-    name: "Stress Test 10k",
+    name: MORPHOLOGY_STRESS ? "Morphology Stress Test 10k" : "Stress Test 10k",
     language: "Synthetic",
     description: "Deterministic 10,000-entry dictionary for UI stress testing.",
     settings: {
@@ -197,7 +259,9 @@ function buildDictionary() {
         clf: "classifier",
       },
       redHighlightTags: ["review"],
-      sourceFuzzyCompletion: true,
+      search: {
+        etymologyAutocomplete: { fuzzy: true },
+      },
       searchHighlight: true,
       entryListTagFiltering: true,
       allowEmptyPronunciation: true,
@@ -231,7 +295,7 @@ function buildDictionary() {
     },
     morphology: {
       functions: {},
-      templateGroups: [],
+      templateGroups: stressMorphologyTemplateGroups(),
     },
     createdAt: CREATED_AT,
     updatedAt: CREATED_AT,

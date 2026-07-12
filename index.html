@@ -668,14 +668,60 @@
                     <h3 data-i18n="fuzzySearch">模糊匹配</h3>
                   </div>
                 </div>
-                <label class="toggle-row">
-                  <span data-i18n="fuzzySearchHelp">在词条搜索中启用模糊匹配</span>
-                  <input id="fuzzySearchInput" type="checkbox">
-                </label>
-                <label class="toggle-row">
-                  <span data-i18n="tagFuzzySearchHelp">在原始标签和替换后标签中启用模糊匹配</span>
-                  <input id="tagFuzzySearchInput" type="checkbox">
-                </label>
+                <div class="subsection-title">
+                  <h3 data-i18n="searchFields">搜索字段</h3>
+                </div>
+                <div class="search-field-settings" role="group" data-i18n-aria-label="searchFields">
+                  <div class="search-field-settings-header" aria-hidden="true">
+                    <span data-i18n="searchField">字段</span>
+                    <span data-i18n="searchFieldEnabled">参与搜索</span>
+                    <span data-i18n="searchFieldFuzzy">模糊匹配</span>
+                  </div>
+                  <div class="search-field-setting" data-search-field="lemma">
+                    <span data-i18n="searchFieldLemma">词形</span>
+                    <label><span class="visually-hidden" data-i18n="searchFieldEnabled">参与搜索</span><input type="checkbox" data-search-enabled="lemma" data-i18n-aria-label="searchFieldEnabled"></label>
+                    <label><span class="visually-hidden" data-i18n="searchFieldFuzzy">模糊匹配</span><input type="checkbox" data-search-fuzzy="lemma" data-i18n-aria-label="searchFieldFuzzy"></label>
+                  </div>
+                  <div class="search-field-setting" data-search-field="pronunciation">
+                    <span data-i18n="searchFieldPronunciation">IPA</span>
+                    <label><span class="visually-hidden" data-i18n="searchFieldEnabled">参与搜索</span><input type="checkbox" data-search-enabled="pronunciation" data-i18n-aria-label="searchFieldEnabled"></label>
+                    <label><span class="visually-hidden" data-i18n="searchFieldFuzzy">模糊匹配</span><input type="checkbox" data-search-fuzzy="pronunciation" data-i18n-aria-label="searchFieldFuzzy"></label>
+                  </div>
+                  <div class="search-field-setting" data-search-field="tags">
+                    <span data-i18n="searchFieldTags">标签</span>
+                    <label><span class="visually-hidden" data-i18n="searchFieldEnabled">参与搜索</span><input type="checkbox" data-search-enabled="tags" data-i18n-aria-label="searchFieldEnabled"></label>
+                    <label><span class="visually-hidden" data-i18n="searchFieldFuzzy">模糊匹配</span><input type="checkbox" data-search-fuzzy="tags" data-i18n-aria-label="searchFieldFuzzy"></label>
+                  </div>
+                  <div class="search-field-setting" data-search-field="definitions">
+                    <span data-i18n="searchFieldDefinitions">释义</span>
+                    <label><span class="visually-hidden" data-i18n="searchFieldEnabled">参与搜索</span><input type="checkbox" data-search-enabled="definitions" data-i18n-aria-label="searchFieldEnabled"></label>
+                    <label><span class="visually-hidden" data-i18n="searchFieldFuzzy">模糊匹配</span><input type="checkbox" data-search-fuzzy="definitions" data-i18n-aria-label="searchFieldFuzzy"></label>
+                  </div>
+                  <div class="search-field-setting" data-search-field="examples">
+                    <span data-i18n="searchFieldExamples">例句</span>
+                    <label><span class="visually-hidden" data-i18n="searchFieldEnabled">参与搜索</span><input type="checkbox" data-search-enabled="examples" data-i18n-aria-label="searchFieldEnabled"></label>
+                    <label><span class="visually-hidden" data-i18n="searchFieldFuzzy">模糊匹配</span><input type="checkbox" data-search-fuzzy="examples" data-i18n-aria-label="searchFieldFuzzy"></label>
+                  </div>
+                  <div class="search-field-setting" data-search-field="notes">
+                    <span data-i18n="searchFieldNotes">备注</span>
+                    <label><span class="visually-hidden" data-i18n="searchFieldEnabled">参与搜索</span><input type="checkbox" data-search-enabled="notes" data-i18n-aria-label="searchFieldEnabled"></label>
+                    <label><span class="visually-hidden" data-i18n="searchFieldFuzzy">模糊匹配</span><input type="checkbox" data-search-fuzzy="notes" data-i18n-aria-label="searchFieldFuzzy"></label>
+                  </div>
+                  <div class="search-field-setting" data-search-field="etymology">
+                    <span data-i18n="searchFieldEtymology">词源</span>
+                    <label><span class="visually-hidden" data-i18n="searchFieldEnabled">参与搜索</span><input type="checkbox" data-search-enabled="etymology" data-i18n-aria-label="searchFieldEnabled"></label>
+                    <label><span class="visually-hidden" data-i18n="searchFieldFuzzy">模糊匹配</span><input type="checkbox" data-search-fuzzy="etymology" data-i18n-aria-label="searchFieldFuzzy"></label>
+                  </div>
+                  <div class="search-field-setting" data-search-field="morphology">
+                    <span data-i18n="searchFieldMorphology">形态学</span>
+                    <label><span class="visually-hidden" data-i18n="searchFieldEnabled">参与搜索</span><input type="checkbox" data-search-enabled="morphology" data-i18n-aria-label="searchFieldEnabled"></label>
+                    <label><span class="visually-hidden" data-i18n="searchFieldFuzzy">模糊匹配</span><input type="checkbox" data-search-fuzzy="morphology" data-i18n-aria-label="searchFieldFuzzy"></label>
+                  </div>
+                </div>
+                <p class="muted-text" data-i18n="searchFieldMorphologyHelp">形态字段由规则动态生成，启用搜索可能明显增加大型词典的搜索耗时。</p>
+                <div class="subsection-title">
+                  <h3 data-i18n="etymologyAutocomplete">词源自动补全</h3>
+                </div>
                 <label class="toggle-row">
                   <span data-i18n="sourceFuzzyHelp">在词源来源补全中启用模糊匹配</span>
                   <input id="sourceFuzzyInput" type="checkbox">

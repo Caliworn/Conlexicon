@@ -197,7 +197,9 @@ function buildDictionary() {
         clf: "classifier",
       },
       redHighlightTags: ["review"],
-      sourceFuzzyCompletion: true,
+      search: {
+        etymologyAutocomplete: { fuzzy: true },
+      },
       searchHighlight: true,
       entryListTagFiltering: true,
       allowEmptyPronunciation: true,
