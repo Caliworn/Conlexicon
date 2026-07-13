@@ -4,6 +4,8 @@ const assert = require("node:assert/strict");
 const { normalizeDictionary } = require("../lib/dictionary-model");
 const entryRelationsModel = require("../lib/entry-relations-model");
 const entrySearchModel = require("../lib/entry-search-model");
+const morphologyModel = require("../lib/morphology-model");
+const searchNormalizationModel = require("../lib/search-normalization-model");
 const tagModel = require("../lib/tag-model");
 const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
 const { createTempSqliteRepository } = require("./sqlite-check-utils");
@@ -11,7 +13,7 @@ const { createTempSqliteRepository } = require("./sqlite-check-utils");
 const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
 
 function normalizeText(value) {
-  return String(value || "").trim().toLocaleLowerCase("zh-CN");
+  return searchNormalizationModel.normalizeSearchText(value);
 }
 
 function splitList(value) {
@@ -61,7 +63,7 @@ function expectedEntryIds(dictionary, query = {}) {
   const searchFields = entrySearchModel.normalizeSearchFields(query.fields || query.searchFields);
   const fuzzyFields = entrySearchModel.normalizeFuzzyFields(query.fuzzyFields);
   const normalizedQuery = normalizeText(query.q || query.query);
-  const tags = splitList(query.tags).map(normalizeText);
+  const tags = splitList(query.tags).map(searchNormalizationModel.normalizeStructuralKey);
   const source = normalizeText(query.source);
   const derivedFrom = normalizeText(query.derivedFrom);
   const relationIndex = entryRelationsModel.buildEntryRelationIndex(dictionary, { normalizeText });
@@ -87,14 +89,17 @@ function expectedEntryIds(dictionary, query = {}) {
       })) {
         return false;
       }
-      const parts = tagModel.entryParts(entry, dictionary, { normalizeText });
+      const parts = tagModel.entryParts(entry, dictionary);
       if (query.part) {
-        if (query.part === NO_PART_FILTER_VALUE ? parts.length : !parts.some((part) => normalizeText(part) === normalizeText(query.part))) {
+        if (query.part === NO_PART_FILTER_VALUE ? parts.length : !parts.some((part) => (
+          searchNormalizationModel.normalizeStructuralKey(part)
+            === searchNormalizationModel.normalizeStructuralKey(query.part)
+        ))) {
           return false;
         }
       }
       if (tags.length) {
-        const entryTags = new Set((entry.tags || []).map(normalizeText));
+        const entryTags = new Set((entry.tags || []).map(searchNormalizationModel.normalizeStructuralKey));
         const matches = tags.map((tag) => entryTags.has(tag));
         if (query.tagMode === "all" ? matches.some((match) => !match) : !matches.some(Boolean)) {
           return false;
@@ -170,6 +175,12 @@ function searchConsistencyDictionary() {
       partOfSpeechTags: ["n", "v"],
       tagDisplayMap: { "internal-tag": "DisplayTagToken" },
     },
+    morphology: {
+      templateGroups: [
+        { id: "morph-upper-tag", name: "Upper tag", matchTags: ["N"], tables: [] },
+        { id: "morph-lower-tag", name: "Lower tag", matchTags: ["n"], tables: [] },
+      ],
+    },
     entries: [
       {
         id: "entry-alpha-root",
@@ -206,6 +217,21 @@ function searchConsistencyDictionary() {
         createdAt: "2026-01-03T00:00:00.000Z",
         updatedAt: "2026-01-03T00:00:00.000Z",
       },
+      {
+        id: "entry-separate-search-values",
+        lemma: "SeparateSearchValues",
+        tags: ["TagLeftMarker", "TagRightMarker"],
+        definitions: [
+          { id: "def-separate-left", meaning: "DefinitionLeftMarker", example: "f", note: "NoteLeftMarker" },
+          { id: "def-separate-right", meaning: "DefinitionRightMarker", example: "ar", note: "NoteRightMarker" },
+          { id: "def-single-phrase", meaning: "Phrase Inside Value", example: "Example Phrase Inside Value" },
+        ],
+        notes: "EntryNoteMarker",
+        etymology: {
+          sources: ["SourceRightMarker"],
+          description: "EtymologyLeftMarker",
+        },
+      },
       { id: "entry-unicode", lemma: "ČapToken", definitions: [] },
       { id: "entry-pua-one", lemma: "\uE000PrivateToken", definitions: [] },
       { id: "entry-pua-two", lemma: "\uE001PrivateToken", definitions: [] },
@@ -214,6 +240,8 @@ function searchConsistencyDictionary() {
       { id: "entry-sharp-s", lemma: "StraßeToken", definitions: [] },
       { id: "entry-dotless-i", lemma: "IstanbulToken", definitions: [] },
       { id: "entry-dotted-i", lemma: "İzmirToken", definitions: [] },
+      { id: "entry-upper-tag", lemma: "UpperTag", tags: ["N"], definitions: [{ id: "def-upper-tag", meaning: "StructuralToken" }] },
+      { id: "entry-lower-tag", lemma: "LowerTag", tags: ["n"], definitions: [{ id: "def-lower-tag", meaning: "StructuralToken" }] },
     ],
   });
 }
@@ -240,12 +268,49 @@ async function main() {
     await assertDirectQuery(repository, dictionary, { q: "DefinitionNoteToken", fields: "notes" });
     await assertDirectQuery(repository, dictionary, { q: "EtymologyDescriptionToken", fields: "etymology" });
     await assertDirectQuery(repository, dictionary, { q: "ProtoSourceToken", fields: "etymology" });
+    await assertDirectQuery(repository, dictionary, { q: "Phrase Inside Value", fields: "definitions" }, ["entry-separate-search-values"]);
+    await assertDirectQuery(repository, dictionary, { q: "Example Phrase Inside Value", fields: "examples" }, ["entry-separate-search-values"]);
+
+    await assertDirectQuery(repository, dictionary, { q: "DefinitionLeftMarker DefinitionRightMarker", fields: "definitions" }, []);
+    await assertDirectQuery(repository, dictionary, { q: "TagLeftMarker TagRightMarker", fields: "tags" }, []);
+    await assertDirectQuery(repository, dictionary, { q: "EntryNoteMarker NoteLeftMarker", fields: "notes" }, []);
+    await assertDirectQuery(repository, dictionary, { q: "EtymologyLeftMarker SourceRightMarker", fields: "etymology" }, []);
+    await assertFallbackQuery(repository, dictionary, {
+      q: "far",
+      fields: "examples",
+      fuzzyFields: "examples",
+    }, []);
 
     await assertDirectQuery(repository, dictionary, { q: "CommonToken", fields: "definitions", part: "n" });
     await assertDirectQuery(repository, dictionary, { q: "CommonToken", fields: "definitions", tags: "RawTagToken" });
     await assertDirectQuery(repository, dictionary, { q: "CommonToken", fields: "definitions", source: "ProtoSourceToken" });
     await assertDirectQuery(repository, dictionary, { q: "CommonToken", fields: "definitions", derivedFrom: "AlphaRoot" });
     await assertDirectQuery(repository, dictionary, { q: "CommonToken", fields: "definitions", part: NO_PART_FILTER_VALUE });
+    await assertDirectQuery(repository, dictionary, { q: "StructuralToken", fields: "definitions", tags: "N" }, ["entry-upper-tag"]);
+    await assertDirectQuery(repository, dictionary, { q: "StructuralToken", fields: "definitions", tags: "n" }, ["entry-lower-tag"]);
+    await assertDirectQuery(repository, dictionary, { q: "StructuralToken", fields: "definitions", part: "n" }, ["entry-lower-tag"]);
+    await assertDirectQuery(repository, dictionary, { q: "StructuralToken", fields: "definitions", part: "N" }, []);
+    assert.deepEqual(
+      morphologyModel.resolveEntryMorphologyGroups(
+        dictionary.entries.find((entry) => entry.id === "entry-upper-tag"),
+        dictionary,
+      ).map(({ templateGroup }) => templateGroup.id),
+      ["morph-upper-tag"],
+      "automatic morphology must match uppercase structural tags exactly",
+    );
+    assert.deepEqual(
+      morphologyModel.resolveEntryMorphologyGroups(
+        dictionary.entries.find((entry) => entry.id === "entry-lower-tag"),
+        dictionary,
+      ).map(({ templateGroup }) => templateGroup.id),
+      ["morph-lower-tag"],
+      "automatic morphology must match lowercase structural tags exactly",
+    );
+    await assertDirectQuery(repository, dictionary, {
+      q: "CommonToken",
+      fields: "definitions",
+      source: "protosourcetoken",
+    }, ["entry-alpha-root"]);
 
     const fullResult = await assertDirectQuery(repository, dictionary, {
       q: "DefinitionToken",

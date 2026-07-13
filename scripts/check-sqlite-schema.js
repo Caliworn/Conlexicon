@@ -1,10 +1,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 
-const {
-  SQLITE_SCHEMA_VERSION,
-  SqliteDictionaryRepository,
-} = require("../lib/sqlite-dictionary-repository");
+const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
 const {
   createTempSqliteRepository,
   sampleSqliteDictionary,
@@ -25,7 +22,6 @@ async function runSqliteSchemaCheck() {
       language: "test",
       description: "schema smoke",
     });
-    assert.equal(initialized.schemaVersion, SQLITE_SCHEMA_VERSION);
     assert.equal((await fs.stat(initialized.path)).isFile(), true);
 
     const db = repository.openDictionaryDatabase("dict-sqlite-schema");
@@ -45,15 +41,17 @@ async function runSqliteSchemaCheck() {
       "morphology_template_cells",
       "entry_morphology_groups",
       "entry_morphology_cell_overrides",
-      "schema_migrations",
     ].forEach((table) => assert.equal(tables.has(table), true, `missing table: ${table}`));
-    ["dictionary_settings", "ipa_rules", "morphology_tables", "entry_morphology_tables", "corpus_units"]
+    ["schema_migrations", "dictionary_settings", "ipa_rules", "morphology_tables", "entry_morphology_tables", "corpus_units"]
       .forEach((table) => assert.equal(tables.has(table), false, `unexpected table: ${table}`));
 
     const entryColumns = new Set(db.prepare("PRAGMA table_info(entries)").all().map((row) => row.name));
     ["id", "position", "lemma", "pronunciation", "notes", "etymology_description", "morphology_mode", "created_at", "updated_at", "sort_key"]
       .forEach((column) => assert.equal(entryColumns.has(column), true, `missing entries column: ${column}`));
     assert.equal(entryColumns.has("entry_json"), false);
+    const entryTagColumns = new Set(db.prepare("PRAGMA table_info(entry_tags)").all().map((row) => row.name));
+    ["entry_id", "position", "tag"].forEach((column) => assert.equal(entryTagColumns.has(column), true, `missing entry_tags column: ${column}`));
+    assert.equal(entryTagColumns.has("normalized_tag"), false);
     const entryMorphologyGroupColumns = new Set(db.prepare("PRAGMA table_info(entry_morphology_groups)").all().map((row) => row.name));
     ["id", "entry_id", "position", "template_group_id", "title", "notes", "created_at", "updated_at"]
       .forEach((column) => assert.equal(entryMorphologyGroupColumns.has(column), true, `missing entry morphology group column: ${column}`));

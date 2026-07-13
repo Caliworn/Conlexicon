@@ -84,7 +84,7 @@
 
 - `fields`：逗号分隔的搜索字段白名单；当前支持 `lemma`、`pronunciation`、`tags`、`definitions`、`examples`、`notes`、`etymology`、`morphology`。为空或全部无效时搜索全部字段。
 - `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；仅对同时出现在 `fields` 中的字段生效。
-- SQLite 在 `q` 为不含空白的 ASCII 文本、`fields` 不含 `morphology` 且 `fuzzyFields` 为空时可直接执行静态字段严格匹配；该优化不改变请求或响应形状。包含非 ASCII/IPA 或空白的查询仍使用共享的 locale-aware 匹配逻辑，避免 SQLite 内建大小写转换或多字段拼接边界改变结果。
+- 基础搜索逐个独立字段值匹配：一条释义、一个标签、一个来源或一段备注必须自行包含查询文本，查询不会跨多个值拼接命中；多标签组合等条件应使用高级筛选。SQLite 在 `q` 为可打印 ASCII 文本、`fields` 不含 `morphology` 且 `fuzzyFields` 为空时可直接执行静态字段严格匹配；该优化不改变请求或响应形状。包含非 ASCII/IPA 的查询仍使用共享的 locale-aware 匹配逻辑，避免 SQLite 内建大小写转换改变结果。
 
 ## 实体 ID 校验约定
 
@@ -211,8 +211,8 @@ GET /api/dictionaries/:id/entries?q=&fields=&fuzzyFields=&part=&tags=&tagMode=&s
   - `etymology`：词源描述和来源文本；
   - `morphology`：按当前形态表设置动态生成的形态形式，以及词条级形态 override。
 - `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；仅对 `fields` 中的字段生效。
-- `part`：词性筛选；特殊值 `__conlexicon_no_part__` 表示无词性。
-- `tags`：逗号分隔的原始标签列表。
+- `part`：词性筛选；按去除边缘空白后的原始标签精确匹配，特殊值 `__conlexicon_no_part__` 表示无词性。
+- `tags`：逗号分隔的原始标签列表；按去除边缘空白后的原始标签精确匹配。
 - `tagMode`：`any` 或 `all`，默认 `any`。
 - `sort`：`lemmaAsc`、`lemmaDesc`、`updatedAsc`、`updatedDesc`、`createdAsc`、`createdDesc`。
 - `source`：筛选具有指定来源文本的词条。

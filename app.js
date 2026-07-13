@@ -43,6 +43,7 @@ const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
 const tagModel = window.ConlexiconTags;
 const morphologyModel = window.ConlexiconMorphology;
 const entrySearchModel = window.ConlexiconEntrySearch;
+const searchNormalizationModel = window.ConlexiconSearchNormalization;
 const ENTRY_SEARCH_FIELD_KEYS = entrySearchModel.ENTRY_SEARCH_FIELD_KEYS;
 const qualityModel = window.ConlexiconQuality;
 let docsViewMode = "split";
@@ -2334,7 +2335,9 @@ function entryPart(entry) {
 }
 
 function entryParts(entry, dictionary = activeDictionary()) {
-  return tagModel.entryParts(entry, normalizeDictionarySettings(dictionary?.settings), { normalizeText: normalize });
+  return tagModel.entryParts(entry, normalizeDictionarySettings(dictionary?.settings), {
+    normalizeText: searchNormalizationModel.normalizeStructuralKey,
+  });
 }
 
 function entryPartLabels(entry, dictionary = activeDictionary()) {
@@ -2346,7 +2349,9 @@ function entryPartText(entry, dictionary = activeDictionary()) {
 }
 
 function entryTagIsPart(entry, tagIndex, tag, dictionary = activeDictionary()) {
-  return tagModel.entryTagIsPart(entry, tagIndex, tag, normalizeDictionarySettings(dictionary?.settings), { normalizeText: normalize });
+  return tagModel.entryTagIsPart(entry, tagIndex, tag, normalizeDictionarySettings(dictionary?.settings), {
+    normalizeText: searchNormalizationModel.normalizeStructuralKey,
+  });
 }
 
 function displayTag(tag, dictionary = activeDictionary()) {
@@ -2358,11 +2363,15 @@ function entryListDisplayTag(tag, settings = normalizeDictionarySettings(activeD
 }
 
 function tagIsRedHighlighted(tag, dictionary = activeDictionary()) {
-  return tagModel.tagIsRedHighlighted(tag, normalizeDictionarySettings(dictionary?.settings), { normalizeText: normalize });
+  return tagModel.tagIsRedHighlighted(tag, normalizeDictionarySettings(dictionary?.settings), {
+    normalizeText: searchNormalizationModel.normalizeStructuralKey,
+  });
 }
 
 function normalize(value) {
-  return String(value || "").trim().toLocaleLowerCase(currentLanguage === "zh" ? "zh-CN" : "en-US");
+  return searchNormalizationModel.normalizeSearchText(value, {
+    locale: currentLanguage === "zh" ? "zh-CN" : "en-US",
+  });
 }
 
 function splitList(value) {
@@ -5558,13 +5567,18 @@ function highlightSearchText(value, fuzzyEnabled = false, searchEnabled = true) 
   }
 
   const normalizedText = normalize(text);
-  const index = normalizedText.indexOf(query);
+  let cursor = 0;
+  let index = normalizedText.indexOf(query, cursor);
   if (index >= 0) {
-    return [
-      escapeHtml(text.slice(0, index)),
-      `<mark>${escapeHtml(text.slice(index, index + query.length))}</mark>`,
-      escapeHtml(text.slice(index + query.length)),
-    ].join("");
+    const html = [];
+    while (index >= 0) {
+      html.push(escapeHtml(text.slice(cursor, index)));
+      html.push(`<mark>${escapeHtml(text.slice(index, index + query.length))}</mark>`);
+      cursor = index + query.length;
+      index = normalizedText.indexOf(query, cursor);
+    }
+    html.push(escapeHtml(text.slice(cursor)));
+    return html.join("");
   }
 
   if (!fuzzyEnabled || fuzzyScore(text, query) <= 0) {
@@ -5606,13 +5620,22 @@ function renderEntrySearchSnippets(entry) {
     etymology: t("etymology"),
     morphology: t("morphologyDisplay"),
   };
+  const firstDisplayedDefinitionIndex = (entry.definitions || []).findIndex((definition) => (
+    Boolean(String(definition?.meaning || "").trim())
+  ));
   const snippets = Object.entries(labels)
-    .flatMap(([field, label]) => valuesByField[field].map((value) => ({ field, label, value })))
-    .filter(({ field, value }) => value && textMatches(normalize(value), query, fuzzyFields.has(field)))
+    .flatMap(([field, label]) => valuesByField[field].map((value, index) => ({ field, label, value, index })))
+    .filter(({ field, value, index }) => (
+      value
+      && textMatches(normalize(value), query, fuzzyFields.has(field))
+      && (field !== "definitions" || index !== firstDisplayedDefinitionIndex)
+    ))
     .slice(0, 2)
-    .map(({ field, label, value }) => `
+    .map(({ field, label, value, index }) => `
       <span class="search-snippet">
-        <b>${escapeHtml(label)}</b>
+        <b>${escapeHtml(field === "definitions"
+          ? (currentLanguage === "zh" ? `${label}${index + 1}` : `${label} ${index + 1}`)
+          : label)}</b>
         ${highlightSearchText(compactSearchSnippet(value), fuzzyFields.has(field), true)}
       </span>
     `)
@@ -6140,8 +6163,8 @@ function resolveEntryMorphologyTable(entry, dictionary = activeDictionary()) {
   if (selected !== "auto") {
     return tables.find((table) => table.id === selected) || null;
   }
-  const entryTags = new Set((entry?.tags || []).map(normalize));
-  return tables.find((table) => table.matchTags.some((tag) => entryTags.has(normalize(tag)))) || null;
+  const entryTags = new Set((entry?.tags || []).map(searchNormalizationModel.normalizeStructuralKey));
+  return tables.find((table) => table.matchTags.some((tag) => entryTags.has(searchNormalizationModel.normalizeStructuralKey(tag)))) || null;
 }
 
 function morphologyCellValue(entry, table, row, col, dictionary = activeDictionary()) {
@@ -7152,8 +7175,7 @@ function analyzeSearchFields(entries, dictionary) {
       ["notes", aText("备注", "Notes"), fieldValues.notes],
     ];
     fieldGroups.forEach(([field, label, values]) => {
-      const text = values.map(normalize).join(" ");
-      if (textMatches(text, query, fuzzyFields.has(field))) {
+      if (values.some((value) => textMatches(value, query, fuzzyFields.has(field)))) {
         incrementEntry(counts, label, entry);
       }
     });
@@ -7408,9 +7430,10 @@ function partDisplayLabel(part, dictionary = activeDictionary()) {
 }
 
 function tagIsPartFilterCandidate(tag, dictionary = activeDictionary()) {
-  const normalizedTag = normalize(tag);
-  return Boolean(normalizedTag)
-    && (dictionary?.entries || []).some((entry) => entryParts(entry, dictionary).some((part) => normalize(part) === normalizedTag));
+  const structuralTag = searchNormalizationModel.normalizeStructuralKey(tag);
+  return Boolean(structuralTag)
+    && (dictionary?.entries || []).some((entry) => entryParts(entry, dictionary)
+      .some((part) => searchNormalizationModel.normalizeStructuralKey(part) === structuralTag));
 }
 
 function numericMapItems(map) {
@@ -7436,7 +7459,7 @@ function numericDateEntryItems(map, title = "") {
 function renderMorphologyDisplay(entry, showEmptySections = false) {
   const dictionary = activeDictionary();
   const resolvedGroups = morphologyModel
-    .resolveEntryMorphologyGroups(entry, dictionary, { normalizeText: normalize })
+    .resolveEntryMorphologyGroups(entry, dictionary, { normalizeText: searchNormalizationModel.normalizeStructuralKey })
     .filter(({ templateGroup }) => templateGroup.tables.length);
   elements.displayMorphologySection.hidden = !resolvedGroups.length && !showEmptySections;
   elements.displayMorphology.innerHTML = "";
@@ -7582,7 +7605,7 @@ function morphologyFormPreviewEntry(entry = {}, full = false) {
 }
 
 function morphologyEditorResolvedGroups(entry, dictionary) {
-  return morphologyModel.resolveEntryMorphologyGroups(entry, dictionary, { normalizeText: normalize })
+  return morphologyModel.resolveEntryMorphologyGroups(entry, dictionary, { normalizeText: searchNormalizationModel.normalizeStructuralKey })
     .filter(({ templateGroup }) => templateGroup.tables.length);
 }
 
@@ -7690,7 +7713,11 @@ async function toggleMorphologyEditorMode(host, entry = {}, { full = false } = {
     const morphologyGroups = morphologyModel.materializeAutomaticMorphologyGroups(
       previewEntry,
       activeDictionary(),
-      { normalizeText: normalize, reserveEntityId, usedIds: new Set() },
+      {
+        normalizeText: searchNormalizationModel.normalizeStructuralKey,
+        reserveEntityId,
+        usedIds: new Set(),
+      },
     );
     renderMorphologyEntryControls(host, {
       ...previewEntry,
