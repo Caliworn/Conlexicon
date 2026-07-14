@@ -3665,6 +3665,43 @@ textarea.ipa-single-line::-webkit-scrollbar {
   background: color-mix(in srgb, var(--surface-2) 65%, var(--bg));
 }
 
+.search-normalization-rule-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.search-normalization-rule-card {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.7fr) minmax(180px, 1.3fr) auto;
+  align-items: start;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--bg));
+}
+
+.search-normalization-rule-card label {
+  display: grid;
+  gap: 5px;
+}
+
+.search-normalization-rule-card textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+@media (max-width: 640px) {
+  .search-normalization-rule-card {
+    grid-template-columns: 1fr;
+  }
+
+  .search-normalization-rule-card .danger-ghost {
+    justify-self: start;
+  }
+}
+
 .file-trigger {
   display: inline-flex;
   align-items: center;

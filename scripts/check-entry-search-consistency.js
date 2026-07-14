@@ -60,9 +60,10 @@ function compareEntries(left, right, sort = "lemmaAsc") {
 }
 
 function expectedEntryIds(dictionary, query = {}) {
+  const searchRuntime = entrySearchModel.searchSettingsQueryOptions(dictionary.settings?.search);
   const searchFields = entrySearchModel.normalizeSearchFields(query.fields || query.searchFields);
   const fuzzyFields = entrySearchModel.normalizeFuzzyFields(query.fuzzyFields);
-  const normalizedQuery = normalizeText(query.q || query.query);
+  const normalizedQuery = searchRuntime.normalizeText(query.q || query.query);
   const tags = splitList(query.tags).map(searchNormalizationModel.normalizeStructuralKey);
   const source = normalizeText(query.source);
   const derivedFrom = normalizeText(query.derivedFrom);
@@ -71,7 +72,7 @@ function expectedEntryIds(dictionary, query = {}) {
     ? null
     : new Set((() => {
       const target = entryRelationsModel.resolveSourceEntry(derivedFrom, dictionary, {
-        normalizeText,
+        normalizeText: searchRuntime.normalizeText,
         index: relationIndex,
       });
       const derived = target
@@ -82,7 +83,7 @@ function expectedEntryIds(dictionary, query = {}) {
 
   return [...(dictionary.entries || [])]
     .filter((entry) => {
-      if (normalizedQuery && !entrySearchModel.entryMatchesSearchText(entry, dictionary, normalizedQuery, {
+      if (normalizedQuery && !entrySearchModel.entryMatchesSearchText(entry, dictionary, query.q || query.query, {
         fields: searchFields,
         fuzzyFields,
         normalizeText,
@@ -255,7 +256,7 @@ async function main() {
   try {
     const source = searchConsistencyDictionary();
     await context.repository.importDictionarySnapshot(source, { overwrite: true });
-    const dictionary = await context.repository.exportDictionary(source.id);
+    let dictionary = await context.repository.exportDictionary(source.id);
     const repository = context.repository;
 
     await assertDirectQuery(repository, dictionary, { q: "AlphaRoot", fields: "lemma" });
@@ -332,17 +333,40 @@ async function main() {
       "direct SQL pagination differs from shared matcher",
     );
 
-    await assertFallbackQuery(repository, dictionary, { q: "ČAPTOKEN", fields: "lemma" });
+    await assertFallbackQuery(repository, dictionary, { q: "ČAPTOKEN", fields: "lemma" }, []);
     await assertFallbackQuery(repository, dictionary, { q: "\uE000PrivateToken", fields: "lemma" });
     await assertFallbackQuery(repository, dictionary, { q: "\uE001PrivateToken", fields: "lemma" });
     await assertFallbackQuery(repository, dictionary, { q: "Cafe\u0301Token", fields: "lemma" }, []);
     await assertFallbackQuery(repository, dictionary, { q: "ΣTOKEN", fields: "lemma" }, []);
     await assertDirectQuery(repository, dictionary, { q: "STRASSETOKEN", fields: "lemma" }, []);
-    await assertFallbackQuery(repository, dictionary, { q: "STRAẞETOKEN", fields: "lemma" });
-    await assertDirectQuery(repository, dictionary, { q: "istanbultoken", fields: "lemma" });
+    await assertFallbackQuery(repository, dictionary, { q: "STRAẞETOKEN", fields: "lemma" }, []);
+    await assertDirectQuery(repository, dictionary, { q: "istanbultoken", fields: "lemma" }, []);
     await assertDirectQuery(repository, dictionary, { q: "izmirtoken", fields: "lemma" }, []);
 
-    console.log("Entry-search SQL fast-path and Unicode fallback consistency checks passed.");
+    await repository.updateSettings(dictionary.id, {
+      ...dictionary.settings,
+      search: {
+        ...dictionary.settings.search,
+        normalization: {
+          unicodeNormalization: "nfc",
+          caseFolding: true,
+          customRules: [
+            { canonical: "t", variants: ["\uE000"] },
+            { canonical: "x", variants: ["alpha"] },
+            { canonical: "y", variants: ["x"] },
+          ],
+        },
+      },
+    });
+    dictionary = await repository.exportDictionary(dictionary.id);
+    await assertFallbackQuery(repository, dictionary, { q: "ČAPTOKEN", fields: "lemma" }, ["entry-unicode"]);
+    await assertFallbackQuery(repository, dictionary, { q: "Cafe\u0301Token", fields: "lemma" }, ["entry-composed"]);
+    await assertFallbackQuery(repository, dictionary, { q: "ΣTOKEN", fields: "lemma" }, ["entry-final-sigma"]);
+    await assertFallbackQuery(repository, dictionary, { q: "STRASSETOKEN", fields: "lemma" }, ["entry-sharp-s"]);
+    await assertFallbackQuery(repository, dictionary, { q: "tPrivateToken", fields: "lemma" }, ["entry-pua-one"]);
+    await assertFallbackQuery(repository, dictionary, { q: "AlphaRoot", fields: "lemma" }, ["entry-alpha-root"]);
+
+    console.log("Entry-search S2 settings, SQL fast-path, and shared fallback checks passed.");
   } finally {
     await context.cleanup();
   }

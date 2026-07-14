@@ -54,7 +54,7 @@
 | 方法 | 路径 | 用途 | 响应 | 校验范围 |
 | --- | --- | --- | --- | --- |
 | `PUT` | `/api/dictionaries/:id/meta` | 保存词典名称、语言、描述 | 词典 metadata payload | 不做实体 ID 检查；响应包含 `id/name/language/description/createdAt/updatedAt`。 |
-| `PUT` | `/api/dictionaries/:id/settings` | 保存其他设置 | `{ id, updatedAt, settings }` | 不做实体 ID 检查；会保留既有 IPA 设置。`settings.search` 含 `fields.<lemma|pronunciation|tags|definitions|examples|notes|etymology|morphology>.enabled/fuzzy` 与 `etymologyAutocomplete.fuzzy`；字段缺失默认均为 `true`。前端据此生成读取 API 的 `fields` / `fuzzyFields` 参数，并同步用于本地筛选、词根模式和搜索字段分析。 |
+| `PUT` | `/api/dictionaries/:id/settings` | 保存其他设置 | `{ id, updatedAt, settings }` | 不做实体 ID 检查；会保留既有 IPA 设置。`settings.search` 含字段级 `enabled/fuzzy`、`etymologyAutocomplete.fuzzy`，以及 `normalization: { unicodeNormalization: "none" | "nfc", caseFolding: boolean, customRules: { canonical, variants[] }[] }`。规范化默认严格关闭；自定义规则按最长变体优先且单次应用。前端据此生成读取 API 参数，并同步用于本地筛选、词根模式、搜索摘要/高亮、搜索字段分析和词源自动补全。 |
 | `PUT` | `/api/dictionaries/:id/docs` | 保存语言文档 | `{ id, updatedAt, docs }` | 不做实体 ID 检查。 |
 | `PUT` | `/api/dictionaries/:id/corpus` | 保存语料库模块 | `{ id, updatedAt, corpus }` | 检查语料范围内实体 ID 冲突。 |
 | `PUT` | `/api/dictionaries/:id/morphology` | 保存自动形态学模块 | `{ id, updatedAt, morphology }` | 检查形态表实体 ID 冲突，并使用共享形态模块校验规则引用语法和函数对象配置；SQLite 事务提交后只重建并返回形态模块，不重建完整词典 snapshot。 |
@@ -84,7 +84,7 @@
 
 - `fields`：逗号分隔的搜索字段白名单；当前支持 `lemma`、`pronunciation`、`tags`、`definitions`、`examples`、`notes`、`etymology`、`morphology`。为空或全部无效时搜索全部字段。
 - `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；仅对同时出现在 `fields` 中的字段生效。
-- 基础搜索逐个独立字段值匹配：一条释义、一个标签、一个来源或一段备注必须自行包含查询文本，查询不会跨多个值拼接命中；多标签组合等条件应使用高级筛选。SQLite 在 `q` 为可打印 ASCII 文本、`fields` 不含 `morphology` 且 `fuzzyFields` 为空时可直接执行静态字段严格匹配；该优化不改变请求或响应形状。包含非 ASCII/IPA 的查询仍使用共享的 locale-aware 匹配逻辑，避免 SQLite 内建大小写转换改变结果。
+- 基础搜索逐个独立字段值匹配：一条释义、一个标签、一个来源或一段备注必须自行包含查询文本，查询不会跨多个值拼接命中；多标签组合等条件应使用高级筛选。自由文本按当前词典的 `settings.search.normalization` 处理。SQLite 仅在 `q` 为可打印 ASCII、`fields` 不含 `morphology`、`fuzzyFields` 为空，且未启用 case folding 或自定义规则时直接执行静态字段严格匹配；其余请求在 S3 检索投影完成前使用共享 JavaScript matcher。结构键和词源关系键不套用该自由文本配置。
 
 ## 实体 ID 校验约定
 

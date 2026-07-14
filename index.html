@@ -720,6 +720,23 @@
                 </div>
                 <p class="muted-text" data-i18n="searchFieldMorphologyHelp">形态字段由规则动态生成，启用搜索可能明显增加大型词典的搜索耗时。</p>
                 <div class="subsection-title">
+                  <h3 data-i18n="searchNormalization">搜索规范化</h3>
+                </div>
+                <label class="toggle-row">
+                  <span data-i18n="searchNfcHelp">将等价的 Unicode 组合形式统一为 NFC</span>
+                  <input id="searchNfcInput" type="checkbox">
+                </label>
+                <label class="toggle-row">
+                  <span data-i18n="searchCaseFoldingHelp">忽略 Unicode 字符的大小写差异</span>
+                  <input id="searchCaseFoldingInput" type="checkbox">
+                </label>
+                <div class="subsection-title">
+                  <h3 data-i18n="searchCustomRules">自定义等价规则</h3>
+                </div>
+                <p class="muted-text" data-i18n="searchCustomRulesHelp">将每行变体统一匹配为一个标准形式。规则按最长变体优先，且不会递归套用。</p>
+                <div class="search-normalization-rule-list" id="searchNormalizationRuleList"></div>
+                <button class="secondary-button additive-button" id="addSearchNormalizationRuleButton" type="button" data-i18n="addSearchNormalizationRule">添加规则</button>
+                <div class="subsection-title">
                   <h3 data-i18n="etymologyAutocomplete">词源自动补全</h3>
                 </div>
                 <label class="toggle-row">

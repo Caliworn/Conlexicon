@@ -193,14 +193,15 @@ function testEntryMatches(entry, dictionary, query = {}) {
   if (!matchesPart) {
     return false;
   }
-  const normalizedQuery = testNormalize(query.q);
+  const searchRuntime = entrySearchModel.searchSettingsQueryOptions(dictionary.settings?.search);
+  const normalizedQuery = searchRuntime.normalizeText(query.q);
   if (!normalizedQuery) {
     return testEntryMatchesDerivedFrom(entry, dictionary, query);
   }
-  return entrySearchModel.entryMatchesSearchText(entry, dictionary, normalizedQuery, {
+  return entrySearchModel.entryMatchesSearchText(entry, dictionary, query.q || query.query || "", {
     fields: entrySearchModel.normalizeSearchFields(query.fields || query.searchFields),
     fuzzyFields: entrySearchModel.normalizeFuzzyFields(query.fuzzyFields),
-    normalizeText: testNormalize,
+    normalizeText: searchRuntime.normalizeText,
   }) && testEntryMatchesDerivedFrom(entry, dictionary, query);
 }
 
@@ -282,14 +283,16 @@ async function assertEntryQueryConsistency(repository, dictionary, params = {}) 
 }
 
 function expectedRootGroupSnapshot(dictionary, query = {}) {
+  const searchRuntime = entrySearchModel.searchSettingsQueryOptions(dictionary.settings?.search);
+  const normalizedQuery = searchRuntime.normalizeText(query.q || query.query);
   return entryRelationsModel.rootModeGroups(dictionary, {
-    query: testNormalize(query.q || query.query),
+    query: normalizedQuery,
     normalizeText: testNormalize,
     compareEntries: testCompareEntries(query.sort || "lemmaAsc"),
     matchesEntry: (entry) => entrySearchModel.entryMatchesSearchText(entry, dictionary, query.q || query.query || "", {
       fields: entrySearchModel.normalizeSearchFields(query.fields || query.searchFields),
       fuzzyFields: entrySearchModel.normalizeFuzzyFields(query.fuzzyFields),
-      normalizeText: testNormalize,
+      normalizeText: searchRuntime.normalizeText,
     }),
   }).map((group) => ({
     rootId: group.root.id,

@@ -330,6 +330,19 @@ const i18n = {
     searchFieldEtymology: "词源",
     searchFieldMorphology: "形态学",
     searchFieldMorphologyHelp: "形态字段由规则动态生成，启用搜索可能明显增加大型词典的搜索耗时。",
+    searchNormalization: "搜索规范化",
+    searchNfcHelp: "将等价的 Unicode 组合形式统一为 NFC",
+    searchCaseFoldingHelp: "忽略 Unicode 字符的大小写差异",
+    searchCustomRules: "自定义等价规则",
+    searchCustomRulesHelp: "将每行变体统一匹配为一个标准形式。规则按最长变体优先，且不会递归套用。",
+    searchCanonical: "标准形式",
+    searchVariants: "等价变体（每行一个）",
+    addSearchNormalizationRule: "添加规则",
+    removeSearchNormalizationRule: "删除规则",
+    searchNormalizationInvalidRule: "自定义搜索规则无效。",
+    searchNormalizationEmptyCanonical: "请填写规则的标准形式。",
+    searchNormalizationEmptyVariants: "请至少填写一个等价变体。",
+    searchNormalizationConflictingVariant: "同一个等价变体不能对应多个标准形式。",
     etymologyAutocomplete: "词源自动补全",
     sourceFuzzyHelp: "在词源来源补全中启用模糊匹配",
     searchFieldRequired: "请至少启用一个搜索字段。",
@@ -814,6 +827,19 @@ const i18n = {
     searchFieldEtymology: "Etymology",
     searchFieldMorphology: "Morphology",
     searchFieldMorphologyHelp: "Morphology is generated dynamically; searching it can noticeably slow large dictionaries.",
+    searchNormalization: "Search normalization",
+    searchNfcHelp: "Treat canonically equivalent Unicode forms as NFC",
+    searchCaseFoldingHelp: "Ignore Unicode case differences",
+    searchCustomRules: "Custom equivalence rules",
+    searchCustomRulesHelp: "Match each line of variants as one canonical form. Longest variants take priority and rules are not applied recursively.",
+    searchCanonical: "Canonical form",
+    searchVariants: "Equivalent variants (one per line)",
+    addSearchNormalizationRule: "Add rule",
+    removeSearchNormalizationRule: "Remove rule",
+    searchNormalizationInvalidRule: "The custom search rule is invalid.",
+    searchNormalizationEmptyCanonical: "Enter a canonical form for the rule.",
+    searchNormalizationEmptyVariants: "Enter at least one equivalent variant.",
+    searchNormalizationConflictingVariant: "An equivalent variant cannot map to multiple canonical forms.",
     etymologyAutocomplete: "Etymology Autocomplete",
     sourceFuzzyHelp: "Enable fuzzy matching in etymology source completion",
     searchFieldRequired: "Enable at least one search field.",
@@ -1273,6 +1299,10 @@ const elements = {
   showEmptyEntrySectionsInput: document.querySelector("#showEmptyEntrySectionsInput"),
   searchFieldEnabledInputs: [...document.querySelectorAll("[data-search-enabled]")],
   searchFieldFuzzyInputs: [...document.querySelectorAll("[data-search-fuzzy]")],
+  searchNfcInput: document.querySelector("#searchNfcInput"),
+  searchCaseFoldingInput: document.querySelector("#searchCaseFoldingInput"),
+  searchNormalizationRuleList: document.querySelector("#searchNormalizationRuleList"),
+  addSearchNormalizationRuleButton: document.querySelector("#addSearchNormalizationRuleButton"),
   sourceFuzzyInput: document.querySelector("#sourceFuzzyInput"),
   searchHighlightInput: document.querySelector("#searchHighlightInput"),
   savePartialOnSwitchInput: document.querySelector("#savePartialOnSwitchInput"),
@@ -1803,16 +1833,31 @@ function normalizeDictionarySettings(settings = {}, usedIds = new Set()) {
   };
 }
 
+let entrySearchRuntimeCache = { dictionary: null, search: null, options: null };
+
 function entrySearchQueryOptions(dictionary = activeDictionary()) {
-  const search = normalizeDictionarySettings(dictionary?.settings).search;
-  return entrySearchModel.searchSettingsQueryOptions(search);
+  const search = dictionary?.settings?.search;
+  if (entrySearchRuntimeCache.dictionary === dictionary
+    && entrySearchRuntimeCache.search === search
+    && entrySearchRuntimeCache.options) {
+    return entrySearchRuntimeCache.options;
+  }
+  const normalizedSearch = entrySearchModel.normalizeEntrySearchSettings(search);
+  const options = entrySearchModel.searchSettingsQueryOptions(normalizedSearch);
+  entrySearchRuntimeCache = { dictionary, search, options };
+  return options;
+}
+
+function normalizeEntrySearchText(value, dictionary = activeDictionary()) {
+  return entrySearchQueryOptions(dictionary).normalizeText(value);
 }
 
 function entrySearchQuerySignature(dictionary = activeDictionary()) {
-  const { fields, fuzzyFields } = entrySearchQueryOptions(dictionary);
+  const { fields, fuzzyFields, normalization } = entrySearchQueryOptions(dictionary);
   return [
     [...fields].join(","),
     [...fuzzyFields].join(","),
+    stableJson(normalization),
   ].join("|");
 }
 
@@ -3206,7 +3251,7 @@ function renderPartFilter() {
   } else {
     elements.advancedFilterLabel.removeAttribute("aria-label");
   }
-  const hasRootSearch = Boolean(normalize(searchQuery));
+  const hasRootSearch = Boolean(normalizeEntrySearchText(searchQuery));
   const rootGroupsFullyLoaded = rootMode
     && rootGroupsQueryState.status === "success"
     && !rootGroupsQueryState.pageInfo?.hasMore;
@@ -4005,7 +4050,7 @@ function entryVirtualResetToken() {
   return [
     state.activeDictionaryId,
     rootMode ? "root" : "entries",
-    normalize(searchQuery),
+    normalizeEntrySearchText(searchQuery),
     activePart,
     entrySort,
     entryQueryState.status === "success" ? "api" : "local",
@@ -4066,7 +4111,7 @@ function entryCardSizeCacheKey(entry, options = {}) {
     "entry-card",
     state.activeDictionaryId,
     rootMode ? "root-mode" : "entry-mode",
-    normalize(searchQuery),
+    normalizeEntrySearchText(searchQuery),
     activePart,
     advancedFilter?.title || "",
     advancedFilter?.variantIndex ?? "",
@@ -4097,7 +4142,7 @@ function rootGroupsQueryApiKey(dictionary = activeDictionary()) {
   return [
     dictionary.id,
     dictionaryEntriesSignature(dictionary),
-    normalize(searchQuery),
+    normalizeEntrySearchText(searchQuery, dictionary),
     entrySort,
     stableJson(dictionary.morphology || {}),
     stableJson(settings.tagDisplayMap),
@@ -4254,7 +4299,7 @@ function entryQueryApiKey(dictionary = activeDictionary()) {
   return [
     dictionary.id,
     dictionaryEntriesSignature(dictionary),
-    normalize(searchQuery),
+    normalizeEntrySearchText(searchQuery, dictionary),
     activePart,
     entrySort,
     stableJson(settings.tagDisplayMap),
@@ -5025,7 +5070,7 @@ function filteredEntries() {
     return [...dictionary.entries].filter((entry) => ids.has(entry.id)).sort(compareEntries);
   }
 
-  const query = normalize(searchQuery);
+  const query = searchQuery;
   const { fields, fuzzyFields } = entrySearchQueryOptions(dictionary);
 
   return [...dictionary.entries]
@@ -5462,7 +5507,7 @@ function cycleAdvancedFilterVariant() {
 }
 
 function entryMatchesSearch(entry, dictionary = activeDictionary(), options = {}) {
-  const query = options.query ?? normalize(searchQuery);
+  const query = options.query ?? searchQuery;
   const searchOptions = entrySearchQueryOptions(dictionary);
   const fields = options.fields ?? searchOptions.fields;
   const fuzzyFields = options.fuzzyFields ?? searchOptions.fuzzyFields;
@@ -5472,7 +5517,7 @@ function entryMatchesSearch(entry, dictionary = activeDictionary(), options = {}
     || !activePart
     || (activePart === NO_PART_FILTER_VALUE ? !parts.length : parts.includes(activePart));
   return matchesPart && entrySearchModel.entryMatchesSearchText(entry, dictionary, query, {
-    normalizeText: normalize,
+    normalizeText: searchOptions.normalizeText,
     fields,
     fuzzyFields,
   });
@@ -5503,8 +5548,10 @@ function rootModeGroups(dictionary = activeDictionary(), options = {}) {
   if (!dictionary) {
     return [];
   }
-  const query = normalize(options.query ?? searchQuery);
-  const { fields, fuzzyFields } = entrySearchQueryOptions(dictionary);
+  const searchOptions = entrySearchQueryOptions(dictionary);
+  const query = options.query ?? searchQuery;
+  const normalizedQuery = searchOptions.normalizeText(query);
+  const { fields, fuzzyFields } = searchOptions;
   const matchOptions = {
     query,
     fields,
@@ -5512,7 +5559,7 @@ function rootModeGroups(dictionary = activeDictionary(), options = {}) {
     respectPart: false,
   };
   return entryRelationsModel.rootModeGroups(dictionary, {
-    query,
+    query: normalizedQuery,
     normalizeText: normalize,
     compareEntries,
     matchesEntry: (entry) => entryMatchesSearch(entry, dictionary, matchOptions),
@@ -5550,15 +5597,17 @@ function compareEntries(a, b) {
 }
 
 function textMatches(text, query, fuzzyEnabled = false) {
+  const searchOptions = entrySearchQueryOptions();
   return entrySearchModel.textMatches(text, query, {
     fuzzy: Boolean(fuzzyEnabled),
-    normalizeText: normalize,
+    normalizeText: searchOptions.normalizeText,
   });
 }
 
 function highlightSearchText(value, fuzzyEnabled = false, searchEnabled = true) {
   const text = String(value || "");
-  const query = normalize(searchQuery);
+  const searchOptions = entrySearchQueryOptions();
+  const query = searchOptions.normalizeText(searchQuery);
   if (!normalizeDictionarySettings(activeDictionary()?.settings).searchHighlight) {
     return escapeHtml(text);
   }
@@ -5566,17 +5615,39 @@ function highlightSearchText(value, fuzzyEnabled = false, searchEnabled = true) 
     return escapeHtml(text);
   }
 
-  const normalizedText = normalize(text);
-  let cursor = 0;
-  let index = normalizedText.indexOf(query, cursor);
+  const normalized = searchOptions.normalizeTextWithMap(text);
+  const normalizedText = normalized.text;
+  let normalizedCursor = 0;
+  let index = normalizedText.indexOf(query, normalizedCursor);
   if (index >= 0) {
-    const html = [];
+    const ranges = [];
     while (index >= 0) {
-      html.push(escapeHtml(text.slice(cursor, index)));
-      html.push(`<mark>${escapeHtml(text.slice(index, index + query.length))}</mark>`);
-      cursor = index + query.length;
-      index = normalizedText.indexOf(query, cursor);
+      const covered = normalized.map.slice(index, index + query.length);
+      if (covered.length) {
+        ranges.push({
+          start: Math.min(...covered.map((item) => item.start)),
+          end: Math.max(...covered.map((item) => item.end)),
+        });
+      }
+      normalizedCursor = index + query.length;
+      index = normalizedText.indexOf(query, normalizedCursor);
     }
+    const merged = ranges.reduce((result, range) => {
+      const previous = result[result.length - 1];
+      if (previous && range.start <= previous.end) {
+        previous.end = Math.max(previous.end, range.end);
+      } else {
+        result.push({ ...range });
+      }
+      return result;
+    }, []);
+    const html = [];
+    let cursor = 0;
+    merged.forEach((range) => {
+      html.push(escapeHtml(text.slice(cursor, range.start)));
+      html.push(`<mark>${escapeHtml(text.slice(range.start, range.end))}</mark>`);
+      cursor = range.end;
+    });
     html.push(escapeHtml(text.slice(cursor)));
     return html.join("");
   }
@@ -5589,10 +5660,11 @@ function highlightSearchText(value, fuzzyEnabled = false, searchEnabled = true) 
 
 function highlightFuzzyText(value, query) {
   const text = String(value || "");
+  const normalizeSearch = entrySearchQueryOptions().normalizeText;
   let queryIndex = 0;
   let html = "";
   for (const char of text) {
-    if (queryIndex < query.length && normalize(char) === query[queryIndex]) {
+    if (queryIndex < query.length && normalizeSearch(char) === query[queryIndex]) {
       html += `<mark>${escapeHtml(char)}</mark>`;
       queryIndex += 1;
     } else {
@@ -5603,15 +5675,16 @@ function highlightFuzzyText(value, query) {
 }
 
 function renderEntrySearchSnippets(entry) {
-  const query = normalize(searchQuery);
-  if (!query) {
+  const dictionary = activeDictionary();
+  const searchOptions = entrySearchQueryOptions(dictionary);
+  const query = searchQuery;
+  if (!searchOptions.normalizeText(query)) {
     return "";
   }
-  const dictionary = activeDictionary();
-  const { fields: searchFields, fuzzyFields } = entrySearchQueryOptions(dictionary);
+  const { fields: searchFields, fuzzyFields } = searchOptions;
   const valuesByField = entrySearchModel.entrySearchFieldValues(entry, dictionary, {
     fields: searchFields,
-    normalizeText: normalize,
+    normalizeText: searchOptions.normalizeText,
   });
   const labels = {
     definitions: t("meaning"),
@@ -5627,7 +5700,10 @@ function renderEntrySearchSnippets(entry) {
     .flatMap(([field, label]) => valuesByField[field].map((value, index) => ({ field, label, value, index })))
     .filter(({ field, value, index }) => (
       value
-      && textMatches(normalize(value), query, fuzzyFields.has(field))
+      && entrySearchModel.textMatches(value, query, {
+        fuzzy: fuzzyFields.has(field),
+        normalizeText: searchOptions.normalizeText,
+      })
       && (field !== "definitions" || index !== firstDisplayedDefinitionIndex)
     ))
     .slice(0, 2)
@@ -5649,7 +5725,7 @@ function compactSearchSnippet(value) {
 }
 
 function fuzzyScore(value, query) {
-  return entrySearchModel.fuzzyScore(value, query, { normalizeText: normalize });
+  return entrySearchModel.fuzzyScore(value, query, { normalizeText: entrySearchQueryOptions().normalizeText });
 }
 
 function renderDetail() {
@@ -6260,7 +6336,7 @@ function analysisSliceCacheKey(context, dep) {
   return stableJson({
     base: context.cacheBaseKey,
     dep,
-    searchQuery: dep === "search" ? normalize(searchQuery) : "",
+    searchQuery: dep === "search" ? normalizeEntrySearchText(searchQuery, context.dictionary) : "",
     entrySort: dep === "relation" || dep === "rootFamilies" ? entrySort : "",
     rootFamilyLimit: dep === "rootFamilies" ? analysisRootFamilyLimit() : "",
   });
@@ -7002,7 +7078,7 @@ function buildAnalysisMorphologySlice(context) {
 
 function buildAnalysisSearchSlice(context) {
   const { dictionary, entries } = context;
-  const searchMatchEntries = normalize(searchQuery)
+  const searchMatchEntries = normalizeEntrySearchText(searchQuery, dictionary)
     ? entries.filter((entry) => entryMatchesSearch(entry, dictionary))
     : entries;
   return {
@@ -7153,16 +7229,17 @@ function analyzeActivity(entries) {
 }
 
 function analyzeSearchFields(entries, dictionary) {
-  const query = normalize(searchQuery);
-  if (!query) {
+  const searchOptions = entrySearchQueryOptions(dictionary);
+  const query = searchQuery;
+  if (!searchOptions.normalizeText(query)) {
     return [];
   }
-  const { fields: searchFields, fuzzyFields } = entrySearchQueryOptions(dictionary);
+  const { fields: searchFields, fuzzyFields } = searchOptions;
   const counts = new Map();
   entries.forEach((entry) => {
     const fieldValues = entrySearchModel.entrySearchFieldValues(entry, dictionary, {
       fields: searchFields,
-      normalizeText: normalize,
+      normalizeText: searchOptions.normalizeText,
     });
     const fieldGroups = [
       ["lemma", aText("词形", "Lemma"), fieldValues.lemma],
@@ -7966,21 +8043,22 @@ function completeSourceAtCursor(input = elements.sourceEntryInput) {
 }
 
 function sourceCompletionCandidates(prefix, dictionary = activeDictionary()) {
-  const normalizedPrefix = normalize(prefix);
+  const normalizeSearch = entrySearchQueryOptions(dictionary).normalizeText;
+  const normalizedPrefix = normalizeSearch(prefix);
   if (!dictionary || !normalizedPrefix) {
     return [];
   }
   const fuzzyEnabled = normalizeDictionarySettings(dictionary.settings).search.etymologyAutocomplete.fuzzy;
   return dictionary.entries
     .map((entry) => {
-      const lemma = normalize(entry.lemma);
+      const lemma = normalizeSearch(entry.lemma);
       let score = 0;
       if (lemma.startsWith(normalizedPrefix)) {
         score = 1000 - Math.abs(lemma.length - normalizedPrefix.length);
       } else if (fuzzyEnabled && lemma.includes(normalizedPrefix)) {
         score = 700 - lemma.indexOf(normalizedPrefix);
       } else if (fuzzyEnabled) {
-        score = fuzzyScore(lemma, normalizedPrefix);
+        score = entrySearchModel.fuzzyScore(entry.lemma, prefix, { normalizeText: normalizeSearch });
       }
       return { entry, score };
     })
@@ -8193,10 +8271,51 @@ function collectEntrySearchSettingsForm() {
   }));
   return entrySearchModel.normalizeEntrySearchSettings({
     fields,
+    normalization: {
+      unicodeNormalization: elements.searchNfcInput?.checked ? "nfc" : "none",
+      caseFolding: Boolean(elements.searchCaseFoldingInput?.checked),
+      customRules: collectSearchNormalizationRules(),
+    },
     etymologyAutocomplete: {
       fuzzy: Boolean(elements.sourceFuzzyInput?.checked),
     },
   });
+}
+
+function createSearchNormalizationRuleCard(rule = {}) {
+  const card = document.createElement("div");
+  card.className = "search-normalization-rule-card";
+  card.innerHTML = `
+    <label>
+      <span>${escapeHtml(t("searchCanonical"))}</span>
+      <input type="text" data-search-rule-canonical value="${escapeHtml(rule.canonical || "")}">
+    </label>
+    <label>
+      <span>${escapeHtml(t("searchVariants"))}</span>
+      <textarea data-search-rule-variants>${escapeHtml((rule.variants || []).join("\n"))}</textarea>
+    </label>
+    <button class="danger-ghost" type="button" data-action="remove-search-normalization-rule">${escapeHtml(t("removeSearchNormalizationRule"))}</button>
+  `;
+  return card;
+}
+
+function collectSearchNormalizationRules() {
+  return [...(elements.searchNormalizationRuleList?.children || [])].map((card) => ({
+    canonical: card.querySelector("[data-search-rule-canonical]")?.value.trim() || "",
+    variants: String(card.querySelector("[data-search-rule-variants]")?.value || "")
+      .split(/\r?\n/)
+      .map((value) => value.trim())
+      .filter(Boolean),
+  }));
+}
+
+function fillSearchNormalizationRules(rules = []) {
+  if (!elements.searchNormalizationRuleList) {
+    return;
+  }
+  elements.searchNormalizationRuleList.replaceChildren(
+    ...rules.map((rule) => createSearchNormalizationRuleCard(rule)),
+  );
 }
 
 function fillEntrySearchSettingsForm(search) {
@@ -8207,8 +8326,38 @@ function fillEntrySearchSettingsForm(search) {
   elements.searchFieldFuzzyInputs.forEach((input) => {
     input.checked = normalized.fields[input.dataset.searchFuzzy]?.fuzzy ?? true;
   });
+  elements.searchNfcInput.checked = normalized.normalization.unicodeNormalization === "nfc";
+  elements.searchCaseFoldingInput.checked = normalized.normalization.caseFolding;
+  fillSearchNormalizationRules(normalized.normalization.customRules);
   elements.sourceFuzzyInput.checked = normalized.etymologyAutocomplete.fuzzy;
   syncEntrySearchSettingsControls();
+}
+
+function searchNormalizationValidationMessage(error = {}) {
+  if (["empty_canonical", "invalid_canonical"].includes(error.code)) {
+    return t("searchNormalizationEmptyCanonical");
+  }
+  if (["empty_variants", "empty_variant", "invalid_variants", "invalid_variant"].includes(error.code)) {
+    return t("searchNormalizationEmptyVariants");
+  }
+  if (error.code === "conflicting_variant") {
+    return t("searchNormalizationConflictingVariant");
+  }
+  return t("searchNormalizationInvalidRule");
+}
+
+function validateSearchNormalizationForm(search) {
+  const runtime = searchNormalizationModel.createConfiguredSearchNormalizer(search.normalization);
+  const error = runtime.errors[0];
+  if (!error) {
+    return true;
+  }
+  showToast(searchNormalizationValidationMessage(error));
+  const card = elements.searchNormalizationRuleList?.children[error.index];
+  card?.querySelector(error.code.includes("canonical")
+    ? "[data-search-rule-canonical]"
+    : "[data-search-rule-variants]")?.focus();
+  return false;
 }
 
 function syncEntrySearchSettingsControls() {
@@ -8733,9 +8882,13 @@ async function saveSettings(event, options = {}) {
     return false;
   }
 
-  if (!entrySearchModel.searchSettingsHaveEnabledField(collectEntrySearchSettingsForm())) {
+  const entrySearchSettings = collectEntrySearchSettingsForm();
+  if (!entrySearchModel.searchSettingsHaveEnabledField(entrySearchSettings)) {
     showToast(t("searchFieldRequired"));
     elements.searchFieldEnabledInputs[0]?.focus();
+    return false;
+  }
+  if (!validateSearchNormalizationForm(entrySearchSettings)) {
     return false;
   }
 
@@ -11511,7 +11664,7 @@ elements.rootModeToggleButton.addEventListener("click", () => {
 elements.expandAllRootsButton.addEventListener("click", () => {
   if (
     advancedFilter
-    || normalize(searchQuery)
+    || normalizeEntrySearchText(searchQuery)
     || rootGroupsQueryState.status !== "success"
     || rootGroupsQueryState.pageInfo?.hasMore
   ) {
@@ -11522,7 +11675,7 @@ elements.expandAllRootsButton.addEventListener("click", () => {
 });
 
 elements.collapseAllRootsButton.addEventListener("click", () => {
-  if (advancedFilter || normalize(searchQuery)) {
+  if (advancedFilter || normalizeEntrySearchText(searchQuery)) {
     return;
   }
   expandedRootEntries.clear();
@@ -12004,6 +12157,16 @@ elements.settingsForm.addEventListener("submit", saveSettings);
 elements.manualPartOfSpeechTagsInput.addEventListener("change", syncPartOfSpeechTagSettingsControls);
 elements.searchFieldEnabledInputs.forEach((input) => {
   input.addEventListener("change", syncEntrySearchSettingsControls);
+});
+elements.addSearchNormalizationRuleButton?.addEventListener("click", () => {
+  const card = createSearchNormalizationRuleCard();
+  elements.searchNormalizationRuleList.append(card);
+  card.querySelector("[data-search-rule-canonical]")?.focus();
+});
+elements.searchNormalizationRuleList?.addEventListener("click", (event) => {
+  if (event.target.closest('[data-action="remove-search-normalization-rule"]')) {
+    event.target.closest(".search-normalization-rule-card")?.remove();
+  }
 });
 elements.tagOrderInfoButton.addEventListener("click", () => {
   appInfoDialog(t("tagOrderSettings"), {
