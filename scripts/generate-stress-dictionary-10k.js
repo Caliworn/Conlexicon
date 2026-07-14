@@ -186,7 +186,6 @@ function stressMorphologyGroups(index, partOfSpeech) {
   const groupId = deterministicId("morph", 8, partIndex);
   const tableId = deterministicId("mtable", 8, partIndex);
   return [{
-    id: deterministicId("emorph", 8, index),
     templateGroupId: groupId,
     title: "",
     notes: "",

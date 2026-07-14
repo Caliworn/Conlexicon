@@ -58,7 +58,7 @@
 | `PUT` | `/api/dictionaries/:id/docs` | 保存语言文档 | `{ id, updatedAt, docs }` | 不做实体 ID 检查。 |
 | `PUT` | `/api/dictionaries/:id/corpus` | 保存语料库模块 | `{ id, updatedAt, corpus }` | 检查语料范围内实体 ID 冲突。 |
 | `PUT` | `/api/dictionaries/:id/morphology` | 保存自动形态学模块 | `{ id, updatedAt, morphology }` | 检查形态表实体 ID 冲突，并使用共享形态模块校验规则引用语法和函数对象配置；SQLite 事务提交后只重建并返回形态模块，不重建完整词典 snapshot。 |
-| `PUT` | `/api/dictionaries/:id/settings/ipa` | 保存自动 IPA 设置 | `{ id, updatedAt, settings }` | 检查 IPA 规则和重音规则实体 ID 冲突。 |
+| `PUT` | `/api/dictionaries/:id/settings/ipa` | 保存自动 IPA 设置 | `{ id, updatedAt, settings }` | IPA 映射是按顺序保存的纯文本规则 `{ from, to, before, after }`，没有实体 ID，也不参与实体 ID 防撞。 |
 | `POST` | `/api/dictionaries/:id/autosave` | 页面卸载时保存文档/语料草稿 | `{ id, updatedAt, docs?, corpus? }` | 当前只分发 `docs` 和 `corpus`；请求至少须携带其中一个有效对象，否则返回 `invalid_autosave_payload`。 |
 
 ### 词条级保存
@@ -91,7 +91,7 @@
 - 完整快照保存、导入和迁移必须执行全量实体 ID 唯一性检查。
 - 增量保存只检查本次保存范围：
   - 词条保存检查该词条及其释义等子对象。
-  - IPA 保存检查 IPA 映射规则和重音规则。
+  - IPA 映射是无 ID 的文本配置，IPA 保存不执行实体 ID 检查。
   - 形态保存检查形态表。
   - 语料保存检查语料块、层和单元。
   - 元数据、普通设置和语言文档保存不应被无关历史重复 ID 阻断。

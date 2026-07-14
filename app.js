@@ -126,7 +126,6 @@ let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
 let draggedToolNavView = "";
 let draggedEntrySectionId = "";
-let draggedIpaRuleId = "";
 let draggedMorphologyGroupId = "";
 let draggedMorphologyTableId = "";
 let entryCardScrollRequestId = 0;
@@ -518,7 +517,6 @@ const i18n = {
     orthographyModule: "正写法识别",
     orthographyStressModule: "正写法重音映射",
     mappingRules: "映射规则",
-    stressMappings: "重音映射",
     addMapping: "添加映射",
     addStressMapping: "添加重音映射",
     mappingRuleHelp: "规则从上到下匹配；输入与前后条件始终只读取原始词形，生成结果不会被后续规则再次读取。较前规则消耗的字符不会再参与后续匹配，可拖动规则调整优先级。输出中写入 ˈ 或以 ' 开头，可将该音节标为重读并覆盖默认重音。",
@@ -631,8 +629,6 @@ const i18n = {
     entryEntity: "词条",
     definitionEntity: "释义",
     morphologyTableEntity: "形态表",
-    ipaRuleEntity: "IPA 规则",
-    ipaStressRuleEntity: "IPA 重音规则",
     corpusBlockFallback: "未命名块",
     corpusLayerFallback: "未命名层",
     corpusUnitFallback: "空单元",
@@ -1018,7 +1014,6 @@ const i18n = {
     orthographyModule: "Orthography Recognition",
     orthographyStressModule: "Orthographic Stress",
     mappingRules: "Mapping Rules",
-    stressMappings: "Stress Mappings",
     addMapping: "Add Mapping",
     addStressMapping: "Add Stress Mapping",
     mappingRuleHelp: "Rules are tried from top to bottom. Inputs and contexts always read the original lemma; generated output is never fed into later rules. Characters consumed by an earlier rule are unavailable to later rules. Drag rules to change priority. Put ˈ in the output, or start it with ', to mark that syllable as stressed and override default stress.",
@@ -1131,8 +1126,6 @@ const i18n = {
     entryEntity: "Entry",
     definitionEntity: "Definition",
     morphologyTableEntity: "Morphology table",
-    ipaRuleEntity: "IPA rule",
-    ipaStressRuleEntity: "IPA stress rule",
     corpusBlockFallback: "Untitled Block",
     corpusLayerFallback: "Untitled Layer",
     corpusUnitFallback: "Empty Unit",
@@ -1828,7 +1821,7 @@ function normalizeDictionarySettings(settings = {}, usedIds = new Set()) {
     allowEmptyTags: Boolean(settings.allowEmptyTags ?? true),
     allowEmptyDefinitions: Boolean(settings.allowEmptyDefinitions ?? true),
     ipaKeyboard: normalizeIpaKeyboard(settings.ipaKeyboard),
-    ipa: normalizeIpaSettings(settings.ipa, usedIds),
+    ipa: normalizeIpaSettings(settings.ipa),
     toolNavOrder: normalizeToolNavOrder(settings.toolNavOrder),
   };
 }
@@ -2209,8 +2202,8 @@ function splitKeyboardSymbols(value) {
   return ipaModel.splitKeyboardSymbols(value);
 }
 
-function normalizeIpaSettings(ipa = {}, usedIds = new Set()) {
-  return ipaModel.normalizeIpaSettings(ipa, { usedIds, reserveEntityId });
+function normalizeIpaSettings(ipa = {}) {
+  return ipaModel.normalizeIpaSettings(ipa);
 }
 
 function normalizeClusterList(value) {
@@ -2289,26 +2282,6 @@ function dictionaryEntityIdRecords(dictionary = {}) {
         id: String(table.id || "").trim(),
         typeKey: "morphologyTableEntity",
       });
-    });
-  });
-  (dictionary.entries || []).forEach((entry) => {
-    (entry.morphologyGroups || []).forEach((group) => {
-      records.push({
-        id: String(group.id || "").trim(),
-        typeKey: "morphologyTableEntity",
-      });
-    });
-  });
-  (dictionary.settings?.ipa?.mappings || []).forEach((rule) => {
-    records.push({
-      id: String(rule.id || "").trim(),
-      typeKey: "ipaRuleEntity",
-    });
-  });
-  (dictionary.settings?.ipa?.stressMappings || []).forEach((rule) => {
-    records.push({
-      id: String(rule.id || "").trim(),
-      typeKey: "ipaStressRuleEntity",
     });
   });
   records.push(...corpusEntityIdRecords(dictionary.corpus));
@@ -4446,7 +4419,6 @@ function dictionaryEntriesSignature(dictionary = activeDictionary()) {
       note: definition.note,
     })),
     morphologyGroups: (entry.morphologyGroups || []).map((group) => ({
-      id: group.id,
       templateGroupId: group.templateGroupId,
       title: group.title,
       overrides: group.overrides || {},
@@ -7716,10 +7688,10 @@ function renderMorphologyEntryControls(host, entry = {}, { full = false } = {}) 
 }
 
 function renderEntryMorphologyGroupEditor(templateGroup, entryGroup, entry, mode, index = 0, total = 1) {
-  const group = entryGroup || { id: "", templateGroupId: templateGroup.id, title: "", notes: "", overrides: {} };
+  const group = entryGroup || { templateGroupId: templateGroup.id, title: "", notes: "", overrides: {} };
   const tables = templateGroup.tables.map((table) => renderEntryMorphologyOverrideTable(table, group, entry)).join("");
   return `
-    <section class="entry-morphology-group-card" data-template-group-id="${escapeHtml(templateGroup.id)}" data-emorph-id="${escapeHtml(group.id)}">
+    <section class="entry-morphology-group-card" data-template-group-id="${escapeHtml(templateGroup.id)}">
       <div class="entry-morphology-group-heading">
         <div>
           <strong>${escapeHtml(templateGroup.name)}</strong>
@@ -7765,7 +7737,6 @@ function collectMorphologyEntryState(host, entry = {}) {
       overrides[tableId][input.dataset.morphologyOverride] = value;
     });
     return {
-      id: card.dataset.emorphId || uniqueDictionaryEntityId("emorph", activeDictionary()),
       templateGroupId: card.dataset.templateGroupId,
       title: card.querySelector('[data-field="entryMorphologyTitle"]')?.value.trim() || "",
       notes: card.querySelector('[data-field="entryMorphologyNotes"]')?.value.trim() || "",
@@ -7776,7 +7747,7 @@ function collectMorphologyEntryState(host, entry = {}) {
   const morphologyGroups = morphologyMode === "auto"
     ? [...previous.filter((group) => !visibleGroups.some((visible) => visible.templateGroupId === group.templateGroupId)), ...visibleGroups]
     : visibleGroups;
-  return morphologyModel.normalizeEntryMorphologyState({ morphologyMode, morphologyGroups }, { reserveEntityId, usedIds: new Set() });
+  return morphologyModel.normalizeEntryMorphologyState({ morphologyMode, morphologyGroups });
 }
 
 async function toggleMorphologyEditorMode(host, entry = {}, { full = false } = {}) {
@@ -7792,8 +7763,6 @@ async function toggleMorphologyEditorMode(host, entry = {}, { full = false } = {
       activeDictionary(),
       {
         normalizeText: searchNormalizationModel.normalizeStructuralKey,
-        reserveEntityId,
-        usedIds: new Set(),
       },
     );
     renderMorphologyEntryControls(host, {
@@ -7965,7 +7934,6 @@ function entrySemanticSnapshot(entry = {}) {
     },
     morphologyMode: morphologyState.morphologyMode,
     morphologyGroups: morphologyState.morphologyGroups.map((group) => ({
-      id: String(group.id || ""),
       templateGroupId: String(group.templateGroupId || ""),
       title: String(group.title || "").trim(),
       notes: String(group.notes || "").trim(),
@@ -8553,7 +8521,6 @@ function renderIpaRuleList(container, rules) {
 function createIpaRuleCard(rule = normalizeIpaRule()) {
   const card = document.createElement("article");
   card.className = "ipa-rule-card";
-  card.dataset.ruleId = rule.id || uid("ipa");
   card.innerHTML = `
     <div class="ipa-rule-grid">
       <button class="ipa-rule-drag-handle" type="button" draggable="true" data-app-tooltip="always" aria-label="${escapeHtml(t("reorderIpaRule"))}">⋮⋮</button>
@@ -8581,14 +8548,12 @@ function ipaRuleInsertBefore(container, y) {
 
 function finishIpaRuleDrag() {
   elements.ipaMappingList.querySelector(".ipa-rule-card.dragging")?.classList.remove("dragging");
-  draggedIpaRuleId = "";
   renderIpaSandbox();
 }
 
 function collectIpaRuleList(container) {
   return [...container.querySelectorAll(".ipa-rule-card")]
     .map((card) => normalizeIpaRule({
-      id: card.dataset.ruleId || uid("ipa"),
       from: card.querySelector('[data-field="from"]').value.trim(),
       to: card.querySelector('[data-field="to"]').value.trim(),
       before: card.querySelector('[data-field="before"]').value.trim(),
@@ -11794,7 +11759,7 @@ elements.entryDisplay.addEventListener("click", async (event) => {
     const current = collectMorphologyEntryState(host, entry);
     const selected = host?.querySelector('[data-field="addMorphologyGroup"]')?.value || "";
     if (selected && !current.morphologyGroups.some((group) => group.templateGroupId === selected)) {
-      current.morphologyGroups.push({ id: uniqueDictionaryEntityId("emorph", activeDictionary()), templateGroupId: selected, title: "", notes: "", overrides: {} });
+      current.morphologyGroups.push({ templateGroupId: selected, title: "", notes: "", overrides: {} });
     }
     current.morphologyMode = "manual";
     renderMorphologyEntryControls(host, { ...entry, ...current });
@@ -12148,7 +12113,7 @@ elements.entryMorphologyControls.addEventListener("click", async (event) => {
   const current = collectMorphologyEntryState(elements.entryMorphologyControls, baseEntry);
   const selected = elements.entryMorphologyControls.querySelector('[data-field="addMorphologyGroup"]')?.value || "";
   if (selected && !current.morphologyGroups.some((group) => group.templateGroupId === selected)) {
-    current.morphologyGroups.push({ id: uniqueDictionaryEntityId("emorph", activeDictionary()), templateGroupId: selected, title: "", notes: "", overrides: {} });
+    current.morphologyGroups.push({ templateGroupId: selected, title: "", notes: "", overrides: {} });
   }
   current.morphologyMode = "manual";
   renderMorphologyEntryControls(elements.entryMorphologyControls, { ...baseEntry, ...current }, { full: true });
@@ -12623,14 +12588,13 @@ elements.ipaMappingList.addEventListener("dragstart", (event) => {
     event.preventDefault();
     return;
   }
-  draggedIpaRuleId = card.dataset.ruleId || "";
   card.classList.add("dragging");
   event.dataTransfer.effectAllowed = "move";
-  event.dataTransfer.setData("text/plain", draggedIpaRuleId);
+  event.dataTransfer.setData("text/plain", "ipa-rule");
 });
 elements.ipaMappingList.addEventListener("dragover", (event) => {
   const dragging = elements.ipaMappingList.querySelector(".ipa-rule-card.dragging");
-  if (!dragging || !draggedIpaRuleId) {
+  if (!dragging) {
     return;
   }
   event.preventDefault();

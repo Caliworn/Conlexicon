@@ -592,7 +592,6 @@ function checkModelNormalization() {
     tags: ["n"],
     morphologyMode: "auto",
     morphologyGroups: [{
-      id: "emorph-auto-overlay",
       templateGroupId: "morph-auto",
       title: "Irregular auto group",
       notes: "Entry-specific note",
@@ -622,7 +621,7 @@ function checkModelNormalization() {
       ...autoOverlayEntry,
       morphologyGroups: [
         ...autoOverlayEntry.morphologyGroups,
-        { id: "emorph-dormant", templateGroupId: "morph-manual", notes: "keep dormant", overrides: {} },
+        { templateGroupId: "morph-manual", notes: "keep dormant", overrides: {} },
       ],
     }, canonicalMorphologyDictionary).map((group) => group.templateGroupId),
     ["morph-auto", "morph-manual"],
@@ -632,7 +631,7 @@ function checkModelNormalization() {
       lemma: "root",
       tags: ["n"],
       morphologyMode: "manual",
-      morphologyGroups: [{ id: "emorph-manual", templateGroupId: "morph-manual" }],
+      morphologyGroups: [{ templateGroupId: "morph-manual" }],
     }, canonicalMorphologyDictionary).map(({ templateGroup }) => templateGroup.id),
     ["morph-manual"],
   );
@@ -649,8 +648,8 @@ function checkModelNormalization() {
     morphologyModel.normalizeEntryMorphologyState({
       morphologyMode: "auto",
       morphologyGroups: [
-        { id: "empty-overlay", templateGroupId: "morph-auto" },
-        { id: "real-overlay", templateGroupId: "morph-manual", notes: "keep" },
+        { templateGroupId: "morph-auto" },
+        { templateGroupId: "morph-manual", notes: "keep" },
       ],
     }).morphologyGroups.map((group) => group.templateGroupId),
     ["morph-manual"],
@@ -659,7 +658,6 @@ function checkModelNormalization() {
     morphologyModel.validateCanonicalEntryMorphology({
       morphologyMode: "auto",
       morphologyGroups: [{
-        id: "invalid-override",
         templateGroupId: "morph-auto",
         overrides: { "mtable-auto": { "1,0": "out of range" } },
       }],
@@ -669,9 +667,19 @@ function checkModelNormalization() {
   assert.deepEqual(
     morphologyModel.validateCanonicalEntryMorphology({
       morphologyMode: "manual",
-      morphologyGroups: [{ id: "invalid-group", templateGroupId: "auto" }],
+      morphologyGroups: [{ templateGroupId: "auto" }],
     }, canonicalMorphologyDictionary),
     ["invalid morphology template group: auto"],
+  );
+  assert.deepEqual(
+    morphologyModel.validateCanonicalEntryMorphology({
+      morphologyMode: "manual",
+      morphologyGroups: [
+        { templateGroupId: "morph-manual" },
+        { templateGroupId: "morph-manual", notes: "duplicate" },
+      ],
+    }, canonicalMorphologyDictionary),
+    ["duplicate entry morphology group: morph-manual"],
   );
   const migratedLegacyMorphology = migrateLegacyDictionary({
     morphology: canonicalMorphologyDictionary.morphology,
@@ -686,7 +694,7 @@ function checkModelNormalization() {
         id: "legacy-manual",
         lemma: "root",
         tags: ["n"],
-        morphology: { tableId: "morph-manual", overrides: { "0,0": "root-manual" } },
+        morphology: { id: "emorph-legacy", tableId: "morph-manual", overrides: { "0,0": "root-manual" } },
       },
       {
         id: "legacy-none",
@@ -708,6 +716,7 @@ function checkModelNormalization() {
     migratedLegacyMorphology[1].morphologyGroups[0].overrides,
     { "mtable-manual": { "0,0": "root-manual" } },
   );
+  assert.equal(Object.hasOwn(migratedLegacyMorphology[1].morphologyGroups[0], "id"), false);
   assert.equal(Object.hasOwn(migratedLegacyMorphology[0], "morphology"), false);
 
   const normalized = normalizeDictionary({
@@ -775,7 +784,7 @@ function checkModelNormalization() {
       },
     ],
     settings: {
-      ipa: { stressMappings: [{ from: "a", to: "a" }] },
+      ipa: { stressMappings: [{ id: "ipa-legacy", from: "a", to: "a" }] },
       toolNavOrder: ["editor", "morphology", "settings"],
       glossFontFamily: "sans",
       corpusGlossAlign: false,
@@ -794,6 +803,7 @@ function checkModelNormalization() {
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.entries[0], "roots"), false);
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.entries[0].etymology, "sourceEntryId"), false);
   assert.equal(legacyConvertedImport.dictionary.settings.ipa.mappings[0].to, "ˈa");
+  assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings.ipa.mappings[0], "id"), false);
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings.ipa, "stressMappings"), false);
   assert.equal(legacyConvertedImport.dictionary.settings.glossStyles.gla.fontFamily, "sans");
   assert.equal(legacyConvertedImport.dictionary.settings.corpusUnitCardGlossAlign, false);
@@ -805,6 +815,26 @@ function checkModelNormalization() {
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "tagFuzzySearch"), false);
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "sourceFuzzyCompletion"), false);
   assert.equal(legacyConvertedImport.dictionary.settings.search.fields.lemma.enabled, true);
+
+  const migratedIpaRuleIds = migrateLegacyDictionary({
+    settings: { ipa: { mappings: [{ id: "ipa-old", from: "b", to: "p" }] } },
+  }).dictionary.settings.ipa.mappings;
+  assert.deepEqual(migratedIpaRuleIds, [{ from: "b", to: "p" }]);
+
+  const obsoleteChildIds = migrateLegacyDictionary({
+    id: "dict-obsolete-child-ids",
+    morphology: canonicalMorphologyDictionary.morphology,
+    entries: [{
+      id: "shared-obsolete-id",
+      lemma: "legacy",
+      morphologyMode: "manual",
+      morphologyGroups: [{ id: "shared-obsolete-id", templateGroupId: "morph-manual" }],
+    }],
+    settings: { ipa: { mappings: [{ id: "shared-obsolete-id", from: "a", to: "b" }] } },
+  }).dictionary;
+  assert.equal(Object.hasOwn(obsoleteChildIds.entries[0].morphologyGroups[0], "id"), false);
+  assert.equal(Object.hasOwn(obsoleteChildIds.settings.ipa.mappings[0], "id"), false);
+  assert.doesNotThrow(() => assertUniqueDictionaryEntityIds(normalizeDictionary(obsoleteChildIds)));
   assert.equal(legacyConvertedImport.dictionary.settings.search.fields.lemma.fuzzy, true);
   assert.equal(legacyConvertedImport.dictionary.settings.search.etymologyAutocomplete.fuzzy, true);
   assert.equal(legacyConvertedImport.dictionary.entries[1].definitions[0].note, "legacy definition note");
@@ -866,7 +896,7 @@ function checkModelNormalization() {
     () => {
       const duplicate = normalizeDictionary({
         entries: [{ id: "shared-cross-type-id", lemma: "a" }],
-        settings: { ipa: { mappings: [{ id: "shared-cross-type-id", from: "a", to: "b" }] } },
+        settings: { ipa: { mappings: [{ from: "a", to: "b" }] } },
         morphology: { templateGroups: [{ id: "shared-cross-type-id", name: "A", tables: [] }] },
         corpus: { units: [{ id: "shared-cross-type-id", content: "x" }] },
       });
@@ -907,17 +937,6 @@ function checkModelNormalization() {
     (error) => error.status === 409,
   );
 
-  assert.throws(
-    () => {
-      const duplicate = normalizeDictionary({
-        entries: [{ id: "shared-ipa-id", lemma: "a" }],
-        settings: { ipa: { mappings: [{ id: "shared-ipa-id", from: "a", to: "b" }] } },
-      });
-      assertUniqueDictionaryEntityIds(duplicate);
-    },
-    (error) => error.status === 409,
-  );
-
   withPatchedRandomUUID(["collision", "fresh"], () => {
     const normalized = normalizeDictionary({
       id: "dict-static",
@@ -941,14 +960,11 @@ function checkModelNormalization() {
     assert.equal(normalized.morphology.templateGroups[0].id, "morph-fresh");
   });
 
-  withPatchedRandomUUID(["collision", "fresh"], () => {
-    const normalized = normalizeDictionary({
-      id: "dict-static",
-      entries: [{ id: "ipa-collision", lemma: "a" }],
-      settings: { ipa: { mappings: [{ from: "a", to: "b" }] } },
-    });
-    assert.equal(normalized.settings.ipa.mappings[0].id, "ipa-fresh");
+  const textOnlyIpa = normalizeDictionary({
+    id: "dict-static",
+    settings: { ipa: { mappings: [{ from: "a", to: "b" }] } },
   });
+  assert.deepEqual(textOnlyIpa.settings.ipa.mappings, [{ from: "a", to: "b", before: "", after: "" }]);
 }
 
 async function checkReadApiConsistency(repository) {
@@ -1005,7 +1021,6 @@ async function checkReadApiConsistency(repository) {
         definitions: [{ id: "def-beta", meaning: "movement" }],
         etymology: { sources: ["alpha"], description: "" },
         morphologyGroups: [{
-          id: "emorph-beta",
           templateGroupId: "morph-n-group",
           overrides: { "mtable-n-main": { "0,0": "manual-beta-form" } },
         }],
@@ -1480,13 +1495,11 @@ async function runRepositoryContractTests(options = {}) {
         409,
         "entry save rejects conflicts in saved scope",
       );
-      await assertRejectStatus(
-        callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(legacyDuplicateId)}/settings/ipa`, {
-          mappings: [{ id: "entry-legacy-ok", from: "a", to: "b" }],
-        }),
-        409,
-        "IPA save rejects conflicts in saved scope",
-      );
+      apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(legacyDuplicateId)}/settings/ipa`, {
+        mappings: [{ from: "a", to: "b" }],
+      });
+      assert.equal(apiResult.statusCode, 200);
+      assert.deepEqual(apiResult.body.settings.ipa.mappings[0], { from: "a", to: "b", before: "", after: "" });
       await repository.deleteDictionary(legacyDuplicateId);
     }
 
@@ -1529,7 +1542,7 @@ async function runRepositoryContractTests(options = {}) {
         id: "dict-cross-type-import",
         name: "Cross Type Import",
         entries: [{ id: "shared-import-id", lemma: "a" }],
-        settings: { ipa: { mappings: [{ id: "shared-import-id", from: "a", to: "b" }] } },
+        settings: { ipa: { mappings: [{ from: "a", to: "b" }] } },
         morphology: { templateGroups: [{ id: "shared-import-id", name: "A", tables: [] }] },
         corpus: { units: [{ id: "shared-import-id", content: "x" }] },
       })),

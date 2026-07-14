@@ -173,7 +173,6 @@ function buildMorphologyTestDictionary() {
         notes: "",
         morphologyMode: "auto",
         morphologyGroups: [{
-          id: fixtureId("emorph", 1),
           templateGroupId: nounGroupId,
           title: "Irregular noun paradigm",
           notes: "The accusative is suppletive in this entry.",
@@ -193,14 +192,12 @@ function buildMorphologyTestDictionary() {
         morphologyMode: "manual",
         morphologyGroups: [
           {
-            id: fixtureId("emorph", 2),
             templateGroupId: adjectiveGroupId,
             title: "Borrowed degree forms",
             notes: "A manual group can ignore the entry's part of speech.",
             overrides: {},
           },
           {
-            id: fixtureId("emorph", 3),
             templateGroupId: nounGroupId,
             title: "",
             notes: "",

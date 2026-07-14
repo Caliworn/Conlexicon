@@ -53,8 +53,13 @@ async function runSqliteSchemaCheck() {
     ["entry_id", "position", "tag"].forEach((column) => assert.equal(entryTagColumns.has(column), true, `missing entry_tags column: ${column}`));
     assert.equal(entryTagColumns.has("normalized_tag"), false);
     const entryMorphologyGroupColumns = new Set(db.prepare("PRAGMA table_info(entry_morphology_groups)").all().map((row) => row.name));
-    ["id", "entry_id", "position", "template_group_id", "title", "notes", "created_at", "updated_at"]
+    ["entry_id", "position", "template_group_id", "title", "notes", "created_at", "updated_at"]
       .forEach((column) => assert.equal(entryMorphologyGroupColumns.has(column), true, `missing entry morphology group column: ${column}`));
+    assert.equal(entryMorphologyGroupColumns.has("id"), false);
+    const entryMorphologyOverrideColumns = new Set(db.prepare("PRAGMA table_info(entry_morphology_cell_overrides)").all().map((row) => row.name));
+    ["entry_id", "template_group_id", "template_table_id", "row_index", "column_index", "value"]
+      .forEach((column) => assert.equal(entryMorphologyOverrideColumns.has(column), true, `missing entry morphology override column: ${column}`));
+    assert.equal(entryMorphologyOverrideColumns.has("entry_morphology_group_id"), false);
 
     const sourceDictionary = sampleSqliteDictionary();
     await repository.importDictionarySnapshot(sourceDictionary);
@@ -145,7 +150,7 @@ async function runSqliteSchemaCheck() {
     assert.equal(projectedTemplateTable.rowCount, 2);
     assert.equal(projectedTemplateTable.columnCount, 2);
     const projectedMorphologyGroup = roundtripDb.prepare(`
-      SELECT id, template_group_id AS templateGroupId, notes
+      SELECT entry_id AS entryId, template_group_id AS templateGroupId, notes
       FROM entry_morphology_groups
       WHERE entry_id = 'entry-root'
       ORDER BY position ASC
@@ -155,8 +160,8 @@ async function runSqliteSchemaCheck() {
     const projectedOverride = roundtripDb.prepare(`
       SELECT template_table_id AS templateTableId, row_index AS rowIndex, column_index AS columnIndex, value
       FROM entry_morphology_cell_overrides
-      WHERE entry_morphology_group_id = ?
-    `).get(projectedMorphologyGroup.id);
+      WHERE entry_id = ? AND template_group_id = ?
+    `).get(projectedMorphologyGroup.entryId, projectedMorphologyGroup.templateGroupId);
     assert.equal(projectedOverride.rowIndex, 0);
     assert.equal(projectedOverride.columnIndex, 0);
     assert.equal(projectedOverride.value, "root-form");
@@ -167,6 +172,7 @@ async function runSqliteSchemaCheck() {
     assert.equal(rebuiltEntry.definitions[0].meaning, "root meaning");
     assert.equal(rebuiltEntry.morphologyGroups[0].templateGroupId, "morph-roundtrip");
     assert.equal(rebuiltEntry.morphologyGroups[0].notes, "Irregular plural retained for this entry.");
+    assert.equal(Object.hasOwn(rebuiltEntry.morphologyGroups[0], "id"), false);
     assert.equal(Object.hasOwn(rebuiltEntry, "morphology"), false);
   } finally {
     await cleanup();
