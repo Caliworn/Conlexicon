@@ -4,6 +4,8 @@
 
 ## New
 
+## 2026-07-16
+
 ### 改进
 
 - 搜索 S3.1 建立统一的逐值检索 record 契约：共享搜索模型现在为每个词形、标签、义项、备注和词源值保留字段及来源定位，现有 JavaScript matcher 也复用同一边界；SQLite 静态 projection 与 API `searchHits` 的后续结构和失效范围已同步写入契约文档。
