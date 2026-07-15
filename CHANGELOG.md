@@ -13,7 +13,7 @@
 
 - 搜索 S3.2 新增无独立 ID 的 SQLite `entry_search_values` 派生表；导入、词条保存、批量 patch、删除以及相关搜索规范化/标签替换设置变化会事务性维护词形、IPA、标签、释义、例句、备注和词源 records。动态形态不写入该表。
 - 搜索 S3.3 将全部非模糊静态字段查询切换到 `entry_search_values`，覆盖 Unicode、NFC、case folding 和自定义等价规则，避免读取完整词典 snapshot。
-- 搜索 S4 新增独立、无实体 ID 的 `entry_morphology_search_values` 派生表，保存形态求值顺序、真实模板组/子表/单元格坐标及原始/规范化值；词条写入局部维护，形态配置或搜索规范化变化全量重建，删除外键级联。严格及 fuzzy 的形态单字段、静态字段和混合查询现在均直接读取两张 projection，并返回统一 `searchHits`，不再导出完整词典或逐词条动态生成形态。
+- 搜索 S4 新增独立、无实体 ID 的 `entry_morphology_search_values` 派生表，保存形态求值顺序、真实模板组/子表/单元格坐标及原始/规范化值；词条写入局部维护，形态配置或搜索规范化变化全量重建，删除外键级联。严格及 fuzzy 的形态单字段、静态字段和混合查询现在均直接读取两张 projection，并返回统一 `searchHits`，不再导出完整词典或逐词条动态生成形态。SQLite 连接通过确定性函数复用共享 fuzzy 评分；大型候选集顺序扫描 projection，避免大型 `IN (...)` 查询和全部 records 的 Node.js 物化。
 
 ## 2026-07-14
 

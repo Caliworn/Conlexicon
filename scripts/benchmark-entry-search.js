@@ -110,6 +110,7 @@ async function main() {
     const scenarios = [
       { key: "all-fields-fuzzy", fields: ENTRY_SEARCH_FIELD_KEYS, fuzzyFields: ENTRY_SEARCH_FIELD_KEYS },
       { key: "static-fields-fuzzy", fields: STATIC_SEARCH_FIELDS, fuzzyFields: STATIC_SEARCH_FIELDS },
+      { key: "morphology-fuzzy", fields: ["morphology"], fuzzyFields: ["morphology"] },
       { key: "static-fields-strict", fields: STATIC_SEARCH_FIELDS, fuzzyFields: [] },
       { key: "lemma-strict", fields: ["lemma"], fuzzyFields: [] },
     ];
