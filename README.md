@@ -94,6 +94,22 @@ For the focused frontend query-cache contract check, run:
 node scripts/check-query-page-cache.js
 ```
 
+For the backend runtime query-session cache and SQLite integration check, run:
+
+后端运行时查询会话及 SQLite 接线可通过以下命令检查：
+
+```bash
+node scripts/check-query-session-cache.js
+```
+
+To compare cold and repeated hot query-session performance against an existing SQLite test data directory, run:
+
+如需使用现有 SQLite 测试词典比较查询会话的冷查询与重复热查询性能，可运行：
+
+```bash
+node scripts/benchmark-query-session-cache.js --data /path/to/sqlite-data --query bdy --runs 5
+```
+
 ## Data Storage / 数据存储
 
 Dictionary data is stored locally under:

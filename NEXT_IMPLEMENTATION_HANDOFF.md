@@ -263,7 +263,7 @@ SQLite 已是默认主存储。真实 schema、当前状态审计和后续优化
 - 词源自动补全仍在前端当前词典快照上执行，复用 normalizer 和独立的 `etymologyAutocomplete.fuzzy` 开关，但尚未接入 `/entries` projection 与普通列表查询路径；若后续迁移，需保留其前缀优先和 fuzzy 分数排序，而不能直接复用按 lemma 排序的普通列表响应。
 - 搜索 S3.1/S3.2/S3.3 已完成逐值 projection 契约、静态写入和查询接线：`entry-search-model.entrySearchValueRecords()` 为词形、IPA、原始/显示标签、各义项释义/例句/备注、词条备注、词源描述/来源和动态形态生成带 `field + sourceType/sourceId/sourcePosition + valueType` 的独立 records，现有 matcher 也从同一 records 聚合字段值。SQLite `entry_search_values` 不分配实体 ID，写入词形、IPA、标签、释义、例句、备注和词源；导入、整库覆盖、单词条保存、批量 patch、删除级联以及规范化/标签替换设置变化均维护该 projection。非 fuzzy 静态查询直接读取 projection 并返回 `searchHits`，前端用其选择命中摘要。没有 schema 版本、旧 SQLite 回填或运行时兼容；测试库需从 JSON 重建。
 - 搜索 S4 已建立并查询 `entry_morphology_search_values`：共享 `morphologySearchValueRecords()` 输出真实模板组/子表/行列坐标与求值顺序，SQLite 只写非空原始值和规范化值。导入/整库覆盖、形态模块保存和搜索规范化变化全量重建；词条保存/patch 局部重建；删除通过外键级联；标签显示替换不会误触发形态重建。该表不进入 JSON，未加入 schema 版本或旧库兼容。10k 形态压力词典验收生成 115872 条 records，覆盖 9656 个实际命中形态组的词条，完整 JSON 导入连同全部 SQLite projection 构建约 2737ms。严格及 fuzzy 的形态单字段、静态字段和混合查询均已读取两张 projection；fuzzy 通过连接级确定性函数复用共享评分。`limit=10000`、7 轮独立进程基准中，`body` 的全字段/静态字段 fuzzy 约 251ms/162ms，`bdy` 约 251ms/159ms，形态 fuzzy-only 的 `qna` 约 218ms。fuzzy 仍线性扫描 records，下一阶段是否增加真正候选索引应由真实词典基准决定。
-- 读取稳定性第一批已完成：搜索输入采用 250ms debounce（连续输入会重置计时），请求 ID 会丢弃过期响应，SQLite 排序使用 ID 作为最终稳定键；普通列表和词根模式遇到 `pageInfo.hasMore` 时显示最小截断提示。当前仍是单次大 `limit` 的过渡方案，不等于真正的数据窗口化。
+- 读取稳定性第一批已完成：搜索输入采用 250ms debounce（连续输入会重置计时），请求 ID 会丢弃过期响应，SQLite 排序使用 ID 作为最终稳定键；普通列表和词根模式遇到 `pageInfo.hasMore` 时显示最小截断提示。查询缓存 Q1/Q2 也已完成前端紧凑 LRU 和后端 fuzzy/root-groups 运行时会话，但当前仍是单次大 `limit` 的过渡方案，不等于真正的数据窗口化。
 
 当前前端数据分析已采用按需切片构建和 slice cache。现阶段缓存上限为 24 条 slice 结果，只是防止搜索词、排序、语言或词典版本变化导致缓存无限增长的临时小容量策略，不是长期语义约束。API 化数据分析后，应由 repository/SQLite 索引、服务端 query planner 或更明确的缓存键替代这类前端临时缓存。
 
@@ -528,7 +528,7 @@ lib/
 2. 确认当前分支、工作树和最新提交；如果有未提交改动，先判断归属，不要默认回滚。
 3. 默认后端已经是 SQLite。若涉及启动/存储，先跑 SQLite schema、repository contract 或目标功能的定向检查；只有改动 legacy/debug 边界时才需要额外验证显式 JSON 模式。
 4. 若继续阶段 B，优先处理默认 SQLite 后的清债项：
-   - 查询缓存 Q1 已完成前端紧凑 LRU、in-flight 合并、facets 轻量 key 和词典级失效。下一步按 `QUERY_SESSION_CACHE_PLAN.md` 的 Q2 为 fuzzy entries 和 root groups 增加后端运行时查询会话。
+   - 查询缓存 Q1/Q2 已完成前端紧凑 LRU、后端运行时会话、in-flight 合并和词典级 generation 失效。下一步按 `QUERY_SESSION_CACHE_PLAN.md` 的 Q3 收窄列表 DTO、按需加载词条详情，并拆开折叠词根组与衍生词加载。
    - 先让词条列表直接消费 summary DTO、按需加载详情，并把折叠词根组与衍生词加载拆开；之后再推进纯滚动数据窗口化，保留虚拟滚动和准确的 `hasMore/total` 语义。
    - 将带搜索条件的词根模式、高级筛选等剩余本地/完整 snapshot 路径接到可序列化查询契约；候选索引是否采用 FTS/ngram 由真实基准决定。
    - 形态学结构化存储已完成；DSL v2、表格结构编辑与 layout 设计暂缓，除明确 bug 外不要继续扩展其 schema。数据分析升级时删除 `app.js` 的旧形态单表适配，改为直接调用共享 morphology model。

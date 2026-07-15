@@ -266,13 +266,25 @@ query kind
 - 现有 `requestId` 继续保护 UI 提交；有效迟到响应可以写入缓存，写入成功、词典覆盖或删除会按词典失效。
 - 本阶段没有改变 API 和 cursor。
 
-### Q2：后端会话缓存基础设施
+### Q2：后端会话缓存基础设施（已完成）
 
-- 新建独立运行时 `QuerySessionCache`，不放入 SQLite schema。
-- 先接 fuzzy entries、无搜索 root groups、搜索 root groups。
-- session 保存完整 descriptor、有序身份和 cache generation；不保存完整词条。
-- repository 写事务成功后递增运行时 generation，并统一调用按词典失效。
-- 增加 hit/miss 和无缓存一致性检查。
+- 已新增独立运行时 `QuerySessionCache`，不进入 SQLite schema、词典导出或持久化 revision。
+- fuzzy entries 缓存排序后的命中词条 ID；无搜索和搜索 root groups 缓存根/衍生关系 ID。summary/full 页面仍按需从 SQLite 重建。
+- descriptor 统一规范化字段、fuzzy 字段、标签和排序，并排除 `cursor`、`limit`、`include`；无查询文本的 root groups 也会忽略无效的字段搜索选项。
+- 当前每词典最多 8 个会话、全局约 64 MiB、idle TTL 2 分钟；支持 LRU、超大单项跳过、同 key in-flight 合并和开发期统计。
+- repository 的词条、模块、metadata、完整导入/覆盖和词典删除只在成功写入后递增运行时 generation 并按词典失效；空 patch 和失败写入不失效。
+- 当前 API 与 offset cursor 未改变；可重建版本化 cursor 留在 Q4。
+
+2026-07-16 使用 10k 形态压力词典、查询 `bdy`、5 次热查询的基准如下。热查询仍包含当前页 SQLite DTO 和 `searchHits` 重建成本：
+
+| 场景 | 冷查询 | 热查询中位数 | 约提升 |
+| --- | ---: | ---: | ---: |
+| fuzzy entries，返回 1045 条 | 789.18ms | 93.81ms | 8.4× |
+| fuzzy entries，100 条窗口 | 192.37ms | 11.51ms | 16.7× |
+| 无搜索 root groups，返回 2000/8147 组 | 6180.75ms | 42.09ms | 146.8× |
+| fuzzy root groups，返回 1066 组 | 2962.72ms | 26.46ms | 112.0× |
+
+该结果证明会话复用有效，同时暴露两个后续边界：无搜索 root groups 的首次构建仍约 6.2 秒，必须继续下推/优化；大页面 fuzzy entries 的热查询仍约 94ms，主要成本已经转为页面 DTO 和命中详情重建，适合由 Q3/Q4 的小窗口与按需详情继续收窄。
 
 ### Q3：列表 DTO、按需详情与词根组边界
 

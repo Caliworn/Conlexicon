@@ -2,7 +2,7 @@
 
 本文记录 Conlexicon 当前本地 HTTP API 的稳定约定。它描述前端可依赖的接口边界，而不是底层存储实现；后端默认使用 SQLite repository，也可通过 `CONLEXICON_REPOSITORY=json` 显式启动 legacy/debug JSON repository，但前端不应直接依赖文件结构。SQLite 后端设计见 `SQLITE_BACKEND_PLAN.md`；JSON 兼容导入/导出和迁移设计见 `SQLITE_MIGRATION_PLAN.md`。
 
-查询会话和结果缓存当前仍处于设计阶段；缓存身份、失效和未来 session cursor 约定见 `QUERY_SESSION_CACHE_PLAN.md`。在对应阶段实装前，本文件下述现有 cursor 契约不变。
+查询缓存 Q1/Q2 已实装前端紧凑页面缓存和后端运行时查询会话；缓存身份、失效和未来 session cursor 约定见 `QUERY_SESSION_CACHE_PLAN.md`。当前 API 响应与 offset cursor 契约仍保持不变。
 
 ## 通用约定
 
@@ -226,7 +226,7 @@ GET /api/dictionaries/:id/entries?q=&fields=&fuzzyFields=&part=&tags=&tagMode=&s
 
 前端普通词条列表当前直接使用该 API 返回的顺序；请求失败时显示失败状态。现阶段为避免未接入列表窗口化前截断 1k/10k 压测词典，前端会请求较大的 `limit`，后端临时上限为 10000；若后端仍返回 `pageInfo.hasMore: true`，普通列表与词根模式会在当前结果末尾显示已加载数量提示。后续进入真正分页/窗口化后，应降低单次请求规模并用 `cursor` 拉取窗口，不应恢复前端本地全量筛选作为运行期兜底。
 
-当前搜索输入采用 250ms debounce，连续输入会重置计时；前端用递增请求 ID 忽略迟到的旧响应。后端所有排序以词条 ID 作为最终稳定键，避免同词形或同时间记录跨分页边界漂移。这些只解决请求稳定性，不等同于查询会话缓存或真正的数据窗口化。
+当前搜索输入采用 250ms debounce，连续输入会重置计时；前端用递增请求 ID 忽略迟到的旧响应。后端所有排序以词条 ID 作为最终稳定键，避免同词形或同时间记录跨分页边界漂移。SQLite repository 会为 fuzzy entries、无搜索 root groups 和搜索 root groups 缓存运行时有序身份；页面 DTO 仍按请求从 SQLite 重建。该缓存不改变响应结构和现有 cursor，也不等同于真正的数据窗口化。
 
 返回：
 
