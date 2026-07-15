@@ -2,6 +2,8 @@
 
 本文记录 Conlexicon 当前本地 HTTP API 的稳定约定。它描述前端可依赖的接口边界，而不是底层存储实现；后端默认使用 SQLite repository，也可通过 `CONLEXICON_REPOSITORY=json` 显式启动 legacy/debug JSON repository，但前端不应直接依赖文件结构。SQLite 后端设计见 `SQLITE_BACKEND_PLAN.md`；JSON 兼容导入/导出和迁移设计见 `SQLITE_MIGRATION_PLAN.md`。
 
+查询会话和结果缓存当前仍处于设计阶段；缓存身份、失效和未来 session cursor 约定见 `QUERY_SESSION_CACHE_PLAN.md`。在对应阶段实装前，本文件下述现有 cursor 契约不变。
+
 ## 通用约定
 
 - 所有业务 API 位于 `/api/` 下。

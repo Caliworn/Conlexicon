@@ -2,6 +2,8 @@
 
 本文记录 Conlexicon 当前 SQLite 数据层的真实状态与后续设计。它用于说明已稳定的 API 边界，以及哪些 JSON 专用优化不应再继续加码。正式迁移、JSON 兼容导入/导出和 export profile 的设计见 `SQLITE_MIGRATION_PLAN.md`。
 
+运行时查询会话、结果缓存、失效边界及其与后续数据窗口化的关系见 `QUERY_SESSION_CACHE_PLAN.md`。
+
 ## 1. 目标
 
 - SQLite 已是正式运行期主存储，而不是 JSON 文件的旁路缓存。
@@ -441,8 +443,8 @@ POST /api/dictionaries/:id/diagnostics/fix
 
 SQLite repository 的核心读写、schema、迁移脚本和 smoke 已经落地，`server.js` 已默认使用 SQLite；静态和形态搜索 projection 也已进入主查询路径。当前优先级是读取稳定性与剩余查询下推：
 
-1. 在已完成的 150ms 输入防抖、过期响应保护、确定性排序和 `hasMore` 提示之上，建立查询会话/结果缓存。
-2. 推进纯滚动数据窗口化、列表 DTO 和按需词条详情，停止依赖一次性 `limit=10000` 作为长期方案。
+1. 按 `QUERY_SESSION_CACHE_PLAN.md`，在已完成的 150ms 输入防抖、过期响应保护、确定性排序和 `hasMore` 提示之上，先做前端紧凑查询缓存与请求合并，再接入选择性的后端运行时会话。
+2. 先让列表直接消费 summary DTO、详情按需读取，并拆开折叠词根组与衍生词加载；随后推进纯滚动数据窗口化，停止依赖一次性 `limit=10000` 作为长期方案。
 3. 将带搜索条件的 root groups、高级筛选、数据分析和质量检查逐步接入查询 API/query planner。
 4. 候选索引是否采用 FTS/ngram 由真实词典基准决定；语料 SQL 化留到语料升级阶段。
 5. JSON repository 仅维持 legacy/debug、导入迁移来源和必要参考价值，不同步新增普通功能。
@@ -556,8 +558,8 @@ CREATE TABLE entry_morphology_search_values (
 
 按当前依赖关系建议依次处理：
 
-1. 建立查询会话/结果缓存，并继续用真实 10k 词典观察 projection 扫描和重复请求成本。
-2. 实装纯滚动的数据窗口化，随后收窄列表 DTO 并按需读取词条详情。
+1. 按 `QUERY_SESSION_CACHE_PLAN.md` 先建立前端紧凑查询缓存与请求合并，再为 fuzzy entries 和 root groups 建立后端运行时会话；继续用真实 10k 词典观察 projection 扫描和重复请求成本。
+2. 先收窄列表 DTO、按需读取词条详情并拆分词根组子项加载，再实装纯滚动的数据窗口化。
 3. 将带搜索条件的 `queryRootGroups()`、高级筛选等剩余完整 snapshot/共享 JS 路径推进到查询层。
 4. 把数据分析和质量检查推进为按需 API + query planner，而不是前端基于完整 snapshot 重算。
 5. 仅在基准表明确认线性扫描成为主要瓶颈后，再选择 FTS、ngram 或其他候选索引。
