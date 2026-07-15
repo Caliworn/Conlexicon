@@ -29,17 +29,17 @@
 
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/state` | 读取轻量应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme }` | `dictionaries` 可只包含词典 metadata 和 `summary.entryCount/rootCount`；前端启动后会按需读取当前词典完整快照。JSON repository 目前仍可返回完整词典。 |
+| `GET` | `/api/state` | 读取轻量应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme }` | 主路径的 `dictionaries` 只包含 metadata 和 `summary.entryCount/rootCount`；前端始终把它当轻量索引，并按需读取当前词典快照。legacy/debug 实现即使返回额外字段，前端也不依赖。 |
 | `PUT` | `/api/preferences` | 保存全局界面偏好 | `{ uiLanguage, uiTheme }` | 目前支持 `uiLanguage` 和 `uiTheme`。 |
 
 ### 导入、导出与词典生命周期
 
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/export?dictionaryId=&format=&profile=` | 导出数据 | 当前支持 JSON 完整词典 payload | 默认 `format=json&profile=legacy-json`；`profile=portable-json` 当前仍输出兼容完整 JSON，后续由转换服务扩展。 |
+| `GET` | `/api/export?dictionaryId=&format=&profile=` | 导出数据 | 当前支持 JSON 完整词典 payload | 默认 `format=json&profile=legacy-json`；`profile=portable-json` 当前只是同结构兼容别名，不代表已有独立 portable 格式。原生 SQLite 与 XLSX 导出尚未实装。 |
 | `POST` | `/api/import?overwrite=&regenerateId=&profile=` | 导入 JSON | 应用状态 | 默认 `profile=legacy-json`；完整快照导入会通过转换服务执行 legacy 兼容解析、规范化和实体 ID 检查。 |
 | `POST` | `/api/dictionaries` | 新建词典 | 完整词典 JSON | 创建空词典，并设为当前词典。 |
-| `GET` | `/api/dictionaries/:id` | 读取完整词典快照 | 完整词典 JSON | 前端启动、切换当前词典和兼容旧完整状态逻辑时按需调用；普通列表、搜索和 facets 仍优先使用专用读取 API。 |
+| `GET` | `/api/dictionaries/:id` | 读取当前词典完整快照 | 完整词典 JSON | 前端启动或切换当前词典时按需加载详情与尚未拆出的模块；普通列表、搜索、facets 和关系查询优先使用专用读取 API。 |
 | `POST` | `/api/dictionaries/:id/activate` | 切换当前词典 | 应用状态 | 只改 `index.json` 中的当前词典。 |
 | `DELETE` | `/api/dictionaries/:id` | 删除词典 | 应用状态 | 删除词典文件并更新索引。 |
 
@@ -223,6 +223,8 @@ GET /api/dictionaries/:id/entries?q=&fields=&fuzzyFields=&part=&tags=&tagMode=&s
 - `include`：`summary` 或 `full`，默认 `summary`。
 
 前端普通词条列表当前直接使用该 API 返回的顺序；请求失败时显示失败状态。现阶段为避免未接入列表窗口化前截断 1k/10k 压测词典，前端会请求较大的 `limit`，后端临时上限为 10000；若后端仍返回 `pageInfo.hasMore: true`，普通列表与词根模式会在当前结果末尾显示已加载数量提示。后续进入真正分页/窗口化后，应降低单次请求规模并用 `cursor` 拉取窗口，不应恢复前端本地全量筛选作为运行期兜底。
+
+当前搜索输入采用 150ms debounce，连续输入会重置计时；前端用递增请求 ID 忽略迟到的旧响应。后端所有排序以词条 ID 作为最终稳定键，避免同词形或同时间记录跨分页边界漂移。这些只解决请求稳定性，不等同于查询会话缓存或真正的数据窗口化。
 
 返回：
 

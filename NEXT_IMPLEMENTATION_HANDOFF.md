@@ -31,7 +31,7 @@
 
 ### 阶段 B：数据访问层与索引（核心已完成）
 
-前端已通过 HTTP API 与具体文件读写解耦，SQLite 已是默认主存储。后续重点是全文/模糊/动态形态搜索索引、数据分析与质量检查的按需查询 API，以及语料库的独立 SQL 化；所有后续语料功能继续只依赖稳定 API，不直接依赖 JSON 或 SQLite。
+前端已通过 HTTP API 与具体文件读写解耦，SQLite 已是默认主存储。静态字段和动态形态的严格/fuzzy 搜索 projection 已接线；近期重点转为查询会话与结果缓存、纯滚动数据窗口化、列表 DTO 与按需词条详情、高级筛选/词根模式剩余查询下推，以及数据分析与质量检查的按需 API。所有后续语料功能继续只依赖稳定 API，不直接依赖 JSON 或 SQLite。
 
 ### 阶段 C：例句链接迁移
 
@@ -135,6 +135,7 @@ data-browser-state="expanded|collapsed|drawer"
 - 词条列表隐藏或抽屉关闭时触发跳转/保存后，会记录待聚焦词条，并在列表重新显示后滚动到当前词条。
 - 移动端抽屉打开时，通用确认弹窗层级高于抽屉。
 - 已抽查 320、480、768、1024、1440px 基础布局；320px 下抽屉筛选入口与未保存确认流程已抽查。
+- 主要页面区域、词条编辑/详情和筛选排序控件已有中英文无障碍名称；完整焦点陷阱、触摸替代和系统性无障碍验收仍属于 A+。
 - 阶段 A 收尾不包含阶段 A+ 的完整触摸、焦点陷阱和无障碍专项。
 
 ## 4A+. 触摸、焦点管理与无障碍专项（阶段 A 之后，暂不纳入阶段 A 收尾）
@@ -254,16 +255,15 @@ SQLite 已是默认主存储。真实 schema、当前状态审计和后续优化
 - 形态学结构化 schema 见 `SQLITE_BACKEND_PLAN.md` 5.4：模板组/子表/单元格/词条形态组/override 已 SQL 化；共享 `morphology-model` 已使用当前 `templateGroups` / `morphologyGroups` 结构，旧形态结构迁移集中在 `lib/legacy-dictionary-migration.js`。同一词条不能重复实例化同一模板组，`entry_morphology_groups` 以 `entry_id + template_group_id` 为组合主键，override 使用同一组合外键，不再分配 `emorph` UUID。`notes` 已作为词条实例备注接入 SQL、导入导出和详情展示；模板组 `notes` 不应出现在词条详情或词条编辑。SQLite 读取与导出已停止回吐旧 `morphology.tables` / `entry.morphology`；**形态表格**页面现按模板组编辑，支持可编辑的组标题、自动匹配标签、空组、组内多个子表、各级排序和独立的子表尺寸。词条完整/局部编辑已使用正式的词条级多组/多子表 override 视图。导航栏已拆为独立的**形态函数**与**形态表格**页面，前者单独保存函数配置，为 DSL 配置预留。旧 `leftV/rightV` 设置暂留 `module_blobs.morphology`，函数、集合和 DSL 源码后续不做函数级主表，生成结果、AST 和诊断只作为派生缓存或索引。
 - 词条形态已切换为 `morphologyMode: auto | manual`：`auto` 由自动规则决定模板组，`morphologyGroups` 仅作为按真实 `templateGroupId` 查找的 overlay；`manual` 按形态组 position 决定展示顺序，空列表即明确不使用形态。自动转手动会将当前自动结果按自动顺序实体化，并在其后保留 dormant overlay；手动转自动须确认并放弃手动配置。SQLite `entries.morphology_mode`、repository 读写、词条 API、共享解析和形态搜索均已接入。完整编辑和局部编辑已改为正式的多组/多子表 override 视图，支持标题 override、词条形态备注、自动 overlay、手动增删组与排序。**已知清债项：数据分析的旧形态统计仍在 `app.js` 通过临时派生的旧式 `morphology.tables` 视图和 `entry.morphology` 读取；它不参与持久化，但无法表达当前多组、多子表和 nested override 语义。后续升级数据分析（以及若质量检查未来加入形态规则时）必须改为直接调用 `morphology-model.resolveEntryMorphologyGroups()` / `morphologyCellValue()`，然后删除该临时视图和全部旧字段读取。**旧 JSON 的 `entry.morphology`、`templateGroupId: "auto"` / `"none"` 只在 `legacy-dictionary-migration` 导入阶段转换；核心模型、repository 与前端持久化路径不再解释旧字段。**不为既有 SQLite schema 写运行时迁移，旧 SQLite 测试库需从 JSON 重新导入。**后续可单独处理表格行列可视化编辑、结构操作下 override 坐标语义和自动分配 DSL。
 - 数据模型升级时只保证旧版本 JSON 能导入并转换成新格式；除非确有必要，不要为了旧前端数据形状额外维护临时兼容层。旧 JSON 字段迁移集中在 `lib/legacy-dictionary-migration.js`，核心 `dictionary-model` 只处理当前形状规范化。前端因新模型出问题时，优先修前端。
-- 搜索 FTS、数据分析/质量检查 API 化、语料 SQL 分表和产品内迁移向导都不是当前默认切换的阻断项。
-- 搜索字段配置已接入词条列表、词根模式、本地筛选、搜索摘要和搜索字段分析；读取 API 现在只接受 `fields` / `fuzzyFields`，旧 `fuzzy` / `tagFuzzy` 参数已删除。`scripts/benchmark-entry-search.js` 可将指定 JSON 词典临时导入 SQLite 后测量搜索模式。2026-07-12 对无形态模板的 10k 生成词典、查询 `body`、21 次交错样本的中位数为：全字段模糊 369ms、静态字段模糊 359ms、静态字段严格 294ms、仅词形严格 195ms。新增 `scripts/generate-morphology-stress-dictionary-10k.js` 后，对其 10k 词典的初测（`body`、3 次交错样本）为：全字段模糊 3578ms、静态字段模糊 362ms、静态字段严格 309ms、仅词形严格 210ms。该压力词典为每个词性配置 3×4 自动形态模板，并为约 1/29 词条加入单元格 override；结果确认动态形态生成是当前搜索主瓶颈。FTS/索引方案必须先解决 fuzzy 召回语义，不能直接替代当前模糊匹配；动态形态应继续作为显式启用的慢路径。
+- 搜索 projection 已完成第一轮 SQL 接线；候选索引、数据分析/质量检查 API 化、语料 SQL 分表和产品内迁移向导都不是当前 SQLite 主路径的阻断项。
+- 搜索字段配置已接入词条列表、词根模式、本地筛选、搜索摘要和搜索字段分析；读取 API 现在只接受 `fields` / `fuzzyFields`，旧 `fuzzy` / `tagFuzzy` 参数已删除。`scripts/benchmark-entry-search.js` 可将指定 JSON 词典临时导入 SQLite 后测量搜索模式；`scripts/generate-morphology-stress-dictionary-10k.js` 用于生成带 3×4 自动形态模板和少量 override 的 10k 压力词典。
 - `/entries` 的严格和 fuzzy 搜索均按所选字段读取静态 `entry_search_values` 与形态 `entry_morphology_search_values`，承接 ASCII、Unicode、NFC、case folding 和自定义等价规则，并只为当前页回读完整 `searchHits`。形态单字段和静态+形态混合查询均不再导出完整 snapshot 或逐词条动态生成形态；fuzzy 由连接级确定性函数复用共享评分语义。词根分组搜索读取相同配置并保持等价语义，但搜索型 root groups 仍是完整共享 JS 路径；关系分组键保持既有独立语义。
-- 该 SQL 路径已在带形态模板的临时 10k 压测词典上运行 `body`、7 轮交错样本：全字段模糊 1847.18ms、静态字段模糊 188ms、静态字段严格 84.69ms、仅词形严格 3.65ms（均为中位数）。此前静态严格约 309ms 的 3 轮初测不应作严格横向比较，但新路径已确认显著避开完整 snapshot 导出、形态重建和全条目 JavaScript 匹配；含形态的 fuzzy 路径仍是首要慢路径。
-- S3.3 完成后的 2026-07-15 同类 10k 基准（`body`、7 轮）为：全字段 fuzzy 1865.55ms、静态字段 fuzzy 137.31ms、静态字段严格 projection 144.96ms、仅词形严格 33.68ms；补充 3 轮显示全字段严格 1830.88ms、仅形态严格 1832.74ms、仅形态 fuzzy 1808.83ms。`bdy` 的静态 fuzzy 为 135.29ms，而含形态 fuzzy 为 1850.55ms。由此确认当前约 1.8 秒瓶颈来自逐词条动态形态求值，而非 fuzzy 评分；S4 不应先上 FTS/ngram。
 - `scripts/check-entry-search-consistency.js` 验证严格及 fuzzy 的静态/形态 projection 查询均不调用完整 snapshot，并覆盖逐值字段、命中定位、结构筛选、分页、`include=full`、NFC、Unicode case folding 和 PUA 自定义规则。
 - 搜索规范化 S2 已接线：`settings.search.normalization` 支持可选 NFC、Unicode 17 default case folding 和 `{ canonical, variants }[]` 自定义规则；默认严格关闭。词条列表、词根模式、搜索摘要/高亮、搜索字段分析和词源自动补全共用缓存的词典级 normalizer。精确高亮带原文范围映射，可处理 `ß → ss`、NFC 和自定义替换造成的长度变化。标签/词性/形态匹配等结构键不套用自由文本配置；词源关系与 `source_key` 继续保持既有匹配，留待稳定 ID 引用升级。S3.3 已让 SQLite 规范化检索 projection 承接全部非 fuzzy 静态查询；JSON repository 不同步该功能。
 - 词源自动补全仍在前端当前词典快照上执行，复用 normalizer 和独立的 `etymologyAutocomplete.fuzzy` 开关，但尚未接入 `/entries` projection 与普通列表查询路径；若后续迁移，需保留其前缀优先和 fuzzy 分数排序，而不能直接复用按 lemma 排序的普通列表响应。
 - 搜索 S3.1/S3.2/S3.3 已完成逐值 projection 契约、静态写入和查询接线：`entry-search-model.entrySearchValueRecords()` 为词形、IPA、原始/显示标签、各义项释义/例句/备注、词条备注、词源描述/来源和动态形态生成带 `field + sourceType/sourceId/sourcePosition + valueType` 的独立 records，现有 matcher 也从同一 records 聚合字段值。SQLite `entry_search_values` 不分配实体 ID，写入词形、IPA、标签、释义、例句、备注和词源；导入、整库覆盖、单词条保存、批量 patch、删除级联以及规范化/标签替换设置变化均维护该 projection。非 fuzzy 静态查询直接读取 projection 并返回 `searchHits`，前端用其选择命中摘要。没有 schema 版本、旧 SQLite 回填或运行时兼容；测试库需从 JSON 重建。
 - 搜索 S4 已建立并查询 `entry_morphology_search_values`：共享 `morphologySearchValueRecords()` 输出真实模板组/子表/行列坐标与求值顺序，SQLite 只写非空原始值和规范化值。导入/整库覆盖、形态模块保存和搜索规范化变化全量重建；词条保存/patch 局部重建；删除通过外键级联；标签显示替换不会误触发形态重建。该表不进入 JSON，未加入 schema 版本或旧库兼容。10k 形态压力词典验收生成 115872 条 records，覆盖 9656 个实际命中形态组的词条，完整 JSON 导入连同全部 SQLite projection 构建约 2737ms。严格及 fuzzy 的形态单字段、静态字段和混合查询均已读取两张 projection；fuzzy 通过连接级确定性函数复用共享评分。`limit=10000`、7 轮独立进程基准中，`body` 的全字段/静态字段 fuzzy 约 251ms/162ms，`bdy` 约 251ms/159ms，形态 fuzzy-only 的 `qna` 约 218ms。fuzzy 仍线性扫描 records，下一阶段是否增加真正候选索引应由真实词典基准决定。
+- 读取稳定性第一批已完成：搜索输入采用 150ms debounce（连续输入会重置计时），请求 ID 会丢弃过期响应，SQLite 排序使用 ID 作为最终稳定键；普通列表和词根模式遇到 `pageInfo.hasMore` 时显示最小截断提示。当前仍是单次大 `limit` 的过渡方案，不等于真正的数据窗口化。
 
 当前前端数据分析已采用按需切片构建和 slice cache。现阶段缓存上限为 24 条 slice 结果，只是防止搜索词、排序、语言或词典版本变化导致缓存无限增长的临时小容量策略，不是长期语义约束。API 化数据分析后，应由 repository/SQLite 索引、服务端 query planner 或更明确的缓存键替代这类前端临时缓存。
 
@@ -484,7 +484,7 @@ test/
 ```
 
 - 测试数据必须位于 `test/fixtures` 或临时目录。
-- repository 测试应对 JSON 和 SQLite 实现运行同一套契约测试。
+- SQLite repository 运行当前完整主契约；JSON repository 只保留 legacy 导入/转换、基础读取和显式调试所需的定向检查，不再要求同步新增主路径能力。
 - 迁移测试包含旧词典、部分迁移词典、重复 ID、悬空引用和重复父级。
 - API 测试验证事务失败后没有半保存状态。
 - 浏览器验收至少覆盖桌面、中等宽度和竖屏。
@@ -492,7 +492,7 @@ test/
 
 每阶段完成时至少执行：
 
-```powershell
+```bash
 node --check app.js
 node --check server.js
 git diff --check
@@ -502,21 +502,18 @@ git diff --check
 
 ## 9. 代码组织建议
 
-不要在第一步重写整个 `app.js`。优先以稳定边界增量拆分：
+不要一次性重写整个 `app.js`。现有后端模块集中在 `lib/`，继续沿已经形成的边界增量拆分：
 
 ```text
-server/
-  repositories/
-    dictionary-repository.js
-    json-dictionary-repository.js
-    sqlite-dictionary-repository.js
-  migrations/
-  search/
-
-client/
-  shell/
-  corpus/
-  gloss/
+lib/
+  sqlite-dictionary-repository.js
+  api-routes.js
+  dictionary-model.js
+  legacy-dictionary-migration.js
+  entry-search-model.js
+  morphology-model.js
+  analysis-model.js
+  quality-model.js
 ```
 
 - 后端 CommonJS 拆分风险较低，可以先进行。
@@ -529,10 +526,11 @@ client/
 
 1. 阅读 `AGENTS.md`、`API_CONTRACT.md`、本文、`CHANGELOG.md` 和当前 diff。
 2. 确认当前分支、工作树和最新提交；如果有未提交改动，先判断归属，不要默认回滚。
-3. 默认后端已经是 SQLite。若涉及启动/存储，先跑 `node scripts/check-default-repository.js`，确认默认 SQLite 和显式 JSON 回滚路径仍正常。
+3. 默认后端已经是 SQLite。若涉及启动/存储，先跑 SQLite schema、repository contract 或目标功能的定向检查；只有改动 legacy/debug 边界时才需要额外验证显式 JSON 模式。
 4. 若继续阶段 B，优先处理默认 SQLite 后的清债项：
-   - 继续减少前端对完整 snapshot 的依赖，普通保存路径不回到完整 `PUT /api/dictionaries/:id`。
-   - 为全文/fuzzy/动态形态搜索设计 FTS 或预计算搜索索引。
+   - 在现有 150ms debounce、过期响应保护和稳定排序基础上建立查询会话/结果缓存，避免相同查询重复扫描。
+   - 把普通词条列表推进到纯滚动的数据窗口化，再收窄列表 DTO 并按需加载词条详情；保留虚拟滚动和准确的 `hasMore/total` 语义。
+   - 将带搜索条件的词根模式、高级筛选等剩余本地/完整 snapshot 路径接到可序列化查询契约；候选索引是否采用 FTS/ngram 由真实基准决定。
    - 形态学结构化存储已完成；DSL v2、表格结构编辑与 layout 设计暂缓，除明确 bug 外不要继续扩展其 schema。数据分析升级时删除 `app.js` 的旧形态单表适配，改为直接调用共享 morphology model。
    - 将数据分析、质量检查推进为按需 API + query planner。
    - 评估语料库是否先拆为块/单元级 changeset，再决定何时 SQL 分表。

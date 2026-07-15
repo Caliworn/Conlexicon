@@ -18,7 +18,7 @@
 | Legacy JSON dictionary | 旧版 Conlexicon 直接存储和读取的 JSON 词典文件。 |
 | Normalized dictionary | 经过当前 `normalizeDictionary()` 的当前形状内存词典对象，只包含当前规范化、ID 补齐和当前语义校验。旧字段兼容应在进入 normalized dictionary 前完成。 |
 | Import adapter | 把某种外部格式解析成 normalized dictionary 或可诊断中间结构的模块。 |
-| Export profile | 从 canonical SQLite dictionary 生成某种导出格式的规则，例如 legacy JSON、portable JSON、compact JSON、XLSX。 |
+| Export profile | 从 canonical SQLite dictionary 生成某种导出格式的规则，例如 legacy JSON、SQLite 文件或 XLSX。 |
 | Migration report | 迁移或导入过程生成的结构化报告，记录成功项、警告、修复和失败原因。 |
 
 ## 3. 目标形态
@@ -50,14 +50,14 @@
   JSON / XLSX / other exchange formats
 ```
 
-JSON repository 在迁移完成后可以保留为：
+当前过渡期的 JSON repository 只保留为：
 
 - 旧数据读取和迁移工具的一部分。
 - legacy/debug subset 的基础检查对象。
 - 旧 JSON 导入转换和 legacy JSON 导出 profile 的参考。
-- 紧急回退工具，但不作为普通运行期主路径。
+- 显式 legacy/debug 回退工具，但不作为普通运行期主路径。
 
-JSON repository 不再作为并行后端追随新增功能。SQLite repository 跑完整当前主契约；JSON repository 只覆盖旧 JSON 导入/转换、基础读取、legacy 导出和显式回滚相关检查。
+JSON repository 不再作为并行后端追随新增功能。SQLite repository 跑完整当前主契约；JSON repository 只覆盖旧 JSON 导入/转换、基础读取、legacy 导出和显式回滚相关检查。长期目标是让旧 JSON 适配器直接进入转换服务，并从正式运行期移除 JSON repository，而不是维持两种可选主存储。
 
 ## 4. 标准转换服务
 
@@ -155,20 +155,20 @@ data/
 
 导出不应只有“把内部结构原样吐成 JSON”这一种。
 
-当前 JSON 导出已使用 profile；其余格式仍是后续设计：
+当前 JSON 导出已使用 profile。`portable-json` 只是现有兼容别名，不是近期设计重点；后续优先级是直接导入/导出 SQLite 文件以及表格交换格式：
 
 | profile | 目标 | 说明 |
 | --- | --- | --- |
 | `legacy-json` | 当前默认 JSON 导出 | 用于旧版回退或人工查看；不承诺永久等同内部结构。 |
-| `portable-json` | 已识别的 JSON profile | 当前输出仍与兼容完整 JSON 相同；独立交换结构尚未设计。 |
-| `compact-json` | 备份或版本管理 | 可裁剪派生字段、排序稳定、体积较小。 |
+| `portable-json` | 兼容别名 | 当前输出与 `legacy-json` 相同；暂不设计独立结构，也不把它作为主要交换格式。 |
+| `sqlite` | 原生词典交换/备份 | 直接复制并校验完整词典数据库；需要明确应用版本、schema 版本和导入冲突处理。 |
 | `xlsx` | 表格交换 | 适合词条、释义、标签、来源、IPA 等扁平化导出；复杂模块可能拆成多 sheet。 |
 | `fieldwork` / `interlinear` | 后续田野或语料交换 | 预留给语料和 gloss 工具升级后设计。 |
 
 `GET /api/export` 后续可以扩展参数：
 
 ```text
-GET /api/export?dictionaryId=...&format=json&profile=portable-json
+GET /api/export?dictionaryId=...&format=sqlite
 GET /api/export?dictionaryId=...&format=xlsx
 ```
 
@@ -264,7 +264,7 @@ GET /api/export?dictionaryId=...&format=xlsx
 
 以下项目不是默认切 SQLite 的阻断项，但切换时必须在文档中明确其状态：
 
-- 普通文本搜索、fuzzy 搜索、tag fuzzy、动态形态搜索仍可能从 SQL 表重建完整 dictionary object 后用共享 JS 逻辑扫描；这不依赖 JSON repository，但仍不是纯 SQL/FTS。
+- 普通词条搜索的静态字段与动态形态字段已分别接入 `entry_search_values` 和 `entry_morphology_search_values`；严格及 fuzzy 查询不再为此重建完整 dictionary object。fuzzy 仍会线性扫描所选 projection records，候选索引留待真实基准决定。
 - 带搜索条件的 root groups 仍可能走共享 JS 语义。
 - 数据分析和质量检查仍主要由前端/共享 JS 基于完整 dictionary object 计算，尚未全部 API 化或 SQL 化。
 - 语料库仍作为 `module_blobs.corpus` 保存，尚未正式 SQL 分表。
@@ -304,7 +304,6 @@ CONLEXICON_REPOSITORY=json
   - 旧 JSON → normalized dictionary。
   - normalized dictionary → SQLite。
   - SQLite → legacy-json。
-  - SQLite → portable-json。
 - 目录迁移脚本测试覆盖：
   - 使用临时数据目录。
   - 覆盖多词典、当前词典、无词典、坏词典、重复 ID、无效词典 ID。
@@ -335,10 +334,10 @@ CONLEXICON_REPOSITORY=json
 - 它输出机器可读和人可读 report。
 - 当前已实现第一版 CLI 和临时目录检查脚本；后续可继续扩展 report 详情、失败项定位和产品内迁移入口。
 
-### M3：导出 profile（部分完成）
+### M3：导入/导出格式（部分完成）
 
-- 已提供 `legacy-json` 与 `portable-json` 参数；后者暂仍输出兼容完整 JSON。
-- 为 XLSX 导出预留 adapter 位置。
+- 已提供 `legacy-json` 与 `portable-json` 参数；后者仅是兼容别名，暂不继续设计。
+- 原生 SQLite 文件导入/导出和 XLSX 等表格交换尚未实装；后续优先于独立 portable JSON 结构。
 
 ### M4：产品内迁移入口（暂缓）
 
