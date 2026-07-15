@@ -86,6 +86,14 @@ Then open:
 http://localhost:4173/
 ```
 
+For the focused frontend query-cache contract check, run:
+
+前端查询缓存的定向契约检查可通过以下命令运行：
+
+```bash
+node scripts/check-query-page-cache.js
+```
+
 ## Data Storage / 数据存储
 
 Dictionary data is stored locally under:

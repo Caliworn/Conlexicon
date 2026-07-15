@@ -11,7 +11,7 @@ let state = {
 let backendAvailable = true;
 let backendMessage = "";
 let searchQuery = "";
-const ENTRY_SEARCH_DEBOUNCE_MS = 150;
+const ENTRY_SEARCH_DEBOUNCE_MS = 250;
 let entrySearchDebounceTimer = 0;
 let activePart = "";
 let entrySort = "lemmaAsc";
@@ -48,6 +48,11 @@ const entrySearchModel = window.ConlexiconEntrySearch;
 const searchNormalizationModel = window.ConlexiconSearchNormalization;
 const ENTRY_SEARCH_FIELD_KEYS = entrySearchModel.ENTRY_SEARCH_FIELD_KEYS;
 const qualityModel = window.ConlexiconQuality;
+const QueryPageCache = window.ConlexiconQueryPageCache.QueryPageCache;
+const queryPageCache = new QueryPageCache({
+  maxEntries: 4,
+  maxBytes: 16 * 1024 * 1024,
+});
 let docsViewMode = "split";
 let docsSaveTimer = null;
 let corpusSaveTimer = null;
@@ -1693,6 +1698,7 @@ async function ensureDictionarySnapshotLoaded(dictionaryId) {
 }
 
 async function applyServerState(source) {
+  const previousDictionaryIds = new Set(state.dictionaries.map((dictionary) => dictionary.id));
   const previousLoadedById = new Map(
     state.dictionaries
       .filter((dictionary) => loadedDictionaryIds.has(dictionary.id))
@@ -1700,12 +1706,22 @@ async function applyServerState(source) {
   );
   const normalizedState = normalizeState(source);
   const nextLoadedDictionaryIds = new Set();
+  const nextDictionaryIds = new Set(normalizedState.dictionaries.map((dictionary) => dictionary.id));
+
+  previousDictionaryIds.forEach((dictionaryId) => {
+    if (!nextDictionaryIds.has(dictionaryId)) {
+      invalidateDictionaryQueryCache(dictionaryId);
+    }
+  });
 
   normalizedState.dictionaries = normalizedState.dictionaries.map((dictionary) => {
     const previous = previousLoadedById.get(dictionary.id);
     if (previous && previous.updatedAt === dictionary.updatedAt) {
       nextLoadedDictionaryIds.add(dictionary.id);
       return mergeDictionaryMetadataSnapshot(previous, dictionary);
+    }
+    if (previous) {
+      invalidateDictionaryQueryCache(dictionary.id);
     }
 
     return dictionary;
@@ -4174,6 +4190,29 @@ function rootGroupsQueryApiKey(dictionary = activeDictionary()) {
   ].join("|");
 }
 
+function queryPageCacheKey(kind, key) {
+  return `${kind}\u0000${key}`;
+}
+
+function compactRootGroupsQueryResult(result) {
+  const groups = Array.isArray(result?.items)
+    ? result.items.map((group) => ({
+      rootId: group.root?.id || "",
+      derivedIds: Array.isArray(group.derivedEntries)
+        ? group.derivedEntries.map((entry) => entry.id).filter(Boolean)
+        : [],
+      matchedDerivedIds: Array.isArray(group.matchedDerivedIds)
+        ? group.matchedDerivedIds.filter(Boolean)
+        : [],
+      rootMatches: Boolean(group.rootMatches),
+    })).filter((group) => group.rootId)
+    : [];
+  return {
+    groups,
+    pageInfo: result?.pageInfo || null,
+  };
+}
+
 function resetRootGroupsQueryState() {
   rootGroupsQueryState = {
     key: "",
@@ -4248,6 +4287,19 @@ function startRootGroupsQueryApiCheck(dictionary) {
   }
 
   const requestId = rootGroupsQueryState.requestId + 1;
+  const cacheKey = queryPageCacheKey("root-groups", key);
+  const cached = queryPageCache.get(cacheKey);
+  if (cached) {
+    rootGroupsQueryState = {
+      key,
+      status: "success",
+      groups: cached.groups,
+      pageInfo: cached.pageInfo,
+      error: null,
+      requestId,
+    };
+    return;
+  }
   rootGroupsQueryState = {
     key,
     status: "loading",
@@ -4257,29 +4309,21 @@ function startRootGroupsQueryApiCheck(dictionary) {
     requestId,
   };
 
-  api(rootGroupsQueryUrl(dictionary))
+  queryPageCache.load({
+    key: cacheKey,
+    dictionaryId: dictionary.id,
+    load: () => api(rootGroupsQueryUrl(dictionary)),
+    transform: compactRootGroupsQueryResult,
+  })
     .then((result) => {
       if (rootGroupsQueryState.requestId !== requestId || rootGroupsQueryApiKey(activeDictionary()) !== key) {
         return;
       }
-      const apiGroups = Array.isArray(result?.items)
-        ? result.items.map((group) => ({
-          rootId: group.root?.id || "",
-          derivedIds: Array.isArray(group.derivedEntries)
-            ? group.derivedEntries.map((entry) => entry.id).filter(Boolean)
-            : [],
-          matchedDerivedIds: Array.isArray(group.matchedDerivedIds)
-            ? group.matchedDerivedIds.filter(Boolean)
-            : [],
-          rootMatches: Boolean(group.rootMatches),
-        })).filter((group) => group.rootId)
-        : [];
-      const pageInfo = result?.pageInfo || null;
       rootGroupsQueryState = {
         key,
         status: "success",
-        groups: apiGroups,
-        pageInfo,
+        groups: result.groups,
+        pageInfo: result.pageInfo,
         error: null,
         requestId,
       };
@@ -4329,6 +4373,17 @@ function entryQueryApiKey(dictionary = activeDictionary()) {
     settings.partOfSpeechTags.join(","),
     entrySearchQuerySignature(dictionary),
   ].join("|");
+}
+
+function compactEntryQueryResult(result) {
+  const items = Array.isArray(result?.items) ? result.items : [];
+  return {
+    ids: items.map((entry) => entry.id).filter(Boolean),
+    hitsById: Object.fromEntries(items
+      .filter((entry) => entry?.id && Array.isArray(entry.searchHits))
+      .map((entry) => [entry.id, entry.searchHits])),
+    pageInfo: result?.pageInfo || null,
+  };
 }
 
 function resetEntryQueryState(options = {}) {
@@ -4400,6 +4455,22 @@ function startEntryQueryApiCheck(dictionary) {
 
   const requestId = entryQueryState.requestId + 1;
   const preserveRenderedList = entryQueryState.preserveRenderedList;
+  const cacheKey = queryPageCacheKey("entries", key);
+  const cached = queryPageCache.get(cacheKey);
+  if (cached) {
+    entryQueryState = {
+      key,
+      status: "success",
+      ids: cached.ids,
+      hitsById: cached.hitsById,
+      pageInfo: cached.pageInfo,
+      error: null,
+      requestId,
+      preserveRenderedList: false,
+    };
+    requestAnimationFrame(() => flushPendingEntryCardScroll());
+    return;
+  }
   entryQueryState = {
     key,
     status: "loading",
@@ -4411,22 +4482,22 @@ function startEntryQueryApiCheck(dictionary) {
     preserveRenderedList,
   };
 
-  api(entryQueryUrl(dictionary))
+  queryPageCache.load({
+    key: cacheKey,
+    dictionaryId: dictionary.id,
+    load: () => api(entryQueryUrl(dictionary)),
+    transform: compactEntryQueryResult,
+  })
     .then((result) => {
       if (entryQueryState.requestId !== requestId || entryQueryApiKey(activeDictionary()) !== key) {
         return;
       }
-      const apiIds = Array.isArray(result?.items) ? result.items.map((entry) => entry.id).filter(Boolean) : [];
-      const hitsById = Object.fromEntries((result?.items || [])
-        .filter((entry) => entry?.id && Array.isArray(entry.searchHits))
-        .map((entry) => [entry.id, entry.searchHits]));
-      const pageInfo = result?.pageInfo || null;
       entryQueryState = {
         key,
         status: "success",
-        ids: apiIds,
-        hitsById,
-        pageInfo,
+        ids: result.ids,
+        hitsById: result.hitsById,
+        pageInfo: result.pageInfo,
         error: null,
         requestId,
         preserveRenderedList: false,
@@ -4460,14 +4531,6 @@ function localPartTags(dictionary = activeDictionary()) {
     : [];
 }
 
-function dictionaryPartFacetSignature(dictionary = activeDictionary()) {
-  return stableJson((dictionary?.entries || []).map((entry) => ({
-    id: entry.id,
-    updatedAt: entry.updatedAt,
-    tags: entry.tags || [],
-  })));
-}
-
 function entryFacetsCanUseApi(dictionary = activeDictionary()) {
   return Boolean(backendAvailable && dictionary);
 }
@@ -4479,11 +4542,19 @@ function entryFacetsApiKey(dictionary = activeDictionary()) {
   const settings = normalizeDictionarySettings(dictionary.settings);
   return [
     dictionary.id,
-    dictionaryPartFacetSignature(dictionary),
+    dictionary.updatedAt || "",
     stableJson(settings.tagDisplayMap),
     settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
     settings.partOfSpeechTags.join(","),
   ].join("|");
+}
+
+function compactEntryFacetsResult(result) {
+  return {
+    parts: Array.isArray(result?.parts)
+      ? result.parts.map((part) => part?.tag).filter(Boolean).sort((a, b) => a.localeCompare(b, "zh-CN"))
+      : [],
+  };
 }
 
 function resetEntryFacetsState() {
@@ -4518,6 +4589,18 @@ function startEntryFacetsApiCheck(dictionary) {
   }
 
   const requestId = entryFacetsState.requestId + 1;
+  const cacheKey = queryPageCacheKey("facets", key);
+  const cached = queryPageCache.get(cacheKey);
+  if (cached) {
+    entryFacetsState = {
+      key,
+      status: "success",
+      parts: cached.parts,
+      error: null,
+      requestId,
+    };
+    return;
+  }
   entryFacetsState = {
     key,
     status: "loading",
@@ -4526,18 +4609,20 @@ function startEntryFacetsApiCheck(dictionary) {
     requestId,
   };
 
-  api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/facets`)
+  queryPageCache.load({
+    key: cacheKey,
+    dictionaryId: dictionary.id,
+    load: () => api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/facets`),
+    transform: compactEntryFacetsResult,
+  })
     .then((result) => {
       if (entryFacetsState.requestId !== requestId || entryFacetsApiKey(activeDictionary()) !== key) {
         return;
       }
-      const apiParts = Array.isArray(result?.parts)
-        ? result.parts.map((part) => part?.tag).filter(Boolean).sort((a, b) => a.localeCompare(b, "zh-CN"))
-        : [];
       entryFacetsState = {
         key,
         status: "success",
-        parts: apiParts,
+        parts: result.parts,
         error: null,
         requestId,
       };
@@ -11187,8 +11272,13 @@ async function saveDictionary(event) {
   }
 }
 
+function invalidateDictionaryQueryCache(dictionaryId) {
+  queryPageCache.invalidateDictionary(dictionaryId);
+}
+
 function replaceDictionaryInState(saved) {
   const normalized = normalizeDictionary(saved);
+  invalidateDictionaryQueryCache(normalized.id);
   const dictionaryIndex = state.dictionaries.findIndex((dictionary) => dictionary.id === normalized.id);
   if (dictionaryIndex >= 0) {
     state.dictionaries[dictionaryIndex] = normalized;
@@ -11205,6 +11295,7 @@ function replaceLoadedDictionarySource(dictionaryId, source) {
     return null;
   }
   const normalized = normalizeDictionary(source);
+  invalidateDictionaryQueryCache(dictionaryId);
   state.dictionaries[dictionaryIndex] = normalized;
   loadedDictionaryIds.add(normalized.id);
   return normalized;
@@ -11228,6 +11319,7 @@ function updateDictionaryMetadataInState(payload) {
   if (dictionaryIndex < 0) {
     return null;
   }
+  invalidateDictionaryQueryCache(payload.id);
   const current = state.dictionaries[dictionaryIndex];
   const next = {
     ...current,
@@ -11333,6 +11425,7 @@ function applyEntryPatchPayload(payload) {
 function resetEntryReadStateAfterSave(options = {}) {
   resetEntryQueryState({ preserveRenderedList: options.preserveEntryList });
   resetEntryFacetsState();
+  resetRootGroupsQueryState();
   lexicalNetworkRelationsCache.clear();
 }
 

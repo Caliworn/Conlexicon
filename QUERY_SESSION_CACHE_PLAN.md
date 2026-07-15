@@ -7,7 +7,7 @@
 当前已经具备：
 
 - 普通词条和词根模式使用独立 API 查询状态，并以递增 `requestId` 丢弃迟到响应。
-- 搜索输入使用 150ms debounce；连续输入会重新计时。
+- 搜索输入使用 250ms debounce；连续输入会重新计时。
 - SQLite 查询使用稳定排序，词条 ID 是最终排序键。
 - `/entries` 和 `/root-groups` 返回 `{ items, pageInfo }`，cursor 当前只是编码后的 offset。
 - 静态及形态严格/fuzzy 搜索读取 `entry_search_values` / `entry_morphology_search_values`。
@@ -258,12 +258,13 @@ query kind
 
 ## 11. 分步实施
 
-### Q1：前端紧凑查询缓存与请求合并
+### Q1：前端紧凑查询缓存与请求合并（已完成）
 
-- 新建通用 `QueryPageCache`，替代 entries/rootGroups 各自只能记住当前 key 的单槽复用；缓存 `{ ids, hitsById, pageInfo }`，不复制整页 summary DTO。
-- 用 `dictionary.updatedAt` 替代 facets 的 O(N) 词条标签签名。
-- 用小型 LRU 缓存成功查询并合并同 key Promise；保留现有 `requestId` 作为 UI 提交保护，但允许仍有效的迟到响应进入缓存。
-- 先不改变 API 和 cursor。
+- 已新增通用 `QueryPageCache`，entries、root groups 和 facets 会缓存紧凑投影，不复制整页 summary DTO。
+- facets 已改用 `dictionary.updatedAt`，不再以 O(N) 方式扫描词条标签生成签名。
+- 当前前端上限为 4 项、约 16 MiB；同 key Promise 会合并，成功结果按 LRU/容量淘汰，错误不缓存。
+- 现有 `requestId` 继续保护 UI 提交；有效迟到响应可以写入缓存，写入成功、词典覆盖或删除会按词典失效。
+- 本阶段没有改变 API 和 cursor。
 
 ### Q2：后端会话缓存基础设施
 
