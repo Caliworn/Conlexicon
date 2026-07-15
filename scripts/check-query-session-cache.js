@@ -10,6 +10,7 @@ const {
 const {
   createTempSqliteRepository,
   sampleSqliteDictionary,
+  sqliteRepositoryOptions,
   sqliteRuntimeUnavailableMessage,
 } = require("./sqlite-check-utils");
 
@@ -201,6 +202,13 @@ async function checkRepositoryIntegration() {
           tags: ["n"],
           definitions: [{ id: "def-route", meaning: "a way" }],
         },
+        ...Array.from({ length: 205 }, (_, index) => ({
+          id: `entry-derived-window-${index}`,
+          lemma: `derived-window-${String(index).padStart(3, "0")}`,
+          tags: ["v"],
+          definitions: [{ id: `def-derived-window-${index}`, meaning: `derived window ${index}` }],
+          etymology: { sources: ["root"], description: "cursor window fixture" },
+        })),
       ],
     });
     await repository.importDictionarySnapshot(dictionary);
@@ -226,6 +234,68 @@ async function checkRepositoryIntegration() {
       fuzzyFirst.items.map((entry) => entry.id),
       fuzzySecond.items.slice(0, fuzzyFirst.items.length).map((entry) => entry.id),
     );
+    assert.ok(fuzzyFirst.pageInfo.nextCursor, "the first fuzzy page should expose a versioned cursor");
+    const fuzzyNext = await repository.queryEntries(dictionary.id, {
+      ...fuzzyQuery,
+      cursor: fuzzyFirst.pageInfo.nextCursor,
+    });
+    assert.notDeepEqual(
+      fuzzyNext.items.map((entry) => entry.id),
+      fuzzyFirst.items.map((entry) => entry.id),
+      "a valid cursor should continue from its bound offset",
+    );
+    const fuzzyFirstWindow = await repository.queryEntries(dictionary.id, {
+      ...fuzzyQuery,
+      cursor: fuzzyFirst.pageInfo.nextCursor,
+      windowOffset: 0,
+    });
+    assert.deepEqual(
+      fuzzyFirstWindow.items.map((entry) => entry.id),
+      fuzzyFirst.items.map((entry) => entry.id),
+      "a validated cursor should permit direct access to another result window",
+    );
+    await assert.rejects(
+      () => repository.queryEntries(dictionary.id, {
+        ...fuzzyQuery,
+        windowOffset: 1,
+      }),
+      (error) => error?.code === "query_cursor_required",
+      "a non-zero window offset must be bound to a versioned cursor",
+    );
+    await assert.rejects(
+      () => repository.queryEntries(dictionary.id, {
+        ...fuzzyQuery,
+        cursor: fuzzyFirst.pageInfo.nextCursor,
+        windowOffset: "not-an-offset",
+      }),
+      (error) => error?.code === "invalid_query_window_offset",
+      "window offsets must be non-negative safe integers",
+    );
+    await assert.rejects(
+      () => repository.queryEntries(dictionary.id, {
+        ...fuzzyQuery,
+        fields: "definitions",
+        cursor: fuzzyFirst.pageInfo.nextCursor,
+      }),
+      (error) => error?.code === "query_cursor_stale" && error?.details?.reason === "descriptor",
+      "a cursor must not be reused with a different query descriptor",
+    );
+    const otherProcessRepository = new SqliteDictionaryRepository({
+      ...sqliteRepositoryOptions(repository.dataDir),
+      queryProcessEpoch: "other-process-epoch",
+    });
+    try {
+      await assert.rejects(
+        () => otherProcessRepository.queryEntries(dictionary.id, {
+          ...fuzzyQuery,
+          cursor: fuzzyFirst.pageInfo.nextCursor,
+        }),
+        (error) => error?.code === "query_cursor_stale" && error?.details?.reason === "process_epoch",
+        "a cursor must not survive a repository process epoch change",
+      );
+    } finally {
+      otherProcessRepository.close();
+    }
 
     let rootBuilds = 0;
     const originalRootBuilder = repository.rootGroupsFromDatabase.bind(repository);
@@ -248,6 +318,42 @@ async function checkRepositoryIntegration() {
     assert.deepEqual(
       rootFirst.items.map((group) => group.root.id),
       rootSecond.items.slice(0, rootFirst.items.length).map((group) => group.root.id),
+    );
+    assert.equal(
+      rootFirst.pageInfo.windowMetrics.reduce((total, metric) => total + metric.groupCount, 0),
+      rootFirst.pageInfo.total,
+      "the first root-group window should describe every parent window",
+    );
+    assert.ok(
+      rootFirst.pageInfo.windowMetrics.reduce((total, metric) => total + metric.derivedCount, 0) >= 206,
+      "root-group window metrics should include derived-entry counts",
+    );
+    assert.ok(rootFirst.pageInfo.nextCursor, "the first root-group page should expose a versioned cursor");
+    const rootFirstWindow = await repository.queryRootGroups(dictionary.id, {
+      cursor: rootFirst.pageInfo.nextCursor,
+      windowOffset: 0,
+      limit: 1,
+    });
+    assert.deepEqual(
+      rootFirstWindow.items.map((group) => group.root.id),
+      rootFirst.items.map((group) => group.root.id),
+      "root-group windows should support direct access after cursor validation",
+    );
+    assert.ok(rootFirstWindow.pageInfo.windowMetrics.length > 0, "offset zero should retain root-group window metrics");
+    const derivedWholeGroup = await repository.queryRootGroupEntries(dictionary.id, "entry-root");
+    assert.equal(derivedWholeGroup.items.length, 206, "the product UI should be able to read a realistic root group at once");
+    assert.equal("pageInfo" in derivedWholeGroup, false, "derived groups should not expose a pagination contract");
+    [...repository.querySessionCache.sessions.entries()]
+      .filter(([, session]) => session.kind === "rootGroups")
+      .forEach(([key]) => repository.querySessionCache.remove(key));
+    const rebuiltRootNext = await repository.queryRootGroups(dictionary.id, {
+      cursor: rootFirst.pageInfo.nextCursor,
+      limit: 1,
+    });
+    assert.deepEqual(
+      rebuiltRootNext.items.map((group) => group.root.id),
+      rootSecond.items.slice(1, 2).map((group) => group.root.id),
+      "an evicted query session should rebuild behind a still-valid cursor",
     );
 
     const beforeSearchRoot = repository.querySessionCacheStats();
@@ -279,6 +385,14 @@ async function checkRepositoryIntegration() {
     const rootEntry = await repository.getEntry(dictionary.id, "entry-root");
     await repository.saveEntry(dictionary.id, { ...rootEntry, notes: "updated" });
     assert.equal(repository.querySessionCache.generation(dictionary.id), generationBeforeNoOp + 1);
+    await assert.rejects(
+      () => repository.queryEntries(dictionary.id, {
+        ...fuzzyQuery,
+        cursor: fuzzyFirst.pageInfo.nextCursor,
+      }),
+      (error) => error?.code === "query_cursor_stale" && error?.details?.reason === "cache_generation",
+      "a successful write must invalidate cursors from the previous generation",
+    );
     await repository.queryEntries(dictionary.id, fuzzyQuery);
     assert.equal(fuzzyBuilds, 2, "a successful write must rebuild the fuzzy session");
 

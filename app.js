@@ -12,6 +12,9 @@ let backendAvailable = true;
 let backendMessage = "";
 let searchQuery = "";
 const ENTRY_SEARCH_DEBOUNCE_MS = 250;
+const ENTRY_QUERY_WINDOW_PAGE_SIZE = 200;
+const ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE = 100;
+const QUERY_WINDOW_MAX_LOADED_PAGES = 5;
 let entrySearchDebounceTimer = 0;
 let activePart = "";
 let entrySort = "lemmaAsc";
@@ -81,7 +84,9 @@ let partialEditSection = "";
 let partialEditHost = null;
 const expandedMorphologyTables = new Set();
 let rootMode = false;
+let rootExpansionMode = "manual";
 const expandedRootEntries = new Set();
+const collapsedRootEntries = new Set();
 let rootNavigationContextId = "";
 let entryDraft = null;
 const defaultAnalysisViewState = {
@@ -114,6 +119,9 @@ let entryQueryState = {
   error: null,
   requestId: 0,
   preserveRenderedList: false,
+  pages: [],
+  visiblePageIndexes: new Set(),
+  windowCursor: "",
 };
 let entryFacetsState = {
   key: "",
@@ -129,6 +137,9 @@ let rootGroupsQueryState = {
   pageInfo: null,
   error: null,
   requestId: 0,
+  pages: [],
+  visiblePageIndexes: new Set(),
+  windowCursor: "",
 };
 const rootGroupDerivedStates = new Map();
 let selectedEntryDetailState = {
@@ -3390,11 +3401,11 @@ function renderPartFilter() {
     elements.advancedFilterLabel.removeAttribute("aria-label");
   }
   const hasRootSearch = Boolean(normalizeEntrySearchText(searchQuery));
-  const rootGroupsFullyLoaded = rootMode
-    && rootGroupsQueryState.status === "success"
-    && !rootGroupsQueryState.pageInfo?.hasMore;
-  elements.expandAllRootsButton.disabled = rootMode && (hasRootSearch || !rootGroupsFullyLoaded);
-  elements.collapseAllRootsButton.disabled = rootMode && hasRootSearch;
+  const rootGroupsReady = rootMode && rootGroupsQueryState.status === "success";
+  elements.expandAllRootsButton.disabled = rootMode
+    && (hasRootSearch || !rootGroupsReady || (rootExpansionMode === "all" && !collapsedRootEntries.size));
+  elements.collapseAllRootsButton.disabled = rootMode
+    && (hasRootSearch || !rootGroupsReady || (rootExpansionMode === "manual" && !expandedRootEntries.size));
 }
 
 function createVirtualListState(estimatedItemHeight) {
@@ -3423,6 +3434,7 @@ function createVirtualListState(estimatedItemHeight) {
     pendingSizeUpdates: new Map(),
     sizeCacheKeys: new Map(),
     heightCache: new Map(),
+    onRangeChange: null,
   };
 }
 
@@ -3787,10 +3799,21 @@ function renderVirtualListWindow(virtualList) {
   virtualList.resizeObserver?.disconnect();
   container.replaceChildren(fragment);
   container.querySelectorAll(".virtual-list-row").forEach((row) => virtualList.resizeObserver?.observe(row));
+  virtualList.onRangeChange?.({
+    start,
+    end,
+    visibleStart: virtualListIndexAt(offsets, container.scrollTop),
+    visibleEnd: Math.min(items.length, virtualListIndexAt(offsets, container.scrollTop + viewportHeight) + 1),
+    items: items.slice(start, end).map((item) => item.value),
+  });
 }
 
 function renderVirtualList(container, virtualList, items, options) {
   initializeVirtualList(virtualList, container);
+  const preservedAnchor = virtualList.resetToken === options.resetToken
+    && !virtualListIsActivelyScrolling(virtualList)
+    ? virtualListAnchor(virtualList)
+    : null;
   if (virtualList.renderThrottleTimer) {
     clearTimeout(virtualList.renderThrottleTimer);
     virtualList.renderThrottleTimer = 0;
@@ -3813,6 +3836,7 @@ function renderVirtualList(container, virtualList, items, options) {
   const resetScroll = virtualList.resetToken !== options.resetToken;
   virtualList.resetToken = options.resetToken;
   virtualList.renderItem = options.renderItem;
+  virtualList.onRangeChange = typeof options.onRangeChange === "function" ? options.onRangeChange : null;
   const previousSizeCacheKeys = virtualList.sizeCacheKeys;
   const nextSizeCacheKeys = new Map();
   virtualList.items = items.map((value) => {
@@ -3850,6 +3874,7 @@ function renderVirtualList(container, virtualList, items, options) {
     container.scrollTop = 0;
   }
   clampVirtualListScroll(virtualList);
+  restoreVirtualListAnchor(virtualList, preservedAnchor);
   renderVirtualListWindow(virtualList);
 }
 
@@ -3875,6 +3900,7 @@ function renderVirtualListEmpty(container, virtualList, content) {
   virtualList.pendingSizeUpdates.clear();
   virtualList.resizeObserver?.disconnect();
   virtualList.items = [];
+  virtualList.onRangeChange = null;
   virtualList.indexByKey.clear();
   virtualList.sizeCacheKeys.clear();
   virtualList.offsets = [0];
@@ -4085,8 +4111,8 @@ function renderEntries() {
 
   if (!advancedFilter && entryQueryCanUseApi(dictionary)) {
     startEntryQueryApiCheck(dictionary);
-    const apiEntries = entryQueryEntriesForRender(dictionary);
-    if (!apiEntries) {
+    const queryPages = entryQueryWindowForRender(dictionary);
+    if (!queryPages) {
       if (entryQueryState.status === "loading") {
         if (entryQueryState.preserveRenderedList && entryVirtualList.items.length) {
           return;
@@ -4101,7 +4127,11 @@ function renderEntries() {
       );
       return;
     }
-    renderEntryRows(apiEntries, { pageInfo: entryQueryState.pageInfo });
+    renderEntryRows(entryQueryState.items, {
+      pageInfo: entryQueryState.pageInfo,
+      windowPages: queryPages,
+      onRangeChange: (range) => handleEntryQueryWindowRange(dictionary, range),
+    });
     return;
   }
 
@@ -4110,17 +4140,33 @@ function renderEntries() {
 }
 
 function renderEntryRows(entries = [], options = {}) {
-  if (!entries.length) {
+  const windowPages = Array.isArray(options.windowPages) ? options.windowPages : null;
+  if (!entries.length && !windowPages?.some((page) => page.status !== "success" || page.items.length)) {
     renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noMatch"), t("noMatchBody")));
     return;
   }
 
-  const rows = entries.map((entry) => ({
-    kind: "entry",
-    entry,
-    qualityIssues: advancedFilterIssuesForEntry(entry.id),
-  }));
-  if (options.pageInfo?.hasMore) {
+  const rows = windowPages
+    ? windowPages.flatMap((page) => page.status === "success"
+      ? page.items.map((entry) => ({
+        kind: "entry",
+        entry,
+        qualityIssues: advancedFilterIssuesForEntry(entry.id),
+        windowPageIndex: page.index,
+        windowEstimateScale: page.estimateScale || 1,
+      }))
+      : [{
+        kind: "window-placeholder",
+        windowPageIndex: page.index,
+        status: page.status,
+        estimatedHeight: Math.max(page.estimatedHeight || entryVirtualList.estimatedItemHeight, entryVirtualList.estimatedItemHeight),
+      }])
+    : entries.map((entry) => ({
+      kind: "entry",
+      entry,
+      qualityIssues: advancedFilterIssuesForEntry(entry.id),
+    }));
+  if (!windowPages && options.pageInfo?.hasMore) {
     rows.push({
       kind: "truncation",
       loaded: entries.length,
@@ -4133,12 +4179,18 @@ function renderEntryRows(entries = [], options = {}) {
     resetToken: entryVirtualResetToken(),
     getKey: (row) => row.kind === "truncation"
       ? `truncation:entries:${row.loaded}:${row.total}`
+      : row.kind === "window-placeholder"
+        ? `window-placeholder:entries:${row.windowPageIndex}`
       : `entry:${row.entry.id}`,
     getEstimatedHeight: (row) => row.kind === "truncation"
       ? 44
-      : estimateEntryCardHeight(row.entry, { qualityIssues: row.qualityIssues }),
+      : row.kind === "window-placeholder"
+        ? row.estimatedHeight
+      : estimateEntryCardHeight(row.entry, { qualityIssues: row.qualityIssues }) * (row.windowEstimateScale || 1),
     getSizeCacheKey: (row) => row.kind === "truncation"
       ? `truncation:entries:${currentLanguage}:${row.loaded}:${row.total}`
+      : row.kind === "window-placeholder"
+        ? `window-placeholder:entries:${row.windowPageIndex}:${Math.round(row.estimatedHeight)}`
       : entryCardSizeCacheKey(row.entry, {
         qualityIssues: row.qualityIssues,
         role: "entry",
@@ -4146,15 +4198,27 @@ function renderEntryRows(entries = [], options = {}) {
       }),
     renderItem: (row) => row.kind === "truncation"
       ? renderEntryQueryTruncationNotice(row)
+      : row.kind === "window-placeholder"
+        ? renderQueryWindowPlaceholder(row)
       : createEntryCard(row.entry, { qualityIssues: row.qualityIssues }),
+    onRangeChange: options.onRangeChange,
   });
+}
+
+function renderQueryWindowPlaceholder(row) {
+  const placeholder = document.createElement("div");
+  placeholder.className = "query-window-placeholder";
+  placeholder.style.height = `${Math.max(row.estimatedHeight || 0, entryVirtualList.estimatedItemHeight)}px`;
+  placeholder.setAttribute("role", "status");
+  placeholder.textContent = row.status === "loading" ? aText("加载中", "Loading") : "";
+  return placeholder;
 }
 
 function renderRootModeEntries() {
   const dictionary = activeDictionary();
   startRootGroupsQueryApiCheck(dictionary);
-  const groups = rootGroupsQueryForRender(dictionary);
-  if (!groups) {
+  const groupPages = rootGroupsQueryForRender(dictionary);
+  if (!groupPages) {
     if (rootGroupsQueryState.status === "loading") {
       renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(aText("加载中", "Loading"), ""));
       return;
@@ -4166,38 +4230,62 @@ function renderRootModeEntries() {
     );
     return;
   }
-  renderRootModeGroups(groups, { pageInfo: rootGroupsQueryState.pageInfo });
+  renderRootModeGroups(rootGroupsQueryState.groups, {
+    pageInfo: rootGroupsQueryState.pageInfo,
+    windowPages: groupPages,
+    onRangeChange: (range) => handleRootGroupsWindowRange(dictionary, range),
+  });
 }
 
 function renderRootModeGroups(groups = [], options = {}) {
-  if (!groups.length) {
+  const windowPages = Array.isArray(options.windowPages) ? options.windowPages : null;
+  if (!groups.length && !windowPages?.some((page) => page.status !== "success" || page.items.length)) {
     renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noMatch"), t("noMatchBody")));
     return;
   }
 
   const rows = [];
   const dictionary = activeDictionary();
-  groups.forEach((group) => {
-    const expanded = expandedRootEntries.has(group.root.id) || Boolean(searchQuery && group.matchedDerivedCount);
-    rows.push({ kind: "root", group, expanded });
+  const appendGroupRows = (group, windowPageIndex = null, windowEstimateScale = 1) => {
+    const expanded = rootGroupIsExpanded(group);
+    rows.push({ kind: "root", group, expanded, windowPageIndex, windowEstimateScale });
     if (expanded) {
       const derivedState = rootGroupDerivedState(dictionary, group.root.id);
       if (derivedState?.status === "success") {
-        derivedState.items.forEach((entry) => rows.push({ kind: "derived", entry, rootId: group.root.id }));
-        if (derivedState.pageInfo?.hasMore) {
-          rows.push({
-            kind: "truncation",
-            loaded: derivedState.items.length,
-            total: derivedState.pageInfo.total,
-            messageKey: "entryResultsTruncated",
-          });
-        }
-      } else if (derivedState) {
-        rows.push({ kind: "derived-status", rootId: group.root.id, status: derivedState.status });
+        derivedState.items.forEach((entry) => rows.push({
+          kind: "derived",
+          entry,
+          rootId: group.root.id,
+          windowPageIndex,
+        }));
+      } else {
+        rows.push({
+          kind: "derived-placeholder",
+          rootId: group.root.id,
+          windowPageIndex,
+          status: derivedState?.status || "idle",
+          estimatedHeight: Math.max(44, group.derivedCount * 116) * (windowEstimateScale || 1),
+        });
       }
     }
-  });
-  if (options.pageInfo?.hasMore) {
+  };
+  if (windowPages) {
+    windowPages.forEach((page) => {
+      if (page.status === "success") {
+        page.items.forEach((group) => appendGroupRows(group, page.index, page.estimateScale || 1));
+      } else {
+        rows.push({
+          kind: "window-placeholder",
+          windowPageIndex: page.index,
+          status: page.status,
+          estimatedHeight: Math.max(page.estimatedHeight || 156, 156),
+        });
+      }
+    });
+  } else {
+    groups.forEach((group) => appendGroupRows(group));
+  }
+  if (!windowPages && options.pageInfo?.hasMore) {
     rows.push({
       kind: "truncation",
       loaded: groups.length,
@@ -4209,17 +4297,27 @@ function renderRootModeGroups(groups = [], options = {}) {
   renderVirtualList(elements.entryList, entryVirtualList, rows, {
     resetToken: entryVirtualResetToken(),
     getKey: (row) => row.kind === "truncation"
-      ? `truncation:root-groups:${row.loaded}:${row.total}`
-      : row.kind === "derived-status"
+      ? `truncation:${row.truncationScope || "root-groups"}:${row.loaded}:${row.total}`
+      : row.kind === "window-placeholder"
+        ? `window-placeholder:root-groups:${row.windowPageIndex}`
+      : row.kind === "derived-placeholder"
         ? `derived-status:${row.rootId}:${row.status}`
       : row.kind === "root"
         ? `root:${row.group.root.id}`
         : `derived:${row.rootId}:${row.entry.id}`,
-    getEstimatedHeight: (row) => ["truncation", "derived-status"].includes(row.kind) ? 44 : row.kind === "root" ? 156 : 116,
+    getEstimatedHeight: (row) => row.kind === "window-placeholder"
+      ? row.estimatedHeight
+      : row.kind === "derived-placeholder"
+        ? row.estimatedHeight
+      : row.kind === "truncation"
+        ? 44
+        : (row.kind === "root" ? 156 : 116) * (row.windowEstimateScale || 1),
     getSizeCacheKey: (row) => row.kind === "truncation"
       ? `truncation:root-groups:${currentLanguage}:${row.loaded}:${row.total}`
-      : row.kind === "derived-status"
-        ? `derived-status:${currentLanguage}:${row.rootId}:${row.status}`
+      : row.kind === "window-placeholder"
+        ? `window-placeholder:root-groups:${row.windowPageIndex}:${Math.round(row.estimatedHeight)}`
+      : row.kind === "derived-placeholder"
+        ? `derived-status:${currentLanguage}:${row.rootId}:${row.status}:${Math.round(row.estimatedHeight)}`
       : row.kind === "root"
       ? entryCardSizeCacheKey(row.group.root, {
         role: "root",
@@ -4228,7 +4326,10 @@ function renderRootModeGroups(groups = [], options = {}) {
         settingsSizeSignature,
       })
       : entryCardSizeCacheKey(row.entry, { role: "derived", rootId: row.rootId, settingsSizeSignature }),
-    renderItem: renderRootModeRow,
+    renderItem: (row) => row.kind === "window-placeholder"
+      ? renderQueryWindowPlaceholder(row)
+      : renderRootModeRow(row),
+    onRangeChange: options.onRangeChange,
   });
 }
 
@@ -4337,6 +4438,186 @@ function queryPageCacheKey(kind, key) {
   return `${kind}\u0000${key}`;
 }
 
+function createQueryWindowPage(cursor = "", index = 0, status = "loading") {
+  return {
+    index,
+    offset: 0,
+    cursor: String(cursor || ""),
+    status,
+    items: [],
+    pageInfo: null,
+    error: null,
+    estimatedHeight: 0,
+    estimateScale: 1,
+    windowMetric: null,
+    lastAccessAt: performance.now(),
+  };
+}
+
+function rootSearchExpandsGroups() {
+  return Boolean(normalizeEntrySearchText(searchQuery));
+}
+
+function rootGroupDerivedCount(group) {
+  return Math.max(
+    0,
+    Number(group?.derivedCount) || (Array.isArray(group?.derived) ? group.derived.length : 0),
+  );
+}
+
+function rootGroupMatchedDerivedCount(group) {
+  return Math.max(
+    0,
+    Number(group?.matchedDerivedCount) || (Array.isArray(group?.matchedDerived) ? group.matchedDerived.length : 0),
+  );
+}
+
+function rootGroupIsExpanded(group) {
+  const rootId = group?.root?.id || "";
+  if (!rootId || !rootGroupDerivedCount(group)) {
+    return false;
+  }
+  if (rootSearchExpandsGroups() && rootGroupMatchedDerivedCount(group)) {
+    return true;
+  }
+  if (rootExpansionMode === "all") {
+    return !collapsedRootEntries.has(rootId);
+  }
+  return expandedRootEntries.has(rootId);
+}
+
+function rootGroupEstimatedHeight(group) {
+  const rootHeight = 156;
+  const derivedHeight = rootGroupIsExpanded(group)
+    ? rootGroupDerivedCount(group) * 116
+    : 0;
+  return rootHeight + derivedHeight;
+}
+
+function rootGroupWindowMetricHeight(metric = {}) {
+  const groupCount = Math.max(0, Number(metric.groupCount) || 0);
+  const derivedCount = Math.max(0, Number(metric.derivedCount) || 0);
+  const includeDerived = rootExpansionMode === "all" || rootSearchExpandsGroups();
+  return (groupCount * 156) + (includeDerived ? derivedCount * 116 : 0);
+}
+
+function applyRootGroupWindowMetrics(state, pageInfo = null) {
+  const metrics = Array.isArray(pageInfo?.windowMetrics) ? pageInfo.windowMetrics : [];
+  metrics.forEach((metric, index) => {
+    const page = state.pages[index];
+    if (!page) {
+      return;
+    }
+    page.windowMetric = metric;
+    if (page.status !== "success") {
+      page.estimatedHeight = rootGroupWindowMetricHeight(metric);
+      page.estimateScale = 1;
+    }
+  });
+}
+
+function refreshRootGroupWindowHeightEstimates() {
+  rootGroupsQueryState.pages.forEach((page) => {
+    page.estimateScale = 1;
+    if (page.status !== "success" && page.windowMetric) {
+      page.estimatedHeight = rootGroupWindowMetricHeight(page.windowMetric);
+    }
+  });
+}
+
+function resetRootExpansionState() {
+  rootExpansionMode = "manual";
+  expandedRootEntries.clear();
+  collapsedRootEntries.clear();
+  rootGroupDerivedStates.clear();
+  refreshRootGroupWindowHeightEstimates();
+}
+
+function preserveQueryWindowPageHeight(page, naturalHeight, hasWindowCursor) {
+  const safeNaturalHeight = Math.max(0, Number(naturalHeight) || 0);
+  const reservedHeight = Math.max(0, Number(page.estimatedHeight) || 0);
+  if (hasWindowCursor && reservedHeight > 0 && safeNaturalHeight > 0) {
+    page.estimateScale = reservedHeight / safeNaturalHeight;
+    return;
+  }
+  page.estimatedHeight = safeNaturalHeight;
+  page.estimateScale = 1;
+}
+
+function queryWindowLoadedItems(pages = []) {
+  return pages.flatMap((page) => page.status === "success" ? page.items : []);
+}
+
+function queryWindowAggregatePageInfo(pages = []) {
+  const successfulPage = [...pages].reverse().find((page) => page.pageInfo);
+  return successfulPage ? {
+    ...successfulPage.pageInfo,
+    hasMore: pages.some((page) => page.status !== "success"),
+  } : null;
+}
+
+function populateQueryWindowPages(state, firstPage, pageSize, estimatedItemHeight) {
+  if (firstPage.index !== 0 || state.pages.length !== 1 || !firstPage.pageInfo) {
+    return;
+  }
+  const total = Math.max(0, Number(firstPage.pageInfo.total) || 0);
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  state.windowCursor = firstPage.pageInfo.nextCursor || "";
+  for (let index = 1; index < pageCount; index += 1) {
+    const page = createQueryWindowPage(state.windowCursor, index, "unloaded");
+    page.offset = index * pageSize;
+    page.estimatedHeight = Math.min(pageSize, total - page.offset) * estimatedItemHeight;
+    state.pages.push(page);
+  }
+}
+
+function queryWindowPageHeight(virtualList, pageIndex, fallback = 0) {
+  const matching = virtualList.items.filter((item) => item.value?.windowPageIndex === pageIndex);
+  if (!matching.length) {
+    return fallback;
+  }
+  return matching.reduce((total, item) => (
+    total + (virtualList.sizes.get(item.key) || item.estimatedHeight || virtualList.estimatedItemHeight)
+  ), 0);
+}
+
+function evictDistantQueryWindowPages(
+  pages,
+  virtualList,
+  activePageIndexes = new Set(),
+  protectedEntryId = "",
+  options = {},
+) {
+  const loaded = pages.filter((page) => page.status === "success");
+  if (loaded.length <= QUERY_WINDOW_MAX_LOADED_PAGES) {
+    return false;
+  }
+  const activeIndexes = activePageIndexes.size ? [...activePageIndexes] : [loaded[loaded.length - 1].index];
+  const activeCenter = activeIndexes.reduce((sum, index) => sum + index, 0) / activeIndexes.length;
+  const protectedIds = protectedEntryId instanceof Set
+    ? protectedEntryId
+    : new Set([protectedEntryId].filter(Boolean));
+  const candidates = loaded
+    .filter((page) => !activePageIndexes.has(page.index))
+    .filter((page) => !page.items.some((item) => protectedIds.has(item.id || item.root?.id)))
+    .sort((left, right) => Math.abs(right.index - activeCenter) - Math.abs(left.index - activeCenter));
+  let remaining = loaded.length;
+  let changed = false;
+  for (const page of candidates) {
+    if (remaining <= QUERY_WINDOW_MAX_LOADED_PAGES) {
+      break;
+    }
+    page.estimatedHeight = queryWindowPageHeight(virtualList, page.index, page.estimatedHeight);
+    options.onEvict?.(page);
+    page.items = [];
+    page.status = "evicted";
+    page.error = null;
+    remaining -= 1;
+    changed = true;
+  }
+  return changed;
+}
+
 function compactRootGroupsQueryResult(result) {
   const groups = Array.isArray(result?.items)
     ? result.items.map((group) => ({
@@ -4348,7 +4629,15 @@ function compactRootGroupsQueryResult(result) {
     : [];
   return {
     groups,
-    pageInfo: result?.pageInfo || null,
+    pageInfo: result?.pageInfo ? {
+      ...result.pageInfo,
+      windowMetrics: Array.isArray(result.pageInfo.windowMetrics)
+        ? result.pageInfo.windowMetrics.map((metric) => ({
+          groupCount: Math.max(0, Number(metric?.groupCount) || 0),
+          derivedCount: Math.max(0, Number(metric?.derivedCount) || 0),
+        }))
+        : [],
+    } : null,
   };
 }
 
@@ -4360,11 +4649,14 @@ function resetRootGroupsQueryState() {
     pageInfo: null,
     error: null,
     requestId: rootGroupsQueryState.requestId + 1,
+    pages: [],
+    visiblePageIndexes: new Set(),
+    windowCursor: "",
   };
   rootGroupDerivedStates.clear();
 }
 
-function rootGroupsQueryUrl(dictionary, options = {}) {
+function rootGroupsQueryParams(dictionary) {
   const params = new URLSearchParams();
   if (searchQuery.trim()) {
     params.set("q", searchQuery.trim());
@@ -4378,7 +4670,12 @@ function rootGroupsQueryUrl(dictionary, options = {}) {
     params.set("fuzzyFields", [...fuzzyFields].join(","));
   }
   params.set("include", "summary");
-  params.set("limit", "2000");
+  return params;
+}
+
+function rootGroupsQueryUrl(dictionary, options = {}) {
+  const params = rootGroupsQueryParams(dictionary);
+  params.set("limit", String(ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE));
   Object.entries(options).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") {
       params.set(key, String(value));
@@ -4392,7 +4689,7 @@ function rootGroupsQueryForRender(dictionary) {
   if (rootGroupsQueryState.status !== "success" || rootGroupsQueryState.key !== key) {
     return null;
   }
-  return rootGroupsQueryState.groups;
+  return rootGroupsQueryState.pages;
 }
 
 function rootGroupDerivedStateKey(dictionary, rootId) {
@@ -4400,11 +4697,8 @@ function rootGroupDerivedStateKey(dictionary, rootId) {
 }
 
 function rootGroupDerivedUrl(dictionary, rootId) {
-  const baseUrl = rootGroupsQueryUrl(dictionary, { limit: 2000 });
-  return baseUrl.replace(
-    `/root-groups?`,
-    `/root-groups/${encodeURIComponent(rootId)}/entries?`,
-  );
+  const params = rootGroupsQueryParams(dictionary);
+  return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups/${encodeURIComponent(rootId)}/entries?${params}`;
 }
 
 function rootGroupDerivedState(dictionary, rootId) {
@@ -4421,7 +4715,6 @@ function startRootGroupDerivedLoad(dictionary, rootId) {
   rootGroupDerivedStates.set(key, {
     status: "loading",
     items: [],
-    pageInfo: null,
     error: null,
     requestId,
   });
@@ -4429,21 +4722,26 @@ function startRootGroupDerivedLoad(dictionary, rootId) {
     key: queryPageCacheKey("root-group-entries", key),
     dictionaryId: dictionary.id,
     load: () => api(rootGroupDerivedUrl(dictionary, rootId)),
-    transform: compactEntryQueryResult,
+    transform: (result) => ({
+      items: Array.isArray(result?.items) ? result.items.filter((entry) => entry?.id) : [],
+    }),
   })
     .then((result) => {
       const active = rootGroupDerivedStates.get(key);
-      if (active?.requestId !== requestId || rootGroupsQueryApiKey(activeDictionary()) !== rootGroupsQueryApiKey(dictionary)) {
+      if (
+        active?.requestId !== requestId
+        || rootGroupsQueryApiKey(activeDictionary()) !== rootGroupsQueryApiKey(dictionary)
+      ) {
         return;
       }
       rootGroupDerivedStates.set(key, {
         status: "success",
         items: result.items,
-        pageInfo: result.pageInfo,
         error: null,
         requestId,
       });
       renderEntries();
+      flushPendingEntryCardScroll();
     })
     .catch((error) => {
       const active = rootGroupDerivedStates.get(key);
@@ -4453,13 +4751,158 @@ function startRootGroupDerivedLoad(dictionary, rootId) {
       rootGroupDerivedStates.set(key, {
         status: "error",
         items: [],
-        pageInfo: null,
         error,
         requestId,
       });
       console.error(error);
       renderEntries();
     });
+}
+
+function syncRootGroupsQueryWindowState() {
+  rootGroupsQueryState.groups = queryWindowLoadedItems(rootGroupsQueryState.pages);
+  rootGroupsQueryState.pageInfo = queryWindowAggregatePageInfo(rootGroupsQueryState.pages);
+}
+
+function rootGroupsPageCacheKey(key, cursor = "") {
+  return queryPageCacheKey("root-groups", `${key}\u0000${cursor}`);
+}
+
+function invalidateQueryPageCacheAfterCursorStale(dictionary) {
+  if (dictionary?.id) {
+    queryPageCache.invalidateDictionary(dictionary.id);
+  }
+}
+
+function restartRootGroupsWindowAfterStale() {
+  const selectedEntryId = state.selectedEntryId;
+  const rootId = rootNavigationContextId;
+  resetRootGroupsQueryState();
+  renderEntries();
+  if (selectedEntryId) {
+    scheduleEntryCardScroll(selectedEntryId, rootId ? { rootId } : {});
+  }
+}
+
+function loadRootGroupsWindowPage(dictionary, page) {
+  const key = rootGroupsQueryState.key;
+  const requestId = rootGroupsQueryState.requestId;
+  page.status = "loading";
+  page.error = null;
+  page.lastAccessAt = performance.now();
+  return queryPageCache.load({
+    key: rootGroupsPageCacheKey(key, `${rootGroupsQueryState.windowCursor || page.cursor}\u0000${page.offset}`),
+    dictionaryId: dictionary.id,
+    load: () => api(rootGroupsQueryUrl(dictionary, {
+      cursor: rootGroupsQueryState.windowCursor || page.cursor,
+      windowOffset: rootGroupsQueryState.windowCursor ? page.offset : "",
+      limit: ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE,
+    })),
+    transform: compactRootGroupsQueryResult,
+  })
+    .then((result) => {
+      if (
+        rootGroupsQueryState.requestId !== requestId
+        || rootGroupsQueryState.key !== key
+        || rootGroupsQueryApiKey(activeDictionary()) !== key
+        || !rootGroupsQueryState.pages.includes(page)
+      ) {
+        return;
+      }
+      page.estimatedHeight = queryWindowPageHeight(entryVirtualList, page.index, page.estimatedHeight);
+      page.status = "success";
+      page.items = result.groups;
+      page.pageInfo = result.pageInfo;
+      page.error = null;
+      page.lastAccessAt = performance.now();
+      populateQueryWindowPages(
+        rootGroupsQueryState,
+        page,
+        ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE,
+        156,
+      );
+      applyRootGroupWindowMetrics(rootGroupsQueryState, result.pageInfo);
+      const naturalHeight = result.groups.reduce((total, group) => total + rootGroupEstimatedHeight(group), 0);
+      preserveQueryWindowPageHeight(
+        page,
+        naturalHeight,
+        Boolean(rootGroupsQueryState.windowCursor),
+      );
+      rootGroupsQueryState.status = "success";
+      rootGroupsQueryState.error = null;
+      syncRootGroupsQueryWindowState();
+      const protectedRootIds = new Set([rootNavigationContextId, state.selectedEntryId].filter(Boolean));
+      evictDistantQueryWindowPages(
+        rootGroupsQueryState.pages,
+        entryVirtualList,
+        rootGroupsQueryState.visiblePageIndexes,
+        protectedRootIds,
+        {
+          onEvict: (evictedPage) => {
+            evictedPage.items.forEach((group) => {
+              rootGroupDerivedStates.delete(rootGroupDerivedStateKey(dictionary, group.root.id));
+            });
+          },
+        },
+      );
+      syncRootGroupsQueryWindowState();
+      renderPartFilter();
+      renderEntries();
+      flushPendingEntryCardScroll();
+    })
+    .catch((error) => {
+      if (rootGroupsQueryState.requestId !== requestId || rootGroupsQueryState.key !== key) {
+        return;
+      }
+      if (error?.code === "query_cursor_stale") {
+        invalidateQueryPageCacheAfterCursorStale(dictionary);
+        restartRootGroupsWindowAfterStale();
+        return;
+      }
+      rootGroupsQueryState = {
+        key,
+        status: "error",
+        groups: [],
+        pageInfo: null,
+        error,
+        requestId,
+        pages: [],
+        visiblePageIndexes: new Set(),
+        windowCursor: "",
+      };
+      console.error(error);
+      renderPartFilter();
+      renderEntries();
+    });
+}
+
+function handleRootGroupsWindowRange(dictionary, range) {
+  if (rootGroupsQueryState.key !== rootGroupsQueryApiKey(dictionary) || rootGroupsQueryState.status !== "success") {
+    return;
+  }
+  const visiblePageIndexes = new Set(
+    range.items.map((row) => row?.windowPageIndex).filter((index) => Number.isInteger(index)),
+  );
+  rootGroupsQueryState.visiblePageIndexes = visiblePageIndexes;
+  visiblePageIndexes.forEach((index) => {
+    const page = rootGroupsQueryState.pages.find((candidate) => candidate.index === index);
+    if (!page) {
+      return;
+    }
+    page.lastAccessAt = performance.now();
+    if (["unloaded", "evicted"].includes(page.status)) {
+      loadRootGroupsWindowPage(dictionary, page);
+    }
+  });
+  const adjacentPageIndexes = new Set(
+    [...visiblePageIndexes].flatMap((index) => [index - 1, index + 1]).filter((index) => index >= 0),
+  );
+  adjacentPageIndexes.forEach((index) => {
+    const page = rootGroupsQueryState.pages.find((candidate) => candidate.index === index);
+    if (page?.status === "unloaded") {
+      loadRootGroupsWindowPage(dictionary, page);
+    }
+  });
 }
 
 function startRootGroupsQueryApiCheck(dictionary) {
@@ -4479,19 +4922,8 @@ function startRootGroupsQueryApiCheck(dictionary) {
   }
 
   const requestId = rootGroupsQueryState.requestId + 1;
-  const cacheKey = queryPageCacheKey("root-groups", key);
-  const cached = queryPageCache.get(cacheKey);
-  if (cached) {
-    rootGroupsQueryState = {
-      key,
-      status: "success",
-      groups: cached.groups,
-      pageInfo: cached.pageInfo,
-      error: null,
-      requestId,
-    };
-    return;
-  }
+  const firstPage = createQueryWindowPage("", 0);
+  firstPage.estimatedHeight = ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE * 156;
   rootGroupsQueryState = {
     key,
     status: "loading",
@@ -4499,45 +4931,11 @@ function startRootGroupsQueryApiCheck(dictionary) {
     pageInfo: null,
     error: null,
     requestId,
+    pages: [firstPage],
+    visiblePageIndexes: new Set([0]),
+    windowCursor: "",
   };
-
-  queryPageCache.load({
-    key: cacheKey,
-    dictionaryId: dictionary.id,
-    load: () => api(rootGroupsQueryUrl(dictionary)),
-    transform: compactRootGroupsQueryResult,
-  })
-    .then((result) => {
-      if (rootGroupsQueryState.requestId !== requestId || rootGroupsQueryApiKey(activeDictionary()) !== key) {
-        return;
-      }
-      rootGroupsQueryState = {
-        key,
-        status: "success",
-        groups: result.groups,
-        pageInfo: result.pageInfo,
-        error: null,
-        requestId,
-      };
-      renderPartFilter();
-      renderEntries();
-    })
-    .catch((error) => {
-      if (rootGroupsQueryState.requestId !== requestId) {
-        return;
-      }
-      rootGroupsQueryState = {
-        key,
-        status: "error",
-        groups: [],
-        pageInfo: null,
-        error,
-        requestId,
-      };
-      console.error(error);
-      renderPartFilter();
-      renderEntries();
-    });
+  loadRootGroupsWindowPage(dictionary, firstPage);
 }
 
 function entryQueryCanUseApi(dictionary = activeDictionary()) {
@@ -4599,29 +4997,32 @@ function updateEntrySummaryDtoAfterSave(dictionary, entry) {
   }
   const summary = entrySummaryDto(entry, dictionary);
   if (entryQueryState.status === "success") {
-    const hadEntry = entryQueryState.items.some((item) => item.id === entry.id);
-    entryQueryState.items = entryQueryState.items.map((item) => (
-      item.id === entry.id
-        ? { ...summary, ...(Array.isArray(item.searchHits) ? { searchHits: item.searchHits } : {}) }
-        : item
-    ));
-    if (!hadEntry && !normalizeEntrySearchText(searchQuery, dictionary) && !activePart) {
-      entryQueryState.items.push(summary);
-      entryQueryState.items.sort(compareEntries);
-      if (entryQueryState.pageInfo) {
-        entryQueryState.pageInfo = {
-          ...entryQueryState.pageInfo,
-          total: Number(entryQueryState.pageInfo.total || 0) + 1,
-        };
+    entryQueryState.pages.forEach((page) => {
+      if (page.status === "success") {
+        page.items = page.items.map((item) => (
+          item.id === entry.id
+            ? { ...summary, ...(Array.isArray(item.searchHits) ? { searchHits: item.searchHits } : {}) }
+            : item
+        ));
       }
-    }
+    });
+    syncEntryQueryWindowState();
     if (!rootMode && !advancedFilter) {
-      renderEntryRows(entryQueryState.items, { pageInfo: entryQueryState.pageInfo });
+      renderEntryRows(entryQueryState.items, {
+        pageInfo: entryQueryState.pageInfo,
+        windowPages: entryQueryState.pages,
+        onRangeChange: (range) => handleEntryQueryWindowRange(dictionary, range),
+      });
     }
   }
-  rootGroupsQueryState.groups = rootGroupsQueryState.groups.map((group) => (
-    group.root.id === entry.id ? { ...group, root: summary } : group
-  ));
+  rootGroupsQueryState.pages.forEach((page) => {
+    if (page.status === "success") {
+      page.items = page.items.map((group) => (
+        group.root.id === entry.id ? { ...group, root: summary } : group
+      ));
+    }
+  });
+  syncRootGroupsQueryWindowState();
   rootGroupDerivedStates.forEach((derivedState) => {
     if (derivedState.status === "success") {
       derivedState.items = derivedState.items.map((item) => (
@@ -4640,6 +5041,9 @@ function resetEntryQueryState(options = {}) {
     error: null,
     requestId: entryQueryState.requestId + 1,
     preserveRenderedList: Boolean(options.preserveRenderedList && entryVirtualList.items.length),
+    pages: [],
+    visiblePageIndexes: new Set(),
+    windowCursor: "",
   };
 }
 
@@ -4660,7 +5064,7 @@ function entryQueryUrl(dictionary, options = {}) {
     params.set("fuzzyFields", [...fuzzyFields].join(","));
   }
   params.set("include", "summary");
-  params.set("limit", String(Math.min(Math.max(dictionaryEntryCount(dictionary), 500), 10000)));
+  params.set("limit", String(ENTRY_QUERY_WINDOW_PAGE_SIZE));
   Object.entries(options).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") {
       params.set(key, String(value));
@@ -4669,12 +5073,143 @@ function entryQueryUrl(dictionary, options = {}) {
   return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries?${params}`;
 }
 
-function entryQueryEntriesForRender(dictionary) {
+function entryQueryWindowForRender(dictionary) {
   const key = entryQueryApiKey(dictionary);
   if (entryQueryState.status !== "success" || entryQueryState.key !== key) {
     return null;
   }
-  return entryQueryState.items;
+  return entryQueryState.pages;
+}
+
+function syncEntryQueryWindowState() {
+  entryQueryState.items = queryWindowLoadedItems(entryQueryState.pages);
+  entryQueryState.pageInfo = queryWindowAggregatePageInfo(entryQueryState.pages);
+}
+
+function entryQueryPageCacheKey(key, cursor = "") {
+  return queryPageCacheKey("entries", `${key}\u0000${cursor}`);
+}
+
+function restartEntryQueryWindowAfterStale(dictionary) {
+  const selectedEntryId = state.selectedEntryId;
+  resetEntryQueryState();
+  renderEntries();
+  if (selectedEntryId) {
+    scheduleEntryCardScroll(selectedEntryId);
+  }
+}
+
+function loadEntryQueryWindowPage(dictionary, page) {
+  const key = entryQueryState.key;
+  const requestId = entryQueryState.requestId;
+  page.status = "loading";
+  page.error = null;
+  page.lastAccessAt = performance.now();
+  return queryPageCache.load({
+    key: entryQueryPageCacheKey(key, `${entryQueryState.windowCursor || page.cursor}\u0000${page.offset}`),
+    dictionaryId: dictionary.id,
+    load: () => api(entryQueryUrl(dictionary, {
+      cursor: entryQueryState.windowCursor || page.cursor,
+      windowOffset: entryQueryState.windowCursor ? page.offset : "",
+      limit: ENTRY_QUERY_WINDOW_PAGE_SIZE,
+    })),
+    transform: compactEntryQueryResult,
+  })
+    .then((result) => {
+      if (
+        entryQueryState.requestId !== requestId
+        || entryQueryState.key !== key
+        || entryQueryApiKey(activeDictionary()) !== key
+        || !entryQueryState.pages.includes(page)
+      ) {
+        return;
+      }
+      page.estimatedHeight = queryWindowPageHeight(entryVirtualList, page.index, page.estimatedHeight);
+      page.status = "success";
+      page.items = result.items;
+      page.pageInfo = result.pageInfo;
+      page.error = null;
+      page.lastAccessAt = performance.now();
+      preserveQueryWindowPageHeight(
+        page,
+        result.items.reduce((total, entry) => (
+          total + estimateEntryCardHeight(entry, { qualityIssues: advancedFilterIssuesForEntry(entry.id) })
+        ), 0),
+        Boolean(entryQueryState.windowCursor),
+      );
+      populateQueryWindowPages(
+        entryQueryState,
+        page,
+        ENTRY_QUERY_WINDOW_PAGE_SIZE,
+        entryVirtualList.estimatedItemHeight,
+      );
+      entryQueryState.status = "success";
+      entryQueryState.error = null;
+      entryQueryState.preserveRenderedList = false;
+      syncEntryQueryWindowState();
+      evictDistantQueryWindowPages(
+        entryQueryState.pages,
+        entryVirtualList,
+        entryQueryState.visiblePageIndexes,
+        state.selectedEntryId,
+      );
+      syncEntryQueryWindowState();
+      renderEntries();
+      flushPendingEntryCardScroll();
+    })
+    .catch((error) => {
+      if (entryQueryState.requestId !== requestId || entryQueryState.key !== key) {
+        return;
+      }
+      if (error?.code === "query_cursor_stale") {
+        invalidateQueryPageCacheAfterCursorStale(dictionary);
+        restartEntryQueryWindowAfterStale(dictionary);
+        return;
+      }
+      entryQueryState = {
+        key,
+        status: "error",
+        items: [],
+        pageInfo: null,
+        error,
+        requestId,
+        preserveRenderedList: false,
+        pages: [],
+        visiblePageIndexes: new Set(),
+        windowCursor: "",
+      };
+      console.error(error);
+      renderEntries();
+    });
+}
+
+function handleEntryQueryWindowRange(dictionary, range) {
+  if (entryQueryState.key !== entryQueryApiKey(dictionary) || entryQueryState.status !== "success") {
+    return;
+  }
+  const visiblePageIndexes = new Set(
+    range.items.map((row) => row?.windowPageIndex).filter((index) => Number.isInteger(index)),
+  );
+  entryQueryState.visiblePageIndexes = visiblePageIndexes;
+  visiblePageIndexes.forEach((index) => {
+    const page = entryQueryState.pages.find((candidate) => candidate.index === index);
+    if (!page) {
+      return;
+    }
+    page.lastAccessAt = performance.now();
+    if (["unloaded", "evicted"].includes(page.status)) {
+      loadEntryQueryWindowPage(dictionary, page);
+    }
+  });
+  const adjacentPageIndexes = new Set(
+    [...visiblePageIndexes].flatMap((index) => [index - 1, index + 1]).filter((index) => index >= 0),
+  );
+  adjacentPageIndexes.forEach((index) => {
+    const page = entryQueryState.pages.find((candidate) => candidate.index === index);
+    if (page?.status === "unloaded") {
+      loadEntryQueryWindowPage(dictionary, page);
+    }
+  });
 }
 
 function startEntryQueryApiCheck(dictionary) {
@@ -4692,21 +5227,8 @@ function startEntryQueryApiCheck(dictionary) {
 
   const requestId = entryQueryState.requestId + 1;
   const preserveRenderedList = entryQueryState.preserveRenderedList;
-  const cacheKey = queryPageCacheKey("entries", key);
-  const cached = queryPageCache.get(cacheKey);
-  if (cached) {
-    entryQueryState = {
-      key,
-      status: "success",
-      items: cached.items,
-      pageInfo: cached.pageInfo,
-      error: null,
-      requestId,
-      preserveRenderedList: false,
-    };
-    requestAnimationFrame(() => flushPendingEntryCardScroll());
-    return;
-  }
+  const firstPage = createQueryWindowPage("", 0);
+  firstPage.estimatedHeight = ENTRY_QUERY_WINDOW_PAGE_SIZE * entryVirtualList.estimatedItemHeight;
   entryQueryState = {
     key,
     status: "loading",
@@ -4715,46 +5237,11 @@ function startEntryQueryApiCheck(dictionary) {
     error: null,
     requestId,
     preserveRenderedList,
+    pages: [firstPage],
+    visiblePageIndexes: new Set([0]),
+    windowCursor: "",
   };
-
-  queryPageCache.load({
-    key: cacheKey,
-    dictionaryId: dictionary.id,
-    load: () => api(entryQueryUrl(dictionary)),
-    transform: compactEntryQueryResult,
-  })
-    .then((result) => {
-      if (entryQueryState.requestId !== requestId || entryQueryApiKey(activeDictionary()) !== key) {
-        return;
-      }
-      entryQueryState = {
-        key,
-        status: "success",
-        items: result.items,
-        pageInfo: result.pageInfo,
-        error: null,
-        requestId,
-        preserveRenderedList: false,
-      };
-      renderEntries();
-      flushPendingEntryCardScroll();
-    })
-    .catch((error) => {
-      if (entryQueryState.requestId !== requestId) {
-        return;
-      }
-      entryQueryState = {
-        key,
-        status: "error",
-        items: [],
-        pageInfo: null,
-        error,
-        requestId,
-        preserveRenderedList: false,
-      };
-      console.error(error);
-      renderEntries();
-    });
+  loadEntryQueryWindowPage(dictionary, firstPage);
 }
 
 function localPartTags(dictionary = activeDictionary()) {
@@ -4881,14 +5368,18 @@ function renderRootModeRow(row) {
   if (row.kind === "truncation") {
     return renderEntryQueryTruncationNotice(row);
   }
-  if (row.kind === "derived-status") {
-    const status = document.createElement("div");
-    status.className = "entry-list-truncation-notice";
-    status.setAttribute("role", "status");
-    status.textContent = row.status === "error"
+  if (row.kind === "derived-placeholder") {
+    if (row.status === "idle") {
+      startRootGroupDerivedLoad(activeDictionary(), row.rootId);
+    }
+    const placeholder = document.createElement("div");
+    placeholder.className = "entry-list-truncation-notice root-derived-placeholder";
+    placeholder.style.height = `${Math.max(32, row.estimatedHeight - 12)}px`;
+    placeholder.setAttribute("role", "status");
+    placeholder.textContent = row.status === "error"
       ? aText("无法加载衍生词条", "Could not load derived entries")
       : aText("加载中", "Loading");
-    return status;
+    return placeholder;
   }
   if (row.kind === "derived") {
     const wrapper = document.createElement("div");
@@ -4915,8 +5406,16 @@ function renderRootModeRow(row) {
     toggle.addEventListener("click", (event) => {
       event.stopPropagation();
       rootNavigationContextId = group.root.id;
-      if (expandedRootEntries.has(group.root.id)) {
+      if (rootExpansionMode === "all") {
+        if (collapsedRootEntries.has(group.root.id)) {
+          collapsedRootEntries.delete(group.root.id);
+        } else {
+          collapsedRootEntries.add(group.root.id);
+          rootGroupDerivedStates.delete(rootGroupDerivedStateKey(activeDictionary(), group.root.id));
+        }
+      } else if (expandedRootEntries.has(group.root.id)) {
         expandedRootEntries.delete(group.root.id);
+        rootGroupDerivedStates.delete(rootGroupDerivedStateKey(activeDictionary(), group.root.id));
       } else {
         const derivedKey = rootGroupDerivedStateKey(activeDictionary(), group.root.id);
         if (rootGroupDerivedStates.get(derivedKey)?.status === "error") {
@@ -4924,6 +5423,7 @@ function renderRootModeRow(row) {
         }
         expandedRootEntries.add(group.root.id);
       }
+      renderPartFilter();
       renderEntries();
     });
     wrapper.append(toggle);
@@ -5304,13 +5804,17 @@ function prepareRootModeEntryNavigation(entryId, options = {}) {
   const contextGroup = rootNavigationContextId
     ? matchingGroups.find((group) => group.root.id === rootNavigationContextId)
     : null;
-  const expandedGroup = matchingGroups.find((group) => expandedRootEntries.has(group.root.id));
+  const expandedGroup = matchingGroups.find((group) => rootGroupIsExpanded(group));
   const targetGroup = requestedGroup || contextGroup || expandedGroup || matchingGroups[0];
   const isDerivedEntry = targetGroup.root.id !== entryId;
 
   rootNavigationContextId = targetGroup.root.id;
   if (isDerivedEntry) {
-    expandedRootEntries.add(targetGroup.root.id);
+    if (rootExpansionMode === "all") {
+      collapsedRootEntries.delete(targetGroup.root.id);
+    } else {
+      expandedRootEntries.add(targetGroup.root.id);
+    }
   }
   return { ...options, rootId: targetGroup.root.id };
 }
@@ -5323,6 +5827,7 @@ function scheduleEntryCardScroll(entryId, options = {}) {
     entryId,
     options: { ...options },
   };
+  ensureQueryWindowForEntryScroll(entryId, options);
   const requestId = entryCardScrollRequestId += 1;
   requestAnimationFrame(() => {
     if (requestId !== entryCardScrollRequestId) {
@@ -5354,6 +5859,43 @@ function scheduleEntryCardScroll(entryId, options = {}) {
       }
     }
   });
+}
+
+function ensureQueryWindowForEntryScroll(entryId, options = {}) {
+  const dictionary = activeDictionary();
+  if (!dictionary || advancedFilter) {
+    return;
+  }
+  if (!rootMode && entryQueryState.status === "success") {
+    if (entryQueryState.pages.some((page) => page.items.some((entry) => entry.id === entryId))) {
+      return;
+    }
+    const entryIndex = filteredEntries().findIndex((entry) => entry.id === entryId);
+    const page = entryQueryState.pages[Math.floor(entryIndex / ENTRY_QUERY_WINDOW_PAGE_SIZE)];
+    if (entryIndex >= 0 && ["unloaded", "evicted"].includes(page?.status)) {
+      loadEntryQueryWindowPage(dictionary, page);
+    }
+    return;
+  }
+  if (!rootMode || rootGroupsQueryState.status !== "success") {
+    return;
+  }
+  const groups = rootModeGroups();
+  const rootId = options.rootId || groups.find((group) => (
+    group.root.id === entryId || group.derived.some((entry) => entry.id === entryId)
+  ))?.root.id;
+  const groupIndex = groups.findIndex((group) => group.root.id === rootId);
+  const groupPage = rootGroupsQueryState.pages[Math.floor(groupIndex / ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE)];
+  if (groupIndex >= 0 && ["unloaded", "evicted"].includes(groupPage?.status)) {
+    loadRootGroupsWindowPage(dictionary, groupPage);
+    return;
+  }
+  if (!rootId || rootId === entryId) {
+    return;
+  }
+  if (!rootGroupDerivedState(dictionary, rootId)) {
+    startRootGroupDerivedLoad(dictionary, rootId);
+  }
 }
 
 async function closePendingEditsForPageSwitch() {
@@ -5441,7 +5983,9 @@ function entryViewSnapshot() {
     activePart,
     entrySort,
     searchQuery,
+    rootExpansionMode,
     expandedRootEntries: [...expandedRootEntries],
+    collapsedRootEntries: [...collapsedRootEntries],
   };
 }
 
@@ -5450,8 +5994,12 @@ function restoreEntryViewSnapshot(snapshot = {}) {
   activePart = snapshot.activePart || "";
   entrySort = snapshot.entrySort || "lemmaAsc";
   searchQuery = snapshot.searchQuery || "";
+  rootExpansionMode = snapshot.rootExpansionMode === "all" ? "all" : "manual";
   expandedRootEntries.clear();
   (snapshot.expandedRootEntries || []).forEach((id) => expandedRootEntries.add(id));
+  collapsedRootEntries.clear();
+  (snapshot.collapsedRootEntries || []).forEach((id) => collapsedRootEntries.add(id));
+  refreshRootGroupWindowHeightEstimates();
   elements.searchInput.value = searchQuery;
   elements.sortSelect.value = entrySort;
 }
@@ -11525,6 +12073,7 @@ async function saveDictionary(event) {
       });
       state.selectedDictionaryConfigId = created.id;
       state.activeDictionaryId = created.id;
+      resetRootExpansionState();
       state.selectedEntryId = "";
       editorMode = "display";
       showToast(t("dictionaryCreated"));
@@ -11709,6 +12258,7 @@ async function activateDictionary(dictionaryId) {
   try {
     await api(`/api/dictionaries/${encodeURIComponent(dictionaryId)}/activate`, { method: "POST" });
     state.activeDictionaryId = dictionary.id;
+    resetRootExpansionState();
     state.selectedDictionaryConfigId = dictionary.id;
     state.selectedEntryId = firstLemmaEntry(dictionary)?.id || "";
     editorMode = "display";
@@ -11748,6 +12298,7 @@ async function deleteSelectedDictionary() {
     }
     state.selectedDictionaryConfigId = "";
     state.selectedEntryId = "";
+    resetRootExpansionState();
     editorMode = "display";
     await refreshState();
     showToast(t("dictionaryDeleted"));
@@ -12062,11 +12613,14 @@ elements.expandAllRootsButton.addEventListener("click", () => {
     advancedFilter
     || normalizeEntrySearchText(searchQuery)
     || rootGroupsQueryState.status !== "success"
-    || rootGroupsQueryState.pageInfo?.hasMore
   ) {
     return;
   }
-  rootGroupsQueryState.groups.forEach((group) => expandedRootEntries.add(group.root.id));
+  rootExpansionMode = "all";
+  expandedRootEntries.clear();
+  collapsedRootEntries.clear();
+  refreshRootGroupWindowHeightEstimates();
+  renderPartFilter();
   renderEntries();
 });
 
@@ -12074,7 +12628,8 @@ elements.collapseAllRootsButton.addEventListener("click", () => {
   if (advancedFilter || normalizeEntrySearchText(searchQuery)) {
     return;
   }
-  expandedRootEntries.clear();
+  resetRootExpansionState();
+  renderPartFilter();
   renderEntries();
 });
 

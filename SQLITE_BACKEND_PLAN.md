@@ -355,7 +355,7 @@ GET /api/dictionaries/:id/entries?derivedFrom=:entryId
 必须明确：
 
 - `root-groups` 需要 `total`、分页/窗口参数和可选 include。
-- “展开全部”只有在结果完整或后端支持分页展开时可用。
+- “展开全部”使用前端全局状态意图；父级首窗返回每个窗口的组数和衍生词总数，用于完整高度估算，组内内容仍按可见范围懒加载，因此不要求所有父级结果同时驻留。
 - 关系解析以 lemma/source key 语义为准，并处理同名 lemma 的既有规则。
 - 未解析来源属于质量检查，不应塞进诊断修复。
 
@@ -443,8 +443,8 @@ POST /api/dictionaries/:id/diagnostics/fix
 
 SQLite repository 的核心读写、schema、迁移脚本和 smoke 已经落地，`server.js` 已默认使用 SQLite；静态和形态搜索 projection 也已进入主查询路径。当前优先级是读取稳定性与剩余查询下推：
 
-1. 查询缓存 Q1–Q3 已完成前端查询缓存、fuzzy entries/root groups 后端运行时会话、列表 summary DTO 直读、当前词条按需详情和词根组子项懒加载；下一步按 `QUERY_SESSION_CACHE_PLAN.md` 的 Q4 设计可重建 cursor 与纯滚动数据窗口。
-2. 先让列表直接消费 summary DTO、详情按需读取，并拆开折叠词根组与衍生词加载；随后推进纯滚动数据窗口化，停止依赖一次性 `limit=10000` 作为长期方案。
+1. 查询缓存 Q1–Q4 已完成前端查询缓存、fuzzy entries/root groups 后端运行时会话、summary DTO、按需详情、词根组子项懒加载、版本化 cursor 和纯滚动数据窗口；普通词条和父级词根组采用小窗口，单个词根组展开后一次读取全部衍生词，子端点不分页。
+2. 下一步实装两段式 stale-while-revalidate 和词条切换局部渲染，避免每次选择词条都重建完整虚拟列表及前端词源关系索引；失败继续走明确错误状态，不用旧内容掩盖失败。
 3. 将带搜索条件的 root groups、高级筛选、数据分析和质量检查逐步接入查询 API/query planner。
 4. 候选索引是否采用 FTS/ngram 由真实词典基准决定；语料 SQL 化留到语料升级阶段。
 5. JSON repository 仅维持 legacy/debug、导入迁移来源和必要参考价值，不同步新增普通功能。
@@ -558,12 +558,11 @@ CREATE TABLE entry_morphology_search_values (
 
 按当前依赖关系建议依次处理：
 
-1. 按 `QUERY_SESSION_CACHE_PLAN.md` 先建立前端紧凑查询缓存与请求合并，再为 fuzzy entries 和 root groups 建立后端运行时会话；继续用真实 10k 词典观察 projection 扫描和重复请求成本。
-2. 先收窄列表 DTO、按需读取词条详情并拆分词根组子项加载，再实装纯滚动的数据窗口化。
-3. 将带搜索条件的 `queryRootGroups()`、高级筛选等剩余完整 snapshot/共享 JS 路径推进到查询层。
-4. 把数据分析和质量检查推进为按需 API + query planner，而不是前端基于完整 snapshot 重算。
-5. 仅在基准表明确认线性扫描成为主要瓶颈后，再选择 FTS、ngram 或其他候选索引。
-6. 语料库进入独立升级阶段后，再把 `module_blobs.corpus` 拆成正式 SQL 表。
+1. 在已完成的 Q1–Q4 窗口边界上实装两段式 stale-while-revalidate，并把词条切换改为局部渲染。
+2. 将带搜索条件的 `queryRootGroups()`、高级筛选等剩余完整 snapshot/共享 JS 路径推进到查询层，并为自动滚动提供后端目标定位。
+3. 把数据分析和质量检查推进为按需 API + query planner，而不是前端基于完整 snapshot 重算。
+4. 仅在基准表明确认线性扫描成为主要瓶颈后，再选择 FTS、ngram 或其他候选索引。
+5. 语料库进入独立升级阶段后，再把 `module_blobs.corpus` 拆成正式 SQL 表。
 
 ## 10. 需要暂缓的事情
 

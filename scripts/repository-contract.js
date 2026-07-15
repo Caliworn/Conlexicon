@@ -308,6 +308,12 @@ async function assertRootGroupQueryConsistency(repository, dictionary, params = 
   const apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups?${qs}`);
   assert.equal(apiResult.statusCode, 200);
   assert.equal(apiResult.body.pageInfo.hasMore, false);
+  if (typeof repository.queryRootGroupEntries === "function") {
+    assert.equal(
+      apiResult.body.pageInfo.windowMetrics.reduce((total, metric) => total + metric.groupCount, 0),
+      apiResult.body.pageInfo.total,
+    );
+  }
   if (typeof repository.queryRootGroupEntries !== "function") {
     assert.deepEqual(
       apiResult.body.items.map((group) => ({
@@ -323,7 +329,7 @@ async function assertRootGroupQueryConsistency(repository, dictionary, params = 
   }
   const actualGroups = [];
   for (const group of apiResult.body.items) {
-    const entriesQs = queryString({ ...params, limit: 100, include: "summary" });
+    const entriesQs = queryString({ ...params, include: "summary" });
     const entriesResult = await callApi(
       repository,
       "GET",
@@ -336,7 +342,7 @@ async function assertRootGroupQueryConsistency(repository, dictionary, params = 
       matchedDerivedIds: entriesResult.body.items.filter((entry) => entry.rootGroupMatch).map((entry) => entry.id),
       rootMatches: Boolean(group.rootMatches),
     });
-    assert.equal(group.derivedCount, entriesResult.body.pageInfo.total);
+    assert.equal(group.derivedCount, entriesResult.body.items.length);
   }
   assert.deepEqual(
     actualGroups,
@@ -1355,7 +1361,7 @@ async function runRepositoryContractTests(options = {}) {
       apiResult = await callApi(
         repository,
         "GET",
-        `/api/dictionaries/${encodeURIComponent(first.id)}/root-groups/${encodeURIComponent(rootEntryId)}/entries?q=derived&limit=100`,
+        `/api/dictionaries/${encodeURIComponent(first.id)}/root-groups/${encodeURIComponent(rootEntryId)}/entries?q=derived`,
       );
       assert.equal(apiResult.statusCode, 200);
       assert.deepEqual(apiResult.body.items.map((entry) => entry.id), [derivedEntryId]);

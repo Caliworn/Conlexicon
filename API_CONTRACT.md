@@ -2,7 +2,7 @@
 
 本文记录 Conlexicon 当前本地 HTTP API 的稳定约定。它描述前端可依赖的接口边界，而不是底层存储实现；后端默认使用 SQLite repository，也可通过 `CONLEXICON_REPOSITORY=json` 显式启动 legacy/debug JSON repository，但前端不应直接依赖文件结构。SQLite 后端设计见 `SQLITE_BACKEND_PLAN.md`；JSON 兼容导入/导出和迁移设计见 `SQLITE_MIGRATION_PLAN.md`。
 
-查询缓存 Q1/Q2 已实装前端紧凑页面缓存和后端运行时查询会话；缓存身份、失效和未来 session cursor 约定见 `QUERY_SESSION_CACHE_PLAN.md`。当前 API 响应与 offset cursor 契约仍保持不变。
+查询缓存 Q1–Q4 已实装前端紧凑页面缓存、后端运行时查询会话、版本化 cursor 和纯滚动数据窗口；缓存身份、失效及窗口淘汰约定见 `QUERY_SESSION_CACHE_PLAN.md`。
 
 ## 通用约定
 
@@ -67,7 +67,7 @@
 
 | 方法 | 路径 | 用途 | 响应 | 校验范围 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | 无参数时为词条数组；带查询参数时为分页查询对象 | 支持 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`source`、`derivedFrom`、`sort`、`cursor`、`limit`、`include`。前端普通词条列表正常路径以该 API 为准，不再每次本地筛选完整列表做一致性校验。 |
+| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | 无参数时为词条数组；带查询参数时为分页查询对象 | 支持 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`source`、`derivedFrom`、`sort`、`cursor`、`windowOffset`、`limit`、`include`。前端普通词条列表正常路径以该 API 为准，并按窗口加载。 |
 | `POST` | `/api/dictionaries/:id/entries` | 新建词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
 | `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存单个词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
@@ -80,8 +80,8 @@
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/dictionaries/:id/facets` | 读取词性和标签统计 | `{ parts, tags, noPartOfSpeechCount }` | 尊重当前词典的词性标签设置和标签显示替换。前端词性筛选选项正常路径以该 API 为准，不再每次本地统计完整词性集合做一致性校验。 |
 | `GET` | `/api/dictionaries/:id/entry-relations/:entryId` | 读取词源/衍生/同根关系 | `{ entryId, sources, derivedEntries, rootGroup }` | SQLite 路径直接读取 `entries` / `entry_sources` projection；同名 lemma 暂按排序后的第一条匹配，后续可由诊断模块报告歧义。 |
-| `GET` | `/api/dictionaries/:id/root-groups` | 读取词根模式分组 | `{ items, pageInfo }` | 支持 `q`、`fields`、`fuzzyFields`、`sort`、`cursor`、`limit`、`include`。前端词根模式正常路径以该 API 为准，不再用前端本地完整分组兜底。 |
-| `GET` | `/api/dictionaries/:id/root-groups/:rootId/entries` | 按需读取单个词根组的衍生词 | `{ items, pageInfo }` | 参数与词根组查询一致；折叠组不再预载全部衍生词，展开后才读取。 |
+| `GET` | `/api/dictionaries/:id/root-groups` | 读取词根模式分组 | `{ items, pageInfo }` | 支持 `q`、`fields`、`fuzzyFields`、`sort`、`cursor`、`windowOffset`、`limit`、`include`。前端词根模式正常路径以该 API 为准，并按窗口加载。 |
+| `GET` | `/api/dictionaries/:id/root-groups/:rootId/entries` | 按需读取单个词根组的全部衍生词 | `{ items }` | 支持与词根组查询相同的搜索、排序、字段和 `include` 参数，但不分页；折叠组不预载衍生词，展开后一次读取整组。 |
 
 #### `GET /api/dictionaries/:id/entries` 查询参数补充
 
@@ -127,6 +127,9 @@
 | `invalid_docs_payload` | 语言文档请求体格式无效。 |
 | `invalid_corpus_payload` | 语料请求体格式无效。 |
 | `invalid_autosave_payload` | autosave 请求未携带有效 docs 或 corpus 对象。 |
+| `invalid_query_window_offset` | 查询窗口 offset 不是非负安全整数。 |
+| `query_cursor_required` | 非零窗口 offset 未附带版本化 cursor。 |
+| `query_cursor_stale` | cursor 已因服务进程、词典写入或查询条件变化而失效；`details.reason` 标明原因。 |
 | `invalid_morphology_payload` | 形态学请求体格式无效。 |
 | `invalid_ipa_settings_payload` | IPA 设置请求体格式无效。 |
 | `unsupported_entry_patch_fields` | 批量词条 patch 包含不支持字段。 |
@@ -199,7 +202,7 @@ GET /api/dictionaries
 `GET /api/dictionaries/:id/entries` 保持无参数时返回完整词条数组的兼容行为。带查询参数时返回分页查询对象：
 
 ```text
-GET /api/dictionaries/:id/entries?q=&fields=&fuzzyFields=&part=&tags=&tagMode=&sort=&source=&derivedFrom=&cursor=&limit=&include=
+GET /api/dictionaries/:id/entries?q=&fields=&fuzzyFields=&part=&tags=&tagMode=&sort=&source=&derivedFrom=&cursor=&windowOffset=&limit=&include=
 ```
 
 参数约定：
@@ -222,12 +225,13 @@ GET /api/dictionaries/:id/entries?q=&fields=&fuzzyFields=&part=&tags=&tagMode=&s
 - `source`：筛选具有指定来源文本的词条。
 - `derivedFrom`：筛选从指定词条 ID 或 lemma 派生的词条。
 - `cursor`：不透明分页游标，前端不得解析。
+- `windowOffset`：可选的结果窗口起点。非零值必须与该查询第一页返回的有效 `cursor` 一起发送；省略时沿用 cursor 自身的位置。该参数用于纯滚动列表直接读取远端窗口，不是 UI 页码。
 - `limit`：分页大小，后端可设置上限。
 - `include`：`summary` 或 `full`，默认 `summary`。
 
-前端普通词条列表当前直接使用该 API 返回的顺序；请求失败时显示失败状态。现阶段为避免未接入列表窗口化前截断 1k/10k 压测词典，前端会请求较大的 `limit`，后端临时上限为 10000；若后端仍返回 `pageInfo.hasMore: true`，普通列表与词根模式会在当前结果末尾显示已加载数量提示。后续进入真正分页/窗口化后，应降低单次请求规模并用 `cursor` 拉取窗口，不应恢复前端本地全量筛选作为运行期兜底。
+前端普通列表以每窗 200 条读取，最多保留 5 个已加载窗口；未加载和已淘汰窗口使用等高占位，从而让原生滚动条始终代表完整结果集。请求失败时显示失败状态，不回退到前端完整词典快照。repository 仍允许显式诊断和基准工具请求至多 10000 条，但产品 UI 不使用该大页路径。
 
-当前搜索输入采用 250ms debounce，连续输入会重置计时；前端用递增请求 ID 忽略迟到的旧响应。后端所有排序以词条 ID 作为最终稳定键，避免同词形或同时间记录跨分页边界漂移。SQLite repository 会为 fuzzy entries、无搜索 root groups 和搜索 root groups 缓存运行时有序身份；页面 DTO 仍按请求从 SQLite 重建。该缓存不改变响应结构和现有 cursor，也不等同于真正的数据窗口化。
+当前搜索输入采用 250ms debounce，连续输入会重置计时；前端用递增请求 ID 忽略迟到的旧响应。后端所有排序以词条 ID 作为最终稳定键，避免同词形或同时间记录跨窗口边界漂移。cursor 绑定当前服务进程 epoch、词典查询缓存 generation、规范化查询 descriptor 和位置；会话被 TTL/LRU 淘汰时后端可重建查询并继续读取，服务重启、成功写入或查询条件变化则返回 `query_cursor_stale`。前端收到 stale cursor 后从首窗重建查询。
 
 返回：
 
@@ -359,7 +363,7 @@ GET /api/dictionaries/:id/entry-relations/:entryId
 词根模式读取端点：
 
 ```text
-GET /api/dictionaries/:id/root-groups?q=&fields=&fuzzyFields=&sort=&cursor=&limit=&include=
+GET /api/dictionaries/:id/root-groups?q=&fields=&fuzzyFields=&sort=&cursor=&windowOffset=&limit=&include=
 ```
 
 返回分页后的词根组，而不是向前端一次返回全部分组：
@@ -374,25 +378,31 @@ GET /api/dictionaries/:id/root-groups?q=&fields=&fuzzyFields=&sort=&cursor=&limi
       rootMatches: true
     }
   ],
-  pageInfo: { nextCursor, hasMore, total }
+  pageInfo: {
+    nextCursor,
+    hasMore,
+    total,
+    windowMetrics: [{ groupCount, derivedCount }]
+  }
 }
 ```
+
+`windowMetrics` 只在 offset 为 0 的父级响应中提供，按本次 `limit` 划分全部父级窗口；它只包含每窗词根组数和衍生词总数，不携带词条内容。前端用它在“全部展开”和搜索自动展开状态下估算尚未加载窗口的完整高度。后续窗口响应可以省略该数组。
 
 折叠的词根组不携带衍生词 DTO。展开某组时按需读取：
 
 ```text
-GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&sort=&cursor=&limit=&include=
+GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&sort=&include=
 ```
 
-返回 `{ items, pageInfo }`；每个 `items` 元素是词条 summary（或 `include=full` 时的完整词条），并额外含 `rootGroupMatch`，表示该衍生词是否直接命中当前词根查询。该端点与 `/root-groups` 共享同一个运行时关系会话；`limit` 和 `cursor` 只切分当前组内的衍生词。
+返回 `{ items }`；每个 `items` 元素是词条 summary（或 `include=full` 时的完整词条），并额外含 `rootGroupMatch`，表示该衍生词是否直接命中当前词根查询。该端点与 `/root-groups` 共享同一个运行时关系会话，但不接受 `cursor`、`windowOffset` 或 `limit`，也没有 2000 条截断。当前前端只对父级词根组列表按每窗 100 组、最多 5 个已加载窗口进行窗口化；展开单组时一次读取并渲染全部衍生词。
 
 性能优化方向：
 
 - repository 层为一次请求构建临时关系索引：`id -> entry`、`normalized lemma -> first entry`、`source key -> derived entries`，避免每个来源或衍生查询重复扫描全词条。
 - `entry-relations/:entryId`、`root-groups`、`entries?derivedFrom=` 和后续质量检查中的词源问题应共享同一套关系索引。
 - SQLite 后端应继续用 `entry_sources(source_key, entry_id)` 或等价表/索引支持 `derivedFrom`、词根分组和词汇网络查询；legacy/debug JSON repository 只需保持契约参考，不再作为普通性能优化目标。
-- 前端词根模式当前正常路径以 `/root-groups` 为准；请求失败时显示失败状态，API 结果被分页截断时先渲染已返回页面并保留 `pageInfo`。后续分页/窗口化实装后，应继续用 `cursor` 拉取后续页面，而不是回退前端本地完整分组。
-- 词根模式分页/窗口化 UI 暂时搁置到后端关系索引或 SQLite 评估之后；不要在现阶段用简单无限滚动冒充完整列表滚动条，因为那会让滚动条只代表已加载页面，而不是完整词根组集合。
+- 前端词根模式正常路径以 `/root-groups` 为准；请求失败时显示失败状态，不回退前端本地完整分组。父级未加载窗口以 `pageInfo.total` 和 `windowMetrics` 建立占位，因此滚动条可在折叠、搜索自动展开及全局展开状态下代表完整词根组集合。全局展开采用状态意图：父级页进入可见范围后才加载各组衍生词；单组收起作为例外保留到重新展开或“全部收起/全部展开”重置。组内衍生词不建立第二层分页窗口。
 
 ### 语料库读取
 
