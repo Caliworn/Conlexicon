@@ -221,26 +221,27 @@ function testEntryMatchesDerivedFrom(entry, dictionary, query = {}) {
 function testCompareEntries(sort = "lemmaAsc") {
   return (a, b) => {
     const lemmaCompare = String(a.lemma || "").localeCompare(String(b.lemma || ""), "zh-CN");
-    const dateCompare = (left, right) => {
+    const idCompare = String(a.id || "").localeCompare(String(b.id || ""));
+    const dateCompare = (left, right, direction = 1) => {
       const diff = new Date(left || 0).getTime() - new Date(right || 0).getTime();
-      return diff || lemmaCompare;
+      return (diff * direction) || (lemmaCompare * direction) || idCompare;
     };
     if (sort === "lemmaDesc") {
-      return -lemmaCompare;
+      return -lemmaCompare || idCompare;
     }
     if (sort === "updatedAsc") {
       return dateCompare(a.updatedAt, b.updatedAt);
     }
     if (sort === "updatedDesc") {
-      return -dateCompare(a.updatedAt, b.updatedAt);
+      return dateCompare(a.updatedAt, b.updatedAt, -1);
     }
     if (sort === "createdAsc") {
       return dateCompare(a.createdAt, b.createdAt);
     }
     if (sort === "createdDesc") {
-      return -dateCompare(a.createdAt, b.createdAt);
+      return dateCompare(a.createdAt, b.createdAt, -1);
     }
-    return lemmaCompare;
+    return lemmaCompare || idCompare;
   };
 }
 

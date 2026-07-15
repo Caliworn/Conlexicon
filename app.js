@@ -11,6 +11,8 @@ let state = {
 let backendAvailable = true;
 let backendMessage = "";
 let searchQuery = "";
+const ENTRY_SEARCH_DEBOUNCE_MS = 150;
+let entrySearchDebounceTimer = 0;
 let activePart = "";
 let entrySort = "lemmaAsc";
 let toastTimer = null;
@@ -441,6 +443,8 @@ const i18n = {
     noEntriesBody: "新建第一个词条后，这里会显示词条详情。",
     noMatch: "没有匹配的词条",
     noMatchBody: "可以新建词条，或调整搜索与筛选条件。",
+    entryResultsTruncated: "当前仅加载 {loaded} / {total} 个词条",
+    rootGroupsTruncated: "当前仅加载 {loaded} / {total} 个词根组",
     noDescription: "暂无描述",
     config: "配置",
     setCurrent: "设为当前",
@@ -935,6 +939,8 @@ const i18n = {
     noEntriesBody: "Create the first entry to show details here.",
     noMatch: "No matching entries",
     noMatchBody: "Create an entry, or adjust search and filters.",
+    entryResultsTruncated: "Loaded {loaded} of {total} entries",
+    rootGroupsTruncated: "Loaded {loaded} of {total} root groups",
     noDescription: "No description",
     config: "Configure",
     setCurrent: "Set Current",
@@ -3937,7 +3943,7 @@ function renderEntries() {
       );
       return;
     }
-    renderEntryRows(apiEntries);
+    renderEntryRows(apiEntries, { pageInfo: entryQueryState.pageInfo });
     return;
   }
 
@@ -3945,7 +3951,7 @@ function renderEntries() {
   renderEntryRows(entries);
 }
 
-function renderEntryRows(entries = []) {
+function renderEntryRows(entries = [], options = {}) {
   if (!entries.length) {
     renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noMatch"), t("noMatchBody")));
     return;
@@ -3956,17 +3962,33 @@ function renderEntryRows(entries = []) {
     entry,
     qualityIssues: advancedFilterIssuesForEntry(entry.id),
   }));
+  if (options.pageInfo?.hasMore) {
+    rows.push({
+      kind: "truncation",
+      loaded: entries.length,
+      total: options.pageInfo.total,
+      messageKey: "entryResultsTruncated",
+    });
+  }
   const settingsSizeSignature = entryCardSettingsSizeSignature();
   renderVirtualList(elements.entryList, entryVirtualList, rows, {
     resetToken: entryVirtualResetToken(),
-    getKey: (row) => `entry:${row.entry.id}`,
-    getEstimatedHeight: (row) => estimateEntryCardHeight(row.entry, { qualityIssues: row.qualityIssues }),
-    getSizeCacheKey: (row) => entryCardSizeCacheKey(row.entry, {
-      qualityIssues: row.qualityIssues,
-      role: "entry",
-      settingsSizeSignature,
-    }),
-    renderItem: (row) => createEntryCard(row.entry, { qualityIssues: row.qualityIssues }),
+    getKey: (row) => row.kind === "truncation"
+      ? `truncation:entries:${row.loaded}:${row.total}`
+      : `entry:${row.entry.id}`,
+    getEstimatedHeight: (row) => row.kind === "truncation"
+      ? 44
+      : estimateEntryCardHeight(row.entry, { qualityIssues: row.qualityIssues }),
+    getSizeCacheKey: (row) => row.kind === "truncation"
+      ? `truncation:entries:${currentLanguage}:${row.loaded}:${row.total}`
+      : entryCardSizeCacheKey(row.entry, {
+        qualityIssues: row.qualityIssues,
+        role: "entry",
+        settingsSizeSignature,
+      }),
+    renderItem: (row) => row.kind === "truncation"
+      ? renderEntryQueryTruncationNotice(row)
+      : createEntryCard(row.entry, { qualityIssues: row.qualityIssues }),
   });
 }
 
@@ -3986,10 +4008,10 @@ function renderRootModeEntries() {
     );
     return;
   }
-  renderRootModeGroups(groups);
+  renderRootModeGroups(groups, { pageInfo: rootGroupsQueryState.pageInfo });
 }
 
-function renderRootModeGroups(groups = []) {
+function renderRootModeGroups(groups = [], options = {}) {
   if (!groups.length) {
     renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noMatch"), t("noMatchBody")));
     return;
@@ -4003,12 +4025,26 @@ function renderRootModeGroups(groups = []) {
       group.derived.forEach((entry) => rows.push({ kind: "derived", entry, rootId: group.root.id }));
     }
   });
+  if (options.pageInfo?.hasMore) {
+    rows.push({
+      kind: "truncation",
+      loaded: groups.length,
+      total: options.pageInfo.total,
+      messageKey: "rootGroupsTruncated",
+    });
+  }
   const settingsSizeSignature = entryCardSettingsSizeSignature();
   renderVirtualList(elements.entryList, entryVirtualList, rows, {
     resetToken: entryVirtualResetToken(),
-    getKey: (row) => row.kind === "root" ? `root:${row.group.root.id}` : `derived:${row.rootId}:${row.entry.id}`,
-    getEstimatedHeight: (row) => row.kind === "root" ? 156 : 116,
-    getSizeCacheKey: (row) => row.kind === "root"
+    getKey: (row) => row.kind === "truncation"
+      ? `truncation:root-groups:${row.loaded}:${row.total}`
+      : row.kind === "root"
+        ? `root:${row.group.root.id}`
+        : `derived:${row.rootId}:${row.entry.id}`,
+    getEstimatedHeight: (row) => row.kind === "truncation" ? 44 : row.kind === "root" ? 156 : 116,
+    getSizeCacheKey: (row) => row.kind === "truncation"
+      ? `truncation:root-groups:${currentLanguage}:${row.loaded}:${row.total}`
+      : row.kind === "root"
       ? entryCardSizeCacheKey(row.group.root, {
         role: "root",
         expanded: row.expanded,
@@ -4115,7 +4151,7 @@ function rootGroupsQueryApiKey(dictionary = activeDictionary()) {
   const settings = normalizeDictionarySettings(dictionary.settings);
   return [
     dictionary.id,
-    dictionaryEntriesSignature(dictionary),
+    dictionary.updatedAt || "",
     normalizeEntrySearchText(searchQuery, dictionary),
     entrySort,
     stableJson(dictionary.morphology || {}),
@@ -4272,7 +4308,7 @@ function entryQueryApiKey(dictionary = activeDictionary()) {
   const settings = normalizeDictionarySettings(dictionary.settings);
   return [
     dictionary.id,
-    dictionaryEntriesSignature(dictionary),
+    dictionary.updatedAt || "",
     normalizeEntrySearchText(searchQuery, dictionary),
     activePart,
     entrySort,
@@ -4412,34 +4448,6 @@ function localPartTags(dictionary = activeDictionary()) {
     : [];
 }
 
-function dictionaryEntriesSignature(dictionary = activeDictionary()) {
-  return stableJson((dictionary?.entries || []).map((entry) => ({
-    id: entry.id,
-    lemma: entry.lemma,
-    pronunciation: entry.pronunciation,
-    notes: entry.notes,
-    createdAt: entry.createdAt,
-    updatedAt: entry.updatedAt,
-    tags: entry.tags || [],
-    etymology: {
-      description: entry.etymology?.description || "",
-      sources: entry.etymology?.sources || [],
-    },
-    definitions: (entry.definitions || []).map((definition) => ({
-      id: definition.id,
-      meaning: definition.meaning,
-      example: definition.example,
-      note: definition.note,
-    })),
-    morphologyGroups: (entry.morphologyGroups || []).map((group) => ({
-      templateGroupId: group.templateGroupId,
-      title: group.title,
-      overrides: group.overrides || {},
-    })),
-    morphologyMode: entry.morphologyMode || "auto",
-  })));
-}
-
 function dictionaryPartFacetSignature(dictionary = activeDictionary()) {
   return stableJson((dictionary?.entries || []).map((entry) => ({
     id: entry.id,
@@ -4540,6 +4548,9 @@ function startEntryFacetsApiCheck(dictionary) {
 }
 
 function renderRootModeRow(row) {
+  if (row.kind === "truncation") {
+    return renderEntryQueryTruncationNotice(row);
+  }
   if (row.kind === "derived") {
     const wrapper = document.createElement("div");
     wrapper.className = "root-derived-list virtual-root-derived-row";
@@ -4572,6 +4583,17 @@ function renderRootModeRow(row) {
     wrapper.append(toggle);
   }
   return wrapper;
+}
+
+function renderEntryQueryTruncationNotice(row) {
+  const notice = document.createElement("div");
+  notice.className = "entry-list-truncation-notice";
+  notice.setAttribute("role", "status");
+  notice.textContent = formatText(row.messageKey, {
+    loaded: row.loaded,
+    total: row.total,
+  });
+  return notice;
 }
 
 function createEntryCard(entry, options = {}) {
@@ -11638,7 +11660,11 @@ elements.searchInput.addEventListener("input", (event) => {
   }
   searchQuery = event.target.value;
   renderPartFilter();
-  renderEntries();
+  window.clearTimeout(entrySearchDebounceTimer);
+  entrySearchDebounceTimer = window.setTimeout(() => {
+    entrySearchDebounceTimer = 0;
+    renderEntries();
+  }, ENTRY_SEARCH_DEBOUNCE_MS);
 });
 
 elements.rootModeToggleButton.addEventListener("click", () => {

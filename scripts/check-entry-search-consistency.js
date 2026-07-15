@@ -37,26 +37,27 @@ function queryOffset(cursor) {
 
 function compareEntries(left, right, sort = "lemmaAsc") {
   const lemmaCompare = String(left.lemma || "").localeCompare(String(right.lemma || ""), "zh-CN");
-  const dateCompare = (a, b) => {
+  const idCompare = String(left.id || "").localeCompare(String(right.id || ""));
+  const dateCompare = (a, b, direction = 1) => {
     const difference = new Date(a || 0).getTime() - new Date(b || 0).getTime();
-    return difference || lemmaCompare;
+    return (difference * direction) || (lemmaCompare * direction) || idCompare;
   };
   if (sort === "lemmaDesc") {
-    return -lemmaCompare;
+    return -lemmaCompare || idCompare;
   }
   if (sort === "updatedAsc") {
     return dateCompare(left.updatedAt, right.updatedAt);
   }
   if (sort === "updatedDesc") {
-    return -dateCompare(left.updatedAt, right.updatedAt);
+    return dateCompare(left.updatedAt, right.updatedAt, -1);
   }
   if (sort === "createdAsc") {
     return dateCompare(left.createdAt, right.createdAt);
   }
   if (sort === "createdDesc") {
-    return -dateCompare(left.createdAt, right.createdAt);
+    return dateCompare(left.createdAt, right.createdAt, -1);
   }
-  return lemmaCompare;
+  return lemmaCompare || idCompare;
 }
 
 function expectedEntryIds(dictionary, query = {}) {

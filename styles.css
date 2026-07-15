@@ -797,6 +797,21 @@ label span {
   padding-bottom: 12px;
 }
 
+.entry-list-truncation-notice {
+  display: grid;
+  place-items: center;
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 750;
+  line-height: 1.35;
+  text-align: center;
+}
+
 .corpus-item-list .virtual-list-row {
   padding-bottom: 8px;
 }
