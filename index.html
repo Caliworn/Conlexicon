@@ -114,7 +114,7 @@
       <div class="mobile-drawer-backdrop" id="mobileDrawerBackdrop" hidden></div>
 
       <main class="workspace">
-        <section class="view active" id="editorView" aria-label="词条编辑">
+        <section class="view active" id="editorView" data-i18n-aria-label="entryEditor" aria-label="词条编辑">
           <section class="top-bar" id="editorTopBar">
             <div class="dictionary-heading">
               <p class="eyebrow" id="dictionaryMeta">0 个词条</p>
@@ -149,10 +149,10 @@
             <section class="entry-browser view-browser" id="entryBrowser" data-i18n-aria-label="entryBrowser" aria-label="词条列表">
               <div class="filter-row">
                 <input id="searchInput" type="search" data-i18n-placeholder="searchPlaceholder" placeholder="搜索词形、释义、标签">
-                <select id="partFilter" aria-label="词性筛选">
+                <select id="partFilter" data-i18n-aria-label="partFilterLabel" aria-label="词性筛选">
                   <option value="" data-i18n="allParts">全部词性</option>
                 </select>
-                <select id="sortSelect" aria-label="词条排序">
+                <select id="sortSelect" data-i18n-aria-label="entrySortLabel" aria-label="词条排序">
                   <option value="lemmaAsc" data-i18n="sortLemmaAsc">首字母正序</option>
                   <option value="lemmaDesc" data-i18n="sortLemmaDesc">首字母倒序</option>
                   <option value="updatedAsc" data-i18n="sortUpdatedAsc">编辑时间正序</option>
@@ -190,7 +190,7 @@
               <div class="entry-list" id="entryList"></div>
             </section>
 
-            <section class="entry-detail-panel" aria-label="词条详情">
+            <section class="entry-detail-panel" data-i18n-aria-label="entryDetail" aria-label="词条详情">
               <article class="entry-display" id="entryDisplay" hidden>
                 <div class="entry-display-header" data-edit-section="basic">
                   <div>
@@ -265,7 +265,7 @@
                     <button class="secondary-button" id="autoIpaButton" type="button" data-i18n="autoIpa">自动 IPA</button>
                   </div>
                 </label>
-                <div class="ipa-keyboard" id="ipaKeyboard" aria-label="IPA 虚拟键盘"></div>
+                <div class="ipa-keyboard" id="ipaKeyboard" data-i18n-aria-label="ipaKeyboardSettings" aria-label="IPA 虚拟键盘"></div>
 
                 <label>
                   <span data-i18n="tagsLabel">属性标签（第一个标签会作为词性）</span>
@@ -334,7 +334,7 @@
           </section>
         </section>
 
-        <section class="view" id="dictionaryManagerView" aria-label="词典管理">
+        <section class="view" id="dictionaryManagerView" data-i18n-aria-label="dictionaryManager" aria-label="词典管理">
           <section class="top-bar">
             <div>
               <p class="eyebrow" data-i18n="dictionaryManagerEyebrow">多词典管理</p>
@@ -359,7 +359,7 @@
           <section class="manager-grid" id="managerGrid">
             <div class="manager-list" id="dictionaryManagerList"></div>
 
-            <section class="editor-panel" aria-label="词典配置">
+            <section class="editor-panel" data-i18n-aria-label="dictionaryConfig" aria-label="词典配置">
               <form id="dictionaryForm" autocomplete="off">
                 <input id="dictionaryId" type="hidden">
                 <div class="form-heading">
@@ -389,7 +389,7 @@
           </section>
         </section>
 
-        <section class="view" id="analysisView" aria-label="数据分析">
+        <section class="view" id="analysisView" data-i18n-aria-label="analysis" aria-label="数据分析">
           <section class="top-bar">
             <div>
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
@@ -410,7 +410,7 @@
           <section class="analysis-panel" id="analysisPanel"></section>
         </section>
 
-        <section class="view" id="qualityView" aria-label="质量检查">
+        <section class="view" id="qualityView" data-i18n-aria-label="qualityCheck" aria-label="质量检查">
           <section class="top-bar">
             <div>
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
@@ -431,7 +431,7 @@
           <section class="analysis-panel" id="qualityPanel"></section>
         </section>
 
-        <section class="view" id="settingsView" aria-label="其他设置">
+        <section class="view" id="settingsView" data-i18n-aria-label="otherSettings" aria-label="其他设置">
           <section class="top-bar">
             <div>
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
@@ -821,14 +821,14 @@
           </section>
         </section>
 
-        <section class="view" id="docsView" aria-label="语言文档">
+        <section class="view" id="docsView" data-i18n-aria-label="languageDocs" aria-label="语言文档">
           <section class="top-bar">
             <div>
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
               <h2 data-i18n="languageDocs">语言文档</h2>
             </div>
             <div class="top-actions">
-              <div class="segmented-control" id="docsModeControl" aria-label="文档模式">
+              <div class="segmented-control" id="docsModeControl" data-i18n-aria-label="docsModeLabel" aria-label="文档模式">
                 <button class="active" type="button" data-doc-mode="split" data-i18n="splitMode">分栏</button>
                 <button type="button" data-doc-mode="edit" data-i18n="editMode">编辑</button>
                 <button type="button" data-doc-mode="preview" data-i18n="previewMode">查看</button>
@@ -853,7 +853,7 @@
           </section>
         </section>
 
-        <section class="view" id="corpusView" aria-label="语料库">
+        <section class="view" id="corpusView" data-i18n-aria-label="corpus" aria-label="语料库">
           <section class="top-bar">
             <div>
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
@@ -882,7 +882,7 @@
 
           <section class="corpus-panel" id="corpusPanel">
             <div class="corpus-toolbar">
-              <div class="segmented-control" id="corpusModeControl" aria-label="语料类型">
+              <div class="segmented-control" id="corpusModeControl" data-i18n-aria-label="corpusModeLabel" aria-label="语料类型">
                 <button class="active" type="button" data-corpus-mode="blocks" data-i18n="corpusBlocks">块</button>
                 <button type="button" data-corpus-mode="units" data-i18n="corpusUnits">单元</button>
               </div>
@@ -898,7 +898,7 @@
           </section>
         </section>
 
-        <section class="view" id="morphologyFunctionsView" aria-label="形态函数">
+        <section class="view" id="morphologyFunctionsView" data-i18n-aria-label="morphologyFunctions" aria-label="形态函数">
           <section class="top-bar">
             <div>
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
@@ -943,7 +943,7 @@
           </section>
         </section>
 
-        <section class="view" id="morphologyTablesView" aria-label="形态表格">
+        <section class="view" id="morphologyTablesView" data-i18n-aria-label="morphologyTables" aria-label="形态表格">
           <section class="top-bar">
             <div>
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
@@ -977,7 +977,7 @@
           </section>
         </section>
 
-        <section class="view" id="ipaView" aria-label="自动 IPA 标注">
+        <section class="view" id="ipaView" data-i18n-aria-label="ipaConfig" aria-label="自动 IPA 标注">
           <section class="top-bar">
             <div>
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
