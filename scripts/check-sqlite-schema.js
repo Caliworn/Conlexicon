@@ -37,6 +37,7 @@ async function runSqliteSchemaCheck() {
       "entry_tags",
       "entry_sources",
       "entry_search_values",
+      "entry_morphology_search_values",
       "morphology_template_groups",
       "morphology_template_tables",
       "morphology_template_cells",
@@ -57,6 +58,10 @@ async function runSqliteSchemaCheck() {
     ["entry_id", "field", "source_type", "source_id", "source_position", "value_type", "raw_value", "normalized_value"]
       .forEach((column) => assert.equal(entrySearchValueColumns.has(column), true, `missing entry_search_values column: ${column}`));
     assert.equal(entrySearchValueColumns.has("id"), false);
+    const entryMorphologySearchValueColumns = new Set(db.prepare("PRAGMA table_info(entry_morphology_search_values)").all().map((row) => row.name));
+    ["entry_id", "position", "template_group_id", "template_table_id", "row_index", "column_index", "raw_value", "normalized_value"]
+      .forEach((column) => assert.equal(entryMorphologySearchValueColumns.has(column), true, `missing entry_morphology_search_values column: ${column}`));
+    assert.equal(entryMorphologySearchValueColumns.has("id"), false);
     const entryMorphologyGroupColumns = new Set(db.prepare("PRAGMA table_info(entry_morphology_groups)").all().map((row) => row.name));
     ["entry_id", "position", "template_group_id", "title", "notes", "created_at", "updated_at"]
       .forEach((column) => assert.equal(entryMorphologyGroupColumns.has(column), true, `missing entry morphology group column: ${column}`));
@@ -93,6 +98,21 @@ async function runSqliteSchemaCheck() {
       importedSearchRows.some((row) => row.field === "tags" && row.valueType === "display" && row.rawValue === "noun"),
       true,
     );
+    assert.deepEqual({ ...projectionDb.prepare(`
+      SELECT position, template_group_id AS templateGroupId, template_table_id AS templateTableId,
+        row_index AS rowIndex, column_index AS columnIndex,
+        raw_value AS rawValue, normalized_value AS normalizedValue
+      FROM entry_morphology_search_values
+      WHERE entry_id = 'entry-root'
+    `).get() }, {
+      position: 0,
+      templateGroupId: "morph-roundtrip",
+      templateTableId: "mtable-roundtrip",
+      rowIndex: 0,
+      columnIndex: 0,
+      rawValue: "root-form",
+      normalizedValue: "root-form",
+    });
     const savedMetadata = await repository.updateMetadata(sourceDictionary.id, {
       name: "SQLite Schema Updated",
       language: "test",
@@ -141,6 +161,12 @@ async function runSqliteSchemaCheck() {
       FROM entry_search_values
       WHERE entry_id = 'entry-root' AND field = 'tags' AND value_type = 'display' AND raw_value = 'noun'
     `).get().count, 0);
+    assert.equal(projectionDb.prepare(`
+      SELECT normalized_value AS normalizedValue
+      FROM entry_morphology_search_values
+      WHERE entry_id = 'entry-root' AND template_table_id = 'mtable-roundtrip'
+        AND row_index = 0 AND column_index = 0
+    `).get().normalizedValue, "stem-form");
 
     const savedIpaSettings = await repository.updateIpaSettings(sourceDictionary.id, {
       mappings: [{ from: "a", to: "ɑ" }],
@@ -161,10 +187,18 @@ async function runSqliteSchemaCheck() {
     assert.equal(Object.hasOwn(savedCorpus, "entries"), false);
     assert.equal(savedCorpus.corpus.units[0].content, "SQLite corpus");
 
-    const savedMorphology = await repository.saveMorphology(sourceDictionary.id, sourceDictionary.morphology);
+    const morphologyWithGeneratedCell = structuredClone(sourceDictionary.morphology);
+    morphologyWithGeneratedCell.templateGroups[0].tables[0].cells["0,1"] = { sourceText: "{}-suffix" };
+    const savedMorphology = await repository.saveMorphology(sourceDictionary.id, morphologyWithGeneratedCell);
     assert.deepEqual(Object.keys(savedMorphology).sort(), ["id", "morphology", "updatedAt"]);
     assert.equal(Object.hasOwn(savedMorphology, "entries"), false);
     assert.equal(savedMorphology.morphology.templateGroups[0].id, "morph-roundtrip");
+    assert.equal(projectionDb.prepare(`
+      SELECT normalized_value AS normalizedValue
+      FROM entry_morphology_search_values
+      WHERE entry_id = 'entry-root' AND template_table_id = 'mtable-roundtrip'
+        AND row_index = 0 AND column_index = 1
+    `).get().normalizedValue, "stem-suffix");
 
     const patchedEntries = await repository.patchEntries(sourceDictionary.id, [{
       id: "entry-root",
@@ -183,6 +217,16 @@ async function runSqliteSchemaCheck() {
       FROM entry_search_values
       WHERE entry_id = 'entry-root' AND field = 'pronunciation'
     `).get().normalizedValue, "/patched/");
+
+    const entryForSave = await repository.getEntry(sourceDictionary.id, "entry-root");
+    entryForSave.morphologyGroups[0].overrides["mtable-roundtrip"]["0,0"] = "saved-form";
+    await repository.saveEntry(sourceDictionary.id, entryForSave);
+    assert.equal(projectionDb.prepare(`
+      SELECT raw_value AS rawValue
+      FROM entry_morphology_search_values
+      WHERE entry_id = 'entry-root' AND template_table_id = 'mtable-roundtrip'
+        AND row_index = 0 AND column_index = 0
+    `).get().rawValue, "saved-form");
 
     const exported = repository.exportDictionarySnapshot(sourceDictionary.id);
     assert.equal(exported.id, sourceDictionary.id);
@@ -229,7 +273,7 @@ async function runSqliteSchemaCheck() {
     `).get(projectedMorphologyGroup.entryId, projectedMorphologyGroup.templateGroupId);
     assert.equal(projectedOverride.rowIndex, 0);
     assert.equal(projectedOverride.columnIndex, 0);
-    assert.equal(projectedOverride.value, "root-form");
+    assert.equal(projectedOverride.value, "saved-form");
 
     const rebuiltEntry = await repository.getEntry(sourceDictionary.id, "entry-root");
     assert.equal(rebuiltEntry.lemma, "root");
@@ -242,6 +286,8 @@ async function runSqliteSchemaCheck() {
 
     await repository.deleteEntry(sourceDictionary.id, "entry-derived");
     assert.equal(projectionDb.prepare("SELECT COUNT(*) AS count FROM entry_search_values WHERE entry_id = 'entry-derived'").get().count, 0);
+    await repository.deleteEntry(sourceDictionary.id, "entry-root");
+    assert.equal(projectionDb.prepare("SELECT COUNT(*) AS count FROM entry_morphology_search_values WHERE entry_id = 'entry-root'").get().count, 0);
   } finally {
     await cleanup();
   }

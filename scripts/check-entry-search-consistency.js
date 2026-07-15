@@ -127,22 +127,6 @@ async function queryWithoutSnapshot(repository, dictionaryId, query) {
   }
 }
 
-async function queryExpectingSnapshot(repository, dictionaryId, query) {
-  const original = repository.exportDictionarySnapshot;
-  let snapshotCalls = 0;
-  repository.exportDictionarySnapshot = function trackedSnapshot(...args) {
-    snapshotCalls += 1;
-    return original.apply(this, args);
-  };
-  try {
-    const result = await repository.queryEntries(dictionaryId, query);
-    assert.ok(snapshotCalls > 0, `Expected fallback snapshot for ${JSON.stringify(query)}.`);
-    return result;
-  } finally {
-    repository.exportDictionarySnapshot = original;
-  }
-}
-
 async function assertDirectQuery(repository, dictionary, query, expected = expectedEntryIds(dictionary, query)) {
   const result = await queryWithoutSnapshot(repository, dictionary.id, query);
   const offset = queryOffset(query.cursor);
@@ -158,18 +142,6 @@ async function assertDirectQuery(repository, dictionary, query, expected = expec
   return result;
 }
 
-async function assertFallbackQuery(repository, dictionary, query, expected = expectedEntryIds(dictionary, query)) {
-  const result = await queryExpectingSnapshot(repository, dictionary.id, query);
-  const offset = queryOffset(query.cursor);
-  const limit = query.limit || 100;
-  assert.deepEqual(
-    result.items.map((entry) => entry.id),
-    expected.slice(offset, offset + limit),
-    `fallback result differs from shared matcher: ${JSON.stringify(query)}`,
-  );
-  return result;
-}
-
 function searchConsistencyDictionary() {
   return normalizeDictionary({
     id: "dict-entry-search-consistency",
@@ -181,7 +153,18 @@ function searchConsistencyDictionary() {
     },
     morphology: {
       templateGroups: [
-        { id: "morph-upper-tag", name: "Upper tag", matchTags: ["N"], tables: [] },
+        {
+          id: "morph-upper-tag",
+          name: "Upper tag",
+          matchTags: ["N"],
+          tables: [{
+            id: "mtable-upper-tag",
+            title: "Upper forms",
+            rowCount: 1,
+            columnCount: 1,
+            cells: { "0,0": { sourceText: "{}-MorphToken" } },
+          }],
+        },
         { id: "morph-lower-tag", name: "Lower tag", matchTags: ["n"], tables: [] },
       ],
     },
@@ -304,6 +287,7 @@ async function main() {
       "the current matcher must consume the shared per-value record projection",
     );
 
+    await assertDirectQuery(repository, dictionary, { fields: "lemma", fuzzyFields: "lemma", limit: 2 });
     await assertDirectQuery(repository, dictionary, { q: "AlphaRoot", fields: "lemma" });
     await assertDirectQuery(repository, dictionary, { q: "PronunciationToken", fields: "pronunciation" });
     await assertDirectQuery(repository, dictionary, { q: "RawTagToken", fields: "tags" });
@@ -317,6 +301,32 @@ async function main() {
       sourcePosition: 0,
       valueType: "meaning",
     }]);
+    const morphologyHitResult = await assertDirectQuery(
+      repository,
+      dictionary,
+      { q: "UpperTag-MorphToken", fields: "morphology" },
+      ["entry-upper-tag"],
+    );
+    assert.deepEqual(morphologyHitResult.items[0].searchHits, [{
+      field: "morphology",
+      value: "UpperTag-MorphToken",
+      sourceType: "morphology",
+      sourceId: "mtable-upper-tag",
+      sourcePosition: 0,
+      valueType: "generated",
+    }]);
+    await assertDirectQuery(
+      repository,
+      dictionary,
+      { q: "UpperTag-MorphToken", fields: "definitions,morphology" },
+      ["entry-upper-tag"],
+    );
+    await assertDirectQuery(
+      repository,
+      dictionary,
+      { q: "DefinitionToken", fields: "definitions,morphology" },
+      ["entry-alpha-root"],
+    );
     await assertDirectQuery(repository, dictionary, { q: "ExampleToken", fields: "examples" });
     await assertDirectQuery(repository, dictionary, { q: "EntryNoteToken", fields: "notes" });
     await assertDirectQuery(repository, dictionary, { q: "DefinitionNoteToken", fields: "notes" });
@@ -329,11 +339,49 @@ async function main() {
     await assertDirectQuery(repository, dictionary, { q: "TagLeftMarker TagRightMarker", fields: "tags" }, []);
     await assertDirectQuery(repository, dictionary, { q: "EntryNoteMarker NoteLeftMarker", fields: "notes" }, []);
     await assertDirectQuery(repository, dictionary, { q: "EtymologyLeftMarker SourceRightMarker", fields: "etymology" }, []);
-    await assertFallbackQuery(repository, dictionary, {
+    await assertDirectQuery(repository, dictionary, {
       q: "far",
       fields: "examples",
       fuzzyFields: "examples",
     }, []);
+    const fuzzyMorphologyResult = await assertDirectQuery(repository, dictionary, {
+      q: "MorphTkn",
+      fields: "morphology",
+      fuzzyFields: "morphology",
+    }, ["entry-upper-tag"]);
+    assert.equal(fuzzyMorphologyResult.items[0].searchHits[0].sourceId, "mtable-upper-tag");
+    await assertDirectQuery(repository, dictionary, {
+      q: "DefTkn",
+      fields: "definitions,morphology",
+      fuzzyFields: "definitions",
+    }, ["entry-alpha-root"]);
+    const fuzzyFullResult = await assertDirectQuery(repository, dictionary, {
+      q: "DefTkn",
+      fields: "definitions",
+      fuzzyFields: "definitions",
+      include: "full",
+    }, ["entry-alpha-root"]);
+    assert.equal(fuzzyFullResult.items[0].definitions[0].meaning, "CommonToken DefinitionToken");
+    await assertDirectQuery(repository, dictionary, {
+      q: "StrctrlTkn",
+      fields: "definitions",
+      fuzzyFields: "definitions",
+      tags: "N",
+    }, ["entry-upper-tag"]);
+    const fuzzyPageQuery = {
+      q: "CmonTkn",
+      fields: "definitions",
+      fuzzyFields: "definitions",
+      limit: 2,
+    };
+    const fuzzyPageIds = expectedEntryIds(dictionary, fuzzyPageQuery);
+    const fuzzyFirstPage = await assertDirectQuery(repository, dictionary, fuzzyPageQuery, fuzzyPageIds);
+    if (fuzzyFirstPage.pageInfo.hasMore) {
+      await assertDirectQuery(repository, dictionary, {
+        ...fuzzyPageQuery,
+        cursor: fuzzyFirstPage.pageInfo.nextCursor,
+      }, fuzzyPageIds);
+    }
 
     await assertDirectQuery(repository, dictionary, { q: "CommonToken", fields: "definitions", part: "n" });
     await assertDirectQuery(repository, dictionary, { q: "CommonToken", fields: "definitions", tags: "RawTagToken" });
@@ -418,8 +466,14 @@ async function main() {
     await assertDirectQuery(repository, dictionary, { q: "STRASSETOKEN", fields: "lemma" }, ["entry-sharp-s"]);
     await assertDirectQuery(repository, dictionary, { q: "tPrivateToken", fields: "lemma" }, ["entry-pua-one"]);
     await assertDirectQuery(repository, dictionary, { q: "AlphaRoot", fields: "lemma" }, ["entry-alpha-root"]);
+    await assertDirectQuery(repository, dictionary, { q: "UPPERTAG-MORPHTOKEN", fields: "morphology" }, ["entry-upper-tag"]);
+    await assertDirectQuery(repository, dictionary, {
+      q: "STRSSTKN",
+      fields: "lemma",
+      fuzzyFields: "lemma",
+    }, ["entry-sharp-s"]);
 
-    console.log("Entry-search S3.3 projection query, search-hit, and fuzzy fallback checks passed.");
+    console.log("Entry-search S4 strict and fuzzy static/morphology projection checks passed.");
   } finally {
     await context.cleanup();
   }
