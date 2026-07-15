@@ -308,13 +308,38 @@ async function assertRootGroupQueryConsistency(repository, dictionary, params = 
   const apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups?${qs}`);
   assert.equal(apiResult.statusCode, 200);
   assert.equal(apiResult.body.pageInfo.hasMore, false);
-  assert.deepEqual(
-    apiResult.body.items.map((group) => ({
+  if (typeof repository.queryRootGroupEntries !== "function") {
+    assert.deepEqual(
+      apiResult.body.items.map((group) => ({
+        rootId: group.root.id,
+        derivedIds: group.derivedEntries.map((entry) => entry.id),
+        matchedDerivedIds: group.matchedDerivedIds,
+        rootMatches: Boolean(group.rootMatches),
+      })),
+      expectedRootGroupSnapshot(dictionary, params),
+      `legacy root group query consistency: ${JSON.stringify(params)}`,
+    );
+    return;
+  }
+  const actualGroups = [];
+  for (const group of apiResult.body.items) {
+    const entriesQs = queryString({ ...params, limit: 100, include: "summary" });
+    const entriesResult = await callApi(
+      repository,
+      "GET",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups/${encodeURIComponent(group.root.id)}/entries?${entriesQs}`,
+    );
+    assert.equal(entriesResult.statusCode, 200);
+    actualGroups.push({
       rootId: group.root.id,
-      derivedIds: group.derivedEntries.map((entry) => entry.id),
-      matchedDerivedIds: group.matchedDerivedIds,
+      derivedIds: entriesResult.body.items.map((entry) => entry.id),
+      matchedDerivedIds: entriesResult.body.items.filter((entry) => entry.rootGroupMatch).map((entry) => entry.id),
       rootMatches: Boolean(group.rootMatches),
-    })),
+    });
+    assert.equal(group.derivedCount, entriesResult.body.pageInfo.total);
+  }
+  assert.deepEqual(
+    actualGroups,
     expectedRootGroupSnapshot(dictionary, params),
     `root group query consistency: ${JSON.stringify(params)}`,
   );
@@ -1289,7 +1314,11 @@ async function runRepositoryContractTests(options = {}) {
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.items.length, 1);
     assert.equal(apiResult.body.items[0].lemma, "derived smoke");
-    assert.equal(apiResult.body.items[0].definitionPreview, "derived from root");
+    if (typeof repository.queryRootGroupEntries === "function") {
+      assert.deepEqual(apiResult.body.items[0].definitionPreviews.map((definition) => definition.meaning), ["derived from root"]);
+    } else {
+      assert.equal(apiResult.body.items[0].definitionPreview, "derived from root");
+    }
 
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entries?part=v&tags=derived&tagMode=all&limit=1`);
     assert.equal(apiResult.statusCode, 200);
@@ -1320,8 +1349,21 @@ async function runRepositoryContractTests(options = {}) {
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.items.length, 1);
     assert.equal(apiResult.body.items[0].root.id, rootEntryId);
-    assert.deepEqual(apiResult.body.items[0].derivedEntries.map((entry) => entry.id), [derivedEntryId]);
-    assert.deepEqual(apiResult.body.items[0].matchedDerivedIds, [derivedEntryId]);
+    if (typeof repository.queryRootGroupEntries === "function") {
+      assert.equal(apiResult.body.items[0].derivedCount, 1);
+      assert.equal(apiResult.body.items[0].matchedDerivedCount, 1);
+      apiResult = await callApi(
+        repository,
+        "GET",
+        `/api/dictionaries/${encodeURIComponent(first.id)}/root-groups/${encodeURIComponent(rootEntryId)}/entries?q=derived&limit=100`,
+      );
+      assert.equal(apiResult.statusCode, 200);
+      assert.deepEqual(apiResult.body.items.map((entry) => entry.id), [derivedEntryId]);
+      assert.equal(apiResult.body.items[0].rootGroupMatch, true);
+    } else {
+      assert.deepEqual(apiResult.body.items[0].derivedEntries.map((entry) => entry.id), [derivedEntryId]);
+      assert.deepEqual(apiResult.body.items[0].matchedDerivedIds, [derivedEntryId]);
+    }
 
     await checkReadApiConsistency(repository);
     if (shouldStopAfter("readApi")) {

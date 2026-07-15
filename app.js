@@ -53,6 +53,10 @@ const queryPageCache = new QueryPageCache({
   maxEntries: 4,
   maxBytes: 16 * 1024 * 1024,
 });
+const entryDetailCache = new QueryPageCache({
+  maxEntries: 12,
+  maxBytes: 12 * 1024 * 1024,
+});
 let docsViewMode = "split";
 let docsSaveTimer = null;
 let corpusSaveTimer = null;
@@ -105,8 +109,7 @@ let advancedFilter = null;
 let entryQueryState = {
   key: "",
   status: "idle",
-  ids: [],
-  hitsById: {},
+  items: [],
   pageInfo: null,
   error: null,
   requestId: 0,
@@ -127,6 +130,16 @@ let rootGroupsQueryState = {
   error: null,
   requestId: 0,
 };
+const rootGroupDerivedStates = new Map();
+let selectedEntryDetailState = {
+  dictionaryId: "",
+  entryId: "",
+  status: "idle",
+  entry: null,
+  error: null,
+  requestId: 0,
+};
+let selectedEntryDetailLoadPromise = null;
 const lexicalNetworkRelationsCache = new Map();
 let lexicalNetworkRelationsRequestId = 0;
 let qualityReportCache = null;
@@ -2376,7 +2389,124 @@ function activeDictionary() {
 
 function selectedEntry() {
   const dictionary = activeDictionary();
-  return dictionary?.entries.find((entry) => entry.id === state.selectedEntryId) || null;
+  if (
+    !dictionary
+    || !state.selectedEntryId
+    || selectedEntryDetailState.dictionaryId !== dictionary.id
+    || selectedEntryDetailState.entryId !== state.selectedEntryId
+    || selectedEntryDetailState.status !== "success"
+  ) {
+    return null;
+  }
+  return selectedEntryDetailState.entry;
+}
+
+function entryDetailCacheKey(dictionaryId, entryId) {
+  return `entry-detail\u0000${dictionaryId}\u0000${entryId}`;
+}
+
+function resetSelectedEntryDetailState() {
+  selectedEntryDetailLoadPromise = null;
+  selectedEntryDetailState = {
+    dictionaryId: "",
+    entryId: "",
+    status: "idle",
+    entry: null,
+    error: null,
+    requestId: selectedEntryDetailState.requestId + 1,
+  };
+}
+
+function cacheSavedEntryDetail(dictionaryId, entry) {
+  if (!dictionaryId || !entry?.id) {
+    return;
+  }
+  entryDetailCache.set(entryDetailCacheKey(dictionaryId, entry.id), entry, { dictionaryId });
+  if (state.activeDictionaryId === dictionaryId && state.selectedEntryId === entry.id) {
+    selectedEntryDetailState = {
+      dictionaryId,
+      entryId: entry.id,
+      status: "success",
+      entry,
+      error: null,
+      requestId: selectedEntryDetailState.requestId + 1,
+    };
+  }
+}
+
+async function ensureSelectedEntryDetailLoaded() {
+  const dictionary = activeDictionary();
+  const entryId = state.selectedEntryId;
+  if (!dictionary || !entryId) {
+    resetSelectedEntryDetailState();
+    return null;
+  }
+  if (
+    selectedEntryDetailState.dictionaryId === dictionary.id
+    && selectedEntryDetailState.entryId === entryId
+    && selectedEntryDetailState.status === "success"
+  ) {
+    return selectedEntryDetailState.entry;
+  }
+  if (
+    selectedEntryDetailState.dictionaryId === dictionary.id
+    && selectedEntryDetailState.entryId === entryId
+    && selectedEntryDetailState.status === "loading"
+  ) {
+    return selectedEntryDetailLoadPromise;
+  }
+  const requestId = selectedEntryDetailState.requestId + 1;
+  selectedEntryDetailState = {
+    dictionaryId: dictionary.id,
+    entryId,
+    status: "loading",
+    entry: null,
+    error: null,
+    requestId,
+  };
+  try {
+    selectedEntryDetailLoadPromise = entryDetailCache.load({
+      key: entryDetailCacheKey(dictionary.id, entryId),
+      dictionaryId: dictionary.id,
+      load: () => api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entryId)}`),
+    });
+    const entry = await selectedEntryDetailLoadPromise;
+    if (
+      selectedEntryDetailState.requestId !== requestId
+      || state.activeDictionaryId !== dictionary.id
+      || state.selectedEntryId !== entryId
+    ) {
+      return entry;
+    }
+    selectedEntryDetailState = {
+      dictionaryId: dictionary.id,
+      entryId,
+      status: "success",
+      entry,
+      error: null,
+      requestId,
+    };
+    renderDetail();
+    return entry;
+  } catch (error) {
+    if (selectedEntryDetailState.requestId === requestId) {
+      selectedEntryDetailState = {
+        dictionaryId: dictionary.id,
+        entryId,
+        status: "error",
+        entry: null,
+        error,
+        requestId,
+      };
+      console.error(error);
+      renderDetail();
+    }
+    return null;
+  } finally {
+    if (selectedEntryDetailState.requestId === requestId) {
+      selectedEntryDetailLoadPromise = null;
+    }
+  }
 }
 
 function selectedDictionaryConfig() {
@@ -4046,11 +4176,25 @@ function renderRootModeGroups(groups = [], options = {}) {
   }
 
   const rows = [];
+  const dictionary = activeDictionary();
   groups.forEach((group) => {
-    const expanded = expandedRootEntries.has(group.root.id) || Boolean(searchQuery && group.matchedDerived.length);
+    const expanded = expandedRootEntries.has(group.root.id) || Boolean(searchQuery && group.matchedDerivedCount);
     rows.push({ kind: "root", group, expanded });
     if (expanded) {
-      group.derived.forEach((entry) => rows.push({ kind: "derived", entry, rootId: group.root.id }));
+      const derivedState = rootGroupDerivedState(dictionary, group.root.id);
+      if (derivedState?.status === "success") {
+        derivedState.items.forEach((entry) => rows.push({ kind: "derived", entry, rootId: group.root.id }));
+        if (derivedState.pageInfo?.hasMore) {
+          rows.push({
+            kind: "truncation",
+            loaded: derivedState.items.length,
+            total: derivedState.pageInfo.total,
+            messageKey: "entryResultsTruncated",
+          });
+        }
+      } else if (derivedState) {
+        rows.push({ kind: "derived-status", rootId: group.root.id, status: derivedState.status });
+      }
     }
   });
   if (options.pageInfo?.hasMore) {
@@ -4066,17 +4210,21 @@ function renderRootModeGroups(groups = [], options = {}) {
     resetToken: entryVirtualResetToken(),
     getKey: (row) => row.kind === "truncation"
       ? `truncation:root-groups:${row.loaded}:${row.total}`
+      : row.kind === "derived-status"
+        ? `derived-status:${row.rootId}:${row.status}`
       : row.kind === "root"
         ? `root:${row.group.root.id}`
         : `derived:${row.rootId}:${row.entry.id}`,
-    getEstimatedHeight: (row) => row.kind === "truncation" ? 44 : row.kind === "root" ? 156 : 116,
+    getEstimatedHeight: (row) => ["truncation", "derived-status"].includes(row.kind) ? 44 : row.kind === "root" ? 156 : 116,
     getSizeCacheKey: (row) => row.kind === "truncation"
       ? `truncation:root-groups:${currentLanguage}:${row.loaded}:${row.total}`
+      : row.kind === "derived-status"
+        ? `derived-status:${currentLanguage}:${row.rootId}:${row.status}`
       : row.kind === "root"
       ? entryCardSizeCacheKey(row.group.root, {
         role: "root",
         expanded: row.expanded,
-        derivedCount: row.group.derived.length,
+        derivedCount: row.group.derivedCount,
         settingsSizeSignature,
       })
       : entryCardSizeCacheKey(row.entry, { role: "derived", rootId: row.rootId, settingsSizeSignature }),
@@ -4127,7 +4275,7 @@ function entryCardContentSizeSignature(entry) {
     entry.pronunciation,
     entryPartText(entry),
     (entry.tags || []).join(","),
-    (entry.definitions || []).map((definition) => [
+    entryDefinitionItems(entry).map((definition) => [
       definition.id,
       definition.meaning,
       definition.example,
@@ -4176,16 +4324,11 @@ function rootGroupsQueryApiKey(dictionary = activeDictionary()) {
   if (!dictionary) {
     return "";
   }
-  const settings = normalizeDictionarySettings(dictionary.settings);
   return [
     dictionary.id,
     dictionary.updatedAt || "",
     normalizeEntrySearchText(searchQuery, dictionary),
     entrySort,
-    stableJson(dictionary.morphology || {}),
-    stableJson(settings.tagDisplayMap),
-    settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
-    settings.partOfSpeechTags.join(","),
     entrySearchQuerySignature(dictionary),
   ].join("|");
 }
@@ -4197,15 +4340,11 @@ function queryPageCacheKey(kind, key) {
 function compactRootGroupsQueryResult(result) {
   const groups = Array.isArray(result?.items)
     ? result.items.map((group) => ({
-      rootId: group.root?.id || "",
-      derivedIds: Array.isArray(group.derivedEntries)
-        ? group.derivedEntries.map((entry) => entry.id).filter(Boolean)
-        : [],
-      matchedDerivedIds: Array.isArray(group.matchedDerivedIds)
-        ? group.matchedDerivedIds.filter(Boolean)
-        : [],
+      root: group.root || null,
+      derivedCount: Math.max(0, Number(group.derivedCount) || 0),
+      matchedDerivedCount: Math.max(0, Number(group.matchedDerivedCount) || 0),
       rootMatches: Boolean(group.rootMatches),
-    })).filter((group) => group.rootId)
+    })).filter((group) => group.root?.id)
     : [];
   return {
     groups,
@@ -4222,6 +4361,7 @@ function resetRootGroupsQueryState() {
     error: null,
     requestId: rootGroupsQueryState.requestId + 1,
   };
+  rootGroupDerivedStates.clear();
 }
 
 function rootGroupsQueryUrl(dictionary, options = {}) {
@@ -4252,25 +4392,74 @@ function rootGroupsQueryForRender(dictionary) {
   if (rootGroupsQueryState.status !== "success" || rootGroupsQueryState.key !== key) {
     return null;
   }
-  const byId = new Map((dictionary?.entries || []).map((entry) => [entry.id, entry]));
-  const groups = rootGroupsQueryState.groups.map((group) => {
-    const root = byId.get(group.rootId);
-    if (!root) {
-      return null;
-    }
-    const derived = group.derivedIds.map((id) => byId.get(id)).filter(Boolean);
-    const matchedDerived = group.matchedDerivedIds.map((id) => byId.get(id)).filter(Boolean);
-    if (derived.length !== group.derivedIds.length || matchedDerived.length !== group.matchedDerivedIds.length) {
-      return null;
-    }
-    return {
-      root,
-      derived,
-      matchedDerived,
-      rootMatches: group.rootMatches,
-    };
+  return rootGroupsQueryState.groups;
+}
+
+function rootGroupDerivedStateKey(dictionary, rootId) {
+  return `${rootGroupsQueryApiKey(dictionary)}\u0000${rootId}`;
+}
+
+function rootGroupDerivedUrl(dictionary, rootId) {
+  const baseUrl = rootGroupsQueryUrl(dictionary, { limit: 2000 });
+  return baseUrl.replace(
+    `/root-groups?`,
+    `/root-groups/${encodeURIComponent(rootId)}/entries?`,
+  );
+}
+
+function rootGroupDerivedState(dictionary, rootId) {
+  return rootGroupDerivedStates.get(rootGroupDerivedStateKey(dictionary, rootId)) || null;
+}
+
+function startRootGroupDerivedLoad(dictionary, rootId) {
+  const key = rootGroupDerivedStateKey(dictionary, rootId);
+  const current = rootGroupDerivedStates.get(key);
+  if (current && ["loading", "success", "error"].includes(current.status)) {
+    return;
+  }
+  const requestId = (current?.requestId || 0) + 1;
+  rootGroupDerivedStates.set(key, {
+    status: "loading",
+    items: [],
+    pageInfo: null,
+    error: null,
+    requestId,
   });
-  return groups.every(Boolean) ? groups : null;
+  queryPageCache.load({
+    key: queryPageCacheKey("root-group-entries", key),
+    dictionaryId: dictionary.id,
+    load: () => api(rootGroupDerivedUrl(dictionary, rootId)),
+    transform: compactEntryQueryResult,
+  })
+    .then((result) => {
+      const active = rootGroupDerivedStates.get(key);
+      if (active?.requestId !== requestId || rootGroupsQueryApiKey(activeDictionary()) !== rootGroupsQueryApiKey(dictionary)) {
+        return;
+      }
+      rootGroupDerivedStates.set(key, {
+        status: "success",
+        items: result.items,
+        pageInfo: result.pageInfo,
+        error: null,
+        requestId,
+      });
+      renderEntries();
+    })
+    .catch((error) => {
+      const active = rootGroupDerivedStates.get(key);
+      if (active?.requestId !== requestId) {
+        return;
+      }
+      rootGroupDerivedStates.set(key, {
+        status: "error",
+        items: [],
+        pageInfo: null,
+        error,
+        requestId,
+      });
+      console.error(error);
+      renderEntries();
+    });
 }
 
 function startRootGroupsQueryApiCheck(dictionary) {
@@ -4284,6 +4473,9 @@ function startRootGroupsQueryApiCheck(dictionary) {
   const key = rootGroupsQueryApiKey(dictionary);
   if (rootGroupsQueryState.key === key && ["loading", "success", "error"].includes(rootGroupsQueryState.status)) {
     return;
+  }
+  if (rootGroupsQueryState.key && rootGroupsQueryState.key !== key) {
+    rootGroupDerivedStates.clear();
   }
 
   const requestId = rootGroupsQueryState.requestId + 1;
@@ -4376,22 +4568,74 @@ function entryQueryApiKey(dictionary = activeDictionary()) {
 }
 
 function compactEntryQueryResult(result) {
-  const items = Array.isArray(result?.items) ? result.items : [];
   return {
-    ids: items.map((entry) => entry.id).filter(Boolean),
-    hitsById: Object.fromEntries(items
-      .filter((entry) => entry?.id && Array.isArray(entry.searchHits))
-      .map((entry) => [entry.id, entry.searchHits])),
+    items: Array.isArray(result?.items) ? result.items.filter((entry) => entry?.id) : [],
     pageInfo: result?.pageInfo || null,
   };
+}
+
+function entrySummaryDto(entry, dictionary = activeDictionary()) {
+  const parts = entryParts(entry, dictionary);
+  return {
+    id: entry.id,
+    lemma: entry.lemma || "",
+    pronunciation: entry.pronunciation || "",
+    tags: Array.isArray(entry.tags) ? [...entry.tags] : [],
+    definitionPreviews: (entry.definitions || []).map((definition, position) => ({
+      id: definition.id || "",
+      position,
+      meaning: definition.meaning || "",
+    })),
+    createdAt: entry.createdAt || "",
+    updatedAt: entry.updatedAt || "",
+    partOfSpeech: parts[0] || "",
+    parts,
+  };
+}
+
+function updateEntrySummaryDtoAfterSave(dictionary, entry) {
+  if (!dictionary || !entry?.id) {
+    return;
+  }
+  const summary = entrySummaryDto(entry, dictionary);
+  if (entryQueryState.status === "success") {
+    const hadEntry = entryQueryState.items.some((item) => item.id === entry.id);
+    entryQueryState.items = entryQueryState.items.map((item) => (
+      item.id === entry.id
+        ? { ...summary, ...(Array.isArray(item.searchHits) ? { searchHits: item.searchHits } : {}) }
+        : item
+    ));
+    if (!hadEntry && !normalizeEntrySearchText(searchQuery, dictionary) && !activePart) {
+      entryQueryState.items.push(summary);
+      entryQueryState.items.sort(compareEntries);
+      if (entryQueryState.pageInfo) {
+        entryQueryState.pageInfo = {
+          ...entryQueryState.pageInfo,
+          total: Number(entryQueryState.pageInfo.total || 0) + 1,
+        };
+      }
+    }
+    if (!rootMode && !advancedFilter) {
+      renderEntryRows(entryQueryState.items, { pageInfo: entryQueryState.pageInfo });
+    }
+  }
+  rootGroupsQueryState.groups = rootGroupsQueryState.groups.map((group) => (
+    group.root.id === entry.id ? { ...group, root: summary } : group
+  ));
+  rootGroupDerivedStates.forEach((derivedState) => {
+    if (derivedState.status === "success") {
+      derivedState.items = derivedState.items.map((item) => (
+        item.id === entry.id ? { ...summary, rootGroupMatch: item.rootGroupMatch } : item
+      ));
+    }
+  });
 }
 
 function resetEntryQueryState(options = {}) {
   entryQueryState = {
     key: "",
     status: "idle",
-    ids: [],
-    hitsById: {},
+    items: [],
     pageInfo: null,
     error: null,
     requestId: entryQueryState.requestId + 1,
@@ -4416,7 +4660,7 @@ function entryQueryUrl(dictionary, options = {}) {
     params.set("fuzzyFields", [...fuzzyFields].join(","));
   }
   params.set("include", "summary");
-  params.set("limit", String(Math.min(Math.max((dictionary?.entries || []).length, 500), 10000)));
+  params.set("limit", String(Math.min(Math.max(dictionaryEntryCount(dictionary), 500), 10000)));
   Object.entries(options).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") {
       params.set(key, String(value));
@@ -4430,14 +4674,7 @@ function entryQueryEntriesForRender(dictionary) {
   if (entryQueryState.status !== "success" || entryQueryState.key !== key) {
     return null;
   }
-  const byId = new Map((dictionary.entries || []).map((entry) => [entry.id, entry]));
-  const entries = entryQueryState.ids.map((id) => {
-    const entry = byId.get(id);
-    return entry && Object.hasOwn(entryQueryState.hitsById, id)
-      ? { ...entry, searchHits: entryQueryState.hitsById[id] }
-      : entry;
-  }).filter(Boolean);
-  return entries.length === entryQueryState.ids.length ? entries : null;
+  return entryQueryState.items;
 }
 
 function startEntryQueryApiCheck(dictionary) {
@@ -4461,8 +4698,7 @@ function startEntryQueryApiCheck(dictionary) {
     entryQueryState = {
       key,
       status: "success",
-      ids: cached.ids,
-      hitsById: cached.hitsById,
+      items: cached.items,
       pageInfo: cached.pageInfo,
       error: null,
       requestId,
@@ -4474,8 +4710,7 @@ function startEntryQueryApiCheck(dictionary) {
   entryQueryState = {
     key,
     status: "loading",
-    ids: [],
-    hitsById: {},
+    items: [],
     pageInfo: null,
     error: null,
     requestId,
@@ -4495,8 +4730,7 @@ function startEntryQueryApiCheck(dictionary) {
       entryQueryState = {
         key,
         status: "success",
-        ids: result.ids,
-        hitsById: result.hitsById,
+        items: result.items,
         pageInfo: result.pageInfo,
         error: null,
         requestId,
@@ -4512,8 +4746,7 @@ function startEntryQueryApiCheck(dictionary) {
       entryQueryState = {
         key,
         status: "error",
-        ids: [],
-        hitsById: {},
+        items: [],
         pageInfo: null,
         error,
         requestId,
@@ -4648,6 +4881,15 @@ function renderRootModeRow(row) {
   if (row.kind === "truncation") {
     return renderEntryQueryTruncationNotice(row);
   }
+  if (row.kind === "derived-status") {
+    const status = document.createElement("div");
+    status.className = "entry-list-truncation-notice";
+    status.setAttribute("role", "status");
+    status.textContent = row.status === "error"
+      ? aText("无法加载衍生词条", "Could not load derived entries")
+      : aText("加载中", "Loading");
+    return status;
+  }
   if (row.kind === "derived") {
     const wrapper = document.createElement("div");
     wrapper.className = "root-derived-list virtual-root-derived-row";
@@ -4656,11 +4898,14 @@ function renderRootModeRow(row) {
     return wrapper;
   }
   const { group, expanded } = row;
+  if (expanded && !rootGroupDerivedState(activeDictionary(), group.root.id)) {
+    startRootGroupDerivedLoad(activeDictionary(), group.root.id);
+  }
   const wrapper = document.createElement("article");
   wrapper.className = "root-entry-group";
   wrapper.dataset.rootId = group.root.id;
   wrapper.append(createEntryCard(group.root, { root: true, rootId: group.root.id }));
-  if (group.derived.length) {
+  if (group.derivedCount) {
     const toggle = document.createElement("button");
     toggle.type = "button";
     toggle.className = `root-toggle-button${expanded ? " expanded" : ""}`;
@@ -4673,6 +4918,10 @@ function renderRootModeRow(row) {
       if (expandedRootEntries.has(group.root.id)) {
         expandedRootEntries.delete(group.root.id);
       } else {
+        const derivedKey = rootGroupDerivedStateKey(activeDictionary(), group.root.id);
+        if (rootGroupDerivedStates.get(derivedKey)?.status === "error") {
+          rootGroupDerivedStates.delete(derivedKey);
+        }
         expandedRootEntries.add(group.root.id);
       }
       renderEntries();
@@ -4989,9 +5238,16 @@ function updateHoveredEntryQualityIssueTooltipPlacement() {
 }
 
 function entryDefinitionMeanings(entry) {
-  return (entry.definitions || [])
+  return entryDefinitionItems(entry)
     .map((definition) => String(definition.meaning || "").trim())
     .filter(Boolean);
+}
+
+function entryDefinitionItems(entry = {}) {
+  if (Array.isArray(entry.definitions)) {
+    return entry.definitions;
+  }
+  return Array.isArray(entry.definitionPreviews) ? entry.definitionPreviews : [];
 }
 
 function entryDefinitionSummary(entry, showPolysemy = false) {
@@ -5015,11 +5271,6 @@ async function switchToEntry(entryId, options = {}) {
     return;
   }
 
-  const targetEntry = dictionary.entries.find((entry) => entry.id === entryId);
-  if (!targetEntry) {
-    return;
-  }
-
   const ready = await closePendingEditsForPageSwitch();
   if (!ready) {
     return;
@@ -5027,9 +5278,11 @@ async function switchToEntry(entryId, options = {}) {
 
   entryDraft = null;
   state.selectedEntryId = entryId;
+  resetSelectedEntryDetailState();
   editorMode = "display";
   const navigationOptions = prepareRootModeEntryNavigation(entryId, options);
   render();
+  await ensureSelectedEntryDetailLoaded();
   scheduleEntryCardScroll(entryId, navigationOptions);
   closeMobileEntryBrowserDrawer();
 }
@@ -5793,7 +6046,7 @@ function renderEntrySearchSnippets(entry) {
     etymology: t("etymology"),
     morphology: t("morphologyDisplay"),
   };
-  const firstDisplayedDefinitionIndex = (entry.definitions || []).findIndex((definition) => (
+  const firstDisplayedDefinitionIndex = entryDefinitionItems(entry).findIndex((definition) => (
     Boolean(String(definition?.meaning || "").trim())
   ));
   const labelOrder = Object.keys(labels);
@@ -5868,6 +6121,14 @@ function renderDetail() {
   if (!entry) {
     elements.entryDisplay.hidden = false;
     renderEmptyDetail();
+    if (state.selectedEntryId) {
+      if (selectedEntryDetailState.status === "error") {
+        elements.displayLemma.textContent = aText("无法加载词条详情", "Could not load entry details");
+      } else {
+        elements.displayLemma.textContent = aText("加载中", "Loading");
+        ensureSelectedEntryDetailLoaded();
+      }
+    }
     return;
   }
 
@@ -6215,8 +6476,9 @@ function createNetworkNode(entry, isFocus = false) {
 
 function renderNetworkMeaningHtml(entry, showPolysemy = false) {
   const meanings = entryDefinitionMeanings(entry);
-  if (!meanings.length && entry.definitionPreview) {
-    return `<div class="network-definition-list"><p>${escapeHtml(entry.definitionPreview)}</p></div>`;
+  const preview = entryDefinitionItems(entry).map((definition) => definition.meaning).find(Boolean) || "";
+  if (!meanings.length && preview) {
+    return `<div class="network-definition-list"><p>${escapeHtml(preview)}</p></div>`;
   }
   if (!meanings.length) {
     return "";
@@ -11001,6 +11263,8 @@ async function savePartialEdit(event) {
     });
     upsertEntryInDictionary(dictionary.id, savedEntry);
     state.selectedEntryId = savedEntry.id;
+    cacheSavedEntryDetail(dictionary.id, savedEntry);
+    updateEntrySummaryDtoAfterSave(activeDictionary(), savedEntry);
     cancelPartialEdit();
     resetEntryReadStateAfterSave({ preserveEntryList: true });
     render();
@@ -11159,6 +11423,8 @@ async function saveEntry(event) {
     );
     upsertEntryInDictionary(dictionary.id, savedEntry);
     state.selectedEntryId = savedEntry.id;
+    cacheSavedEntryDetail(dictionary.id, savedEntry);
+    updateEntrySummaryDtoAfterSave(activeDictionary(), savedEntry);
     entryDraft = null;
     editorMode = "display";
     resetEntryReadStateAfterSave({ preserveEntryList: true });
@@ -11274,6 +11540,10 @@ async function saveDictionary(event) {
 
 function invalidateDictionaryQueryCache(dictionaryId) {
   queryPageCache.invalidateDictionary(dictionaryId);
+  entryDetailCache.invalidateDictionary(dictionaryId);
+  if (selectedEntryDetailState.dictionaryId === dictionaryId) {
+    resetSelectedEntryDetailState();
+  }
 }
 
 function replaceDictionaryInState(saved) {
@@ -11427,6 +11697,7 @@ function resetEntryReadStateAfterSave(options = {}) {
   resetEntryFacetsState();
   resetRootGroupsQueryState();
   lexicalNetworkRelationsCache.clear();
+  rootGroupDerivedStates.clear();
 }
 
 async function activateDictionary(dictionaryId) {
@@ -11795,7 +12066,7 @@ elements.expandAllRootsButton.addEventListener("click", () => {
   ) {
     return;
   }
-  rootModeGroups().forEach((group) => expandedRootEntries.add(group.root.id));
+  rootGroupsQueryState.groups.forEach((group) => expandedRootEntries.add(group.root.id));
   renderEntries();
 });
 

@@ -528,7 +528,7 @@ lib/
 2. 确认当前分支、工作树和最新提交；如果有未提交改动，先判断归属，不要默认回滚。
 3. 默认后端已经是 SQLite。若涉及启动/存储，先跑 SQLite schema、repository contract 或目标功能的定向检查；只有改动 legacy/debug 边界时才需要额外验证显式 JSON 模式。
 4. 若继续阶段 B，优先处理默认 SQLite 后的清债项：
-   - 查询缓存 Q1/Q2 已完成前端紧凑 LRU、后端运行时会话、in-flight 合并和词典级 generation 失效。下一步按 `QUERY_SESSION_CACHE_PLAN.md` 的 Q3 收窄列表 DTO、按需加载词条详情，并拆开折叠词根组与衍生词加载。
+   - 查询缓存 Q1–Q3 已完成前端查询 LRU、后端运行时会话、in-flight 合并、词典级 generation 失效、列表 summary DTO 直读、当前词条按需详情和词根组子项懒加载。下一步按 `QUERY_SESSION_CACHE_PLAN.md` 的 Q4 设计可重建 cursor 与纯滚动数据窗口。
    - 先让词条列表直接消费 summary DTO、按需加载详情，并把折叠词根组与衍生词加载拆开；之后再推进纯滚动数据窗口化，保留虚拟滚动和准确的 `hasMore/total` 语义。
    - 将带搜索条件的词根模式、高级筛选等剩余本地/完整 snapshot 路径接到可序列化查询契约；候选索引是否采用 FTS/ngram 由真实基准决定。
    - 形态学结构化存储已完成；DSL v2、表格结构编辑与 layout 设计暂缓，除明确 bug 外不要继续扩展其 schema。数据分析升级时删除 `app.js` 的旧形态单表适配，改为直接调用共享 morphology model。

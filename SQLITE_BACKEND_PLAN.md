@@ -443,7 +443,7 @@ POST /api/dictionaries/:id/diagnostics/fix
 
 SQLite repository 的核心读写、schema、迁移脚本和 smoke 已经落地，`server.js` 已默认使用 SQLite；静态和形态搜索 projection 也已进入主查询路径。当前优先级是读取稳定性与剩余查询下推：
 
-1. 查询缓存 Q1/Q2 已完成前端紧凑缓存以及 fuzzy entries/root groups 的后端运行时会话；下一步按 `QUERY_SESSION_CACHE_PLAN.md` 的 Q3 收窄列表 DTO、按需读取详情并拆开词根组子项。
+1. 查询缓存 Q1–Q3 已完成前端查询缓存、fuzzy entries/root groups 后端运行时会话、列表 summary DTO 直读、当前词条按需详情和词根组子项懒加载；下一步按 `QUERY_SESSION_CACHE_PLAN.md` 的 Q4 设计可重建 cursor 与纯滚动数据窗口。
 2. 先让列表直接消费 summary DTO、详情按需读取，并拆开折叠词根组与衍生词加载；随后推进纯滚动数据窗口化，停止依赖一次性 `limit=10000` 作为长期方案。
 3. 将带搜索条件的 root groups、高级筛选、数据分析和质量检查逐步接入查询 API/query planner。
 4. 候选索引是否采用 FTS/ngram 由真实词典基准决定；语料 SQL 化留到语料升级阶段。

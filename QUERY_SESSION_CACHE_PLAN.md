@@ -260,7 +260,7 @@ query kind
 
 ### Q1：前端紧凑查询缓存与请求合并（已完成）
 
-- 已新增通用 `QueryPageCache`，entries、root groups 和 facets 会缓存紧凑投影，不复制整页 summary DTO。
+- 已新增通用 `QueryPageCache`，entries、root groups 和 facets 会缓存紧凑查询结果；entries 在 Q3 起直接缓存可渲染的 summary DTO，避免再复制完整词条。
 - facets 已改用 `dictionary.updatedAt`，不再以 O(N) 方式扫描词条标签生成签名。
 - 当前前端上限为 4 项、约 16 MiB；同 key Promise 会合并，成功结果按 LRU/容量淘汰，错误不缓存。
 - 现有 `requestId` 继续保护 UI 提交；有效迟到响应可以写入缓存，写入成功、词典覆盖或删除会按词典失效。
@@ -286,12 +286,12 @@ query kind
 
 该结果证明会话复用有效，同时暴露两个后续边界：无搜索 root groups 的首次构建仍约 6.2 秒，必须继续下推/优化；大页面 fuzzy entries 的热查询仍约 94ms，主要成本已经转为页面 DTO 和命中详情重建，适合由 Q3/Q4 的小窗口与按需详情继续收窄。
 
-### Q3：列表 DTO、按需详情与词根组边界
+### Q3：列表 DTO、按需详情与词根组边界（已完成）
 
-- 列表直接保存 API summary DTO，不再通过完整 `dictionary.entries` 把 ID 映射回词条。
-- 选中词条时使用 `/entries/:entryId` 读取详情，并建立小型详情缓存。
-- 保存响应局部更新 DTO、详情缓存和查询失效状态。
-- 折叠词根组不再携带全部衍生词；展开时按需读取，超大组可继续分页。
+- 普通列表直接保存并渲染 API summary DTO，不再先压缩成 ID、再通过完整 `dictionary.entries` 映射回词条。summary 的 `definitionPreviews` 保留全部义项的轻量文本与原位置，因此列表的多义项显示和搜索命中序号不需要完整词条。
+- 当前词条详情统一通过 `/entries/:entryId` 按需读取；前端使用最多 12 项、约 12 MiB 的小型 LRU，并合并同一词条的并发请求。保存响应会立即更新当前详情缓存，查询 DTO 则局部更新后按 `updatedAt` 失效并重查。
+- `/root-groups` 的折叠组只返回 root summary、衍生词数量和匹配数量，不再携带全部衍生词。展开时通过 `/root-groups/:rootId/entries` 读取组内 summary；该子端点与父端点复用同一关系会话，并保留独立 cursor/`hasMore`。
+- 普通编辑器列表与详情已切到上述边界；高级筛选、数据分析、质量检查及若干本地关系消费者仍会在 Q5 前使用完整活动词典 snapshot。这是尚未迁移的当前消费者，不是 summary/detail 的运行时兜底。
 
 ### Q4：可重建 cursor 与纯滚动窗口化
 

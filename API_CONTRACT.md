@@ -81,6 +81,7 @@
 | `GET` | `/api/dictionaries/:id/facets` | 读取词性和标签统计 | `{ parts, tags, noPartOfSpeechCount }` | 尊重当前词典的词性标签设置和标签显示替换。前端词性筛选选项正常路径以该 API 为准，不再每次本地统计完整词性集合做一致性校验。 |
 | `GET` | `/api/dictionaries/:id/entry-relations/:entryId` | 读取词源/衍生/同根关系 | `{ entryId, sources, derivedEntries, rootGroup }` | SQLite 路径直接读取 `entries` / `entry_sources` projection；同名 lemma 暂按排序后的第一条匹配，后续可由诊断模块报告歧义。 |
 | `GET` | `/api/dictionaries/:id/root-groups` | 读取词根模式分组 | `{ items, pageInfo }` | 支持 `q`、`fields`、`fuzzyFields`、`sort`、`cursor`、`limit`、`include`。前端词根模式正常路径以该 API 为准，不再用前端本地完整分组兜底。 |
+| `GET` | `/api/dictionaries/:id/root-groups/:rootId/entries` | 按需读取单个词根组的衍生词 | `{ items, pageInfo }` | 参数与词根组查询一致；折叠组不再预载全部衍生词，展开后才读取。 |
 
 #### `GET /api/dictionaries/:id/entries` 查询参数补充
 
@@ -238,7 +239,9 @@ GET /api/dictionaries/:id/entries?q=&fields=&fuzzyFields=&part=&tags=&tagMode=&s
       lemma,
       pronunciation,
       tags,
-      definitionPreview,
+      definitionPreviews: [
+        { id, position, meaning }
+      ],
       createdAt,
       updatedAt,
       partOfSpeech,
@@ -338,12 +341,12 @@ GET /api/dictionaries/:id/entry-relations/:entryId
     { sourceText, matchedEntryId, matchedLemma }
   ],
   derivedEntries: [
-    { id, lemma, pronunciation, tags, definitionPreview, createdAt, updatedAt }
+    { id, lemma, pronunciation, tags, definitionPreviews, createdAt, updatedAt }
   ],
   rootGroup: {
     rootKey,
     entries: [
-      { id, lemma, pronunciation, tags, definitionPreview, createdAt, updatedAt }
+      { id, lemma, pronunciation, tags, definitionPreviews, createdAt, updatedAt }
     ]
   }
 }
@@ -365,17 +368,23 @@ GET /api/dictionaries/:id/root-groups?q=&fields=&fuzzyFields=&sort=&cursor=&limi
 {
   items: [
     {
-      root: { id, lemma, pronunciation, tags, definitionPreview, createdAt, updatedAt },
-      derivedEntries: [
-        { id, lemma, pronunciation, tags, definitionPreview, createdAt, updatedAt }
-      ],
-      matchedDerivedIds: [],
+      root: { id, lemma, pronunciation, tags, definitionPreviews, createdAt, updatedAt },
+      derivedCount,
+      matchedDerivedCount,
       rootMatches: true
     }
   ],
   pageInfo: { nextCursor, hasMore, total }
 }
 ```
+
+折叠的词根组不携带衍生词 DTO。展开某组时按需读取：
+
+```text
+GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&sort=&cursor=&limit=&include=
+```
+
+返回 `{ items, pageInfo }`；每个 `items` 元素是词条 summary（或 `include=full` 时的完整词条），并额外含 `rootGroupMatch`，表示该衍生词是否直接命中当前词根查询。该端点与 `/root-groups` 共享同一个运行时关系会话；`limit` 和 `cursor` 只切分当前组内的衍生词。
 
 性能优化方向：
 
