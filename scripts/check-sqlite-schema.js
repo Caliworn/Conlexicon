@@ -36,6 +36,7 @@ async function runSqliteSchemaCheck() {
       "definitions",
       "entry_tags",
       "entry_sources",
+      "entry_search_values",
       "morphology_template_groups",
       "morphology_template_tables",
       "morphology_template_cells",
@@ -52,6 +53,10 @@ async function runSqliteSchemaCheck() {
     const entryTagColumns = new Set(db.prepare("PRAGMA table_info(entry_tags)").all().map((row) => row.name));
     ["entry_id", "position", "tag"].forEach((column) => assert.equal(entryTagColumns.has(column), true, `missing entry_tags column: ${column}`));
     assert.equal(entryTagColumns.has("normalized_tag"), false);
+    const entrySearchValueColumns = new Set(db.prepare("PRAGMA table_info(entry_search_values)").all().map((row) => row.name));
+    ["entry_id", "field", "source_type", "source_id", "source_position", "value_type", "raw_value", "normalized_value"]
+      .forEach((column) => assert.equal(entrySearchValueColumns.has(column), true, `missing entry_search_values column: ${column}`));
+    assert.equal(entrySearchValueColumns.has("id"), false);
     const entryMorphologyGroupColumns = new Set(db.prepare("PRAGMA table_info(entry_morphology_groups)").all().map((row) => row.name));
     ["entry_id", "position", "template_group_id", "title", "notes", "created_at", "updated_at"]
       .forEach((column) => assert.equal(entryMorphologyGroupColumns.has(column), true, `missing entry morphology group column: ${column}`));
@@ -63,6 +68,31 @@ async function runSqliteSchemaCheck() {
 
     const sourceDictionary = sampleSqliteDictionary();
     await repository.importDictionarySnapshot(sourceDictionary);
+    const projectionDb = repository.openDictionaryDatabase(sourceDictionary.id);
+    const importedSearchRows = projectionDb.prepare(`
+      SELECT field, source_type AS sourceType, source_id AS sourceId, source_position AS sourcePosition,
+        value_type AS valueType, raw_value AS rawValue, normalized_value AS normalizedValue
+      FROM entry_search_values
+      WHERE entry_id = 'entry-root'
+      ORDER BY field ASC, source_position ASC, value_type ASC
+    `).all();
+    assert.equal(importedSearchRows.some((row) => row.field === "morphology"), false);
+    assert.deepEqual(
+      { ...importedSearchRows.find((row) => row.field === "definitions") },
+      {
+        field: "definitions",
+        sourceType: "definition",
+        sourceId: "def-root",
+        sourcePosition: 0,
+        valueType: "meaning",
+        rawValue: "root meaning",
+        normalizedValue: "root meaning",
+      },
+    );
+    assert.equal(
+      importedSearchRows.some((row) => row.field === "tags" && row.valueType === "display" && row.rawValue === "noun"),
+      true,
+    );
     const savedMetadata = await repository.updateMetadata(sourceDictionary.id, {
       name: "SQLite Schema Updated",
       language: "test",
@@ -81,6 +111,36 @@ async function runSqliteSchemaCheck() {
     assert.deepEqual(Object.keys(savedSettings).sort(), ["id", "settings", "updatedAt"]);
     assert.equal(Object.hasOwn(savedSettings, "entries"), false);
     assert.equal(savedSettings.settings.entryListTagDisplayLimit, 4);
+
+    const normalizedSearchSettings = await repository.updateSettings(sourceDictionary.id, {
+      ...savedSettings.settings,
+      tagDisplayMap: { n: "NounLabel" },
+      search: {
+        ...savedSettings.settings.search,
+        normalization: {
+          unicodeNormalization: "none",
+          caseFolding: true,
+          customRules: [{ canonical: "stem", variants: ["root"] }],
+        },
+      },
+    });
+    assert.equal(normalizedSearchSettings.settings.tagDisplayMap.n, "NounLabel");
+    const rebuiltLemmaSearchRow = projectionDb.prepare(`
+      SELECT raw_value AS rawValue, normalized_value AS normalizedValue
+      FROM entry_search_values
+      WHERE entry_id = 'entry-root' AND field = 'lemma'
+    `).get();
+    assert.deepEqual({ ...rebuiltLemmaSearchRow }, { rawValue: "root", normalizedValue: "stem" });
+    assert.equal(projectionDb.prepare(`
+      SELECT COUNT(*) AS count
+      FROM entry_search_values
+      WHERE entry_id = 'entry-root' AND field = 'tags' AND value_type = 'display' AND raw_value = 'NounLabel'
+    `).get().count, 1);
+    assert.equal(projectionDb.prepare(`
+      SELECT COUNT(*) AS count
+      FROM entry_search_values
+      WHERE entry_id = 'entry-root' AND field = 'tags' AND value_type = 'display' AND raw_value = 'noun'
+    `).get().count, 0);
 
     const savedIpaSettings = await repository.updateIpaSettings(sourceDictionary.id, {
       mappings: [{ from: "a", to: "ɑ" }],
@@ -118,6 +178,11 @@ async function runSqliteSchemaCheck() {
     assert.equal(patchedEntries.entries[0].pronunciation, "/patched/");
     assert.equal(patchedEntries.settings.entryListTagDisplayLimit, 5);
     assert.equal(Object.hasOwn(patchedEntries, "name"), false);
+    assert.equal(projectionDb.prepare(`
+      SELECT normalized_value AS normalizedValue
+      FROM entry_search_values
+      WHERE entry_id = 'entry-root' AND field = 'pronunciation'
+    `).get().normalizedValue, "/patched/");
 
     const exported = repository.exportDictionarySnapshot(sourceDictionary.id);
     assert.equal(exported.id, sourceDictionary.id);
@@ -174,6 +239,9 @@ async function runSqliteSchemaCheck() {
     assert.equal(rebuiltEntry.morphologyGroups[0].notes, "Irregular plural retained for this entry.");
     assert.equal(Object.hasOwn(rebuiltEntry.morphologyGroups[0], "id"), false);
     assert.equal(Object.hasOwn(rebuiltEntry, "morphology"), false);
+
+    await repository.deleteEntry(sourceDictionary.id, "entry-derived");
+    assert.equal(projectionDb.prepare("SELECT COUNT(*) AS count FROM entry_search_values WHERE entry_id = 'entry-derived'").get().count, 0);
   } finally {
     await cleanup();
   }

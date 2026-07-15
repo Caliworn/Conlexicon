@@ -84,7 +84,7 @@
 
 - `fields`：逗号分隔的搜索字段白名单；当前支持 `lemma`、`pronunciation`、`tags`、`definitions`、`examples`、`notes`、`etymology`、`morphology`。为空或全部无效时搜索全部字段。
 - `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；仅对同时出现在 `fields` 中的字段生效。
-- 基础搜索逐个独立字段值匹配：一条释义、一个标签、一个来源或一段备注必须自行包含查询文本，查询不会跨多个值拼接命中；多标签组合等条件应使用高级筛选。自由文本按当前词典的 `settings.search.normalization` 处理。SQLite 仅在 `q` 为可打印 ASCII、`fields` 不含 `morphology`、`fuzzyFields` 为空，且未启用 case folding 或自定义规则时直接执行静态字段严格匹配；其余请求在 S3 检索投影完成前使用共享 JavaScript matcher。结构键和词源关系键不套用该自由文本配置。
+- 基础搜索逐个独立字段值匹配：一条释义、一个标签、一个来源或一段备注必须自行包含查询文本，查询不会跨多个值拼接命中；多标签组合等条件应使用高级筛选。自由文本按当前词典的 `settings.search.normalization` 处理。SQLite 对 `fields` 不含 `morphology` 且 `fuzzyFields` 为空的查询直接读取逐值静态 projection；该路径支持 NFC、Unicode case folding 和自定义等价规则。包含动态形态或字段级模糊匹配的请求仍使用共享 JavaScript matcher。结构键和词源关系键不套用该自由文本配置。
 
 ## 实体 ID 校验约定
 
@@ -247,6 +247,45 @@ GET /api/dictionaries/:id/entries?q=&fields=&fuzzyFields=&part=&tags=&tagMode=&s
   }
 }
 ```
+
+#### S3 逐值检索与命中定位契约
+
+S3 不把一个词条或同一字段的多个值拼成全文字符串。共享搜索模型先把词条展开为独立 value record：
+
+```js
+{
+  field,           // lemma / pronunciation / tags / definitions / examples / notes / etymology / morphology
+  value,           // 原始显示文本，不是规范化文本
+  sourceType,      // entry / tag / definition / etymologySource / morphology
+  sourceId,        // 有稳定 ID 时填写；标签等无独立 ID 的对象为空字符串
+  sourcePosition,  // 该来源在所属词条中的零基位置
+  valueType        // lemma / raw / display / meaning / example / note / description / source / generated 等
+}
+```
+
+`lib/entry-search-model.js` 的 `entrySearchValueRecords()` 是该结构的共享定义；现有 matcher 也由这些 records 重新聚合字段值，避免后续 SQL projection 与 JavaScript 搜索形成两套逐值边界。`morphology` record 仍由共享形态模型动态生成，不进入 S3 第一批静态 projection。
+
+SQLite projection 查询中，带 `q` 的分页结果会为每个命中词条附加：
+
+```js
+{
+  // 既有 summary 或 full entry 字段
+  searchHits: [
+    {
+      field,
+      value,
+      sourceType,
+      sourceId,
+      sourcePosition,
+      valueType
+    }
+  ]
+}
+```
+
+`searchHits` 只返回当前查询实际命中的独立 records；同一来源定位与 `valueType` 的同一值最多返回一次，但不同义项包含相同文本时仍分别返回。它用于选择命中摘要、显示义项序号及定位原始对象，不代替前端基于共享 normalizer 的原文范围映射。无 `q` 时省略该字段；动态形态或 fuzzy fallback 当前也不返回该字段，前端继续使用共享 matcher 生成摘要。S3.1 固定 record/response 形状，S3.2 写入 SQLite 静态 projection，S3.3 已启用查询与前端消费。
+
+未来例句迁移为语料链接后，`examples` record 仍以对应释义作为列表展示定位；语料单元 ID 的返回字段随阶段 C 的关系 API 一并确定，不在 S3.1 提前固化。
 
 形态搜索不是简单读取持久化字段。词条使用 `morphologyMode: "auto" | "manual"`：`auto` 先按自动分配规则得出有序模板组，再按真实 `templateGroupId` 合并该词条的 overlay；`manual` 按词条形态组 position 使用显式模板组，空列表表示明确不使用形态。随后遍历组内全部子表，逐格读取以真实子表 ID 分层的 override；没有 override 时用词形、形态规则和形态函数动态生成默认形式。`templateGroupId` 不再接受 `"auto"` 或 `"none"` 伪值；旧 JSON 的转换只发生在导入迁移。后续若引入形态搜索索引或缓存，也必须保持该语义，并在形态配置、词条 lemma、标签或 override 改变时失效。
 

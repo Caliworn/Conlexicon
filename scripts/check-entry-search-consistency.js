@@ -86,7 +86,7 @@ function expectedEntryIds(dictionary, query = {}) {
       if (normalizedQuery && !entrySearchModel.entryMatchesSearchText(entry, dictionary, query.q || query.query, {
         fields: searchFields,
         fuzzyFields,
-        normalizeText,
+        normalizeText: searchRuntime.normalizeText,
       })) {
         return false;
       }
@@ -152,6 +152,9 @@ async function assertDirectQuery(repository, dictionary, query, expected = expec
     expected.slice(offset, offset + limit),
     `direct SQL result differs from shared matcher: ${JSON.stringify(query)}`,
   );
+  if (query.q) {
+    result.items.forEach((entry) => assert.equal(Array.isArray(entry.searchHits), true));
+  }
   return result;
 }
 
@@ -259,11 +262,61 @@ async function main() {
     let dictionary = await context.repository.exportDictionary(source.id);
     const repository = context.repository;
 
+    const alphaRoot = dictionary.entries.find((entry) => entry.id === "entry-alpha-root");
+    const alphaSearchRecords = entrySearchModel.entrySearchValueRecords(alphaRoot, dictionary);
+    assert.deepEqual(
+      alphaSearchRecords.find((record) => record.field === "definitions"),
+      {
+        field: "definitions",
+        value: "CommonToken DefinitionToken",
+        sourceType: "definition",
+        sourceId: "def-alpha-root",
+        sourcePosition: 0,
+        valueType: "meaning",
+      },
+      "definition search values must retain a stable definition locator",
+    );
+    assert.deepEqual(
+      alphaSearchRecords.filter((record) => record.field === "tags" && record.sourcePosition === 2),
+      [
+        {
+          field: "tags",
+          value: "internal-tag",
+          sourceType: "tag",
+          sourceId: "",
+          sourcePosition: 2,
+          valueType: "raw",
+        },
+        {
+          field: "tags",
+          value: "DisplayTagToken",
+          sourceType: "tag",
+          sourceId: "",
+          sourcePosition: 2,
+          valueType: "display",
+        },
+      ],
+      "raw and displayed tag values must share the same tag locator",
+    );
+    assert.deepEqual(
+      entrySearchModel.entrySearchFieldValues(alphaRoot, dictionary).definitions,
+      alphaSearchRecords.filter((record) => record.field === "definitions").map((record) => record.value),
+      "the current matcher must consume the shared per-value record projection",
+    );
+
     await assertDirectQuery(repository, dictionary, { q: "AlphaRoot", fields: "lemma" });
     await assertDirectQuery(repository, dictionary, { q: "PronunciationToken", fields: "pronunciation" });
     await assertDirectQuery(repository, dictionary, { q: "RawTagToken", fields: "tags" });
     await assertDirectQuery(repository, dictionary, { q: "DisplayTagToken", fields: "tags" });
-    await assertDirectQuery(repository, dictionary, { q: "DefinitionToken", fields: "definitions" });
+    const definitionHitResult = await assertDirectQuery(repository, dictionary, { q: "DefinitionToken", fields: "definitions" });
+    assert.deepEqual(definitionHitResult.items[0].searchHits, [{
+      field: "definitions",
+      value: "CommonToken DefinitionToken",
+      sourceType: "definition",
+      sourceId: "def-alpha-root",
+      sourcePosition: 0,
+      valueType: "meaning",
+    }]);
     await assertDirectQuery(repository, dictionary, { q: "ExampleToken", fields: "examples" });
     await assertDirectQuery(repository, dictionary, { q: "EntryNoteToken", fields: "notes" });
     await assertDirectQuery(repository, dictionary, { q: "DefinitionNoteToken", fields: "notes" });
@@ -333,13 +386,13 @@ async function main() {
       "direct SQL pagination differs from shared matcher",
     );
 
-    await assertFallbackQuery(repository, dictionary, { q: "ČAPTOKEN", fields: "lemma" }, []);
-    await assertFallbackQuery(repository, dictionary, { q: "\uE000PrivateToken", fields: "lemma" });
-    await assertFallbackQuery(repository, dictionary, { q: "\uE001PrivateToken", fields: "lemma" });
-    await assertFallbackQuery(repository, dictionary, { q: "Cafe\u0301Token", fields: "lemma" }, []);
-    await assertFallbackQuery(repository, dictionary, { q: "ΣTOKEN", fields: "lemma" }, []);
+    await assertDirectQuery(repository, dictionary, { q: "ČAPTOKEN", fields: "lemma" }, []);
+    await assertDirectQuery(repository, dictionary, { q: "\uE000PrivateToken", fields: "lemma" });
+    await assertDirectQuery(repository, dictionary, { q: "\uE001PrivateToken", fields: "lemma" });
+    await assertDirectQuery(repository, dictionary, { q: "Cafe\u0301Token", fields: "lemma" }, []);
+    await assertDirectQuery(repository, dictionary, { q: "ΣTOKEN", fields: "lemma" }, []);
     await assertDirectQuery(repository, dictionary, { q: "STRASSETOKEN", fields: "lemma" }, []);
-    await assertFallbackQuery(repository, dictionary, { q: "STRAẞETOKEN", fields: "lemma" }, []);
+    await assertDirectQuery(repository, dictionary, { q: "STRAẞETOKEN", fields: "lemma" }, []);
     await assertDirectQuery(repository, dictionary, { q: "istanbultoken", fields: "lemma" }, []);
     await assertDirectQuery(repository, dictionary, { q: "izmirtoken", fields: "lemma" }, []);
 
@@ -359,14 +412,14 @@ async function main() {
       },
     });
     dictionary = await repository.exportDictionary(dictionary.id);
-    await assertFallbackQuery(repository, dictionary, { q: "ČAPTOKEN", fields: "lemma" }, ["entry-unicode"]);
-    await assertFallbackQuery(repository, dictionary, { q: "Cafe\u0301Token", fields: "lemma" }, ["entry-composed"]);
-    await assertFallbackQuery(repository, dictionary, { q: "ΣTOKEN", fields: "lemma" }, ["entry-final-sigma"]);
-    await assertFallbackQuery(repository, dictionary, { q: "STRASSETOKEN", fields: "lemma" }, ["entry-sharp-s"]);
-    await assertFallbackQuery(repository, dictionary, { q: "tPrivateToken", fields: "lemma" }, ["entry-pua-one"]);
-    await assertFallbackQuery(repository, dictionary, { q: "AlphaRoot", fields: "lemma" }, ["entry-alpha-root"]);
+    await assertDirectQuery(repository, dictionary, { q: "ČAPTOKEN", fields: "lemma" }, ["entry-unicode"]);
+    await assertDirectQuery(repository, dictionary, { q: "Cafe\u0301Token", fields: "lemma" }, ["entry-composed"]);
+    await assertDirectQuery(repository, dictionary, { q: "ΣTOKEN", fields: "lemma" }, ["entry-final-sigma"]);
+    await assertDirectQuery(repository, dictionary, { q: "STRASSETOKEN", fields: "lemma" }, ["entry-sharp-s"]);
+    await assertDirectQuery(repository, dictionary, { q: "tPrivateToken", fields: "lemma" }, ["entry-pua-one"]);
+    await assertDirectQuery(repository, dictionary, { q: "AlphaRoot", fields: "lemma" }, ["entry-alpha-root"]);
 
-    console.log("Entry-search S2 settings, SQL fast-path, and shared fallback checks passed.");
+    console.log("Entry-search S3.3 projection query, search-hit, and fuzzy fallback checks passed.");
   } finally {
     await context.cleanup();
   }

@@ -99,6 +99,7 @@ let entryQueryState = {
   key: "",
   status: "idle",
   ids: [],
+  hitsById: {},
   pageInfo: null,
   error: null,
   requestId: 0,
@@ -4287,6 +4288,7 @@ function resetEntryQueryState(options = {}) {
     key: "",
     status: "idle",
     ids: [],
+    hitsById: {},
     pageInfo: null,
     error: null,
     requestId: entryQueryState.requestId + 1,
@@ -4326,7 +4328,12 @@ function entryQueryEntriesForRender(dictionary) {
     return null;
   }
   const byId = new Map((dictionary.entries || []).map((entry) => [entry.id, entry]));
-  const entries = entryQueryState.ids.map((id) => byId.get(id)).filter(Boolean);
+  const entries = entryQueryState.ids.map((id) => {
+    const entry = byId.get(id);
+    return entry && Object.hasOwn(entryQueryState.hitsById, id)
+      ? { ...entry, searchHits: entryQueryState.hitsById[id] }
+      : entry;
+  }).filter(Boolean);
   return entries.length === entryQueryState.ids.length ? entries : null;
 }
 
@@ -4349,6 +4356,7 @@ function startEntryQueryApiCheck(dictionary) {
     key,
     status: "loading",
     ids: [],
+    hitsById: {},
     pageInfo: null,
     error: null,
     requestId,
@@ -4361,11 +4369,15 @@ function startEntryQueryApiCheck(dictionary) {
         return;
       }
       const apiIds = Array.isArray(result?.items) ? result.items.map((entry) => entry.id).filter(Boolean) : [];
+      const hitsById = Object.fromEntries((result?.items || [])
+        .filter((entry) => entry?.id && Array.isArray(entry.searchHits))
+        .map((entry) => [entry.id, entry.searchHits]));
       const pageInfo = result?.pageInfo || null;
       entryQueryState = {
         key,
         status: "success",
         ids: apiIds,
+        hitsById,
         pageInfo,
         error: null,
         requestId,
@@ -4382,6 +4394,7 @@ function startEntryQueryApiCheck(dictionary) {
         key,
         status: "error",
         ids: [],
+        hitsById: {},
         pageInfo: null,
         error,
         requestId,
@@ -5654,10 +5667,6 @@ function renderEntrySearchSnippets(entry) {
     return "";
   }
   const { fields: searchFields, fuzzyFields } = searchOptions;
-  const valuesByField = entrySearchModel.entrySearchFieldValues(entry, dictionary, {
-    fields: searchFields,
-    normalizeText: searchOptions.normalizeText,
-  });
   const labels = {
     definitions: t("meaning"),
     examples: t("example"),
@@ -5668,16 +5677,36 @@ function renderEntrySearchSnippets(entry) {
   const firstDisplayedDefinitionIndex = (entry.definitions || []).findIndex((definition) => (
     Boolean(String(definition?.meaning || "").trim())
   ));
-  const snippets = Object.entries(labels)
-    .flatMap(([field, label]) => valuesByField[field].map((value, index) => ({ field, label, value, index })))
-    .filter(({ field, value, index }) => (
-      value
-      && entrySearchModel.textMatches(value, query, {
-        fuzzy: fuzzyFields.has(field),
-        normalizeText: searchOptions.normalizeText,
-      })
-      && (field !== "definitions" || index !== firstDisplayedDefinitionIndex)
-    ))
+  const labelOrder = Object.keys(labels);
+  const apiHits = Array.isArray(entry.searchHits) ? entry.searchHits : null;
+  const candidates = apiHits
+    ? apiHits
+        .filter((hit) => Object.hasOwn(labels, hit.field))
+        .sort((left, right) => labelOrder.indexOf(left.field) - labelOrder.indexOf(right.field))
+        .map((hit) => ({
+          field: hit.field,
+          label: labels[hit.field],
+          value: hit.value,
+          index: Number(hit.sourcePosition) || 0,
+        }))
+        .filter(({ field, index }) => field !== "definitions" || index !== firstDisplayedDefinitionIndex)
+    : (() => {
+        const valuesByField = entrySearchModel.entrySearchFieldValues(entry, dictionary, {
+          fields: searchFields,
+          normalizeText: searchOptions.normalizeText,
+        });
+        return Object.entries(labels)
+          .flatMap(([field, label]) => valuesByField[field].map((value, index) => ({ field, label, value, index })))
+          .filter(({ field, value, index }) => (
+            value
+            && entrySearchModel.textMatches(value, query, {
+              fuzzy: fuzzyFields.has(field),
+              normalizeText: searchOptions.normalizeText,
+            })
+            && (field !== "definitions" || index !== firstDisplayedDefinitionIndex)
+          ));
+      })();
+  const snippets = candidates
     .slice(0, 2)
     .map(({ field, label, value, index }) => `
       <span class="search-snippet">
