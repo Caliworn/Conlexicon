@@ -257,7 +257,7 @@ SQLite 已是默认主存储。真实 schema、当前状态审计和后续优化
 - 数据模型升级时只保证旧版本 JSON 能导入并转换成新格式；除非确有必要，不要为了旧前端数据形状额外维护临时兼容层。旧 JSON 字段迁移集中在 `lib/legacy-dictionary-migration.js`，核心 `dictionary-model` 只处理当前形状规范化。前端因新模型出问题时，优先修前端。
 - 搜索 projection 已完成第一轮 SQL 接线；候选索引、数据分析/质量检查 API 化、语料 SQL 分表和产品内迁移向导都不是当前 SQLite 主路径的阻断项。
 - 搜索字段配置已接入词条列表、词根模式、本地筛选、搜索摘要和搜索字段分析；读取 API 现在只接受 `fields` / `fuzzyFields`，旧 `fuzzy` / `tagFuzzy` 参数已删除。`scripts/benchmark-entry-search.js` 可将指定 JSON 词典临时导入 SQLite 后测量搜索模式；`scripts/generate-morphology-stress-dictionary-10k.js` 用于生成带 3×4 自动形态模板和少量 override 的 10k 压力词典。
-- `/entries` 的严格和 fuzzy 搜索均按所选字段读取静态 `entry_search_values` 与形态 `entry_morphology_search_values`，承接 ASCII、Unicode、NFC、case folding 和自定义等价规则，并只为当前页回读完整 `searchHits`。形态单字段和静态+形态混合查询均不再导出完整 snapshot 或逐词条动态生成形态；fuzzy 由连接级确定性函数复用共享评分语义。词根分组搜索读取相同配置并保持等价语义，但搜索型 root groups 仍是完整共享 JS 路径；关系分组键保持既有独立语义。
+- `/entries` 的严格和 fuzzy 搜索均按所选字段读取静态 `entry_search_values` 与形态 `entry_morphology_search_values`，承接 ASCII、Unicode、NFC、case folding 和自定义等价规则，并只为当前页回读完整 `searchHits`。形态单字段和静态+形态混合查询均不再导出完整 snapshot 或逐词条动态生成形态；fuzzy 由连接级确定性函数复用共享评分语义。词根分组搜索也直接从两张 projection 取得命中 ID，并在独立 relation generation 的稳定词根拓扑上生成查询视图，不再走完整共享 JS 路径；关系分组键保持既有独立语义。
 - `scripts/check-entry-search-consistency.js` 验证严格及 fuzzy 的静态/形态 projection 查询均不调用完整 snapshot，并覆盖逐值字段、命中定位、结构筛选、分页、`include=full`、NFC、Unicode case folding 和 PUA 自定义规则。
 - 搜索规范化 S2 已接线：`settings.search.normalization` 支持可选 NFC、Unicode 17 default case folding 和 `{ canonical, variants }[]` 自定义规则；默认严格关闭。词条列表、词根模式、搜索摘要/高亮、搜索字段分析和词源自动补全共用缓存的词典级 normalizer。精确高亮带原文范围映射，可处理 `ß → ss`、NFC 和自定义替换造成的长度变化。标签/词性/形态匹配等结构键不套用自由文本配置；词源关系与 `source_key` 继续保持既有匹配，留待稳定 ID 引用升级。S3.3 已让 SQLite 规范化检索 projection 承接全部非 fuzzy 静态查询；JSON repository 不同步该功能。
 - 词源自动补全仍在前端当前词典快照上执行，复用 normalizer 和独立的 `etymologyAutocomplete.fuzzy` 开关，但尚未接入 `/entries` projection 与普通列表查询路径；若后续迁移，需保留其前缀优先和 fuzzy 分数排序，而不能直接复用按 lemma 排序的普通列表响应。
@@ -267,7 +267,7 @@ SQLite 已是默认主存储。真实 schema、当前状态审计和后续优化
 
 当前前端数据分析已采用按需切片构建和 slice cache。现阶段缓存上限为 24 条 slice 结果，只是防止搜索词、排序、语言或词典版本变化导致缓存无限增长的临时小容量策略，不是长期语义约束。API 化数据分析后，应由 repository/SQLite 索引、服务端 query planner 或更明确的缓存键替代这类前端临时缓存。
 
-词根模式已经接入 `/root-groups`，前端正常路径不再本地构建完整词根分组，也不在请求失败时回退前端全量计算。Q4 只对父级词根组列表进行窗口加载；展开单组时一次读取该组全部衍生词，子端点不分页。“全部展开”已改为全局状态意图，不再要求全部父级窗口同时加载；父级首窗提供窗口级组数/衍生词数统计来估算展开高度。`all` 模式下可以单独收起词根作为例外，父级淘汰不丢失该状态；全部展开或全部收起会清理上一轮例外。增强型滚动条/词典地图和 marker/overview 数据仍是后续独立设计，不应混入当前原生滚动窗口。
+词根模式已经接入 `/root-groups`，前端正常路径不再本地构建完整词根分组，也不在请求失败时回退前端全量计算。后端以独立 relation generation 缓存与搜索条件无关的 rootId → derivedIds 稳定拓扑，并维护 entryId → rootIds、rootId → group 反向索引；词典摘要计数、无搜索/搜索分组、组内读取和词汇网络关系 API 复用该拓扑。只有词条增删、lemma/来源变化和整库替换会清除拓扑；普通词条保存/patch 只刷新排序记录，其他模块保存不再影响它。Q4 只对父级词根组列表进行窗口加载；展开单组时一次读取该组全部衍生词，子端点不分页。“全部展开”已改为全局状态意图，不再要求全部父级窗口同时加载；父级首窗提供窗口级组数/衍生词数统计来估算展开高度。`all` 模式下可以单独收起词根作为例外，父级淘汰不丢失该状态；全部展开或全部收起会清理上一轮例外。增强型滚动条/词典地图和 marker/overview 数据仍是后续独立设计，不应混入当前原生滚动窗口。
 
 ### 5.3 阶段 B 验收
 

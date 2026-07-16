@@ -79,7 +79,7 @@
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/dictionaries/:id/facets` | 读取词性和标签统计 | `{ parts, tags, noPartOfSpeechCount }` | 尊重当前词典的词性标签设置和标签显示替换。前端词性筛选选项正常路径以该 API 为准，不再每次本地统计完整词性集合做一致性校验。 |
-| `GET` | `/api/dictionaries/:id/entry-relations/:entryId` | 读取词源/衍生/同根关系 | `{ entryId, sources, derivedEntries, rootGroup }` | SQLite 路径直接读取 `entries` / `entry_sources` projection；同名 lemma 暂按排序后的第一条匹配，后续可由诊断模块报告歧义。 |
+| `GET` | `/api/dictionaries/:id/entry-relations/:entryId` | 读取词源/衍生/同根关系 | `{ entryId, sources, derivedEntries, rootGroup }` | SQLite 路径复用稳定词根拓扑的反向索引，并按需读取关系 DTO；同名 lemma 暂按排序后的第一条匹配，后续可由诊断模块报告歧义。 |
 | `GET` | `/api/dictionaries/:id/root-groups` | 读取词根模式分组 | `{ items, pageInfo }` | 支持 `q`、`fields`、`fuzzyFields`、`sort`、`cursor`、`windowOffset`、`limit`、`include`。前端词根模式正常路径以该 API 为准，并按窗口加载。 |
 | `GET` | `/api/dictionaries/:id/root-groups/:rootId/entries` | 按需读取单个词根组的全部衍生词 | `{ items }` | 支持与词根组查询相同的搜索、排序、字段和 `include` 参数，但不分页；折叠组不预载衍生词，展开后一次读取整组。 |
 
@@ -399,8 +399,8 @@ GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&so
 
 性能优化方向：
 
-- repository 层为一次请求构建临时关系索引：`id -> entry`、`normalized lemma -> first entry`、`source key -> derived entries`，避免每个来源或衍生查询重复扫描全词条。
-- `entry-relations/:entryId`、`root-groups`、`entries?derivedFrom=` 和后续质量检查中的词源问题应共享同一套关系索引。
+- repository 已以独立 relation generation 缓存与搜索条件无关的 `rootId -> derivedIds` 稳定拓扑，并同时维护 `entryId -> rootIds`、`rootId -> group` 反向索引；词典摘要计数、`/root-groups`、组内子项和 `/entry-relations/:entryId` 复用该拓扑。组定位为 O(1)，关系响应仍需按实际返回条目数读取并构建 DTO。词条增删、lemma/来源变化、整库替换和词典删除会使其失效；普通词条保存/patch 仅同步轻量排序记录，其他模块保存不触碰拓扑。查询 session/cursor 的 cache generation 仍按查询一致性要求独立失效。
+- `/root-groups` 搜索直接从 `entry_search_values` / `entry_morphology_search_values` 获取命中 ID，再筛选稳定拓扑，不导出完整词典 snapshot。`entry-relations/:entryId` 已复用同一拓扑的反向索引；`entries?derivedFrom=` 和后续质量检查中的词源问题仍应继续收敛到该关系查询层。
 - SQLite 后端应继续用 `entry_sources(source_key, entry_id)` 或等价表/索引支持 `derivedFrom`、词根分组和词汇网络查询；legacy/debug JSON repository 只需保持契约参考，不再作为普通性能优化目标。
 - 前端词根模式正常路径以 `/root-groups` 为准；请求失败时显示失败状态，不回退前端本地完整分组。父级未加载窗口以 `pageInfo.total` 和 `windowMetrics` 建立占位，因此滚动条可在折叠、搜索自动展开及全局展开状态下代表完整词根组集合。全局展开采用状态意图：父级页进入可见范围后才加载各组衍生词；单组收起作为例外保留到重新展开或“全部收起/全部展开”重置。组内衍生词不建立第二层分页窗口。
 

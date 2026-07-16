@@ -7,6 +7,7 @@ const {
   createQueryDescriptor,
   queryDescriptorKey,
 } = require("../lib/query-session-cache");
+const { RootTopologyCache } = require("../lib/root-topology-cache");
 const {
   createTempSqliteRepository,
   sampleSqliteDictionary,
@@ -74,6 +75,58 @@ function checkDescriptorIdentity() {
     query: { searchFields: new Set(["morphology"]), fuzzyFields: new Set() },
   });
   assert.equal(queryDescriptorKey(noSearchRootA), queryDescriptorKey(noSearchRootB));
+}
+
+function checkRootTopologyCache() {
+  let now = 1000;
+  let builds = 0;
+  const cache = new RootTopologyCache({
+    maxDictionaries: 2,
+    now: () => now,
+  });
+  const build = (rootId) => {
+    builds += 1;
+    const group = { rootId, derivedIds: [] };
+    return {
+      groups: [group],
+      entriesById: new Map([[rootId, { id: rootId, updatedAt: "old" }]]),
+      groupsByRootId: new Map([[rootId, group]]),
+      rootIdsByEntryId: new Map([[rootId, [rootId]]]),
+      groupsBySort: new Map([["lemmaAsc", [{ rootId, derivedIds: [] }]]]),
+    };
+  };
+  const first = cache.getOrCreate({
+    dictionaryId: "dict-a",
+    build: () => build("root-a"),
+  });
+  now += 1;
+  const repeated = cache.getOrCreate({
+    dictionaryId: "dict-a",
+    build: () => build("unexpected"),
+  });
+  assert.equal(first, repeated, "one dictionary generation should reuse a stable root topology");
+  assert.equal(builds, 1);
+  assert.equal(cache.updateEntryRecords("dict-a", [{ id: "root-a", updatedAt: "new" }]), true);
+  assert.equal(first.entriesById.get("root-a").updatedAt, "new");
+  assert.equal(first.groupsBySort.size, 0, "entry metadata updates should clear only cached topology sort views");
+
+  const firstGeneration = cache.generation("dict-a");
+  cache.invalidateDictionary("dict-a");
+  assert.equal(cache.generation("dict-a"), firstGeneration + 1);
+  const nextGeneration = cache.getOrCreate({
+    dictionaryId: "dict-a",
+    build: () => build("root-a-next"),
+  });
+  assert.equal(nextGeneration.groups[0].rootId, "root-a-next");
+  assert.equal(builds, 2, "a new dictionary generation must rebuild the topology");
+
+  cache.getOrCreate({ dictionaryId: "dict-b", build: () => build("root-b") });
+  cache.getOrCreate({ dictionaryId: "dict-c", build: () => build("root-c") });
+  assert.equal(cache.stats().dictionaryCount, 2);
+  assert.equal(cache.stats().evictions, 1, "the stable cache should retain only its configured dictionary count");
+  cache.invalidateDictionary("dict-c");
+  assert.equal(cache.stats().dictionaryCount, 1);
+  assert.equal(cache.stats().invalidations, 2);
 }
 
 async function checkCacheLifecycle() {
@@ -297,11 +350,11 @@ async function checkRepositoryIntegration() {
       otherProcessRepository.close();
     }
 
-    let rootBuilds = 0;
-    const originalRootBuilder = repository.rootGroupsFromDatabase.bind(repository);
-    repository.rootGroupsFromDatabase = (...args) => {
-      rootBuilds += 1;
-      return originalRootBuilder(...args);
+    let topologyBuilds = 0;
+    const originalTopologyBuilder = repository.rootTopologyFromDatabase.bind(repository);
+    repository.rootTopologyFromDatabase = (...args) => {
+      topologyBuilds += 1;
+      return originalTopologyBuilder(...args);
     };
     const rootFirst = await repository.queryRootGroups(dictionary.id, {
       fields: "lemma,tags",
@@ -314,7 +367,18 @@ async function checkRepositoryIntegration() {
       limit: 10,
       include: "full",
     });
-    assert.equal(rootBuilds, 1, "no-search root groups should ignore inactive search options and reuse the session");
+    assert.equal(topologyBuilds, 1, "no-search root groups should build one stable topology");
+    const topology = repository.currentRootTopology(dictionary.id);
+    assert.equal(topology.groupsByRootId.get("entry-root")?.rootId, "entry-root");
+    assert.deepEqual(topology.rootIdsByEntryId.get("entry-root"), ["entry-root"]);
+    assert.deepEqual(topology.rootIdsByEntryId.get("entry-derived"), ["entry-root"]);
+    assert.ok(
+      topology.groupsByRootId.get("entry-root")?.derivedIds.includes("entry-derived"),
+      "the reverse topology indexes should expose group membership without scanning groups",
+    );
+    const metadataWithRootCount = await repository.getDictionaryMeta(dictionary.id);
+    assert.equal(metadataWithRootCount.summary.rootCount, rootFirst.pageInfo.total);
+    assert.equal(topologyBuilds, 1, "dictionary summary root counts should reuse the stable topology");
     assert.deepEqual(
       rootFirst.items.map((group) => group.root.id),
       rootSecond.items.slice(0, rootFirst.items.length).map((group) => group.root.id),
@@ -343,6 +407,10 @@ async function checkRepositoryIntegration() {
     const derivedWholeGroup = await repository.queryRootGroupEntries(dictionary.id, "entry-root");
     assert.equal(derivedWholeGroup.items.length, 206, "the product UI should be able to read a realistic root group at once");
     assert.equal("pageInfo" in derivedWholeGroup, false, "derived groups should not expose a pagination contract");
+    const derivedRelations = await repository.getEntryRelations(dictionary.id, "entry-derived");
+    assert.equal(derivedRelations.rootGroup.entries.length, 207);
+    assert.equal(derivedRelations.rootGroup.entries[0].id, "entry-root");
+    assert.equal(topologyBuilds, 1, "relation reads should reuse the indexed stable topology");
     [...repository.querySessionCache.sessions.entries()]
       .filter(([, session]) => session.kind === "rootGroups")
       .forEach(([key]) => repository.querySessionCache.remove(key));
@@ -357,21 +425,35 @@ async function checkRepositoryIntegration() {
     );
 
     const beforeSearchRoot = repository.querySessionCacheStats();
-    await repository.queryRootGroups(dictionary.id, {
-      q: "rt",
-      fields: "lemma",
-      fuzzyFields: "lemma",
-      limit: 10,
-    });
-    await repository.queryRootGroups(dictionary.id, {
-      q: "rt",
-      fields: "lemma",
-      fuzzyFields: "lemma",
-      limit: 1,
-    });
+    const originalSnapshotExport = repository.exportDictionarySnapshot.bind(repository);
+    repository.exportDictionarySnapshot = () => {
+      throw new Error("root-group search must not export a full dictionary snapshot");
+    };
+    try {
+      await repository.queryRootGroups(dictionary.id, {
+        q: "rt",
+        fields: "lemma",
+        fuzzyFields: "lemma",
+        limit: 10,
+      });
+      await repository.queryRootGroups(dictionary.id, {
+        q: "rt",
+        fields: "lemma",
+        fuzzyFields: "lemma",
+        limit: 1,
+      });
+      await repository.queryRootGroups(dictionary.id, {
+        q: "derived",
+        fields: "lemma",
+        limit: 10,
+      });
+    } finally {
+      repository.exportDictionarySnapshot = originalSnapshotExport;
+    }
     const afterSearchRoot = repository.querySessionCacheStats();
-    assert.equal(afterSearchRoot.builds, beforeSearchRoot.builds + 1);
+    assert.equal(afterSearchRoot.builds, beforeSearchRoot.builds + 2);
     assert.equal(afterSearchRoot.hits, beforeSearchRoot.hits + 1);
+    assert.equal(topologyBuilds, 1, "different searches should filter one query-independent topology");
 
     const generationBeforeNoOp = repository.querySessionCache.generation(dictionary.id);
     await repository.patchEntries(dictionary.id, [], {});
@@ -383,8 +465,21 @@ async function checkRepositoryIntegration() {
     assert.equal(repository.querySessionCache.generation(dictionary.id), generationBeforeNoOp);
 
     const rootEntry = await repository.getEntry(dictionary.id, "entry-root");
-    await repository.saveEntry(dictionary.id, { ...rootEntry, notes: "updated" });
+    const topologyGenerationBeforeEntrySave = repository.rootTopologyCache.generation(dictionary.id);
+    const savedRootEntry = await repository.saveEntry(dictionary.id, { ...rootEntry, notes: "updated" });
     assert.equal(repository.querySessionCache.generation(dictionary.id), generationBeforeNoOp + 1);
+    assert.equal(
+      repository.rootTopologyCache.generation(dictionary.id),
+      topologyGenerationBeforeEntrySave,
+      "a non-relation entry edit must not invalidate the root topology",
+    );
+    await repository.queryRootGroups(dictionary.id, { limit: 10 });
+    assert.equal(topologyBuilds, 1, "a non-relation entry edit should reuse the root topology");
+    assert.equal(
+      repository.currentRootTopology(dictionary.id).entriesById.get(rootEntry.id).updatedAt,
+      savedRootEntry.entry.updatedAt,
+      "a non-relation edit should refresh cached entry sort metadata",
+    );
     await assert.rejects(
       () => repository.queryEntries(dictionary.id, {
         ...fuzzyQuery,
@@ -396,7 +491,53 @@ async function checkRepositoryIntegration() {
     await repository.queryEntries(dictionary.id, fuzzyQuery);
     assert.equal(fuzzyBuilds, 2, "a successful write must rebuild the fuzzy session");
 
+    const routeEntry = await repository.getEntry(dictionary.id, "entry-route");
+    await repository.saveEntry(dictionary.id, {
+      ...routeEntry,
+      etymology: { ...(routeEntry.etymology || {}), sources: ["root"] },
+    });
+    assert.equal(
+      repository.rootTopologyCache.generation(dictionary.id),
+      topologyGenerationBeforeEntrySave + 1,
+      "a source edit must invalidate the independent root topology generation",
+    );
+    await repository.queryRootGroups(dictionary.id, { limit: 10 });
+    assert.equal(topologyBuilds, 2, "a relation edit should rebuild the root topology on demand");
+
+    const topologyGenerationBeforePatch = repository.rootTopologyCache.generation(dictionary.id);
+    await repository.patchEntries(dictionary.id, [{
+      id: "entry-route",
+      patch: { pronunciation: "route-updated" },
+    }]);
+    assert.equal(
+      repository.rootTopologyCache.generation(dictionary.id),
+      topologyGenerationBeforePatch,
+      "a non-relation batch patch must preserve the root topology",
+    );
+    await repository.queryRootGroups(dictionary.id, { limit: 10 });
+    assert.equal(topologyBuilds, 2);
+
+    const topologyGenerationBeforeMetadata = repository.rootTopologyCache.generation(dictionary.id);
+    await repository.updateMetadata(dictionary.id, {
+      name: dictionary.name,
+      language: dictionary.language,
+      description: dictionary.description,
+    });
+    assert.equal(
+      repository.rootTopologyCache.generation(dictionary.id),
+      topologyGenerationBeforeMetadata,
+      "module and metadata saves must not invalidate the root topology",
+    );
+    await repository.queryRootGroups(dictionary.id, { limit: 10 });
+    assert.equal(topologyBuilds, 2);
+
+    const topologyGenerationBeforeQueryInvalidation = repository.rootTopologyCache.generation(dictionary.id);
     repository.invalidateQuerySessions(dictionary.id);
+    assert.equal(
+      repository.rootTopologyCache.generation(dictionary.id),
+      topologyGenerationBeforeQueryInvalidation,
+      "query-session invalidation must not alter the independent root topology generation",
+    );
     const rebuilt = await repository.queryEntries(dictionary.id, fuzzyQuery);
     assert.deepEqual(
       rebuilt.items.map((entry) => entry.id),
@@ -410,6 +551,7 @@ async function checkRepositoryIntegration() {
 
 async function main() {
   checkDescriptorIdentity();
+  checkRootTopologyCache();
   await checkCacheLifecycle();
   await checkRepositoryIntegration();
   console.log("Query session cache checks passed.");

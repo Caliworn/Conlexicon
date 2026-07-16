@@ -265,7 +265,7 @@ GET /api/export?dictionaryId=...&format=xlsx
 以下项目不是默认切 SQLite 的阻断项，但切换时必须在文档中明确其状态：
 
 - 普通词条搜索的静态字段与动态形态字段已分别接入 `entry_search_values` 和 `entry_morphology_search_values`；严格及 fuzzy 查询不再为此重建完整 dictionary object。fuzzy 仍会线性扫描所选 projection records，候选索引留待真实基准决定。
-- 带搜索条件的 root groups 仍可能走共享 JS 语义。
+- root groups 的搜索条件已读取 SQLite 搜索投射，并在独立 relation generation 的稳定词根拓扑上生成查询视图；词汇网络和质量检查中的关系查询仍待继续复用该拓扑。
 - 数据分析和质量检查仍主要由前端/共享 JS 基于完整 dictionary object 计算，尚未全部 API 化或 SQL 化。
 - 语料库仍作为 `module_blobs.corpus` 保存，尚未正式 SQL 分表。
 - JSON 导入/导出仍返回完整 dictionary-shaped JSON；这是交换/备份路径，不代表存储层仍使用 JSON repo。

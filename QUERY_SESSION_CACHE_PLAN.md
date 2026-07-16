@@ -35,7 +35,7 @@
 - 不新增 SQLite cache 表，不把派生查询结果写进词典文件。
 - 不缓存完整 dictionary snapshot 或完整词条对象。
 - 不引入持久化 revision、保存冲突协议或多进程一致性机制。
-- 不用缓存掩盖带搜索 `queryRootGroups()` 的完整 snapshot 慢路径；该路径仍应后续下推。
+- 不用查询会话缓存掩盖重复的词根关系计算；稳定词根拓扑使用独立 relation generation，搜索只在其上生成查询视图。
 - 不在缓存中保存完整词典 snapshot，也不让窗口状态承担持久化职责。
 
 ## 3. 三层职责
@@ -160,8 +160,8 @@ repository 继续负责：
 | `/entries` 无搜索结构筛选 | 前端页缓存；后端继续直接 SQL count/page | SQL 已能直接分页，物化全部 ID 可能得不偿失 |
 | `/entries` 严格 projection 搜索 | 先用前端页缓存；基准证明重复扫描显著后再纳入会话 | 当前 SQL `EXISTS` + count/page 已较轻 |
 | `/entries` fuzzy projection 搜索 | 后端会话优先 | 当前需要扫描候选 records 并形成完整命中集合 |
-| `/root-groups` 无搜索 | 后端会话优先 | 当前每次都会构建全部组再切页；但缓存不解决单个超大组携带全部衍生词的问题 |
-| `/root-groups` 带搜索 | 后端会话优先，同时保留后续 SQL 下推任务 | 当前完整共享计算成本最高；不能用缓存固化该慢路径 |
+| `/root-groups` 无搜索 | 稳定拓扑缓存 + 后端查询会话 | 拓扑按独立 relation generation 构建一次，并维护 `entryId → rootIds`、`rootId → group` 反向索引；查询会话只保存排序后的组视图、组索引和窗口状态 |
+| `/root-groups` 带搜索 | 稳定拓扑缓存 + SQLite projection 命中集合 + 后端查询会话 | 搜索条件只筛选 root/derived ID，不再重建关系或导出完整 snapshot；fuzzy projection 扫描仍可继续优化候选索引 |
 | `/facets` | 独立的小型版本化响应缓存 | payload 小，不需要分页会话 |
 | 高级筛选 | 等 filter descriptor API 落地后复用 entries 会话 | 不能继续缓存一组前端临时 ID |
 
@@ -271,6 +271,7 @@ query kind
 - descriptor 统一规范化字段、fuzzy 字段、标签和排序，并排除 `cursor`、`limit`、`include`；无查询文本的 root groups 也会忽略无效的字段搜索选项。
 - 当前每词典最多 8 个会话、全局约 64 MiB、idle TTL 2 分钟；支持 LRU、超大单项跳过、同 key in-flight 合并和开发期统计。
 - repository 的词条、模块、metadata、完整导入/覆盖和词典删除只在成功写入后递增运行时 generation 并按词典失效；空 patch 和失败写入不失效。
+- 查询 generation 与词根 relation generation 已拆分：查询会话仍在相关成功写入后失效；词根拓扑只在词条增删、lemma/来源变化、完整导入覆盖或词典删除时递增 relation generation。普通词条保存和 `patchEntries()` 只同步缓存中的排序字段并清除排序视图，metadata/settings/IPA/docs/morphology/corpus 保存不触碰拓扑。
 - 当前 API 与 offset cursor 未改变；可重建版本化 cursor 留在 Q4。
 
 2026-07-16 使用 10k 形态压力词典、查询 `bdy`、5 次热查询的基准如下。热查询仍包含当前页 SQLite DTO 和 `searchHits` 重建成本：
@@ -299,7 +300,7 @@ query kind
 - 首窗根据 `pageInfo.total` 建立整组等高占位，滚动条从一开始就代表完整结果集；可见窗口及相邻窗口按需预取。加载页继承占位高度比例，非滚动状态下恢复现有锚点，避免窗口替换导致跳动。
 - 自动滚动会先补载目标所在的普通词条或词根组窗口；目标是衍生词时，再一次读取其所在的完整词根组。在 Q5 提供后端定位接口前，目标页号仍暂由完整活动词典 snapshot 计算。
 - 产品前端不再请求临时 `limit=10000`，窗口大小固定为上述小批次；repository 保留原有大页硬上限，供显式基准和诊断工具使用，不进入正常 UI 路径。
-- `/root-groups/:rootId/entries` 不复用父级分页协议：后端直接返回整组，不处理 cursor、`windowOffset` 或 `limit`，也不设置单组 2000 条硬上限。
+- `/root-groups/:rootId/entries` 不复用父级分页协议：后端通过查询会话的 `rootId → group` 索引直接定位并返回整组，不处理 cursor、`windowOffset` 或 `limit`，也不设置单组 2000 条硬上限。`/entry-relations/:entryId` 同时通过稳定拓扑的 `entryId → rootIds` 和 `rootId → group` 索引定位同根组，不再逐请求递归扫描祖先与后代。
 - 全局展开状态使用 `manual/all` 两种模式；`all` 下单组收起记录为例外。父级窗口淘汰只释放衍生词 DTO，不清除展开意图；“全部展开”和“全部收起”都会清空上一轮手动展开/收起例外。“全部收起”同时释放已加载的组内数据。
 
 ### Q4 后：stale-while-revalidate 与词条切换局部渲染
