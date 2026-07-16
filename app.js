@@ -2982,11 +2982,59 @@ function entryBrowserCanScrollNow() {
   );
 }
 
+function entryCardScrollQueryIsReady() {
+  const dictionary = activeDictionary();
+  if (!dictionary || advancedFilter) {
+    return true;
+  }
+  if (rootMode && rootGroupsQueryCanUseApi(dictionary)) {
+    return rootGroupsQueryState.status === "success"
+      && rootGroupsQueryState.key === rootGroupsQueryApiKey(dictionary);
+  }
+  if (!rootMode && entryQueryCanUseApi(dictionary)) {
+    return entryQueryState.status === "success"
+      && entryQueryState.key === entryQueryApiKey(dictionary);
+  }
+  return true;
+}
+
 function flushPendingEntryCardScroll() {
   if (!pendingEntryCardScroll) {
     return;
   }
-  scheduleEntryCardScroll(pendingEntryCardScroll.entryId, pendingEntryCardScroll.options);
+  const { entryId, options } = pendingEntryCardScroll;
+  ensureQueryWindowForEntryScroll(entryId, options);
+  const requestId = entryCardScrollRequestId += 1;
+  requestAnimationFrame(() => {
+    if (requestId !== entryCardScrollRequestId || !pendingEntryCardScroll) {
+      return;
+    }
+    if (!entryBrowserCanScrollNow() || !entryCardScrollQueryIsReady()) {
+      return;
+    }
+    let key = `entry:${entryId}`;
+    if (rootMode && !advancedFilter) {
+      key = options.rootId && options.rootId !== entryId
+        ? `derived:${options.rootId}:${entryId}`
+        : `root:${options.rootId || entryId}`;
+    }
+    const stableScrollOptions = {
+      isCurrent: () => requestId === entryCardScrollRequestId,
+    };
+    if (scrollVirtualListItemIntoViewStable(entryVirtualList, key, stableScrollOptions)) {
+      if (pendingEntryCardScroll?.entryId === entryId) {
+        pendingEntryCardScroll = null;
+      }
+      return;
+    }
+    const row = entryVirtualList.items.find((item) => item.value?.entry?.id === entryId || item.value?.group?.root?.id === entryId);
+    if (row) {
+      const scrolled = scrollVirtualListItemIntoViewStable(entryVirtualList, row.key, stableScrollOptions);
+      if (scrolled && pendingEntryCardScroll?.entryId === entryId) {
+        pendingEntryCardScroll = null;
+      }
+    }
+  });
 }
 
 function revealEntryBrowserForResults() {
@@ -4680,7 +4728,7 @@ function populateQueryWindowPages(state, firstPage, pageSize, estimatedItemHeigh
   }
   const total = Math.max(0, Number(firstPage.pageInfo.total) || 0);
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  state.windowCursor = firstPage.pageInfo.nextCursor || "";
+  state.windowCursor = firstPage.pageInfo.windowCursor || "";
   for (let index = 1; index < pageCount; index += 1) {
     const page = createQueryWindowPage(state.windowCursor, index, "unloaded");
     page.offset = index * pageSize;
@@ -4801,6 +4849,18 @@ function rootGroupsQueryUrl(dictionary, options = {}) {
     }
   });
   return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups?${params}`;
+}
+
+function rootGroupsLocationUrl(dictionary, entryId, options = {}) {
+  const params = rootGroupsQueryParams(dictionary);
+  params.set("entryId", entryId);
+  params.set("limit", String(ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE));
+  Object.entries(options).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      params.set(key, String(value));
+    }
+  });
+  return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups/location?${params}`;
 }
 
 function rootGroupsQueryForRender(dictionary) {
@@ -5177,7 +5237,7 @@ function resetEntryQueryState() {
   };
 }
 
-function entryQueryUrl(dictionary, options = {}) {
+function entryQueryParams(dictionary) {
   const params = new URLSearchParams();
   if (searchQuery.trim()) {
     params.set("q", searchQuery.trim());
@@ -5194,6 +5254,11 @@ function entryQueryUrl(dictionary, options = {}) {
     params.set("fuzzyFields", [...fuzzyFields].join(","));
   }
   params.set("include", "summary");
+  return params;
+}
+
+function entryQueryUrl(dictionary, options = {}) {
+  const params = entryQueryParams(dictionary);
   params.set("limit", String(ENTRY_QUERY_WINDOW_PAGE_SIZE));
   Object.entries(options).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") {
@@ -5201,6 +5266,12 @@ function entryQueryUrl(dictionary, options = {}) {
     }
   });
   return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries?${params}`;
+}
+
+function entryQueryLocationUrl(dictionary, entryId) {
+  const params = entryQueryParams(dictionary);
+  params.set("limit", String(ENTRY_QUERY_WINDOW_PAGE_SIZE));
+  return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entryId)}/location?${params}`;
 }
 
 function entryQueryWindowForRender(dictionary) {
@@ -5929,31 +6000,36 @@ function prepareRootModeEntryNavigation(entryId, options = {}) {
     return options;
   }
 
-  const matchingGroups = rootModeGroups()
-    .filter((group) => group.root.id === entryId || group.derived.some((entry) => entry.id === entryId));
-  if (!matchingGroups.length) {
+  let rootId = String(options.rootId || "");
+  if (!rootId) {
+    const loadedRoot = rootGroupsQueryState.pages
+      .filter((page) => page.status === "success")
+      .flatMap((page) => page.items)
+      .find((group) => group.root.id === entryId);
+    rootId = loadedRoot?.root?.id || "";
+  }
+  if (!rootId) {
+    for (const [key, derivedState] of rootGroupDerivedStates) {
+      if (derivedState.status === "success" && derivedState.items.some((entry) => entry.id === entryId)) {
+        rootId = key.slice(key.lastIndexOf("\u0000") + 1);
+        break;
+      }
+    }
+  }
+  if (!rootId) {
     return options;
   }
 
-  const requestedGroup = options.rootId
-    ? matchingGroups.find((group) => group.root.id === options.rootId)
-    : null;
-  const contextGroup = rootNavigationContextId
-    ? matchingGroups.find((group) => group.root.id === rootNavigationContextId)
-    : null;
-  const expandedGroup = matchingGroups.find((group) => rootGroupIsExpanded(group));
-  const targetGroup = requestedGroup || contextGroup || expandedGroup || matchingGroups[0];
-  const isDerivedEntry = targetGroup.root.id !== entryId;
-
-  rootNavigationContextId = targetGroup.root.id;
+  const isDerivedEntry = rootId !== entryId;
+  rootNavigationContextId = rootId;
   if (isDerivedEntry) {
     if (rootExpansionMode === "all") {
-      collapsedRootEntries.delete(targetGroup.root.id);
+      collapsedRootEntries.delete(rootId);
     } else {
-      expandedRootEntries.add(targetGroup.root.id);
+      expandedRootEntries.add(rootId);
     }
   }
-  return { ...options, rootId: targetGroup.root.id };
+  return { ...options, rootId };
 }
 
 function scheduleEntryCardScroll(entryId, options = {}) {
@@ -5963,39 +6039,200 @@ function scheduleEntryCardScroll(entryId, options = {}) {
   pendingEntryCardScroll = {
     entryId,
     options: { ...options },
+    locationRequestKey: "",
   };
-  ensureQueryWindowForEntryScroll(entryId, options);
-  const requestId = entryCardScrollRequestId += 1;
-  requestAnimationFrame(() => {
-    if (requestId !== entryCardScrollRequestId) {
-      return;
-    }
-    if (!entryBrowserCanScrollNow()) {
-      return;
-    }
-    let key = `entry:${entryId}`;
-    if (rootMode && !advancedFilter) {
-      key = options.rootId && options.rootId !== entryId
-        ? `derived:${options.rootId}:${entryId}`
-        : `root:${options.rootId || entryId}`;
-    }
-    const stableScrollOptions = {
-      isCurrent: () => requestId === entryCardScrollRequestId,
-    };
-    if (scrollVirtualListItemIntoViewStable(entryVirtualList, key, stableScrollOptions)) {
+  flushPendingEntryCardScroll();
+}
+
+function markPendingEntryLocationRequest(entryId, requestKey) {
+  if (!pendingEntryCardScroll || pendingEntryCardScroll.entryId !== entryId) {
+    return false;
+  }
+  if (pendingEntryCardScroll.locationRequestKey === requestKey) {
+    return false;
+  }
+  pendingEntryCardScroll.locationRequestKey = requestKey;
+  return true;
+}
+
+function clearPendingEntryLocationRequest(entryId, requestKey) {
+  if (
+    pendingEntryCardScroll?.entryId === entryId
+    && pendingEntryCardScroll.locationRequestKey === requestKey
+  ) {
+    pendingEntryCardScroll.locationRequestKey = "";
+  }
+}
+
+function startEntryQueryLocation(dictionary, entryId) {
+  const key = entryQueryState.key;
+  const requestId = entryQueryState.requestId;
+  const requestKey = `entry-location\u0000${key}\u0000${entryId}`;
+  if (!markPendingEntryLocationRequest(entryId, requestKey)) {
+    return;
+  }
+  queryPageCache.load({
+    key: queryPageCacheKey("entry-location", `${key}\u0000${entryId}`),
+    dictionaryId: dictionary.id,
+    load: () => api(entryQueryLocationUrl(dictionary, entryId)),
+    transform: (result) => ({
+      ...compactEntryQueryResult(result),
+      location: result?.location || null,
+    }),
+  })
+    .then((result) => {
+      if (
+        entryQueryState.requestId !== requestId
+        || entryQueryState.key !== key
+        || entryQueryApiKey(activeDictionary()) !== key
+        || pendingEntryCardScroll?.entryId !== entryId
+      ) {
+        return;
+      }
+      if (!result.location?.found) {
+        pendingEntryCardScroll = null;
+        return;
+      }
+      const page = entryQueryState.pages.find((candidate) => candidate.index === result.location.windowIndex);
+      if (!page) {
+        return;
+      }
+      page.estimatedHeight = queryWindowPageHeight(entryVirtualList, page.index, page.estimatedHeight);
+      page.offset = result.location.windowOffset;
+      page.cursor = result.pageInfo?.windowCursor || entryQueryState.windowCursor;
+      page.status = "success";
+      page.items = result.items;
+      page.pageInfo = result.pageInfo;
+      page.error = null;
+      page.lastAccessAt = performance.now();
+      entryQueryState.windowCursor = result.pageInfo?.windowCursor || entryQueryState.windowCursor;
+      preserveQueryWindowPageHeight(
+        page,
+        result.items.reduce((total, entry) => (
+          total + estimateEntryCardHeight(entry, { qualityIssues: advancedFilterIssuesForEntry(entry.id) })
+        ), 0),
+        Boolean(entryQueryState.windowCursor),
+      );
+      syncEntryQueryWindowState();
+      evictDistantQueryWindowPages(
+        entryQueryState.pages,
+        entryVirtualList,
+        new Set([page.index]),
+        entryId,
+      );
+      syncEntryQueryWindowState();
+      renderEntries();
+      flushPendingEntryCardScroll();
+    })
+    .catch((error) => {
+      if (error?.code === "query_cursor_stale") {
+        invalidateQueryPageCacheAfterCursorStale(dictionary);
+        restartEntryQueryWindowAfterStale(dictionary);
+        return;
+      }
+      console.error(error);
       if (pendingEntryCardScroll?.entryId === entryId) {
         pendingEntryCardScroll = null;
       }
-      return;
-    }
-    const row = entryVirtualList.items.find((item) => item.value?.entry?.id === entryId || item.value?.group?.root?.id === entryId);
-    if (row) {
-      const scrolled = scrollVirtualListItemIntoViewStable(entryVirtualList, row.key, stableScrollOptions);
-      if (scrolled && pendingEntryCardScroll?.entryId === entryId) {
+    })
+    .finally(() => clearPendingEntryLocationRequest(entryId, requestKey));
+}
+
+function startRootGroupQueryLocation(dictionary, entryId, options = {}) {
+  const key = rootGroupsQueryState.key;
+  const requestId = rootGroupsQueryState.requestId;
+  const preferredRootId = String(options.rootId || "");
+  const requestKey = `root-location\u0000${key}\u0000${entryId}\u0000${preferredRootId}`;
+  if (!markPendingEntryLocationRequest(entryId, requestKey)) {
+    return;
+  }
+  queryPageCache.load({
+    key: queryPageCacheKey("root-group-location", `${key}\u0000${entryId}\u0000${preferredRootId}`),
+    dictionaryId: dictionary.id,
+    load: () => api(rootGroupsLocationUrl(dictionary, entryId, { preferredRootId })),
+    transform: (result) => ({
+      ...compactRootGroupsQueryResult(result),
+      location: result?.location || null,
+    }),
+  })
+    .then((result) => {
+      if (
+        rootGroupsQueryState.requestId !== requestId
+        || rootGroupsQueryState.key !== key
+        || rootGroupsQueryApiKey(activeDictionary()) !== key
+        || pendingEntryCardScroll?.entryId !== entryId
+      ) {
+        return;
+      }
+      if (!result.location?.found) {
+        pendingEntryCardScroll = null;
+        return;
+      }
+      const rootId = result.location.rootId;
+      const page = rootGroupsQueryState.pages.find((candidate) => candidate.index === result.location.windowIndex);
+      if (!page || !rootId) {
+        return;
+      }
+      rootNavigationContextId = rootId;
+      if (rootId !== entryId) {
+        if (rootExpansionMode === "all") {
+          collapsedRootEntries.delete(rootId);
+        } else {
+          expandedRootEntries.add(rootId);
+        }
+      }
+      pendingEntryCardScroll.options = {
+        ...pendingEntryCardScroll.options,
+        rootId,
+      };
+      page.estimatedHeight = queryWindowPageHeight(entryVirtualList, page.index, page.estimatedHeight);
+      page.offset = result.location.windowOffset;
+      page.cursor = result.pageInfo?.windowCursor || rootGroupsQueryState.windowCursor;
+      page.status = "success";
+      page.items = result.groups;
+      page.pageInfo = result.pageInfo;
+      page.error = null;
+      page.lastAccessAt = performance.now();
+      rootGroupsQueryState.windowCursor = result.pageInfo?.windowCursor || rootGroupsQueryState.windowCursor;
+      applyRootGroupWindowMetrics(rootGroupsQueryState, result.pageInfo);
+      preserveQueryWindowPageHeight(
+        page,
+        result.groups.reduce((total, group) => total + rootGroupEstimatedHeight(group), 0),
+        Boolean(rootGroupsQueryState.windowCursor),
+      );
+      syncRootGroupsQueryWindowState();
+      evictDistantQueryWindowPages(
+        rootGroupsQueryState.pages,
+        entryVirtualList,
+        new Set([page.index]),
+        new Set([rootId, entryId]),
+        {
+          onEvict: (evictedPage) => {
+            evictedPage.items.forEach((group) => {
+              rootGroupDerivedStates.delete(rootGroupDerivedStateKey(dictionary, group.root.id));
+            });
+          },
+        },
+      );
+      syncRootGroupsQueryWindowState();
+      renderEntries();
+      if (rootId !== entryId && !rootGroupDerivedState(dictionary, rootId)) {
+        startRootGroupDerivedLoad(dictionary, rootId);
+      }
+      flushPendingEntryCardScroll();
+    })
+    .catch((error) => {
+      if (error?.code === "query_cursor_stale") {
+        invalidateQueryPageCacheAfterCursorStale(dictionary);
+        restartRootGroupsWindowAfterStale();
+        return;
+      }
+      console.error(error);
+      if (pendingEntryCardScroll?.entryId === entryId) {
         pendingEntryCardScroll = null;
       }
-    }
-  });
+    })
+    .finally(() => clearPendingEntryLocationRequest(entryId, requestKey));
 }
 
 function ensureQueryWindowForEntryScroll(entryId, options = {}) {
@@ -6007,31 +6244,43 @@ function ensureQueryWindowForEntryScroll(entryId, options = {}) {
     if (entryQueryState.pages.some((page) => page.items.some((entry) => entry.id === entryId))) {
       return;
     }
-    const entryIndex = filteredEntries().findIndex((entry) => entry.id === entryId);
-    const page = entryQueryState.pages[Math.floor(entryIndex / ENTRY_QUERY_WINDOW_PAGE_SIZE)];
-    if (entryIndex >= 0 && ["unloaded", "evicted"].includes(page?.status)) {
-      loadEntryQueryWindowPage(dictionary, page);
-    }
+    startEntryQueryLocation(dictionary, entryId);
     return;
   }
   if (!rootMode || rootGroupsQueryState.status !== "success") {
     return;
   }
-  const groups = rootModeGroups();
-  const rootId = options.rootId || groups.find((group) => (
-    group.root.id === entryId || group.derived.some((entry) => entry.id === entryId)
-  ))?.root.id;
-  const groupIndex = groups.findIndex((group) => group.root.id === rootId);
-  const groupPage = rootGroupsQueryState.pages[Math.floor(groupIndex / ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE)];
-  if (groupIndex >= 0 && ["unloaded", "evicted"].includes(groupPage?.status)) {
-    loadRootGroupsWindowPage(dictionary, groupPage);
+  let rootId = String(options.rootId || "");
+  const loadedGroups = rootGroupsQueryState.pages
+    .filter((page) => page.status === "success")
+    .flatMap((page) => page.items);
+  if (!rootId && loadedGroups.some((group) => group.root.id === entryId)) {
+    rootId = entryId;
+  }
+  if (!rootId) {
+    for (const group of loadedGroups) {
+      const derivedState = rootGroupDerivedState(dictionary, group.root.id);
+      if (derivedState?.status === "success" && derivedState.items.some((entry) => entry.id === entryId)) {
+        rootId = group.root.id;
+        break;
+      }
+    }
+  }
+  const loadedGroup = rootId ? loadedGroups.find((group) => group.root.id === rootId) : null;
+  if (!loadedGroup) {
+    startRootGroupQueryLocation(dictionary, entryId, options);
     return;
   }
-  if (!rootId || rootId === entryId) {
-    return;
-  }
-  if (!rootGroupDerivedState(dictionary, rootId)) {
-    startRootGroupDerivedLoad(dictionary, rootId);
+  rootNavigationContextId = rootId;
+  if (rootId !== entryId) {
+    if (rootExpansionMode === "all") {
+      collapsedRootEntries.delete(rootId);
+    } else {
+      expandedRootEntries.add(rootId);
+    }
+    if (!rootGroupDerivedState(dictionary, rootId)) {
+      startRootGroupDerivedLoad(dictionary, rootId);
+    }
   }
 }
 

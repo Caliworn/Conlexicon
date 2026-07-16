@@ -137,6 +137,7 @@ async function assertDirectQuery(repository, dictionary, query, expected = expec
     expected.slice(offset, offset + limit),
     `direct SQL result differs from shared matcher: ${JSON.stringify(query)}`,
   );
+  assert.ok(result.pageInfo.windowCursor, "windowed entry queries should always expose a random-access cursor");
   if (query.q) {
     result.items.forEach((entry) => assert.equal(Array.isArray(entry.searchHits), true));
   }
@@ -433,6 +434,25 @@ async function main() {
       [...firstPage.items, ...secondPage.items].map((entry) => entry.id),
       expectedEntryIds(dictionary, pagedQuery),
       "direct SQL pagination differs from shared matcher",
+    );
+    const firstWindowAgain = await assertDirectQuery(repository, dictionary, {
+      ...pagedQuery,
+      cursor: firstPage.pageInfo.windowCursor,
+      windowOffset: 0,
+    });
+    assert.deepEqual(
+      firstWindowAgain.items.map((entry) => entry.id),
+      firstPage.items.map((entry) => entry.id),
+      "the dedicated window cursor should support random access independently of nextCursor",
+    );
+    const strictResultIds = expectedEntryIds(dictionary, pagedQuery);
+    const strictLocatedId = strictResultIds.at(-1);
+    const strictLocated = await repository.locateEntryQueryWindow(dictionary.id, strictLocatedId, pagedQuery);
+    assert.equal(strictLocated.location.found, true);
+    assert.equal(strictLocated.location.resultIndex, strictResultIds.length - 1);
+    assert.ok(
+      strictLocated.items.some((entry) => entry.id === strictLocatedId),
+      "strict SQL location should return the window containing the target",
     );
 
     await assertDirectQuery(repository, dictionary, { q: "ČAPTOKEN", fields: "lemma" }, []);

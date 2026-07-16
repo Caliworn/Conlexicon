@@ -68,6 +68,7 @@
 | 方法 | 路径 | 用途 | 响应 | 校验范围 |
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | 无参数时为词条数组；带查询参数时为分页查询对象 | 支持 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`source`、`derivedFrom`、`sort`、`cursor`、`windowOffset`、`limit`、`include`。前端普通词条列表正常路径以该 API 为准，并按窗口加载。 |
+| `GET` | `/api/dictionaries/:id/entries/:entryId/location` | 定位词条在当前查询中的窗口 | `{ items, pageInfo, location }` | 接受与 `/entries` 相同的查询 descriptor 和 `limit`，但不接受客户端 cursor；目标存在但被查询排除时返回 `location.found: false`。 |
 | `POST` | `/api/dictionaries/:id/entries` | 新建词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
 | `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存单个词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
@@ -81,6 +82,7 @@
 | `GET` | `/api/dictionaries/:id/facets` | 读取词性和标签统计 | `{ parts, tags, noPartOfSpeechCount }` | 尊重当前词典的词性标签设置和标签显示替换。前端词性筛选选项正常路径以该 API 为准，不再每次本地统计完整词性集合做一致性校验。 |
 | `GET` | `/api/dictionaries/:id/entry-relations/:entryId` | 读取词源/衍生/同根关系 | `{ entryId, sources, derivedEntries, rootGroup }` | SQLite 路径复用稳定词根拓扑的反向索引，并按需读取关系 DTO；同名 lemma 暂按排序后的第一条匹配，后续可由诊断模块报告歧义。 |
 | `GET` | `/api/dictionaries/:id/root-groups` | 读取词根模式分组 | `{ items, pageInfo }` | 支持 `q`、`fields`、`fuzzyFields`、`sort`、`cursor`、`windowOffset`、`limit`、`include`。前端词根模式正常路径以该 API 为准，并按窗口加载。 |
+| `GET` | `/api/dictionaries/:id/root-groups/location` | 定位词条所属的父级词根窗口 | `{ items, pageInfo, location }` | 必须传 `entryId`；可传 `preferredRootId` 消除多来源词条的父级歧义，其余参数沿用 `/root-groups` descriptor。 |
 | `GET` | `/api/dictionaries/:id/root-groups/:rootId/entries` | 按需读取单个词根组的全部衍生词 | `{ items }` | 支持与词根组查询相同的搜索、排序、字段和 `include` 参数，但不分页；折叠组不预载衍生词，展开后一次读取整组。 |
 
 #### `GET /api/dictionaries/:id/entries` 查询参数补充
@@ -123,6 +125,8 @@
 | `entry_id_exists` | 新建词条 ID 已存在。 |
 | `invalid_entry_updates_payload` | 批量词条更新请求格式无效。 |
 | `entry_not_found` | 词条不存在或已被删除。 |
+| `invalid_entry_location_target` | 词根窗口定位请求未提供目标词条 ID。 |
+| `invalid_root_context` | `preferredRootId` 不是目标词条的可用词根上下文。 |
 | `invalid_settings_payload` | 设置请求体格式无效。 |
 | `invalid_docs_payload` | 语言文档请求体格式无效。 |
 | `invalid_corpus_payload` | 语料请求体格式无效。 |
@@ -224,14 +228,40 @@ GET /api/dictionaries/:id/entries?q=&fields=&fuzzyFields=&part=&tags=&tagMode=&s
 - `sort`：`lemmaAsc`、`lemmaDesc`、`updatedAsc`、`updatedDesc`、`createdAsc`、`createdDesc`。
 - `source`：筛选具有指定来源文本的词条。
 - `derivedFrom`：筛选从指定词条 ID 或 lemma 派生的词条。
-- `cursor`：不透明分页游标，前端不得解析。
-- `windowOffset`：可选的结果窗口起点。非零值必须与该查询第一页返回的有效 `cursor` 一起发送；省略时沿用 cursor 自身的位置。该参数用于纯滚动列表直接读取远端窗口，不是 UI 页码。
+- `cursor`：不透明查询游标，前端不得解析。顺序分页使用响应的 `pageInfo.nextCursor`；随机窗口读取使用 `pageInfo.windowCursor`。
+- `windowOffset`：可选的结果窗口起点。非零值必须与同一查询返回的有效 `windowCursor` 一起发送；省略时沿用 cursor 自身的位置。该参数用于纯滚动列表直接读取远端窗口，不是 UI 页码。
 - `limit`：分页大小，后端可设置上限。
 - `include`：`summary` 或 `full`，默认 `summary`。
 
 前端普通列表以每窗 200 条读取，最多保留 5 个已加载窗口；未加载和已淘汰窗口使用等高占位，从而让原生滚动条始终代表完整结果集。请求失败时显示失败状态，不回退到前端完整词典快照。repository 仍允许显式诊断和基准工具请求至多 10000 条，但产品 UI 不使用该大页路径。
 
-当前搜索输入采用 250ms debounce，连续输入会重置计时；前端用递增请求 ID 忽略迟到的旧响应。后端所有排序以词条 ID 作为最终稳定键，避免同词形或同时间记录跨窗口边界漂移。cursor 绑定当前服务进程 epoch、词典查询缓存 generation、规范化查询 descriptor 和位置；会话被 TTL/LRU 淘汰时后端可重建查询并继续读取，服务重启、成功写入或查询条件变化则返回 `query_cursor_stale`。前端收到 stale cursor 后从首窗重建查询。
+当前搜索输入采用 250ms debounce，连续输入会重置计时；前端用递增请求 ID 忽略迟到的旧响应。后端所有排序以词条 ID 作为最终稳定键，避免同词形或同时间记录跨窗口边界漂移。`nextCursor` 表示顺序下一页，最后一页为空；`windowCursor` 始终绑定同一结果集合的起点，即使当前响应来自最后一页也可继续用于任意 `windowOffset`。两类 cursor 都绑定当前服务进程 epoch、词典查询缓存 generation 和规范化查询 descriptor；会话被 TTL/LRU 淘汰时后端可重建查询并继续读取，服务重启、成功写入或查询条件变化则返回 `query_cursor_stale`。前端收到 stale cursor 后从首窗重建查询。
+
+目标词条位于尚未加载的窗口时，当前前端不会根据完整词典 snapshot 猜测页号，而会请求：
+
+```text
+GET /api/dictionaries/:id/entries/:entryId/location?q=&fields=&fuzzyFields=&part=&tags=&tagMode=&sort=&source=&derivedFrom=&limit=&include=
+```
+
+后端按同一 descriptor 计算目标结果下标，并直接返回包含目标的窗口。严格 SQL 查询在数据库内计算排序位置；fuzzy 查询复用会话的 `entryId -> resultIndex` 索引。目标词条不存在时返回 `entry_not_found`；词条存在但不属于当前查询结果时仍返回 200，`items` 为空且 `location` 为：
+
+```js
+{ found: false, entryId, reason: "not_in_results" }
+```
+
+成功定位时为：
+
+```js
+{
+  found: true,
+  entryId,
+  resultIndex,  // 当前查询结果内的零基下标
+  windowIndex,
+  windowOffset
+}
+```
+
+响应的 `pageInfo.windowCursor` 可供随后加载相邻窗口；定位请求自身不接收客户端 cursor，避免把旧结果集游标与新的定位 descriptor 混用。前端会把返回窗口直接写入当前窗口状态，再执行虚拟列表稳定滚动；查询 SWR 阶段保留的旧 DOM 不能被视为本次定位完成。
 
 返回：
 
@@ -254,6 +284,7 @@ GET /api/dictionaries/:id/entries?q=&fields=&fuzzyFields=&part=&tags=&tagMode=&s
   ],
   pageInfo: {
     nextCursor,
+    windowCursor,
     hasMore,
     total
   }
@@ -380,6 +411,7 @@ GET /api/dictionaries/:id/root-groups?q=&fields=&fuzzyFields=&sort=&cursor=&wind
   ],
   pageInfo: {
     nextCursor,
+    windowCursor,
     hasMore,
     total,
     windowMetrics: [{ groupCount, derivedCount }]
@@ -387,7 +419,28 @@ GET /api/dictionaries/:id/root-groups?q=&fields=&fuzzyFields=&sort=&cursor=&wind
 }
 ```
 
-`windowMetrics` 只在 offset 为 0 的父级响应中提供，按本次 `limit` 划分全部父级窗口；它只包含每窗词根组数和衍生词总数，不携带词条内容。前端用它在“全部展开”和搜索自动展开状态下估算尚未加载窗口的完整高度。后续窗口响应可以省略该数组。
+`windowMetrics` 通常只在 offset 为 0 的父级响应中提供，按本次 `limit` 划分全部父级窗口；词根定位响应即使位于后续窗口也会携带它，以便前端直接重建完整父级占位。它只包含每窗词根组数和衍生词总数，不携带词条内容。前端用它在“全部展开”和搜索自动展开状态下估算尚未加载窗口的完整高度。普通后续窗口响应可以省略该数组。
+
+目标词条所在父级窗口由以下端点定位：
+
+```text
+GET /api/dictionaries/:id/root-groups/location?entryId=&preferredRootId=&q=&fields=&fuzzyFields=&sort=&limit=&include=
+```
+
+后端先通过稳定拓扑的 `entryId -> rootIds` 取得候选父级，再用查询会话的 `rootId -> resultIndex` 定位当前 descriptor 下的父级窗口；不会扫描所有词根组。多来源词条可传 `preferredRootId` 指定当前导航上下文。成功响应的 `location` 为：
+
+```js
+{
+  found: true,
+  entryId,
+  rootId,
+  groupIndex,
+  windowIndex,
+  windowOffset
+}
+```
+
+目标存在但当前搜索/筛选排除了对应组时返回 200 和 `found: false`；无效的 `preferredRootId` 返回 `invalid_root_context`。返回的 `items` 是目标父级窗口，前端随后只需按需调用该组的 `/entries` 子端点即可展开并定位衍生词。
 
 折叠的词根组不携带衍生词 DTO。展开某组时按需读取：
 
@@ -399,7 +452,7 @@ GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&so
 
 性能优化方向：
 
-- repository 已以独立 relation generation 缓存与搜索条件无关的 `rootId -> derivedIds` 稳定拓扑，并同时维护 `entryId -> rootIds`、`rootId -> group` 反向索引；词典摘要计数、`/root-groups`、组内子项和 `/entry-relations/:entryId` 复用该拓扑。组定位为 O(1)，关系响应仍需按实际返回条目数读取并构建 DTO。词条增删、lemma/来源变化、整库替换和词典删除会使其失效；普通词条保存/patch 仅同步轻量排序记录，其他模块保存不触碰拓扑。查询 session/cursor 的 cache generation 仍按查询一致性要求独立失效。
+- repository 已以独立 relation generation 缓存与搜索条件无关的 `rootId -> derivedIds` 稳定拓扑，并同时维护 `entryId -> rootIds`、`rootId -> group` 反向索引；词根查询会话进一步维护 `rootId -> resultIndex`。词典摘要计数、`/root-groups`、组内子项和 `/entry-relations/:entryId` 复用该拓扑。拓扑组和查询结果位置的定位均为 O(1)，关系响应仍需按实际返回条目数读取并构建 DTO。词条增删、lemma/来源变化、整库替换和词典删除会使其失效；普通词条保存/patch 仅同步轻量排序记录，其他模块保存不触碰拓扑。查询 session/cursor 的 cache generation 仍按查询一致性要求独立失效。
 - `/root-groups` 搜索直接从 `entry_search_values` / `entry_morphology_search_values` 获取命中 ID，再筛选稳定拓扑，不导出完整词典 snapshot。`entry-relations/:entryId` 已复用同一拓扑的反向索引；`entries?derivedFrom=` 和后续质量检查中的词源问题仍应继续收敛到该关系查询层。
 - SQLite 后端应继续用 `entry_sources(source_key, entry_id)` 或等价表/索引支持 `derivedFrom`、词根分组和词汇网络查询；legacy/debug JSON repository 只需保持契约参考，不再作为普通性能优化目标。
 - 前端词根模式正常路径以 `/root-groups` 为准；请求失败时显示失败状态，不回退前端本地完整分组。父级未加载窗口以 `pageInfo.total` 和 `windowMetrics` 建立占位，因此滚动条可在折叠、搜索自动展开及全局展开状态下代表完整词根组集合。全局展开采用状态意图：父级页进入可见范围后才加载各组衍生词；单组收起作为例外保留到重新展开或“全部收起/全部展开”重置。组内衍生词不建立第二层分页窗口。

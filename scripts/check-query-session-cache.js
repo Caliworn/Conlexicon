@@ -287,7 +287,29 @@ async function checkRepositoryIntegration() {
       fuzzyFirst.items.map((entry) => entry.id),
       fuzzySecond.items.slice(0, fuzzyFirst.items.length).map((entry) => entry.id),
     );
+    const fuzzySession = [...repository.querySessionCache.sessions.values()]
+      .find((session) => session.kind === "entries" && session.descriptor.q === "rt");
+    assert.ok(fuzzySession?.entryIndexById instanceof Map);
+    assert.equal(fuzzySession.entryIndexById.size, fuzzySession.orderedIds.length);
+    assert.equal(fuzzySession.entryIndexById.get(fuzzyFirst.items[0].id), 0);
+    const fuzzyLocated = await repository.locateEntryQueryWindow(
+      dictionary.id,
+      fuzzySecond.items.at(-1).id,
+      fuzzyQuery,
+    );
+    assert.equal(fuzzyLocated.location.found, true);
+    assert.equal(
+      fuzzyLocated.location.resultIndex,
+      fuzzySession.entryIndexById.get(fuzzySecond.items.at(-1).id),
+      "fuzzy location should reuse the session's O(1) entry index",
+    );
+    assert.ok(
+      fuzzyLocated.items.some((entry) => entry.id === fuzzySecond.items.at(-1).id),
+      "fuzzy location should return the target window",
+    );
+    assert.equal(fuzzyBuilds, 1, "fuzzy location should reuse the existing query session");
     assert.ok(fuzzyFirst.pageInfo.nextCursor, "the first fuzzy page should expose a versioned cursor");
+    assert.ok(fuzzyFirst.pageInfo.windowCursor, "the first fuzzy page should expose a dedicated window cursor");
     const fuzzyNext = await repository.queryEntries(dictionary.id, {
       ...fuzzyQuery,
       cursor: fuzzyFirst.pageInfo.nextCursor,
@@ -299,7 +321,7 @@ async function checkRepositoryIntegration() {
     );
     const fuzzyFirstWindow = await repository.queryEntries(dictionary.id, {
       ...fuzzyQuery,
-      cursor: fuzzyFirst.pageInfo.nextCursor,
+      cursor: fuzzyFirst.pageInfo.windowCursor,
       windowOffset: 0,
     });
     assert.deepEqual(
@@ -307,6 +329,13 @@ async function checkRepositoryIntegration() {
       fuzzyFirst.items.map((entry) => entry.id),
       "a validated cursor should permit direct access to another result window",
     );
+    const fuzzyLastWindow = await repository.queryEntries(dictionary.id, {
+      ...fuzzyQuery,
+      cursor: fuzzyFirst.pageInfo.windowCursor,
+      windowOffset: fuzzyFirst.pageInfo.total - 1,
+    });
+    assert.equal(fuzzyLastWindow.pageInfo.nextCursor, "", "the last page should not expose a sequential next cursor");
+    assert.ok(fuzzyLastWindow.pageInfo.windowCursor, "the last page should retain a random-access window cursor");
     await assert.rejects(
       () => repository.queryEntries(dictionary.id, {
         ...fuzzyQuery,
@@ -368,6 +397,11 @@ async function checkRepositoryIntegration() {
       include: "full",
     });
     assert.equal(topologyBuilds, 1, "no-search root groups should build one stable topology");
+    const rootSession = [...repository.querySessionCache.sessions.values()]
+      .find((session) => session.kind === "rootGroups" && !session.descriptor.q);
+    assert.ok(rootSession?.groupIndexByRootId instanceof Map);
+    assert.equal(rootSession.groupIndexByRootId.size, rootSession.groups.length);
+    assert.equal(rootSession.groupIndexByRootId.get(rootFirst.items[0].root.id), 0);
     const topology = repository.currentRootTopology(dictionary.id);
     assert.equal(topology.groupsByRootId.get("entry-root")?.rootId, "entry-root");
     assert.deepEqual(topology.rootIdsByEntryId.get("entry-root"), ["entry-root"]);
@@ -393,8 +427,9 @@ async function checkRepositoryIntegration() {
       "root-group window metrics should include derived-entry counts",
     );
     assert.ok(rootFirst.pageInfo.nextCursor, "the first root-group page should expose a versioned cursor");
+    assert.ok(rootFirst.pageInfo.windowCursor, "the first root-group page should expose a dedicated window cursor");
     const rootFirstWindow = await repository.queryRootGroups(dictionary.id, {
-      cursor: rootFirst.pageInfo.nextCursor,
+      cursor: rootFirst.pageInfo.windowCursor,
       windowOffset: 0,
       limit: 1,
     });

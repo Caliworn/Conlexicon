@@ -1141,6 +1141,7 @@ async function checkReadApiConsistency(repository) {
     assert.equal(apiResult.body.items.length, 3);
     assert.equal(apiResult.body.pageInfo.hasMore, true);
     assert.ok(apiResult.body.pageInfo.nextCursor);
+    assert.ok(apiResult.body.pageInfo.windowCursor);
     const nextPage = await callApi(
       repository,
       "GET",
@@ -1152,11 +1153,42 @@ async function checkReadApiConsistency(repository) {
       expectedEntryIds(dictionary, { sort: "lemmaAsc" }),
     );
 
+    const orderedEntryIds = expectedEntryIds(dictionary, { sort: "lemmaAsc" });
+    const locatedEntryId = orderedEntryIds.at(-1);
+    const locatedEntry = await callApi(
+      repository,
+      "GET",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(locatedEntryId)}/location?sort=lemmaAsc&limit=2`,
+    );
+    assert.equal(locatedEntry.statusCode, 200);
+    assert.equal(locatedEntry.body.location.found, true);
+    assert.equal(locatedEntry.body.location.entryId, locatedEntryId);
+    assert.equal(locatedEntry.body.location.resultIndex, orderedEntryIds.length - 1);
+    assert.equal(locatedEntry.body.location.windowOffset, Math.floor((orderedEntryIds.length - 1) / 2) * 2);
+    assert.ok(locatedEntry.body.items.some((entry) => entry.id === locatedEntryId));
+    assert.ok(locatedEntry.body.pageInfo.windowCursor);
+
+    const excludedEntry = await callApi(
+      repository,
+      "GET",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(locatedEntryId)}/location?part=missing-part&limit=2`,
+    );
+    assert.equal(excludedEntry.statusCode, 200);
+    assert.equal(excludedEntry.body.location.found, false);
+    assert.equal(excludedEntry.body.location.reason, "not_in_results");
+    assert.deepEqual(excludedEntry.body.items, []);
+
+    await assert.rejects(
+      () => repository.locateEntryQueryWindow(dictionary.id, "entry-does-not-exist", { limit: 2 }),
+      (error) => error?.status === 404 && error?.code === "entry_not_found",
+    );
+
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups?sort=lemmaAsc&limit=2`);
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.items.length, 2);
     assert.equal(apiResult.body.pageInfo.hasMore, true);
     assert.ok(apiResult.body.pageInfo.nextCursor);
+    assert.ok(apiResult.body.pageInfo.windowCursor);
     const nextRootGroupPage = await callApi(
       repository,
       "GET",
@@ -1166,6 +1198,50 @@ async function checkReadApiConsistency(repository) {
     assert.deepEqual(
       [...apiResult.body.items, ...nextRootGroupPage.body.items].map((group) => group.root.id),
       expectedRootGroupSnapshot(dictionary, { sort: "lemmaAsc" }).map((group) => group.rootId),
+    );
+
+    const rootSnapshot = expectedRootGroupSnapshot(dictionary, { sort: "lemmaAsc" });
+    const locatedRootGroup = rootSnapshot.find((group) => group.derivedIds.length > 0);
+    assert.ok(locatedRootGroup, "root locator fixture must contain a derived entry");
+    const locatedDerivedId = locatedRootGroup.derivedIds[0];
+    const locatedRoot = await callApi(
+      repository,
+      "GET",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups/location?entryId=${encodeURIComponent(locatedDerivedId)}&sort=lemmaAsc&limit=1`,
+    );
+    assert.equal(locatedRoot.statusCode, 200);
+    assert.equal(locatedRoot.body.location.found, true);
+    assert.equal(locatedRoot.body.location.entryId, locatedDerivedId);
+    assert.equal(locatedRoot.body.location.rootId, locatedRootGroup.rootId);
+    assert.equal(locatedRoot.body.location.groupIndex, rootSnapshot.indexOf(locatedRootGroup));
+    assert.equal(locatedRoot.body.location.windowOffset, rootSnapshot.indexOf(locatedRootGroup));
+    assert.equal(locatedRoot.body.items[0]?.root?.id, locatedRootGroup.rootId);
+    assert.ok(locatedRoot.body.pageInfo.windowCursor);
+    assert.ok(locatedRoot.body.pageInfo.windowMetrics.length > 0);
+
+    const excludedRoot = await callApi(
+      repository,
+      "GET",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups/location?entryId=${encodeURIComponent(locatedDerivedId)}&q=no-such-root-result&limit=1`,
+    );
+    assert.equal(excludedRoot.statusCode, 200);
+    assert.equal(excludedRoot.body.location.found, false);
+    assert.ok(["not_in_results", "root_context_not_in_results"].includes(excludedRoot.body.location.reason));
+
+    await assert.rejects(
+      () => repository.locateRootGroupQueryWindow(dictionary.id, locatedDerivedId, {
+        preferredRootId: "entry-does-not-exist",
+        limit: 1,
+      }),
+      (error) => error?.status === 400 && error?.code === "invalid_root_context",
+    );
+    await assert.rejects(
+      () => callApi(
+        repository,
+        "GET",
+        `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups/location?limit=1`,
+      ),
+      (error) => error?.status === 400 && error?.code === "invalid_entry_location_target",
     );
   } finally {
     await repository.deleteDictionary(dictionary.id);
@@ -1336,6 +1412,7 @@ async function runRepositoryContractTests(options = {}) {
     assert.equal(apiResult.body.items.length, 2);
     assert.equal(apiResult.body.pageInfo.hasMore, true);
     assert.ok(apiResult.body.pageInfo.nextCursor);
+    assert.ok(apiResult.body.pageInfo.windowCursor);
 
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/facets`);
     assert.equal(apiResult.statusCode, 200);

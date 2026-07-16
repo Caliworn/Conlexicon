@@ -9,7 +9,7 @@
 - 普通词条和词根模式使用独立 API 查询状态，并以递增 `requestId` 丢弃迟到响应。
 - 搜索输入使用 250ms debounce；连续输入会重新计时。
 - SQLite 查询使用稳定排序，词条 ID 是最终排序键。
-- `/entries` 和 `/root-groups` 返回 `{ items, pageInfo }`；cursor 已绑定查询版本，前端通过 `windowOffset` 直接读取远端窗口。
+- `/entries` 和 `/root-groups` 返回 `{ items, pageInfo }`；`nextCursor` 只用于顺序下一页，独立的 `windowCursor` 始终绑定查询结果起点，前端用它配合 `windowOffset` 直接读取远端窗口。
 - 静态及形态严格/fuzzy 搜索读取 `entry_search_values` / `entry_morphology_search_values`。
 - 前端虚拟列表有卡片高度缓存，但这与查询结果缓存无关。
 
@@ -17,7 +17,7 @@
 
 - 词条切换仍会触发全局渲染，并在详情缓存未命中时出现短暂加载状态。
 - 高级筛选、数据分析、质量检查及部分关系消费者尚未接入同一查询边界。
-- 自动滚动对未加载窗口的定位暂时借助当前完整活动词典 snapshot；Q5 拆除完整 snapshot 依赖时需要改为后端定位/导航接口。
+- 普通词条和词根父级窗口定位接口已经接入前端自动滚动；未加载目标不再通过完整活动词典 snapshot 推算页号。
 - 无搜索词根模式的冷会话构建仍是已知慢路径，窗口化只减少传输与 DTO 构建，不消除第一次关系分组计算。
 
 ## 2. 目标与非目标
@@ -99,7 +99,9 @@ include
   descriptor,           // 完整规范化查询，用于页面命中回读和重建
   descriptorKey,
   orderedIds,           // entries 查询
+  entryIndexById,       // 已物化有序 ID 的 entryId -> resultIndex
   groups,               // rootId + derivedIds + matchedDerivedIds + rootMatches
+  groupIndexByRootId,   // rootId -> resultIndex
   total,
   createdAt,
   lastAccessAt,
@@ -107,7 +109,7 @@ include
 }
 ```
 
-词条 fuzzy 会话只需保存排序后的命中词条 ID。`searchHits` 继续按当前页面的 ID 从 projection 读取，避免把所有命中详情长期留在内存。词根会话只保存组身份和匹配标记，页面 DTO 仍从 SQLite 主表组装。session 必须保留完整规范化 descriptor；只有 digest 无法在后续页面中恢复字段、fuzzy 配置和命中定位语义。
+词条 fuzzy 会话保存排序后的命中词条 ID，并同步维护 `entryIndexById`；词根会话保存组身份、匹配标记和 `groupIndexByRootId`。两种索引都只复用已经物化的结果数组，不额外扫描 SQLite，供后续定位 API 直接取得结果下标。`searchHits` 和页面 DTO 仍按当前窗口的 ID 从 projection/主表读取，避免把所有命中详情长期留在内存。session 必须保留完整规范化 descriptor；只有 digest 无法在后续页面中恢复字段、fuzzy 配置和命中定位语义。
 
 ### 3.3 SQLite repository
 
@@ -206,7 +208,7 @@ Q4 已将 cursor 从纯 offset 升级为可重建的不透明查询 cursor，绑
 - 词典写入后 `cacheGeneration` 已变化。
 - cursor 与当前 descriptor 不匹配。
 
-前端收到该错误时从第一页重新建立查询，并通过现有列表锚点策略恢复到当前词条或尽量接近的位置。非零 `windowOffset` 必须携带已通过上述校验的 cursor，防止客户端绕过查询版本直接混入任意窗口。
+前端收到该错误时从第一页重新建立查询，并通过现有列表锚点策略恢复到当前词条或尽量接近的位置。分页响应同时提供两种同格式、同校验规则的 cursor：`nextCursor` 携带下一页 offset，最后一页为空；`windowCursor` 携带结果起点 offset，并在每一页都返回。非零 `windowOffset` 必须携带已通过上述校验的 `windowCursor`，防止客户端绕过查询版本直接混入任意窗口。
 
 ## 8. 容量与淘汰
 
@@ -294,11 +296,11 @@ query kind
 
 ### Q4：可重建 cursor 与纯滚动窗口化（已完成）
 
-- cursor 绑定 process epoch、cache generation、descriptor digest 和 offset；服务重启、写入或查询条件变化返回 `query_cursor_stale`，无效窗口参数返回独立结构化错误。
+- `nextCursor` 与 `windowCursor` 均绑定 process epoch、cache generation、descriptor digest 和 offset；前者表示顺序下一页，后者始终表示同一查询的随机窗口访问凭证。服务重启、写入或查询条件变化返回 `query_cursor_stale`，无效窗口参数返回独立结构化错误。
 - session 被 TTL/LRU 淘汰时按 descriptor 重算并继续，不把缓存 miss 转化为错误；测试覆盖进程 epoch、generation、descriptor 和缓存淘汰边界。
 - 普通词条每窗 200 条、词根组每窗 100 组；两类父级列表各自最多保留 5 个已加载窗口，远端窗口按距离淘汰。组内衍生词不建立嵌套窗口：展开时一次读取整组，符合真实词根家族规模，也避免维护没有产品收益的第二套占位、高度和淘汰状态。
 - 首窗根据 `pageInfo.total` 建立整组等高占位，滚动条从一开始就代表完整结果集；可见窗口及相邻窗口按需预取。加载页继承占位高度比例，非滚动状态下恢复现有锚点，避免窗口替换导致跳动。
-- 自动滚动会先补载目标所在的普通词条或词根组窗口；目标是衍生词时，再一次读取其所在的完整词根组。在 Q5 提供后端定位接口前，目标页号仍暂由完整活动词典 snapshot 计算。
+- 定位层已完成并接入自动滚动：`/entries/:entryId/location` 返回当前普通查询下的目标窗口，`/root-groups/location` 通过稳定拓扑候选根和会话组下标返回父级窗口；严格查询在 SQL 内求结果位置，fuzzy/词根会话分别复用 `entryId -> resultIndex` 与 `rootId -> resultIndex`。目标存在但被查询排除时返回明确的 `found: false`，而不是伪造首窗。词根衍生词定位先加载父级窗口，再按需读取整组子项；前端不再调用 `filteredEntries()` / `rootModeGroups()` 猜测未加载窗口。
 - 产品前端不再请求临时 `limit=10000`，窗口大小固定为上述小批次；repository 保留原有大页硬上限，供显式基准和诊断工具使用，不进入正常 UI 路径。
 - `/root-groups/:rootId/entries` 不复用父级分页协议：后端通过查询会话的 `rootId → group` 索引直接定位并返回整组，不处理 cursor、`windowOffset` 或 `limit`，也不设置单组 2000 条硬上限。`/entry-relations/:entryId` 同时通过稳定拓扑的 `entryId → rootIds` 和 `rootId → group` 索引定位同根组，不再逐请求递归扫描祖先与后代。
 - 全局展开状态使用 `manual/all` 两种模式；`all` 下单组收起记录为例外。父级窗口淘汰只释放衍生词 DTO，不清除展开意图；“全部展开”和“全部收起”都会清空上一轮手动展开/收起例外。“全部收起”同时释放已加载的组内数据。
