@@ -118,10 +118,10 @@ let entryQueryState = {
   pageInfo: null,
   error: null,
   requestId: 0,
-  preserveRenderedList: false,
   pages: [],
   visiblePageIndexes: new Set(),
   windowCursor: "",
+  updateToken: 0,
 };
 let entryFacetsState = {
   key: "",
@@ -140,6 +140,7 @@ let rootGroupsQueryState = {
   pages: [],
   visiblePageIndexes: new Set(),
   windowCursor: "",
+  updateToken: 0,
 };
 const rootGroupDerivedStates = new Map();
 let selectedEntryDetailState = {
@@ -147,6 +148,7 @@ let selectedEntryDetailState = {
   entryId: "",
   status: "idle",
   entry: null,
+  staleEntry: null,
   error: null,
   requestId: 0,
 };
@@ -176,7 +178,15 @@ const VIRTUAL_LIST_RESIZE_THROTTLE_MS = 500;
 const VIRTUAL_LIST_RESIZE_IDLE_FLUSH_MS = 180;
 const VIRTUAL_LIST_HEIGHT_CACHE_WIDTH_BUCKET = 24;
 const VIRTUAL_LIST_HEIGHT_CACHE_LIMIT = 50000;
+const STALE_CONTENT_UPDATE_DELAY_MS = 200;
 const DEFAULT_ANALYSIS_ROOT_FAMILY_LIMIT = 12;
+let staleContentUpdateSequence = 0;
+let entryListHasSettledContent = false;
+let entryDetailHasSettledContent = false;
+const staleContentUpdates = {
+  list: { token: 0, timer: 0, pending: false, hasStaleContent: false, showing: false },
+  detail: { token: 0, timer: 0, pending: false, hasStaleContent: false, showing: false },
+};
 
 const i18n = {
   zh: {
@@ -679,6 +689,7 @@ const i18n = {
     lexicalNetwork: "词汇网络",
     closeNetwork: "关闭网络",
     lexicalNetworkLoading: "正在加载词汇网络",
+    contentUpdating: "正在更新",
     lexicalNetworkLoadFailed: "无法加载词汇网络",
   },
   en: {
@@ -1184,6 +1195,7 @@ const i18n = {
     lexicalNetwork: "Lexical Network",
     closeNetwork: "Close Network",
     lexicalNetworkLoading: "Loading lexical network",
+    contentUpdating: "Updating",
     lexicalNetworkLoadFailed: "Could not load lexical network",
   },
 };
@@ -1240,6 +1252,8 @@ const elements = {
   dictionaryManagerList: document.querySelector("#dictionaryManagerList"),
   dictionaryMeta: document.querySelector("#dictionaryMeta"),
   dictionaryTitle: document.querySelector("#dictionaryTitle"),
+  entryListUpdateFrame: document.querySelector("#entryListUpdateFrame"),
+  entryListUpdateOverlay: document.querySelector("#entryListUpdateOverlay"),
   entryList: document.querySelector("#entryList"),
   searchInput: document.querySelector("#searchInput"),
   rootModeToggleButton: document.querySelector("#rootModeToggleButton"),
@@ -1255,6 +1269,8 @@ const elements = {
   newEntryButton: document.querySelector("#newEntryButton"),
   entryListNewEntryButton: document.querySelector("#entryListNewEntryButton"),
   importInput: document.querySelector("#importInput"),
+  entryDetailPanel: document.querySelector("#entryDetailPanel"),
+  entryDetailUpdateOverlay: document.querySelector("#entryDetailUpdateOverlay"),
   entryDisplay: document.querySelector("#entryDisplay"),
   displayLemma: document.querySelector("#displayLemma"),
   displayPronunciation: document.querySelector("#displayPronunciation"),
@@ -1424,6 +1440,71 @@ const elements = {
   confirmAcceptButton: document.querySelector("#confirmAcceptButton"),
   toast: document.querySelector("#toast"),
 };
+
+function staleContentUpdateElements(surface) {
+  return surface === "detail"
+    ? { frame: elements.entryDetailPanel, overlay: elements.entryDetailUpdateOverlay }
+    : { frame: elements.entryListUpdateFrame, overlay: elements.entryListUpdateOverlay };
+}
+
+function syncStaleContentUpdate(surface) {
+  const update = staleContentUpdates[surface];
+  const { frame, overlay } = staleContentUpdateElements(surface);
+  if (!update || !frame || !overlay) {
+    return;
+  }
+  frame.classList.toggle("content-updating", update.showing);
+  frame.setAttribute("aria-busy", String(update.pending));
+  overlay.hidden = !update.showing;
+}
+
+function beginStaleContentUpdate(surface, hasStaleContent) {
+  const update = staleContentUpdates[surface];
+  if (!update) {
+    return 0;
+  }
+  if (update.timer) {
+    window.clearTimeout(update.timer);
+  }
+  const token = ++staleContentUpdateSequence;
+  update.token = token;
+  update.timer = 0;
+  update.pending = true;
+  update.hasStaleContent = Boolean(hasStaleContent);
+  update.showing = false;
+  syncStaleContentUpdate(surface);
+  if (update.hasStaleContent) {
+    update.timer = window.setTimeout(() => {
+      if (update.token !== token || !update.pending) {
+        return;
+      }
+      update.timer = 0;
+      update.showing = true;
+      syncStaleContentUpdate(surface);
+    }, STALE_CONTENT_UPDATE_DELAY_MS);
+  }
+  return token;
+}
+
+function finishStaleContentUpdate(surface, token = null) {
+  const update = staleContentUpdates[surface];
+  if (!update || (token !== null && update.token !== token)) {
+    return;
+  }
+  if (update.timer) {
+    window.clearTimeout(update.timer);
+  }
+  update.timer = 0;
+  update.pending = false;
+  update.hasStaleContent = false;
+  update.showing = false;
+  syncStaleContentUpdate(surface);
+}
+
+function staleContentUpdateRetainsContent(surface) {
+  const update = staleContentUpdates[surface];
+  return Boolean(update?.pending && update.hasStaleContent);
+}
 
 function t(key) {
   return i18n[currentLanguage][key] || i18n.zh[key] || key;
@@ -2417,12 +2498,15 @@ function entryDetailCacheKey(dictionaryId, entryId) {
 }
 
 function resetSelectedEntryDetailState() {
+  finishStaleContentUpdate("detail");
+  entryDetailHasSettledContent = false;
   selectedEntryDetailLoadPromise = null;
   selectedEntryDetailState = {
     dictionaryId: "",
     entryId: "",
     status: "idle",
     entry: null,
+    staleEntry: null,
     error: null,
     requestId: selectedEntryDetailState.requestId + 1,
   };
@@ -2439,9 +2523,11 @@ function cacheSavedEntryDetail(dictionaryId, entry) {
       entryId: entry.id,
       status: "success",
       entry,
+      staleEntry: null,
       error: null,
       requestId: selectedEntryDetailState.requestId + 1,
     };
+    finishStaleContentUpdate("detail");
   }
 }
 
@@ -2467,11 +2553,19 @@ async function ensureSelectedEntryDetailLoaded() {
     return selectedEntryDetailLoadPromise;
   }
   const requestId = selectedEntryDetailState.requestId + 1;
+  const staleEntry = selectedEntryDetailState.status === "success"
+    ? selectedEntryDetailState.entry
+    : selectedEntryDetailState.staleEntry;
+  const updateToken = beginStaleContentUpdate(
+    "detail",
+    Boolean(staleEntry && entryDetailHasSettledContent),
+  );
   selectedEntryDetailState = {
     dictionaryId: dictionary.id,
     entryId,
     status: "loading",
     entry: null,
+    staleEntry,
     error: null,
     requestId,
   };
@@ -2494,9 +2588,11 @@ async function ensureSelectedEntryDetailLoaded() {
       entryId,
       status: "success",
       entry,
+      staleEntry: null,
       error: null,
       requestId,
     };
+    finishStaleContentUpdate("detail", updateToken);
     renderDetail();
     return entry;
   } catch (error) {
@@ -2506,9 +2602,11 @@ async function ensureSelectedEntryDetailLoaded() {
         entryId,
         status: "error",
         entry: null,
+        staleEntry: null,
         error,
         requestId,
       };
+      finishStaleContentUpdate("detail", updateToken);
       console.error(error);
       renderDetail();
     }
@@ -4100,6 +4198,8 @@ function setupQualityMasonryLayouts() {
 function renderEntries() {
   const dictionary = activeDictionary();
   if (!dictionary) {
+    finishStaleContentUpdate("list");
+    entryListHasSettledContent = false;
     renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noDictionary"), t("emptyDictionaryBody")));
     return;
   }
@@ -4114,12 +4214,15 @@ function renderEntries() {
     const queryPages = entryQueryWindowForRender(dictionary);
     if (!queryPages) {
       if (entryQueryState.status === "loading") {
-        if (entryQueryState.preserveRenderedList && entryVirtualList.items.length) {
+        if (staleContentUpdateRetainsContent("list")) {
           return;
         }
+        entryListHasSettledContent = false;
         renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(aText("加载中", "Loading"), ""));
         return;
       }
+      finishStaleContentUpdate("list");
+      entryListHasSettledContent = false;
       renderVirtualListEmpty(
         elements.entryList,
         entryVirtualList,
@@ -4132,11 +4235,15 @@ function renderEntries() {
       windowPages: queryPages,
       onRangeChange: (range) => handleEntryQueryWindowRange(dictionary, range),
     });
+    finishStaleContentUpdate("list");
+    entryListHasSettledContent = true;
     return;
   }
 
+  finishStaleContentUpdate("list");
   const entries = filteredEntries();
   renderEntryRows(entries);
+  entryListHasSettledContent = true;
 }
 
 function renderEntryRows(entries = [], options = {}) {
@@ -4220,9 +4327,15 @@ function renderRootModeEntries() {
   const groupPages = rootGroupsQueryForRender(dictionary);
   if (!groupPages) {
     if (rootGroupsQueryState.status === "loading") {
+      if (staleContentUpdateRetainsContent("list")) {
+        return;
+      }
+      entryListHasSettledContent = false;
       renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(aText("加载中", "Loading"), ""));
       return;
     }
+    finishStaleContentUpdate("list");
+    entryListHasSettledContent = false;
     renderVirtualListEmpty(
       elements.entryList,
       entryVirtualList,
@@ -4235,6 +4348,8 @@ function renderRootModeEntries() {
     windowPages: groupPages,
     onRangeChange: (range) => handleRootGroupsWindowRange(dictionary, range),
   });
+  finishStaleContentUpdate("list");
+  entryListHasSettledContent = true;
 }
 
 function renderRootModeGroups(groups = [], options = {}) {
@@ -4652,6 +4767,7 @@ function resetRootGroupsQueryState() {
     pages: [],
     visiblePageIndexes: new Set(),
     windowCursor: "",
+    updateToken: 0,
   };
   rootGroupDerivedStates.clear();
 }
@@ -4787,6 +4903,7 @@ function restartRootGroupsWindowAfterStale() {
 function loadRootGroupsWindowPage(dictionary, page) {
   const key = rootGroupsQueryState.key;
   const requestId = rootGroupsQueryState.requestId;
+  const updateToken = rootGroupsQueryState.updateToken;
   page.status = "loading";
   page.error = null;
   page.lastAccessAt = performance.now();
@@ -4830,6 +4947,10 @@ function loadRootGroupsWindowPage(dictionary, page) {
       );
       rootGroupsQueryState.status = "success";
       rootGroupsQueryState.error = null;
+      if (page.index === 0) {
+        rootGroupsQueryState.updateToken = 0;
+        finishStaleContentUpdate("list", updateToken);
+      }
       syncRootGroupsQueryWindowState();
       const protectedRootIds = new Set([rootNavigationContextId, state.selectedEntryId].filter(Boolean));
       evictDistantQueryWindowPages(
@@ -4869,7 +4990,11 @@ function loadRootGroupsWindowPage(dictionary, page) {
         pages: [],
         visiblePageIndexes: new Set(),
         windowCursor: "",
+        updateToken: 0,
       };
+      if (page.index === 0) {
+        finishStaleContentUpdate("list", updateToken);
+      }
       console.error(error);
       renderPartFilter();
       renderEntries();
@@ -4922,6 +5047,7 @@ function startRootGroupsQueryApiCheck(dictionary) {
   }
 
   const requestId = rootGroupsQueryState.requestId + 1;
+  const updateToken = beginStaleContentUpdate("list", entryListHasSettledContent);
   const firstPage = createQueryWindowPage("", 0);
   firstPage.estimatedHeight = ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE * 156;
   rootGroupsQueryState = {
@@ -4934,6 +5060,7 @@ function startRootGroupsQueryApiCheck(dictionary) {
     pages: [firstPage],
     visiblePageIndexes: new Set([0]),
     windowCursor: "",
+    updateToken,
   };
   loadRootGroupsWindowPage(dictionary, firstPage);
 }
@@ -5032,7 +5159,7 @@ function updateEntrySummaryDtoAfterSave(dictionary, entry) {
   });
 }
 
-function resetEntryQueryState(options = {}) {
+function resetEntryQueryState() {
   entryQueryState = {
     key: "",
     status: "idle",
@@ -5040,10 +5167,10 @@ function resetEntryQueryState(options = {}) {
     pageInfo: null,
     error: null,
     requestId: entryQueryState.requestId + 1,
-    preserveRenderedList: Boolean(options.preserveRenderedList && entryVirtualList.items.length),
     pages: [],
     visiblePageIndexes: new Set(),
     windowCursor: "",
+    updateToken: 0,
   };
 }
 
@@ -5102,6 +5229,7 @@ function restartEntryQueryWindowAfterStale(dictionary) {
 function loadEntryQueryWindowPage(dictionary, page) {
   const key = entryQueryState.key;
   const requestId = entryQueryState.requestId;
+  const updateToken = entryQueryState.updateToken;
   page.status = "loading";
   page.error = null;
   page.lastAccessAt = performance.now();
@@ -5145,7 +5273,10 @@ function loadEntryQueryWindowPage(dictionary, page) {
       );
       entryQueryState.status = "success";
       entryQueryState.error = null;
-      entryQueryState.preserveRenderedList = false;
+      if (page.index === 0) {
+        entryQueryState.updateToken = 0;
+        finishStaleContentUpdate("list", updateToken);
+      }
       syncEntryQueryWindowState();
       evictDistantQueryWindowPages(
         entryQueryState.pages,
@@ -5173,11 +5304,14 @@ function loadEntryQueryWindowPage(dictionary, page) {
         pageInfo: null,
         error,
         requestId,
-        preserveRenderedList: false,
         pages: [],
         visiblePageIndexes: new Set(),
         windowCursor: "",
+        updateToken: 0,
       };
+      if (page.index === 0) {
+        finishStaleContentUpdate("list", updateToken);
+      }
       console.error(error);
       renderEntries();
     });
@@ -5226,7 +5360,7 @@ function startEntryQueryApiCheck(dictionary) {
   }
 
   const requestId = entryQueryState.requestId + 1;
-  const preserveRenderedList = entryQueryState.preserveRenderedList;
+  const updateToken = beginStaleContentUpdate("list", entryListHasSettledContent);
   const firstPage = createQueryWindowPage("", 0);
   firstPage.estimatedHeight = ENTRY_QUERY_WINDOW_PAGE_SIZE * entryVirtualList.estimatedItemHeight;
   entryQueryState = {
@@ -5236,10 +5370,10 @@ function startEntryQueryApiCheck(dictionary) {
     pageInfo: null,
     error: null,
     requestId,
-    preserveRenderedList,
     pages: [firstPage],
     visiblePageIndexes: new Set([0]),
     windowCursor: "",
+    updateToken,
   };
   loadEntryQueryWindowPage(dictionary, firstPage);
 }
@@ -5778,11 +5912,11 @@ async function switchToEntry(entryId, options = {}) {
 
   entryDraft = null;
   state.selectedEntryId = entryId;
-  resetSelectedEntryDetailState();
   editorMode = "display";
   const navigationOptions = prepareRootModeEntryNavigation(entryId, options);
+  const detailLoadPromise = ensureSelectedEntryDetailLoaded();
   render();
-  await ensureSelectedEntryDetailLoaded();
+  await detailLoadPromise;
   scheduleEntryCardScroll(entryId, navigationOptions);
   closeMobileEntryBrowserDrawer();
 }
@@ -6651,36 +6785,68 @@ function fuzzyScore(value, query) {
 
 function renderDetail() {
   const dictionary = activeDictionary();
-  const entry = selectedEntry();
   const isEditing = editorMode === "edit";
 
-  elements.entryDisplay.hidden = isEditing || !dictionary || !entry;
-  elements.entryForm.hidden = !dictionary || !isEditing;
-
   if (!dictionary) {
+    finishStaleContentUpdate("detail");
+    entryDetailHasSettledContent = false;
+    elements.entryDisplay.hidden = true;
+    elements.entryForm.hidden = true;
     return;
   }
 
   if (isEditing) {
-    fillEntryForm(entry || entryDraft);
+    finishStaleContentUpdate("detail");
+    elements.entryDisplay.hidden = true;
+    elements.entryForm.hidden = false;
+    fillEntryForm(selectedEntry() || entryDraft);
     return;
   }
+
+  const detailStateMatchesSelection = selectedEntryDetailState.dictionaryId === dictionary.id
+    && selectedEntryDetailState.entryId === state.selectedEntryId;
+  if (
+    state.selectedEntryId
+    && !selectedEntry()
+    && !(detailStateMatchesSelection && selectedEntryDetailState.status === "error")
+  ) {
+    ensureSelectedEntryDetailLoaded();
+  }
+  const entry = selectedEntry();
+  const retainingStaleDetail = Boolean(
+    !entry
+    && selectedEntryDetailState.dictionaryId === dictionary.id
+    && selectedEntryDetailState.entryId === state.selectedEntryId
+    && selectedEntryDetailState.status === "loading"
+    && selectedEntryDetailState.staleEntry
+    && staleContentUpdateRetainsContent("detail")
+  );
+
+  elements.entryForm.hidden = true;
+  if (retainingStaleDetail) {
+    elements.entryDisplay.hidden = false;
+    return;
+  }
+
+  elements.entryDisplay.hidden = !entry && !state.selectedEntryId;
 
   if (!entry) {
     elements.entryDisplay.hidden = false;
     renderEmptyDetail();
+    entryDetailHasSettledContent = false;
     if (state.selectedEntryId) {
       if (selectedEntryDetailState.status === "error") {
         elements.displayLemma.textContent = aText("无法加载词条详情", "Could not load entry details");
       } else {
         elements.displayLemma.textContent = aText("加载中", "Loading");
-        ensureSelectedEntryDetailLoaded();
       }
     }
     return;
   }
 
+  elements.entryDisplay.hidden = false;
   renderEntryDisplay(entry);
+  entryDetailHasSettledContent = true;
 }
 
 function renderEmptyDetail() {
@@ -11814,7 +11980,7 @@ async function savePartialEdit(event) {
     cacheSavedEntryDetail(dictionary.id, savedEntry);
     updateEntrySummaryDtoAfterSave(activeDictionary(), savedEntry);
     cancelPartialEdit();
-    resetEntryReadStateAfterSave({ preserveEntryList: true });
+    resetEntryReadStateAfterSave();
     render();
     if (shouldScrollAfterSave) {
       scheduleEntryCardScroll(savedEntry.id, prepareRootModeEntryNavigation(savedEntry.id));
@@ -11975,7 +12141,7 @@ async function saveEntry(event) {
     updateEntrySummaryDtoAfterSave(activeDictionary(), savedEntry);
     entryDraft = null;
     editorMode = "display";
-    resetEntryReadStateAfterSave({ preserveEntryList: true });
+    resetEntryReadStateAfterSave();
     render();
     if (wasNewEntry || previousLemma !== savedEntry.lemma) {
       scheduleEntryCardScroll(savedEntry.id, prepareRootModeEntryNavigation(savedEntry.id));
@@ -12241,8 +12407,8 @@ function applyEntryPatchPayload(payload) {
   return normalized;
 }
 
-function resetEntryReadStateAfterSave(options = {}) {
-  resetEntryQueryState({ preserveRenderedList: options.preserveEntryList });
+function resetEntryReadStateAfterSave() {
+  resetEntryQueryState();
   resetEntryFacetsState();
   resetRootGroupsQueryState();
   lexicalNetworkRelationsCache.clear();
