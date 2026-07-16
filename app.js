@@ -1456,6 +1456,9 @@ function syncStaleContentUpdate(surface) {
   frame.classList.toggle("content-updating", update.showing);
   frame.setAttribute("aria-busy", String(update.pending));
   overlay.hidden = !update.showing;
+  if (surface === "detail" && elements.entryDisplay) {
+    elements.entryDisplay.inert = update.pending && update.hasStaleContent;
+  }
 }
 
 function beginStaleContentUpdate(surface, hasStaleContent) {
