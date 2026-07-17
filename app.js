@@ -1893,7 +1893,7 @@ function normalizeDictionary(dictionary) {
     name: dictionary.name || t("unnamedDictionary"),
     language: dictionary.language || "",
     description: dictionary.description || "",
-    settings: normalizeDictionarySettings(dictionary.settings, usedEntityIds),
+    settings: normalizeDictionarySettings(dictionary.settings),
     docs: normalizeDocs(dictionary.docs),
     corpus: normalizeCorpus(dictionary.corpus, usedEntityIds),
     morphology: normalizeMorphology(dictionary.morphology, usedEntityIds),
@@ -1915,7 +1915,7 @@ function normalizeEntry(entry, usedIds = new Set()) {
     ? entry.etymology.sources.map(String).map((item) => item.trim()).filter(Boolean)
     : [];
 
-  const morphologyState = morphologyModel.normalizeEntryMorphologyState(entry, { usedIds, reserveEntityId });
+  const morphologyState = morphologyModel.normalizeEntryMorphologyState(entry);
   return {
     id: entry.id || uid("entry"),
     lemma: entry.lemma || "",
@@ -1946,7 +1946,7 @@ function normalizeDefinition(definition = {}, usedIds = new Set()) {
   };
 }
 
-function normalizeDictionarySettings(settings = {}, usedIds = new Set()) {
+function normalizeDictionarySettings(settings = {}) {
   const search = entrySearchModel.normalizeEntrySearchSettings(settings.search);
   return {
     ...settings,
@@ -2377,12 +2377,8 @@ function hasStressOutput(value) {
   return ipaModel.hasStressOutput(value);
 }
 
-function normalizeIpaRuleList(rules, usedIds = new Set()) {
-  return ipaModel.normalizeIpaRuleList(rules, { usedIds, reserveEntityId });
-}
-
-function normalizeIpaRule(rule = {}, usedIds = new Set()) {
-  return ipaModel.normalizeIpaRule(rule, { usedIds, reserveEntityId });
+function normalizeIpaRule(rule = {}) {
+  return ipaModel.normalizeIpaRule(rule);
 }
 
 function uid(prefix) {
@@ -9491,7 +9487,7 @@ function renderMorphologyEntryControls(host, entry = {}, { full = false } = {}) 
   }
   const dictionary = activeDictionary();
   const previewEntry = morphologyFormPreviewEntry(entry, full);
-  const state = morphologyModel.normalizeEntryMorphologyState(entry, { reserveEntityId, usedIds: new Set() });
+  const state = morphologyModel.normalizeEntryMorphologyState(entry);
   const resolved = morphologyEditorResolvedGroups({ ...previewEntry, ...state }, dictionary);
   const manualGroups = state.morphologyGroups.map((entryGroup) => ({
     templateGroup: normalizeMorphology(dictionary?.morphology).templateGroups.find((group) => group.id === entryGroup.templateGroupId),
