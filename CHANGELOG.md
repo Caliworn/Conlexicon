@@ -6,6 +6,8 @@
 
 ### 改进
 
+- 将 API、SQLite、查询缓存和高级筛选等技术文档整理到 `docs/`，新增文档索引并修正全部当前文档间的相对路径；根目录继续保留项目 README、Changelog、长期协作规则和阶段性交接入口。
+- 完成高级筛选查询化 F0 清点：区分可直接进入 EntryQuery 的稳定条件、需要独立服务端结果会话的分析/质量结果，以及不属于筛选的导航动作；记录全部现有入口、刷新失效和语义债务，为后续移除前端完整 ID 数组与本地快照扫描确定边界。
 - 正式移除旧 JSON runtime repository 与 `CONLEXICON_REPOSITORY` 后端切换入口，主服务固定使用 SQLite；旧 JSON 单文件导入、导出和目录迁移仍由独立 conversion/migration 边界处理，批量迁移脚本改为直接只读旧数据目录。
 - 重整存储测试边界：删除 JSON repository 完整契约入口，将共享 repository contract 收紧为 SQLite 正式契约，并把模型与旧 JSON 转换检查拆为独立脚本；服务启动 smoke 现在只验证 SQLite 数据文件。
 - 删除 repository contract 中已被逐值搜索 record 专项检查覆盖的旧标签扁平数组断言，避免重复绑定内部投射形状。

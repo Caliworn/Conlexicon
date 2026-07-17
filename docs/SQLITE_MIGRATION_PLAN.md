@@ -1,6 +1,6 @@
 # SQLite 正式迁移与 JSON 兼容层设计
 
-本文记录 Conlexicon 从 JSON 词典文件过渡到 SQLite 主存储时的迁移、转换、兼容导入和导出设计。它补充 `SQLITE_BACKEND_PLAN.md`：后者关注 SQLite schema 和 API 反推，本文关注“如何安全地从旧数据进入新存储，以及以后如何把数据导出为不同交换格式”。
+本文记录 Conlexicon 从 JSON 词典文件过渡到 SQLite 主存储时的迁移、转换、兼容导入和导出设计。它补充 [SQLite Backend Plan](SQLITE_BACKEND_PLAN.md)：后者关注 SQLite schema 和 API 反推，本文关注“如何安全地从旧数据进入新存储，以及以后如何把数据导出为不同交换格式”。
 
 ## 1. 总原则
 
@@ -247,7 +247,7 @@ GET /api/export?dictionaryId=...&format=xlsx
   - Stress Test 1k
   - Stress Test 3k
   - Stress Test 10k
-- 默认切换时必须更新 `README.md`、`API_CONTRACT.md` 和本文档，明确：
+- 默认切换时必须更新根目录 `../README.md`、[API Contract](API_CONTRACT.md) 和本文档，明确：
   - SQLite 是唯一的 runtime repository。
   - 旧 JSON 仅作为导入、导出和离线目录迁移格式。
   - 旧 JSON data 需要显式导入或显式迁移；开发期不静默原地迁移真实 `data/`。

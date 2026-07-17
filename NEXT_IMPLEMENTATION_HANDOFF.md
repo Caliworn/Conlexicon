@@ -236,7 +236,7 @@ class DictionaryRepository {
 
 - 已建立 `SqliteDictionaryRepository`、词典模型规范化模块、API 路由模块、HTTP 工具模块和静态文件服务模块；`server.js` 只负责组装 SQLite repository、路由、静态服务并启动服务。
 - `server.js` 运行期只使用 SQLite repository；旧 JSON runtime repository 和 `CONLEXICON_REPOSITORY` feature flag 已移除。
-- 当前 API 契约记录在 `API_CONTRACT.md`。该文档是前后端接口边界的长期参考；本文只记录阶段状态和后续计划。
+- 当前 API 契约记录在 `docs/API_CONTRACT.md`。该文档是前后端接口边界的长期参考；本文只记录阶段状态和后续计划。
 - 普通运行期保存已基本迁移到词条级、模块级或批量 patch API：新建/完整编辑/局部编辑/删除词条走词条级 API；其他设置、语言文档、语料库、自动形态学、自动 IPA、自动整理标签顺序和批量 IPA 生成走模块级或批量词条 API。
 - 词典管理的名称、语言和描述保存已改用词典元数据 API；页面卸载时的文档/语料自动保存兜底统一走 autosave 入口。
 - 后端 API 错误已改为结构化错误码；前端保存、导入、词典切换和偏好保存等路径会显示本地化短 toast，控制台保留原始技术错误。
@@ -245,14 +245,14 @@ class DictionaryRepository {
 
 ### 5.2 SQLite 化方向
 
-SQLite 已是默认主存储。真实 schema、当前状态审计和后续优化建议见 `SQLITE_BACKEND_PLAN.md`；迁移策略、JSON 导入/导出 profile 和回滚策略见 `SQLITE_MIGRATION_PLAN.md`。本文只保留接手时需要知道的阶段状态：
+SQLite 已是默认主存储。真实 schema、当前状态审计和后续优化建议见 `docs/SQLITE_BACKEND_PLAN.md`；迁移策略、JSON 导入/导出 profile 和回滚策略见 `docs/SQLITE_MIGRATION_PLAN.md`。本文只保留接手时需要知道的阶段状态：
 
 - 正式运行期方向是全面 SQLite 化，不设计 JSON/SQLite 存储分流；`index.json` 继续只保存当前词典、词典 ID 列表和 UI 偏好。
 - 旧 JSON 词典暂时通过词典管理界面的 JSON 导入功能手动迁入 SQLite；产品内自动迁移向导暂缓。
 - 旧 JSON 只保留为导入、导出和目录迁移格式；目录迁移脚本直接只读 `index.json` 与词典文件，再交给 conversion service 和 legacy migration。
 - SQLite repository 跑完整当前主契约；模型、旧 JSON 转换和目录迁移分别运行定向检查，不再维护第二套 runtime repository contract。
 - 当前 SQLite 写入已是 SQL 增量写入；词典元数据、设置、IPA、文档、语料、形态、单词条和批量 patch 的普通响应均已收窄。autosave 必须携带 docs 或 corpus；携带两者时会合并两个局部保存结果。
-- 形态学结构化 schema 见 `SQLITE_BACKEND_PLAN.md` 5.4：模板组/子表/单元格/词条形态组/override 已 SQL 化；共享 `morphology-model` 已使用当前 `templateGroups` / `morphologyGroups` 结构，旧形态结构迁移集中在 `lib/legacy-dictionary-migration.js`。同一词条不能重复实例化同一模板组，`entry_morphology_groups` 以 `entry_id + template_group_id` 为组合主键，override 使用同一组合外键，不再分配 `emorph` UUID。`notes` 已作为词条实例备注接入 SQL、导入导出和详情展示；模板组 `notes` 不应出现在词条详情或词条编辑。SQLite 读取与导出已停止回吐旧 `morphology.tables` / `entry.morphology`；**形态表格**页面现按模板组编辑，支持可编辑的组标题、自动匹配标签、空组、组内多个子表、各级排序和独立的子表尺寸。词条完整/局部编辑已使用正式的词条级多组/多子表 override 视图。导航栏已拆为独立的**形态函数**与**形态表格**页面，前者单独保存函数配置，为 DSL 配置预留。旧 `leftV/rightV` 设置暂留 `module_blobs.morphology`，函数、集合和 DSL 源码后续不做函数级主表，生成结果、AST 和诊断只作为派生缓存或索引。
+- 形态学结构化 schema 见 `docs/SQLITE_BACKEND_PLAN.md` 5.4：模板组/子表/单元格/词条形态组/override 已 SQL 化；共享 `morphology-model` 已使用当前 `templateGroups` / `morphologyGroups` 结构，旧形态结构迁移集中在 `lib/legacy-dictionary-migration.js`。同一词条不能重复实例化同一模板组，`entry_morphology_groups` 以 `entry_id + template_group_id` 为组合主键，override 使用同一组合外键，不再分配 `emorph` UUID。`notes` 已作为词条实例备注接入 SQL、导入导出和详情展示；模板组 `notes` 不应出现在词条详情或词条编辑。SQLite 读取与导出已停止回吐旧 `morphology.tables` / `entry.morphology`；**形态表格**页面现按模板组编辑，支持可编辑的组标题、自动匹配标签、空组、组内多个子表、各级排序和独立的子表尺寸。词条完整/局部编辑已使用正式的词条级多组/多子表 override 视图。导航栏已拆为独立的**形态函数**与**形态表格**页面，前者单独保存函数配置，为 DSL 配置预留。旧 `leftV/rightV` 设置暂留 `module_blobs.morphology`，函数、集合和 DSL 源码后续不做函数级主表，生成结果、AST 和诊断只作为派生缓存或索引。
 - 词条形态已切换为 `morphologyMode: auto | manual`：`auto` 由自动规则决定模板组，`morphologyGroups` 仅作为按真实 `templateGroupId` 查找的 overlay；`manual` 按形态组 position 决定展示顺序，空列表即明确不使用形态。自动转手动会将当前自动结果按自动顺序实体化，并在其后保留 dormant overlay；手动转自动须确认并放弃手动配置。SQLite `entries.morphology_mode`、repository 读写、词条 API、共享解析和形态搜索均已接入。完整编辑和局部编辑已改为正式的多组/多子表 override 视图，支持标题 override、词条形态备注、自动 overlay、手动增删组与排序。**已知清债项：数据分析的旧形态统计仍在 `app.js` 通过临时派生的旧式 `morphology.tables` 视图和 `entry.morphology` 读取；它不参与持久化，但无法表达当前多组、多子表和 nested override 语义。后续升级数据分析（以及若质量检查未来加入形态规则时）必须改为直接调用 `morphology-model.resolveEntryMorphologyGroups()` / `morphologyCellValue()`，然后删除该临时视图和全部旧字段读取。**旧 JSON 的 `entry.morphology`、`templateGroupId: "auto"` / `"none"` 只在 `legacy-dictionary-migration` 导入阶段转换；核心模型、repository 与前端持久化路径不再解释旧字段。**不为既有 SQLite schema 写运行时迁移，旧 SQLite 测试库需从 JSON 重新导入。**后续可单独处理表格行列可视化编辑、结构操作下 override 坐标语义和自动分配 DSL。
 - 数据模型升级时只保证旧版本 JSON 能导入并转换成新格式；除非确有必要，不要为了旧前端数据形状额外维护临时兼容层。旧 JSON 字段迁移集中在 `lib/legacy-dictionary-migration.js`，核心 `dictionary-model` 只处理当前形状规范化。前端因新模型出问题时，优先修前端。
 - 搜索 projection 已完成第一轮 SQL 接线；候选索引、数据分析/质量检查 API 化、语料 SQL 分表和产品内迁移向导都不是当前 SQLite 主路径的阻断项。
@@ -524,13 +524,14 @@ lib/
 
 新的开发对话应按以下顺序开始：
 
-1. 阅读 `AGENTS.md`、`API_CONTRACT.md`、本文、`CHANGELOG.md` 和当前 diff。
+1. 阅读 `AGENTS.md`、`docs/API_CONTRACT.md`、本文、`CHANGELOG.md` 和当前 diff。
 2. 确认当前分支、工作树和最新提交；如果有未提交改动，先判断归属，不要默认回滚。
 3. 运行期后端只有 SQLite。若涉及启动/存储，先跑 SQLite schema、repository contract 或目标功能的定向检查；改动旧 JSON 边界时验证 conversion service 和目录迁移，不再验证 JSON runtime 模式。
 4. 若继续阶段 B，优先处理默认 SQLite 后的清债项：
    - 查询缓存 Q1–Q4 已完成前端查询 LRU、后端运行时会话、in-flight 合并、词典级 generation 失效、summary DTO、按需详情、词根组子项懒加载、版本化 cursor 和纯滚动数据窗口。`/entries/:entryId/location` 与 `/root-groups/location` 已接入自动滚动：普通目标直接装入返回窗口，词根衍生词先定位父级、保留多来源根语境，再读取整组子项。前端不再通过完整活动词典 snapshot 猜测未加载页号；SWR 保留的旧列表也不能提前完成新查询的滚动请求。
    - 两段式 stale-while-revalidate 已接入查询首窗和按需词条详情：200ms 内保持原内容，但旧详情从请求开始即进入 `inert`；超过后以统一覆盖视觉显示详情遮罩和变淡列表的“正在更新”。首次无旧内容仍直接显示加载状态，失败直接进入现有错误状态，不重试或把旧内容当作成功结果。词条切换和词汇网络返回已改为局部提交，只同步已渲染卡片选中态、详情和必要滚动，不再调用全局 `render()` 或重建查询窗口。详情来源、详情/完整编辑衍生词和词汇网络已共用 `/entry-relations/:entryId` 与前端关系缓存，不再重建完整词典关系索引。
-   - 将带搜索条件的词根模式、高级筛选等剩余本地/完整 snapshot 路径接到可序列化查询契约；候选索引是否采用 FTS/ngram 由真实基准决定。
+   - 高级筛选查询化 F0 已完成，完整入口矩阵、语义债务与 F1–F5 边界见 `docs/ADVANCED_FILTER_QUERY_PLAN.md`。下一步先建立统一 EntryQuery/EntryFilter 模型并迁移可直接 SQL 查询的稳定条件；IPA、Gloss、形态和质量问题必须走各自 feature result session，不能伪装成 repository 普通 predicate。
+   - 将带搜索条件的词根模式等剩余本地/完整 snapshot 路径接到可序列化查询契约；候选索引是否采用 FTS/ngram 由真实基准决定。
    - 形态学结构化存储已完成；DSL v2、表格结构编辑与 layout 设计暂缓，除明确 bug 外不要继续扩展其 schema。数据分析升级时删除 `app.js` 的旧形态单表适配，改为直接调用共享 morphology model。
    - 将数据分析、质量检查推进为按需 API + query planner。
    - 评估语料库是否先拆为块/单元级 changeset，再决定何时 SQL 分表。

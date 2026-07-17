@@ -1,8 +1,8 @@
 # API Contract
 
-本文记录 Conlexicon 当前本地 HTTP API 的稳定约定。它描述前端可依赖的接口边界，而不是底层文件结构；后端运行期只使用 SQLite repository。旧 JSON 仅通过转换服务作为导入、导出和目录迁移格式，不再提供 JSON runtime repository。SQLite 后端设计见 `SQLITE_BACKEND_PLAN.md`；JSON 兼容导入/导出和迁移设计见 `SQLITE_MIGRATION_PLAN.md`。
+本文记录 Conlexicon 当前本地 HTTP API 的稳定约定。它描述前端可依赖的接口边界，而不是底层文件结构；后端运行期只使用 SQLite repository。旧 JSON 仅通过转换服务作为导入、导出和目录迁移格式，不再提供 JSON runtime repository。SQLite 后端设计见 [SQLite Backend Plan](SQLITE_BACKEND_PLAN.md)；JSON 兼容导入/导出和迁移设计见 [SQLite Migration Plan](SQLITE_MIGRATION_PLAN.md)。
 
-查询缓存 Q1–Q4 已实装前端紧凑页面缓存、后端运行时查询会话、版本化 cursor 和纯滚动数据窗口；缓存身份、失效及窗口淘汰约定见 `QUERY_SESSION_CACHE_PLAN.md`。
+查询缓存 Q1–Q4 已实装前端紧凑页面缓存、后端运行时查询会话、版本化 cursor 和纯滚动数据窗口；缓存身份、失效及窗口淘汰约定见 [Query Session Cache Plan](QUERY_SESSION_CACHE_PLAN.md)。
 
 ## 通用约定
 
@@ -473,6 +473,8 @@ GET /api/dictionaries/:id/corpus/units/:unitId
 ### 共享查询索引与分析 planner 草案
 
 数据分析 API 化不应只服务“数据分析”页面。词典标题、词典管理、词根模式、词汇网络、质量检查、高级筛选和未来诊断修复都会用到相同的统计、关系解析和索引能力。后续应先建立共享查询层，再在其上实现不同 UI 端点。
+
+高级筛选查询化的完整入口清点与边界见 [Advanced Filter Query Plan](ADVANCED_FILTER_QUERY_PLAN.md)。稳定的标签、词性、字段存在性、来源和日期条件应归入 EntryFilter；IPA 生成、Gloss、形态和质量问题属于 feature result source。两者都可被词条列表窗口消费，但 repository 不应为了普通 filter 反向调用分析或质量模块。
 
 建议分三层：
 

@@ -4,6 +4,10 @@ Conlexicon is a local-first web dictionary and editor for constructed languages.
 
 Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。它支持多词典管理、复杂词条编辑，并将每个正在使用的词典分别保存为独立的 SQLite 文件。
 
+See [docs/README.md](docs/README.md) for architecture, API, migration, and feature-design documentation.
+
+架构、API、迁移和专题设计文档见 [docs/README.md](docs/README.md)。
+
 ## Features / 功能
 
 - Multi-dictionary management: create, switch, import, export, configure, and delete dictionaries, with explicit confirmation before an imported dictionary ID overwrites an existing dictionary.

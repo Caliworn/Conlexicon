@@ -1927,8 +1927,8 @@ function normalizeEntry(entry, usedIds = new Set()) {
       description: entry.etymology?.description || "",
     },
     notes: entry.notes || "",
-    // `morphology` is a temporary view-model adapter for the old editor UI.
-    // Persistence and all shared calculations use the canonical state below.
+    // `morphology` is a temporary flattened view used by the legacy analysis path.
+    // Persistence and current entry editors use the canonical state below.
     morphologyMode: morphologyState.morphologyMode,
     morphologyGroups: morphologyState.morphologyGroups,
     morphology: morphologyEditorView(morphologyState),
@@ -2272,8 +2272,8 @@ function normalizeMorphology(morphology = {}, usedIds = new Set()) {
   });
   return {
     ...normalized,
-    // The old table editor remains a temporary UI adapter until the dedicated
-    // morphology-table page is migrated in a later step.
+    // Data analysis still consumes this temporary flattened table view. Remove
+    // it when analysis reads the canonical morphology model directly.
     tables: legacyMorphologyTableViews(normalized.templateGroups),
   };
 }
@@ -2305,8 +2305,8 @@ function legacyMorphologyTableViews(templateGroups = []) {
       cells[key] = normalizeMorphologyCell(cell);
     });
     return {
-      // The existing UI identifies the first table in a group by group ID.
-      // This adapter is deleted with the old single-table editor.
+      // The temporary analysis view pairs its first table with the template
+      // group ID used by the entry-side flattened overlay.
       id: tableIndex === 0 ? group.id : table.id,
       templateGroupId: group.id,
       templateTableId: table.id,
