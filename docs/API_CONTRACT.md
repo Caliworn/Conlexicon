@@ -31,7 +31,7 @@
 
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/state` | 读取轻量应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme }` | `dictionaries` 只包含 metadata 和 `summary.entryCount/rootCount`；前端把它当轻量索引，并按需读取当前词典快照。 |
+| `GET` | `/api/state` | 读取轻量应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme }` | `dictionaries` 只包含 metadata 和 `summary.entryCount/rootCount`；前端把它当轻量索引，并按需读取当前词典快照。这里的“轻量”指响应不含词典正文；冷启动计算 `rootCount` 仍可能建立稳定词根拓扑，不等于常数时间。 |
 | `PUT` | `/api/preferences` | 保存全局界面偏好 | `{ uiLanguage, uiTheme }` | 目前支持 `uiLanguage` 和 `uiTheme`。 |
 
 ### 导入、导出与词典生命周期
@@ -63,7 +63,7 @@
 | `PUT` | `/api/dictionaries/:id/settings/ipa` | 保存自动 IPA 设置 | `{ id, updatedAt, settings }` | IPA 映射是按顺序保存的纯文本规则 `{ from, to, before, after }`，没有实体 ID，也不参与实体 ID 防撞。 |
 | `POST` | `/api/dictionaries/:id/autosave` | 页面卸载时保存文档/语料草稿 | `{ id, updatedAt, docs?, corpus? }` | 当前只分发 `docs` 和 `corpus`；请求至少须携带其中一个有效对象，否则返回 `invalid_autosave_payload`。 |
 
-### 词条级保存
+### 词条读取与保存
 
 | 方法 | 路径 | 用途 | 响应 | 校验范围 |
 | --- | --- | --- | --- | --- |
@@ -87,6 +87,7 @@
 
 #### `GET /api/dictionaries/:id/entries` 查询参数补充
 
+- F1 起，transport 参数会统一归一化为内部 `{ filter, search, sort, include, page }` EntryQuery；查询会话、cursor digest 和缓存键使用同一个稳定 identity。`limit`、`cursor`、`windowOffset` 和 `include` 不改变匹配集合，因此不进入 identity。当前 HTTP 参数保持不变；presence、sourceCount 和 activity day descriptor 已在共享模型中定义，但要等 F2 SQL 编译完成后才会开放 transport 接线，未实现条件不得被静默忽略。
 - `fields`：逗号分隔的搜索字段白名单；当前支持 `lemma`、`pronunciation`、`tags`、`definitions`、`examples`、`notes`、`etymology`、`morphology`。为空或全部无效时搜索全部字段。
 - `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；仅对同时出现在 `fields` 中的字段生效。
 - 基础搜索逐个独立字段值匹配：一条释义、一个标签、一个来源或一段备注必须自行包含查询文本，查询不会跨多个值拼接命中；`notes` 中的词条备注、释义备注和每个词条形态组备注也分别作为独立值。多标签组合等条件应使用高级筛选。自由文本按当前词典的 `settings.search.normalization` 处理。SQLite 的严格及 fuzzy 查询均直接读取静态 `entry_search_values` 和按需读取形态 `entry_morphology_search_values`；fuzzy 通过连接级确定性函数复用共享搜索模型的评分语义。该路径支持 NFC、Unicode case folding 和自定义等价规则。结构键和词源关系键不套用该自由文本配置。
@@ -125,13 +126,17 @@
 | `entry_id_exists` | 新建词条 ID 已存在。 |
 | `invalid_entry_updates_payload` | 批量词条更新请求格式无效。 |
 | `entry_not_found` | 词条不存在或已被删除。 |
+| `invalid_entry_morphology` | 词条携带的当前形态组或覆盖项结构无效。 |
 | `invalid_entry_location_target` | 词根窗口定位请求未提供目标词条 ID。 |
 | `invalid_root_context` | `preferredRootId` 不是目标词条的可用词根上下文。 |
+| `root_group_not_found` | 请求的词根组不存在于当前查询结果。 |
 | `invalid_settings_payload` | 设置请求体格式无效。 |
 | `invalid_docs_payload` | 语言文档请求体格式无效。 |
 | `invalid_corpus_payload` | 语料请求体格式无效。 |
 | `invalid_autosave_payload` | autosave 请求未携带有效 docs 或 corpus 对象。 |
 | `invalid_query_window_offset` | 查询窗口 offset 不是非负安全整数。 |
+| `invalid_entry_query_limit` | 词条查询 limit 不是大于零的安全整数。 |
+| `entry_filter_not_implemented` | 请求使用了已定义但尚未在当前阶段接入 repository 的 EntryFilter 条件；服务不会静默忽略。 |
 | `query_cursor_required` | 非零窗口 offset 未附带版本化 cursor。 |
 | `query_cursor_stale` | cursor 已因服务进程、词典写入或查询条件变化而失效；`details.reason` 标明原因。 |
 | `invalid_morphology_payload` | 形态学请求体格式无效。 |
@@ -144,6 +149,7 @@
 | `system_file_busy` | 文件被占用。 |
 | `system_file_missing` | 目标文件缺失。 |
 | `system_json_parse` | 本地 JSON 文件无法解析。 |
+| `sqlite_runtime_unavailable` | 当前 Node.js 运行时不提供项目所需的 SQLite 能力。 |
 | `unknown_error` | 未归类错误。 |
 
 ## 后续扩展原则
@@ -151,12 +157,12 @@
 - 普通保存优先增加细粒度端点，不再回退到完整词典 PUT。
 - `GET /api/state` 是轻量启动状态入口；普通启动只应读取词典 metadata/summary，再通过 `GET /api/dictionaries/:id` 或专用读取端点按需加载当前词典内容。
 - 语料库下一步可从整份 corpus 模块保存拆成块、层、单元级 changeset。
-- 搜索、筛选、词源反查和数据分析后续应依赖 repository 查询/索引，不应让前端扫描大型完整快照。
+- 搜索、词根模式和词汇关系读取已依赖 repository 查询/索引；高级筛选、数据分析和质量检查仍应继续迁移，不能长期让前端扫描大型完整快照。
 - 短期不引入词典级 revision。等对象级增量端点稳定后，再基于目标对象 `updatedAt` 做轻量乐观锁。
 
-## 计划中的读取 API
+## 读取 API 现状与后续草案
 
-阶段 B3 的目标是继续收紧查询契约，而不是让前端重新扫描大型完整快照。运行期后端只有 SQLite；新增能力应优先考虑 SQLite 索引、SQL 查询或共享 query layer。
+本节同时记录已经落地的读取契约和仍待实现的扩展草案。`/entries`、`/facets`、`/entry-relations`、`/root-groups`、窗口 cursor 与目标定位已经实装；拆分式启动端点、语料细粒度读取、分析/质量 query 和统一 EntryFilter 仍是后续设计。运行期后端只有 SQLite；新增能力应优先考虑 SQLite 索引、SQL 查询或共享 query layer。
 
 ### 启动与词典索引
 
@@ -169,7 +175,7 @@ GET /api/dictionaries/:id/summary
 GET /api/dictionaries/:id/settings
 ```
 
-SQLite repository 的 `readState()` / `listDictionaries()` 已只返回词典 metadata 和 summary；前端启动流程始终将 `/api/state` 的 `dictionaries` 当作 metadata，再按需加载 active dictionary。
+SQLite repository 的 `readState()` / `listDictionaries()` 已只返回词典 metadata 和 summary；前端启动流程始终将 `/api/state` 的 `dictionaries` 当作 metadata，再按需加载 active dictionary。`entryCount` 使用 SQL count，`rootCount` 复用稳定词根拓扑；因此 payload 已收窄，但首次拓扑构建仍是可继续优化的启动成本。
 
 示例：
 
@@ -326,13 +332,13 @@ SQLite projection 查询中，带 `q` 的分页结果会为每个命中词条附
 }
 ```
 
-`searchHits` 只返回当前查询实际命中的独立 records；同一来源定位与 `valueType` 的同一值最多返回一次，但不同义项包含相同文本时仍分别返回。它用于选择命中摘要、显示义项序号及定位原始对象，不代替前端基于共享 normalizer 的原文范围映射。无 `q` 时省略该字段；严格及 fuzzy 查询都会返回该字段。S3.1 固定 record/response 形状，S3.2 写入 SQLite 静态 projection，S3.3 启用静态严格查询与前端消费，S4 将形态以及 fuzzy 命中纳入同一响应。
+`searchHits` 只返回当前查询实际命中的独立 records；同一来源定位与 `valueType` 的同一值最多返回一次，但不同义项包含相同文本时仍分别返回。它用于选择命中摘要、显示义项序号及定位原始对象，不代替前端基于共享 normalizer 的原文范围映射。无 `q` 时省略该字段；严格及 fuzzy 查询都会返回该字段。S3.1 已固定 record/response 形状，S3.2 已写入 SQLite 静态 projection，S3.3 已启用静态严格查询与前端消费，S4 已把形态以及 fuzzy 命中纳入同一响应。
 
 未来例句迁移为语料链接后，`examples` record 仍以对应释义作为列表展示定位；语料单元 ID 的返回字段随阶段 C 的关系 API 一并确定，不在 S3.1 提前固化。
 
 形态搜索不是简单读取持久化字段。词条使用 `morphologyMode: "auto" | "manual"`：`auto` 先按自动分配规则得出有序模板组，再按真实 `templateGroupId` 合并该词条的 overlay；`manual` 按词条形态组 position 使用显式模板组，空列表表示明确不使用形态。随后遍历组内全部子表，逐格读取以真实子表 ID 分层的 override；没有 override 时用词形、形态规则和形态函数动态生成默认形式。`templateGroupId` 不再接受 `"auto"` 或 `"none"` 伪值；旧 JSON 的转换只发生在导入迁移。
 
-S4 将上述结果写入独立的 `entry_morphology_search_values` 派生 projection。它保存真实模板组、子表和单元格坐标以及原始/规范化值，不进入 JSON，也不替代形态主数据。词条 lemma、形态匹配标签、模式、显式组或 override 变化时局部重建；形态模板/函数变化或搜索规范化变化时全量重建。严格及 fuzzy 的形态单字段查询以及静态+形态混合查询均直接读取两张 projection，并把形态单元格映射为 `sourceType: "morphology"`、`sourceId: <templateTableId>`、`sourcePosition: <求值顺序>`、`valueType: "generated"`。每个 SQLite 连接注册确定性的 `conlexicon_fuzzy_match(normalized_value, normalized_query)`，使 fuzzy projection 查询复用共享 matcher。SQL 只返回命中 ID，不再读取完整 snapshot、动态生成形态或把所有候选 records 返回 Node.js。
+S4 已将上述结果写入独立的 `entry_morphology_search_values` 派生 projection。它保存真实模板组、子表和单元格坐标以及原始/规范化值，不进入 JSON，也不替代形态主数据。词条 lemma、形态匹配标签、模式、显式组或 override 变化时局部重建；形态模板/函数变化或搜索规范化变化时全量重建。严格及 fuzzy 的形态单字段查询以及静态+形态混合查询均直接读取两张 projection，并把形态单元格映射为 `sourceType: "morphology"`、`sourceId: <templateTableId>`、`sourcePosition: <求值顺序>`、`valueType: "generated"`。每个 SQLite 连接注册确定性的 `conlexicon_fuzzy_match(normalized_value, normalized_query)`，使 fuzzy projection 查询复用共享 matcher。SQL 只返回命中 ID，不再读取完整 snapshot、动态生成形态或把所有候选 records 返回 Node.js。
 
 ### 词条 facets
 
@@ -389,7 +395,7 @@ GET /api/dictionaries/:id/entry-relations/:entryId
 
 `matchedEntry` 是已匹配来源的 summary DTO；未解析来源时为 `null`。词条详情和词汇网络应直接消费该 DTO，不应回到完整活动词典扫描 `matchedEntryId`。`matchedEntryId` 应由 repository 明确解析；如果同名 lemma 存在多条，当前阶段可选择排序后的第一条并在后续诊断模块中报告歧义。
 
-词汇网络详情视图已接入该 API。词根组、来源解析和衍生关系语义抽入共享关系模块，词根模式也通过独立读取端点预备接线。
+词汇网络详情视图和词根模式均已接入后端关系/词根读取端点。词根模式、词汇网络同根组和词典摘要的词根数量复用 SQLite repository 的稳定词根拓扑；来源匹配与直接衍生词仍由相同 repository 关系边界返回，不再由前端扫描完整活动词典。
 
 词根模式读取端点：
 
@@ -506,7 +512,7 @@ Feature Services
 }
 ```
 
-当前已落地最小共享实现：`lib/dictionary-query-model.js` 提供前后端可复用的 `createDictionaryQueryContext()`，第一批只接管 `getEntryById()` / `getEntriesByIds()`、relation index、relation summary 和 root family 查询；覆盖率、标签、活动和 corpus placement 仍按原模块逐步迁移。
+当前已落地的 `lib/dictionary-query-model.js` 是浏览器/Node 可复用的内存查询模型，但运行期目前只由前端数据分析消费：它接管 `getEntryById()` / `getEntriesByIds()`、relation index、relation summary 和 root family 查询。它不是 SQLite repository 的查询层，也没有消除数据分析对完整活动词典的依赖。SQLite 侧的词根拓扑、反向索引和窗口查询由 repository 独立实现；覆盖率、标签、活动和 corpus placement 仍待后续 API/query planner 迁移。
 
 SQLite 路径应逐步用 SQL、持久索引、视图或临时表实现相同接口。旧 JSON conversion 与 migration 不参与运行期查询，上层服务也不应重新引入完整 JSON 扫描后端。
 
@@ -689,8 +695,8 @@ activityFull
 
 #### 最小落地顺序
 
-1. 抽出 repository 共享 query/index context，先用 JSON 请求级临时索引实现。
-2. 将 `listDictionaries()`、词典标题 root count、数据分析 relation summary 统一到同一 relation summary helper。
-3. 实装 `POST /analysis/query` 的 light widgets：`entryCount`、`coverageBreakdown`、`partDistribution`、`activityPreview`。
-4. 总览切到 widget query；重型 IPA / morphology / root family widgets 后续按需接入。
-5. 高级筛选逐步支持 filter descriptor，而不是只支持 materialized entry IDs。
+1. 已完成的基础继续保持：`listDictionaries()`/词典标题 root count、词根模式和词汇网络复用 SQLite 稳定词根拓扑；前端数据分析暂时仍使用独立内存 query model。
+2. 先按 [Advanced Filter Query Plan](ADVANCED_FILTER_QUERY_PLAN.md) 的 F1 建立统一 EntryQuery/EntryFilter，让稳定筛选条件复用 `/entries` 的窗口、cursor、缓存与定位。
+3. 再实装 `POST /analysis/query` 的 light widgets：`entryCount`、`coverageBreakdown`、`partDistribution`、`activityPreview`，并让总览改用 widget query。
+4. 为质量检查建立独立 `/quality/query` 与 result session，再让质量高级筛选消费该会话；repository 不反向调用质量算法。
+5. 重型 IPA、morphology、root family widgets 和语料查询在对应服务边界稳定后按需接入，不恢复前端 materialized ID 或完整快照兜底。

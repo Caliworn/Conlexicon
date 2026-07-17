@@ -152,7 +152,7 @@ data/
 
 | profile | 目标 | 说明 |
 | --- | --- | --- |
-| `legacy-json` | 当前默认 JSON 导出 | 用于旧版回退或人工查看；不承诺永久等同内部结构。 |
+| `legacy-json` | 当前默认 JSON 导出 | 用于兼容导入导出、迁移和人工检查；不承诺永久等同内部结构，也不代表可重新启用已移除的 JSON runtime。 |
 | `portable-json` | 兼容别名 | 当前输出与 `legacy-json` 相同；暂不设计独立结构，也不把它作为主要交换格式。 |
 | `sqlite` | 原生词典交换/备份 | 直接复制并校验完整词典数据库；需要明确应用版本、schema 版本和导入冲突处理。 |
 | `xlsx` | 表格交换 | 适合词条、释义、标签、来源、IPA 等扁平化导出；复杂模块可能拆成多 sheet。 |
@@ -182,7 +182,7 @@ GET /api/export?dictionaryId=...&format=xlsx
 }
 ```
 
-词典名称、语言、描述、`entryCount/rootCount` 等从 SQLite 轻量查询；不写入 `index.json` 作为第二份真相。除非未来确有启动性能需求，否则不要为了过渡期存储分流给 `index.json` 增加 `storage/path` 字段。
+词典名称、语言、描述、`entryCount/rootCount` 等从 SQLite 查询；`entryCount` 是直接 SQL count，`rootCount` 复用稳定词根拓扑，因此这里只保证不读取完整词典正文，不保证冷启动为常数时间。这些派生值不写入 `index.json` 作为第二份真相。除非未来确有启动性能需求，否则不要为了过渡期存储分流给 `index.json` 增加 `storage/path` 字段。
 
 ## 9. 失败与诊断
 
@@ -196,7 +196,7 @@ GET /api/export?dictionaryId=...&format=xlsx
 | 实体 ID 重复 | 拒绝迁移该词典，报告重复类型和位置；后续诊断修复模块可提供修复。 |
 | legacy 字段被转换 | 迁移成功但写入 warning。 |
 | 语料结构错误 | 拒绝或降级为 warning 需谨慎，默认拒绝更安全。 |
-| 未识别字段 | 默认保留在 normalized/exportable 结构中或记录 warning；不要静默丢弃。 |
+| 未识别字段 | 当前 normalized dictionary 只保留受支持的当前字段，尚无通用未知字段保留机制。扩展外部格式前，应在对应 import adapter 中显式映射或报告未识别字段，不能把“无损保留未知字段”写成现有保证。 |
 
 诊断修复模块可以复用迁移 report 的结构，但不要把未解析来源等普通质量检查问题塞进迁移诊断。迁移诊断只处理“会影响数据能否安全进入 canonical storage”的问题。
 
@@ -258,7 +258,7 @@ GET /api/export?dictionaryId=...&format=xlsx
 以下项目不是默认切 SQLite 的阻断项，但切换时必须在文档中明确其状态：
 
 - 普通词条搜索的静态字段与动态形态字段已分别接入 `entry_search_values` 和 `entry_morphology_search_values`；严格及 fuzzy 查询不再为此重建完整 dictionary object。fuzzy 仍会线性扫描所选 projection records，候选索引留待真实基准决定。
-- root groups 的搜索条件已读取 SQLite 搜索投射，并在独立 relation generation 的稳定词根拓扑上生成查询视图；词汇网络和质量检查中的关系查询仍待继续复用该拓扑。
+- root groups 的搜索条件已读取 SQLite 搜索投射，并在独立 relation generation 的稳定词根拓扑上生成查询视图；词汇网络已通过 `/entry-relations/:entryId` 复用该拓扑，质量检查中的词源关系仍待接线。
 - 数据分析和质量检查仍主要由前端/共享 JS 基于完整 dictionary object 计算，尚未全部 API 化或 SQL 化。
 - 语料库仍作为 `module_blobs.corpus` 保存，尚未正式 SQL 分表。
 - JSON 导入/导出仍返回完整 dictionary-shaped JSON；这是交换/备份路径，不代表存储层仍使用 JSON repo。
@@ -315,7 +315,7 @@ SQLite 单后端仍需保留以下测试边界：
 
 - 已新增 `scripts/migrate-json-data-to-sqlite.js`。
 - 它只操作临时或显式指定目录。
-- 它输出机器可读和人可读 report。
+- 它向标准输出写出格式化的结构化 JSON report，可由脚本读取，也可直接人工检查。
 - 当前已实现第一版 CLI 和临时目录检查脚本；后续可继续扩展 report 详情、失败项定位和产品内迁移入口。
 
 ### M3：导入/导出格式（部分完成）

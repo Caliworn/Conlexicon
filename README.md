@@ -11,7 +11,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 ## Features / 功能
 
 - Multi-dictionary management: create, switch, import, export, configure, and delete dictionaries, with explicit confirmation before an imported dictionary ID overwrites an existing dictionary.
-- Per-dictionary SQLite persistence: entries and their structured subobjects, morphology template groups/tables/overrides, corpus data, settings, docs, and IPA rules are stored locally with each dictionary. Legacy JSON remains an explicit import/export and debugging format.
+- Per-dictionary SQLite persistence: entries and their structured subobjects, morphology template groups/tables/overrides, corpus data, settings, docs, and IPA rules are stored locally with each dictionary. Legacy JSON remains an explicit import/export and migration format.
 - Lexical entry editing with lemma, pronunciation, tags, multiple definitions, examples, notes, etymology, sources, and derived-entry backlinks.
 - Configurable part-of-speech logic: by default the first tag is treated as the part of speech; an optional explicit tag list supports multiple parts of speech per entry for display and filtering.
 - Display mode and edit mode: saved entries open in a clean reading view, with full editing and inline section editing available.
@@ -23,26 +23,26 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - Auto morphology with template groups, multiple subtables per group, automatic or manual per-entry group selection, rule syntax, function objects, overrides, generated forms, and searchable morphology output.
 - Markdown language documentation with split edit/preview, edit-only, and preview-only modes.
 - Per-dictionary corpus management with ordered blocks, speaker/modality layers, standalone units, inherited attributes, unique entity ID validation, single-parent link validation, and configurable gloss-based unit names with optional render objects.
-- Paged data analysis for overview, entries/tags, IPA, morphology, and editing activity, plus a dedicated quality-check page for priority/module issue review.
+- Tabbed data analysis for overview, entries/tags, IPA, morphology, and editing activity, plus a dedicated quality-check page for priority/module issue review.
 - Gloss rendering for `\gla`, `\glb`, `\glc`, and `\ft`, with independent render-object and alignment settings for corpus unit cards, unit content headings, and entry examples, plus per-object font, size, bold, italic, and `\glb` small-caps styles.
 - Per-dictionary UI/settings options, including per-field search/fuzzy controls, optional NFC and Unicode case folding, custom search equivalence rules, etymology autocomplete matching, label display replacement, highlighted tags, gloss rendering, polysemy display, save/discard/prompt handling for edits during navigation, corpus/docs auto-save, IPA keyboard symbols, and left navigation order.
 - SQLite-backed per-value search projections for static entry fields and generated morphology, with configurable strict/fuzzy matching and localized hit summaries. Large entry and root-mode results use versioned query windows while retaining one continuous native scrollbar.
 - Dark mode and Chinese/English UI switching, with the global interface theme and language remembered in `data/index.json`.
 
 - 多词典管理：新建、切换、导入、导出、配置和删除词典；导入相同词典 ID 的词典前会明确确认是否覆盖。
-- 词典级 SQLite 保存：词条及其结构化子对象、形态模板组/子表/覆盖项、语料库、设置、语言文档和 IPA 规则都会随当前词典保存在本地。旧 JSON 仅作为显式导入、导出和调试格式保留。
+- 词典级 SQLite 保存：词条及其结构化子对象、形态模板组/子表/覆盖项、语料库、设置、语言文档和 IPA 规则都会随当前词典保存在本地。旧 JSON 仅作为显式导入、导出和迁移格式保留。
 - 词条编辑：支持词形、发音、标签、多条释义、例句、备注、词源、来源以及反向衍生链接。
 - 可配置词性逻辑：默认将第一个标签视为词性；也可显式指定词性标签列表，使一个词条拥有多个词性并用于显示和筛选。
 - 查看模式与编辑模式：保存后的词条会进入整洁的阅读界面，也支持完整编辑和栏目局部编辑。
 - 响应式应用外壳：支持可收起工具导航、可收起词条列表，以及移动端用于导航、浏览词条和新建词条的抽屉控件。
-- 数据分析与质量检查高级筛选：点击统计行或质量类别可以筛选词条浏览栏，并支持释义覆盖、IPA、形态学、质量问题等项目的筛选条件切换。
+- 数据分析与质量检查高级筛选：点击统计行或质量类别可以筛选词条列表，并支持释义覆盖、IPA、形态学、质量问题等项目的筛选条件切换。
 - 词根模式浏览：衍生词可以嵌套显示在词根下方，支持单组展开/收起、全局展开、全局模式下的单组收起例外，以及快速创建衍生词；父级窗口淘汰只释放数据，不丢失展开意图。
 - 词汇网络：以分层 SVG 展示来源、当前焦点与衍生关系；关联节点会在切换焦点时连续移动并更新连线，同时支持悬浮信息、键盘操作和窄屏纵向布局。
 - 自动 IPA：支持映射、音节划分、音节首/尾辅音簇、复杂音位、重音设置、沙盒测试和批量生成。
 - 自动形态学：支持模板组及组内多个形态表格、词条级自动匹配或手动选择形态组、规则语法、函数识别对象、词条覆盖项、生成形式和搜索生成结果。
 - Markdown 语言文档：支持左右分栏编辑预览、纯编辑和纯查看模式。
 - 词典级语料库：支持有序语料块、发言人/模态语料层、独立语料单元、属性继承、实体 ID 唯一性检查、单父级链接检查，以及带可选渲染对象的 Gloss 单元名渲染。
-- 分页式数据分析：包括总览、词条与标签、IPA、形态学和编辑进度；质量检查拥有独立页面，支持按优先度和检查模块查看问题。
+- 分标签页数据分析：包括总览、词条与标签、IPA、形态学和编辑进度；质量检查拥有独立页面，支持按优先度和检查模块查看问题。
 - Gloss 渲染：语料单元卡片、单元内容名称和词条例句可分别配置渲染对象与对齐，并支持 `\gla`、`\glb`、`\glc`、`\ft` 独立配置字体、字号、粗体和斜体，以及 `\glb` small caps。
 - 词典级界面设置：包括逐字段搜索/模糊匹配、可选 NFC 与 Unicode 大小写折叠、自定义搜索等价规则、词源自动补全、标签显示替换、红色高亮标签、gloss 渲染、多义项显示、导航时保存/放弃/提示编辑、语料库/文档自动保存、IPA 虚拟键盘符号和左侧导航栏排序。
 - SQLite 逐值搜索投射：静态词条字段和自动生成形态均支持可配置的严格/模糊搜索及本地化命中摘要；词根模式和词汇网络复用仅在关系变化时失效、带双向定位索引的稳定拓扑。大型词条列表与词根模式结果通过版本化查询窗口加载，同时保持一条连续的原生滚动条。切换查询或词条详情时会先保留当前内容，旧详情会立即停止响应交互；读取超过 200ms 后再以统一遮罩标明正在更新，避免快速本地读取产生闪烁。
@@ -147,7 +147,7 @@ The `data/` directory is intentionally ignored by Git so personal dictionaries a
 ```text
 index.html   Main UI / 主界面
 app.js       Frontend logic / 前端逻辑
-server.js    Local backend with selectable repository / 可选择 repository 的本地后端
+server.js    Local SQLite-backed HTTP server / 使用 SQLite 的本地 HTTP 服务
 styles.css   Application styling / 应用样式
 ```
 

@@ -3,7 +3,7 @@
 本文供新的开发对话直接接手，记录当前完成状态和以下后续工作：
 
 1. 已完成的基础 UI 外壳与暂缓的触摸/焦点/无障碍专项。
-2. 已默认 SQLite 的保存读取接口，以及后续查询与索引优化。
+2. 已默认 SQLite 的保存读取接口、查询会话和窗口化，以及剩余查询消费者的 API 化。
 3. 将词条例句迁移为对语料单元的链接。
 4. 重做语料库 UI，形成适合文本语料和未来多媒体时间轴的工作区。
 
@@ -31,7 +31,7 @@
 
 ### 阶段 B：数据访问层与索引（核心已完成）
 
-前端已通过 HTTP API 与具体文件读写解耦，SQLite 已是默认主存储。静态字段和动态形态的严格/fuzzy 搜索 projection 已接线；近期重点转为查询会话与结果缓存、纯滚动数据窗口化、列表 DTO 与按需词条详情、高级筛选/词根模式剩余查询下推，以及数据分析与质量检查的按需 API。所有后续语料功能继续只依赖稳定 API，不直接依赖 JSON 或 SQLite。
+前端已通过 HTTP API 与具体文件读写解耦，SQLite 已是默认主存储。静态字段和动态形态的严格/fuzzy 搜索 projection、查询会话、纯滚动数据窗口、列表 summary DTO、按需词条详情、词根模式和词汇关系 API 均已接入。阶段 B 的剩余重点是将已建立的高级筛选 EntryFilter 接入 SQL 与前端状态、建立 feature result session、推进数据分析与质量检查按需 API，以及之后独立处理语料查询边界。所有后续语料功能继续只依赖稳定 API，不直接依赖 JSON 或 SQLite。
 
 ### 阶段 C：例句链接迁移
 
@@ -48,13 +48,13 @@
 桌面宽屏：
 
 ```text
-[全局工具导航] [条目浏览栏] [主编辑/查看区]
+[全局工具导航] [词条列表] [主编辑/查看区]
 ```
 
 桌面中等宽度：
 
 ```text
-[图标导航栏] [可收起条目浏览栏] [主编辑/查看区]
+[强制收起的图标导航栏] [可收起词条列表] [主编辑/查看区]
 ```
 
 竖屏移动端：
@@ -70,41 +70,42 @@
 - 抽屉内容独立滚动，页面主体保持自己的滚动位置。
 - 语料列表暂不套用最终设计；只接入通用外壳，具体列表等待阶段 D。
 
-### 4.2 状态模型
+### 4.2 状态模型（已实装）
 
-建议增加独立的进程 UI 状态：
+当前应用外壳使用独立的进程 UI 状态，核心字段如下：
 
 ```js
 const shellState = {
   navCollapsed: false,
+  wideNavCollapsed: false,
   navDrawerOpen: false,
   browserCollapsedByView: {},
   browserDrawerOpen: false,
 };
 ```
 
-- 默认不写入词典 JSON。
-- 响应式自动折叠和用户手动折叠应区分，避免旋转屏幕后覆盖用户选择。
-- 切换词典时可以保留全局导航状态，但条目浏览抽屉应关闭。
+- 这些状态不写入词典数据。
+- 响应式自动折叠和宽屏用户手动折叠已经分开：中等宽度强制使用 rail，宽屏只读写 `wideNavCollapsed`，不会互相覆盖。
+- 切换词典时可以保留全局导航状态，但词条列表抽屉应关闭。
 - 打开/关闭抽屉不是数据页面切换，不应触发保存弹窗。
 - 在抽屉中选择新词条或新模块时，仍必须经过现有未保存处理流程。
 
-### 4.3 DOM 和 CSS 建议
+### 4.3 DOM 和 CSS 边界
 
-- 为应用外壳引入稳定区域：`app-nav`、`view-browser`、`view-content`、`mobile-app-bar`。
-- 使用 CSS class 或 `data-*` 表达状态，例如：
+- 应用外壳已经使用稳定区域：`app-nav`、`view-browser`、`view-content`、`mobile-app-bar`。
+- 当前使用 CSS class 和 `data-*` 表达状态，例如：
 
 ```text
 data-nav-state="expanded|rail|drawer"
 data-browser-state="expanded|collapsed|drawer"
 ```
 
-- 桌面收起导航后只显示图标，必须有 tooltip 和可访问名称。
-- 不使用文字圆角块代替已有常见图标；优先复用现有图标库，如项目尚无图标库，再决定是否引入 Lucide。
-- 不把词条详情重新复制到移动端专用 DOM；同一内容区通过布局状态响应。
+- 桌面收起导航后只显示图标，并使用应用内 tooltip 和可访问名称。
+- 导航使用现有内联图标体系，不另用文字圆角块代替常见图标。
+- 词条详情没有复制到移动端专用 DOM；同一内容区通过布局状态响应。
 - 避免只依赖 viewport 宽度；主工作区可考虑 container query，使 Electron 窗口和网页嵌入都能正确响应。
 
-建议断点仅作为初始值，最终以内容是否可用为准：
+当前主断点如下；后续仍应以内容是否可用为准：
 
 - 宽屏：约 `>= 1280px`。
 - 中等宽度：约 `800-1279px`。
@@ -122,7 +123,7 @@ data-browser-state="expanded|collapsed|drawer"
 
 - 竖屏首次进入词条编辑时可直接看到词条详情或空状态。
 - 无需滚过完整列表即可打开任意词条。
-- 中等宽度可分别收起导航和词条浏览栏。
+- 中等宽度工具导航固定为图标栏且不显示手动开关；词条列表仍可单独收起。
 - 抽屉内搜索、排序、词根模式和高级筛选正常。
 - 完整/局部编辑未保存时，从抽屉切换词条或模块仍正确提示。
 - 320、480、768、1024、1440px 下无不可访问操作。
@@ -209,11 +210,11 @@ data-browser-state="expanded|collapsed|drawer"
 
 ## 5. 阶段 B：保存读取接口、SQLite 与索引
 
-### 5.1 先建立 repository 边界
+### 5.1 Repository 边界（已建立）
 
-不要让前端知道后端使用 JSON 还是 SQLite。先在 `server.js` 周围建立接口，并逐步把代码移入独立 CommonJS 模块。
+前端不感知后端文件结构；`server.js`、API 路由与 SQLite repository 的边界已经建立。后续扩展继续沿该边界增加细粒度能力，不把 SQL 或旧 JSON 形状泄露给前端。
 
-建议接口：
+代表性的核心接口如下：
 
 ```js
 class DictionaryRepository {
@@ -240,8 +241,8 @@ class DictionaryRepository {
 - 普通运行期保存已基本迁移到词条级、模块级或批量 patch API：新建/完整编辑/局部编辑/删除词条走词条级 API；其他设置、语言文档、语料库、自动形态学、自动 IPA、自动整理标签顺序和批量 IPA 生成走模块级或批量词条 API。
 - 词典管理的名称、语言和描述保存已改用词典元数据 API；页面卸载时的文档/语料自动保存兜底统一走 autosave 入口。
 - 后端 API 错误已改为结构化错误码；前端保存、导入、词典切换和偏好保存等路径会显示本地化短 toast，控制台保留原始技术错误。
-- 完整快照 `PUT /api/dictionaries/:id`、`GET /api/state`、导入和导出仍保留。它们现在是兼容层、启动入口和完整 JSON 交换路径，不应作为普通编辑保存路径继续扩展。
-- repository 内还有 `queryCorpusUnits()`、`getCorpusBlock()` 等读取侧细粒度方法未暴露为 HTTP API；语料库 UI 仍以整份 corpus 模块保存为主，尚未拆到语料块/语料单元级。
+- 完整快照 `PUT /api/dictionaries/:id` 与 `GET /api/dictionaries/:id` 仍作为低频兼容/整库入口保留；导入和导出仍使用完整 JSON 交换。`GET /api/state` 已是轻量 payload，不属于完整快照路径，但其 `rootCount` 在冷启动时仍可能建立稳定词根拓扑。以上整库入口都不应作为普通编辑保存路径继续扩展。
+- repository 内有 `queryCorpusUnits()`、`getCorpusBlock()` 方法，但它们当前仍先重建完整词典快照再读取 corpus，并非真正轻量查询，也未暴露为 HTTP API；语料库 UI 仍以整份 corpus 模块保存为主，尚未拆到语料块/语料单元级。
 
 ### 5.2 SQLite 化方向
 
@@ -267,16 +268,20 @@ SQLite 已是默认主存储。真实 schema、当前状态审计和后续优化
 
 当前前端数据分析已采用按需切片构建和 slice cache。现阶段缓存上限为 24 条 slice 结果，只是防止搜索词、排序、语言或词典版本变化导致缓存无限增长的临时小容量策略，不是长期语义约束。API 化数据分析后，应由 repository/SQLite 索引、服务端 query planner 或更明确的缓存键替代这类前端临时缓存。
 
+质量检查也已有一项前端完整 report 缓存，并与数据分析缓存分离；但两者命中前仍会序列化完整活动词典的相关字段来构造 key，缓存 key 本身仍是 O(N)，首次 miss 也仍运行完整前端算法。因此“已有薄缓存”不等于已经 API 化或消除了大词典扫描。
+
 词根模式已经接入 `/root-groups`，前端正常路径不再本地构建完整词根分组，也不在请求失败时回退前端全量计算。后端以独立 relation generation 缓存与搜索条件无关的 rootId → derivedIds 稳定拓扑，并维护 entryId → rootIds、rootId → group 反向索引；词典摘要计数、无搜索/搜索分组、组内读取和词汇网络关系 API 复用该拓扑。只有词条增删、lemma/来源变化和整库替换会清除拓扑；普通词条保存/patch 只刷新排序记录，其他模块保存不再影响它。Q4 只对父级词根组列表进行窗口加载；展开单组时一次读取该组全部衍生词，子端点不分页。“全部展开”已改为全局状态意图，不再要求全部父级窗口同时加载；父级首窗提供窗口级组数/衍生词数统计来估算展开高度。`all` 模式下可以单独收起词根作为例外，父级淘汰不丢失该状态；全部展开或全部收起会清理上一轮例外。增强型滚动条/词典地图和 marker/overview 数据仍是后续独立设计，不应混入当前原生滚动窗口。
+
+`/api/state` 虽只返回 metadata/summary，但 `summary.rootCount` 同样复用该拓扑；10k 词典冷启动时首次拓扑构建仍可能明显变慢。不要把“轻量 payload”误写成“常数时间读取”，后续应在启动摘要、拓扑预热或更轻计数契约之间单独评估。
 
 ### 5.3 阶段 B 验收
 
-- 旧 JSON 可以无损导入并重新导出。
-- 导出 JSON 的词条、定义、顺序、语料链接、设置和文档与迁移前等价。
+- 旧 JSON 中受支持的词条、定义、顺序、语料、设置和文档字段可以导入并按当前结构重新导出。
+- 迁移与 roundtrip 检查验证已识别字段的语义等价；未知字段目前不承诺原样保留。
 - 同 ID、重复父级、缺失引用会被事务拒绝并给出可理解错误。
 - API 层的普通编辑保存不再依赖完整词典 PUT。
 - SQLite repository 的普通词条保存不重写整库，且 `saveEntry()` / `deleteEntry()` / `patchEntries()` 响应已收窄；模块保存也只返回各自的局部 payload。
-- 10k/100k 基准结果记录在文档或 benchmark 输出中。
+- 当前 10k 压力词典的关键基准结果记录在文档或 benchmark 输出中；只有真实需求出现时再增加更大数据级别的专项基准。
 - 失败迁移不会删除或修改原始 JSON。
 
 ## 6. 阶段 C：例句迁移为语料单元链接
@@ -530,8 +535,8 @@ lib/
 4. 若继续阶段 B，优先处理默认 SQLite 后的清债项：
    - 查询缓存 Q1–Q4 已完成前端查询 LRU、后端运行时会话、in-flight 合并、词典级 generation 失效、summary DTO、按需详情、词根组子项懒加载、版本化 cursor 和纯滚动数据窗口。`/entries/:entryId/location` 与 `/root-groups/location` 已接入自动滚动：普通目标直接装入返回窗口，词根衍生词先定位父级、保留多来源根语境，再读取整组子项。前端不再通过完整活动词典 snapshot 猜测未加载页号；SWR 保留的旧列表也不能提前完成新查询的滚动请求。
    - 两段式 stale-while-revalidate 已接入查询首窗和按需词条详情：200ms 内保持原内容，但旧详情从请求开始即进入 `inert`；超过后以统一覆盖视觉显示详情遮罩和变淡列表的“正在更新”。首次无旧内容仍直接显示加载状态，失败直接进入现有错误状态，不重试或把旧内容当作成功结果。词条切换和词汇网络返回已改为局部提交，只同步已渲染卡片选中态、详情和必要滚动，不再调用全局 `render()` 或重建查询窗口。详情来源、详情/完整编辑衍生词和词汇网络已共用 `/entry-relations/:entryId` 与前端关系缓存，不再重建完整词典关系索引。
-   - 高级筛选查询化 F0 已完成，完整入口矩阵、语义债务与 F1–F5 边界见 `docs/ADVANCED_FILTER_QUERY_PLAN.md`。下一步先建立统一 EntryQuery/EntryFilter 模型并迁移可直接 SQL 查询的稳定条件；IPA、Gloss、形态和质量问题必须走各自 feature result session，不能伪装成 repository 普通 predicate。
-   - 将带搜索条件的词根模式等剩余本地/完整 snapshot 路径接到可序列化查询契约；候选索引是否采用 FTS/ngram 由真实基准决定。
+   - 高级筛选查询化 F0/F1 已完成：共享 `EntryQuery/EntryFilter` 已统一现有 `/entries` 参数、查询 descriptor、cursor digest 与缓存身份，完整入口矩阵、语义债务和 F2–F5 边界见 `docs/ADVANCED_FILTER_QUERY_PLAN.md`。下一步按 F2 编译并接入可直接 SQL 查询的稳定条件；IPA、Gloss、形态和质量问题必须走各自 feature result session，不能伪装成 repository 普通 predicate。
+   - 普通词条和词根模式的搜索、窗口、定位与关系读取已完成查询化；候选索引是否采用 FTS/ngram 由真实基准决定，不再把这些已完成路径列为待接线项。
    - 形态学结构化存储已完成；DSL v2、表格结构编辑与 layout 设计暂缓，除明确 bug 外不要继续扩展其 schema。数据分析升级时删除 `app.js` 的旧形态单表适配，改为直接调用共享 morphology model。
    - 将数据分析、质量检查推进为按需 API + query planner。
    - 评估语料库是否先拆为块/单元级 changeset，再决定何时 SQL 分表。

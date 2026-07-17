@@ -60,7 +60,15 @@ function checkDescriptorIdentity() {
       dictionaryId: "dict-a",
       dictionaryUpdatedAt: "2026-07-16T00:00:00.000Z",
       cacheGeneration: 3,
-      query: { ...second, fuzzyFields: new Set(["lemma", "tags"]) },
+      query: {
+        q: "root",
+        part: "n",
+        tags: ["n", "root"],
+        tagMode: "all",
+        sort: "lemmaAsc",
+        searchFields: new Set(["lemma", "tags"]),
+        fuzzyFields: new Set(["lemma", "tags"]),
+      },
     })),
   );
 
@@ -288,7 +296,7 @@ async function checkRepositoryIntegration() {
       fuzzySecond.items.slice(0, fuzzyFirst.items.length).map((entry) => entry.id),
     );
     const fuzzySession = [...repository.querySessionCache.sessions.values()]
-      .find((session) => session.kind === "entries" && session.descriptor.q === "rt");
+      .find((session) => session.kind === "entries" && session.descriptor.search.text === "rt");
     assert.ok(fuzzySession?.entryIndexById instanceof Map);
     assert.equal(fuzzySession.entryIndexById.size, fuzzySession.orderedIds.length);
     assert.equal(fuzzySession.entryIndexById.get(fuzzyFirst.items[0].id), 0);
