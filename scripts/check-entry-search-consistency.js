@@ -187,6 +187,11 @@ function searchConsistencyDictionary() {
           sources: ["ProtoSourceToken"],
           description: "EtymologyDescriptionToken",
         },
+        morphologyMode: "manual",
+        morphologyGroups: [{
+          templateGroupId: "morph-lower-tag",
+          notes: "MorphologyGroupNoteToken",
+        }],
         createdAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-01T00:00:00.000Z",
       },
@@ -288,6 +293,18 @@ async function main() {
       alphaSearchRecords.filter((record) => record.field === "definitions").map((record) => record.value),
       "the current matcher must consume the shared per-value record projection",
     );
+    assert.deepEqual(
+      alphaSearchRecords.find((record) => record.value === "MorphologyGroupNoteToken"),
+      {
+        field: "notes",
+        value: "MorphologyGroupNoteToken",
+        sourceType: "morphologyGroup",
+        sourceId: "morph-lower-tag",
+        sourcePosition: 0,
+        valueType: "note",
+      },
+      "entry morphology-group notes must participate in the shared notes projection",
+    );
 
     await assertDirectQuery(repository, dictionary, { fields: "lemma", fuzzyFields: "lemma", limit: 2 });
     await assertDirectQuery(repository, dictionary, { q: "AlphaRoot", fields: "lemma" });
@@ -332,6 +349,20 @@ async function main() {
     await assertDirectQuery(repository, dictionary, { q: "ExampleToken", fields: "examples" });
     await assertDirectQuery(repository, dictionary, { q: "EntryNoteToken", fields: "notes" });
     await assertDirectQuery(repository, dictionary, { q: "DefinitionNoteToken", fields: "notes" });
+    const morphologyNoteResult = await assertDirectQuery(
+      repository,
+      dictionary,
+      { q: "MorphologyGroupNoteToken", fields: "notes" },
+      ["entry-alpha-root"],
+    );
+    assert.deepEqual(morphologyNoteResult.items[0].searchHits, [{
+      field: "notes",
+      value: "MorphologyGroupNoteToken",
+      sourceType: "morphologyGroup",
+      sourceId: "morph-lower-tag",
+      sourcePosition: 0,
+      valueType: "note",
+    }]);
     await assertDirectQuery(repository, dictionary, { q: "EtymologyDescriptionToken", fields: "etymology" });
     await assertDirectQuery(repository, dictionary, { q: "ProtoSourceToken", fields: "etymology" });
     await assertDirectQuery(repository, dictionary, { q: "Phrase Inside Value", fields: "definitions" }, ["entry-separate-search-values"]);

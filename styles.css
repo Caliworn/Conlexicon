@@ -4078,7 +4078,7 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
 .network-overlay {
   position: fixed;
   inset: 0;
-  z-index: 20;
+  z-index: 95;
   display: grid;
   place-items: center;
   padding: 28px;
@@ -4093,6 +4093,8 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   min-width: 0;
   max-width: 100%;
   min-height: min(720px, calc(100vh - 56px));
+  max-height: calc(100vh - 56px);
+  grid-template-rows: auto minmax(0, 1fr);
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 24px;
@@ -4101,12 +4103,10 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
   transform-origin: center;
   animation: networkIn 220ms ease both;
-  transition: opacity 160ms ease, transform 160ms ease;
 }
 
-.network-panel.moving {
-  opacity: 0.55;
-  transform: translateY(8px) scale(0.985);
+.network-panel:focus {
+  outline: none;
 }
 
 .network-header {
@@ -4121,123 +4121,171 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   margin: 4px 0 0;
 }
 
-.network-grid {
-  display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(240px, 1.2fr) minmax(180px, 1fr);
-  gap: 18px;
-  align-items: stretch;
-}
-
-.network-column,
-.network-center {
-  display: grid;
-  align-content: start;
-  gap: 12px;
-  min-height: 520px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 16px;
-  background: color-mix(in srgb, var(--surface) 88%, var(--bg));
-}
-
-.network-center {
-  place-items: center;
-  align-content: center;
-}
-
-.network-column h3 {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.network-node-list {
-  display: grid;
-  gap: 10px;
-}
-
-.network-node {
+.network-viewport {
   position: relative;
-  display: grid;
-  gap: 4px;
-  width: 100%;
   min-width: 0;
-  max-width: 100%;
-  min-height: 58px;
+  min-height: 0;
+  height: min(72vh, 760px);
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 12px;
-  background: var(--surface);
-  color: var(--ink);
-  text-align: left;
-  animation: nodeIn 220ms ease both;
-  transition: border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+  overflow: auto;
+  background: color-mix(in srgb, var(--surface) 88%, var(--bg));
+  scrollbar-gutter: stable;
 }
 
-.network-node:hover {
-  border-color: var(--accent);
-  transform: translateY(-2px);
-  box-shadow: 0 14px 26px rgba(24, 36, 48, 0.14);
+.network-svg {
+  display: block;
+  width: 100%;
+  min-width: 300px;
+  overflow: visible;
 }
 
-.network-node.focus {
-  min-height: 150px;
-  place-items: center;
-  padding: 22px;
-  background: var(--accent-soft);
-  text-align: center;
-}
-
-.network-node strong {
-  font-size: 1.05rem;
-}
-
-.network-node.focus strong {
-  font-size: 1.8rem;
-}
-
-.network-node span {
-  color: var(--muted);
-  font-size: 0.82rem;
-  font-weight: 800;
-}
-
-.network-card {
+.network-layer-label {
   position: absolute;
-  left: 50%;
-  bottom: calc(100% + 10px);
+  top: 14px;
   z-index: 2;
-  display: none;
-  width: min(260px, 80vw);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 12px;
-  background: var(--surface);
-  color: var(--ink);
-  box-shadow: var(--shadow);
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--line));
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+}
+
+.network-layer-label.source {
+  left: 16px;
+}
+
+.network-layer-label.derived {
+  right: 16px;
+}
+
+.network-viewport[data-layout="vertical"] .network-layer-label {
+  left: 50%;
+  right: auto;
   transform: translateX(-50%);
 }
 
-.network-node:hover .network-card {
+.network-viewport[data-layout="vertical"] .network-layer-label.derived {
+  top: var(--network-derived-label-top, 14px);
+}
+
+.network-edge {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent) 58%, var(--line));
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  transition: d 300ms cubic-bezier(0.22, 0.75, 0.25, 1), opacity 180ms ease;
+}
+
+#networkArrow path {
+  fill: color-mix(in srgb, var(--accent) 72%, var(--ink));
+}
+
+.network-svg-node {
+  cursor: pointer;
+  opacity: 1;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 300ms cubic-bezier(0.22, 0.75, 0.25, 1), opacity 180ms ease;
+  outline: none;
+}
+
+.network-svg-node rect {
+  fill: var(--surface);
+  stroke: var(--line);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 8px 12px rgba(24, 36, 48, 0.08));
+  transition: fill 180ms ease, stroke 180ms ease, filter 180ms ease;
+}
+
+.network-svg-node:hover rect,
+.network-svg-node:focus-visible rect {
+  stroke: var(--accent);
+  filter: drop-shadow(0 12px 18px rgba(24, 36, 48, 0.16));
+}
+
+.network-svg-node.focus rect {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+  stroke-width: 2;
+  filter: drop-shadow(0 16px 24px rgba(24, 121, 108, 0.17));
+}
+
+.network-node-lemma,
+.network-node-subtitle {
+  pointer-events: none;
+  dominant-baseline: middle;
+}
+
+.network-node-lemma {
+  fill: var(--ink);
+  font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.network-svg-node.focus .network-node-lemma {
+  font-size: 1.45rem;
+}
+
+.network-node-subtitle {
+  fill: var(--muted);
+  font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.network-status {
+  position: sticky;
+  left: 50%;
+  bottom: 16px;
+  z-index: 3;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  margin: -48px auto 14px;
+  transform: translateX(0);
+  border: 1px solid color-mix(in srgb, var(--accent) 52%, var(--line));
+  border-radius: 999px;
+  padding: 7px 12px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  color: var(--accent-strong);
+  font-size: 0.8rem;
+  font-weight: 850;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+}
+
+.network-status.error {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.network-tooltip-content {
   display: grid;
-  gap: 6px;
-  animation: tooltipIn 120ms ease both;
+  gap: 5px;
+  min-width: min(220px, 70vw);
+  text-align: left;
 }
 
-.network-card p {
-  margin: 4px 0 0;
-  color: var(--muted);
-  line-height: 1.45;
+.app-tooltip .network-tooltip-content > span,
+.app-tooltip .network-tooltip-content p {
+  color: rgba(248, 251, 250, 0.72);
 }
 
-.network-definition-list {
+.network-tooltip-content .network-definition-list {
   display: grid;
   gap: 4px;
   margin-top: 4px;
 }
 
-.network-definition-list p {
+.network-tooltip-content .network-definition-list p {
   margin: 0;
+  line-height: 1.45;
 }
 
 @keyframes overlayIn {
@@ -4253,17 +4301,6 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes nodeIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -4283,8 +4320,7 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   .docs-panel,
   .corpus-layout,
   .ipa-layout,
-  .analysis-wide-grid,
-  .network-grid {
+  .analysis-wide-grid {
     grid-template-columns: 1fr;
   }
 
@@ -4299,11 +4335,6 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
 
   .network-panel {
     overflow: auto;
-  }
-
-  .network-column,
-  .network-center {
-    min-height: auto;
   }
 
   .corpus-browser {
@@ -4465,6 +4496,36 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
 }
 
 @media (max-width: 640px) {
+  .network-overlay {
+    place-items: stretch;
+    padding: 8px;
+  }
+
+  .network-panel {
+    width: 100%;
+    min-height: calc(100vh - 16px);
+    max-height: calc(100vh - 16px);
+    gap: 14px;
+    padding: 14px;
+  }
+
+  .network-header {
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+
+  .network-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .network-viewport {
+    height: auto;
+  }
+
+  .network-layer-label {
+    top: 10px;
+  }
+
   .workspace,
   .dictionary-panel {
     padding: 18px;
@@ -4627,5 +4688,16 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
 
   .app-tooltip {
     animation: none;
+  }
+
+  .network-overlay,
+  .network-panel {
+    animation: none;
+  }
+
+  .network-svg-node,
+  .network-edge,
+  .network-svg-node rect {
+    transition: none;
   }
 }

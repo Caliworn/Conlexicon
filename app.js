@@ -80,6 +80,16 @@ let sourceSuggestionIndex = 0;
 let sourceSuggestionHideTimer = 0;
 let networkEntryId = "";
 let networkOpen = false;
+let networkPreviousFocusId = "";
+let networkLayoutFrame = 0;
+const networkNodeElements = new Map();
+const networkEdgeElements = new Map();
+let networkScene = {
+  focusEntryId: "",
+  nodes: new Map(),
+  edges: new Map(),
+  positions: new Map(),
+};
 let partialEditSection = "";
 let partialEditHost = null;
 const expandedMorphologyTables = new Set();
@@ -262,6 +272,7 @@ const i18n = {
     removeEntryMorphologyGroup: "移除形态组",
     entryMorphologyGroupTitle: "组标题覆盖",
     entryMorphologyGroupNotes: "词条形态备注",
+    morphologyGroupNote: "形态组备注",
     useTemplateGroupTitle: "留空则使用表格组标题",
     morphologyOverrideHelp: "留空则使用表格规则；填写内容会覆盖对应栏目。",
     morphologyRuleSyntaxHelp: "使用 {} 引用词形；{a = e} 引用并替换词形；/leftV(a,o,u) = lar; rightV(e,i,ö,ü) = ler; else = / 按最近左侧或右侧音位选择输出；else 可留空。",
@@ -765,6 +776,7 @@ const i18n = {
     removeEntryMorphologyGroup: "Remove Morphology Group",
     entryMorphologyGroupTitle: "Group Title Override",
     entryMorphologyGroupNotes: "Entry Morphology Notes",
+    morphologyGroupNote: "Morphology Group Note",
     useTemplateGroupTitle: "Leave blank to use the template group title",
     morphologyOverrideHelp: "Leave blank to use table rules; filled cells override that slot.",
     morphologyRuleSyntaxHelp: "Use {} to reference the lemma; {a = e} references and replaces inside the lemma; /leftV(a,o,u) = lar; rightV(e,i,ö,ü) = ler; else = / chooses output by the nearest left or right phoneme. Empty else inserts nothing.",
@@ -1429,9 +1441,13 @@ const elements = {
   lexicalNetworkPanel: document.querySelector("#lexicalNetworkPanel"),
   closeLexicalNetworkButton: document.querySelector("#closeLexicalNetworkButton"),
   networkTitle: document.querySelector("#networkTitle"),
-  networkSources: document.querySelector("#networkSources"),
-  networkFocus: document.querySelector("#networkFocus"),
-  networkDerived: document.querySelector("#networkDerived"),
+  networkViewport: document.querySelector("#networkViewport"),
+  networkSvg: document.querySelector("#networkSvg"),
+  networkEdges: document.querySelector("#networkEdges"),
+  networkNodes: document.querySelector("#networkNodes"),
+  networkStatus: document.querySelector("#networkStatus"),
+  networkSourceLabel: document.querySelector("#networkSourceLabel"),
+  networkDerivedLabel: document.querySelector("#networkDerivedLabel"),
   confirmDialog: document.querySelector("#confirmDialog"),
   confirmDialogTitle: document.querySelector("#confirmDialogTitle"),
   confirmDialogMessage: document.querySelector("#confirmDialogMessage"),
@@ -7011,27 +7027,45 @@ function renderEntrySearchSnippets(entry) {
   ));
   const labelOrder = Object.keys(labels);
   const apiHits = Array.isArray(entry.searchHits) ? entry.searchHits : null;
+  const hitLabel = (hit) => {
+    if (hit.field !== "notes") {
+      return labels[hit.field];
+    }
+    if (hit.sourceType === "definition") {
+      return t("definitionNote");
+    }
+    if (hit.sourceType === "morphologyGroup") {
+      return t("morphologyGroupNote");
+    }
+    return t("entryNotes");
+  };
   const candidates = apiHits
     ? apiHits
         .filter((hit) => Object.hasOwn(labels, hit.field))
         .sort((left, right) => labelOrder.indexOf(left.field) - labelOrder.indexOf(right.field))
         .map((hit) => ({
           field: hit.field,
-          label: labels[hit.field],
+          label: hitLabel(hit),
           value: hit.value,
           index: Number(hit.sourcePosition) || 0,
         }))
         .filter(({ field, index }) => field !== "definitions" || index !== firstDisplayedDefinitionIndex)
     : (() => {
-        const valuesByField = entrySearchModel.entrySearchFieldValues(entry, dictionary, {
+        const records = entrySearchModel.entrySearchValueRecords(entry, dictionary, {
           fields: searchFields,
           normalizeText: searchOptions.normalizeText,
         });
-        return Object.entries(labels)
-          .flatMap(([field, label]) => valuesByField[field].map((value, index) => ({ field, label, value, index })))
+        return records
+          .filter((record) => Object.hasOwn(labels, record.field))
+          .sort((left, right) => labelOrder.indexOf(left.field) - labelOrder.indexOf(right.field))
+          .map((record) => ({
+            field: record.field,
+            label: hitLabel(record),
+            value: record.value,
+            index: Number(record.sourcePosition) || 0,
+          }))
           .filter(({ field, value, index }) => (
-            value
-            && entrySearchModel.textMatches(value, query, {
+            entrySearchModel.textMatches(value, query, {
               fuzzy: fuzzyFields.has(field),
               normalizeText: searchOptions.normalizeText,
             })
@@ -7316,10 +7350,13 @@ async function openLexicalNetwork() {
   if (!entry) {
     return;
   }
+  resetLexicalNetworkScene();
   networkEntryId = entry.id;
+  networkPreviousFocusId = "";
   networkOpen = true;
   editorMode = "display";
   renderLexicalNetwork();
+  window.requestAnimationFrame(() => elements.lexicalNetworkPanel.focus());
 }
 
 function closeLexicalNetwork() {
@@ -7332,6 +7369,7 @@ function closeLexicalNetwork() {
     editorMode = "display";
   }
   networkOpen = false;
+  resetLexicalNetworkScene();
   if (targetEntryId) {
     ensureSelectedEntryDetailLoaded();
   }
@@ -7339,18 +7377,16 @@ function closeLexicalNetwork() {
   if (targetEntryId) {
     scheduleEntryCardScroll(targetEntryId, navigationOptions);
   }
+  elements.openLexicalNetworkButton.focus();
 }
 
 function navigateLexicalNetwork(entryId) {
   if (!entryId || entryId === networkEntryId) {
     return;
   }
-  elements.lexicalNetworkPanel.classList.add("moving");
-  window.setTimeout(() => {
-    networkEntryId = entryId;
-    renderLexicalNetwork();
-    elements.lexicalNetworkPanel.classList.remove("moving");
-  }, 160);
+  networkPreviousFocusId = networkEntryId;
+  networkEntryId = entryId;
+  renderLexicalNetwork();
 }
 
 function renderLexicalNetwork() {
@@ -7360,21 +7396,403 @@ function renderLexicalNetwork() {
   }
 
   const dictionary = activeDictionary();
-  const entry = dictionary?.entries.find((item) => item.id === networkEntryId) || selectedEntry();
+  const entry = dictionary?.entries.find((item) => item.id === networkEntryId)
+    || networkScene.nodes.get(networkEntryId)?.entry
+    || selectedEntry();
   if (!dictionary || !entry) {
     elements.lexicalNetworkOverlay.hidden = true;
     networkOpen = false;
+    resetLexicalNetworkScene();
     return;
   }
 
   networkEntryId = entry.id;
   elements.networkTitle.textContent = entry.lemma;
   const relation = lexicalNetworkRelationForEntry(dictionary, entry);
+  renderLexicalNetworkScene(entry, relation);
+}
 
-  renderNetworkNodeList(elements.networkSources, relation.sources, relation.status);
-  renderNetworkNodeList(elements.networkDerived, relation.derivedEntries, relation.status);
-  elements.networkFocus.innerHTML = "";
-  elements.networkFocus.append(createNetworkNode(entry, true));
+const NETWORK_SVG_NS = "http://www.w3.org/2000/svg";
+const NETWORK_TRANSITION_MS = 300;
+
+function resetLexicalNetworkScene() {
+  if (networkLayoutFrame) {
+    window.cancelAnimationFrame(networkLayoutFrame);
+    networkLayoutFrame = 0;
+  }
+  hideAppTooltip();
+  networkNodeElements.clear();
+  networkEdgeElements.clear();
+  if (elements.networkNodes) {
+    elements.networkNodes.replaceChildren();
+  }
+  if (elements.networkEdges) {
+    elements.networkEdges.replaceChildren();
+  }
+  networkScene = {
+    focusEntryId: "",
+    nodes: new Map(),
+    edges: new Map(),
+    positions: new Map(),
+  };
+}
+
+function createNetworkSvgElement(name, attributes = {}) {
+  const element = document.createElementNS(NETWORK_SVG_NS, name);
+  Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, String(value)));
+  return element;
+}
+
+function renderLexicalNetworkScene(focusEntry, relation) {
+  if (!elements.networkViewport || !elements.networkSvg) {
+    return;
+  }
+  const nextScene = buildLexicalNetworkScene(focusEntry, relation);
+  const layout = layoutLexicalNetworkScene(nextScene);
+  nextScene.positions = layout.positions;
+  nextScene.layout = layout;
+
+  elements.networkViewport.dataset.layout = layout.orientation;
+  elements.networkViewport.style.setProperty("--network-derived-label-top", `${layout.derivedLabelTop || 14}px`);
+  elements.networkSvg.setAttribute("viewBox", `0 0 ${layout.width} ${layout.height}`);
+  elements.networkSvg.style.height = `${layout.height}px`;
+  const sourceCount = [...nextScene.nodes.values()].filter((node) => node.role === "source").length;
+  const derivedCount = [...nextScene.nodes.values()].filter((node) => node.role === "derived").length;
+  elements.networkSourceLabel.textContent = `${t("source")} · ${sourceCount}`;
+  elements.networkDerivedLabel.textContent = `${t("derivedEntries")} · ${derivedCount}`;
+  renderLexicalNetworkStatus(relation.status);
+  updateLexicalNetworkEdges(nextScene);
+  updateLexicalNetworkNodes(nextScene);
+  networkScene = nextScene;
+}
+
+function buildLexicalNetworkScene(focusEntry, relation) {
+  const nodes = new Map();
+  const edges = new Map();
+  const addNode = (entry, role) => {
+    if (!entry?.id) {
+      return;
+    }
+    const previous = nodes.get(entry.id);
+    nodes.set(entry.id, {
+      id: entry.id,
+      entry,
+      role: entry.id === focusEntry.id ? "focus" : previous?.role || role,
+    });
+  };
+  const addEdge = (fromEntry, toEntry) => {
+    if (!fromEntry?.id || !toEntry?.id || fromEntry.id === toEntry.id) {
+      return;
+    }
+    const key = `${fromEntry.id}\u0000${toEntry.id}`;
+    edges.set(key, { key, fromId: fromEntry.id, toId: toEntry.id });
+  };
+
+  addNode(focusEntry, "focus");
+  if (relation.status === "success") {
+    relation.sources.forEach((source) => {
+      addNode(source, "source");
+      addEdge(source, focusEntry);
+    });
+    relation.derivedEntries.forEach((derived) => {
+      addNode(derived, "derived");
+      addEdge(focusEntry, derived);
+    });
+  } else {
+    const previousFocus = networkScene.nodes.get(networkPreviousFocusId);
+    const oldToNewKey = `${networkPreviousFocusId}\u0000${focusEntry.id}`;
+    const newToOldKey = `${focusEntry.id}\u0000${networkPreviousFocusId}`;
+    if (previousFocus && networkScene.edges.has(oldToNewKey)) {
+      addNode(previousFocus.entry, "source");
+      addEdge(previousFocus.entry, focusEntry);
+    } else if (previousFocus && networkScene.edges.has(newToOldKey)) {
+      addNode(previousFocus.entry, "derived");
+      addEdge(focusEntry, previousFocus.entry);
+    }
+  }
+
+  return {
+    focusEntryId: focusEntry.id,
+    nodes,
+    edges,
+    positions: new Map(),
+  };
+}
+
+function layoutLexicalNetworkScene(scene) {
+  const viewportWidth = Math.max(300, Math.floor(elements.networkViewport.clientWidth || 960));
+  const sources = [...scene.nodes.values()].filter((node) => node.role === "source");
+  const derived = [...scene.nodes.values()].filter((node) => node.role === "derived");
+  const positions = new Map();
+  if (viewportWidth < 720) {
+    const width = viewportWidth;
+    const nodeWidth = Math.min(280, width - 40);
+    const nodeHeight = 72;
+    const focusHeight = 108;
+    const gap = 18;
+    const topPadding = 52;
+    let cursorY = topPadding;
+    sources.forEach((node) => {
+      positions.set(node.id, { x: width / 2, y: cursorY + nodeHeight / 2, width: nodeWidth, height: nodeHeight });
+      cursorY += nodeHeight + gap;
+    });
+    if (sources.length) {
+      cursorY += 26;
+    }
+    positions.set(scene.focusEntryId, { x: width / 2, y: cursorY + focusHeight / 2, width: nodeWidth, height: focusHeight });
+    cursorY += focusHeight + (derived.length ? 44 : 22);
+    const derivedLabelTop = cursorY - 34;
+    derived.forEach((node) => {
+      positions.set(node.id, { x: width / 2, y: cursorY + nodeHeight / 2, width: nodeWidth, height: nodeHeight });
+      cursorY += nodeHeight + gap;
+    });
+    return {
+      orientation: "vertical",
+      width,
+      height: Math.max(420, cursorY + 28),
+      derivedLabelTop,
+      positions,
+    };
+  }
+
+  const width = viewportWidth;
+  const nodeWidth = Math.min(230, Math.max(168, (width - 210) / 3));
+  const nodeHeight = 72;
+  const focusWidth = Math.min(250, nodeWidth + 22);
+  const focusHeight = 118;
+  const maxSideCount = Math.max(1, sources.length, derived.length);
+  const height = Math.max(520, maxSideCount * 92 + 112);
+  const sideTop = 74;
+  const sideBottom = height - 38;
+  const sideY = (items, index) => {
+    if (items.length <= 1) {
+      return height / 2;
+    }
+    return sideTop + ((sideBottom - sideTop) * index) / (items.length - 1);
+  };
+  const leftX = 34 + nodeWidth / 2;
+  const rightX = width - 34 - nodeWidth / 2;
+  sources.forEach((node, index) => {
+    positions.set(node.id, { x: leftX, y: sideY(sources, index), width: nodeWidth, height: nodeHeight });
+  });
+  derived.forEach((node, index) => {
+    positions.set(node.id, { x: rightX, y: sideY(derived, index), width: nodeWidth, height: nodeHeight });
+  });
+  positions.set(scene.focusEntryId, { x: width / 2, y: height / 2, width: focusWidth, height: focusHeight });
+  return { orientation: "horizontal", width, height, positions };
+}
+
+function renderLexicalNetworkStatus(status) {
+  if (!elements.networkStatus) {
+    return;
+  }
+  elements.networkStatus.classList.toggle("error", status === "error");
+  if (status === "loading") {
+    elements.networkStatus.textContent = t("lexicalNetworkLoading");
+    elements.networkStatus.hidden = false;
+    return;
+  }
+  if (status === "error") {
+    elements.networkStatus.textContent = t("lexicalNetworkLoadFailed");
+    elements.networkStatus.hidden = false;
+    return;
+  }
+  elements.networkStatus.textContent = "";
+  elements.networkStatus.hidden = true;
+}
+
+function networkNodeTransform(position) {
+  return `translate(${position.x} ${position.y})`;
+}
+
+function networkEntrySubtitle(entry) {
+  return [entry?.pronunciation || "", entryPartText(entry)].filter(Boolean).join(" · ");
+}
+
+function networkTruncatedLabel(value, width, fontSize = 16) {
+  const text = String(value || "");
+  const limit = Math.max(8, Math.floor(width / (fontSize * 0.62)));
+  return text.length > limit ? `${text.slice(0, Math.max(1, limit - 1))}…` : text;
+}
+
+function networkNodeTooltipHtml(entry) {
+  const partText = entryPartText(entry);
+  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
+  return `
+    <div class="network-tooltip-content">
+      <b>${escapeHtml(entry.lemma || "")}</b>
+      ${entry.pronunciation ? `<span>${escapeHtml(entry.pronunciation)}</span>` : ""}
+      ${partText ? `<span>${escapeHtml(partText)}</span>` : ""}
+      ${renderNetworkMeaningHtml(entry, settings.networkPolysemyDisplay)}
+    </div>
+  `;
+}
+
+function createLexicalNetworkNodeElement(node, initialPosition) {
+  const group = createNetworkSvgElement("g", {
+    class: `network-svg-node ${node.role}`,
+    transform: networkNodeTransform(initialPosition),
+    tabindex: "0",
+    role: "button",
+  });
+  const rect = createNetworkSvgElement("rect", { rx: "10", ry: "10" });
+  const lemma = createNetworkSvgElement("text", { class: "network-node-lemma", "text-anchor": "middle" });
+  const subtitle = createNetworkSvgElement("text", { class: "network-node-subtitle", "text-anchor": "middle" });
+  group.append(rect, lemma, subtitle);
+  group.addEventListener("click", () => navigateLexicalNetwork(node.id));
+  group.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      navigateLexicalNetwork(node.id);
+    }
+  });
+  elements.networkNodes.append(group);
+  return group;
+}
+
+function updateLexicalNetworkNodeElement(group, node, position) {
+  group.dataset.networkActive = "true";
+  group.dataset.entryId = node.id;
+  group.dataset.appTooltip = "always";
+  group.dataset.appTooltipWrap = "true";
+  group.dataset.appTooltipHtml = networkNodeTooltipHtml(node.entry);
+  const subtitleText = networkEntrySubtitle(node.entry);
+  group.setAttribute("aria-label", [node.entry.lemma, subtitleText].filter(Boolean).join(", "));
+  group.classList.toggle("focus", node.role === "focus");
+  group.classList.toggle("source", node.role === "source");
+  group.classList.toggle("derived", node.role === "derived");
+  const rect = group.querySelector("rect");
+  rect.setAttribute("x", String(-position.width / 2));
+  rect.setAttribute("y", String(-position.height / 2));
+  rect.setAttribute("width", String(position.width));
+  rect.setAttribute("height", String(position.height));
+  const lemma = group.querySelector(".network-node-lemma");
+  lemma.textContent = networkTruncatedLabel(node.entry.lemma, position.width - 28, node.role === "focus" ? 24 : 16);
+  lemma.setAttribute("y", node.role === "focus" ? "-6" : "-5");
+  const subtitle = group.querySelector(".network-node-subtitle");
+  subtitle.textContent = networkTruncatedLabel(subtitleText, position.width - 28, 13);
+  subtitle.setAttribute("y", node.role === "focus" ? "25" : "20");
+}
+
+function updateLexicalNetworkNodes(scene) {
+  const oldPositions = networkScene.positions;
+  scene.nodes.forEach((node, id) => {
+    const position = scene.positions.get(id);
+    let group = networkNodeElements.get(id);
+    if (!group) {
+      const origin = oldPositions.get(id)
+        || oldPositions.get(networkScene.focusEntryId)
+        || scene.positions.get(scene.focusEntryId)
+        || position;
+      group = createLexicalNetworkNodeElement(node, origin);
+      group.style.opacity = "0";
+      networkNodeElements.set(id, group);
+    }
+    updateLexicalNetworkNodeElement(group, node, position);
+    window.requestAnimationFrame(() => {
+      if (group.dataset.networkActive !== "true") {
+        return;
+      }
+      group.style.opacity = "1";
+      group.setAttribute("transform", networkNodeTransform(position));
+    });
+  });
+
+  [...networkNodeElements.entries()].forEach(([id, group]) => {
+    if (scene.nodes.has(id)) {
+      return;
+    }
+    if (activeAppTooltipTarget === group) {
+      hideAppTooltip();
+    }
+    group.dataset.networkActive = "false";
+    group.style.opacity = "0";
+    const focusPosition = scene.positions.get(scene.focusEntryId);
+    if (focusPosition) {
+      group.setAttribute("transform", networkNodeTransform(focusPosition));
+    }
+    window.setTimeout(() => {
+      if (group.dataset.networkActive === "false") {
+        group.remove();
+        networkNodeElements.delete(id);
+      }
+    }, NETWORK_TRANSITION_MS);
+  });
+}
+
+function networkEdgePath(from, to, orientation) {
+  if (orientation === "vertical") {
+    const startX = from.x;
+    const startY = from.y + from.height / 2;
+    const endX = to.x;
+    const endY = to.y - to.height / 2;
+    const middleY = startY + (endY - startY) / 2;
+    return `M ${startX} ${startY} C ${startX} ${middleY}, ${endX} ${middleY}, ${endX} ${endY}`;
+  }
+  const direction = to.x >= from.x ? 1 : -1;
+  const startX = from.x + direction * from.width / 2;
+  const startY = from.y;
+  const endX = to.x - direction * to.width / 2;
+  const endY = to.y;
+  const middleX = startX + (endX - startX) / 2;
+  return `M ${startX} ${startY} C ${middleX} ${startY}, ${middleX} ${endY}, ${endX} ${endY}`;
+}
+
+function updateLexicalNetworkEdges(scene) {
+  scene.edges.forEach((edge, key) => {
+    const from = scene.positions.get(edge.fromId);
+    const to = scene.positions.get(edge.toId);
+    if (!from || !to) {
+      return;
+    }
+    let path = networkEdgeElements.get(key);
+    if (!path) {
+      path = createNetworkSvgElement("path", {
+        class: "network-edge",
+        "marker-end": "url(#networkArrow)",
+      });
+      path.style.opacity = "0";
+      const origin = networkScene.positions.get(edge.fromId)
+        || networkScene.positions.get(networkScene.focusEntryId)
+        || from;
+      path.setAttribute("d", networkEdgePath(origin, origin, scene.layout.orientation));
+      elements.networkEdges.append(path);
+      networkEdgeElements.set(key, path);
+    }
+    path.dataset.networkActive = "true";
+    const nextPath = networkEdgePath(from, to, scene.layout.orientation);
+    window.requestAnimationFrame(() => {
+      if (path.dataset.networkActive !== "true") {
+        return;
+      }
+      path.style.opacity = "1";
+      path.setAttribute("d", nextPath);
+    });
+  });
+
+  [...networkEdgeElements.entries()].forEach(([key, path]) => {
+    if (scene.edges.has(key)) {
+      return;
+    }
+    path.dataset.networkActive = "false";
+    path.style.opacity = "0";
+    window.setTimeout(() => {
+      if (path.dataset.networkActive === "false") {
+        path.remove();
+        networkEdgeElements.delete(key);
+      }
+    }, NETWORK_TRANSITION_MS);
+  });
+}
+
+function scheduleLexicalNetworkLayout() {
+  if (!networkOpen || networkLayoutFrame) {
+    return;
+  }
+  networkLayoutFrame = window.requestAnimationFrame(() => {
+    networkLayoutFrame = 0;
+    renderLexicalNetwork();
+  });
 }
 
 function entryRelationKey(dictionary, entryId) {
@@ -7479,44 +7897,6 @@ function trimEntryRelationsCache(protectedKey = "") {
     }
     entryRelationsCache.delete(oldestKey);
   }
-}
-
-function renderNetworkNodeList(container, entries, status = "success") {
-  container.innerHTML = "";
-  if (status === "loading") {
-    container.append(emptyState(t("lexicalNetworkLoading"), ""));
-    return;
-  }
-  if (status === "error") {
-    container.append(emptyState(t("lexicalNetworkLoadFailed"), ""));
-    return;
-  }
-  if (!entries.length) {
-    container.append(emptyState(t("none"), ""));
-    return;
-  }
-  entries.forEach((entry) => container.append(createNetworkNode(entry, false)));
-}
-
-function createNetworkNode(entry, isFocus = false) {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = `network-node${isFocus ? " focus" : ""}`;
-  const partText = entryPartText(entry);
-  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
-  const meaningHtml = renderNetworkMeaningHtml(entry, settings.networkPolysemyDisplay);
-  button.innerHTML = `
-    <strong>${escapeHtml(entry.lemma)}</strong>
-    <span>${escapeHtml([entry.pronunciation, partText].filter(Boolean).join(" · "))}</span>
-    <div class="network-card" role="tooltip">
-      <b>${escapeHtml(entry.lemma)}</b>
-      ${entry.pronunciation ? `<span>${escapeHtml(entry.pronunciation)}</span>` : ""}
-      ${partText ? `<span>${escapeHtml(partText)}</span>` : ""}
-      ${meaningHtml}
-    </div>
-  `;
-  button.addEventListener("click", () => navigateLexicalNetwork(entry.id));
-  return button;
 }
 
 function renderNetworkMeaningHtml(entry, showPolysemy = false) {
@@ -14242,6 +14622,11 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
+  if (event.key === "Escape" && networkOpen) {
+    closeLexicalNetwork();
+    return;
+  }
+
   if (event.key === "Escape" && closeMobileDrawers()) {
     return;
   }
@@ -14345,6 +14730,7 @@ window.addEventListener("resize", () => {
   renderShellNav();
   renderMobileAppBar();
   scheduleEntryBrowserLayoutRefresh(120);
+  scheduleLexicalNetworkLayout();
 });
 elements.appShell.addEventListener("transitionend", (event) => {
   if (event.propertyName === "grid-template-columns") {

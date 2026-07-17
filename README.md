@@ -14,7 +14,7 @@ Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。
 - Responsive application shell with collapsible tool navigation, a collapsible entry list, and mobile drawer controls for navigation, entry browsing, and creating entries.
 - Advanced filtering from analytics and quality checks: click analytic rows or quality categories to filter the entry browser, with reversible filter variants for coverage, IPA, morphology, and quality issues.
 - Root mode entry browsing: derived entries can be nested under their roots, with expand/collapse controls and quick derived-entry creation.
-- Lexical network view for source and derived relationships, including hover cards and navigation between connected entries.
+- Layered SVG lexical network for source and derived relationships, with keyed node refocusing, animated edges, hover details, and responsive horizontal/vertical layouts.
 - Auto IPA rules with mapping, syllabification, onset/coda clusters, complex phonemes, stress settings, sandbox testing, and batch generation.
 - Auto morphology with template groups, multiple subtables per group, automatic or manual per-entry group selection, rule syntax, function objects, overrides, generated forms, and searchable morphology output.
 - Markdown language documentation with split edit/preview, edit-only, and preview-only modes.
@@ -33,7 +33,7 @@ Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。
 - 响应式应用外壳：支持可收起工具导航、可收起词条列表，以及移动端用于导航、浏览词条和新建词条的抽屉控件。
 - 数据分析与质量检查高级筛选：点击统计行或质量类别可以筛选词条浏览栏，并支持释义覆盖、IPA、形态学、质量问题等项目的筛选条件切换。
 - 词根模式浏览：衍生词可以嵌套显示在词根下方，支持单组展开/收起、全局展开、全局模式下的单组收起例外，以及快速创建衍生词；父级窗口淘汰只释放数据，不丢失展开意图。
-- 词汇网络：展示来源与衍生关系，支持悬浮信息卡和在关联词条之间导航。
+- 词汇网络：以分层 SVG 展示来源、当前焦点与衍生关系；关联节点会在切换焦点时连续移动并更新连线，同时支持悬浮信息、键盘操作和窄屏纵向布局。
 - 自动 IPA：支持映射、音节划分、音节首/尾辅音簇、复杂音位、重音设置、沙盒测试和批量生成。
 - 自动形态学：支持模板组及组内多个形态表格、词条级自动匹配或手动选择形态组、规则语法、函数识别对象、词条覆盖项、生成形式和搜索生成结果。
 - Markdown 语言文档：支持左右分栏编辑预览、纯编辑和纯查看模式。
