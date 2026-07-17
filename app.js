@@ -153,8 +153,8 @@ let selectedEntryDetailState = {
   requestId: 0,
 };
 let selectedEntryDetailLoadPromise = null;
-const lexicalNetworkRelationsCache = new Map();
-let lexicalNetworkRelationsRequestId = 0;
+const entryRelationsCache = new Map();
+const ENTRY_RELATIONS_CACHE_MAX = 24;
 let qualityReportCache = null;
 let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
@@ -5685,6 +5685,9 @@ function createEntryCard(entry, options = {}) {
     bodyOnlyEntryCard ? "body-only-entry-card" : "",
   ].filter(Boolean).join(" ");
   button.dataset.entryId = entry.id;
+  if (entry.id === state.selectedEntryId) {
+    button.setAttribute("aria-current", "true");
+  }
   if (options.rootId) {
     button.dataset.rootId = options.rootId;
   }
@@ -5715,6 +5718,26 @@ function createEntryCard(entry, options = {}) {
     showEntryContextMenu(event, entry, { rootId: options.rootId || "" });
   });
   return button;
+}
+
+function renderEntryListSelection() {
+  elements.entryList.querySelectorAll(".entry-card[data-entry-id]").forEach((card) => {
+    const selected = card.dataset.entryId === state.selectedEntryId;
+    card.classList.toggle("active", selected);
+    if (selected) {
+      card.setAttribute("aria-current", "true");
+    } else {
+      card.removeAttribute("aria-current");
+    }
+  });
+}
+
+function renderEditorEntrySelection() {
+  closeEntryContextMenu();
+  renderEntryListSelection();
+  renderDetail();
+  renderLexicalNetwork();
+  scheduleEntryBrowserHeightUpdate();
 }
 
 function shouldUseCompactEntryCard(entry, options = {}) {
@@ -5989,8 +6012,11 @@ async function switchToEntry(entryId, options = {}) {
   editorMode = "display";
   const navigationOptions = prepareRootModeEntryNavigation(entryId, options);
   const detailLoadPromise = ensureSelectedEntryDetailLoaded();
-  render();
+  renderEditorEntrySelection();
   await detailLoadPromise;
+  if (state.selectedEntryId !== entryId) {
+    return;
+  }
   scheduleEntryCardScroll(entryId, navigationOptions);
   closeMobileEntryBrowserDrawer();
 }
@@ -7166,8 +7192,7 @@ function renderEntryDisplay(entry) {
     elements.displayDefinitions.append(item);
   });
 
-  renderEtymology(entry, showEmptySections);
-  renderDerivedEntries(entry);
+  renderEntryRelationSections(entry, showEmptySections);
   renderMorphologyDisplay(entry, showEmptySections);
   elements.displayEntryNotesSection.hidden = !entry.notes && !showEmptySections;
   elements.displayEntryNotes.textContent = entry.notes || "";
@@ -7186,8 +7211,13 @@ function applyEntryDisplaySectionOrder() {
     .forEach((section) => elements.entryDisplay.append(sections[section]));
 }
 
-function renderEtymology(entry, showEmptySections = false) {
-  const dictionary = activeDictionary();
+function renderEntryRelationSections(entry, showEmptySections = false) {
+  const relationState = entryRelationStateForEntry(activeDictionary(), entry);
+  renderEtymology(entry, showEmptySections, relationState);
+  renderDerivedEntries(entry, relationState);
+}
+
+function renderEtymology(entry, showEmptySections = false, relationState = { status: "loading", relation: null }) {
   const sources = entry.etymology?.sources || [];
   const description = entry.etymology?.description || "";
   elements.displayEtymologySection.hidden = !sources.length && !description && !showEmptySections;
@@ -7196,16 +7226,19 @@ function renderEtymology(entry, showEmptySections = false) {
   if (sources.length) {
     const sourceRow = document.createElement("div");
     sourceRow.className = "source-row";
-    sources.forEach((sourceName) => {
-      const source = resolveSourceEntry(sourceName, dictionary);
-      if (source) {
+    const resolvedSources = relationState.status === "success"
+      ? relationState.relation.sources || []
+      : sources.map((sourceText) => ({ sourceText, matchedEntryId: "", matchedLemma: "" }));
+    resolvedSources.forEach((sourceRelation) => {
+      const sourceName = sourceRelation.sourceText || "";
+      if (relationState.status === "success" && sourceRelation.matchedEntryId) {
         const button = document.createElement("button");
         button.className = "source-link";
         button.type = "button";
-        button.textContent = source.lemma;
-        button.addEventListener("click", () => switchToEntry(source.id));
+        button.textContent = sourceRelation.matchedLemma || sourceName;
+        button.addEventListener("click", () => switchToEntry(sourceRelation.matchedEntryId));
         sourceRow.append(button);
-      } else {
+      } else if (relationState.status === "success") {
         const pending = document.createElement("button");
         pending.type = "button";
         pending.className = "source-link pending-source";
@@ -7213,6 +7246,11 @@ function renderEtymology(entry, showEmptySections = false) {
         pending.setAttribute("aria-label", formatText("createSourceEntry", { source: sourceName }));
         pending.addEventListener("click", () => beginSourceEntry(sourceName));
         sourceRow.append(pending);
+      } else {
+        const loading = document.createElement("span");
+        loading.className = "source-link pending-source";
+        loading.textContent = sourceName;
+        sourceRow.append(loading);
       }
     });
     elements.displayEtymology.append(sourceRow);
@@ -7233,18 +7271,19 @@ async function beginSourceEntry(sourceName) {
   return beginNewEntry({ lemma });
 }
 
-function renderDerivedEntries(entry) {
-  const dictionary = activeDictionary();
-  const derived = findDerivedEntries(entry, dictionary);
+function renderDerivedEntries(entry, relationState = entryRelationStateForEntry(activeDictionary(), entry)) {
+  const derived = relationState.status === "success" ? relationState.relation.derivedEntries || [] : [];
   elements.displayDerivedSection.hidden = !derived.length;
-  renderDerivedEntryList(elements.displayDerived, derived, dictionary, { interactive: true });
+  renderDerivedEntryList(elements.displayDerived, derived, activeDictionary(), { interactive: true });
 }
 
 function renderFullEditDerivedEntries(entry) {
-  const dictionary = activeDictionary();
-  const derived = entry?.id ? findDerivedEntries(entry, dictionary) : [];
+  const relationState = entry?.id
+    ? entryRelationStateForEntry(activeDictionary(), entry)
+    : { status: "idle", relation: null };
+  const derived = relationState.status === "success" ? relationState.relation.derivedEntries || [] : [];
   elements.fullEditDerivedSection.hidden = !derived.length;
-  renderDerivedEntryList(elements.fullEditDerived, derived, dictionary, { interactive: false });
+  renderDerivedEntryList(elements.fullEditDerived, derived, activeDictionary(), { interactive: false });
 }
 
 function renderDerivedEntryList(container, derived = [], dictionary = activeDictionary(), { interactive = true } = {}) {
@@ -7293,7 +7332,10 @@ function closeLexicalNetwork() {
     editorMode = "display";
   }
   networkOpen = false;
-  render();
+  if (targetEntryId) {
+    ensureSelectedEntryDetailLoaded();
+  }
+  renderEditorEntrySelection();
   if (targetEntryId) {
     scheduleEntryCardScroll(targetEntryId, navigationOptions);
   }
@@ -7335,7 +7377,7 @@ function renderLexicalNetwork() {
   elements.networkFocus.append(createNetworkNode(entry, true));
 }
 
-function lexicalNetworkRelationKey(dictionary, entryId) {
+function entryRelationKey(dictionary, entryId) {
   return [
     dictionary?.id || "",
     entryId || "",
@@ -7343,63 +7385,100 @@ function lexicalNetworkRelationKey(dictionary, entryId) {
   ].join("|");
 }
 
-function lexicalNetworkRelationForEntry(dictionary, entry) {
+function entryRelationStateForEntry(dictionary, entry) {
   if (!backendAvailable || !dictionary?.id || !entry?.id) {
-    return { status: "error", sources: [], derivedEntries: [], rootGroup: null };
+    return { status: "error", relation: null };
   }
 
-  const key = lexicalNetworkRelationKey(dictionary, entry.id);
-  const cached = lexicalNetworkRelationsCache.get(key);
-  if (cached?.status === "success") {
-    return { status: "success", ...apiLexicalNetworkRelation(cached.relation, dictionary) };
+  const key = entryRelationKey(dictionary, entry.id);
+  const cached = entryRelationsCache.get(key);
+  if (cached) {
+    entryRelationsCache.delete(key);
+    entryRelationsCache.set(key, cached);
   }
-  if (!cached || cached.status === "error") {
-    fetchLexicalNetworkRelation(dictionary, entry, key);
+  if (cached?.status === "success") {
+    return { status: "success", relation: cached.relation };
+  }
+  if (!cached) {
+    fetchEntryRelation(dictionary, entry, key);
   }
   return {
-    status: "loading",
-    sources: [],
-    derivedEntries: [],
-    rootGroup: null,
+    status: cached?.status || "loading",
+    relation: null,
   };
 }
 
-function apiLexicalNetworkRelation(relation, dictionary) {
-  const byId = new Map((dictionary?.entries || []).map((entry) => [entry.id, entry]));
+function lexicalNetworkRelationForEntry(dictionary, entry) {
+  const relationState = entryRelationStateForEntry(dictionary, entry);
+  if (relationState.status !== "success") {
+    return { status: relationState.status, sources: [], derivedEntries: [], rootGroup: null };
+  }
+  return { status: "success", ...apiLexicalNetworkRelation(relationState.relation) };
+}
+
+function apiLexicalNetworkRelation(relation) {
+  const relatedEntries = [
+    ...(relation.derivedEntries || []),
+    ...(relation.rootGroup?.entries || []),
+    ...(relation.sources || []).map((source) => source.matchedEntry).filter(Boolean),
+  ];
+  const byId = new Map(relatedEntries.map((entry) => [entry.id, entry]));
   return {
     sources: (relation.sources || [])
-      .map((source) => byId.get(source.matchedEntryId))
+      .map((source) => source.matchedEntry || byId.get(source.matchedEntryId))
       .filter(Boolean),
-    derivedEntries: (relation.derivedEntries || [])
-      .map((entry) => byId.get(entry.id) || entry)
-      .filter(Boolean),
+    derivedEntries: relation.derivedEntries || [],
     rootGroup: relation.rootGroup || null,
   };
 }
 
-function fetchLexicalNetworkRelation(dictionary, entry, key) {
-  const requestId = lexicalNetworkRelationsRequestId += 1;
-  lexicalNetworkRelationsCache.set(key, { status: "loading", relation: null, error: null });
+function refreshEntryRelationConsumers(entryId, key) {
+  if (entryRelationKey(activeDictionary(), entryId) !== key) {
+    return;
+  }
+  const entry = selectedEntry();
+  if (entry?.id === entryId) {
+    if (editorMode === "edit") {
+      renderFullEditDerivedEntries(entry);
+    } else {
+      const showEmptySections = normalizeDictionarySettings(activeDictionary()?.settings).showEmptyEntrySections;
+      renderEntryRelationSections(entry, showEmptySections);
+    }
+  }
+  if (networkOpen && networkEntryId === entryId) {
+    renderLexicalNetwork();
+  }
+}
+
+function fetchEntryRelation(dictionary, entry, key) {
+  entryRelationsCache.set(key, { status: "loading", relation: null, error: null });
+  trimEntryRelationsCache(key);
   api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entry-relations/${encodeURIComponent(entry.id)}`)
     .then((relation) => {
-      lexicalNetworkRelationsCache.set(key, { status: "success", relation, error: null });
-      if (!networkOpen || networkEntryId !== entry.id || lexicalNetworkRelationKey(activeDictionary(), entry.id) !== key) {
-        return;
-      }
-      renderLexicalNetwork();
+      entryRelationsCache.set(key, { status: "success", relation, error: null });
+      refreshEntryRelationConsumers(entry.id, key);
     })
     .catch((error) => {
-      lexicalNetworkRelationsCache.set(key, { status: "error", relation: null, error });
-      console.error("Lexical network API unavailable.", error);
-      if (networkOpen && networkEntryId === entry.id && lexicalNetworkRelationKey(activeDictionary(), entry.id) === key) {
-        renderLexicalNetwork();
-      }
-    })
-    .finally(() => {
-      if (requestId < lexicalNetworkRelationsRequestId - 20) {
-        lexicalNetworkRelationsCache.clear();
-      }
+      entryRelationsCache.set(key, { status: "error", relation: null, error });
+      console.error("Entry relations API unavailable.", error);
+      refreshEntryRelationConsumers(entry.id, key);
     });
+}
+
+function trimEntryRelationsCache(protectedKey = "") {
+  while (entryRelationsCache.size > ENTRY_RELATIONS_CACHE_MAX) {
+    const oldestKey = entryRelationsCache.keys().next().value;
+    if (!oldestKey) {
+      return;
+    }
+    if (oldestKey === protectedKey) {
+      const protectedValue = entryRelationsCache.get(oldestKey);
+      entryRelationsCache.delete(oldestKey);
+      entryRelationsCache.set(oldestKey, protectedValue);
+      continue;
+    }
+    entryRelationsCache.delete(oldestKey);
+  }
 }
 
 function renderNetworkNodeList(container, entries, status = "success") {
@@ -7454,14 +7533,6 @@ function renderNetworkMeaningHtml(entry, showPolysemy = false) {
   return `<div class="network-definition-list">${visibleMeanings.map((meaning, index) => `
     <p>${escapeHtml(numbered ? `${index + 1}. ${meaning}` : meaning)}</p>
   `).join("")}</div>`;
-}
-
-function findDerivedEntries(entry, dictionary = activeDictionary()) {
-  return entryRelationsModel.findDerivedEntries(entry, dictionary, { normalizeText: normalize, compareEntries });
-}
-
-function resolveSourceEntry(sourceName, dictionary = activeDictionary()) {
-  return entryRelationsModel.resolveSourceEntry(sourceName, dictionary, { normalizeText: normalize, compareEntries });
 }
 
 function glossStyleClassNames(key, settings) {
@@ -12663,7 +12734,7 @@ function resetEntryReadStateAfterSave() {
   resetEntryQueryState();
   resetEntryFacetsState();
   resetRootGroupsQueryState();
-  lexicalNetworkRelationsCache.clear();
+  entryRelationsCache.clear();
   rootGroupDerivedStates.clear();
 }
 

@@ -373,7 +373,7 @@ GET /api/dictionaries/:id/entry-relations/:entryId
 {
   entryId,
   sources: [
-    { sourceText, matchedEntryId, matchedLemma }
+    { sourceText, matchedEntryId, matchedLemma, matchedEntry }
   ],
   derivedEntries: [
     { id, lemma, pronunciation, tags, definitionPreviews, createdAt, updatedAt }
@@ -387,7 +387,7 @@ GET /api/dictionaries/:id/entry-relations/:entryId
 }
 ```
 
-`matchedEntryId` 应由 repository 明确解析；如果同名 lemma 存在多条，当前阶段可选择排序后的第一条并在后续诊断模块中报告歧义。
+`matchedEntry` 是已匹配来源的 summary DTO；未解析来源时为 `null`。词条详情和词汇网络应直接消费该 DTO，不应回到完整活动词典扫描 `matchedEntryId`。`matchedEntryId` 应由 repository 明确解析；如果同名 lemma 存在多条，当前阶段可选择排序后的第一条并在后续诊断模块中报告歧义。
 
 词汇网络详情视图已接入该 API。词根组、来源解析和衍生关系语义抽入共享关系模块，词根模式也通过独立读取端点预备接线。
 

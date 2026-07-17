@@ -1427,6 +1427,10 @@ async function runRepositoryContractTests(options = {}) {
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entry-relations/${encodeURIComponent(derivedEntryId)}`);
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.sources[0].matchedEntryId, rootEntryId);
+    if (typeof repository.queryRootGroupEntries === "function") {
+      assert.equal(apiResult.body.sources[0].matchedEntry.id, rootEntryId);
+      assert.equal(apiResult.body.sources[0].matchedEntry.lemma, "root");
+    }
 
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/root-groups?q=derived&limit=100`);
     assert.equal(apiResult.statusCode, 200);

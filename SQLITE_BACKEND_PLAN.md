@@ -444,7 +444,7 @@ POST /api/dictionaries/:id/diagnostics/fix
 SQLite repository 的核心读写、schema、迁移脚本和 smoke 已经落地，`server.js` 已默认使用 SQLite；静态和形态搜索 projection 也已进入主查询路径。当前优先级是读取稳定性与剩余查询下推：
 
 1. 查询缓存 Q1–Q4 已完成前端查询缓存、fuzzy entries/root groups 后端运行时会话、summary DTO、按需详情、词根组子项懒加载、版本化 cursor 和纯滚动数据窗口；普通词条和父级词根组采用小窗口，单个词根组展开后一次读取全部衍生词，子端点不分页。词根拓扑使用独立 relation generation，搜索条件和无关保存不再触发关系重建。
-2. 两段式 stale-while-revalidate 已实装；下一步继续做词条切换局部渲染，避免每次选择词条都重建当前虚拟列表窗口及前端词源关系索引。失败继续走明确错误状态，不用旧内容掩盖失败。
+2. 两段式 stale-while-revalidate、词条切换局部渲染和详情关系 API/缓存接线均已实装；选择词条不再重建当前虚拟列表窗口或前端全词典词源关系索引。失败继续走明确错误状态，不用旧内容掩盖失败。
 3. 将高级筛选、数据分析和质量检查逐步接入查询 API/query planner；词汇网络已复用稳定拓扑的 `entryId → rootIds`、`rootId → group` 反向索引，质量检查中的词源查询后续接入同一层。
 4. 候选索引是否采用 FTS/ngram 由真实词典基准决定；语料 SQL 化留到语料升级阶段。
 5. JSON repository 仅维持 legacy/debug、导入迁移来源和必要参考价值，不同步新增普通功能。
@@ -559,7 +559,7 @@ CREATE TABLE entry_morphology_search_values (
 按当前依赖关系建议依次处理：
 
 1. 在已完成的 Q1–Q4 窗口边界上实装两段式 stale-while-revalidate，并把词条切换改为局部渲染。
-2. 将高级筛选等剩余完整 snapshot/共享 JS 路径推进到查询层，并为自动滚动提供后端目标定位；词汇网络、质量检查中的词源查询继续复用已建立的稳定词根拓扑。
+2. 将高级筛选等剩余完整 snapshot/共享 JS 路径推进到查询层；详情、完整编辑衍生词与词汇网络已消费共享关系 API，质量检查中的词源查询继续复用已建立的稳定词根拓扑。
 3. 把数据分析和质量检查推进为按需 API + query planner，而不是前端基于完整 snapshot 重算。
 4. 仅在基准表明确认线性扫描成为主要瓶颈后，再选择 FTS、ngram 或其他候选索引。
 5. 语料库进入独立升级阶段后，再把 `module_blobs.corpus` 拆成正式 SQL 表。
