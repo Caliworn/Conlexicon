@@ -1,6 +1,6 @@
 # API Contract
 
-本文记录 Conlexicon 当前本地 HTTP API 的稳定约定。它描述前端可依赖的接口边界，而不是底层存储实现；后端默认使用 SQLite repository，也可通过 `CONLEXICON_REPOSITORY=json` 显式启动 legacy/debug JSON repository，但前端不应直接依赖文件结构。SQLite 后端设计见 `SQLITE_BACKEND_PLAN.md`；JSON 兼容导入/导出和迁移设计见 `SQLITE_MIGRATION_PLAN.md`。
+本文记录 Conlexicon 当前本地 HTTP API 的稳定约定。它描述前端可依赖的接口边界，而不是底层文件结构；后端运行期只使用 SQLite repository。旧 JSON 仅通过转换服务作为导入、导出和目录迁移格式，不再提供 JSON runtime repository。SQLite 后端设计见 `SQLITE_BACKEND_PLAN.md`；JSON 兼容导入/导出和迁移设计见 `SQLITE_MIGRATION_PLAN.md`。
 
 查询缓存 Q1–Q4 已实装前端紧凑页面缓存、后端运行时查询会话、版本化 cursor 和纯滚动数据窗口；缓存身份、失效及窗口淘汰约定见 `QUERY_SESSION_CACHE_PLAN.md`。
 
@@ -31,7 +31,7 @@
 
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/state` | 读取轻量应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme }` | 主路径的 `dictionaries` 只包含 metadata 和 `summary.entryCount/rootCount`；前端始终把它当轻量索引，并按需读取当前词典快照。legacy/debug 实现即使返回额外字段，前端也不依赖。 |
+| `GET` | `/api/state` | 读取轻量应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme }` | `dictionaries` 只包含 metadata 和 `summary.entryCount/rootCount`；前端把它当轻量索引，并按需读取当前词典快照。 |
 | `PUT` | `/api/preferences` | 保存全局界面偏好 | `{ uiLanguage, uiTheme }` | 目前支持 `uiLanguage` 和 `uiTheme`。 |
 
 ### 导入、导出与词典生命周期
@@ -156,7 +156,7 @@
 
 ## 计划中的读取 API
 
-阶段 B3 的目标是继续收紧查询契约，而不是让前端重新扫描大型完整快照。当前默认后端已经是 SQLite；legacy/debug JSON repository 可以继续用内存扫描保持契约参考，但新增能力应优先考虑 SQLite 索引、SQL 查询或共享 query layer。
+阶段 B3 的目标是继续收紧查询契约，而不是让前端重新扫描大型完整快照。运行期后端只有 SQLite；新增能力应优先考虑 SQLite 索引、SQL 查询或共享 query layer。
 
 ### 启动与词典索引
 
@@ -169,7 +169,7 @@ GET /api/dictionaries/:id/summary
 GET /api/dictionaries/:id/settings
 ```
 
-SQLite repository 的 `readState()` / `listDictionaries()` 已只返回词典 metadata 和 summary；服务端默认使用 SQLite repository，`CONLEXICON_REPOSITORY=json` 仅作为 legacy/debug 回滚路径。前端启动流程始终将 `/api/state` 的 `dictionaries` 当作 metadata：即使 legacy/debug JSON repository 返回完整对象，也不会读取或保留其中的词典 payload，而是随后按需加载 active dictionary。
+SQLite repository 的 `readState()` / `listDictionaries()` 已只返回词典 metadata 和 summary；前端启动流程始终将 `/api/state` 的 `dictionaries` 当作 metadata，再按需加载 active dictionary。
 
 示例：
 
@@ -454,7 +454,7 @@ GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&so
 
 - repository 已以独立 relation generation 缓存与搜索条件无关的 `rootId -> derivedIds` 稳定拓扑，并同时维护 `entryId -> rootIds`、`rootId -> group` 反向索引；词根查询会话进一步维护 `rootId -> resultIndex`。词典摘要计数、`/root-groups`、组内子项和 `/entry-relations/:entryId` 复用该拓扑。拓扑组和查询结果位置的定位均为 O(1)，关系响应仍需按实际返回条目数读取并构建 DTO。词条增删、lemma/来源变化、整库替换和词典删除会使其失效；普通词条保存/patch 仅同步轻量排序记录，其他模块保存不触碰拓扑。查询 session/cursor 的 cache generation 仍按查询一致性要求独立失效。
 - `/root-groups` 搜索直接从 `entry_search_values` / `entry_morphology_search_values` 获取命中 ID，再筛选稳定拓扑，不导出完整词典 snapshot。`entry-relations/:entryId` 已复用同一拓扑的反向索引；`entries?derivedFrom=` 和后续质量检查中的词源问题仍应继续收敛到该关系查询层。
-- SQLite 后端应继续用 `entry_sources(source_key, entry_id)` 或等价表/索引支持 `derivedFrom`、词根分组和词汇网络查询；legacy/debug JSON repository 只需保持契约参考，不再作为普通性能优化目标。
+- SQLite 后端应继续用 `entry_sources(source_key, entry_id)` 或等价表/索引支持 `derivedFrom`、词根分组和词汇网络查询；旧 JSON conversion 与 migration 不参与运行期查询。
 - 前端词根模式正常路径以 `/root-groups` 为准；请求失败时显示失败状态，不回退前端本地完整分组。父级未加载窗口以 `pageInfo.total` 和 `windowMetrics` 建立占位，因此滚动条可在折叠、搜索自动展开及全局展开状态下代表完整词根组集合。全局展开采用状态意图：父级页进入可见范围后才加载各组衍生词；单组收起作为例外保留到重新展开或“全部收起/全部展开”重置。组内衍生词不建立第二层分页窗口。
 
 ### 语料库读取
@@ -479,7 +479,6 @@ GET /api/dictionaries/:id/corpus/units/:unitId
 ```text
 Repository
   SqliteDictionaryRepository
-  JsonDictionaryRepository (legacy/debug/reference)
 
 DictionaryQueryContext
   请求级或持久化索引、基础查询和聚合能力
@@ -507,7 +506,7 @@ Feature Services
 
 当前已落地最小共享实现：`lib/dictionary-query-model.js` 提供前后端可复用的 `createDictionaryQueryContext()`，第一批只接管 `getEntryById()` / `getEntriesByIds()`、relation index、relation summary 和 root family 查询；覆盖率、标签、活动和 corpus placement 仍按原模块逐步迁移。
 
-SQLite 默认路径应逐步用 SQL、持久索引、视图或临时表实现相同接口。legacy/debug JSON repository 可继续为一次请求构建临时 `Map` / `Set` / prefix data 作为契约参考，但上层服务不应依赖底层是完整 JSON 扫描还是 SQLite 查询。
+SQLite 路径应逐步用 SQL、持久索引、视图或临时表实现相同接口。旧 JSON conversion 与 migration 不参与运行期查询，上层服务也不应重新引入完整 JSON 扫描后端。
 
 #### 共享 relation/query 能力
 

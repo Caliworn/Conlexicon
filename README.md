@@ -54,20 +54,12 @@ Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。
 
 ## Run Locally / 本地运行
 
-Conlexicon currently uses a small Node.js backend with no external npm dependencies. The default storage backend is SQLite.
+Conlexicon currently uses a small Node.js backend with no external npm dependencies. SQLite is the runtime storage backend.
 
-Conlexicon 目前使用一个小型 Node.js 后端，不需要安装额外 npm 依赖。默认存储后端是 SQLite。
+Conlexicon 目前使用一个小型 Node.js 后端，不需要安装额外 npm 依赖。运行时存储后端为 SQLite。
 
 ```bash
 node server.js
-```
-
-To use the legacy JSON repository for debugging or old data, select it explicitly:
-
-如需为了调试或旧数据读取使用 legacy JSON repository，可以显式选择：
-
-```bash
-CONLEXICON_REPOSITORY=json node server.js
 ```
 
 When testing or migrating manually, a separate data directory is still recommended:
@@ -126,9 +118,9 @@ data/dictionaries/*.sqlite
 
 `data/index.json` 保存词典索引、当前词典 ID、全局界面语言和全局界面主题；默认情况下，各词典的内容与设置分别保存在 `data/dictionaries/*.sqlite` 中。
 
-Legacy JSON dictionaries are not migrated automatically on startup. To reuse an old JSON dictionary in SQLite mode, import the JSON file from the app's dictionary management UI. For debugging or rollback, start with `CONLEXICON_REPOSITORY=json` and the original JSON data directory.
+Legacy JSON dictionaries are not migrated automatically on startup. To reuse an old JSON dictionary, import the JSON file from the app's dictionary management UI.
 
-旧 JSON 词典不会在启动时自动迁移。若要在 SQLite 模式下复用旧 JSON 词典，请在应用的词典管理界面导入对应 JSON 文件。如需调试或回滚，可使用 `CONLEXICON_REPOSITORY=json` 和原 JSON 数据目录启动。
+旧 JSON 词典不会在启动时自动迁移。若要复用旧 JSON 词典，请在应用的词典管理界面导入对应 JSON 文件。
 
 For bulk migration testing, use the explicit JSON-to-SQLite migration script with separate source and target data directories:
 

@@ -10,7 +10,6 @@ const {
   normalizeUiLanguage,
   normalizeUiTheme,
 } = require("../lib/dictionary-model");
-const { JsonDictionaryRepository } = require("../lib/json-dictionary-repository");
 const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
 const { migrateJsonDataDirectoryToSqlite } = require("./migrate-json-data-to-sqlite");
 
@@ -36,6 +35,11 @@ async function readSourceSnapshot(dataDir, dictionaryIds) {
   return snapshot;
 }
 
+async function writeJson(filePath, value) {
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
 async function main() {
   if (!SqliteDictionaryRepository.isRuntimeAvailable()) {
     console.log("SQLite runtime unavailable; migration check skipped.");
@@ -45,25 +49,30 @@ async function main() {
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "conlexicon-migration-check-"));
   const sourceDataDir = path.join(tempRoot, "source-data");
   const targetDataDir = path.join(tempRoot, "target-data");
-  const sourceRepository = new JsonDictionaryRepository(repositoryOptions(sourceDataDir));
   const targetRepository = new SqliteDictionaryRepository(repositoryOptions(targetDataDir));
 
   try {
-    await sourceRepository.ensureDataStore();
-    const first = await sourceRepository.createDictionary(normalizeDictionary({
+    const first = normalizeDictionary({
       id: "dict-migration-first",
       name: "Migration First",
       language: "one",
       entries: [{ lemma: "root", tags: ["n"], definitions: [{ meaning: "root meaning" }] }],
-    }));
-    const second = await sourceRepository.createDictionary(normalizeDictionary({
+    });
+    const second = normalizeDictionary({
       id: "dict-migration-second",
       name: "Migration Second",
       language: "two",
       entries: [{ lemma: "leaf", tags: ["v"], etymology: { sources: ["root"] } }],
-    }));
-    await sourceRepository.activateDictionary(first.id);
-    await sourceRepository.updatePreferences({ uiLanguage: "en", uiTheme: "dark" });
+    });
+    await writeJson(path.join(sourceDataDir, "dictionaries", `${first.id}.json`), first);
+    await writeJson(path.join(sourceDataDir, "dictionaries", `${second.id}.json`), second);
+    await writeJson(path.join(sourceDataDir, "index.json"), {
+      ...DEFAULT_INDEX,
+      activeDictionaryId: first.id,
+      dictionaryIds: [first.id, second.id],
+      uiLanguage: "en",
+      uiTheme: "dark",
+    });
 
     const before = await readSourceSnapshot(sourceDataDir, [first.id, second.id]);
     const report = await migrateJsonDataDirectoryToSqlite({ sourceDataDir, targetDataDir });

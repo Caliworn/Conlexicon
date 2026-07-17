@@ -76,7 +76,7 @@ node --check server.js
 - 页面滚动位置、数据分析页码、临时面板展开状态、抽屉开闭状态等进程 UI 状态不写入词典文件。
 - 数据模型升级时，优先保证旧版本 JSON 能导入并转换成新格式；除非确有必要，不要为了旧前端数据形状额外维护临时兼容层。前端因新数据模型出问题时，应修前端而不是绕回旧模型。
 - 旧版本 JSON 字段迁移和旧形态结构迁移集中放在 `lib/legacy-dictionary-migration.js`；核心规范化模块只处理当前数据形状的默认值、ID 补齐和当前语义校验，不继续新增旧字段兼容逻辑。
-- SQLite 是正式运行期主存储。JSON repository 只保留为 legacy/debug/迁移参考；后续新增功能、schema 升级、读取优化、保存返回值优化和前端新数据模型默认不再同步更新 JSON repository。只有修复旧 JSON 导入/转换、基础读取、显式回滚或 legacy 导出相关问题时，才应修改 JSON repository。
+- SQLite 是唯一的正式运行期主存储。旧 JSON 只作为导入、导出和目录迁移格式存在；相关兼容逻辑必须停留在 conversion service、legacy migration 或显式迁移脚本中，不得重新引入 JSON runtime repository、双写或存储后端 feature flag。
 - 任何对象 SQL 化前都必须先判断必要性：结构性主数据可以 SQL 化；语言源码优先文本化；低频复杂配置可 blob 化；派生结果只作索引或缓存；没有明确查询、局部保存、一致性或性能收益的对象不要拆表。
 
 ## API 契约

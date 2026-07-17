@@ -308,25 +308,10 @@ async function assertRootGroupQueryConsistency(repository, dictionary, params = 
   const apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups?${qs}`);
   assert.equal(apiResult.statusCode, 200);
   assert.equal(apiResult.body.pageInfo.hasMore, false);
-  if (typeof repository.queryRootGroupEntries === "function") {
-    assert.equal(
-      apiResult.body.pageInfo.windowMetrics.reduce((total, metric) => total + metric.groupCount, 0),
-      apiResult.body.pageInfo.total,
-    );
-  }
-  if (typeof repository.queryRootGroupEntries !== "function") {
-    assert.deepEqual(
-      apiResult.body.items.map((group) => ({
-        rootId: group.root.id,
-        derivedIds: group.derivedEntries.map((entry) => entry.id),
-        matchedDerivedIds: group.matchedDerivedIds,
-        rootMatches: Boolean(group.rootMatches),
-      })),
-      expectedRootGroupSnapshot(dictionary, params),
-      `legacy root group query consistency: ${JSON.stringify(params)}`,
-    );
-    return;
-  }
+  assert.equal(
+    apiResult.body.pageInfo.windowMetrics.reduce((total, metric) => total + metric.groupCount, 0),
+    apiResult.body.pageInfo.total,
+  );
   const actualGroups = [];
   for (const group of apiResult.body.items) {
     const entriesQs = queryString({ ...params, include: "summary" });
@@ -382,6 +367,11 @@ function checkModelNormalization() {
       morphology: { enabled: true, fuzzy: true },
     },
     etymologyAutocomplete: { fuzzy: false },
+    normalization: {
+      unicodeNormalization: "none",
+      caseFolding: false,
+      customRules: [],
+    },
   });
   assert.equal(entrySearchModel.searchSettingsHaveEnabledField({
     fields: Object.fromEntries(entrySearchModel.ENTRY_SEARCH_FIELD_KEYS.map((field) => [field, { enabled: false }])),
@@ -426,23 +416,6 @@ function checkModelNormalization() {
   assert.deepEqual(
     entryRelationsModel.findDerivedEntries(relationDictionary.entries[0], relationDictionary, { index: relationIndex }).map((entry) => entry.id),
     ["entry-derived-id", "entry-derived-lemma"],
-  );
-  assert.deepEqual(
-    entrySearchModel.entrySearchFieldValues(
-      { lemma: "acar", pronunciation: "/a/", tags: ["n"], definitions: [{ meaning: "root", example: "example", note: "note" }] },
-      { settings: { tagDisplayMap: { n: "noun" } } },
-      { fields: "tags,definitions" },
-    ),
-    {
-      lemma: [],
-      pronunciation: [],
-      tags: ["n", "noun", "n", "noun"],
-      definitions: ["root"],
-      examples: [],
-      notes: [],
-      etymology: [],
-      morphology: [],
-    },
   );
   assert.equal(
     entrySearchModel.entryMatchesSearchText(
@@ -1396,11 +1369,7 @@ async function runRepositoryContractTests(options = {}) {
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.items.length, 1);
     assert.equal(apiResult.body.items[0].lemma, "derived smoke");
-    if (typeof repository.queryRootGroupEntries === "function") {
-      assert.deepEqual(apiResult.body.items[0].definitionPreviews.map((definition) => definition.meaning), ["derived from root"]);
-    } else {
-      assert.equal(apiResult.body.items[0].definitionPreview, "derived from root");
-    }
+    assert.deepEqual(apiResult.body.items[0].definitionPreviews.map((definition) => definition.meaning), ["derived from root"]);
 
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entries?part=v&tags=derived&tagMode=all&limit=1`);
     assert.equal(apiResult.statusCode, 200);
@@ -1427,30 +1396,23 @@ async function runRepositoryContractTests(options = {}) {
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entry-relations/${encodeURIComponent(derivedEntryId)}`);
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.sources[0].matchedEntryId, rootEntryId);
-    if (typeof repository.queryRootGroupEntries === "function") {
-      assert.equal(apiResult.body.sources[0].matchedEntry.id, rootEntryId);
-      assert.equal(apiResult.body.sources[0].matchedEntry.lemma, "root");
-    }
+    assert.equal(apiResult.body.sources[0].matchedEntry.id, rootEntryId);
+    assert.equal(apiResult.body.sources[0].matchedEntry.lemma, "root");
 
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/root-groups?q=derived&limit=100`);
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.items.length, 1);
     assert.equal(apiResult.body.items[0].root.id, rootEntryId);
-    if (typeof repository.queryRootGroupEntries === "function") {
-      assert.equal(apiResult.body.items[0].derivedCount, 1);
-      assert.equal(apiResult.body.items[0].matchedDerivedCount, 1);
-      apiResult = await callApi(
-        repository,
-        "GET",
-        `/api/dictionaries/${encodeURIComponent(first.id)}/root-groups/${encodeURIComponent(rootEntryId)}/entries?q=derived`,
-      );
-      assert.equal(apiResult.statusCode, 200);
-      assert.deepEqual(apiResult.body.items.map((entry) => entry.id), [derivedEntryId]);
-      assert.equal(apiResult.body.items[0].rootGroupMatch, true);
-    } else {
-      assert.deepEqual(apiResult.body.items[0].derivedEntries.map((entry) => entry.id), [derivedEntryId]);
-      assert.deepEqual(apiResult.body.items[0].matchedDerivedIds, [derivedEntryId]);
-    }
+    assert.equal(apiResult.body.items[0].derivedCount, 1);
+    assert.equal(apiResult.body.items[0].matchedDerivedCount, 1);
+    apiResult = await callApi(
+      repository,
+      "GET",
+      `/api/dictionaries/${encodeURIComponent(first.id)}/root-groups/${encodeURIComponent(rootEntryId)}/entries?q=derived`,
+    );
+    assert.equal(apiResult.statusCode, 200);
+    assert.deepEqual(apiResult.body.items.map((entry) => entry.id), [derivedEntryId]);
+    assert.equal(apiResult.body.items[0].rootGroupMatch, true);
 
     await checkReadApiConsistency(repository);
     if (shouldStopAfter("readApi")) {
@@ -1557,81 +1519,6 @@ async function runRepositoryContractTests(options = {}) {
     );
 
     await checkCorpusIdCollisionInvariants(repository);
-
-    const legacyDuplicateId = "dict-legacy-duplicates";
-    const legacyDuplicate = normalizeDictionary({
-      id: legacyDuplicateId,
-      name: "Legacy Duplicates",
-      entries: [
-        {
-          id: "entry-legacy-a",
-          lemma: "legacy a",
-          definitions: [{ id: "def-shared-legacy", meaning: "a" }],
-        },
-        {
-          id: "entry-legacy-b",
-          lemma: "legacy b",
-          definitions: [{ id: "def-shared-legacy", meaning: "b" }],
-        },
-        {
-          id: "entry-legacy-ok",
-          lemma: "legacy ok",
-          definitions: [{ id: "def-legacy-ok", meaning: "ok" }],
-        },
-      ],
-    });
-    if (context.installLegacyDuplicateDictionary) {
-      await context.installLegacyDuplicateDictionary(legacyDuplicate);
-      await assertRejectStatus(
-        repository.updateDictionary(legacyDuplicateId, { name: "Full Save Blocked" }),
-        409,
-        "full snapshot still rejects duplicate ids",
-      );
-
-      apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(legacyDuplicateId)}/settings`, {
-        allowEmptyTags: false,
-      });
-      assert.equal(apiResult.statusCode, 200);
-      assert.equal(apiResult.body.settings.allowEmptyTags, false);
-
-      apiResult = await callApi(repository, "PATCH", `/api/dictionaries/${encodeURIComponent(legacyDuplicateId)}/entries`, {
-        updates: [{ id: "entry-legacy-ok", patch: { tags: ["checked"] } }],
-      });
-      assert.equal(apiResult.statusCode, 200);
-      assert.equal(apiResult.body.entries.length, 1);
-      assert.equal(apiResult.body.entries[0].id, "entry-legacy-ok");
-      assert.deepEqual(apiResult.body.entries[0].tags, ["checked"]);
-
-      apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(legacyDuplicateId)}/docs`, {
-        markdown: "legacy docs",
-      });
-      assert.equal(apiResult.statusCode, 200);
-      assert.equal(apiResult.body.docs.markdown, "legacy docs");
-
-      apiResult = await callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(legacyDuplicateId)}/autosave`, {
-        docs: { markdown: "autosaved docs" },
-        corpus: { units: [{ content: "autosaved corpus" }] },
-      });
-      assert.equal(apiResult.statusCode, 200);
-      assert.equal(apiResult.body.docs.markdown, "autosaved docs");
-      assert.equal(apiResult.body.corpus.units[0].content, "autosaved corpus");
-
-      await assertRejectStatus(
-        callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(legacyDuplicateId)}/entries/entry-legacy-a`, {
-          id: "entry-legacy-a",
-          lemma: "legacy a edited",
-          definitions: [{ id: "def-shared-legacy", meaning: "a" }],
-        }),
-        409,
-        "entry save rejects conflicts in saved scope",
-      );
-      apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(legacyDuplicateId)}/settings/ipa`, {
-        mappings: [{ from: "a", to: "b" }],
-      });
-      assert.equal(apiResult.statusCode, 200);
-      assert.deepEqual(apiResult.body.settings.ipa.mappings[0], { from: "a", to: "b", before: "", after: "" });
-      await repository.deleteDictionary(legacyDuplicateId);
-    }
 
     const preferences = await repository.updatePreferences({ uiLanguage: "en", uiTheme: "dark" });
     assert.deepEqual(preferences, { uiLanguage: "en", uiTheme: "dark" });

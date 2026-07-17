@@ -23,7 +23,7 @@
 
 ## 3. 目标形态
 
-长期目标不是“JSON repository 与 SQLite repository 平级存在”，而是：
+当前已经采用单一 SQLite runtime repository：
 
 ```text
 应用运行期
@@ -50,14 +50,7 @@
   JSON / XLSX / other exchange formats
 ```
 
-当前过渡期的 JSON repository 只保留为：
-
-- 旧数据读取和迁移工具的一部分。
-- legacy/debug subset 的基础检查对象。
-- 旧 JSON 导入转换和 legacy JSON 导出 profile 的参考。
-- 显式 legacy/debug 回退工具，但不作为普通运行期主路径。
-
-JSON repository 不再作为并行后端追随新增功能。SQLite repository 跑完整当前主契约；JSON repository 只覆盖旧 JSON 导入/转换、基础读取、legacy 导出和显式回滚相关检查。长期目标是让旧 JSON 适配器直接进入转换服务，并从正式运行期移除 JSON repository，而不是维持两种可选主存储。
+旧 JSON runtime repository 已移除。旧 JSON 只保留为兼容输入、导出 profile 和离线目录迁移格式：单文件导入由 conversion service 与 legacy migration 处理，目录迁移脚本直接只读旧 `index.json` 和词典文件后写入 SQLite，不再通过第二套 repository。
 
 ## 4. 标准转换服务
 
@@ -217,7 +210,7 @@ GET /api/export?dictionaryId=...&format=xlsx
 
 - 当前改动已经提交或至少形成清晰 checkpoint；SQLite schema 中间态不做兼容迁移，测试库不匹配时从 JSON 重新生成。
 - 本地没有残留测试服务端口；尤其确认默认端口 `4173` 和最近使用的 smoke 端口没有被旧 `node server.js` 占用。
-- 当前 Node runtime 支持 `node:sqlite`；不支持时必须给出明确启动错误，而不是静默退回 JSON repository。
+- 当前 Node runtime 支持 `node:sqlite`；不支持时必须给出明确启动错误，不得引入其他存储后端兜底。
 - 已用 `scripts/migrate-json-data-to-sqlite.js` 或应用内 JSON 导入路径验证 JSON → SQLite 数据进入流程。
 - SQLite 数据目录至少包含：
   - `index.json`
@@ -255,10 +248,10 @@ GET /api/export?dictionaryId=...&format=xlsx
   - Stress Test 3k
   - Stress Test 10k
 - 默认切换时必须更新 `README.md`、`API_CONTRACT.md` 和本文档，明确：
-  - SQLite 是默认 repository。
-  - JSON repository 仅作为 legacy/debug/迁移来源，不再同步新增普通功能。
+  - SQLite 是唯一的 runtime repository。
+  - 旧 JSON 仅作为导入、导出和离线目录迁移格式。
   - 旧 JSON data 需要显式导入或显式迁移；开发期不静默原地迁移真实 `data/`。
-  - 回滚方式是显式设置 `CONLEXICON_REPOSITORY=json` 并使用原 JSON data 目录。
+  - 回滚依赖 Git checkpoint、SQLite 备份或从原 JSON 目录重新迁移，不再启动旧 JSON 后端。
 
 ### 10.2 可暂缓但必须记录
 
@@ -272,34 +265,25 @@ GET /api/export?dictionaryId=...&format=xlsx
 
 ### 10.3 当前切换结果
 
-1. `server.js` 默认 repository 已改为 SQLite。
-2. `CONLEXICON_REPOSITORY=json` 保留为显式 legacy/debug/回滚模式。
+1. `server.js` 运行期只使用 SQLite repository。
+2. 旧 JSON runtime repository 和 `CONLEXICON_REPOSITORY` feature flag 已移除。
 3. 启动时不自动扫描并迁移旧 JSON data。
 4. 旧 JSON 词典当前通过词典管理界面的 JSON 导入功能手动迁入 SQLite。
-5. `scripts/migrate-json-data-to-sqlite.js` 仍保留为批量迁移测试和后续迁移向导的基础设施。
+5. `scripts/migrate-json-data-to-sqlite.js` 直接只读旧数据目录，保留为批量迁移测试和后续迁移向导的基础设施。
 6. 后续如果增加产品内迁移入口，必须补备份、迁移报告、失败回滚和用户确认流程。
 
 ### 10.4 回滚步骤
 
-- 如果默认 SQLite 启动失败，先不要修改或删除原 JSON `data/`。
-- 设置：
-
-```bash
-CONLEXICON_REPOSITORY=json
-```
-
-- 使用原 JSON `data/` 目录启动。
+- 如果 SQLite 启动失败，先不要修改或删除原 JSON `data/`、SQLite 备份或最近的 Git checkpoint。
 - 若已经生成 SQLite 测试目录，可以直接丢弃并重新迁移；开发期不为中间 SQLite schema 写兼容迁移。
 - 如果失败来自真实数据结构问题，优先记录迁移 report 和错误码，再决定是否加入诊断修复模块，而不是在默认启动路径中静默修复。
 
 ## 11. 测试要求
 
-默认 SQLite 后仍需保留以下测试边界：
+SQLite 单后端仍需保留以下测试边界：
 
 - SQLite repository 契约测试继续通过。
-- 默认 repository 启动检查继续覆盖：
-  - 无 `CONLEXICON_REPOSITORY` 时启动 SQLite。
-  - `CONLEXICON_REPOSITORY=json` 时仍可显式切回 legacy/debug JSON repository。
+- 服务启动检查确认临时数据目录中只创建 `.sqlite` 词典。
 - 转换服务测试覆盖：
   - 旧 JSON → normalized dictionary。
   - normalized dictionary → SQLite。
@@ -346,7 +330,7 @@ CONLEXICON_REPOSITORY=json
 
 ### M5：切换默认后端
 
-- 已完成：默认 repository 改为 SQLite。
-- 已完成：JSON repository 降级为 legacy/debug/迁移来源和契约参考。
+- 已完成：运行期 repository 固定为 SQLite。
+- 已完成：删除 JSON runtime repository 和后端 feature flag；目录迁移改为直接只读旧 JSON 文件。
 - 已完成：继续保留显式兼容 JSON 导入/导出。
 - 暂缓：产品内自动迁移向导；当前旧 JSON 词典通过词典管理界面的 JSON 导入功能手动迁入 SQLite。

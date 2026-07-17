@@ -10,7 +10,6 @@ const {
   normalizeUiTheme,
 } = require("../lib/dictionary-model");
 const { createDictionaryConversionService } = require("../lib/dictionary-conversion-service");
-const { JsonDictionaryRepository } = require("../lib/json-dictionary-repository");
 const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
 
 function repositoryOptions(dataDir) {
@@ -99,6 +98,36 @@ function dictionaryReportBase(id) {
   };
 }
 
+async function readJsonFile(filePath, fallback) {
+  try {
+    return JSON.parse(await fs.readFile(filePath, "utf8"));
+  } catch (error) {
+    if (error.code === "ENOENT" && fallback !== undefined) {
+      return fallback;
+    }
+    throw error;
+  }
+}
+
+async function readLegacyDataIndex(sourceDataDir) {
+  const source = await readJsonFile(path.join(sourceDataDir, "index.json"), DEFAULT_INDEX);
+  return {
+    activeDictionaryId: String(source.activeDictionaryId || ""),
+    dictionaryIds: Array.isArray(source.dictionaryIds)
+      ? source.dictionaryIds.map(String).filter(Boolean)
+      : [],
+    uiLanguage: normalizeUiLanguage(source.uiLanguage),
+    uiTheme: normalizeUiTheme(source.uiTheme),
+  };
+}
+
+function legacyDictionaryPath(sourceDataDir, dictionaryId) {
+  if (!/^dict-[a-z0-9-]+$/i.test(dictionaryId)) {
+    throw new Error(`Invalid legacy dictionary id: ${dictionaryId}`);
+  }
+  return path.join(sourceDataDir, "dictionaries", `${dictionaryId}.json`);
+}
+
 async function migrateJsonDataDirectoryToSqlite({
   sourceDataDir,
   targetDataDir,
@@ -118,7 +147,6 @@ async function migrateJsonDataDirectoryToSqlite({
   }
   await assertTargetDirectoryIsSafe(sourceResolved, targetResolved);
 
-  const sourceRepository = new JsonDictionaryRepository(repositoryOptions(sourceResolved));
   const targetRepository = new SqliteDictionaryRepository(repositoryOptions(targetResolved));
   const startedAt = new Date().toISOString();
   const report = {
@@ -135,7 +163,7 @@ async function migrateJsonDataDirectoryToSqlite({
   };
 
   try {
-    const sourceIndex = await sourceRepository.readIndex();
+    const sourceIndex = await readLegacyDataIndex(sourceResolved);
     report.sourceActiveDictionaryId = sourceIndex.activeDictionaryId;
     await targetRepository.ensureDataStore();
 
@@ -144,7 +172,7 @@ async function migrateJsonDataDirectoryToSqlite({
       const itemReport = dictionaryReportBase(dictionaryId);
       report.dictionaries.push(itemReport);
       try {
-        const rawPayload = await sourceRepository.readJson(sourceRepository.dictionaryPath(dictionaryId));
+        const rawPayload = await readJsonFile(legacyDictionaryPath(sourceResolved, dictionaryId));
         const { dictionary, report: importReport } = conversionService.importDictionaryFromJsonPayload(rawPayload, {
           profile: "legacy-json",
         });

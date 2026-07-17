@@ -45,19 +45,13 @@ function requestJson(port, method, pathname, body) {
   });
 }
 
-function startServer({ dataDir, port, repositoryMode }) {
+function startServer({ dataDir, port }) {
   return new Promise((resolve, reject) => {
     const env = {
       ...process.env,
       CONLEXICON_DATA_DIR: dataDir,
       PORT: String(port),
     };
-    if (repositoryMode) {
-      env.CONLEXICON_REPOSITORY = repositoryMode;
-    } else {
-      delete env.CONLEXICON_REPOSITORY;
-    }
-
     const child = spawn(process.execPath, ["server.js"], {
       cwd: ROOT_DIR,
       env,
@@ -134,12 +128,12 @@ async function withTempDataDir(prefix, fn) {
   }
 }
 
-async function checkServerMode({ label, repositoryMode, expectedMode, expectedExtension }) {
-  await withTempDataDir(`conlexicon-${label}-repo-`, async (dataDir) => {
+async function checkSqliteServer() {
+  await withTempDataDir("conlexicon-sqlite-server-", async (dataDir) => {
     const port = randomPort();
-    const server = await startServer({ dataDir, port, repositoryMode });
+    const server = await startServer({ dataDir, port });
     try {
-      assert.match(server.stdout(), new RegExp(`\\(${expectedMode} repository\\)`));
+      assert.match(server.stdout(), /\(sqlite repository\)/);
 
       let response = await requestJson(port, "GET", "/api/state");
       assert.equal(response.status, 200);
@@ -147,14 +141,14 @@ async function checkServerMode({ label, repositoryMode, expectedMode, expectedEx
       assert.deepEqual(response.body.dictionaries, []);
 
       response = await requestJson(port, "POST", "/api/dictionaries", {
-        name: `${expectedMode} default check`,
+        name: "SQLite startup check",
         language: "test",
         description: "created by scripts/check-default-repository.js",
       });
       assert.equal(response.status, 201);
       assert.ok(response.body.id);
 
-      const dictionaryPath = path.join(dataDir, "dictionaries", `${response.body.id}.${expectedExtension}`);
+      const dictionaryPath = path.join(dataDir, "dictionaries", `${response.body.id}.sqlite`);
       await fs.access(dictionaryPath);
 
       response = await requestJson(port, "GET", "/api/state");
@@ -168,19 +162,8 @@ async function checkServerMode({ label, repositoryMode, expectedMode, expectedEx
 }
 
 async function main() {
-  await checkServerMode({
-    label: "default-sqlite",
-    repositoryMode: "",
-    expectedMode: "sqlite",
-    expectedExtension: "sqlite",
-  });
-  await checkServerMode({
-    label: "explicit-json",
-    repositoryMode: "json",
-    expectedMode: "json",
-    expectedExtension: "json",
-  });
-  console.log("Default repository checks passed.");
+  await checkSqliteServer();
+  console.log("SQLite server startup check passed.");
 }
 
 if (require.main === module) {
@@ -191,5 +174,5 @@ if (require.main === module) {
 }
 
 module.exports = {
-  checkServerMode,
+  checkSqliteServer,
 };
