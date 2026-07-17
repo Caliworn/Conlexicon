@@ -2,10 +2,10 @@ const assert = require("node:assert/strict");
 
 const {
   EntryQueryValidationError,
-  entryFilterHasDeferredConditions,
   entryQueryIdentity,
   normalizeEntryFilter,
   normalizeEntryQuery,
+  serializeEntryFilter,
 } = require("../lib/entry-query-model");
 
 function checkLegacyTransportNormalization() {
@@ -79,7 +79,10 @@ function checkCanonicalFilterNormalization() {
       { field: "updated", day: "2026-07-17" },
     ],
   });
-  assert.equal(entryFilterHasDeferredConditions(filter), true);
+  assert.deepEqual(
+    normalizeEntryQuery({ filter: serializeEntryFilter(filter) }).filter,
+    filter,
+  );
 }
 
 function checkStableIdentity() {
@@ -105,6 +108,10 @@ function checkStableIdentity() {
     include: "full",
   });
   assert.deepEqual(entryQueryIdentity(first), entryQueryIdentity(second));
+
+  const present = normalizeEntryQuery({ filter: { presence: { ipa: true } } });
+  const absent = normalizeEntryQuery({ filter: { presence: { ipa: false } } });
+  assert.notDeepEqual(entryQueryIdentity(present), entryQueryIdentity(absent));
 
   const noSearchA = normalizeEntryQuery({ fields: "lemma", fuzzyFields: "lemma" });
   const noSearchB = normalizeEntryQuery({ fields: "morphology", fuzzyFields: "" });
@@ -132,6 +139,14 @@ function checkValidation() {
   assert.throws(
     () => normalizeEntryFilter({ activityDay: { field: "created", day: "2026-02-31" } }),
     (error) => error instanceof EntryQueryValidationError && error.code === "invalid_entry_filter_activity_day",
+  );
+  assert.throws(
+    () => normalizeEntryQuery({ filter: "{not-json" }),
+    (error) => error instanceof EntryQueryValidationError && error.code === "invalid_entry_filter_json",
+  );
+  assert.throws(
+    () => normalizeEntryQuery({ filter: "{}", part: "n" }),
+    (error) => error instanceof EntryQueryValidationError && error.code === "conflicting_entry_filter_transport",
   );
 }
 

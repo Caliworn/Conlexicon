@@ -562,7 +562,7 @@ CREATE TABLE entry_morphology_search_values (
 
 按当前依赖关系建议依次处理：
 
-1. 高级筛选 F1 的统一 EntryQuery/EntryFilter 已完成；下一步按 F2/F3 把 presence/count/date 等稳定条件接入现有 `/entries` 会话、窗口与定位，并替换前端完整 ID 数组。分析/质量类结果使用独立 result session。
+1. 高级筛选 F1/F2 的统一 EntryQuery/EntryFilter 与稳定条件 SQL 编译已完成；下一步按 F3 将前端可查询筛选从完整 ID 数组迁入现有 `/entries` 会话、窗口与定位。分析/质量类结果使用独立 result session。
 2. 把数据分析和质量检查推进为按需 API + query planner，并让质量检查中的词源查询复用已建立的稳定词根拓扑。
 3. 数据分析升级时直接消费当前 morphology model，删除前端临时旧单表视图；不要在 repository 恢复旧形态输出。
 4. 仅在基准表明确认线性扫描成为主要瓶颈后，再选择 FTS、ngram 或其他候选索引。

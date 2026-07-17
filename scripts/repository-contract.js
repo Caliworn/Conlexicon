@@ -283,6 +283,17 @@ async function assertEntryQueryConsistency(repository, dictionary, params = {}) 
   );
 }
 
+async function assertStructuredEntryFilter(repository, dictionaryId, filter, expectedIds, params = {}) {
+  assert.deepEqual(
+    await apiEntryIds(repository, dictionaryId, {
+      ...params,
+      filter: JSON.stringify(filter),
+    }),
+    expectedIds,
+    `structured entry filter: ${JSON.stringify(filter)}`,
+  );
+}
+
 function expectedRootGroupSnapshot(dictionary, query = {}) {
   const searchRuntime = entrySearchModel.searchSettingsQueryOptions(dictionary.settings?.search);
   const normalizedQuery = searchRuntime.normalizeText(query.q || query.query);
@@ -1024,7 +1035,7 @@ async function checkReadApiConsistency(repository) {
         pronunciation: "/beta/",
         tags: ["v", "n", "derived"],
         definitions: [{ id: "def-beta", meaning: "movement" }],
-        etymology: { sources: ["alpha"], description: "" },
+        etymology: { sources: ["alpha", "root"], description: "" },
         morphologyGroups: [{
           templateGroupId: "morph-n-group",
           overrides: { "mtable-n-main": { "0,0": "manual-beta-form" } },
@@ -1066,6 +1077,15 @@ async function checkReadApiConsistency(repository) {
         createdAt: "2026-01-06T00:00:00.000Z",
         updatedAt: "2026-01-06T00:00:00.000Z",
       },
+      {
+        id: "entry-empty",
+        lemma: "empty",
+        pronunciation: "",
+        tags: [],
+        definitions: [],
+        createdAt: "2026-01-07T00:00:00.000Z",
+        updatedAt: "2026-01-07T00:00:00.000Z",
+      },
     ],
   }));
 
@@ -1097,6 +1117,63 @@ async function checkReadApiConsistency(repository) {
     await assertEntryQueryConsistency(repository, dictionary, { sort: "updatedDesc" });
     await assertEntryQueryConsistency(repository, dictionary, { sort: "createdAsc" });
     await assertEntryQueryConsistency(repository, dictionary, { sort: "createdDesc" });
+    await assertStructuredEntryFilter(
+      repository,
+      dictionary.id,
+      { presence: { definition: false } },
+      ["entry-empty"],
+    );
+    await assertStructuredEntryFilter(
+      repository,
+      dictionary.id,
+      { presence: { example: true } },
+      ["entry-alpha"],
+    );
+    await assertStructuredEntryFilter(
+      repository,
+      dictionary.id,
+      { presence: { entryNote: true } },
+      ["entry-alpha"],
+    );
+    await assertStructuredEntryFilter(
+      repository,
+      dictionary.id,
+      { presence: { source: true } },
+      ["entry-alpha", "entry-beta"],
+    );
+    await assertStructuredEntryFilter(
+      repository,
+      dictionary.id,
+      { presence: { ipa: false } },
+      ["entry-delta", "entry-empty", "entry-same-a", "entry-same-b"],
+    );
+    await assertStructuredEntryFilter(
+      repository,
+      dictionary.id,
+      { sourceCount: { min: 2, max: 2 } },
+      ["entry-beta"],
+    );
+    await assertStructuredEntryFilter(
+      repository,
+      dictionary.id,
+      { activityDay: { field: "created", day: "2026-01-02" } },
+      ["entry-beta"],
+    );
+    await assertStructuredEntryFilter(
+      repository,
+      dictionary.id,
+      { derivedFrom: { entryId: "entry-alpha" } },
+      ["entry-beta"],
+    );
+    await assertStructuredEntryFilter(
+      repository,
+      dictionary.id,
+      {
+        tags: { values: ["n"], mode: "all" },
+        presence: { source: true },
+      },
+      ["entry-alpha", "entry-beta"],
+    );
     await assertRootGroupQueryConsistency(repository, dictionary, {});
     await assertRootGroupQueryConsistency(repository, dictionary, { q: "movement" });
     await assertRootGroupQueryConsistency(repository, dictionary, { q: "manual-beta-form" });
@@ -1107,7 +1184,7 @@ async function checkReadApiConsistency(repository) {
     assert.equal(apiResult.statusCode, 200);
     assert.deepEqual(apiResult.body.parts.map((part) => part.tag), expectedParts(dictionary));
     assert.equal(apiResult.body.parts.find((part) => part.tag === "n")?.displayLabel, "Noun Display");
-    assert.equal(apiResult.body.noPartOfSpeechCount, 2);
+    assert.equal(apiResult.body.noPartOfSpeechCount, 3);
 
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries?sort=lemmaAsc&limit=3`);
     assert.equal(apiResult.statusCode, 200);
@@ -1150,6 +1227,25 @@ async function checkReadApiConsistency(repository) {
     assert.equal(excludedEntry.body.location.found, false);
     assert.equal(excludedEntry.body.location.reason, "not_in_results");
     assert.deepEqual(excludedEntry.body.items, []);
+
+    const betaFilter = JSON.stringify({ sourceCount: { min: 2 } });
+    const locatedFilteredEntry = await callApi(
+      repository,
+      "GET",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/entry-beta/location?filter=${encodeURIComponent(betaFilter)}&limit=2`,
+    );
+    assert.equal(locatedFilteredEntry.statusCode, 200);
+    assert.equal(locatedFilteredEntry.body.location.found, true);
+    assert.deepEqual(locatedFilteredEntry.body.items.map((entry) => entry.id), ["entry-beta"]);
+
+    const excludedFilteredEntry = await callApi(
+      repository,
+      "GET",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/entry-alpha/location?filter=${encodeURIComponent(betaFilter)}&limit=2`,
+    );
+    assert.equal(excludedFilteredEntry.statusCode, 200);
+    assert.equal(excludedFilteredEntry.body.location.found, false);
+    assert.equal(excludedFilteredEntry.body.location.reason, "not_in_results");
 
     await assert.rejects(
       () => repository.locateEntryQueryWindow(dictionary.id, "entry-does-not-exist", { limit: 2 }),

@@ -53,6 +53,17 @@ function checkDescriptorIdentity() {
     },
   });
   assert.equal(queryDescriptorKey(first), queryDescriptorKey(second));
+  const withIpa = createQueryDescriptor({
+    kind: "entries",
+    dictionaryId: "dict-a",
+    query: { filter: { presence: { ipa: true } } },
+  });
+  const withoutIpa = createQueryDescriptor({
+    kind: "entries",
+    dictionaryId: "dict-a",
+    query: { filter: { presence: { ipa: false } } },
+  });
+  assert.notEqual(queryDescriptorKey(withIpa), queryDescriptorKey(withoutIpa));
   assert.notEqual(
     queryDescriptorKey(first),
     queryDescriptorKey(createQueryDescriptor({

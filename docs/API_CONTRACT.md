@@ -67,7 +67,7 @@
 
 | 方法 | 路径 | 用途 | 响应 | 校验范围 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | 无参数时为词条数组；带查询参数时为分页查询对象 | 支持 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`source`、`derivedFrom`、`sort`、`cursor`、`windowOffset`、`limit`、`include`。前端普通词条列表正常路径以该 API 为准，并按窗口加载。 |
+| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | 无参数时为词条数组；带查询参数时为分页查询对象 | 支持结构化 JSON `filter`，以及现有 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`source`、`derivedFrom`、`sort`、`cursor`、`windowOffset`、`limit`、`include`。结构化 `filter` 不得与平铺筛选参数混用。前端普通词条列表正常路径以该 API 为准，并按窗口加载。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId/location` | 定位词条在当前查询中的窗口 | `{ items, pageInfo, location }` | 接受与 `/entries` 相同的查询 descriptor 和 `limit`，但不接受客户端 cursor；目标存在但被查询排除时返回 `location.found: false`。 |
 | `POST` | `/api/dictionaries/:id/entries` | 新建词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
@@ -87,7 +87,26 @@
 
 #### `GET /api/dictionaries/:id/entries` 查询参数补充
 
-- F1 起，transport 参数会统一归一化为内部 `{ filter, search, sort, include, page }` EntryQuery；查询会话、cursor digest 和缓存键使用同一个稳定 identity。`limit`、`cursor`、`windowOffset` 和 `include` 不改变匹配集合，因此不进入 identity。当前 HTTP 参数保持不变；presence、sourceCount 和 activity day descriptor 已在共享模型中定义，但要等 F2 SQL 编译完成后才会开放 transport 接线，未实现条件不得被静默忽略。
+- F1/F2 起，transport 参数会统一归一化为内部 `{ filter, search, sort, include, page }` EntryQuery；查询会话、cursor digest 和缓存键使用同一个稳定 identity。`limit`、`cursor`、`windowOffset` 和 `include` 不改变匹配集合，因此不进入 identity。既有平铺筛选参数仍可单独使用；新的 `filter` 参数接收 URL 编码后的 JSON 对象，并且不能与 `part`、`tags`、`tagMode`、`source` 或 `derivedFrom` 混用。
+- 结构化 `filter` 的规范形状为：
+
+  ```js
+  {
+    part: "n",
+    tags: { values: ["motion"], mode: "any" },
+    sourceText: "root",
+    derivedFrom: { entryId: "entry-...", reference: "root" },
+    presence: [
+      { field: "definition", present: true },
+      { field: "ipa", present: false }
+    ],
+    sourceCount: { min: 1, max: 2 },
+    activityDays: [{ field: "updated", day: "2026-07-17" }]
+  }
+  ```
+
+  所有字段均可省略。`tags.mode` 为 `any` 或 `all`；`presence.field` 支持 `definition`、`example`、`entryNote`、`source`、`ipa`；`sourceCount` 是包含边界的非负整数区间，`max` 可省略；`activityDays.field` 支持 `created`、`updated`，日期按 UTC `YYYY-MM-DD` 比较。同一 presence 或日期字段不得给出冲突条件。当前 `entryNote` 只表示词条级备注，不包含释义备注或形态组备注。
+- `derivedFrom.entryId` 是正式结构身份；当前 SQLite 来源仍保存文本键，因此查询会用目标词条的 ID 与 lemma 解析已有来源记录。`reference` 保留给现有文本来源筛选，后续来源 ID 化时不应改变结构 descriptor 的词条 ID 语义。
 - `fields`：逗号分隔的搜索字段白名单；当前支持 `lemma`、`pronunciation`、`tags`、`definitions`、`examples`、`notes`、`etymology`、`morphology`。为空或全部无效时搜索全部字段。
 - `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；仅对同时出现在 `fields` 中的字段生效。
 - 基础搜索逐个独立字段值匹配：一条释义、一个标签、一个来源或一段备注必须自行包含查询文本，查询不会跨多个值拼接命中；`notes` 中的词条备注、释义备注和每个词条形态组备注也分别作为独立值。多标签组合等条件应使用高级筛选。自由文本按当前词典的 `settings.search.normalization` 处理。SQLite 的严格及 fuzzy 查询均直接读取静态 `entry_search_values` 和按需读取形态 `entry_morphology_search_values`；fuzzy 通过连接级确定性函数复用共享搜索模型的评分语义。该路径支持 NFC、Unicode case folding 和自定义等价规则。结构键和词源关系键不套用该自由文本配置。
@@ -136,7 +155,14 @@
 | `invalid_autosave_payload` | autosave 请求未携带有效 docs 或 corpus 对象。 |
 | `invalid_query_window_offset` | 查询窗口 offset 不是非负安全整数。 |
 | `invalid_entry_query_limit` | 词条查询 limit 不是大于零的安全整数。 |
-| `entry_filter_not_implemented` | 请求使用了已定义但尚未在当前阶段接入 repository 的 EntryFilter 条件；服务不会静默忽略。 |
+| `invalid_entry_filter_json` | 结构化 `filter` 参数不是合法 JSON。 |
+| `invalid_entry_filter_payload` | 结构化 `filter` 的顶层不是对象。 |
+| `conflicting_entry_filter_transport` | 同一请求同时使用结构化 `filter` 与旧平铺筛选参数。 |
+| `invalid_entry_filter_presence` | 字段存在性条件使用了不支持的字段。 |
+| `conflicting_entry_filter_presence` | 同一字段同时要求存在与不存在。 |
+| `invalid_entry_filter_source_count` | 来源数量边界无效，或最大值小于最小值。 |
+| `invalid_entry_filter_activity_day` | 活动日期字段或 UTC 日期值无效。 |
+| `conflicting_entry_filter_activity_day` | 同一活动日期字段指定了不同日期。 |
 | `query_cursor_required` | 非零窗口 offset 未附带版本化 cursor。 |
 | `query_cursor_stale` | cursor 已因服务进程、词典写入或查询条件变化而失效；`details.reason` 标明原因。 |
 | `invalid_morphology_payload` | 形态学请求体格式无效。 |
@@ -212,12 +238,13 @@ GET /api/dictionaries
 `GET /api/dictionaries/:id/entries` 保持无参数时返回完整词条数组的兼容行为。带查询参数时返回分页查询对象：
 
 ```text
-GET /api/dictionaries/:id/entries?q=&fields=&fuzzyFields=&part=&tags=&tagMode=&sort=&source=&derivedFrom=&cursor=&windowOffset=&limit=&include=
+GET /api/dictionaries/:id/entries?filter=&q=&fields=&fuzzyFields=&part=&tags=&tagMode=&sort=&source=&derivedFrom=&cursor=&windowOffset=&limit=&include=
 ```
 
 参数约定：
 
 - `q`：搜索关键词；默认匹配全部搜索字段。
+- `filter`：URL 编码后的结构化 EntryFilter JSON；用于字段存在性、来源数量、活动日期和按目标词条 ID 的衍生关系等组合条件。与下方平铺筛选参数互斥。
 - `fields`：逗号分隔的搜索字段白名单；为空或全部无效时按默认全字段搜索。当前字段包括：
   - `lemma`：词形；
   - `pronunciation`：发音 / IPA；
@@ -246,7 +273,7 @@ GET /api/dictionaries/:id/entries?q=&fields=&fuzzyFields=&part=&tags=&tagMode=&s
 目标词条位于尚未加载的窗口时，当前前端不会根据完整词典 snapshot 猜测页号，而会请求：
 
 ```text
-GET /api/dictionaries/:id/entries/:entryId/location?q=&fields=&fuzzyFields=&part=&tags=&tagMode=&sort=&source=&derivedFrom=&limit=&include=
+GET /api/dictionaries/:id/entries/:entryId/location?filter=&q=&fields=&fuzzyFields=&part=&tags=&tagMode=&sort=&source=&derivedFrom=&limit=&include=
 ```
 
 后端按同一 descriptor 计算目标结果下标，并直接返回包含目标的窗口。严格 SQL 查询在数据库内计算排序位置；fuzzy 查询复用会话的 `entryId -> resultIndex` 索引。目标词条不存在时返回 `entry_not_found`；词条存在但不属于当前查询结果时仍返回 200，`items` 为空且 `location` 为：

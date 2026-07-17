@@ -318,6 +318,6 @@ query kind
 
 ### Q5：剩余查询消费者（未完成）
 
-- 高级筛选 F1 已建立共享 filter descriptor 和统一 EntryQuery 身份；F2/F3 继续把稳定条件编译进 `/entries` 会话，并替换前端 `entryIds` 状态。
+- 高级筛选 F1/F2 已建立共享 filter descriptor、统一 EntryQuery 身份，并将字段存在性、来源数量和日期等稳定条件编译进 `/entries` 会话与定位；F3 继续替换前端 `entryIds` 状态。
 - 数据分析和质量检查使用各自按需 API/cache，不复用词条列表页面缓存对象。
 - 语料库在独立升级阶段建立块/单元读取与 changeset；不把 corpus blob 扫描塞进 entries 会话。
