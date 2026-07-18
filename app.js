@@ -4848,7 +4848,6 @@ function rootGroupsQueryParams(dictionary) {
   if (fuzzyFields.size) {
     params.set("fuzzyFields", [...fuzzyFields].join(","));
   }
-  params.set("include", "summary");
   return params;
 }
 
@@ -5265,7 +5264,6 @@ function entryQueryParams(dictionary) {
   if (fuzzyFields.size) {
     params.set("fuzzyFields", [...fuzzyFields].join(","));
   }
-  params.set("include", "summary");
   return params;
 }
 

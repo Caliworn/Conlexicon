@@ -221,12 +221,9 @@ class DictionaryRepository {
   listDictionaries() {}
   getDictionaryMeta(id) {}
   getDictionarySnapshot(id) {}
-  saveDictionarySnapshot(id, snapshot, options) {}
   queryEntries(id, query) {}
   getEntry(id, entryId) {}
   saveEntry(id, entry, options) {}
-  queryCorpusUnits(id, query) {}
-  getCorpusBlock(id, blockId) {}
   saveCorpusChanges(id, changes, options) {}
   exportDictionary(id) {}
   importDictionary(snapshot, options) {}
@@ -241,8 +238,8 @@ class DictionaryRepository {
 - 普通运行期保存已基本迁移到词条级、模块级或批量 patch API：新建/完整编辑/局部编辑/删除词条走词条级 API；其他设置、语言文档、语料库、自动形态学、自动 IPA、自动整理标签顺序和批量 IPA 生成走模块级或批量词条 API。
 - 词典管理的名称、语言和描述保存已改用词典元数据 API；页面卸载时的文档/语料自动保存兜底统一走 autosave 入口。
 - 后端 API 错误已改为结构化错误码；前端保存、导入、词典切换和偏好保存等路径会显示本地化短 toast，控制台保留原始技术错误。
-- 完整快照 `PUT /api/dictionaries/:id` 与 `GET /api/dictionaries/:id` 仍作为低频兼容/整库入口保留；导入和导出仍使用完整 JSON 交换。`GET /api/state` 已是轻量 payload，不属于完整快照路径，但其 `rootCount` 在冷启动时仍可能建立稳定词根拓扑。以上整库入口都不应作为普通编辑保存路径继续扩展。
-- repository 内有 `queryCorpusUnits()`、`getCorpusBlock()` 方法，但它们当前仍先重建完整词典快照再读取 corpus，并非真正轻量查询，也未暴露为 HTTP API；语料库 UI 仍以整份 corpus 模块保存为主，尚未拆到语料块/语料单元级。
+- `GET /api/dictionaries/:id` 仍按需读取当前词典完整快照；完整快照 PUT 和 repository 的整库写入兼容方法已移除。导入和导出继续使用各自的完整 JSON 边界。`GET /api/state` 已是轻量 payload，不属于完整快照路径，但其 `rootCount` 在冷启动时仍可能建立稳定词根拓扑。
+- repository 不再提供伪细粒度的 `queryCorpusUnits()` / `getCorpusBlock()`；语料库 UI 仍以整份 corpus 模块保存为主。真正的语料读取 API 等语料块、层和单元 SQL 模型确定后重新设计。
 
 ### 5.2 SQLite 化方向
 
@@ -259,7 +256,7 @@ SQLite 已是默认主存储。真实 schema、当前状态审计和后续优化
 - 搜索 projection 已完成第一轮 SQL 接线；候选索引、数据分析/质量检查 API 化、语料 SQL 分表和产品内迁移向导都不是当前 SQLite 主路径的阻断项。
 - 搜索字段配置已接入词条列表、词根模式、本地筛选、搜索摘要和搜索字段分析；读取 API 现在只接受 `fields` / `fuzzyFields`，旧 `fuzzy` / `tagFuzzy` 参数已删除。`scripts/benchmark-entry-search.js` 可将指定 JSON 词典临时导入 SQLite 后测量搜索模式；`scripts/generate-morphology-stress-dictionary-10k.js` 用于生成带 3×4 自动形态模板和少量 override 的 10k 压力词典。
 - `/entries` 的严格和 fuzzy 搜索均按所选字段读取静态 `entry_search_values` 与形态 `entry_morphology_search_values`，承接 ASCII、Unicode、NFC、case folding 和自定义等价规则，并只为当前页回读完整 `searchHits`。形态单字段和静态+形态混合查询均不再导出完整 snapshot 或逐词条动态生成形态；fuzzy 由连接级确定性函数复用共享评分语义。词根分组搜索也直接从两张 projection 取得命中 ID，并在独立 relation generation 的稳定词根拓扑上生成查询视图，不再走完整共享 JS 路径；关系分组键保持既有独立语义。
-- `scripts/check-entry-search-consistency.js` 验证严格及 fuzzy 的静态/形态 projection 查询均不调用完整 snapshot，并覆盖逐值字段、命中定位、结构筛选、分页、`include=full`、NFC、Unicode case folding 和 PUA 自定义规则。
+- `scripts/check-entry-search-consistency.js` 验证严格及 fuzzy 的静态/形态 projection 查询均不调用完整 snapshot，并覆盖逐值字段、命中定位、结构筛选、分页、NFC、Unicode case folding 和 PUA 自定义规则。列表查询固定返回摘要 DTO，完整词条由单词条端点按需读取。
 - 搜索规范化 S2 已接线：`settings.search.normalization` 支持可选 NFC、Unicode 17 default case folding 和 `{ canonical, variants }[]` 自定义规则；默认严格关闭。词条列表、词根模式、搜索摘要/高亮、搜索字段分析和词源自动补全共用缓存的词典级 normalizer。精确高亮带原文范围映射，可处理 `ß → ss`、NFC 和自定义替换造成的长度变化。标签/词性/形态匹配等结构键不套用自由文本配置；词源关系与 `source_key` 继续保持既有匹配，留待稳定 ID 引用升级。S3.3 已让 SQLite 规范化检索 projection 承接全部非 fuzzy 静态查询。
 - 词源自动补全仍在前端当前词典快照上执行，复用 normalizer 和独立的 `etymologyAutocomplete.fuzzy` 开关，但尚未接入 `/entries` projection 与普通列表查询路径；若后续迁移，需保留其前缀优先和 fuzzy 分数排序，而不能直接复用按 lemma 排序的普通列表响应。
 - 搜索 S3.1/S3.2/S3.3 已完成逐值 projection 契约、静态写入和查询接线：`entry-search-model.entrySearchValueRecords()` 为词形、IPA、原始/显示标签、各义项释义/例句/备注、词条备注、词源描述/来源和动态形态生成带 `field + sourceType/sourceId/sourcePosition + valueType` 的独立 records，现有 matcher 也从同一 records 聚合字段值。SQLite `entry_search_values` 不分配实体 ID，写入词形、IPA、标签、释义、例句、备注和词源；导入、整库覆盖、单词条保存、批量 patch、删除级联以及规范化/标签替换设置变化均维护该 projection。非 fuzzy 静态查询直接读取 projection 并返回 `searchHits`，前端用其选择命中摘要。没有 schema 版本、旧 SQLite 回填或运行时兼容；测试库需从 JSON 重建。

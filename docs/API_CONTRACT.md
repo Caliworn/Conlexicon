@@ -45,12 +45,6 @@
 | `POST` | `/api/dictionaries/:id/activate` | 切换当前词典 | 应用状态 | 只改 `index.json` 中的当前词典。 |
 | `DELETE` | `/api/dictionaries/:id` | 删除词典 | 应用状态 | 删除词典文件并更新索引。 |
 
-### 完整快照兼容层
-
-| 方法 | 路径 | 用途 | 响应 | 使用限制 |
-| --- | --- | --- | --- | --- |
-| `PUT` | `/api/dictionaries/:id` | 保存完整词典快照 | 完整词典 JSON | 兼容层和低频管理入口。普通运行期保存不应走这里；不要在此端点上叠加复杂冲突合并逻辑。 |
-
 ### 词典元数据与模块级保存
 
 | 方法 | 路径 | 用途 | 响应 | 校验范围 |
@@ -67,7 +61,7 @@
 
 | 方法 | 路径 | 用途 | 响应 | 校验范围 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | 无参数时为词条数组；带查询参数时为分页查询对象 | 支持结构化 JSON `filter`，以及现有 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`source`、`derivedFrom`、`sort`、`cursor`、`windowOffset`、`limit`、`include`。结构化 `filter` 不得与平铺筛选参数混用。前端普通词条列表正常路径以该 API 为准，并按窗口加载。 |
+| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | `{ items, pageInfo }`，其中 `items` 固定为词条摘要 DTO | 支持结构化 JSON `filter`，以及现有 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`source`、`derivedFrom`、`sort`、`cursor`、`windowOffset`、`limit`。结构化 `filter` 不得与平铺筛选参数混用。无参数请求也使用默认排序和窗口大小，不返回完整词条数组。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId/location` | 定位词条在当前查询中的窗口 | `{ items, pageInfo, location }` | 接受与 `/entries` 相同的查询 descriptor 和 `limit`，但不接受客户端 cursor；目标存在但被查询排除时返回 `location.found: false`。 |
 | `POST` | `/api/dictionaries/:id/entries` | 新建词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
@@ -81,13 +75,13 @@
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/dictionaries/:id/facets` | 读取词性和标签统计 | `{ parts, tags, noPartOfSpeechCount }` | 尊重当前词典的词性标签设置和标签显示替换。前端词性筛选选项正常路径以该 API 为准，不再每次本地统计完整词性集合做一致性校验。 |
 | `GET` | `/api/dictionaries/:id/entry-relations/:entryId` | 读取词源/衍生/同根关系 | `{ entryId, sources, derivedEntries, rootGroup }` | SQLite 路径复用稳定词根拓扑的反向索引，并按需读取关系 DTO；同名 lemma 暂按排序后的第一条匹配，后续可由诊断模块报告歧义。 |
-| `GET` | `/api/dictionaries/:id/root-groups` | 读取词根模式分组 | `{ items, pageInfo }` | 支持 `q`、`fields`、`fuzzyFields`、`sort`、`cursor`、`windowOffset`、`limit`、`include`。前端词根模式正常路径以该 API 为准，并按窗口加载。 |
+| `GET` | `/api/dictionaries/:id/root-groups` | 读取词根模式分组 | `{ items, pageInfo }` | 支持 `q`、`fields`、`fuzzyFields`、`sort`、`cursor`、`windowOffset`、`limit`。前端词根模式正常路径以该 API 为准，并按窗口加载。 |
 | `GET` | `/api/dictionaries/:id/root-groups/location` | 定位词条所属的父级词根窗口 | `{ items, pageInfo, location }` | 必须传 `entryId`；可传 `preferredRootId` 消除多来源词条的父级歧义，其余参数沿用 `/root-groups` descriptor。 |
-| `GET` | `/api/dictionaries/:id/root-groups/:rootId/entries` | 按需读取单个词根组的全部衍生词 | `{ items }` | 支持与词根组查询相同的搜索、排序、字段和 `include` 参数，但不分页；折叠组不预载衍生词，展开后一次读取整组。 |
+| `GET` | `/api/dictionaries/:id/root-groups/:rootId/entries` | 按需读取单个词根组的全部衍生词 | `{ items }`，其中 `items` 固定为词条摘要 DTO | 支持与词根组查询相同的搜索、排序和字段参数，但不分页；折叠组不预载衍生词，展开后一次读取整组。 |
 
 #### `GET /api/dictionaries/:id/entries` 查询参数补充
 
-- F1/F2 起，transport 参数会统一归一化为内部 `{ filter, search, sort, include, page }` EntryQuery；查询会话、cursor digest 和缓存键使用同一个稳定 identity。`limit`、`cursor`、`windowOffset` 和 `include` 不改变匹配集合，因此不进入 identity。既有平铺筛选参数仍可单独使用；新的 `filter` 参数接收 URL 编码后的 JSON 对象，并且不能与 `part`、`tags`、`tagMode`、`source` 或 `derivedFrom` 混用。
+- F1/F2 起，transport 参数会统一归一化为内部 `{ filter, search, sort, page }` EntryQuery；查询会话、cursor digest 和缓存键使用同一个稳定 identity。`limit`、`cursor` 和 `windowOffset` 不改变匹配集合，因此不进入 identity。既有平铺筛选参数仍可单独使用；新的 `filter` 参数接收 URL 编码后的 JSON 对象，并且不能与 `part`、`tags`、`tagMode`、`source` 或 `derivedFrom` 混用。
 - 结构化 `filter` 的规范形状为：
 
   ```js
@@ -235,10 +229,10 @@ GET /api/dictionaries
 
 ### 词条列表查询
 
-`GET /api/dictionaries/:id/entries` 保持无参数时返回完整词条数组的兼容行为。带查询参数时返回分页查询对象：
+`GET /api/dictionaries/:id/entries` 始终返回分页查询对象，词条详情由单词条端点按需读取：
 
 ```text
-GET /api/dictionaries/:id/entries?filter=&q=&fields=&fuzzyFields=&part=&tags=&tagMode=&sort=&source=&derivedFrom=&cursor=&windowOffset=&limit=&include=
+GET /api/dictionaries/:id/entries?filter=&q=&fields=&fuzzyFields=&part=&tags=&tagMode=&sort=&source=&derivedFrom=&cursor=&windowOffset=&limit=
 ```
 
 参数约定：
@@ -264,7 +258,6 @@ GET /api/dictionaries/:id/entries?filter=&q=&fields=&fuzzyFields=&part=&tags=&ta
 - `cursor`：不透明查询游标，前端不得解析。顺序分页使用响应的 `pageInfo.nextCursor`；随机窗口读取使用 `pageInfo.windowCursor`。
 - `windowOffset`：可选的结果窗口起点。非零值必须与同一查询返回的有效 `windowCursor` 一起发送；省略时沿用 cursor 自身的位置。该参数用于纯滚动列表直接读取远端窗口，不是 UI 页码。
 - `limit`：分页大小，后端可设置上限。
-- `include`：`summary` 或 `full`，默认 `summary`。
 
 前端普通列表以每窗 200 条读取，最多保留 5 个已加载窗口；未加载和已淘汰窗口使用等高占位，从而让原生滚动条始终代表完整结果集。请求失败时显示失败状态，不回退到前端完整词典快照。repository 仍允许显式诊断和基准工具请求至多 10000 条，但产品 UI 不使用该大页路径。
 
@@ -273,7 +266,7 @@ GET /api/dictionaries/:id/entries?filter=&q=&fields=&fuzzyFields=&part=&tags=&ta
 目标词条位于尚未加载的窗口时，当前前端不会根据完整词典 snapshot 猜测页号，而会请求：
 
 ```text
-GET /api/dictionaries/:id/entries/:entryId/location?filter=&q=&fields=&fuzzyFields=&part=&tags=&tagMode=&sort=&source=&derivedFrom=&limit=&include=
+GET /api/dictionaries/:id/entries/:entryId/location?filter=&q=&fields=&fuzzyFields=&part=&tags=&tagMode=&sort=&source=&derivedFrom=&limit=
 ```
 
 后端按同一 descriptor 计算目标结果下标，并直接返回包含目标的窗口。严格 SQL 查询在数据库内计算排序位置；fuzzy 查询复用会话的 `entryId -> resultIndex` 索引。目标词条不存在时返回 `entry_not_found`；词条存在但不属于当前查询结果时仍返回 200，`items` 为空且 `location` 为：
@@ -427,7 +420,7 @@ GET /api/dictionaries/:id/entry-relations/:entryId
 词根模式读取端点：
 
 ```text
-GET /api/dictionaries/:id/root-groups?q=&fields=&fuzzyFields=&sort=&cursor=&windowOffset=&limit=&include=
+GET /api/dictionaries/:id/root-groups?q=&fields=&fuzzyFields=&sort=&cursor=&windowOffset=&limit=
 ```
 
 返回分页后的词根组，而不是向前端一次返回全部分组：
@@ -457,7 +450,7 @@ GET /api/dictionaries/:id/root-groups?q=&fields=&fuzzyFields=&sort=&cursor=&wind
 目标词条所在父级窗口由以下端点定位：
 
 ```text
-GET /api/dictionaries/:id/root-groups/location?entryId=&preferredRootId=&q=&fields=&fuzzyFields=&sort=&limit=&include=
+GET /api/dictionaries/:id/root-groups/location?entryId=&preferredRootId=&q=&fields=&fuzzyFields=&sort=&limit=
 ```
 
 后端先通过稳定拓扑的 `entryId -> rootIds` 取得候选父级，再用查询会话的 `rootId -> resultIndex` 定位当前 descriptor 下的父级窗口；不会扫描所有词根组。多来源词条可传 `preferredRootId` 指定当前导航上下文。成功响应的 `location` 为：
@@ -478,10 +471,10 @@ GET /api/dictionaries/:id/root-groups/location?entryId=&preferredRootId=&q=&fiel
 折叠的词根组不携带衍生词 DTO。展开某组时按需读取：
 
 ```text
-GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&sort=&include=
+GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&sort=
 ```
 
-返回 `{ items }`；每个 `items` 元素是词条 summary（或 `include=full` 时的完整词条），并额外含 `rootGroupMatch`，表示该衍生词是否直接命中当前词根查询。该端点与 `/root-groups` 共享同一个运行时关系会话，但不接受 `cursor`、`windowOffset` 或 `limit`，也没有 2000 条截断。当前前端只对父级词根组列表按每窗 100 组、最多 5 个已加载窗口进行窗口化；展开单组时一次读取并渲染全部衍生词。
+返回 `{ items }`；每个 `items` 元素是词条摘要 DTO，并额外含 `rootGroupMatch`，表示该衍生词是否直接命中当前词根查询。该端点与 `/root-groups` 共享同一个运行时关系会话，但不接受 `cursor`、`windowOffset` 或 `limit`，也没有 2000 条截断。当前前端只对父级词根组列表按每窗 100 组、最多 5 个已加载窗口进行窗口化；展开单组时一次读取并渲染全部衍生词。
 
 性能优化方向：
 

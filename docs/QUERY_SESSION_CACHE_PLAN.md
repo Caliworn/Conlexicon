@@ -81,7 +81,6 @@ query kind
 canonical query descriptor
 cursor
 limit
-include
 ```
 
 只缓存成功响应；错误和 loading 状态不进入缓存。即使响应因用户已经切换条件而被当前 UI 的 `requestId` 淘汰，只要词典版本和查询 key 仍匹配，结果仍可进入缓存。保存成功后按词典清空；词典切换时可以保留其他词典的小量 LRU 页面，但不能跨 `updatedAt` 命中。
@@ -151,7 +150,6 @@ repository 继续负责：
 
 - `cursor`：只是结果中的窗口位置。
 - `limit`：只是窗口大小。
-- `include`：只决定 summary/full 序列化，不改变匹配与排序。
 - UI locale：当前查询返回原始数据和已保存的显示替换，不进行界面文案本地化。
 
 查询 key 的生成应是单一后端函数；不要让 API route、repository 和缓存各自拼字符串。前端可以生成语义相同的页面 key，但不能把它当成服务端权威身份。`cacheGeneration` 是 repository 进程内的失效世代，不写入词典，也不参与业务保存或冲突检查。
@@ -267,8 +265,8 @@ query kind
 ### Q2：后端会话缓存基础设施（已完成）
 
 - 已新增独立运行时 `QuerySessionCache`，不进入 SQLite schema、词典导出或持久化 revision。
-- fuzzy entries 缓存排序后的命中词条 ID；无搜索和搜索 root groups 缓存根/衍生关系 ID。summary/full 页面仍按需从 SQLite 重建。
-- descriptor 统一规范化字段、fuzzy 字段、标签和排序，并排除 `cursor`、`limit`、`include`；无查询文本的 root groups 也会忽略无效的字段搜索选项。
+- fuzzy entries 缓存排序后的命中词条 ID；无搜索和搜索 root groups 缓存根/衍生关系 ID。摘要页面仍按需从 SQLite 重建。
+- descriptor 统一规范化字段、fuzzy 字段、标签和排序，并排除 `cursor`、`limit`；无查询文本的 root groups 也会忽略无效的字段搜索选项。
 - 当前每词典最多 8 个会话、全局约 64 MiB、idle TTL 2 分钟；支持 LRU、超大单项跳过、同 key in-flight 合并和开发期统计。
 - repository 的词条、模块、metadata、完整导入/覆盖和词典删除只在成功写入后递增运行时 generation 并按词典失效；空 patch 和失败写入不失效。
 - 查询 generation 与词根 relation generation 已拆分：查询会话仍在相关成功写入后失效；词根拓扑只在词条增删、lemma/来源变化、完整导入覆盖或词典删除时递增 relation generation。普通词条保存和 `patchEntries()` 只同步缓存中的排序字段并清除排序视图，metadata/settings/IPA/docs/morphology/corpus 保存不触碰拓扑。

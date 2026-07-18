@@ -31,7 +31,6 @@ function checkDescriptorIdentity() {
       fuzzyFields: new Set(["lemma"]),
       limit: 10,
       offset: 0,
-      include: "summary",
     },
   });
   const second = createQueryDescriptor({
@@ -49,7 +48,6 @@ function checkDescriptorIdentity() {
       fuzzyFields: new Set(["lemma"]),
       limit: 500,
       offset: 100,
-      include: "full",
     },
   });
   assert.equal(queryDescriptorKey(first), queryDescriptorKey(second));
@@ -296,11 +294,10 @@ async function checkRepositoryIntegration() {
       fields: "lemma",
       fuzzyFields: "lemma",
       sort: "lemmaAsc",
-      include: "summary",
       limit: 1,
     };
     const fuzzyFirst = await repository.queryEntries(dictionary.id, fuzzyQuery);
-    const fuzzySecond = await repository.queryEntries(dictionary.id, { ...fuzzyQuery, limit: 10, include: "full" });
+    const fuzzySecond = await repository.queryEntries(dictionary.id, { ...fuzzyQuery, limit: 10 });
     assert.equal(fuzzyBuilds, 1, "repeated fuzzy queries should reuse one ordered ID session");
     assert.deepEqual(
       fuzzyFirst.items.map((entry) => entry.id),
@@ -408,12 +405,10 @@ async function checkRepositoryIntegration() {
       fields: "lemma,tags",
       fuzzyFields: "lemma,tags",
       limit: 1,
-      include: "summary",
     });
     const rootSecond = await repository.queryRootGroups(dictionary.id, {
       fields: "morphology",
       limit: 10,
-      include: "full",
     });
     assert.equal(topologyBuilds, 1, "no-search root groups should build one stable topology");
     const rootSession = [...repository.querySessionCache.sessions.values()]

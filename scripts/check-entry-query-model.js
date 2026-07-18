@@ -19,7 +19,6 @@ function checkLegacyTransportNormalization() {
     source: " Root ",
     derivedFrom: " Parent ",
     sort: "updatedDesc",
-    include: "full",
     limit: "200",
     cursor: "cursor",
     windowOffset: "400",
@@ -40,7 +39,6 @@ function checkLegacyTransportNormalization() {
       fuzzyFields: ["lemma"],
     },
     sort: "updatedDesc",
-    include: "full",
     page: {
       limit: 200,
       cursor: "cursor",
@@ -93,7 +91,6 @@ function checkStableIdentity() {
     tags: "n,root",
     tagMode: "all",
     limit: 20,
-    include: "summary",
   });
   const second = normalizeEntryQuery({
     filter: {
@@ -105,7 +102,6 @@ function checkStableIdentity() {
       fuzzyFields: ["lemma"],
     },
     page: { limit: 500, offset: 100 },
-    include: "full",
   });
   assert.deepEqual(entryQueryIdentity(first), entryQueryIdentity(second));
 

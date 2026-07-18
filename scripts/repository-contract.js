@@ -268,7 +268,7 @@ function queryString(params = {}) {
 }
 
 async function apiEntryIds(repository, dictionaryId, params = {}) {
-  const qs = queryString({ ...params, limit: 100, include: "summary" });
+  const qs = queryString({ ...params, limit: 100 });
   const apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(dictionaryId)}/entries?${qs}`);
   assert.equal(apiResult.statusCode, 200);
   assert.equal(apiResult.body.pageInfo.hasMore, false);
@@ -315,7 +315,7 @@ function expectedRootGroupSnapshot(dictionary, query = {}) {
 }
 
 async function assertRootGroupQueryConsistency(repository, dictionary, params = {}) {
-  const qs = queryString({ ...params, limit: 100, include: "summary" });
+  const qs = queryString({ ...params, limit: 100 });
   const apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups?${qs}`);
   assert.equal(apiResult.statusCode, 200);
   assert.equal(apiResult.body.pageInfo.hasMore, false);
@@ -325,7 +325,7 @@ async function assertRootGroupQueryConsistency(repository, dictionary, params = 
   );
   const actualGroups = [];
   for (const group of apiResult.body.items) {
-    const entriesQs = queryString({ ...params, include: "summary" });
+    const entriesQs = queryString(params);
     const entriesResult = await callApi(
       repository,
       "GET",
@@ -1404,15 +1404,19 @@ async function runRepositoryContractTests(options = {}) {
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.name, "First Renamed");
     assert.equal(apiResult.body.language, "renamed");
-
-    const updated = await repository.updateDictionary(first.id, {
-      name: "First Updated",
-      entries: [{ lemma: "root", tags: ["n"], definitions: [{ meaning: "root meaning" }] }],
+    const removedSnapshotPut = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}`, {
+      name: "Must Not Replace Snapshot",
     });
-    assert.equal(updated.name, "First Updated");
-    assert.equal(updated.entries[0].tags[0], "n");
-    assert.equal(updated.entries[0].definitions[0].meaning, "root meaning");
-    const rootEntryId = updated.entries[0].id;
+    assert.equal(removedSnapshotPut.handled, false, "full snapshot PUT should not be routed");
+
+    const savedRoot = await repository.saveEntry(first.id, {
+      lemma: "root",
+      tags: ["n"],
+      definitions: [{ meaning: "root meaning" }],
+    });
+    assert.equal(savedRoot.entry.tags[0], "n");
+    assert.equal(savedRoot.entry.definitions[0].meaning, "root meaning");
+    const rootEntryId = savedRoot.entry.id;
 
     const savedWithNewEntry = await repository.saveEntry(first.id, { lemma: "new entry", definitions: [{ meaning: "new" }] });
     assert.equal(savedWithNewEntry.id, first.id);
@@ -1426,7 +1430,10 @@ async function runRepositoryContractTests(options = {}) {
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entries`);
     assert.equal(apiResult.handled, true);
     assert.equal(apiResult.statusCode, 200);
-    assert.equal(apiResult.body.length, 3);
+    assert.equal(apiResult.body.items.length, 3);
+    assert.equal(typeof apiResult.body.pageInfo, "object");
+    assert.equal(Object.hasOwn(apiResult.body.items[0], "definitions"), false);
+    assert.equal(Array.isArray(apiResult.body.items[0].definitionPreviews), true);
 
     apiResult = await callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(first.id)}/entries`, {
       lemma: "api entry",
@@ -1461,7 +1468,7 @@ async function runRepositoryContractTests(options = {}) {
       return { completedStage: "entryCrud" };
     }
 
-    apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entries?q=derived&include=summary`);
+    apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entries?q=derived`);
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.items.length, 1);
     assert.equal(apiResult.body.items[0].lemma, "derived smoke");

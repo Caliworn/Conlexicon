@@ -50,7 +50,6 @@ function scenarioRequest(query, scenario) {
     q: query,
     fields: scenario.fields.join(","),
     fuzzyFields: scenario.fuzzyFields.join(","),
-    include: "summary",
     limit: 10000,
   };
 }

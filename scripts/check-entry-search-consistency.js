@@ -388,13 +388,12 @@ async function main() {
       fields: "definitions,morphology",
       fuzzyFields: "definitions",
     }, ["entry-alpha-root"]);
-    const fuzzyFullResult = await assertDirectQuery(repository, dictionary, {
+    const fuzzySummaryResult = await assertDirectQuery(repository, dictionary, {
       q: "DefTkn",
       fields: "definitions",
       fuzzyFields: "definitions",
-      include: "full",
     }, ["entry-alpha-root"]);
-    assert.equal(fuzzyFullResult.items[0].definitions[0].meaning, "CommonToken DefinitionToken");
+    assert.equal(fuzzySummaryResult.items[0].definitionPreviews[0].meaning, "CommonToken DefinitionToken");
     await assertDirectQuery(repository, dictionary, {
       q: "StrctrlTkn",
       fields: "definitions",
@@ -447,12 +446,11 @@ async function main() {
       source: "protosourcetoken",
     }, ["entry-alpha-root"]);
 
-    const fullResult = await assertDirectQuery(repository, dictionary, {
+    const summaryResult = await assertDirectQuery(repository, dictionary, {
       q: "DefinitionToken",
       fields: "definitions",
-      include: "full",
     });
-    assert.equal(fullResult.items[0]?.definitions[0]?.meaning, "CommonToken DefinitionToken");
+    assert.equal(summaryResult.items[0]?.definitionPreviews[0]?.meaning, "CommonToken DefinitionToken");
 
     const pagedQuery = { q: "CommonToken", fields: "definitions", limit: 2 };
     const firstPage = await assertDirectQuery(repository, dictionary, pagedQuery);
