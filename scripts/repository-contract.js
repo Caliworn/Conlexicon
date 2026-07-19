@@ -196,26 +196,13 @@ function testEntryMatches(entry, dictionary, query = {}) {
   const searchRuntime = entrySearchModel.searchSettingsQueryOptions(dictionary.settings?.search);
   const normalizedQuery = searchRuntime.normalizeText(query.q);
   if (!normalizedQuery) {
-    return testEntryMatchesDerivedFrom(entry, dictionary, query);
+    return true;
   }
   return entrySearchModel.entryMatchesSearchText(entry, dictionary, query.q || query.query || "", {
     fields: entrySearchModel.normalizeSearchFields(query.fields || query.searchFields),
     fuzzyFields: entrySearchModel.normalizeFuzzyFields(query.fuzzyFields),
     normalizeText: searchRuntime.normalizeText,
-  }) && testEntryMatchesDerivedFrom(entry, dictionary, query);
-}
-
-function testEntryMatchesDerivedFrom(entry, dictionary, query = {}) {
-  const sourceName = testNormalize(query.derivedFrom);
-  if (!sourceName) {
-    return true;
-  }
-  const index = entryRelationsModel.buildEntryRelationIndex(dictionary, { normalizeText: testNormalize });
-  const target = entryRelationsModel.resolveSourceEntry(sourceName, dictionary, { normalizeText: testNormalize, index });
-  const derivedEntries = target
-    ? entryRelationsModel.findDerivedEntries(target, dictionary, { normalizeText: testNormalize, index })
-    : index.derivedBySourceKey.get(sourceName) || [];
-  return derivedEntries.some((candidate) => candidate.id === entry.id);
+  });
 }
 
 function testCompareEntries(sort = "lemmaAsc") {
@@ -1106,8 +1093,6 @@ async function checkReadApiConsistency(repository) {
     await assertEntryQueryConsistency(repository, dictionary, { q: "alpha-generated", fields: "definitions" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "alpha example", fields: "examples" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "alpha example", fields: "notes" });
-    await assertEntryQueryConsistency(repository, dictionary, { derivedFrom: "alpha" });
-    await assertEntryQueryConsistency(repository, dictionary, { derivedFrom: "root" });
     await assertEntryQueryConsistency(repository, dictionary, { part: "n" });
     await assertEntryQueryConsistency(repository, dictionary, { part: "v" });
     await assertEntryQueryConsistency(repository, dictionary, { part: "adj" });
@@ -1157,12 +1142,6 @@ async function checkReadApiConsistency(repository) {
       repository,
       dictionary.id,
       { activityDay: { field: "created", day: "2026-01-02" } },
-      ["entry-beta"],
-    );
-    await assertStructuredEntryFilter(
-      repository,
-      dictionary.id,
-      { derivedFrom: { entryId: "entry-alpha" } },
       ["entry-beta"],
     );
     await assertStructuredEntryFilter(

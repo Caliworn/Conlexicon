@@ -61,7 +61,7 @@
 
 | 方法 | 路径 | 用途 | 响应 | 校验范围 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | `{ items, pageInfo }`，其中 `items` 固定为词条摘要 DTO | 支持结构化 JSON `filter`，以及现有 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`source`、`derivedFrom`、`sort`、`cursor`、`windowOffset`、`limit`。结构化 `filter` 不得与平铺筛选参数混用。无参数请求也使用默认排序和窗口大小，不返回完整词条数组。 |
+| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | `{ items, pageInfo }`，其中 `items` 固定为词条摘要 DTO | 支持结构化 JSON `filter`，以及现有 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`sort`、`cursor`、`windowOffset`、`limit`。结构化 `filter` 不得与平铺筛选参数混用。无参数请求也使用默认排序和窗口大小，不返回完整词条数组。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId/location` | 定位词条在当前查询中的窗口 | `{ items, pageInfo, location }` | 接受与 `/entries` 相同的查询 descriptor 和 `limit`，但不接受客户端 cursor；目标存在但被查询排除时返回 `location.found: false`。 |
 | `POST` | `/api/dictionaries/:id/entries` | 新建词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
@@ -81,15 +81,13 @@
 
 #### `GET /api/dictionaries/:id/entries` 查询参数补充
 
-- F1/F2 起，transport 参数会统一归一化为内部 `{ filter, search, sort, page }` EntryQuery；查询会话、cursor digest 和缓存键使用同一个稳定 identity。`limit`、`cursor` 和 `windowOffset` 不改变匹配集合，因此不进入 identity。既有平铺筛选参数仍可单独使用；新的 `filter` 参数接收 URL 编码后的 JSON 对象，并且不能与 `part`、`tags`、`tagMode`、`source` 或 `derivedFrom` 混用。
+- F1/F2 起，transport 参数会统一归一化为内部 `{ filter, search, sort, page }` EntryQuery；查询会话、cursor digest 和缓存键使用同一个稳定 identity。`limit`、`cursor` 和 `windowOffset` 不改变匹配集合，因此不进入 identity。既有 `part`、`tags`、`tagMode` 平铺筛选参数仍可单独使用；新的 `filter` 参数接收 URL 编码后的 JSON 对象，并且不能与这些平铺筛选参数混用。
 - 结构化 `filter` 的规范形状为：
 
   ```js
   {
     part: "n",
     tags: { values: ["motion"], mode: "any" },
-    sourceText: "root",
-    derivedFrom: { entryId: "entry-...", reference: "root" },
     presence: [
       { field: "definition", present: true },
       { field: "ipa", present: false }
@@ -100,7 +98,6 @@
   ```
 
   所有字段均可省略。`tags.mode` 为 `any` 或 `all`；`presence.field` 支持 `definition`、`example`、`entryNote`、`source`、`ipa`；`sourceCount` 是包含边界的非负整数区间，`max` 可省略；`activityDays.field` 支持 `created`、`updated`，日期按 UTC `YYYY-MM-DD` 比较。同一 presence 或日期字段不得给出冲突条件。当前 `entryNote` 只表示词条级备注，不包含释义备注或形态组备注。
-- `derivedFrom.entryId` 是正式结构身份；当前 SQLite 来源仍保存文本键，因此查询会用目标词条的 ID 与 lemma 解析已有来源记录。`reference` 保留给现有文本来源筛选，后续来源 ID 化时不应改变结构 descriptor 的词条 ID 语义。
 - `fields`：逗号分隔的搜索字段白名单；当前支持 `lemma`、`pronunciation`、`tags`、`definitions`、`examples`、`notes`、`etymology`、`morphology`。为空或全部无效时搜索全部字段。
 - `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；仅对同时出现在 `fields` 中的字段生效。
 - 基础搜索逐个独立字段值匹配：一条释义、一个标签、一个来源或一段备注必须自行包含查询文本，查询不会跨多个值拼接命中；`notes` 中的词条备注、释义备注和每个词条形态组备注也分别作为独立值。多标签组合等条件应使用高级筛选。自由文本按当前词典的 `settings.search.normalization` 处理。SQLite 的严格及 fuzzy 查询均直接读取静态 `entry_search_values` 和按需读取形态 `entry_morphology_search_values`；fuzzy 通过连接级确定性函数复用共享搜索模型的评分语义。该路径支持 NFC、Unicode case folding 和自定义等价规则。结构键和词源关系键不套用该自由文本配置。
@@ -232,13 +229,13 @@ GET /api/dictionaries
 `GET /api/dictionaries/:id/entries` 始终返回分页查询对象，词条详情由单词条端点按需读取：
 
 ```text
-GET /api/dictionaries/:id/entries?filter=&q=&fields=&fuzzyFields=&part=&tags=&tagMode=&sort=&source=&derivedFrom=&cursor=&windowOffset=&limit=
+GET /api/dictionaries/:id/entries?filter=&q=&fields=&fuzzyFields=&part=&tags=&tagMode=&sort=&cursor=&windowOffset=&limit=
 ```
 
 参数约定：
 
 - `q`：搜索关键词；默认匹配全部搜索字段。
-- `filter`：URL 编码后的结构化 EntryFilter JSON；用于字段存在性、来源数量、活动日期和按目标词条 ID 的衍生关系等组合条件。与下方平铺筛选参数互斥。
+- `filter`：URL 编码后的结构化 EntryFilter JSON；用于字段存在性、来源数量和活动日期等组合条件。与下方平铺筛选参数互斥。
 - `fields`：逗号分隔的搜索字段白名单；为空或全部无效时按默认全字段搜索。当前字段包括：
   - `lemma`：词形；
   - `pronunciation`：发音 / IPA；
@@ -253,8 +250,6 @@ GET /api/dictionaries/:id/entries?filter=&q=&fields=&fuzzyFields=&part=&tags=&ta
 - `tags`：逗号分隔的原始标签列表；按去除边缘空白后的原始标签精确匹配。
 - `tagMode`：`any` 或 `all`，默认 `any`。
 - `sort`：`lemmaAsc`、`lemmaDesc`、`updatedAsc`、`updatedDesc`、`createdAsc`、`createdDesc`。
-- `source`：筛选具有指定来源文本的词条。
-- `derivedFrom`：筛选从指定词条 ID 或 lemma 派生的词条。
 - `cursor`：不透明查询游标，前端不得解析。顺序分页使用响应的 `pageInfo.nextCursor`；随机窗口读取使用 `pageInfo.windowCursor`。
 - `windowOffset`：可选的结果窗口起点。非零值必须与同一查询返回的有效 `windowCursor` 一起发送；省略时沿用 cursor 自身的位置。该参数用于纯滚动列表直接读取远端窗口，不是 UI 页码。
 - `limit`：分页大小，后端可设置上限。
@@ -266,7 +261,7 @@ GET /api/dictionaries/:id/entries?filter=&q=&fields=&fuzzyFields=&part=&tags=&ta
 目标词条位于尚未加载的窗口时，当前前端不会根据完整词典 snapshot 猜测页号，而会请求：
 
 ```text
-GET /api/dictionaries/:id/entries/:entryId/location?filter=&q=&fields=&fuzzyFields=&part=&tags=&tagMode=&sort=&source=&derivedFrom=&limit=
+GET /api/dictionaries/:id/entries/:entryId/location?filter=&q=&fields=&fuzzyFields=&part=&tags=&tagMode=&sort=&limit=
 ```
 
 后端按同一 descriptor 计算目标结果下标，并直接返回包含目标的窗口。严格 SQL 查询在数据库内计算排序位置；fuzzy 查询复用会话的 `entryId -> resultIndex` 索引。目标词条不存在时返回 `entry_not_found`；词条存在但不属于当前查询结果时仍返回 200，`items` 为空且 `location` 为：
@@ -479,28 +474,15 @@ GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&so
 性能优化方向：
 
 - repository 已以独立 relation generation 缓存与搜索条件无关的 `rootId -> derivedIds` 稳定拓扑，并同时维护 `entryId -> rootIds`、`rootId -> group` 反向索引；词根查询会话进一步维护 `rootId -> resultIndex`。词典摘要计数、`/root-groups`、组内子项和 `/entry-relations/:entryId` 复用该拓扑。拓扑组和查询结果位置的定位均为 O(1)，关系响应仍需按实际返回条目数读取并构建 DTO。词条增删、lemma/来源变化、整库替换和词典删除会使其失效；普通词条保存/patch 仅同步轻量排序记录，其他模块保存不触碰拓扑。查询 session/cursor 的 cache generation 仍按查询一致性要求独立失效。
-- `/root-groups` 搜索直接从 `entry_search_values` / `entry_morphology_search_values` 获取命中 ID，再筛选稳定拓扑，不导出完整词典 snapshot。`entry-relations/:entryId` 已复用同一拓扑的反向索引；`entries?derivedFrom=` 和后续质量检查中的词源问题仍应继续收敛到该关系查询层。
-- SQLite 后端应继续用 `entry_sources(source_key, entry_id)` 或等价表/索引支持 `derivedFrom`、词根分组和词汇网络查询；旧 JSON conversion 与 migration 不参与运行期查询。
+- `/root-groups` 搜索直接从 `entry_search_values` / `entry_morphology_search_values` 获取命中 ID，再筛选稳定拓扑，不导出完整词典 snapshot。`entry-relations/:entryId` 已复用同一拓扑的反向索引；后续质量检查中的词源问题仍应继续收敛到该关系查询层。
+- SQLite 后端继续用 `entry_sources(source_key, entry_id)` 或等价表/索引支持词根分组和词汇网络查询；旧 JSON conversion 与 migration 不参与运行期查询。
 - 前端词根模式正常路径以 `/root-groups` 为准；请求失败时显示失败状态，不回退前端本地完整分组。父级未加载窗口以 `pageInfo.total` 和 `windowMetrics` 建立占位，因此滚动条可在折叠、搜索自动展开及全局展开状态下代表完整词根组集合。全局展开采用状态意图：父级页进入可见范围后才加载各组衍生词；单组收起作为例外保留到重新展开或“全部收起/全部展开”重置。组内衍生词不建立第二层分页窗口。
-
-### 语料库读取
-
-语料库读取后续再拆：
-
-```text
-GET /api/dictionaries/:id/corpus/blocks
-GET /api/dictionaries/:id/corpus/blocks/:blockId
-GET /api/dictionaries/:id/corpus/units?q=&blockId=&layerId=&orphan=&cursor=&limit=
-GET /api/dictionaries/:id/corpus/units/:unitId
-```
-
-语料保存下一步可从整份 corpus 模块保存拆成块、层、单元级 changeset。
 
 ### 共享查询索引与分析 planner 草案
 
 数据分析 API 化不应只服务“数据分析”页面。词典标题、词典管理、词根模式、词汇网络、质量检查、高级筛选和未来诊断修复都会用到相同的统计、关系解析和索引能力。后续应先建立共享查询层，再在其上实现不同 UI 端点。
 
-高级筛选查询化的完整入口清点与边界见 [Advanced Filter Query Plan](ADVANCED_FILTER_QUERY_PLAN.md)。稳定的标签、词性、字段存在性、来源和日期条件应归入 EntryFilter；IPA 生成、Gloss、形态和质量问题属于 feature result source。两者都可被词条列表窗口消费，但 repository 不应为了普通 filter 反向调用分析或质量模块。
+高级筛选查询化的完整入口清点与边界见 [Advanced Filter Query Plan](ADVANCED_FILTER_QUERY_PLAN.md)。稳定的标签、词性、字段存在性、来源有无/数量和日期条件应归入 EntryFilter；IPA 生成、Gloss、形态和质量问题属于 feature result source。两者都可被词条列表窗口消费，但 repository 不应为了普通 filter 反向调用分析或质量模块。
 
 建议分三层：
 
@@ -545,9 +527,7 @@ SQLite 路径应逐步用 SQL、持久索引、视图或临时表实现相同接
 - 数据分析 relation summary 与 root family widgets。
 - `/root-groups` 词根模式。
 - `/entry-relations/:entryId` 词汇网络详情。
-- `/entries?derivedFrom=` 衍生词查询。
 - 质量检查中的词源网络问题。
-- 未来高级筛选的 relation filter descriptor。
 
 建议拆分为可复用任务：
 
@@ -568,7 +548,7 @@ entryRelations
 sourceResolution
   source string -> matched entry / ambiguity / unresolved
 
-derivedFrom
+directDerivedEntries
   source entry/key -> derived entries
 ```
 

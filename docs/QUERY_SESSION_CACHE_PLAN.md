@@ -138,8 +138,6 @@ repository 继续负责：
   part,
   tags,                 // 稳定排序
   tagMode,
-  source,
-  derivedFrom,
   sort,
   fields,               // 稳定排序
   fuzzyFields           // 稳定排序

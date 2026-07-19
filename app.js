@@ -6592,8 +6592,6 @@ function localizeAdvancedFilterTitle(title) {
     ["中优先级质量问题", aText("中优先级质量问题", "Medium-priority quality issues")],
     ["Low-priority quality issues", aText("低优先级质量问题", "Low-priority quality issues")],
     ["低优先级质量问题", aText("低优先级质量问题", "Low-priority quality issues")],
-    ["Derived entries", aText("衍生词", "Derived entries")],
-    ["衍生词", aText("衍生词", "Derived entries")],
     ["Has definitions", aText("有释义", "Has definitions")],
     ["有释义", aText("有释义", "Has definitions")],
     ["No definitions", aText("无释义", "No definitions")],
@@ -8334,7 +8332,7 @@ function renderAnalysisOverview(report) {
   return `
     <section class="analysis-grid analysis-summary-grid">
       ${analysisMetricCard(aText("词条", "Entries"), report.entries.length, `${report.rootCount} ${aText("个词根", "roots")}`, viewAction("editor"))}
-      ${analysisMetricCard(aText("衍生词", "Derived"), report.derivedCount, `${report.isolatedRootCount} ${aText("个孤立词根", "isolated roots")}`, advancedFilterAction(aText("衍生词", "Derived entries"), report.derivedEntryIds))}
+      ${analysisMetricCard(aText("衍生词", "Derived"), report.derivedCount, `${report.isolatedRootCount} ${aText("个孤立词根", "isolated roots")}`, advancedFilterAction(aText("有来源", "Has sources"), report.sourceEntryIds))}
       ${analysisMetricCard(aText("释义覆盖", "Definition Coverage"), percentText(report.coverage.definitions), `${report.definitionCount} ${aText("条释义", "definitions")}`, advancedFilterAction(aText("有释义", "Has definitions"), report.definitionEntryIds, { variants: [{ title: aText("无释义", "No definitions"), entryIds: report.noDefinitionEntryIds }] }))}
       ${analysisMetricCard("IPA", percentText(report.coverage.ipa), `${report.ipa.syllableAverage} ${aText("平均音节", "avg syllables")}`, advancedFilterAction(aText("有 IPA", "Has IPA"), report.ipaEntryIds, { variants: [{ title: aText("无 IPA", "No IPA"), entryIds: report.noIpaEntryIds }] }))}
       ${analysisMetricCard(aText("形态学", "Morphology"), percentText(report.coverage.morphology), `${report.morphology.generatedForms} ${aText("个生成形式", "generated forms")}`, advancedFilterAction(aText("有形态表格", "Has morphology table"), report.morphologyEntryIds, { variants: [{ title: aText("无形态表格", "No morphology table"), entryIds: report.noMorphologyEntryIds }] }))}

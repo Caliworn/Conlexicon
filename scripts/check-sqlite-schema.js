@@ -54,6 +54,10 @@ async function runSqliteSchemaCheck() {
     const entryTagColumns = new Set(db.prepare("PRAGMA table_info(entry_tags)").all().map((row) => row.name));
     ["entry_id", "position", "tag"].forEach((column) => assert.equal(entryTagColumns.has(column), true, `missing entry_tags column: ${column}`));
     assert.equal(entryTagColumns.has("normalized_tag"), false);
+    const entryTagIndexes = new Set(db.prepare("PRAGMA index_list(entry_tags)").all().map((row) => row.name));
+    assert.equal(entryTagIndexes.has("idx_entry_tags_tag_entry"), true);
+    assert.equal(entryTagIndexes.has("idx_entry_tags_first_tag"), true);
+    assert.equal(entryTagIndexes.has("idx_entry_tags_tag"), false);
     const entrySearchValueColumns = new Set(db.prepare("PRAGMA table_info(entry_search_values)").all().map((row) => row.name));
     ["entry_id", "field", "source_type", "source_id", "source_position", "value_type", "raw_value", "normalized_value"]
       .forEach((column) => assert.equal(entrySearchValueColumns.has(column), true, `missing entry_search_values column: ${column}`));
@@ -74,6 +78,28 @@ async function runSqliteSchemaCheck() {
     const sourceDictionary = sampleSqliteDictionary();
     await repository.importDictionarySnapshot(sourceDictionary);
     const projectionDb = repository.openDictionaryDatabase(sourceDictionary.id);
+    const automaticPartPlan = projectionDb.prepare(`
+      EXPLAIN QUERY PLAN
+      SELECT e.id
+      FROM entries e
+      WHERE e.id IN (
+        SELECT first_tag.entry_id
+        FROM entry_tags first_tag
+        WHERE first_tag.position = 0 AND first_tag.tag = ?
+      )
+    `).all("n").map((row) => row.detail || "").join("\n");
+    assert.match(automaticPartPlan, /idx_entry_tags_first_tag/);
+    const manualPartPlan = projectionDb.prepare(`
+      EXPLAIN QUERY PLAN
+      SELECT e.id
+      FROM entries e
+      WHERE e.id IN (
+        SELECT part_tags.entry_id
+        FROM entry_tags part_tags
+        WHERE part_tags.tag = ?
+      )
+    `).all("n").map((row) => row.detail || "").join("\n");
+    assert.match(manualPartPlan, /idx_entry_tags_tag_entry/);
     const importedSearchRows = projectionDb.prepare(`
       SELECT field, source_type AS sourceType, source_id AS sourceId, source_position AS sourcePosition,
         value_type AS valueType, raw_value AS rawValue, normalized_value AS normalizedValue

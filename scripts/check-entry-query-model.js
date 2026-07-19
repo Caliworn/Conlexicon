@@ -16,8 +16,6 @@ function checkLegacyTransportNormalization() {
     part: " N ",
     tags: "motion,n,motion",
     tagMode: "all",
-    source: " Root ",
-    derivedFrom: " Parent ",
     sort: "updatedDesc",
     limit: "200",
     cursor: "cursor",
@@ -27,8 +25,6 @@ function checkLegacyTransportNormalization() {
     filter: {
       part: "N",
       tags: { values: ["motion", "n"], mode: "all" },
-      sourceText: "root",
-      derivedFrom: { entryId: "", reference: "parent" },
       presence: [],
       sourceCount: null,
       activityDays: [],
@@ -53,8 +49,6 @@ function checkCanonicalFilterNormalization() {
   const filter = normalizeEntryFilter({
     part: "v",
     tags: { values: ["motion", "derived", "motion"], mode: "any" },
-    sourceText: "root",
-    derivedFrom: { entryId: "entry-root", reference: "root" },
     presence: { definition: true, ipa: false },
     sourceCount: { min: 2, max: 4 },
     activityDays: [
@@ -65,8 +59,6 @@ function checkCanonicalFilterNormalization() {
   assert.deepEqual(filter, {
     part: "v",
     tags: { values: ["derived", "motion"], mode: "any" },
-    sourceText: "root",
-    derivedFrom: { entryId: "entry-root", reference: "root" },
     presence: [
       { field: "definition", present: true },
       { field: "ipa", present: false },

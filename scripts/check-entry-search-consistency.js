@@ -2,7 +2,6 @@
 const assert = require("node:assert/strict");
 
 const { normalizeDictionary } = require("../lib/dictionary-model");
-const entryRelationsModel = require("../lib/entry-relations-model");
 const entrySearchModel = require("../lib/entry-search-model");
 const morphologyModel = require("../lib/morphology-model");
 const searchNormalizationModel = require("../lib/search-normalization-model");
@@ -11,10 +10,6 @@ const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-reposit
 const { createTempSqliteRepository } = require("./sqlite-check-utils");
 
 const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
-
-function normalizeText(value) {
-  return searchNormalizationModel.normalizeSearchText(value);
-}
 
 function splitList(value) {
   return String(value || "")
@@ -66,22 +61,6 @@ function expectedEntryIds(dictionary, query = {}) {
   const fuzzyFields = entrySearchModel.normalizeFuzzyFields(query.fuzzyFields);
   const normalizedQuery = searchRuntime.normalizeText(query.q || query.query);
   const tags = splitList(query.tags).map(searchNormalizationModel.normalizeStructuralKey);
-  const source = normalizeText(query.source);
-  const derivedFrom = normalizeText(query.derivedFrom);
-  const relationIndex = entryRelationsModel.buildEntryRelationIndex(dictionary, { normalizeText });
-  const derivedIds = !derivedFrom
-    ? null
-    : new Set((() => {
-      const target = entryRelationsModel.resolveSourceEntry(derivedFrom, dictionary, {
-        normalizeText: searchRuntime.normalizeText,
-        index: relationIndex,
-      });
-      const derived = target
-        ? entryRelationsModel.findDerivedEntries(target, dictionary, { normalizeText, index: relationIndex })
-        : relationIndex.derivedBySourceKey.get(derivedFrom) || [];
-      return derived.map((entry) => entry.id);
-    })());
-
   return [...(dictionary.entries || [])]
     .filter((entry) => {
       if (normalizedQuery && !entrySearchModel.entryMatchesSearchText(entry, dictionary, query.q || query.query, {
@@ -107,10 +86,7 @@ function expectedEntryIds(dictionary, query = {}) {
           return false;
         }
       }
-      if (source && !(entry.etymology?.sources || []).some((item) => normalizeText(item) === source)) {
-        return false;
-      }
-      return !derivedIds || derivedIds.has(entry.id);
+      return true;
     })
     .sort((left, right) => compareEntries(left, right, query.sort || "lemmaAsc"))
     .map((entry) => entry.id);
@@ -417,8 +393,6 @@ async function main() {
 
     await assertDirectQuery(repository, dictionary, { q: "CommonToken", fields: "definitions", part: "n" });
     await assertDirectQuery(repository, dictionary, { q: "CommonToken", fields: "definitions", tags: "RawTagToken" });
-    await assertDirectQuery(repository, dictionary, { q: "CommonToken", fields: "definitions", source: "ProtoSourceToken" });
-    await assertDirectQuery(repository, dictionary, { q: "CommonToken", fields: "definitions", derivedFrom: "AlphaRoot" });
     await assertDirectQuery(repository, dictionary, { q: "CommonToken", fields: "definitions", part: NO_PART_FILTER_VALUE });
     await assertDirectQuery(repository, dictionary, { q: "StructuralToken", fields: "definitions", tags: "N" }, ["entry-upper-tag"]);
     await assertDirectQuery(repository, dictionary, { q: "StructuralToken", fields: "definitions", tags: "n" }, ["entry-lower-tag"]);
@@ -440,12 +414,6 @@ async function main() {
       ["morph-lower-tag"],
       "automatic morphology must match lowercase structural tags exactly",
     );
-    await assertDirectQuery(repository, dictionary, {
-      q: "CommonToken",
-      fields: "definitions",
-      source: "protosourcetoken",
-    }, ["entry-alpha-root"]);
-
     const summaryResult = await assertDirectQuery(repository, dictionary, {
       q: "DefinitionToken",
       fields: "definitions",

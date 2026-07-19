@@ -532,7 +532,7 @@ lib/
 4. 若继续阶段 B，优先处理默认 SQLite 后的清债项：
    - 查询缓存 Q1–Q4 已完成前端查询 LRU、后端运行时会话、in-flight 合并、词典级 generation 失效、summary DTO、按需详情、词根组子项懒加载、版本化 cursor 和纯滚动数据窗口。`/entries/:entryId/location` 与 `/root-groups/location` 已接入自动滚动：普通目标直接装入返回窗口，词根衍生词先定位父级、保留多来源根语境，再读取整组子项。前端不再通过完整活动词典 snapshot 猜测未加载页号；SWR 保留的旧列表也不能提前完成新查询的滚动请求。
    - 两段式 stale-while-revalidate 已接入查询首窗和按需词条详情：200ms 内保持原内容，但旧详情从请求开始即进入 `inert`；超过后以统一覆盖视觉显示详情遮罩和变淡列表的“正在更新”。首次无旧内容仍直接显示加载状态，失败直接进入现有错误状态，不重试或把旧内容当作成功结果。词条切换和词汇网络返回已改为局部提交，只同步已渲染卡片选中态、详情和必要滚动，不再调用全局 `render()` 或重建查询窗口。详情来源、详情/完整编辑衍生词和词汇网络已共用 `/entry-relations/:entryId` 与前端关系缓存，不再重建完整词典关系索引。
-   - 高级筛选查询化 F0–F2 已完成：共享 `EntryQuery/EntryFilter` 已统一现有 `/entries` 参数、查询 descriptor、cursor digest 与缓存身份；字段存在性、来源数量、UTC 日期和按词条 ID 的衍生关系已接入同一 SQLite 编译器及定位 API。下一步进入 F3，将可稳定查询的高级筛选前端状态从完整 `entryIds` 数组迁为结构 descriptor。IPA、Gloss、形态和质量问题必须走各自 feature result session，不能伪装成 repository 普通 predicate。
+   - 高级筛选查询化 F0–F2 已完成：共享 `EntryQuery/EntryFilter` 已统一现有 `/entries` 参数、查询 descriptor、cursor digest 与缓存身份；字段存在性、来源数量和 UTC 日期已接入同一 SQLite 编译器及定位 API。与词条详情/词汇网络重复的来源文本、指定来源词条筛选已删除；总览“衍生词”入口复用“有来源”条件。下一步进入 F3，将可稳定查询的高级筛选前端状态从完整 `entryIds` 数组迁为结构 descriptor。IPA、Gloss、形态和质量问题必须走各自 feature result session，不能伪装成 repository 普通 predicate。
    - 普通词条和词根模式的搜索、窗口、定位与关系读取已完成查询化；候选索引是否采用 FTS/ngram 由真实基准决定，不再把这些已完成路径列为待接线项。
    - 形态学结构化存储已完成；DSL v2、表格结构编辑与 layout 设计暂缓，除明确 bug 外不要继续扩展其 schema。数据分析升级时删除 `app.js` 的旧形态单表适配，改为直接调用共享 morphology model。
    - 将数据分析、质量检查推进为按需 API + query planner。
