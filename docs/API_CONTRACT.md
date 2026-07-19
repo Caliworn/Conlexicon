@@ -31,7 +31,7 @@
 
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/state` | 读取轻量应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme }` | `dictionaries` 只包含 metadata 和 `summary.entryCount/rootCount`；前端把它当轻量索引，并按需读取当前词典快照。这里的“轻量”指响应不含词典正文；冷启动计算 `rootCount` 仍可能建立稳定词根拓扑，不等于常数时间。 |
+| `GET` | `/api/state` | 读取轻量应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme }` | `dictionaries` 只包含 metadata 和 summary；所有词典都返回 `entryCount`，只有当前词典返回 `rootCount`。前端把它当轻量索引，并按需读取当前词典快照；未加载词典不会因此建立词根拓扑。 |
 | `PUT` | `/api/preferences` | 保存全局界面偏好 | `{ uiLanguage, uiTheme }` | 目前支持 `uiLanguage` 和 `uiTheme`。 |
 
 ### 导入、导出与词典生命周期
@@ -192,7 +192,7 @@ GET /api/dictionaries/:id/summary
 GET /api/dictionaries/:id/settings
 ```
 
-SQLite repository 的 `readState()` / `listDictionaries()` 已只返回词典 metadata 和 summary；前端启动流程始终将 `/api/state` 的 `dictionaries` 当作 metadata，再按需加载 active dictionary。`entryCount` 使用 SQL count，`rootCount` 复用稳定词根拓扑；因此 payload 已收窄，但首次拓扑构建仍是可继续优化的启动成本。
+SQLite repository 的 `readState()` / `listDictionaries()` 已只返回词典 metadata 和 summary；前端启动流程始终将 `/api/state` 的 `dictionaries` 当作 metadata，再按需加载 active dictionary。`entryCount` 对每本词典使用轻量 SQL count；`rootCount` 只为当前词典返回并复用稳定词根拓扑。未加载词典不会在启动或打开词典管理页时建立拓扑，切换为当前词典后才会建立。
 
 示例：
 
@@ -217,7 +217,7 @@ GET /api/dictionaries
       updatedAt,
       summary: {
         entryCount,
-        rootCount
+        rootCount // 仅当前词典存在
       }
     }
   ]
@@ -525,7 +525,6 @@ SQLite 路径应逐步用 SQL、持久索引、视图或临时表实现相同接
 以下能力应共享同一套 relation/index 语义：
 
 - 词典标题的 `rootCount`。
-- 词典管理列表中的 `rootCount`。
 - 数据分析 relation summary 与 root family widgets。
 - `/root-groups` 词根模式。
 - `/entry-relations/:entryId` 词汇网络详情。

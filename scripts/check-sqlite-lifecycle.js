@@ -34,20 +34,33 @@ async function runSqliteLifecycleCheck() {
       language: "two",
     }));
 
+    let topologyBuilds = 0;
+    const buildRootTopology = repository.rootTopologyFromDatabase.bind(repository);
+    repository.rootTopologyFromDatabase = (...args) => {
+      topologyBuilds += 1;
+      return buildRootTopology(...args);
+    };
     let state = await repository.readState();
+    assert.equal(topologyBuilds, 1, "readState should build a topology only for the active dictionary");
     assert.equal(state.activeDictionaryId, second.id);
     assert.deepEqual(state.dictionaries.map((dictionary) => dictionary.id), [first.id, second.id]);
     assert.equal(state.dictionaries.every((dictionary) => dictionary.entries === undefined), true);
     assert.deepEqual(state.dictionaries.map((dictionary) => dictionary.summary), [
-      { entryCount: 0, rootCount: 0 },
+      { entryCount: 0 },
       { entryCount: 0, rootCount: 0 },
     ]);
 
     await repository.activateDictionary(first.id);
     state = await repository.readState();
+    assert.equal(topologyBuilds, 2, "activating another dictionary should build its topology on demand");
     assert.equal(state.activeDictionaryId, first.id);
+    assert.deepEqual(state.dictionaries.map((dictionary) => dictionary.summary), [
+      { entryCount: 0, rootCount: 0 },
+      { entryCount: 0 },
+    ]);
     assert.equal((await repository.exportDictionary()).id, first.id);
     assert.deepEqual(await repository.listDictionaries(), state.dictionaries);
+    assert.equal(topologyBuilds, 2, "listing dictionaries should not build topologies for inactive dictionaries");
     assert.equal((await repository.getDictionarySnapshot(second.id)).name, "Second");
 
     const preferences = await repository.updatePreferences({ uiLanguage: "en", uiTheme: "dark" });

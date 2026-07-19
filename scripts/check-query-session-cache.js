@@ -98,9 +98,9 @@ function checkRootTopologyCache() {
   let now = 1000;
   let builds = 0;
   const cache = new RootTopologyCache({
-    maxDictionaries: 2,
     now: () => now,
   });
+  assert.equal(cache.maxDictionaries, 2, "the default topology LRU should retain current and previous dictionaries");
   const build = (rootId) => {
     builds += 1;
     const group = { rootId, derivedIds: [] };
@@ -453,8 +453,9 @@ async function checkRepositoryIntegration() {
       topology.groupsByRootId.get("entry-root")?.derivedIds.includes("entry-derived"),
       "the reverse topology indexes should expose group membership without scanning groups",
     );
-    const metadataWithRootCount = await repository.getDictionaryMeta(dictionary.id);
-    assert.equal(metadataWithRootCount.summary.rootCount, rootFirst.pageInfo.total);
+    const stateWithRootCount = await repository.readState();
+    const activeMetadata = stateWithRootCount.dictionaries.find(({ id }) => id === dictionary.id);
+    assert.equal(activeMetadata.summary.rootCount, rootFirst.pageInfo.total);
     assert.equal(topologyBuilds, 1, "dictionary summary root counts should reuse the stable topology");
     assert.deepEqual(
       rootFirst.items.map((group) => group.root.id),

@@ -182,7 +182,7 @@ GET /api/export?dictionaryId=...&format=xlsx
 }
 ```
 
-词典名称、语言、描述、`entryCount/rootCount` 等从 SQLite 查询；`entryCount` 是直接 SQL count，`rootCount` 复用稳定词根拓扑，因此这里只保证不读取完整词典正文，不保证冷启动为常数时间。这些派生值不写入 `index.json` 作为第二份真相。除非未来确有启动性能需求，否则不要为了过渡期存储分流给 `index.json` 增加 `storage/path` 字段。
+词典名称、语言、描述和 `entryCount` 从 SQLite 轻量查询；`rootCount` 只为当前词典计算并复用稳定词根拓扑，未加载词典不会因启动或词典管理页建立拓扑。这些派生值不写入 `index.json` 作为第二份真相。除非未来确有启动性能需求，否则不要为了过渡期存储分流给 `index.json` 增加 `storage/path` 字段。
 
 ## 9. 失败与诊断
 

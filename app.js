@@ -1815,8 +1815,9 @@ async function ensureDictionarySnapshotLoaded(dictionaryId) {
   if (!dictionaryId || loadedDictionaryIds.has(dictionaryId)) {
     return null;
   }
+  const metadataSummary = state.dictionaries.find((dictionary) => dictionary.id === dictionaryId)?.summary;
   const snapshot = await fetchDictionarySnapshot(dictionaryId);
-  const normalized = replaceDictionaryInState(snapshot);
+  const normalized = replaceDictionaryInState({ ...snapshot, summary: metadataSummary });
   loadedDictionaryIds.add(normalized.id);
   return normalized;
 }
@@ -6857,6 +6858,10 @@ function dictionaryStatsText(dictionary) {
   return `${dictionaryEntryCount(dictionary)} ${t("entries")} · ${dictionaryRootCountSummary(dictionary)} ${t("roots")}`;
 }
 
+function dictionaryManagerStatsText(dictionary) {
+  return `${dictionaryEntryCount(dictionary)} ${t("entries")}`;
+}
+
 function dictionaryEntryCount(dictionary) {
   const summaryCount = dictionary?.summary?.entryCount;
   return Number.isFinite(summaryCount) ? summaryCount : dictionary?.entries?.length || 0;
@@ -9387,7 +9392,7 @@ function renderDictionaryManager() {
     card.innerHTML = `
       <div>
         <strong>${escapeHtml(dictionary.name)}</strong>
-        <small>${escapeHtml(dictionaryStatsText(dictionary))}</small>
+        <small>${escapeHtml(dictionaryManagerStatsText(dictionary))}</small>
       </div>
       <p>${escapeHtml(dictionary.description || t("noDescription"))}</p>
       <div class="card-actions">
