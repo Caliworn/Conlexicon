@@ -51,6 +51,9 @@ async function runSqliteSchemaCheck() {
     ["id", "position", "lemma", "pronunciation", "notes", "etymology_description", "morphology_mode", "created_at", "updated_at", "sort_key"]
       .forEach((column) => assert.equal(entryColumns.has(column), true, `missing entries column: ${column}`));
     assert.equal(entryColumns.has("entry_json"), false);
+    const entryIndexes = new Set(db.prepare("PRAGMA index_list(entries)").all().map((row) => row.name));
+    assert.equal(entryIndexes.has("idx_entries_created_at"), true);
+    assert.equal(entryIndexes.has("idx_entries_updated_at"), true);
     const entryTagColumns = new Set(db.prepare("PRAGMA table_info(entry_tags)").all().map((row) => row.name));
     ["entry_id", "position", "tag"].forEach((column) => assert.equal(entryTagColumns.has(column), true, `missing entry_tags column: ${column}`));
     assert.equal(entryTagColumns.has("normalized_tag"), false);

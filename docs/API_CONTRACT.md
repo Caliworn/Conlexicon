@@ -104,7 +104,7 @@
   }
   ```
 
-  所有字段均可省略。`tags.mode` 为 `any` 或 `all`；`presence.field` 支持 `definition`、`example`、`entryNote`、`source`、`ipa`；`sourceCount` 是包含边界的非负整数区间，`max` 可省略；`activityDays.field` 支持 `created`、`updated`，日期按 UTC `YYYY-MM-DD` 比较。同一 presence 或日期字段不得给出冲突条件。当前 `entryNote` 只表示词条级备注，不包含释义备注或形态组备注。
+  所有字段均可省略。`tags.mode` 为 `any` 或 `all`；`presence.field` 支持 `definition`、`example`、`entryNote`、`source`、`ipa`；`sourceCount` 是包含边界的非负整数区间，`max` 可省略，同一查询只执行一次来源计数；`activityDays.field` 支持 `created`、`updated`，日期按 UTC `YYYY-MM-DD` 的 `[dayStart, nextDayStart)` 半开范围比较。同一 presence 或日期字段不得给出冲突条件。当前 `entryNote` 只表示词条级备注，不包含释义备注或形态组备注。
 - `fields`：逗号分隔的搜索字段白名单；当前支持 `lemma`、`pronunciation`、`tags`、`definitions`、`examples`、`notes`、`etymology`、`morphology`。为空或全部无效时搜索全部字段。
 - `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；仅对同时出现在 `fields` 中的字段生效。
 - 基础搜索逐个独立字段值匹配：一条释义、一个标签、一个来源或一段备注必须自行包含查询文本，查询不会跨多个值拼接命中；`notes` 中的词条备注、释义备注和每个词条形态组备注也分别作为独立值。多标签组合等条件应使用高级筛选。自由文本按当前词典的 `settings.search.normalization` 处理。SQLite 的严格及 fuzzy 查询均直接读取静态 `entry_search_values` 和按需读取形态 `entry_morphology_search_values`；fuzzy 通过连接级确定性函数复用共享搜索模型的评分语义。该路径支持 NFC、Unicode case folding 和自定义等价规则。结构键和词源关系键不套用该自由文本配置。
@@ -181,7 +181,7 @@
 - 普通保存优先增加细粒度端点，不再回退到完整词典 PUT。
 - `GET /api/state` 是轻量启动状态入口；普通启动只应读取词典 metadata/summary，再通过 `GET /api/dictionaries/:id` 或专用读取端点按需加载当前词典内容。
 - 语料库下一步可从整份 corpus 模块保存拆成块、层、单元级 changeset。
-- 搜索、词根模式和词汇关系读取已依赖 repository 查询/索引；高级筛选、数据分析和质量检查仍应继续迁移，不能长期让前端扫描大型完整快照。
+- 搜索、词根模式、词汇关系读取及稳定 SQL 高级筛选已依赖 repository 查询/索引；数据分析、质量检查及 IPA/Gloss/形态功能结果集仍应继续迁移，不能长期让前端扫描大型完整快照。
 - 短期不引入词典级 revision。等对象级增量端点稳定后，再基于目标对象 `updatedAt` 做轻量乐观锁。
 
 ## 读取 API 现状与后续草案
@@ -491,7 +491,7 @@ GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&so
 
 数据分析 API 化不应只服务“数据分析”页面。词典标题、词典管理、词根模式、词汇网络、质量检查、高级筛选和未来诊断修复都会用到相同的统计、关系解析和索引能力。后续应先建立共享查询层，再在其上实现不同 UI 端点。
 
-高级筛选查询化的完整入口清点与边界见 [Advanced Filter Query Plan](ADVANCED_FILTER_QUERY_PLAN.md)。稳定的标签、词性、字段存在性、来源有无/数量和日期条件应归入 EntryFilter；IPA 生成、Gloss、形态和质量问题属于 feature result source。两者都可被词条列表窗口消费，但 repository 不应为了普通 filter 反向调用分析或质量模块。
+高级筛选查询化的完整入口清点与边界见 [Advanced Filter Query Plan](ADVANCED_FILTER_QUERY_PLAN.md)。稳定的标签、词性、字段存在性、来源有无/数量、日期条件和当前搜索字段已经通过 EntryFilter/EntrySearch 接入词条窗口；IPA 生成、Gloss、形态和质量问题仍属于 feature result source。两者最终都由词条列表窗口消费，但 repository 不应为了普通 filter 反向调用分析或质量模块。
 
 建议分三层：
 

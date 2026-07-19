@@ -1027,7 +1027,7 @@ async function checkReadApiConsistency(repository) {
           templateGroupId: "morph-n-group",
           overrides: { "mtable-n-main": { "0,0": "manual-beta-form" } },
         }],
-        createdAt: "2026-01-02T00:00:00.000Z",
+        createdAt: "2026-01-02T23:59:59.999Z",
         updatedAt: "2026-01-02T00:00:00.000Z",
       },
       {
@@ -1147,6 +1147,13 @@ async function checkReadApiConsistency(repository) {
     await assertStructuredEntryFilter(
       repository,
       dictionary.id,
+      { presence: { source: true } },
+      ["entry-beta"],
+      { q: "movement", fields: "definitions" },
+    );
+    await assertStructuredEntryFilter(
+      repository,
+      dictionary.id,
       {
         tags: { values: ["n"], mode: "all" },
         presence: { source: true },
@@ -1216,6 +1223,15 @@ async function checkReadApiConsistency(repository) {
     assert.equal(locatedFilteredEntry.statusCode, 200);
     assert.equal(locatedFilteredEntry.body.location.found, true);
     assert.deepEqual(locatedFilteredEntry.body.items.map((entry) => entry.id), ["entry-beta"]);
+
+    const locatedFilteredSearchEntry = await callApi(
+      repository,
+      "GET",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/entry-beta/location?filter=${encodeURIComponent(betaFilter)}&q=movement&fields=definitions&limit=2`,
+    );
+    assert.equal(locatedFilteredSearchEntry.statusCode, 200);
+    assert.equal(locatedFilteredSearchEntry.body.location.found, true);
+    assert.deepEqual(locatedFilteredSearchEntry.body.items.map((entry) => entry.id), ["entry-beta"]);
 
     const excludedFilteredEntry = await callApi(
       repository,

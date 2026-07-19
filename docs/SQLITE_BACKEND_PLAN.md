@@ -270,6 +270,7 @@ entry_morphology_cell_overrides(
 
 ```text
 idx_entries_lemma
+idx_entries_created_at
 idx_entries_updated_at
 idx_entry_tags_tag
 idx_entry_sources_source_key
@@ -560,7 +561,7 @@ CREATE TABLE entry_morphology_search_values (
 
 按当前依赖关系建议依次处理：
 
-1. 高级筛选 F1/F2 的统一 EntryQuery/EntryFilter 与稳定条件 SQL 编译已完成；词性/标签 P0 查询计划也已改为索引驱动候选集。下一步按 F3 将前端可查询筛选从完整 ID 数组迁入现有 `/entries` 会话、窗口与定位。分析/质量类结果使用独立 result session。
+1. 高级筛选 F1–F3 已完成：统一 EntryQuery/EntryFilter、稳定条件 SQL 编译和前端 descriptor 状态现已接入 `/entries` 会话、窗口、定位、排序与搜索；标签/词性查询继续使用索引驱动候选集。IPA、Gloss、形态和质量类结果下一步进入独立 feature result session。
 2. 把数据分析和质量检查推进为按需 API + query planner。数据分析词根家族 slice 应直接消费 `currentRootTopology()`：只返回 `{ rootId, lemma, derivedCount }` 和必要的窗口信息，不返回全部 `derivedIds`；可配置 Top N 通过 `limit` 表达。全局衍生词数量不得累加各家族数量，以免多来源词条重复计数。迁移后删除前端重复的关系索引/词根分组，以及未被 UI 消费的 `rootFamilies[].derivedEntryIds`。质量检查中的词源查询也应复用同一稳定拓扑。
 3. 数据分析升级时直接消费当前 morphology model，删除前端临时旧单表视图；不要在 repository 恢复旧形态输出。
 4. 仅在基准表明确认线性扫描成为主要瓶颈后，再选择 FTS、ngram 或其他候选索引。
