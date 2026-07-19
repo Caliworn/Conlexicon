@@ -1923,9 +1923,15 @@ body.dark-theme .entry-card p {
   transition: border-color 120ms ease, background 120ms ease;
 }
 
-.root-toggle-button:hover {
+.root-toggle-button:hover:not(:disabled) {
   border-color: var(--accent);
   background: var(--accent-soft);
+}
+
+.root-toggle-button:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .root-toggle-button .chevron-icon {

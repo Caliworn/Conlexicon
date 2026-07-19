@@ -5616,8 +5616,10 @@ function renderRootModeRow(row) {
   wrapper.append(createEntryCard(group.root, { root: true, rootId: group.root.id }));
   if (group.derivedCount) {
     const toggle = document.createElement("button");
+    const searchAutoExpanded = rootSearchExpandsGroups() && rootGroupMatchedDerivedCount(group) > 0;
     toggle.type = "button";
     toggle.className = `root-toggle-button${expanded ? " expanded" : ""}`;
+    toggle.disabled = searchAutoExpanded;
     toggle.dataset.appTooltip = "always";
     toggle.setAttribute("aria-label", expanded ? t("collapse") : t("expand"));
     toggle.innerHTML = '<span class="chevron-icon" aria-hidden="true"></span>';

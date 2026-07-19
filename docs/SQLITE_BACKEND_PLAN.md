@@ -554,7 +554,7 @@ CREATE TABLE entry_morphology_search_values (
 - NFC、case folding 或自定义等价规则变化时全量重建 `normalized_value`。
 - 标签显示替换不影响形态值，因此不会触发形态 projection 重建。
 
-严格及 fuzzy 查询在没有结构筛选时直接扫描所选静态/形态 projection；存在词性、标签或其他结构条件时，则把现有 SQL 条件编译为物化 `candidates` 关系，并以候选为外层连接 `entry_search_values` / `entry_morphology_search_values`。搜索会话冷构建不再把候选 ID 传回 JavaScript，也不再采用“每 500 个 ID 分批、超过 1000 个则全投射扫描后由 JS 求交”的固定阈值。严格字段执行 `instr()`，fuzzy 字段通过连接级 `conlexicon_fuzzy_match()` 复用共享评分；首次查询保存最终有序命中 ID 与反向下标，repository 只为当前窗口回读完整命中 records。10k 与临时 30k 形态压力词典的同进程交替 A/B 中，约 14% 候选的静态/形态严格与 fuzzy 搜索提升约 1.9–3.3 倍，约 2% 候选提升约 1.0–1.5 倍，无结构筛选提升约 1.1–1.9 倍；接近全量且带结构条件的形态严格查询仍可能与旧全投射扫描持平或慢约 5%，暂不为该边缘形状重新引入经验阈值。两条路径均不再导出完整 snapshot 或逐词条动态生成形态，并返回与共享 record 契约一致的 `searchHits`。fuzzy 仍需对实际候选 records 线性运行评分，后续是否加入真正候选索引应由真实词典基准决定。
+严格及 fuzzy 查询在没有结构筛选时直接扫描所选静态/形态 projection；存在词性、标签或其他结构条件时，则把现有 SQL 条件编译为物化 `candidates` 关系，并以候选为外层连接 `entry_search_values` / `entry_morphology_search_values`。搜索会话冷构建不再把候选 ID 传回 JavaScript，也不再采用“每 500 个 ID 分批、超过 1000 个则全投射扫描后由 JS 求交”的固定阈值。严格字段执行 `instr()`，fuzzy 字段通过连接级 `conlexicon_fuzzy_match()` 复用共享评分；首次查询保存最终有序命中 ID 与反向下标，repository 只为当前窗口回读完整命中 records。词根模式搜索复用同一投射匹配 SQL，但只读取去重命中 ID，不执行列表所需的词条排序，再将命中集合映射到稳定拓扑；旧的全词典候选数组、经验分批和 JavaScript eligible-set 过滤路径已经删除。10k 与临时 30k 形态压力词典的同进程交替 A/B 中，约 14% 候选的静态/形态严格与 fuzzy 搜索提升约 1.9–3.3 倍，约 2% 候选提升约 1.0–1.5 倍，无结构筛选提升约 1.1–1.9 倍；接近全量且带结构条件的形态严格查询仍可能与旧全投射扫描持平或慢约 5%，暂不为该边缘形状重新引入经验阈值。两条路径均不再导出完整 snapshot 或逐词条动态生成形态，并返回与共享 record 契约一致的 `searchHits`。fuzzy 仍需对实际候选 records 线性运行评分，后续是否加入真正候选索引应由真实词典基准决定。
 
 ## 9. 当前下一批优化建议
 

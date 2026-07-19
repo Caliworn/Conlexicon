@@ -163,7 +163,7 @@ repository 继续负责：
 | `/entries` 严格 projection 搜索 | 后端会话 | 首次扫描 projection 形成有序命中 ID；总数、后续窗口和定位复用同一结果，不再重复 `COUNT`、页面 predicate 和排名 |
 | `/entries` fuzzy projection 搜索 | 后端会话 | 当前需要扫描候选 records 并形成完整命中集合 |
 | `/root-groups` 无搜索 | 稳定拓扑缓存 + 后端查询会话 | 拓扑按独立 relation generation 构建一次，并维护 `entryId → rootIds`、`rootId → group` 反向索引；查询会话只保存排序后的组视图、组索引和窗口状态 |
-| `/root-groups` 带搜索 | 稳定拓扑缓存 + SQLite projection 命中集合 + 后端查询会话 | 搜索条件只筛选 root/derived ID，不再重建关系或导出完整 snapshot；fuzzy projection 扫描仍可继续优化候选索引 |
+| `/root-groups` 带搜索 | 稳定拓扑缓存 + SQLite projection 命中集合 + 后端查询会话 | 与普通词条搜索共享同一投射匹配 SQL；词根模式只读取去重命中 ID，不执行无用的词条排序，再将命中集合映射到缓存拓扑。搜索条件不再重建关系或导出完整 snapshot；fuzzy projection 扫描仍可继续优化候选索引 |
 | `/facets` | 独立的小型版本化响应缓存 | payload 小，不需要分页会话 |
 | 高级筛选 | 等 filter descriptor API 落地后复用 entries 会话 | 不能继续缓存一组前端临时 ID |
 

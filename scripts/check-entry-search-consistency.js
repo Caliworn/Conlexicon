@@ -227,11 +227,16 @@ async function main() {
     await context.repository.importDictionarySnapshot(source, { overwrite: true });
     let dictionary = await context.repository.exportDictionary(source.id);
     const repository = context.repository;
-    let idArraySearchCalls = 0;
-    const originalIdArraySearch = repository.entrySearchMatchedIdsForEntryIds.bind(repository);
-    repository.entrySearchMatchedIdsForEntryIds = (...args) => {
-      idArraySearchCalls += 1;
-      return originalIdArraySearch(...args);
+    let orderedProjectionSearchCalls = 0;
+    let unorderedProjectionSearchCalls = 0;
+    const originalProjectionSearch = repository.entrySearchMatchedIdsFromProjectionQuery.bind(repository);
+    repository.entrySearchMatchedIdsFromProjectionQuery = (...args) => {
+      if (args[2]?.ordered === false) {
+        unorderedProjectionSearchCalls += 1;
+      } else {
+        orderedProjectionSearchCalls += 1;
+      }
+      return originalProjectionSearch(...args);
     };
 
     const alphaRoot = dictionary.entries.find((entry) => entry.id === "entry-alpha-root");
@@ -370,6 +375,21 @@ async function main() {
       fields: "definitions,morphology",
       fuzzyFields: "definitions",
     }, ["entry-alpha-root"]);
+    const derivedRootSearch = await repository.queryRootGroups(dictionary.id, {
+      q: "DerivedDefinition",
+      fields: "definitions",
+      limit: 100,
+    });
+    assert.deepEqual(derivedRootSearch.items.map((group) => group.root.id), ["entry-alpha-root"]);
+    assert.equal(derivedRootSearch.items[0].rootMatches, false);
+    assert.equal(derivedRootSearch.items[0].matchedDerivedCount, 1);
+    const fuzzyMorphologyRootSearch = await repository.queryRootGroups(dictionary.id, {
+      q: "MorphTkn",
+      fields: "morphology",
+      fuzzyFields: "morphology",
+      limit: 100,
+    });
+    assert.deepEqual(fuzzyMorphologyRootSearch.items.map((group) => group.root.id), ["entry-upper-tag"]);
     const fuzzySummaryResult = await assertDirectQuery(repository, dictionary, {
       q: "DefTkn",
       fields: "definitions",
@@ -496,11 +516,8 @@ async function main() {
       fields: "lemma",
       fuzzyFields: "lemma",
     }, ["entry-sharp-s"]);
-    assert.equal(
-      idArraySearchCalls,
-      0,
-      "entry searches must compose structural candidates with search projections in SQL",
-    );
+    assert.ok(orderedProjectionSearchCalls > 0, "entry searches must use ordered projection SQL");
+    assert.ok(unorderedProjectionSearchCalls > 0, "root searches must use unordered projection SQL");
 
     console.log("Entry-search S4 strict and fuzzy static/morphology projection checks passed.");
   } finally {
