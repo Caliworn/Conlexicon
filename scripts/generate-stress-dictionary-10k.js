@@ -10,7 +10,10 @@ const INDEX_PATH = path.join(DATA_DIR, "index.json");
 
 const DICTIONARY_ID = process.env.CONLEXICON_STRESS_DICTIONARY_ID || "dict-7a4f7f2b-71dd-4c9f-8d3f-7bb391000000";
 const LEGACY_DICTIONARY_IDS = ["stress-test-10k"];
-const ENTRY_COUNT = 10000;
+const ENTRY_COUNT = Math.max(
+  1,
+  Number.parseInt(process.env.CONLEXICON_STRESS_ENTRY_COUNT, 10) || 10000,
+);
 const CREATED_AT = "2026-07-01T00:00:00.000Z";
 const MORPHOLOGY_STRESS = process.env.CONLEXICON_STRESS_MORPHOLOGY === "1";
 
@@ -241,9 +244,11 @@ function buildDictionary() {
 
   return {
     id: DICTIONARY_ID,
-    name: MORPHOLOGY_STRESS ? "Morphology Stress Test 10k" : "Stress Test 10k",
+    name: MORPHOLOGY_STRESS
+      ? `Morphology Stress Test ${ENTRY_COUNT}`
+      : `Stress Test ${ENTRY_COUNT}`,
     language: "Synthetic",
-    description: "Deterministic 10,000-entry dictionary for UI stress testing.",
+    description: `Deterministic ${ENTRY_COUNT}-entry dictionary for UI stress testing.`,
     settings: {
       manualPartOfSpeechTags: true,
       partOfSpeechTags: partsOfSpeech,

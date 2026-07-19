@@ -11,6 +11,7 @@
 - SQLite 查询使用稳定排序，词条 ID 是最终排序键。
 - `/entries` 和 `/root-groups` 返回 `{ items, pageInfo }`；`nextCursor` 只用于顺序下一页，独立的 `windowCursor` 始终绑定查询结果起点，前端用它配合 `windowOffset` 直接读取远端窗口。
 - 静态及形态严格/fuzzy 搜索读取 `entry_search_values` / `entry_morphology_search_values`。
+- 词条搜索会话冷构建直接组合结构候选 SQL 与搜索 projection；没有结构条件时直接扫描目标 projection，不再在 JavaScript 中对两份 ID 集合求交。最终有序 ID 仍由同一查询会话缓存。
 - 前端虚拟列表有卡片高度缓存，但这与查询结果缓存无关。
 
 已完成的相关边界：
@@ -111,7 +112,7 @@ limit
 }
 ```
 
-词条 fuzzy 会话保存排序后的命中词条 ID，并同步维护 `entryIndexById`；词根会话保存组身份、匹配标记和 `groupIndexByRootId`。两种索引都只复用已经物化的结果数组，不额外扫描 SQLite，供后续定位 API 直接取得结果下标。`searchHits` 和页面 DTO 仍按当前窗口的 ID 从 projection/主表读取，避免把所有命中详情长期留在内存。session 必须保留完整规范化 descriptor；只有 digest 无法在后续页面中恢复字段、fuzzy 配置和命中定位语义。
+词条严格及 fuzzy 搜索会话都保存排序后的命中词条 ID，并同步维护 `entryIndexById`；词根会话保存组身份、匹配标记和 `groupIndexByRootId`。两种索引都只复用已经物化的结果数组，不额外扫描 SQLite，供后续定位 API 直接取得结果下标。`searchHits` 和页面 DTO 仍按当前窗口的 ID 从 projection/主表读取，避免把所有命中详情长期留在内存。session 必须保留完整规范化 descriptor；只有 digest 无法在后续页面中恢复字段、fuzzy 配置和命中定位语义。
 
 ### 3.3 SQLite repository
 
@@ -159,8 +160,8 @@ repository 继续负责：
 | 查询类型 | 当前策略 | 原因 |
 | --- | --- | --- |
 | `/entries` 无搜索结构筛选 | 前端页缓存；后端继续直接 SQL count/page | SQL 已能直接分页，物化全部 ID 可能得不偿失 |
-| `/entries` 严格 projection 搜索 | 先用前端页缓存；基准证明重复扫描显著后再纳入会话 | 当前 SQL `EXISTS` + count/page 已较轻 |
-| `/entries` fuzzy projection 搜索 | 后端会话优先 | 当前需要扫描候选 records 并形成完整命中集合 |
+| `/entries` 严格 projection 搜索 | 后端会话 | 首次扫描 projection 形成有序命中 ID；总数、后续窗口和定位复用同一结果，不再重复 `COUNT`、页面 predicate 和排名 |
+| `/entries` fuzzy projection 搜索 | 后端会话 | 当前需要扫描候选 records 并形成完整命中集合 |
 | `/root-groups` 无搜索 | 稳定拓扑缓存 + 后端查询会话 | 拓扑按独立 relation generation 构建一次，并维护 `entryId → rootIds`、`rootId → group` 反向索引；查询会话只保存排序后的组视图、组索引和窗口状态 |
 | `/root-groups` 带搜索 | 稳定拓扑缓存 + SQLite projection 命中集合 + 后端查询会话 | 搜索条件只筛选 root/derived ID，不再重建关系或导出完整 snapshot；fuzzy projection 扫描仍可继续优化候选索引 |
 | `/facets` | 独立的小型版本化响应缓存 | payload 小，不需要分页会话 |
@@ -241,7 +242,7 @@ query kind
 不记录完整查询正文或词条内容。基准和检查应覆盖：
 
 1. 参数顺序不同但语义相同会命中同一 descriptor。
-2. fuzzy 第二次查询不再执行完整候选扫描。
+2. 严格及 fuzzy 第二次查询不再执行完整候选扫描。
 3. 不同词典、字段、fuzzy 设置和排序不会串用结果。
 4. 保存成功立即失效；保存失败不失效。
 5. TTL、LRU 和容量淘汰只导致重算，不改变查询结果或让有效 cursor 失效。
@@ -263,7 +264,7 @@ query kind
 ### Q2：后端会话缓存基础设施（已完成）
 
 - 已新增独立运行时 `QuerySessionCache`，不进入 SQLite schema、词典导出或持久化 revision。
-- fuzzy entries 缓存排序后的命中词条 ID；无搜索和搜索 root groups 缓存根/衍生关系 ID。摘要页面仍按需从 SQLite 重建。
+- 严格及 fuzzy entries 缓存排序后的命中词条 ID；无搜索和搜索 root groups 缓存根/衍生关系 ID。摘要页面仍按需从 SQLite 重建。
 - descriptor 统一规范化字段、fuzzy 字段、标签和排序，并排除 `cursor`、`limit`；无查询文本的 root groups 也会忽略无效的字段搜索选项。
 - 当前每词典最多 8 个会话、全局约 64 MiB、idle TTL 2 分钟；支持 LRU、超大单项跳过、同 key in-flight 合并和开发期统计。
 - repository 的词条、模块、metadata、完整导入/覆盖和词典删除只在成功写入后递增运行时 generation 并按词典失效；空 patch 和失败写入不失效。
@@ -294,7 +295,7 @@ query kind
 - session 被 TTL/LRU 淘汰时按 descriptor 重算并继续，不把缓存 miss 转化为错误；测试覆盖进程 epoch、generation、descriptor 和缓存淘汰边界。
 - 普通词条每窗 200 条、词根组每窗 100 组；两类父级列表各自最多保留 5 个已加载窗口，远端窗口按距离淘汰。组内衍生词不建立嵌套窗口：展开时一次读取整组，符合真实词根家族规模，也避免维护没有产品收益的第二套占位、高度和淘汰状态。
 - 首窗根据 `pageInfo.total` 建立整组等高占位，滚动条从一开始就代表完整结果集；可见窗口及相邻窗口按需预取。加载页继承占位高度比例，非滚动状态下恢复现有锚点，避免窗口替换导致跳动。
-- 定位层已完成并接入自动滚动：`/entries/:entryId/location` 返回当前普通查询下的目标窗口，`/root-groups/location` 通过稳定拓扑候选根和会话组下标返回父级窗口；严格查询在 SQL 内求结果位置，fuzzy/词根会话分别复用 `entryId -> resultIndex` 与 `rootId -> resultIndex`。目标存在但被查询排除时返回明确的 `found: false`，而不是伪造首窗。词根衍生词定位先加载父级窗口，再按需读取整组子项；前端不再调用 `filteredEntries()` / `rootModeGroups()` 猜测未加载窗口。
+- 定位层已完成并接入自动滚动：`/entries/:entryId/location` 返回当前普通查询下的目标窗口，`/root-groups/location` 通过稳定拓扑候选根和会话组下标返回父级窗口；严格及 fuzzy 搜索共同复用 `entryId -> resultIndex`，词根会话复用 `rootId -> resultIndex`。无搜索的结构筛选仍在 SQL 内计算位置。目标存在但被查询排除时返回明确的 `found: false`，而不是伪造首窗。词根衍生词定位先加载父级窗口，再按需读取整组子项；前端不再调用 `filteredEntries()` / `rootModeGroups()` 猜测未加载窗口。
 - 产品前端不再请求临时 `limit=10000`，窗口大小固定为上述小批次；repository 保留原有大页硬上限，供显式基准和诊断工具使用，不进入正常 UI 路径。
 - `/root-groups/:rootId/entries` 不复用父级分页协议：后端通过查询会话的 `rootId → group` 索引直接定位并返回整组，不处理 cursor、`windowOffset` 或 `limit`，也不设置单组 2000 条硬上限。`/entry-relations/:entryId` 同时通过稳定拓扑的 `entryId → rootIds` 和 `rootId → group` 索引定位同根组，不再逐请求递归扫描祖先与后代。
 - 全局展开状态使用 `manual/all` 两种模式；`all` 下单组收起记录为例外。父级窗口淘汰只释放衍生词 DTO，不清除展开意图；“全部展开”和“全部收起”都会清空上一轮手动展开/收起例外。“全部收起”同时释放已加载的组内数据。

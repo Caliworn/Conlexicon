@@ -227,6 +227,12 @@ async function main() {
     await context.repository.importDictionarySnapshot(source, { overwrite: true });
     let dictionary = await context.repository.exportDictionary(source.id);
     const repository = context.repository;
+    let idArraySearchCalls = 0;
+    const originalIdArraySearch = repository.entrySearchMatchedIdsForEntryIds.bind(repository);
+    repository.entrySearchMatchedIdsForEntryIds = (...args) => {
+      idArraySearchCalls += 1;
+      return originalIdArraySearch(...args);
+    };
 
     const alphaRoot = dictionary.entries.find((entry) => entry.id === "entry-alpha-root");
     const alphaSearchRecords = entrySearchModel.entrySearchValueRecords(alphaRoot, dictionary);
@@ -490,6 +496,11 @@ async function main() {
       fields: "lemma",
       fuzzyFields: "lemma",
     }, ["entry-sharp-s"]);
+    assert.equal(
+      idArraySearchCalls,
+      0,
+      "entry searches must compose structural candidates with search projections in SQL",
+    );
 
     console.log("Entry-search S4 strict and fuzzy static/morphology projection checks passed.");
   } finally {

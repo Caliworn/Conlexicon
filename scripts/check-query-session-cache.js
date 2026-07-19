@@ -284,10 +284,15 @@ async function checkRepositoryIntegration() {
     await repository.importDictionarySnapshot(dictionary);
 
     let fuzzyBuilds = 0;
-    const originalFuzzyBuilder = repository.buildFuzzyEntryQuerySession.bind(repository);
-    repository.buildFuzzyEntryQuerySession = (...args) => {
-      fuzzyBuilds += 1;
-      return originalFuzzyBuilder(...args);
+    let strictBuilds = 0;
+    const originalSearchBuilder = repository.buildEntrySearchQuerySession.bind(repository);
+    repository.buildEntrySearchQuerySession = (...args) => {
+      if (args[1]?.search?.fuzzyFields?.length) {
+        fuzzyBuilds += 1;
+      } else {
+        strictBuilds += 1;
+      }
+      return originalSearchBuilder(...args);
     };
     const fuzzyQuery = {
       q: "rt",
@@ -324,6 +329,30 @@ async function checkRepositoryIntegration() {
       "fuzzy location should return the target window",
     );
     assert.equal(fuzzyBuilds, 1, "fuzzy location should reuse the existing query session");
+
+    const strictQuery = {
+      q: "derived window",
+      fields: "definitions",
+      fuzzyFields: "",
+      sort: "lemmaAsc",
+      limit: 1,
+    };
+    const strictFirst = await repository.queryEntries(dictionary.id, strictQuery);
+    const strictSecond = await repository.queryEntries(dictionary.id, { ...strictQuery, limit: 10 });
+    assert.equal(strictBuilds, 1, "repeated strict searches should reuse one ordered ID session");
+    assert.deepEqual(
+      strictFirst.items.map((entry) => entry.id),
+      strictSecond.items.slice(0, strictFirst.items.length).map((entry) => entry.id),
+    );
+    const strictSession = [...repository.querySessionCache.sessions.values()]
+      .find((session) => session.kind === "entries" && session.descriptor.search.text === "derived window");
+    assert.ok(strictSession?.entryIndexById instanceof Map);
+    const strictLocatedId = strictSecond.items.at(-1).id;
+    const strictLocated = await repository.locateEntryQueryWindow(dictionary.id, strictLocatedId, strictQuery);
+    assert.equal(strictLocated.location.resultIndex, strictSession.entryIndexById.get(strictLocatedId));
+    assert.ok(strictLocated.items.some((entry) => entry.id === strictLocatedId));
+    assert.equal(strictBuilds, 1, "strict location should reuse the existing query session");
+
     assert.ok(fuzzyFirst.pageInfo.nextCursor, "the first fuzzy page should expose a versioned cursor");
     assert.ok(fuzzyFirst.pageInfo.windowCursor, "the first fuzzy page should expose a dedicated window cursor");
     const fuzzyNext = await repository.queryEntries(dictionary.id, {
