@@ -215,6 +215,8 @@ const i18n = {
     expandEntryBrowser: "展开词条列表",
     openEntryList: "打开词条列表",
     closeEntryList: "关闭词条列表",
+    focusCurrentEntryInList: "在词条列表中定位当前词条",
+    currentEntryNotInList: "当前词条不在列表结果中",
     entryEditor: "词条编辑",
     dictionaryConfig: "词典配置",
     docsModeLabel: "文档模式",
@@ -719,6 +721,8 @@ const i18n = {
     expandEntryBrowser: "Expand entry list",
     openEntryList: "Open entry list",
     closeEntryList: "Close entry list",
+    focusCurrentEntryInList: "Locate current entry in the list",
+    currentEntryNotInList: "The current entry is not in the list results",
     entryEditor: "Entries",
     dictionaryConfig: "Dictionary configuration",
     docsModeLabel: "Document view mode",
@@ -1300,6 +1304,7 @@ const elements = {
   displayEntryNotesSection: document.querySelector("#displayEntryNotesSection"),
   displayEntryNotes: document.querySelector("#displayEntryNotes"),
   editEntryButton: document.querySelector("#editEntryButton"),
+  focusEntryListButton: document.querySelector("#focusEntryListButton"),
   openLexicalNetworkButton: document.querySelector("#openLexicalNetworkButton"),
   entryForm: document.querySelector("#entryForm"),
   entryId: document.querySelector("#entryId"),
@@ -3062,6 +3067,34 @@ function revealEntryBrowserForResults() {
   }
   shellState.browserCollapsedByView.editor = false;
   shellState.browserDrawerOpen = false;
+}
+
+function focusCurrentEntryInBrowser() {
+  const entryId = state.selectedEntryId;
+  if (!entryId) {
+    return;
+  }
+  if (
+    advancedFilter
+    && !advancedFilterUsesEntryQuery()
+    && !(advancedFilter.entryIds || []).includes(entryId)
+  ) {
+    showToast(t("currentEntryNotInList"));
+    return;
+  }
+
+  scheduleEntryCardScroll(entryId, { reportMissing: true });
+  if (mobileShellMode()) {
+    openMobileEntryBrowserDrawer();
+    return;
+  }
+  revealEntryBrowserForResults();
+  renderShellEntryBrowser();
+  scheduleEntryBrowserLayoutRefresh();
+  requestAnimationFrame(() => {
+    remeasureEntryVirtualList();
+    flushPendingEntryCardScroll();
+  });
 }
 
 function renderMobileAppBar() {
@@ -6168,6 +6201,9 @@ function startEntryQueryLocation(dictionary, entryId) {
         return;
       }
       if (!result.location?.found) {
+        if (pendingEntryCardScroll?.options?.reportMissing) {
+          showToast(t("currentEntryNotInList"));
+        }
         pendingEntryCardScroll = null;
         return;
       }
@@ -6243,6 +6279,9 @@ function startRootGroupQueryLocation(dictionary, entryId, options = {}) {
         return;
       }
       if (!result.location?.found) {
+        if (pendingEntryCardScroll?.options?.reportMissing) {
+          showToast(t("currentEntryNotInList"));
+        }
         pendingEntryCardScroll = null;
         return;
       }
@@ -7292,6 +7331,7 @@ function renderEmptyDetail() {
   elements.displayMorphologySection.hidden = true;
   elements.displayEntryNotesSection.hidden = true;
   elements.editEntryButton.hidden = true;
+  elements.focusEntryListButton.hidden = true;
   elements.openLexicalNetworkButton.hidden = true;
 }
 
@@ -7304,6 +7344,7 @@ function renderEntryDisplay(entry) {
     .map((tag, index) => ({ tag, index }))
     .filter(({ tag, index }) => !entryTagIsPart(entry, index, tag));
   elements.editEntryButton.hidden = false;
+  elements.focusEntryListButton.hidden = false;
   elements.openLexicalNetworkButton.hidden = false;
   elements.displayLemma.textContent = entry.lemma;
   elements.displayPronunciation.textContent = entry.pronunciation;
@@ -14086,6 +14127,7 @@ elements.qualityPanel.addEventListener("click", (event) => {
 elements.advancedFilterRefreshButton.addEventListener("click", refreshAdvancedFilter);
 elements.advancedFilterCycleButton.addEventListener("click", cycleAdvancedFilterVariant);
 elements.advancedFilterExitButton.addEventListener("click", exitAdvancedFilter);
+elements.focusEntryListButton.addEventListener("click", focusCurrentEntryInBrowser);
 elements.openLexicalNetworkButton.addEventListener("click", openLexicalNetwork);
 elements.closeLexicalNetworkButton.addEventListener("click", closeLexicalNetwork);
 elements.lexicalNetworkOverlay.addEventListener("click", (event) => {

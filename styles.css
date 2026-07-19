@@ -14,6 +14,13 @@
   --danger-soft: #fae5e6;
   --focus: #e7b548;
   --shadow: 0 18px 40px rgba(24, 36, 48, 0.12);
+  --layer-mobile-app-bar: 80;
+  --layer-drawer-backdrop: 82;
+  --layer-drawer: 90;
+  --layer-network-overlay: 95;
+  --layer-app-tooltip: 100;
+  --layer-toast: 110;
+  --layer-modal-overlay: 120;
   font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
 }
 
@@ -1013,6 +1020,21 @@ label span {
   justify-content: flex-end;
   gap: 8px;
   max-width: 100%;
+}
+
+.entry-display-actions .entry-list-focus-button {
+  display: inline-grid;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  padding: 0;
+  place-items: center;
+}
+
+.entry-display-actions .entry-list-focus-button .nav-icon {
+  width: 20px;
+  height: 20px;
 }
 
 .entry-display-header.partial-editing {
@@ -3884,7 +3906,7 @@ dialog::backdrop {
 
 .app-tooltip {
   position: fixed;
-  z-index: 100;
+  z-index: var(--layer-app-tooltip);
   max-width: min(260px, calc(100vw - 16px));
   padding: 8px 10px;
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -3977,7 +3999,7 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   position: fixed;
   right: 22px;
   bottom: 22px;
-  z-index: 10;
+  z-index: var(--layer-toast);
   max-width: min(360px, calc(100vw - 44px));
   padding: 12px 14px;
   border-radius: 8px;
@@ -3998,7 +4020,7 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 120;
+  z-index: var(--layer-modal-overlay);
   display: grid;
   place-items: center;
   padding: 24px;
@@ -4084,7 +4106,7 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
 .network-overlay {
   position: fixed;
   inset: 0;
-  z-index: 95;
+  z-index: var(--layer-network-overlay);
   display: grid;
   place-items: center;
   padding: 28px;
@@ -4370,7 +4392,7 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   .mobile-app-bar {
     position: sticky;
     top: 0;
-    z-index: 80;
+    z-index: var(--layer-mobile-app-bar);
     display: flex;
     grid-column: 1;
     grid-row: 1;
@@ -4392,7 +4414,7 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   .mobile-drawer-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 82;
+    z-index: var(--layer-drawer-backdrop);
     display: block;
     background: rgba(13, 23, 31, 0.42);
   }
@@ -4424,7 +4446,7 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   .app-nav[data-nav-state="drawer"] {
     position: fixed;
     inset: 0 auto 0 0;
-    z-index: 90;
+    z-index: var(--layer-drawer);
     width: min(320px, calc(100vw - 44px));
     height: 100dvh;
     min-height: 0;
@@ -4466,7 +4488,7 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   .entry-browser {
     position: fixed;
     inset: 0 0 0 auto;
-    z-index: 90;
+    z-index: var(--layer-drawer);
     display: grid;
     width: min(380px, calc(100vw - 32px));
     height: 100dvh;
