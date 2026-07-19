@@ -25,6 +25,13 @@
 - `details` 可选，当前主要用于重复 ID 和不支持字段等调试信息；暂不承诺前端展示形态。
 - 前端应继续在控制台保留原始错误对象，toast 只显示本地化短信息。
 
+### 请求体大小限制
+
+- 普通单对象与设置端点最多接受 5 MiB 请求体，包括全局偏好、新建词典、词典 metadata、普通设置、IPA 设置以及单词条新建/保存。
+- 模块级或批量保存端点最多接受 32 MiB，包括 `autosave`、语言文档、语料库、形态学和批量词条 patch。
+- JSON 导入端点最多接受 64 MiB。该上限只控制 HTTP 请求边界；导入仍会经历 JSON 解析、legacy migration 和规范化，不能据此推断峰值内存等于文件大小。
+- 后端会用合法的 `Content-Length` 提前拒绝明显超限请求，同时继续按实际收到的字节流累计检查；缺失、伪造或偏小的声明长度不能绕过上限。超限统一返回 `request_body_too_large`，并在 `details.limitBytes` 中给出当前端点的字节上限。
+
 ## 当前端点
 
 ### 应用状态与全局偏好
@@ -119,7 +126,7 @@
 
 | code | 含义 |
 | --- | --- |
-| `request_body_too_large` | 请求体超过当前限制。 |
+| `request_body_too_large` | 请求体超过当前端点限制；`details.limitBytes` 给出字节上限。 |
 | `invalid_json_body` | 请求体不是合法 JSON。 |
 | `invalid_ui_language` | 全局界面语言值无效。 |
 | `invalid_ui_theme` | 全局主题值无效。 |
