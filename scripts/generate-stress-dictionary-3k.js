@@ -6,9 +6,9 @@ const DATA_DIR = path.join(ROOT, "data");
 const DICTIONARY_DIR = path.join(DATA_DIR, "dictionaries");
 const INDEX_PATH = path.join(DATA_DIR, "index.json");
 
-const DICTIONARY_ID = "dict-7a4f7f2b-71dd-4c9f-8d3f-7bb39c100000";
-const LEGACY_DICTIONARY_IDS = ["stress-test-1k"];
-const ENTRY_COUNT = 1000;
+const DICTIONARY_ID = "dict-7a4f7f2b-71dd-4c9f-8d3f-7bb39c300000";
+const LEGACY_DICTIONARY_IDS = ["stress-test-3k"];
+const ENTRY_COUNT = 3000;
 const CREATED_AT = "2026-07-01T00:00:00.000Z";
 
 function mulberry32(seed) {
@@ -171,10 +171,7 @@ function buildDictionary() {
         description: chance(0.12) ? `Synthetic derivation note ${index}` : "",
       },
       notes: chance(0.12) ? `Stress-test entry ${index}; generated with deterministic seed.` : "",
-      morphology: {
-        tableId: "",
-        overrides: {},
-      },
+      morphologyGroups: [],
       createdAt: CREATED_AT,
       updatedAt: CREATED_AT,
     };
@@ -183,9 +180,9 @@ function buildDictionary() {
 
   return {
     id: DICTIONARY_ID,
-    name: "Stress Test 1k",
+    name: "Stress Test 3k",
     language: "Synthetic",
-    description: "Deterministic 10,000-entry dictionary for UI stress testing.",
+    description: "Deterministic 3,000-entry dictionary for UI stress testing.",
     settings: {
       manualPartOfSpeechTags: true,
       partOfSpeechTags: partsOfSpeech,
@@ -200,7 +197,9 @@ function buildDictionary() {
         clf: "classifier",
       },
       redHighlightTags: ["review"],
-      sourceFuzzyCompletion: true,
+      search: {
+        etymologyAutocomplete: { fuzzy: true },
+      },
       searchHighlight: true,
       entryListTagFiltering: true,
       allowEmptyPronunciation: true,
@@ -234,7 +233,7 @@ function buildDictionary() {
     },
     morphology: {
       functions: {},
-      tables: [],
+      templateGroups: [],
     },
     createdAt: CREATED_AT,
     updatedAt: CREATED_AT,

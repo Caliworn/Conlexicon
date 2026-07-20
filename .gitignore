@@ -1,6 +1,6 @@
 data/
+morphology-stress-10k-data/
 node_modules/
 electron-shell/
 .DS_Store
 Thumbs.db
-NEXT_IMPLEMENTATION_HANDOFF.md
