@@ -22,20 +22,20 @@
     </script>
     <div class="app-shell" id="appShell" data-nav-state="expanded" data-browser-state="expanded" data-nav-drawer="closed" data-browser-drawer="closed">
       <header class="mobile-app-bar" id="mobileAppBar">
-        <button class="mobile-app-bar-button" id="mobileNavButton" type="button" aria-controls="appNav" aria-expanded="false" data-i18n-aria-label="openToolNavigation" aria-label="打开工具导航">
+        <button class="mobile-app-bar-button" id="mobileNavButton" type="button" aria-controls="appNav" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="openToolNavigation" aria-label="打开工具导航">
           <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 7h16M4 12h16M4 17h16"></path>
           </svg>
         </button>
         <span class="mobile-app-bar-title" id="mobileCurrentViewLabel">词条编辑</span>
         <div class="mobile-app-bar-actions">
-          <button class="mobile-app-bar-button" id="mobileEntryListButton" type="button" aria-controls="entryBrowser" aria-expanded="false" data-i18n-aria-label="openEntryList" aria-label="打开词条列表">
+          <button class="mobile-app-bar-button" id="mobileEntryListButton" type="button" aria-controls="entryBrowser" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="openEntryList" aria-label="打开词条列表">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M8 6h12M8 12h12M8 18h12"></path>
               <path d="M4 6h.01M4 12h.01M4 18h.01"></path>
             </svg>
           </button>
-          <button class="mobile-app-bar-button mobile-new-entry-button" id="mobileNewEntryButton" type="button" data-i18n-aria-label="newEntry" aria-label="新建词条">
+          <button class="mobile-app-bar-button mobile-new-entry-button" id="mobileNewEntryButton" type="button" data-app-tooltip="always" data-i18n-aria-label="newEntry" aria-label="新建词条">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 5v14M5 12h14"></path>
             </svg>
@@ -76,13 +76,21 @@
             <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 19V9M10 19V5M16 19v-7M22 19V3"></path></svg></span>
             <span class="tool-label" data-i18n="analysis">数据分析</span>
           </button>
+          <button class="tool-button" type="button" data-view="quality" data-i18n-aria-label="qualityCheck">
+            <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 3 3 7v6c0 5 4 8 9 8s9-3 9-8V7Z"></path><path d="M12 8v5"></path><path d="M12 17h.01"></path></svg></span>
+            <span class="tool-label" data-i18n="qualityCheck">质量检查</span>
+          </button>
           <button class="tool-button" type="button" data-view="ipa" data-i18n-aria-label="ipaConfig">
             <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 10v4M7 7v10M11 4v16M15 8v8M19 6v12M23 10v4"></path></svg></span>
             <span class="tool-label" data-i18n="ipaConfig">自动 IPA 标注</span>
           </button>
-          <button class="tool-button" type="button" data-view="morphology" data-i18n-aria-label="morphologyConfig">
+          <button class="tool-button" type="button" data-view="morphology-functions" data-i18n-aria-label="morphologyFunctions">
+            <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 6h6M4 18h6M14 4v16M14 8h6M14 16h6"></path><circle cx="10" cy="6" r="1"></circle><circle cx="10" cy="18" r="1"></circle></svg></span>
+            <span class="tool-label" data-i18n="morphologyFunctions">形态函数</span>
+          </button>
+          <button class="tool-button" type="button" data-view="morphology-tables" data-i18n-aria-label="morphologyTables">
             <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 10h18M9 4v16M15 4v16"></path></svg></span>
-            <span class="tool-label" data-i18n="morphologyConfig">自动形态学</span>
+            <span class="tool-label" data-i18n="morphologyTables">形态表格</span>
           </button>
           <button class="tool-button" type="button" data-view="settings" data-i18n-aria-label="otherSettings">
             <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"></path></svg></span>
@@ -106,7 +114,7 @@
       <div class="mobile-drawer-backdrop" id="mobileDrawerBackdrop" hidden></div>
 
       <main class="workspace">
-        <section class="view active" id="editorView" aria-label="词条编辑">
+        <section class="view active" id="editorView" data-i18n-aria-label="entryEditor" aria-label="词条编辑">
           <section class="top-bar" id="editorTopBar">
             <div class="dictionary-heading">
               <p class="eyebrow" id="dictionaryMeta">0 个词条</p>
@@ -141,10 +149,10 @@
             <section class="entry-browser view-browser" id="entryBrowser" data-i18n-aria-label="entryBrowser" aria-label="词条列表">
               <div class="filter-row">
                 <input id="searchInput" type="search" data-i18n-placeholder="searchPlaceholder" placeholder="搜索词形、释义、标签">
-                <select id="partFilter" aria-label="词性筛选">
+                <select id="partFilter" data-i18n-aria-label="partFilterLabel" aria-label="词性筛选">
                   <option value="" data-i18n="allParts">全部词性</option>
                 </select>
-                <select id="sortSelect" aria-label="词条排序">
+                <select id="sortSelect" data-i18n-aria-label="entrySortLabel" aria-label="词条排序">
                   <option value="lemmaAsc" data-i18n="sortLemmaAsc">首字母正序</option>
                   <option value="lemmaDesc" data-i18n="sortLemmaDesc">首字母倒序</option>
                   <option value="updatedAsc" data-i18n="sortUpdatedAsc">编辑时间正序</option>
@@ -179,10 +187,15 @@
                   </div>
                 </div>
               </div>
-              <div class="entry-list" id="entryList"></div>
+              <div class="content-update-frame entry-list-update-frame" id="entryListUpdateFrame">
+                <div class="entry-list" id="entryList"></div>
+                <div class="content-update-overlay entry-list-update-overlay" id="entryListUpdateOverlay" role="status" aria-live="polite" hidden>
+                  <span class="content-update-indicator" data-i18n="contentUpdating">正在更新</span>
+                </div>
+              </div>
             </section>
 
-            <section class="entry-detail-panel" aria-label="词条详情">
+            <section class="entry-detail-panel" id="entryDetailPanel" data-i18n-aria-label="entryDetail" aria-label="词条详情">
               <article class="entry-display" id="entryDisplay" hidden>
                 <div class="entry-display-header" data-edit-section="basic">
                   <div>
@@ -194,6 +207,12 @@
                     <div class="chip-row" id="displayTags"></div>
                   </div>
                   <div class="entry-display-actions">
+                    <button class="secondary-button entry-list-focus-button" id="focusEntryListButton" type="button" data-app-tooltip="always" data-i18n-aria-label="focusCurrentEntryInList" aria-label="在词条列表中定位当前词条">
+                      <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
+                      </svg>
+                    </button>
                     <button class="secondary-button" id="openLexicalNetworkButton" type="button" data-i18n="lexicalNetwork">词汇网络</button>
                     <button class="secondary-button" id="editEntryButton" type="button" data-i18n="editEntry">编辑词条</button>
                   </div>
@@ -235,7 +254,7 @@
                 </section>
               </article>
 
-              <form class="editor-panel" id="entryForm" autocomplete="off" hidden>
+              <form class="editor-panel" id="entryForm" autocomplete="off" novalidate hidden>
                 <input id="entryId" type="hidden">
                 <div class="form-heading">
                   <div>
@@ -247,7 +266,7 @@
 
                 <label>
                   <span data-i18n="lemma">词形</span>
-                  <input id="lemmaInput" name="lemma" required maxlength="80">
+                  <input id="lemmaInput" name="lemma" aria-required="true" maxlength="80">
                 </label>
 
                 <label>
@@ -257,27 +276,14 @@
                     <button class="secondary-button" id="autoIpaButton" type="button" data-i18n="autoIpa">自动 IPA</button>
                   </div>
                 </label>
-                <div class="ipa-keyboard" id="ipaKeyboard" aria-label="IPA 虚拟键盘"></div>
+                <div class="ipa-keyboard" id="ipaKeyboard" data-i18n-aria-label="ipaKeyboardSettings" aria-label="IPA 虚拟键盘"></div>
 
                 <label>
                   <span data-i18n="tagsLabel">属性标签（第一个标签会作为词性）</span>
                   <input id="tagsInput" name="tags" maxlength="180">
                 </label>
 
-                <section class="definition-editor">
-                  <div class="form-heading compact-heading">
-                    <div>
-                      <p class="eyebrow" data-i18n="morphologyConfig">自动形态学</p>
-                    </div>
-                  </div>
-                  <label>
-                    <span data-i18n="morphologyTable">形态表格</span>
-                    <select id="entryMorphologyTableSelect"></select>
-                  </label>
-                  <div class="morphology-override-grid" id="entryMorphologyOverrides"></div>
-                </section>
-
-                <section class="definition-editor">
+                <section class="definition-editor" data-entry-form-section="definitions">
                   <div class="form-heading compact-heading">
                     <div>
                       <p class="eyebrow" data-i18n="definitions">释义</p>
@@ -287,7 +293,7 @@
                   <div class="definition-form-list" id="definitionFormList"></div>
                 </section>
 
-                <section class="definition-editor">
+                <section class="definition-editor" data-entry-form-section="etymology">
                   <div class="form-heading compact-heading">
                     <div>
                       <p class="eyebrow" data-i18n="etymology">词源</p>
@@ -304,10 +310,30 @@
                   </label>
                 </section>
 
-                <label>
-                  <span data-i18n="entryNotes">词条整体备注</span>
-                  <textarea id="notesInput" name="notes" rows="4"></textarea>
-                </label>
+                <section class="definition-editor" id="fullEditDerivedSection" data-entry-form-section="derived" hidden>
+                  <div class="form-heading compact-heading">
+                    <div>
+                      <p class="eyebrow" data-i18n="derivedEntries">衍生</p>
+                    </div>
+                  </div>
+                  <div class="derived-list" id="fullEditDerived"></div>
+                </section>
+
+                <section class="definition-editor" data-entry-form-section="morphology">
+                  <div class="form-heading compact-heading">
+                    <div>
+                      <p class="eyebrow" data-i18n="morphologyConfig">自动形态学</p>
+                    </div>
+                  </div>
+                  <div class="entry-morphology-controls" id="entryMorphologyControls"></div>
+                </section>
+
+                <section class="definition-editor" data-entry-form-section="notes">
+                  <label>
+                    <span data-i18n="entryNotes">词条整体备注</span>
+                    <textarea id="notesInput" name="notes" rows="4"></textarea>
+                  </label>
+                </section>
 
                 <div class="form-actions">
                   <button class="secondary-button" id="cancelEditButton" type="button" data-i18n="cancel">取消</button>
@@ -315,11 +341,14 @@
                   <button class="primary-button" type="submit" data-i18n="saveEntry">保存词条</button>
                 </div>
               </form>
+              <div class="content-update-overlay entry-detail-update-overlay" id="entryDetailUpdateOverlay" role="status" aria-live="polite" hidden>
+                <span class="content-update-indicator" data-i18n="contentUpdating">正在更新</span>
+              </div>
             </section>
           </section>
         </section>
 
-        <section class="view" id="dictionaryManagerView" aria-label="词典管理">
+        <section class="view" id="dictionaryManagerView" data-i18n-aria-label="dictionaryManager" aria-label="词典管理">
           <section class="top-bar">
             <div>
               <p class="eyebrow" data-i18n="dictionaryManagerEyebrow">多词典管理</p>
@@ -344,7 +373,7 @@
           <section class="manager-grid" id="managerGrid">
             <div class="manager-list" id="dictionaryManagerList"></div>
 
-            <section class="editor-panel" aria-label="词典配置">
+            <section class="editor-panel" data-i18n-aria-label="dictionaryConfig" aria-label="词典配置">
               <form id="dictionaryForm" autocomplete="off">
                 <input id="dictionaryId" type="hidden">
                 <div class="form-heading">
@@ -374,7 +403,7 @@
           </section>
         </section>
 
-        <section class="view" id="analysisView" aria-label="数据分析">
+        <section class="view" id="analysisView" data-i18n-aria-label="analysis" aria-label="数据分析">
           <section class="top-bar">
             <div>
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
@@ -395,7 +424,28 @@
           <section class="analysis-panel" id="analysisPanel"></section>
         </section>
 
-        <section class="view" id="settingsView" aria-label="其他设置">
+        <section class="view" id="qualityView" data-i18n-aria-label="qualityCheck" aria-label="质量检查">
+          <section class="top-bar">
+            <div>
+              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <h2 data-i18n="qualityCheck">质量检查</h2>
+            </div>
+            <div class="top-actions">
+              <button class="secondary-button" id="backToEditorFromQualityButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+            </div>
+          </section>
+
+          <section class="notice-panel" id="qualityNoDictionaryNotice" hidden>
+            <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
+            <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
+            <p data-i18n="qualityNeedDictionary">质量检查会根据当前词典中的词条、标签、词源、IPA 和 Glossed 例句实时生成。</p>
+            <button class="primary-button" id="qualityOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+          </section>
+
+          <section class="analysis-panel" id="qualityPanel"></section>
+        </section>
+
+        <section class="view" id="settingsView" data-i18n-aria-label="otherSettings" aria-label="其他设置">
           <section class="top-bar">
             <div>
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
@@ -461,66 +511,66 @@
                 <div class="gloss-style-list">
                   <div class="gloss-style-row" data-gloss-style="gla">
                     <code>\gla</code>
-                    <select data-gloss-style-font data-app-tooltip="always" data-i18n-aria-label="glossFontFamily">
+                    <select name="gloss-gla-font" data-gloss-style-font data-app-tooltip="always" data-i18n-aria-label="glossFontFamily">
                       <option value="serif" data-i18n="fontSerif">衬线</option>
                       <option value="sans" data-i18n="fontSans">无衬线</option>
                       <option value="mono" data-i18n="fontMono">等宽</option>
                     </select>
-                    <select data-gloss-style-size data-app-tooltip="always" data-i18n-aria-label="glossFontSize">
+                    <select name="gloss-gla-size" data-gloss-style-size data-app-tooltip="always" data-i18n-aria-label="glossFontSize">
                       <option value="small" data-i18n="fontSizeSmall">小</option>
                       <option value="medium" data-i18n="fontSizeMedium">中</option>
                       <option value="large" data-i18n="fontSizeLarge">大</option>
                     </select>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
+                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input name="gloss-gla-bold" type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
+                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input name="gloss-gla-italic" type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
                     <span class="gloss-style-toggle-placeholder" aria-hidden="true"></span>
                   </div>
                   <div class="gloss-style-row" data-gloss-style="glb">
                     <code>\glb</code>
-                    <select data-gloss-style-font data-app-tooltip="always" data-i18n-aria-label="glossFontFamily">
+                    <select name="gloss-glb-font" data-gloss-style-font data-app-tooltip="always" data-i18n-aria-label="glossFontFamily">
                       <option value="serif" data-i18n="fontSerif">衬线</option>
                       <option value="sans" data-i18n="fontSans">无衬线</option>
                       <option value="mono" data-i18n="fontMono">等宽</option>
                     </select>
-                    <select data-gloss-style-size data-app-tooltip="always" data-i18n-aria-label="glossFontSize">
+                    <select name="gloss-glb-size" data-gloss-style-size data-app-tooltip="always" data-i18n-aria-label="glossFontSize">
                       <option value="small" data-i18n="fontSizeSmall">小</option>
                       <option value="medium" data-i18n="fontSizeMedium">中</option>
                       <option value="large" data-i18n="fontSizeLarge">大</option>
                     </select>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
+                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input name="gloss-glb-bold" type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
+                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input name="gloss-glb-italic" type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
                     <label class="gloss-style-toggle smallcaps-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleSmallCaps"><input id="glbSmallCapsInput" type="checkbox" data-gloss-style-smallcaps><span aria-hidden="true">SC</span></label>
                   </div>
                   <div class="gloss-style-row" data-gloss-style="glc">
                     <code>\glc</code>
-                    <select data-gloss-style-font data-app-tooltip="always" data-i18n-aria-label="glossFontFamily">
+                    <select name="gloss-glc-font" data-gloss-style-font data-app-tooltip="always" data-i18n-aria-label="glossFontFamily">
                       <option value="serif" data-i18n="fontSerif">衬线</option>
                       <option value="sans" data-i18n="fontSans">无衬线</option>
                       <option value="mono" data-i18n="fontMono">等宽</option>
                     </select>
-                    <select data-gloss-style-size data-app-tooltip="always" data-i18n-aria-label="glossFontSize">
+                    <select name="gloss-glc-size" data-gloss-style-size data-app-tooltip="always" data-i18n-aria-label="glossFontSize">
                       <option value="small" data-i18n="fontSizeSmall">小</option>
                       <option value="medium" data-i18n="fontSizeMedium">中</option>
                       <option value="large" data-i18n="fontSizeLarge">大</option>
                     </select>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
+                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input name="gloss-glc-bold" type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
+                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input name="gloss-glc-italic" type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
                     <span class="gloss-style-toggle-placeholder" aria-hidden="true"></span>
                   </div>
                   <div class="gloss-style-row" data-gloss-style="ft">
                     <code>\ft</code>
-                    <select data-gloss-style-font data-app-tooltip="always" data-i18n-aria-label="glossFontFamily">
+                    <select name="gloss-ft-font" data-gloss-style-font data-app-tooltip="always" data-i18n-aria-label="glossFontFamily">
                       <option value="serif" data-i18n="fontSerif">衬线</option>
                       <option value="sans" data-i18n="fontSans">无衬线</option>
                       <option value="mono" data-i18n="fontMono">等宽</option>
                     </select>
-                    <select data-gloss-style-size data-app-tooltip="always" data-i18n-aria-label="glossFontSize">
+                    <select name="gloss-ft-size" data-gloss-style-size data-app-tooltip="always" data-i18n-aria-label="glossFontSize">
                       <option value="small" data-i18n="fontSizeSmall">小</option>
                       <option value="medium" data-i18n="fontSizeMedium">中</option>
                       <option value="large" data-i18n="fontSizeLarge">大</option>
                     </select>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
+                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input name="gloss-ft-bold" type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
+                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input name="gloss-ft-italic" type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
                     <span class="gloss-style-toggle-placeholder" aria-hidden="true"></span>
                   </div>
                 </div>
@@ -546,6 +596,14 @@
                 <label>
                   <span data-i18n="entryListTagDisplayLimitHelp">设为 n 时，超过 n 个标签会显示前 n-1 个和省略号。默认为 3。</span>
                   <input id="entryListTagDisplayLimitInput" type="text" inputmode="numeric" placeholder="3">
+                </label>
+                <label>
+                  <span data-i18n="entryListPartDisplay">词条列表中词性显示位置</span>
+                  <select id="entryListPartDisplayInput">
+                    <option value="subtitle" data-i18n="entryListPartDisplaySubtitle">副标题</option>
+                    <option value="chips" data-i18n="entryListPartDisplayChips">标签区</option>
+                    <option value="both" data-i18n="entryListPartDisplayBoth">两者均显示</option>
+                  </select>
                 </label>
                 <div class="subsection-title">
                   <h3 data-i18n="partOfSpeechTagSettings">词性标签</h3>
@@ -600,6 +658,18 @@
                   <input id="networkPolysemyInput" type="checkbox">
                 </label>
                 <div class="subsection-title">
+                  <h3 data-i18n="emptyEntrySections">空栏目</h3>
+                </div>
+                <label class="toggle-row">
+                  <span data-i18n="showEmptyEntrySections">在词条浏览界面显示空栏目</span>
+                  <input id="showEmptyEntrySectionsInput" type="checkbox">
+                </label>
+                <div class="subsection-title">
+                  <h3 data-i18n="entrySectionOrder">词条栏目排序</h3>
+                </div>
+                <p class="muted-text" data-i18n="entrySectionOrderHelp">拖动卡片以调整词条详情和完整编辑中栏目顺序。衍生词只在有内容时显示，且不可在完整编辑中修改。</p>
+                <div class="tool-order-list" id="entrySectionOrderList"></div>
+                <div class="subsection-title">
                   <h3 data-i18n="toolNavigationOrder">工具导航排序</h3>
                 </div>
                 <p class="muted-text" data-i18n="toolNavigationOrderHelp">拖动卡片来调整左侧导航栏顺序。该顺序保存到当前词典文件中。</p>
@@ -612,14 +682,77 @@
                     <h3 data-i18n="fuzzySearch">模糊匹配</h3>
                   </div>
                 </div>
+                <div class="subsection-title">
+                  <h3 data-i18n="searchFields">搜索字段</h3>
+                </div>
+                <div class="search-field-settings" role="group" data-i18n-aria-label="searchFields">
+                  <div class="search-field-settings-header" aria-hidden="true">
+                    <span data-i18n="searchField">字段</span>
+                    <span data-i18n="searchFieldEnabled">参与搜索</span>
+                    <span data-i18n="searchFieldFuzzy">模糊匹配</span>
+                  </div>
+                  <div class="search-field-setting" data-search-field="lemma">
+                    <span data-i18n="searchFieldLemma">词形</span>
+                    <label><span class="visually-hidden" data-i18n="searchFieldEnabled">参与搜索</span><input name="search-lemma-enabled" type="checkbox" data-search-enabled="lemma" data-i18n-aria-label="searchFieldEnabled"></label>
+                    <label><span class="visually-hidden" data-i18n="searchFieldFuzzy">模糊匹配</span><input name="search-lemma-fuzzy" type="checkbox" data-search-fuzzy="lemma" data-i18n-aria-label="searchFieldFuzzy"></label>
+                  </div>
+                  <div class="search-field-setting" data-search-field="pronunciation">
+                    <span data-i18n="searchFieldPronunciation">IPA</span>
+                    <label><span class="visually-hidden" data-i18n="searchFieldEnabled">参与搜索</span><input name="search-pronunciation-enabled" type="checkbox" data-search-enabled="pronunciation" data-i18n-aria-label="searchFieldEnabled"></label>
+                    <label><span class="visually-hidden" data-i18n="searchFieldFuzzy">模糊匹配</span><input name="search-pronunciation-fuzzy" type="checkbox" data-search-fuzzy="pronunciation" data-i18n-aria-label="searchFieldFuzzy"></label>
+                  </div>
+                  <div class="search-field-setting" data-search-field="tags">
+                    <span data-i18n="searchFieldTags">标签</span>
+                    <label><span class="visually-hidden" data-i18n="searchFieldEnabled">参与搜索</span><input name="search-tags-enabled" type="checkbox" data-search-enabled="tags" data-i18n-aria-label="searchFieldEnabled"></label>
+                    <label><span class="visually-hidden" data-i18n="searchFieldFuzzy">模糊匹配</span><input name="search-tags-fuzzy" type="checkbox" data-search-fuzzy="tags" data-i18n-aria-label="searchFieldFuzzy"></label>
+                  </div>
+                  <div class="search-field-setting" data-search-field="definitions">
+                    <span data-i18n="searchFieldDefinitions">释义</span>
+                    <label><span class="visually-hidden" data-i18n="searchFieldEnabled">参与搜索</span><input name="search-definitions-enabled" type="checkbox" data-search-enabled="definitions" data-i18n-aria-label="searchFieldEnabled"></label>
+                    <label><span class="visually-hidden" data-i18n="searchFieldFuzzy">模糊匹配</span><input name="search-definitions-fuzzy" type="checkbox" data-search-fuzzy="definitions" data-i18n-aria-label="searchFieldFuzzy"></label>
+                  </div>
+                  <div class="search-field-setting" data-search-field="examples">
+                    <span data-i18n="searchFieldExamples">例句</span>
+                    <label><span class="visually-hidden" data-i18n="searchFieldEnabled">参与搜索</span><input name="search-examples-enabled" type="checkbox" data-search-enabled="examples" data-i18n-aria-label="searchFieldEnabled"></label>
+                    <label><span class="visually-hidden" data-i18n="searchFieldFuzzy">模糊匹配</span><input name="search-examples-fuzzy" type="checkbox" data-search-fuzzy="examples" data-i18n-aria-label="searchFieldFuzzy"></label>
+                  </div>
+                  <div class="search-field-setting" data-search-field="notes">
+                    <span data-i18n="searchFieldNotes">备注</span>
+                    <label><span class="visually-hidden" data-i18n="searchFieldEnabled">参与搜索</span><input name="search-notes-enabled" type="checkbox" data-search-enabled="notes" data-i18n-aria-label="searchFieldEnabled"></label>
+                    <label><span class="visually-hidden" data-i18n="searchFieldFuzzy">模糊匹配</span><input name="search-notes-fuzzy" type="checkbox" data-search-fuzzy="notes" data-i18n-aria-label="searchFieldFuzzy"></label>
+                  </div>
+                  <div class="search-field-setting" data-search-field="etymology">
+                    <span data-i18n="searchFieldEtymology">词源</span>
+                    <label><span class="visually-hidden" data-i18n="searchFieldEnabled">参与搜索</span><input name="search-etymology-enabled" type="checkbox" data-search-enabled="etymology" data-i18n-aria-label="searchFieldEnabled"></label>
+                    <label><span class="visually-hidden" data-i18n="searchFieldFuzzy">模糊匹配</span><input name="search-etymology-fuzzy" type="checkbox" data-search-fuzzy="etymology" data-i18n-aria-label="searchFieldFuzzy"></label>
+                  </div>
+                  <div class="search-field-setting" data-search-field="morphology">
+                    <span data-i18n="searchFieldMorphology">形态学</span>
+                    <label><span class="visually-hidden" data-i18n="searchFieldEnabled">参与搜索</span><input name="search-morphology-enabled" type="checkbox" data-search-enabled="morphology" data-i18n-aria-label="searchFieldEnabled"></label>
+                    <label><span class="visually-hidden" data-i18n="searchFieldFuzzy">模糊匹配</span><input name="search-morphology-fuzzy" type="checkbox" data-search-fuzzy="morphology" data-i18n-aria-label="searchFieldFuzzy"></label>
+                  </div>
+                </div>
+                <p class="muted-text" data-i18n="searchFieldMorphologyHelp">形态字段由规则动态生成，启用搜索可能明显增加大型词典的搜索耗时。</p>
+                <div class="subsection-title">
+                  <h3 data-i18n="searchNormalization">搜索规范化</h3>
+                </div>
                 <label class="toggle-row">
-                  <span data-i18n="fuzzySearchHelp">在词条搜索中启用模糊匹配</span>
-                  <input id="fuzzySearchInput" type="checkbox">
+                  <span data-i18n="searchNfcHelp">将等价的 Unicode 组合形式统一为 NFC</span>
+                  <input id="searchNfcInput" type="checkbox">
                 </label>
                 <label class="toggle-row">
-                  <span data-i18n="tagFuzzySearchHelp">在原始标签和替换后标签中启用模糊匹配</span>
-                  <input id="tagFuzzySearchInput" type="checkbox">
+                  <span data-i18n="searchCaseFoldingHelp">忽略 Unicode 字符的大小写差异</span>
+                  <input id="searchCaseFoldingInput" type="checkbox">
                 </label>
+                <div class="subsection-title">
+                  <h3 data-i18n="searchCustomRules">自定义等价规则</h3>
+                </div>
+                <p class="muted-text" data-i18n="searchCustomRulesHelp">将每行变体统一匹配为一个标准形式。规则按最长变体优先，且不会递归套用。</p>
+                <div class="search-normalization-rule-list" id="searchNormalizationRuleList"></div>
+                <button class="secondary-button additive-button" id="addSearchNormalizationRuleButton" type="button" data-i18n="addSearchNormalizationRule">添加规则</button>
+                <div class="subsection-title">
+                  <h3 data-i18n="etymologyAutocomplete">词源自动补全</h3>
+                </div>
                 <label class="toggle-row">
                   <span data-i18n="sourceFuzzyHelp">在词源来源补全中启用模糊匹配</span>
                   <input id="sourceFuzzyInput" type="checkbox">
@@ -702,14 +835,14 @@
           </section>
         </section>
 
-        <section class="view" id="docsView" aria-label="语言文档">
+        <section class="view" id="docsView" data-i18n-aria-label="languageDocs" aria-label="语言文档">
           <section class="top-bar">
             <div>
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
               <h2 data-i18n="languageDocs">语言文档</h2>
             </div>
             <div class="top-actions">
-              <div class="segmented-control" id="docsModeControl" aria-label="文档模式">
+              <div class="segmented-control" id="docsModeControl" data-i18n-aria-label="docsModeLabel" aria-label="文档模式">
                 <button class="active" type="button" data-doc-mode="split" data-i18n="splitMode">分栏</button>
                 <button type="button" data-doc-mode="edit" data-i18n="editMode">编辑</button>
                 <button type="button" data-doc-mode="preview" data-i18n="previewMode">查看</button>
@@ -734,7 +867,7 @@
           </section>
         </section>
 
-        <section class="view" id="corpusView" aria-label="语料库">
+        <section class="view" id="corpusView" data-i18n-aria-label="corpus" aria-label="语料库">
           <section class="top-bar">
             <div>
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
@@ -763,7 +896,7 @@
 
           <section class="corpus-panel" id="corpusPanel">
             <div class="corpus-toolbar">
-              <div class="segmented-control" id="corpusModeControl" aria-label="语料类型">
+              <div class="segmented-control" id="corpusModeControl" data-i18n-aria-label="corpusModeLabel" aria-label="语料类型">
                 <button class="active" type="button" data-corpus-mode="blocks" data-i18n="corpusBlocks">块</button>
                 <button type="button" data-corpus-mode="units" data-i18n="corpusUnits">单元</button>
               </div>
@@ -779,26 +912,26 @@
           </section>
         </section>
 
-        <section class="view" id="morphologyView" aria-label="自动形态学">
+        <section class="view" id="morphologyFunctionsView" data-i18n-aria-label="morphologyFunctions" aria-label="形态函数">
           <section class="top-bar">
             <div>
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
-              <h2 data-i18n="morphologyConfig">自动形态学</h2>
+              <h2 data-i18n="morphologyFunctions">形态函数</h2>
             </div>
             <div class="top-actions">
-              <button class="secondary-button" id="backToEditorFromMorphologyButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+              <button class="secondary-button" id="backToEditorFromMorphologyFunctionsButton" type="button" data-i18n="backToEditor">返回编辑器</button>
             </div>
           </section>
 
-          <section class="notice-panel" id="morphologyNoDictionaryNotice" hidden>
+          <section class="notice-panel" id="morphologyFunctionsNoDictionaryNotice" hidden>
             <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
             <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
             <p data-i18n="morphologyNeedDictionary">自动形态学配置会保存到当前词典文件中。</p>
-            <button class="primary-button" id="morphologyOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+            <button class="primary-button" id="morphologyFunctionsOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
           </section>
 
-          <section class="editor-panel tool-config-panel" id="morphologyPanel">
-            <form id="morphologyForm" autocomplete="off">
+          <section class="editor-panel tool-config-panel" id="morphologyFunctionsPanel">
+            <form id="morphologyFunctionsForm" autocomplete="off">
               <section class="settings-section morphology-function-section">
                 <div class="form-heading compact-heading">
                   <div>
@@ -817,12 +950,38 @@
                 </div>
                 <p class="field-help" data-i18n="morphologyFunctionObjectsHelp">为 leftV/rightV 配置它们会识别的对象。多个对象用逗号分隔。</p>
               </section>
-              <div class="form-heading morphology-table-heading">
-                <div class="heading-line">
-                  <h3 data-i18n="morphologyTables">形态表格</h3>
-                  <button class="info-button" id="morphologySyntaxButton" type="button" data-app-tooltip="always" data-i18n-aria-label="morphologySyntaxInfo" aria-label="形态语法">i</button>
-                </div>
-                <button class="secondary-button" id="addMorphologyTableButton" type="button" data-i18n="addMorphologyTable">添加表格</button>
+              <div class="form-actions">
+                <button class="primary-button" type="submit" data-i18n="saveConfig">保存配置</button>
+              </div>
+            </form>
+          </section>
+        </section>
+
+        <section class="view" id="morphologyTablesView" data-i18n-aria-label="morphologyTables" aria-label="形态表格">
+          <section class="top-bar">
+            <div>
+              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <div class="heading-line morphology-page-title">
+                <h2 data-i18n="morphologyTables">形态表格</h2>
+                <button class="info-button" id="morphologySyntaxButton" type="button" data-app-tooltip="always" data-i18n-aria-label="morphologySyntaxInfo" aria-label="形态语法">i</button>
+              </div>
+            </div>
+            <div class="top-actions">
+              <button class="secondary-button" id="backToEditorFromMorphologyTablesButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+            </div>
+          </section>
+
+          <section class="notice-panel" id="morphologyTablesNoDictionaryNotice" hidden>
+            <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
+            <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
+            <p data-i18n="morphologyNeedDictionary">自动形态学配置会保存到当前词典文件中。</p>
+            <button class="primary-button" id="morphologyTablesOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+          </section>
+
+          <section class="editor-panel tool-config-panel" id="morphologyTablesPanel">
+            <form id="morphologyTablesForm" autocomplete="off">
+              <div class="morphology-table-toolbar">
+                <button class="primary-button" id="addMorphologyTableGroupButton" type="button" data-i18n="addMorphologyTableGroup">新建表格组</button>
               </div>
               <div class="morphology-table-list" id="morphologyTableList"></div>
               <div class="form-actions">
@@ -832,7 +991,7 @@
           </section>
         </section>
 
-        <section class="view" id="ipaView" aria-label="自动 IPA 标注">
+        <section class="view" id="ipaView" data-i18n-aria-label="ipaConfig" aria-label="自动 IPA 标注">
           <section class="top-bar">
             <div>
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
@@ -961,7 +1120,7 @@
     </div>
 
     <section class="network-overlay" id="lexicalNetworkOverlay" hidden>
-      <div class="network-panel" id="lexicalNetworkPanel">
+      <div class="network-panel" id="lexicalNetworkPanel" role="dialog" aria-modal="true" aria-labelledby="networkTitle" tabindex="-1">
         <div class="network-header">
           <div>
             <p class="eyebrow" data-i18n="lexicalNetwork">词汇网络</p>
@@ -969,18 +1128,19 @@
           </div>
           <button class="secondary-button" id="closeLexicalNetworkButton" type="button" data-i18n="closeNetwork">关闭网络</button>
         </div>
-        <div class="network-grid">
-          <section class="network-column">
-            <h3 data-i18n="source">来源</h3>
-            <div class="network-node-list" id="networkSources"></div>
-          </section>
-          <section class="network-center">
-            <div class="network-focus" id="networkFocus"></div>
-          </section>
-          <section class="network-column">
-            <h3 data-i18n="derivedEntries">衍生</h3>
-            <div class="network-node-list" id="networkDerived"></div>
-          </section>
+        <div class="network-viewport" id="networkViewport">
+          <span class="network-layer-label source" id="networkSourceLabel" data-i18n="source">来源</span>
+          <span class="network-layer-label derived" id="networkDerivedLabel" data-i18n="derivedEntries">衍生</span>
+          <svg class="network-svg" id="networkSvg" role="group" aria-labelledby="networkTitle">
+            <defs>
+              <marker id="networkArrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L8,4.5 L0,9 Z"></path>
+              </marker>
+            </defs>
+            <g class="network-edge-layer" id="networkEdges"></g>
+            <g class="network-node-layer" id="networkNodes"></g>
+          </svg>
+          <div class="network-status" id="networkStatus" role="status" aria-live="polite" hidden></div>
         </div>
       </div>
     </section>
@@ -1012,6 +1172,17 @@
     <div class="app-tooltip" id="appTooltip" role="tooltip" hidden></div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+    <script src="lib/search-normalization-model.js"></script>
+    <script src="lib/tag-model.js"></script>
+    <script src="lib/morphology-model.js"></script>
+    <script src="lib/entry-search-model.js"></script>
+    <script src="lib/entry-query-model.js"></script>
+    <script src="lib/entry-relations-model.js"></script>
+    <script src="lib/dictionary-query-model.js"></script>
+    <script src="lib/analysis-model.js"></script>
+    <script src="lib/ipa-model.js"></script>
+    <script src="lib/quality-model.js"></script>
+    <script src="lib/query-page-cache.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
