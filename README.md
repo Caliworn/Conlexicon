@@ -1,51 +1,45 @@
 # Conlexicon / 构典
 
-Conlexicon is a local-first web dictionary and editor for constructed languages. It manages multiple dictionaries, supports rich lexical entries, and stores each active dictionary in its own SQLite file.
+Conlexicon is a local-first web dictionary and editor for constructed languages. It manages multiple dictionaries, supports rich lexical entries, and stores each dictionary in its own JSON file.
 
-Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。它支持多词典管理、复杂词条编辑，并将每个正在使用的词典分别保存为独立的 SQLite 文件。
-
-See [docs/README.md](docs/README.md) for architecture, API, migration, and feature-design documentation.
-
-架构、API、迁移和专题设计文档见 [docs/README.md](docs/README.md)。
+Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。它支持多词典管理、复杂词条编辑，并将每个词典分别保存为独立的 JSON 文件。
 
 ## Features / 功能
 
 - Multi-dictionary management: create, switch, import, export, configure, and delete dictionaries, with explicit confirmation before an imported dictionary ID overwrites an existing dictionary.
-- Per-dictionary SQLite persistence: entries and their structured subobjects, morphology template groups/tables/overrides, corpus data, settings, docs, and IPA rules are stored locally with each dictionary. Legacy JSON remains an explicit import/export and migration format.
+- Per-dictionary JSON persistence: dictionary entries, corpus data, settings, docs, IPA rules, morphology rules, and UI options are saved with the dictionary.
 - Lexical entry editing with lemma, pronunciation, tags, multiple definitions, examples, notes, etymology, sources, and derived-entry backlinks.
-- Configurable part-of-speech logic: by default the first tag is treated as the part of speech; an optional explicit tag list supports multiple parts of speech per entry for display and filtering.
+- Tag-first part-of-speech logic: the first tag is treated as the part of speech and is used for display/filtering.
 - Display mode and edit mode: saved entries open in a clean reading view, with full editing and inline section editing available.
 - Responsive application shell with collapsible tool navigation, a collapsible entry list, and mobile drawer controls for navigation, entry browsing, and creating entries.
-- Advanced filtering from analytics and quality checks: click analytic rows or quality categories to filter the entry browser, with reversible filter variants for coverage, IPA, morphology, and quality issues.
+- Advanced filtering from analytics: click analytic rows to filter the entry browser, with reversible filter variants for coverage, IPA, morphology, and quality checks.
 - Root mode entry browsing: derived entries can be nested under their roots, with expand/collapse controls and quick derived-entry creation.
-- Layered SVG lexical network for source and derived relationships, with keyed node refocusing, animated edges, hover details, and responsive horizontal/vertical layouts.
+- Lexical network view for source and derived relationships, including hover cards and navigation between connected entries.
 - Auto IPA rules with mapping, syllabification, onset/coda clusters, complex phonemes, stress settings, sandbox testing, and batch generation.
-- Auto morphology with template groups, multiple subtables per group, automatic or manual per-entry group selection, rule syntax, function objects, overrides, generated forms, and searchable morphology output.
+- Auto morphology tables with custom rule syntax, function objects, overrides, generated forms, and searchable morphology output.
 - Markdown language documentation with split edit/preview, edit-only, and preview-only modes.
 - Per-dictionary corpus management with ordered blocks, speaker/modality layers, standalone units, inherited attributes, unique entity ID validation, single-parent link validation, and configurable gloss-based unit names with optional render objects.
-- Tabbed data analysis for overview, entries/tags, IPA, morphology, and editing activity, plus a dedicated quality-check page for priority/module issue review.
+- Paged data analysis for overview, entries/tags, IPA, morphology, editing activity, quality checks, etymology checks, and glossed examples.
 - Gloss rendering for `\gla`, `\glb`, `\glc`, and `\ft`, with independent render-object and alignment settings for corpus unit cards, unit content headings, and entry examples, plus per-object font, size, bold, italic, and `\glb` small-caps styles.
-- Per-dictionary UI/settings options, including per-field search/fuzzy controls, optional NFC and Unicode case folding, custom search equivalence rules, etymology autocomplete matching, label display replacement, highlighted tags, gloss rendering, polysemy display, save/discard/prompt handling for edits during navigation, corpus/docs auto-save, IPA keyboard symbols, and left navigation order.
-- SQLite-backed per-value search projections for static entry fields and generated morphology, with configurable strict/fuzzy matching and localized hit summaries. Large entry and root-mode results use versioned query windows while retaining one continuous native scrollbar.
+- Per-dictionary UI/settings options, including fuzzy search, label display replacement, highlighted tags, gloss rendering, polysemy display, save/discard/prompt handling for edits during navigation, corpus/docs auto-save, IPA keyboard symbols, and left navigation order.
 - Dark mode and Chinese/English UI switching, with the global interface theme and language remembered in `data/index.json`.
 
 - 多词典管理：新建、切换、导入、导出、配置和删除词典；导入相同词典 ID 的词典前会明确确认是否覆盖。
-- 词典级 SQLite 保存：词条及其结构化子对象、形态模板组/子表/覆盖项、语料库、设置、语言文档和 IPA 规则都会随当前词典保存在本地。旧 JSON 仅作为显式导入、导出和迁移格式保留。
+- 词典级 JSON 保存：词条、语料库、设置、语言文档、IPA 规则、形态学规则和界面选项都会随当前词典保存。
 - 词条编辑：支持词形、发音、标签、多条释义、例句、备注、词源、来源以及反向衍生链接。
-- 可配置词性逻辑：默认将第一个标签视为词性；也可显式指定词性标签列表，使一个词条拥有多个词性并用于显示和筛选。
+- 标签即词性：第一个标签会被视为词性，用于显示和筛选。
 - 查看模式与编辑模式：保存后的词条会进入整洁的阅读界面，也支持完整编辑和栏目局部编辑。
 - 响应式应用外壳：支持可收起工具导航、可收起词条列表，以及移动端用于导航、浏览词条和新建词条的抽屉控件。
-- 数据分析与质量检查高级筛选：点击统计行或质量类别可以筛选词条列表，并支持释义覆盖、IPA、形态学、质量问题等项目的筛选条件切换；标签、字段有无、来源数量和日期等稳定条件可继续叠加自由文本搜索，并复用普通词条列表的窗口加载与定位。
-- 词根模式浏览：衍生词可以嵌套显示在词根下方，支持单组展开/收起、全局展开、全局模式下的单组收起例外，以及快速创建衍生词；父级窗口淘汰只释放数据，不丢失展开意图。
-- 词汇网络：以分层 SVG 展示来源、当前焦点与衍生关系；关联节点会在切换焦点时连续移动并更新连线，同时支持悬浮信息、键盘操作和窄屏纵向布局。
+- 数据分析高级筛选：点击统计行可以筛选词条浏览栏，并支持释义覆盖、IPA、形态学、质量检查等项目的筛选条件切换。
+- 词根模式浏览：衍生词可以嵌套显示在词根下方，支持展开、收起和快速创建衍生词。
+- 词汇网络：展示来源与衍生关系，支持悬浮信息卡和在关联词条之间导航。
 - 自动 IPA：支持映射、音节划分、音节首/尾辅音簇、复杂音位、重音设置、沙盒测试和批量生成。
-- 自动形态学：支持模板组及组内多个形态表格、词条级自动匹配或手动选择形态组、规则语法、函数识别对象、词条覆盖项、生成形式和搜索生成结果。
+- 自动形态学：支持自定义形态表格、规则语法、函数识别对象、词条覆盖项、生成形式和搜索生成结果。
 - Markdown 语言文档：支持左右分栏编辑预览、纯编辑和纯查看模式。
 - 词典级语料库：支持有序语料块、发言人/模态语料层、独立语料单元、属性继承、实体 ID 唯一性检查、单父级链接检查，以及带可选渲染对象的 Gloss 单元名渲染。
-- 分标签页数据分析：包括总览、词条与标签、IPA、形态学和编辑进度；质量检查拥有独立页面，支持按优先度和检查模块查看问题。
+- 分页式数据分析：包括总览、词条与标签、IPA、形态学、编辑进度、质量检查、词源检查和 glossed 例句检查。
 - Gloss 渲染：语料单元卡片、单元内容名称和词条例句可分别配置渲染对象与对齐，并支持 `\gla`、`\glb`、`\glc`、`\ft` 独立配置字体、字号、粗体和斜体，以及 `\glb` small caps。
-- 词典级界面设置：包括逐字段搜索/模糊匹配、可选 NFC 与 Unicode 大小写折叠、自定义搜索等价规则、词源自动补全、标签显示替换、红色高亮标签、gloss 渲染、多义项显示、导航时保存/放弃/提示编辑、语料库/文档自动保存、IPA 虚拟键盘符号和左侧导航栏排序。
-- SQLite 逐值搜索投射：静态词条字段和自动生成形态均支持可配置的严格/模糊搜索及本地化命中摘要；词根模式和词汇网络复用仅在关系变化时失效、带双向定位索引的稳定拓扑。大型词条列表与词根模式结果通过版本化查询窗口加载，同时保持一条连续的原生滚动条。切换查询或词条详情时会先保留当前内容，旧详情会立即停止响应交互；读取超过 200ms 后再以统一遮罩标明正在更新，避免快速本地读取产生闪烁。
+- 词典级界面设置：包括模糊搜索、标签显示替换、红色高亮标签、gloss 渲染、多义项显示、导航时保存/放弃/提示编辑、语料库/文档自动保存、IPA 虚拟键盘符号和左侧导航栏排序。
 - 暗黑模式和中英界面切换；全局界面主题和语言会记忆在 `data/index.json` 中。
 
 ## Keyboard Shortcuts / 快捷键
@@ -58,20 +52,12 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 
 ## Run Locally / 本地运行
 
-Conlexicon currently uses a small Node.js backend with no external npm dependencies. SQLite is the runtime storage backend.
+Conlexicon currently uses a small Node.js backend with no external dependencies.
 
-Conlexicon 目前使用一个小型 Node.js 后端，不需要安装额外 npm 依赖。运行时存储后端为 SQLite。
+Conlexicon 目前使用一个小型 Node.js 后端，不需要安装额外依赖。
 
 ```bash
 node server.js
-```
-
-When testing or migrating manually, a separate data directory is still recommended:
-
-测试或手动迁移时，仍建议配合单独的数据目录：
-
-```bash
-CONLEXICON_DATA_DIR=/tmp/conlexicon-sqlite node server.js
 ```
 
 Then open:
@@ -80,30 +66,6 @@ Then open:
 
 ```text
 http://localhost:4173/
-```
-
-For the focused frontend query-cache contract check, run:
-
-前端查询缓存的定向契约检查可通过以下命令运行：
-
-```bash
-node scripts/check-query-page-cache.js
-```
-
-For the backend runtime query-session cache and SQLite integration check, run:
-
-后端运行时查询会话及 SQLite 接线可通过以下命令检查：
-
-```bash
-node scripts/check-query-session-cache.js
-```
-
-To compare cold and repeated hot query-session performance against an existing SQLite test data directory, run:
-
-如需使用现有 SQLite 测试词典比较查询会话的冷查询与重复热查询性能，可运行：
-
-```bash
-node scripts/benchmark-query-session-cache.js --data /path/to/sqlite-data --query bdy --runs 5
 ```
 
 ## Data Storage / 数据存储
@@ -115,28 +77,12 @@ Dictionary data is stored locally under:
 ```text
 data/
 data/index.json
-data/dictionaries/*.sqlite
+data/dictionaries/*.json
 ```
 
-`data/index.json` stores the dictionary index, active dictionary ID, global interface language, and global interface theme. Per-dictionary content and settings are stored in `data/dictionaries/*.sqlite` by default.
+`data/index.json` stores the dictionary index, active dictionary ID, global interface language, and global interface theme. Per-dictionary content and settings remain in `data/dictionaries/*.json`.
 
-`data/index.json` 保存词典索引、当前词典 ID、全局界面语言和全局界面主题；默认情况下，各词典的内容与设置分别保存在 `data/dictionaries/*.sqlite` 中。
-
-Legacy JSON dictionaries are not migrated automatically on startup. To reuse an old JSON dictionary, import the JSON file from the app's dictionary management UI.
-
-旧 JSON 词典不会在启动时自动迁移。若要复用旧 JSON 词典，请在应用的词典管理界面导入对应 JSON 文件。
-
-For bulk migration testing, use the explicit JSON-to-SQLite migration script with separate source and target data directories:
-
-如需测试批量迁移，可使用显式的 JSON 到 SQLite 迁移脚本，并为源目录和目标目录指定不同位置：
-
-```bash
-node scripts/migrate-json-data-to-sqlite.js --from /path/to/json-data --to /path/to/sqlite-data
-```
-
-The script refuses to write into a non-empty target directory and does not modify the source directory.
-
-该脚本会拒绝写入非空目标目录，并且不会修改源目录。
+`data/index.json` 保存词典索引、当前词典 ID、全局界面语言和全局界面主题；各词典的内容与设置仍分别保存在 `data/dictionaries/*.json` 中。
 
 The `data/` directory is intentionally ignored by Git so personal dictionaries are not committed to the repository.
 
@@ -147,7 +93,7 @@ The `data/` directory is intentionally ignored by Git so personal dictionaries a
 ```text
 index.html   Main UI / 主界面
 app.js       Frontend logic / 前端逻辑
-server.js    Local SQLite-backed HTTP server / 使用 SQLite 的本地 HTTP 服务
+server.js    Local backend and JSON persistence / 本地后端与 JSON 保存逻辑
 styles.css   Application styling / 应用样式
 ```
 

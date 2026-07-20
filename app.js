@@ -11,18 +11,12 @@ let state = {
 let backendAvailable = true;
 let backendMessage = "";
 let searchQuery = "";
-const ENTRY_SEARCH_DEBOUNCE_MS = 250;
-const ENTRY_QUERY_WINDOW_PAGE_SIZE = 200;
-const ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE = 100;
-const QUERY_WINDOW_MAX_LOADED_PAGES = 5;
-let entrySearchDebounceTimer = 0;
 let activePart = "";
 let entrySort = "lemmaAsc";
 let toastTimer = null;
 let editorMode = "display";
 let currentTheme = "light";
 let currentLanguage = "zh";
-let loadedDictionaryIds = new Set();
 const UI_PREFERENCES_STORAGE_KEY = "conlexicon:ui-preferences";
 const shellState = {
   navCollapsed: false,
@@ -34,33 +28,13 @@ const shellState = {
 let activeAppTooltipTarget = null;
 const desktopNavMediaQuery = window.matchMedia("(min-width: 800px)");
 const wideNavMediaQuery = window.matchMedia("(min-width: 1280px)");
-const analysisModel = window.ConlexiconAnalysis;
-const entryRelationsModel = window.ConlexiconEntryRelations;
-const dictionaryQueryModel = window.ConlexiconDictionaryQuery;
-const entryQueryModel = window.ConlexiconEntryQuery;
-const ipaModel = window.ConlexiconIpa;
-const IPA_STRESS_MARKER = ipaModel.IPA_STRESS_MARKER;
+const IPA_STRESS_MARKER = "\uE000";
 const GLOSS_STYLE_KEYS = ["gla", "glb", "glc", "ft"];
 const DEFAULT_ENTRY_EXAMPLE_RENDER_PATTERN = "(\\gla)\n(\\glb)\n(\\glc)\n(\\ft)";
 const DEFAULT_ENTRY_LIST_TAG_DISPLAY_LIMIT = 3;
 const MIN_ENTRY_LIST_TAG_DISPLAY_LIMIT = 2;
 const MAX_ENTRY_LIST_TAG_DISPLAY_LIMIT = 10;
 const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
-const tagModel = window.ConlexiconTags;
-const morphologyModel = window.ConlexiconMorphology;
-const entrySearchModel = window.ConlexiconEntrySearch;
-const searchNormalizationModel = window.ConlexiconSearchNormalization;
-const ENTRY_SEARCH_FIELD_KEYS = entrySearchModel.ENTRY_SEARCH_FIELD_KEYS;
-const qualityModel = window.ConlexiconQuality;
-const QueryPageCache = window.ConlexiconQueryPageCache.QueryPageCache;
-const queryPageCache = new QueryPageCache({
-  maxEntries: 4,
-  maxBytes: 16 * 1024 * 1024,
-});
-const entryDetailCache = new QueryPageCache({
-  maxEntries: 12,
-  maxBytes: 12 * 1024 * 1024,
-});
 let docsViewMode = "split";
 let docsSaveTimer = null;
 let corpusSaveTimer = null;
@@ -81,23 +55,11 @@ let sourceSuggestionIndex = 0;
 let sourceSuggestionHideTimer = 0;
 let networkEntryId = "";
 let networkOpen = false;
-let networkPreviousFocusId = "";
-let networkLayoutFrame = 0;
-const networkNodeElements = new Map();
-const networkEdgeElements = new Map();
-let networkScene = {
-  focusEntryId: "",
-  nodes: new Map(),
-  edges: new Map(),
-  positions: new Map(),
-};
 let partialEditSection = "";
 let partialEditHost = null;
 const expandedMorphologyTables = new Set();
 let rootMode = false;
-let rootExpansionMode = "manual";
 const expandedRootEntries = new Set();
-const collapsedRootEntries = new Set();
 let rootNavigationContextId = "";
 let entryDraft = null;
 const defaultAnalysisViewState = {
@@ -107,97 +69,28 @@ const defaultAnalysisViewState = {
     ipa: "distribution",
     morphology: "tables",
     activity: "updated",
+    quality: "issues",
   },
   scrollByRoute: {},
 };
-const defaultQualityViewState = {
-  subpage: "issues",
-  scrollBySubpage: {},
-};
 const analysisViewStates = new Map();
-const qualityViewStates = new Map();
 const corpusViewStates = new Map();
 let corpusDraftState = null;
-const DEFAULT_TOOL_NAV_ORDER = ["editor", "docs", "corpus", "analysis", "quality", "ipa", "morphology-functions", "morphology-tables", "settings", "manager"];
-const DEFAULT_ENTRY_SECTION_ORDER = ["definitions", "etymology", "derived", "morphology", "notes"];
-const ENTRY_LIST_PART_DISPLAY_OPTIONS = ["subtitle", "chips", "both"];
+const DEFAULT_TOOL_NAV_ORDER = ["editor", "docs", "corpus", "analysis", "ipa", "morphology", "settings", "manager"];
 let advancedFilter = null;
-let entryQueryState = {
-  key: "",
-  status: "idle",
-  items: [],
-  pageInfo: null,
-  error: null,
-  requestId: 0,
-  pages: [],
-  visiblePageIndexes: new Set(),
-  windowCursor: "",
-  updateToken: 0,
-};
-let entryFacetsState = {
-  key: "",
-  status: "idle",
-  parts: [],
-  error: null,
-  requestId: 0,
-};
-let rootGroupsQueryState = {
-  key: "",
-  status: "idle",
-  groups: [],
-  pageInfo: null,
-  error: null,
-  requestId: 0,
-  pages: [],
-  visiblePageIndexes: new Set(),
-  windowCursor: "",
-  updateToken: 0,
-};
-const rootGroupDerivedStates = new Map();
-let selectedEntryDetailState = {
-  dictionaryId: "",
-  entryId: "",
-  status: "idle",
-  entry: null,
-  staleEntry: null,
-  error: null,
-  requestId: 0,
-};
-let selectedEntryDetailLoadPromise = null;
-const entryRelationsCache = new Map();
-const ENTRY_RELATIONS_CACHE_MAX = 24;
-let qualityReportCache = null;
 let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
 let draggedToolNavView = "";
-let draggedEntrySectionId = "";
-let draggedMorphologyGroupId = "";
-let draggedMorphologyTableId = "";
+let draggedIpaRuleId = "";
 let entryCardScrollRequestId = 0;
 let pendingEntryCardScroll = null;
 let entryBrowserHeightFrame = 0;
 let entryBrowserLayoutRefreshFrame = 0;
 let entryBrowserLayoutRefreshUntil = 0;
 let activeEntryContextMenu = null;
-const entryVirtualList = createVirtualListState(145);
+const entryVirtualList = createVirtualListState(138);
 const corpusVirtualList = createVirtualListState(74);
 const masonryLayouts = new WeakMap();
-const VIRTUAL_LIST_RESIZE_EPSILON = 0.5;
-const VIRTUAL_LIST_ACTIVE_SCROLL_MS = 180;
-const VIRTUAL_LIST_RENDER_THROTTLE_MS = 50;
-const VIRTUAL_LIST_RESIZE_THROTTLE_MS = 500;
-const VIRTUAL_LIST_RESIZE_IDLE_FLUSH_MS = 180;
-const VIRTUAL_LIST_HEIGHT_CACHE_WIDTH_BUCKET = 24;
-const VIRTUAL_LIST_HEIGHT_CACHE_LIMIT = 50000;
-const STALE_CONTENT_UPDATE_DELAY_MS = 200;
-const DEFAULT_ANALYSIS_ROOT_FAMILY_LIMIT = 12;
-let staleContentUpdateSequence = 0;
-let entryListHasSettledContent = false;
-let entryDetailHasSettledContent = false;
-const staleContentUpdates = {
-  list: { token: 0, timer: 0, pending: false, hasStaleContent: false, showing: false },
-  detail: { token: 0, timer: 0, pending: false, hasStaleContent: false, showing: false },
-};
 
 const i18n = {
   zh: {
@@ -208,32 +101,20 @@ const i18n = {
     openToolNavigation: "打开工具导航",
     closeToolNavigation: "关闭工具导航",
     entryBrowser: "词条列表",
-    entryDetail: "词条详情",
-    partFilterLabel: "词性筛选",
-    entrySortLabel: "词条排序",
     collapseEntryBrowser: "收起词条列表",
     expandEntryBrowser: "展开词条列表",
     openEntryList: "打开词条列表",
     closeEntryList: "关闭词条列表",
-    focusCurrentEntryInList: "在词条列表中定位当前词条",
-    currentEntryNotInList: "当前词条不在列表结果中",
     entryEditor: "词条编辑",
-    dictionaryConfig: "词典配置",
-    docsModeLabel: "文档模式",
-    corpusModeLabel: "语料类型",
     current: "当前",
     planned: "待实装",
     ipaConfig: "自动 IPA 标注",
     analysis: "数据分析",
-    qualityCheck: "质量检查",
     languageDocs: "语言文档",
     corpus: "语料库",
     morphologyConfig: "自动形态学",
-    morphologyFunctions: "形态函数",
     morphologyDisplay: "形态学",
-    morphologyGroup: "形态组",
     morphologyNeedDictionary: "自动形态学配置会保存到当前词典文件中。",
-    qualityNeedDictionary: "质量检查会根据当前词典中的词条、标签、词源、IPA 和 Glossed 例句实时生成。",
     morphologyTables: "形态表格",
     morphologyFunctionObjects: "函数识别对象",
     morphologyFunctionObjectsHelp: "为 leftV/rightV 配置它们会识别的对象。函数被规则使用时必须先配置；函数会先找到最近的已配置对象，再判断它是否属于括号中的候选项。多个对象用逗号分隔。",
@@ -242,12 +123,8 @@ const i18n = {
     invalidMorphologyFunctionObjects: "形态配置中存在未配置的函数对象",
     invalidMorphologySyntax: "形态配置中存在不合法的替换语法",
     morphologyTable: "形态表格",
-    morphologyTableGroup: "形态表格组",
-    morphologyTableGroupName: "表格组标题",
-    morphologyTableGroupNotes: "表格组备注",
-    addMorphologyTableGroup: "新建表格组",
     addMorphologyTable: "添加表格",
-    tableName: "表格标题",
+    tableName: "表格名称",
     tableSize: "表格尺寸",
     rowCount: "行数",
     columnCount: "列数",
@@ -258,25 +135,8 @@ const i18n = {
     replacementMode: "替换",
     applySize: "应用尺寸",
     removeTable: "删除表格",
-    removeMorphologyTableGroup: "删除表格组",
-    emptyMorphologyTableGroup: "此表格组暂无表格。",
-    dragMorphologyTableGroup: "拖动以调整表格组排序",
-    dragMorphologyTable: "拖动以调整表格排序",
     morphologyAuto: "自动匹配",
     morphologyNone: "不使用表格",
-    morphologyMode: "形态模式",
-    morphologyManual: "手动配置",
-    switchToManualMorphology: "改为手动配置",
-    switchToManualMorphologyConfirm: "改为手动配置会保留当前自动命中的形态组，并一并转移当前未显示的形态覆盖。之后若恢复自动匹配，所有这些手动形态组、标题、备注和单元格覆盖都会被清空。是否继续？",
-    restoreAutoMorphology: "恢复自动匹配",
-    restoreAutoMorphologyConfirm: "恢复自动匹配将放弃当前手动形态组及其标题、备注和单元格覆盖。是否继续？",
-    morphologyManualGroups: "手动形态组",
-    addEntryMorphologyGroup: "添加形态组",
-    removeEntryMorphologyGroup: "移除形态组",
-    entryMorphologyGroupTitle: "组标题覆盖",
-    entryMorphologyGroupNotes: "词条形态备注",
-    morphologyGroupNote: "形态组备注",
-    useTemplateGroupTitle: "留空则使用表格组标题",
     morphologyOverrideHelp: "留空则使用表格规则；填写内容会覆盖对应栏目。",
     morphologyRuleSyntaxHelp: "使用 {} 引用词形；{a = e} 引用并替换词形；/leftV(a,o,u) = lar; rightV(e,i,ö,ü) = ler; else = / 按最近左侧或右侧音位选择输出；else 可留空。",
     morphologySyntaxTitle: "形态语法",
@@ -378,35 +238,9 @@ const i18n = {
     searchDisplay: "显示",
     save: "保存",
     fuzzySearch: "模糊匹配",
-    searchFields: "搜索字段",
-    searchField: "字段",
-    searchFieldEnabled: "参与搜索",
-    searchFieldFuzzy: "模糊匹配",
-    searchFieldLemma: "词形",
-    searchFieldPronunciation: "IPA",
-    searchFieldTags: "标签",
-    searchFieldDefinitions: "释义",
-    searchFieldExamples: "例句",
-    searchFieldNotes: "备注",
-    searchFieldEtymology: "词源",
-    searchFieldMorphology: "形态学",
-    searchFieldMorphologyHelp: "形态字段由规则动态生成，启用搜索可能明显增加大型词典的搜索耗时。",
-    searchNormalization: "搜索规范化",
-    searchNfcHelp: "将等价的 Unicode 组合形式统一为 NFC",
-    searchCaseFoldingHelp: "忽略 Unicode 字符的大小写差异",
-    searchCustomRules: "自定义等价规则",
-    searchCustomRulesHelp: "将每行变体统一匹配为一个标准形式。规则按最长变体优先，且不会递归套用。",
-    searchCanonical: "标准形式",
-    searchVariants: "等价变体（每行一个）",
-    addSearchNormalizationRule: "添加规则",
-    removeSearchNormalizationRule: "删除规则",
-    searchNormalizationInvalidRule: "自定义搜索规则无效。",
-    searchNormalizationEmptyCanonical: "请填写规则的标准形式。",
-    searchNormalizationEmptyVariants: "请至少填写一个等价变体。",
-    searchNormalizationConflictingVariant: "同一个等价变体不能对应多个标准形式。",
-    etymologyAutocomplete: "词源自动补全",
+    fuzzySearchHelp: "在词条搜索中启用模糊匹配",
+    tagFuzzySearchHelp: "在原始标签和替换后标签中启用模糊匹配",
     sourceFuzzyHelp: "在词源来源补全中启用模糊匹配",
-    searchFieldRequired: "请至少启用一个搜索字段。",
     searchHighlightHelp: "搜索时高亮显示匹配结果",
     switchEntrySettings: "切换词条",
     editEntrySettings: "编辑词条",
@@ -440,10 +274,6 @@ const i18n = {
     entryListTagDisplayLimit: "词条列表中标签显示上限",
     entryListTagDisplayLimitHelp: "设为 n 时，超过 n 个标签会显示前 n-1 个和省略号。默认为 3。",
     entryListTagDisplayLimitInvalid: "词条列表标签显示上限必须是 2 到 10 之间的整数。",
-    entryListPartDisplay: "词条列表中词性显示位置",
-    entryListPartDisplaySubtitle: "副标题",
-    entryListPartDisplayChips: "标签区",
-    entryListPartDisplayBoth: "两者均显示",
     tagTooltipRawTag: "原始标签",
     tagTooltipDisplayReplacement: "显示替换",
     partOfSpeechTagSettings: "词性标签",
@@ -454,10 +284,8 @@ const i18n = {
     tagOrderInfo: "查看标签排序逻辑",
     tagOrderInfoBody: "点击刷新后，系统会按输入框中的统一顺序重排每个词条的标签。统一顺序里有而某个词条没有的标签会被跳过；某个词条里有但统一顺序里没有的标签会保留在末尾，多个额外标签保持原始相对顺序。这里应填写原始标签；显示替换只影响界面显示，不参与匹配。",
     tagOrderConfirm: "将按照当前输入的统一顺序重排当前词典中所有词条的标签，并立即保存。继续吗？",
-    tagOrderUnsavedSettingsConfirm: "当前其他设置有未保存更改。请先保存设置后再自动整理标签顺序。",
     tagOrderApplied: "标签顺序已整理",
     tagOrderEmpty: "请先输入至少一个标签。",
-    saveAndApply: "保存并应用",
     applyTags: "应用",
     tagDisplaySettings: "标签突出显示",
     tagRedHighlightHelp: "配置后，这些标签会在词条浏览栏和查看界面中以红色显示。多个标签用逗号、空格或换行分隔。",
@@ -467,10 +295,6 @@ const i18n = {
     polysemyDisplay: "多义项显示",
     entryListPolysemyDisplay: "词条列表的多义项显示",
     networkPolysemyDisplay: "词汇网络悬浮卡片的多义项显示",
-    emptyEntrySections: "空栏目",
-    showEmptyEntrySections: "在词条浏览界面显示空栏目",
-    entrySectionOrder: "词条栏目排序",
-    entrySectionOrderHelp: "拖动卡片以调整词条详情和完整编辑中栏目顺序。衍生词只在有内容时显示，且不可在完整编辑中修改。",
     ipaKeyboardSettings: "IPA 虚拟键盘",
     ipaKeyboardSymbols: "键盘符号",
     ipaKeyboardHelp: "以空格、逗号或换行分隔。新词典默认包含 ˈ 和 ˌ。",
@@ -502,8 +326,6 @@ const i18n = {
     noEntriesBody: "新建第一个词条后，这里会显示词条详情。",
     noMatch: "没有匹配的词条",
     noMatchBody: "可以新建词条，或调整搜索与筛选条件。",
-    entryResultsTruncated: "当前仅加载 {loaded} / {total} 个词条",
-    rootGroupsTruncated: "当前仅加载 {loaded} / {total} 个词根组",
     noDescription: "暂无描述",
     config: "配置",
     setCurrent: "设为当前",
@@ -519,7 +341,6 @@ const i18n = {
     requiredEntry: "请填写词形",
     missingDefinition: "尚未填写释义",
     savedEntry: "词条已保存",
-    noChangesToSave: "没有需要保存的更改",
     derivedEntryDraft: "已创建衍生词草稿",
     deletedEntry: "词条已删除",
     createDictionaryFirstToast: "请先创建词典",
@@ -539,41 +360,9 @@ const i18n = {
     importFailed: "无法读取这个 JSON 文件",
     languageSaveFailed: "界面语言保存失败",
     themeSaveFailed: "界面主题保存失败",
-    apiErrorRequestBodyTooLarge: "保存内容过大",
-    apiErrorInvalidJsonBody: "请求内容不是有效 JSON",
-    apiErrorInvalidUiLanguage: "界面语言值无效",
-    apiErrorInvalidUiTheme: "界面主题值无效",
-    apiErrorInvalidImportPayload: "导入文件格式无效",
-    apiErrorInvalidDictionaryId: "词典 ID 格式无效",
-    apiErrorDictionaryNotFound: "词典不存在或已被删除",
-    apiErrorDictionaryIdExists: "词典 ID 已存在，需要确认覆盖",
-    apiErrorDuplicateEntityIds: "词典中存在重复 ID",
-    apiErrorDuplicateEntityIdsScoped: "当前保存范围存在重复 ID",
-    apiErrorInvalidEntryPayload: "词条保存请求格式无效",
-    apiErrorEntryIdExists: "词条 ID 已存在",
-    apiErrorInvalidEntryUpdatesPayload: "批量词条更新格式无效",
-    apiErrorEntryNotFound: "词条不存在或已被删除",
-    apiErrorInvalidSettingsPayload: "设置保存请求格式无效",
-    apiErrorInvalidDocsPayload: "语言文档保存请求格式无效",
-    apiErrorInvalidCorpusPayload: "语料库保存请求格式无效",
-    apiErrorInvalidMorphologyPayload: "形态学保存请求格式无效",
-    apiErrorInvalidIpaSettingsPayload: "IPA 设置保存请求格式无效",
-    apiErrorUnsupportedEntryPatchFields: "批量词条更新包含不支持的字段",
-    apiErrorEntryPatchTagsInvalid: "批量标签更新格式无效",
-    apiErrorEntryPatchPronunciationInvalid: "批量 IPA 更新格式无效",
-    apiErrorSystemFilePermission: "文件权限不足，无法写入",
-    apiErrorSystemDiskFull: "磁盘空间不足，无法保存",
-    apiErrorSystemFileBusy: "文件正被占用，无法保存",
-    apiErrorSystemFileMissing: "目标文件不存在或已被移动",
-    apiErrorSystemJsonParse: "本地 JSON 文件损坏或无法解析",
-    apiErrorNetwork: "无法连接到本地服务",
-    apiErrorUnknown: "发生未知错误",
     importOverwriteTitle: "词典 ID 已存在",
     importOverwriteMessage: "词典 ID“{id}”已经存在。导入“{name}”将覆盖现有词典及其全部数据。",
     importAndOverwrite: "导入并覆盖",
-    importInvalidIdTitle: "词典 ID 格式无效",
-    importInvalidIdMessage: "词典 ID“{id}”格式无效。是否作为新词典导入并重新生成 ID？",
-    importAndRegenerateId: "重新生成 ID 并导入",
     updatedAt: "修订日期",
     source: "来源",
     derivedEntries: "衍生",
@@ -581,6 +370,7 @@ const i18n = {
     orthographyModule: "正写法识别",
     orthographyStressModule: "正写法重音映射",
     mappingRules: "映射规则",
+    stressMappings: "重音映射",
     addMapping: "添加映射",
     addStressMapping: "添加重音映射",
     mappingRuleHelp: "规则从上到下匹配；输入与前后条件始终只读取原始词形，生成结果不会被后续规则再次读取。较前规则消耗的字符不会再参与后续匹配，可拖动规则调整优先级。输出中写入 ˈ 或以 ' 开头，可将该音节标为重读并覆盖默认重音。",
@@ -603,8 +393,6 @@ const i18n = {
     batchIpaMissing: "补全空发音",
     batchIpaAllConfirm: "将为当前词典所有有词形的词条重新生成发音，并覆盖已有发音。确定继续吗？",
     batchIpaMissingConfirm: "将为当前词典所有尚未填写发音且有词形的词条生成发音。确定继续吗？",
-    batchIpaUnsavedSettingsConfirm: "当前自动 IPA 设置有未保存更改。请先保存设置后再批量生成。",
-    saveAndGenerate: "保存并生成",
     batchIpaUpdated: "已更新发音",
     batchIpaNoMissing: "当前词典无发音为空的条目",
     ruleFrom: "输入",
@@ -689,10 +477,8 @@ const i18n = {
     corpusDuplicateLink: "父级“{parent}”重复引用了单元“{unit}”",
     corpusDuplicateEntityId: "语料 ID“{id}”被多个对象使用：{types}",
     duplicateEntityIdsTitle: "检测到重复 ID",
-    duplicateEntityIdsMessage: "以下 ID 被多个词典对象使用，保存或导入已停止：\n{details}",
+    duplicateEntityIdsMessage: "以下 ID 被多个条目或语料对象使用，保存或导入已停止：\n{details}",
     entryEntity: "词条",
-    definitionEntity: "释义",
-    morphologyTableEntity: "形态表",
     corpusBlockFallback: "未命名块",
     corpusLayerFallback: "未命名层",
     corpusUnitFallback: "空单元",
@@ -702,9 +488,6 @@ const i18n = {
     corpusUnitParentLabel: "父级：{parent}",
     lexicalNetwork: "词汇网络",
     closeNetwork: "关闭网络",
-    lexicalNetworkLoading: "正在加载词汇网络",
-    contentUpdating: "正在更新",
-    lexicalNetworkLoadFailed: "无法加载词汇网络",
   },
   en: {
     appTitle: "Constructed Language Dictionary",
@@ -714,32 +497,20 @@ const i18n = {
     openToolNavigation: "Open tool navigation",
     closeToolNavigation: "Close tool navigation",
     entryBrowser: "Entry list",
-    entryDetail: "Entry details",
-    partFilterLabel: "Part-of-speech filter",
-    entrySortLabel: "Entry sorting",
     collapseEntryBrowser: "Collapse entry list",
     expandEntryBrowser: "Expand entry list",
     openEntryList: "Open entry list",
     closeEntryList: "Close entry list",
-    focusCurrentEntryInList: "Locate current entry in the list",
-    currentEntryNotInList: "The current entry is not in the list results",
     entryEditor: "Entries",
-    dictionaryConfig: "Dictionary configuration",
-    docsModeLabel: "Document view mode",
-    corpusModeLabel: "Corpus item type",
     current: "Current",
     planned: "Planned",
     ipaConfig: "Auto IPA",
     analysis: "Analytics",
-    qualityCheck: "Quality Checks",
     languageDocs: "Language Docs",
     corpus: "Corpus",
     morphologyConfig: "Auto Morphology",
-    morphologyFunctions: "Morphology Functions",
     morphologyDisplay: "Morphology",
-    morphologyGroup: "Morphology Group",
     morphologyNeedDictionary: "Auto morphology config is saved in the current dictionary file.",
-    qualityNeedDictionary: "Quality checks are generated live from the current dictionary's entries, tags, etymology, IPA, and Glossed examples.",
     morphologyTables: "Morphology Tables",
     morphologyFunctionObjects: "Function Recognition Objects",
     morphologyFunctionObjectsHelp: "Configure the objects recognized by leftV/rightV. A function must be configured before rules can use it; the function finds the nearest configured object first, then checks whether it is in the candidates inside parentheses. Separate objects with commas.",
@@ -748,12 +519,8 @@ const i18n = {
     invalidMorphologyFunctionObjects: "Morphology config contains unconfigured function objects",
     invalidMorphologySyntax: "Morphology config contains invalid replacement syntax",
     morphologyTable: "Morphology Table",
-    morphologyTableGroup: "Morphology Table Group",
-    morphologyTableGroupName: "Table Group Title",
-    morphologyTableGroupNotes: "Table Group Notes",
-    addMorphologyTableGroup: "New Table Group",
     addMorphologyTable: "Add Table",
-    tableName: "Table Title",
+    tableName: "Table Name",
     tableSize: "Table Size",
     rowCount: "Rows",
     columnCount: "Columns",
@@ -764,25 +531,8 @@ const i18n = {
     replacementMode: "Replacement",
     applySize: "Apply Size",
     removeTable: "Delete Table",
-    removeMorphologyTableGroup: "Delete Table Group",
-    emptyMorphologyTableGroup: "This table group has no tables yet.",
-    dragMorphologyTableGroup: "Drag to reorder table groups",
-    dragMorphologyTable: "Drag to reorder tables",
     morphologyAuto: "Auto Match",
     morphologyNone: "No Table",
-    morphologyMode: "Morphology Mode",
-    morphologyManual: "Manual Configuration",
-    switchToManualMorphology: "Switch to Manual",
-    switchToManualMorphologyConfirm: "Switching to manual configuration preserves the currently matched morphology groups and any hidden morphology overlays. Restoring auto matching later will clear all of these manual groups, titles, notes, and cell overrides. Continue?",
-    restoreAutoMorphology: "Restore Auto Match",
-    restoreAutoMorphologyConfirm: "Restoring auto matching will discard the current manual morphology groups, titles, notes, and cell overrides. Continue?",
-    morphologyManualGroups: "Manual Morphology Groups",
-    addEntryMorphologyGroup: "Add Morphology Group",
-    removeEntryMorphologyGroup: "Remove Morphology Group",
-    entryMorphologyGroupTitle: "Group Title Override",
-    entryMorphologyGroupNotes: "Entry Morphology Notes",
-    morphologyGroupNote: "Morphology Group Note",
-    useTemplateGroupTitle: "Leave blank to use the template group title",
     morphologyOverrideHelp: "Leave blank to use table rules; filled cells override that slot.",
     morphologyRuleSyntaxHelp: "Use {} to reference the lemma; {a = e} references and replaces inside the lemma; /leftV(a,o,u) = lar; rightV(e,i,ö,ü) = ler; else = / chooses output by the nearest left or right phoneme. Empty else inserts nothing.",
     morphologySyntaxTitle: "Morphology Syntax",
@@ -884,35 +634,9 @@ const i18n = {
     searchDisplay: "Display",
     save: "Save",
     fuzzySearch: "Fuzzy Matching",
-    searchFields: "Search Fields",
-    searchField: "Field",
-    searchFieldEnabled: "Search",
-    searchFieldFuzzy: "Fuzzy",
-    searchFieldLemma: "Lemma",
-    searchFieldPronunciation: "IPA",
-    searchFieldTags: "Tags",
-    searchFieldDefinitions: "Definitions",
-    searchFieldExamples: "Examples",
-    searchFieldNotes: "Notes",
-    searchFieldEtymology: "Etymology",
-    searchFieldMorphology: "Morphology",
-    searchFieldMorphologyHelp: "Morphology is generated dynamically; searching it can noticeably slow large dictionaries.",
-    searchNormalization: "Search normalization",
-    searchNfcHelp: "Treat canonically equivalent Unicode forms as NFC",
-    searchCaseFoldingHelp: "Ignore Unicode case differences",
-    searchCustomRules: "Custom equivalence rules",
-    searchCustomRulesHelp: "Match each line of variants as one canonical form. Longest variants take priority and rules are not applied recursively.",
-    searchCanonical: "Canonical form",
-    searchVariants: "Equivalent variants (one per line)",
-    addSearchNormalizationRule: "Add rule",
-    removeSearchNormalizationRule: "Remove rule",
-    searchNormalizationInvalidRule: "The custom search rule is invalid.",
-    searchNormalizationEmptyCanonical: "Enter a canonical form for the rule.",
-    searchNormalizationEmptyVariants: "Enter at least one equivalent variant.",
-    searchNormalizationConflictingVariant: "An equivalent variant cannot map to multiple canonical forms.",
-    etymologyAutocomplete: "Etymology Autocomplete",
+    fuzzySearchHelp: "Enable fuzzy matching in entry search",
+    tagFuzzySearchHelp: "Enable fuzzy matching for raw and displayed tags",
     sourceFuzzyHelp: "Enable fuzzy matching in etymology source completion",
-    searchFieldRequired: "Enable at least one search field.",
     searchHighlightHelp: "Highlight matches while searching",
     switchEntrySettings: "Entry Switching",
     editEntrySettings: "Entry Editing",
@@ -946,10 +670,6 @@ const i18n = {
     entryListTagDisplayLimit: "Entry list tag display limit",
     entryListTagDisplayLimitHelp: "Set to n: entries with more than n tags show the first n-1 tags and an ellipsis. Default: 3.",
     entryListTagDisplayLimitInvalid: "Entry list tag display limit must be an integer from 2 to 10.",
-    entryListPartDisplay: "Part-of-speech position in entry list",
-    entryListPartDisplaySubtitle: "Subtitle",
-    entryListPartDisplayChips: "Tag area",
-    entryListPartDisplayBoth: "Both",
     tagTooltipRawTag: "Raw tag",
     tagTooltipDisplayReplacement: "Display",
     partOfSpeechTagSettings: "Part-of-Speech Tags",
@@ -960,10 +680,8 @@ const i18n = {
     tagOrderInfo: "Show tag ordering logic",
     tagOrderInfoBody: "After you click Refresh, each entry's tags are reordered by the unified order in this field. Tags in the unified order that an entry does not have are skipped. Tags on an entry that are not in the unified order are kept at the end, and multiple extra tags keep their original relative order. Use raw tags here; display replacements only affect how tags are shown.",
     tagOrderConfirm: "This will reorder tags for every entry in the current dictionary using the current unified order and save immediately. Continue?",
-    tagOrderUnsavedSettingsConfirm: "Other Settings have unsaved changes. Save the settings before arranging tag order.",
     tagOrderApplied: "Tag order arranged",
     tagOrderEmpty: "Enter at least one tag first.",
-    saveAndApply: "Save and Apply",
     applyTags: "Apply",
     tagDisplaySettings: "Tag Highlighting",
     tagRedHighlightHelp: "Configured tags are shown in red in the entry browser and display mode. Separate tags with commas, spaces, or line breaks.",
@@ -973,10 +691,6 @@ const i18n = {
     polysemyDisplay: "Polysemy Display",
     entryListPolysemyDisplay: "Entry list polysemy display",
     networkPolysemyDisplay: "Lexical network hover-card polysemy display",
-    emptyEntrySections: "Empty Sections",
-    showEmptyEntrySections: "Show empty sections in the entry view",
-    entrySectionOrder: "Entry Section Order",
-    entrySectionOrderHelp: "Drag cards to reorder sections in entry display and full editing. Derived entries appear only when present and remain read-only in full editing.",
     ipaKeyboardSettings: "IPA Virtual Keyboard",
     ipaKeyboardSymbols: "Keyboard Symbols",
     ipaKeyboardHelp: "Separate symbols with spaces, commas, or line breaks. New dictionaries include ˈ and ˌ by default.",
@@ -1008,8 +722,6 @@ const i18n = {
     noEntriesBody: "Create the first entry to show details here.",
     noMatch: "No matching entries",
     noMatchBody: "Create an entry, or adjust search and filters.",
-    entryResultsTruncated: "Loaded {loaded} of {total} entries",
-    rootGroupsTruncated: "Loaded {loaded} of {total} root groups",
     noDescription: "No description",
     config: "Configure",
     setCurrent: "Set Current",
@@ -1027,7 +739,6 @@ const i18n = {
     requiredEntry: "Fill lemma",
     missingDefinition: "No definition yet",
     savedEntry: "Entry saved",
-    noChangesToSave: "No changes to save",
     derivedEntryDraft: "Derived entry draft created",
     deletedEntry: "Entry deleted",
     createDictionaryFirstToast: "Create a dictionary first",
@@ -1047,41 +758,9 @@ const i18n = {
     importFailed: "Cannot read this JSON file",
     languageSaveFailed: "Failed to save the interface language",
     themeSaveFailed: "Failed to save the interface theme",
-    apiErrorRequestBodyTooLarge: "Saved content is too large",
-    apiErrorInvalidJsonBody: "Request body is not valid JSON",
-    apiErrorInvalidUiLanguage: "Invalid interface language value",
-    apiErrorInvalidUiTheme: "Invalid interface theme value",
-    apiErrorInvalidImportPayload: "Invalid import file format",
-    apiErrorInvalidDictionaryId: "Invalid dictionary ID",
-    apiErrorDictionaryNotFound: "Dictionary not found or already deleted",
-    apiErrorDictionaryIdExists: "Dictionary ID already exists and needs overwrite confirmation",
-    apiErrorDuplicateEntityIds: "The dictionary contains duplicate IDs",
-    apiErrorDuplicateEntityIdsScoped: "The current save scope contains duplicate IDs",
-    apiErrorInvalidEntryPayload: "Invalid entry save request",
-    apiErrorEntryIdExists: "Entry ID already exists",
-    apiErrorInvalidEntryUpdatesPayload: "Invalid batch entry update request",
-    apiErrorEntryNotFound: "Entry not found or already deleted",
-    apiErrorInvalidSettingsPayload: "Invalid settings save request",
-    apiErrorInvalidDocsPayload: "Invalid language docs save request",
-    apiErrorInvalidCorpusPayload: "Invalid corpus save request",
-    apiErrorInvalidMorphologyPayload: "Invalid morphology save request",
-    apiErrorInvalidIpaSettingsPayload: "Invalid IPA settings save request",
-    apiErrorUnsupportedEntryPatchFields: "Batch entry update contains unsupported fields",
-    apiErrorEntryPatchTagsInvalid: "Invalid batch tag update format",
-    apiErrorEntryPatchPronunciationInvalid: "Invalid batch IPA update format",
-    apiErrorSystemFilePermission: "File permission denied; cannot save",
-    apiErrorSystemDiskFull: "Disk is full; cannot save",
-    apiErrorSystemFileBusy: "File is busy; cannot save",
-    apiErrorSystemFileMissing: "Target file is missing or was moved",
-    apiErrorSystemJsonParse: "Local JSON file is damaged or cannot be parsed",
-    apiErrorNetwork: "Cannot connect to the local service",
-    apiErrorUnknown: "An unknown error occurred",
     importOverwriteTitle: "Dictionary ID already exists",
     importOverwriteMessage: "Dictionary ID “{id}” already exists. Importing “{name}” will overwrite the existing dictionary and all of its data.",
     importAndOverwrite: "Import and Overwrite",
-    importInvalidIdTitle: "Invalid Dictionary ID",
-    importInvalidIdMessage: "Dictionary ID “{id}” is invalid. Import it as a new dictionary and generate a new ID?",
-    importAndRegenerateId: "Generate New ID and Import",
     updatedAt: "Updated",
     source: "Source",
     createSourceEntry: "Create Source Entry: {source}",
@@ -1090,6 +769,7 @@ const i18n = {
     orthographyModule: "Orthography Recognition",
     orthographyStressModule: "Orthographic Stress",
     mappingRules: "Mapping Rules",
+    stressMappings: "Stress Mappings",
     addMapping: "Add Mapping",
     addStressMapping: "Add Stress Mapping",
     mappingRuleHelp: "Rules are tried from top to bottom. Inputs and contexts always read the original lemma; generated output is never fed into later rules. Characters consumed by an earlier rule are unavailable to later rules. Drag rules to change priority. Put ˈ in the output, or start it with ', to mark that syllable as stressed and override default stress.",
@@ -1112,8 +792,6 @@ const i18n = {
     batchIpaMissing: "Fill Missing Pronunciations",
     batchIpaAllConfirm: "Regenerate pronunciations for every entry with a lemma in the current dictionary, overwriting existing pronunciations. Continue?",
     batchIpaMissingConfirm: "Generate pronunciations for entries with a lemma and no pronunciation in the current dictionary. Continue?",
-    batchIpaUnsavedSettingsConfirm: "Auto IPA settings have unsaved changes. Save the settings before batch generation.",
-    saveAndGenerate: "Save and Generate",
     batchIpaUpdated: "Pronunciations updated",
     batchIpaNoMissing: "No entries with empty pronunciation in the current dictionary",
     ruleFrom: "Input",
@@ -1198,10 +876,8 @@ const i18n = {
     corpusDuplicateLink: "Parent “{parent}” references unit “{unit}” more than once",
     corpusDuplicateEntityId: "Corpus ID “{id}” is used by multiple objects: {types}",
     duplicateEntityIdsTitle: "Duplicate IDs detected",
-    duplicateEntityIdsMessage: "These IDs are used by multiple dictionary objects. Saving or importing has been stopped:\n{details}",
+    duplicateEntityIdsMessage: "These IDs are used by multiple entries or corpus objects. Saving or importing has been stopped:\n{details}",
     entryEntity: "Entry",
-    definitionEntity: "Definition",
-    morphologyTableEntity: "Morphology table",
     corpusBlockFallback: "Untitled Block",
     corpusLayerFallback: "Untitled Layer",
     corpusUnitFallback: "Empty Unit",
@@ -1211,9 +887,6 @@ const i18n = {
     corpusUnitParentLabel: "Parent: {parent}",
     lexicalNetwork: "Lexical Network",
     closeNetwork: "Close Network",
-    lexicalNetworkLoading: "Loading lexical network",
-    contentUpdating: "Updating",
-    lexicalNetworkLoadFailed: "Could not load lexical network",
   },
 };
 
@@ -1238,21 +911,17 @@ const elements = {
   entryBrowser: document.querySelector("#entryBrowser"),
   dictionaryManagerView: document.querySelector("#dictionaryManagerView"),
   analysisView: document.querySelector("#analysisView"),
-  qualityView: document.querySelector("#qualityView"),
   settingsView: document.querySelector("#settingsView"),
   docsView: document.querySelector("#docsView"),
   corpusView: document.querySelector("#corpusView"),
-  morphologyFunctionsView: document.querySelector("#morphologyFunctionsView"),
-  morphologyTablesView: document.querySelector("#morphologyTablesView"),
+  morphologyView: document.querySelector("#morphologyView"),
   ipaView: document.querySelector("#ipaView"),
   backToEditorButton: document.querySelector("#backToEditorButton"),
   backToEditorFromSettingsButton: document.querySelector("#backToEditorFromSettingsButton"),
   backToEditorFromAnalysisButton: document.querySelector("#backToEditorFromAnalysisButton"),
-  backToEditorFromQualityButton: document.querySelector("#backToEditorFromQualityButton"),
   backToEditorFromDocsButton: document.querySelector("#backToEditorFromDocsButton"),
   backToEditorFromCorpusButton: document.querySelector("#backToEditorFromCorpusButton"),
-  backToEditorFromMorphologyFunctionsButton: document.querySelector("#backToEditorFromMorphologyFunctionsButton"),
-  backToEditorFromMorphologyTablesButton: document.querySelector("#backToEditorFromMorphologyTablesButton"),
+  backToEditorFromMorphologyButton: document.querySelector("#backToEditorFromMorphologyButton"),
   backToEditorFromIpaButton: document.querySelector("#backToEditorFromIpaButton"),
   batchIpaAllButton: document.querySelector("#batchIpaAllButton"),
   batchIpaMissingButton: document.querySelector("#batchIpaMissingButton"),
@@ -1265,12 +934,9 @@ const elements = {
   toolList: document.querySelector(".tool-list"),
   toolButtons: document.querySelectorAll(".tool-button"),
   toolNavOrderList: document.querySelector("#toolNavOrderList"),
-  entrySectionOrderList: document.querySelector("#entrySectionOrderList"),
   dictionaryManagerList: document.querySelector("#dictionaryManagerList"),
   dictionaryMeta: document.querySelector("#dictionaryMeta"),
   dictionaryTitle: document.querySelector("#dictionaryTitle"),
-  entryListUpdateFrame: document.querySelector("#entryListUpdateFrame"),
-  entryListUpdateOverlay: document.querySelector("#entryListUpdateOverlay"),
   entryList: document.querySelector("#entryList"),
   searchInput: document.querySelector("#searchInput"),
   rootModeToggleButton: document.querySelector("#rootModeToggleButton"),
@@ -1286,14 +952,11 @@ const elements = {
   newEntryButton: document.querySelector("#newEntryButton"),
   entryListNewEntryButton: document.querySelector("#entryListNewEntryButton"),
   importInput: document.querySelector("#importInput"),
-  entryDetailPanel: document.querySelector("#entryDetailPanel"),
-  entryDetailUpdateOverlay: document.querySelector("#entryDetailUpdateOverlay"),
   entryDisplay: document.querySelector("#entryDisplay"),
   displayLemma: document.querySelector("#displayLemma"),
   displayPronunciation: document.querySelector("#displayPronunciation"),
   displayPart: document.querySelector("#displayPart"),
   displayTags: document.querySelector("#displayTags"),
-  displayDefinitionsSection: document.querySelector("#displayDefinitionsSection"),
   displayDefinitions: document.querySelector("#displayDefinitions"),
   displayEtymologySection: document.querySelector("#displayEtymologySection"),
   displayEtymology: document.querySelector("#displayEtymology"),
@@ -1304,7 +967,6 @@ const elements = {
   displayEntryNotesSection: document.querySelector("#displayEntryNotesSection"),
   displayEntryNotes: document.querySelector("#displayEntryNotes"),
   editEntryButton: document.querySelector("#editEntryButton"),
-  focusEntryListButton: document.querySelector("#focusEntryListButton"),
   openLexicalNetworkButton: document.querySelector("#openLexicalNetworkButton"),
   entryForm: document.querySelector("#entryForm"),
   entryId: document.querySelector("#entryId"),
@@ -1315,9 +977,8 @@ const elements = {
   autoIpaButton: document.querySelector("#autoIpaButton"),
   ipaKeyboard: document.querySelector("#ipaKeyboard"),
   tagsInput: document.querySelector("#tagsInput"),
-  entryMorphologyControls: document.querySelector("#entryMorphologyControls"),
-  fullEditDerivedSection: document.querySelector("#fullEditDerivedSection"),
-  fullEditDerived: document.querySelector("#fullEditDerived"),
+  entryMorphologyTableSelect: document.querySelector("#entryMorphologyTableSelect"),
+  entryMorphologyOverrides: document.querySelector("#entryMorphologyOverrides"),
   definitionFormList: document.querySelector("#definitionFormList"),
   addDefinitionButton: document.querySelector("#addDefinitionButton"),
   sourceEntryInput: document.querySelector("#sourceEntryInput"),
@@ -1347,9 +1008,6 @@ const elements = {
   analysisNoDictionaryNotice: document.querySelector("#analysisNoDictionaryNotice"),
   analysisOpenDictionaryManagerButton: document.querySelector("#analysisOpenDictionaryManagerButton"),
   analysisPanel: document.querySelector("#analysisPanel"),
-  qualityNoDictionaryNotice: document.querySelector("#qualityNoDictionaryNotice"),
-  qualityOpenDictionaryManagerButton: document.querySelector("#qualityOpenDictionaryManagerButton"),
-  qualityPanel: document.querySelector("#qualityPanel"),
   settingsForm: document.querySelector("#settingsForm"),
   glossStyleRows: [...document.querySelectorAll("[data-gloss-style]")],
   corpusUnitCardRenderPatternInput: document.querySelector("#corpusUnitCardRenderPatternInput"),
@@ -1361,7 +1019,6 @@ const elements = {
   tagDisplayMapInput: document.querySelector("#tagDisplayMapInput"),
   entryListRawTagDisplayInput: document.querySelector("#entryListRawTagDisplayInput"),
   entryListTagDisplayLimitInput: document.querySelector("#entryListTagDisplayLimitInput"),
-  entryListPartDisplayInput: document.querySelector("#entryListPartDisplayInput"),
   manualPartOfSpeechTagsInput: document.querySelector("#manualPartOfSpeechTagsInput"),
   partOfSpeechTagsInput: document.querySelector("#partOfSpeechTagsInput"),
   tagSortOrderInput: document.querySelector("#tagSortOrderInput"),
@@ -1371,13 +1028,8 @@ const elements = {
   entryListTagFilteringInput: document.querySelector("#entryListTagFilteringInput"),
   entryListPolysemyInput: document.querySelector("#entryListPolysemyInput"),
   networkPolysemyInput: document.querySelector("#networkPolysemyInput"),
-  showEmptyEntrySectionsInput: document.querySelector("#showEmptyEntrySectionsInput"),
-  searchFieldEnabledInputs: [...document.querySelectorAll("[data-search-enabled]")],
-  searchFieldFuzzyInputs: [...document.querySelectorAll("[data-search-fuzzy]")],
-  searchNfcInput: document.querySelector("#searchNfcInput"),
-  searchCaseFoldingInput: document.querySelector("#searchCaseFoldingInput"),
-  searchNormalizationRuleList: document.querySelector("#searchNormalizationRuleList"),
-  addSearchNormalizationRuleButton: document.querySelector("#addSearchNormalizationRuleButton"),
+  fuzzySearchInput: document.querySelector("#fuzzySearchInput"),
+  tagFuzzySearchInput: document.querySelector("#tagFuzzySearchInput"),
   sourceFuzzyInput: document.querySelector("#sourceFuzzyInput"),
   searchHighlightInput: document.querySelector("#searchHighlightInput"),
   savePartialOnSwitchInput: document.querySelector("#savePartialOnSwitchInput"),
@@ -1406,18 +1058,14 @@ const elements = {
   corpusSearchInput: document.querySelector("#corpusSearchInput"),
   corpusItemList: document.querySelector("#corpusItemList"),
   corpusEditor: document.querySelector("#corpusEditor"),
-  morphologyFunctionsNoDictionaryNotice: document.querySelector("#morphologyFunctionsNoDictionaryNotice"),
-  morphologyFunctionsOpenDictionaryManagerButton: document.querySelector("#morphologyFunctionsOpenDictionaryManagerButton"),
-  morphologyFunctionsPanel: document.querySelector("#morphologyFunctionsPanel"),
-  morphologyFunctionsForm: document.querySelector("#morphologyFunctionsForm"),
-  morphologyTablesNoDictionaryNotice: document.querySelector("#morphologyTablesNoDictionaryNotice"),
-  morphologyTablesOpenDictionaryManagerButton: document.querySelector("#morphologyTablesOpenDictionaryManagerButton"),
-  morphologyTablesPanel: document.querySelector("#morphologyTablesPanel"),
-  morphologyTablesForm: document.querySelector("#morphologyTablesForm"),
+  morphologyNoDictionaryNotice: document.querySelector("#morphologyNoDictionaryNotice"),
+  morphologyOpenDictionaryManagerButton: document.querySelector("#morphologyOpenDictionaryManagerButton"),
+  morphologyPanel: document.querySelector("#morphologyPanel"),
+  morphologyForm: document.querySelector("#morphologyForm"),
   morphologyLeftVObjectsInput: document.querySelector("#morphologyLeftVObjectsInput"),
   morphologyRightVObjectsInput: document.querySelector("#morphologyRightVObjectsInput"),
   morphologyTableList: document.querySelector("#morphologyTableList"),
-  addMorphologyTableGroupButton: document.querySelector("#addMorphologyTableGroupButton"),
+  addMorphologyTableButton: document.querySelector("#addMorphologyTableButton"),
   morphologySyntaxButton: document.querySelector("#morphologySyntaxButton"),
   infoDialog: document.querySelector("#infoDialog"),
   infoDialogTitle: document.querySelector("#infoDialogTitle"),
@@ -1447,13 +1095,9 @@ const elements = {
   lexicalNetworkPanel: document.querySelector("#lexicalNetworkPanel"),
   closeLexicalNetworkButton: document.querySelector("#closeLexicalNetworkButton"),
   networkTitle: document.querySelector("#networkTitle"),
-  networkViewport: document.querySelector("#networkViewport"),
-  networkSvg: document.querySelector("#networkSvg"),
-  networkEdges: document.querySelector("#networkEdges"),
-  networkNodes: document.querySelector("#networkNodes"),
-  networkStatus: document.querySelector("#networkStatus"),
-  networkSourceLabel: document.querySelector("#networkSourceLabel"),
-  networkDerivedLabel: document.querySelector("#networkDerivedLabel"),
+  networkSources: document.querySelector("#networkSources"),
+  networkFocus: document.querySelector("#networkFocus"),
+  networkDerived: document.querySelector("#networkDerived"),
   confirmDialog: document.querySelector("#confirmDialog"),
   confirmDialogTitle: document.querySelector("#confirmDialogTitle"),
   confirmDialogMessage: document.querySelector("#confirmDialogMessage"),
@@ -1462,74 +1106,6 @@ const elements = {
   confirmAcceptButton: document.querySelector("#confirmAcceptButton"),
   toast: document.querySelector("#toast"),
 };
-
-function staleContentUpdateElements(surface) {
-  return surface === "detail"
-    ? { frame: elements.entryDetailPanel, overlay: elements.entryDetailUpdateOverlay }
-    : { frame: elements.entryListUpdateFrame, overlay: elements.entryListUpdateOverlay };
-}
-
-function syncStaleContentUpdate(surface) {
-  const update = staleContentUpdates[surface];
-  const { frame, overlay } = staleContentUpdateElements(surface);
-  if (!update || !frame || !overlay) {
-    return;
-  }
-  frame.classList.toggle("content-updating", update.showing);
-  frame.setAttribute("aria-busy", String(update.pending));
-  overlay.hidden = !update.showing;
-  if (surface === "detail" && elements.entryDisplay) {
-    elements.entryDisplay.inert = update.pending && update.hasStaleContent;
-  }
-}
-
-function beginStaleContentUpdate(surface, hasStaleContent) {
-  const update = staleContentUpdates[surface];
-  if (!update) {
-    return 0;
-  }
-  if (update.timer) {
-    window.clearTimeout(update.timer);
-  }
-  const token = ++staleContentUpdateSequence;
-  update.token = token;
-  update.timer = 0;
-  update.pending = true;
-  update.hasStaleContent = Boolean(hasStaleContent);
-  update.showing = false;
-  syncStaleContentUpdate(surface);
-  if (update.hasStaleContent) {
-    update.timer = window.setTimeout(() => {
-      if (update.token !== token || !update.pending) {
-        return;
-      }
-      update.timer = 0;
-      update.showing = true;
-      syncStaleContentUpdate(surface);
-    }, STALE_CONTENT_UPDATE_DELAY_MS);
-  }
-  return token;
-}
-
-function finishStaleContentUpdate(surface, token = null) {
-  const update = staleContentUpdates[surface];
-  if (!update || (token !== null && update.token !== token)) {
-    return;
-  }
-  if (update.timer) {
-    window.clearTimeout(update.timer);
-  }
-  update.timer = 0;
-  update.pending = false;
-  update.hasStaleContent = false;
-  update.showing = false;
-  syncStaleContentUpdate(surface);
-}
-
-function staleContentUpdateRetainsContent(surface) {
-  const update = staleContentUpdates[surface];
-  return Boolean(update?.pending && update.hasStaleContent);
-}
 
 function t(key) {
   return i18n[currentLanguage][key] || i18n.zh[key] || key;
@@ -1688,51 +1264,6 @@ function appEditSwitchPrompt(message) {
   });
 }
 
-const API_ERROR_TOAST_KEYS = {
-  request_body_too_large: "apiErrorRequestBodyTooLarge",
-  invalid_json_body: "apiErrorInvalidJsonBody",
-  invalid_ui_language: "apiErrorInvalidUiLanguage",
-  invalid_ui_theme: "apiErrorInvalidUiTheme",
-  invalid_import_payload: "apiErrorInvalidImportPayload",
-  invalid_dictionary_id: "apiErrorInvalidDictionaryId",
-  dictionary_not_found: "apiErrorDictionaryNotFound",
-  dictionary_id_exists: "apiErrorDictionaryIdExists",
-  duplicate_entity_ids: "apiErrorDuplicateEntityIds",
-  duplicate_entity_ids_scoped: "apiErrorDuplicateEntityIdsScoped",
-  invalid_entry_payload: "apiErrorInvalidEntryPayload",
-  entry_id_exists: "apiErrorEntryIdExists",
-  invalid_entry_updates_payload: "apiErrorInvalidEntryUpdatesPayload",
-  entry_not_found: "apiErrorEntryNotFound",
-  invalid_settings_payload: "apiErrorInvalidSettingsPayload",
-  invalid_docs_payload: "apiErrorInvalidDocsPayload",
-  invalid_corpus_payload: "apiErrorInvalidCorpusPayload",
-  invalid_morphology_payload: "apiErrorInvalidMorphologyPayload",
-  invalid_ipa_settings_payload: "apiErrorInvalidIpaSettingsPayload",
-  unsupported_entry_patch_fields: "apiErrorUnsupportedEntryPatchFields",
-  entry_patch_tags_invalid: "apiErrorEntryPatchTagsInvalid",
-  entry_patch_pronunciation_invalid: "apiErrorEntryPatchPronunciationInvalid",
-  system_file_permission: "apiErrorSystemFilePermission",
-  system_disk_full: "apiErrorSystemDiskFull",
-  system_file_busy: "apiErrorSystemFileBusy",
-  system_file_missing: "apiErrorSystemFileMissing",
-  system_json_parse: "apiErrorSystemJsonParse",
-  unknown_error: "apiErrorUnknown",
-};
-
-function apiErrorToastMessage(error, fallbackKey = "saveFailed") {
-  const key = API_ERROR_TOAST_KEYS[error?.code] || (error instanceof TypeError ? "apiErrorNetwork" : "");
-  const detail = key ? t(key) : "";
-  if (!detail) {
-    return t(fallbackKey);
-  }
-  return `${t(fallbackKey)}：${detail}`;
-}
-
-function showApiErrorToast(error, fallbackKey = "saveFailed") {
-  showToast(apiErrorToastMessage(error, fallbackKey));
-  console.error(error);
-}
-
 async function api(path, options = {}) {
   const response = await fetch(path, {
     ...options,
@@ -1743,18 +1274,8 @@ async function api(path, options = {}) {
   });
 
   if (!response.ok) {
-    const text = await response.text();
-    let payload = null;
-    try {
-      payload = text ? JSON.parse(text) : null;
-    } catch (error) {
-      payload = null;
-    }
-    const apiError = new Error(payload?.error?.message || text || `HTTP ${response.status}`);
-    apiError.status = response.status;
-    apiError.code = payload?.error?.code || "";
-    apiError.details = payload?.error?.details;
-    throw apiError;
+    const message = await response.text();
+    throw new Error(message || `HTTP ${response.status}`);
   }
 
   if (response.status === 204) {
@@ -1772,7 +1293,7 @@ async function loadState() {
     currentLanguage = normalizeUiLanguage(serverState.uiLanguage);
     currentTheme = normalizeUiTheme(serverState.uiTheme);
     cacheUiPreferences({ uiTheme: currentTheme });
-    await applyServerState({
+    state = normalizeState({
       ...serverState,
       selectedEntryId: state.selectedEntryId,
       selectedDictionaryConfigId: state.selectedDictionaryConfigId || serverState.activeDictionaryId,
@@ -1788,81 +1309,6 @@ async function loadState() {
   finishAppBoot();
 }
 
-function normalizeDictionarySummary(summary) {
-  if (!summary || typeof summary !== "object") {
-    return null;
-  }
-  const entryCount = Number(summary.entryCount);
-  const rootCount = Number(summary.rootCount);
-  return {
-    entryCount: Number.isFinite(entryCount) && entryCount >= 0 ? entryCount : null,
-    rootCount: Number.isFinite(rootCount) && rootCount >= 0 ? rootCount : null,
-  };
-}
-
-function mergeDictionaryMetadataSnapshot(previous, metadata) {
-  return {
-    ...previous,
-    id: metadata.id,
-    name: metadata.name,
-    language: metadata.language,
-    description: metadata.description,
-    createdAt: metadata.createdAt,
-    updatedAt: metadata.updatedAt,
-    summary: metadata.summary || previous.summary || null,
-  };
-}
-
-async function fetchDictionarySnapshot(dictionaryId) {
-  return api(`/api/dictionaries/${encodeURIComponent(dictionaryId)}`);
-}
-
-async function ensureDictionarySnapshotLoaded(dictionaryId) {
-  if (!dictionaryId || loadedDictionaryIds.has(dictionaryId)) {
-    return null;
-  }
-  const metadataSummary = state.dictionaries.find((dictionary) => dictionary.id === dictionaryId)?.summary;
-  const snapshot = await fetchDictionarySnapshot(dictionaryId);
-  const normalized = replaceDictionaryInState({ ...snapshot, summary: metadataSummary });
-  loadedDictionaryIds.add(normalized.id);
-  return normalized;
-}
-
-async function applyServerState(source) {
-  const previousDictionaryIds = new Set(state.dictionaries.map((dictionary) => dictionary.id));
-  const previousLoadedById = new Map(
-    state.dictionaries
-      .filter((dictionary) => loadedDictionaryIds.has(dictionary.id))
-      .map((dictionary) => [dictionary.id, dictionary]),
-  );
-  const normalizedState = normalizeState(source);
-  const nextLoadedDictionaryIds = new Set();
-  const nextDictionaryIds = new Set(normalizedState.dictionaries.map((dictionary) => dictionary.id));
-
-  previousDictionaryIds.forEach((dictionaryId) => {
-    if (!nextDictionaryIds.has(dictionaryId)) {
-      invalidateDictionaryQueryCache(dictionaryId);
-    }
-  });
-
-  normalizedState.dictionaries = normalizedState.dictionaries.map((dictionary) => {
-    const previous = previousLoadedById.get(dictionary.id);
-    if (previous && previous.updatedAt === dictionary.updatedAt) {
-      nextLoadedDictionaryIds.add(dictionary.id);
-      return mergeDictionaryMetadataSnapshot(previous, dictionary);
-    }
-    if (previous) {
-      invalidateDictionaryQueryCache(dictionary.id);
-    }
-
-    return dictionary;
-  });
-
-  state = normalizedState;
-  loadedDictionaryIds = nextLoadedDictionaryIds;
-  await ensureDictionarySnapshotLoaded(state.activeDictionaryId);
-}
-
 function normalizeState(source) {
   return {
     activeDictionaryId: source.activeDictionaryId || "",
@@ -1871,19 +1317,7 @@ function normalizeState(source) {
     activeView: source.activeView || "editor",
     uiLanguage: normalizeUiLanguage(source.uiLanguage),
     uiTheme: normalizeUiTheme(source.uiTheme),
-    dictionaries: Array.isArray(source.dictionaries) ? source.dictionaries.map(normalizeDictionaryMetadata) : [],
-  };
-}
-
-function normalizeDictionaryMetadata(dictionary = {}) {
-  return {
-    id: String(dictionary.id || "").trim(),
-    name: String(dictionary.name || t("unnamedDictionary")),
-    language: String(dictionary.language || ""),
-    description: String(dictionary.description || ""),
-    createdAt: String(dictionary.createdAt || ""),
-    updatedAt: String(dictionary.updatedAt || ""),
-    summary: normalizeDictionarySummary(dictionary.summary),
+    dictionaries: Array.isArray(source.dictionaries) ? source.dictionaries.map(normalizeDictionary) : [],
   };
 }
 
@@ -1893,7 +1327,7 @@ function normalizeDictionary(dictionary) {
     ? dictionary.entries.map((entry) => normalizeEntry({
       ...entry,
       id: reserveEntityId(entry.id, "entry", usedEntityIds),
-    }, usedEntityIds))
+    }))
     : [];
   return {
     id: dictionary.id || uid("dict"),
@@ -1903,26 +1337,38 @@ function normalizeDictionary(dictionary) {
     settings: normalizeDictionarySettings(dictionary.settings),
     docs: normalizeDocs(dictionary.docs),
     corpus: normalizeCorpus(dictionary.corpus, usedEntityIds),
-    morphology: normalizeMorphology(dictionary.morphology, usedEntityIds),
+    morphology: normalizeMorphology(dictionary.morphology),
     createdAt: dictionary.createdAt || new Date().toISOString(),
     updatedAt: dictionary.updatedAt || new Date().toISOString(),
-    summary: normalizeDictionarySummary(dictionary.summary),
     entries,
   };
 }
 
-function normalizeEntry(entry, usedIds = new Set()) {
+function normalizeEntry(entry) {
   const tags = Array.isArray(entry.tags) ? entry.tags.filter(Boolean) : [];
+  if (entry.partOfSpeech && tags[0] !== entry.partOfSpeech) {
+    tags.unshift(entry.partOfSpeech);
+  }
 
-  const definitions = Array.isArray(entry.definitions)
-    ? entry.definitions.map((definition) => normalizeDefinition(definition, usedIds))
-    : [];
+  const definitions = Array.isArray(entry.definitions) && entry.definitions.length
+    ? entry.definitions.map(normalizeDefinition)
+    : [
+        normalizeDefinition({
+          meaning: entry.meaning || "",
+          example: entry.example || "",
+          note: "",
+        }),
+      ];
 
+  const migratedEtymology = [entry.roots, entry.variant].filter(Boolean).join("\n");
+  const sourceText = entry.etymology?.sourceText || entry.etymology?.source || "";
   const sources = Array.isArray(entry.etymology?.sources)
     ? entry.etymology.sources.map(String).map((item) => item.trim()).filter(Boolean)
-    : [];
+    : splitSourceText(sourceText);
+  if (entry.etymology?.sourceEntryId && !sources.includes(entry.etymology.sourceEntryId)) {
+    sources.push(entry.etymology.sourceEntryId);
+  }
 
-  const morphologyState = morphologyModel.normalizeEntryMorphologyState(entry);
   return {
     id: entry.id || uid("entry"),
     lemma: entry.lemma || "",
@@ -1931,22 +1377,18 @@ function normalizeEntry(entry, usedIds = new Set()) {
     definitions,
     etymology: {
       sources,
-      description: entry.etymology?.description || "",
+      description: entry.etymology?.description || migratedEtymology,
     },
     notes: entry.notes || "",
-    // `morphology` is a temporary flattened view used by the legacy analysis path.
-    // Persistence and current entry editors use the canonical state below.
-    morphologyMode: morphologyState.morphologyMode,
-    morphologyGroups: morphologyState.morphologyGroups,
-    morphology: morphologyEditorView(morphologyState),
+    morphology: normalizeEntryMorphology(entry.morphology),
     createdAt: entry.createdAt || new Date().toISOString(),
     updatedAt: entry.updatedAt || new Date().toISOString(),
   };
 }
 
-function normalizeDefinition(definition = {}, usedIds = new Set()) {
+function normalizeDefinition(definition = {}) {
   return {
-    id: reserveEntityId(definition.id, "def", usedIds),
+    id: definition.id || uid("def"),
     meaning: definition.meaning || "",
     example: definition.example || "",
     note: definition.note || "",
@@ -1954,14 +1396,25 @@ function normalizeDefinition(definition = {}, usedIds = new Set()) {
 }
 
 function normalizeDictionarySettings(settings = {}) {
-  const search = entrySearchModel.normalizeEntrySearchSettings(settings.search);
+  const {
+    glossSmallCaps,
+    glossFontFamily,
+    glossFont,
+    corpusGlossAlign,
+    savePartialEditOnSwitch,
+    saveFullEditOnSwitch,
+    savePartialEditOnPageSwitch,
+    saveFullEditOnPageSwitch,
+    ...restSettings
+  } = settings;
+
   return {
-    ...settings,
-    glossStyles: normalizeGlossStyles(settings.glossStyles),
+    ...restSettings,
+    glossStyles: normalizeGlossStyles(settings.glossStyles, glossFontFamily || glossFont, glossSmallCaps),
     corpusUnitCardRenderPattern: String(settings.corpusUnitCardRenderPattern ?? settings.corpusUnitRenderPattern ?? ""),
-    corpusUnitCardGlossAlign: Boolean(settings.corpusUnitCardGlossAlign ?? true),
+    corpusUnitCardGlossAlign: Boolean(settings.corpusUnitCardGlossAlign ?? corpusGlossAlign ?? true),
     corpusUnitRenderPattern: String(settings.corpusUnitRenderPattern || ""),
-    corpusUnitGlossAlign: Boolean(settings.corpusUnitGlossAlign ?? true),
+    corpusUnitGlossAlign: Boolean(settings.corpusUnitGlossAlign ?? corpusGlossAlign ?? true),
     entryExampleRenderPattern: String(settings.entryExampleRenderPattern ?? DEFAULT_ENTRY_EXAMPLE_RENDER_PATTERN),
     entryExampleGlossAlign: Boolean(settings.entryExampleGlossAlign ?? true),
     corpusAutoSave: Boolean(settings.corpusAutoSave ?? true),
@@ -1969,7 +1422,6 @@ function normalizeDictionarySettings(settings = {}) {
     tagDisplayMap: normalizeTagDisplayMap(settings.tagDisplayMap),
     entryListRawTagDisplay: Boolean(settings.entryListRawTagDisplay),
     entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(settings.entryListTagDisplayLimit),
-    entryListPartDisplay: normalizeEntryListPartDisplay(settings.entryListPartDisplay),
     manualPartOfSpeechTags: Boolean(settings.manualPartOfSpeechTags),
     partOfSpeechTags: normalizeTagList(settings.partOfSpeechTags),
     tagSortOrder: normalizeTagList(settings.tagSortOrder),
@@ -1977,12 +1429,18 @@ function normalizeDictionarySettings(settings = {}) {
     entryListTagFiltering: Boolean(settings.entryListTagFiltering ?? true),
     entryListPolysemyDisplay: Boolean(settings.entryListPolysemyDisplay),
     networkPolysemyDisplay: Boolean(settings.networkPolysemyDisplay),
-    showEmptyEntrySections: Boolean(settings.showEmptyEntrySections),
-    entrySectionOrder: normalizeEntrySectionOrder(settings.entrySectionOrder),
-    search,
+    fuzzySearch: Boolean(settings.fuzzySearch),
+    tagFuzzySearch: Boolean(settings.tagFuzzySearch),
+    sourceFuzzyCompletion: Boolean(settings.sourceFuzzyCompletion),
     searchHighlight: Boolean(settings.searchHighlight ?? true),
-    partialEditPageSwitchAction: normalizeEditPageSwitchAction(settings.partialEditPageSwitchAction),
-    fullEditPageSwitchAction: normalizeEditPageSwitchAction(settings.fullEditPageSwitchAction),
+    partialEditPageSwitchAction: normalizeEditPageSwitchAction(
+      settings.partialEditPageSwitchAction,
+      savePartialEditOnPageSwitch ?? savePartialEditOnSwitch,
+    ),
+    fullEditPageSwitchAction: normalizeEditPageSwitchAction(
+      settings.fullEditPageSwitchAction,
+      saveFullEditOnPageSwitch ?? saveFullEditOnSwitch,
+    ),
     allowEmptyPronunciation: Boolean(settings.allowEmptyPronunciation ?? true),
     allowEmptyTags: Boolean(settings.allowEmptyTags ?? true),
     allowEmptyDefinitions: Boolean(settings.allowEmptyDefinitions ?? true),
@@ -1992,38 +1450,10 @@ function normalizeDictionarySettings(settings = {}) {
   };
 }
 
-let entrySearchRuntimeCache = { dictionary: null, search: null, options: null };
-
-function entrySearchQueryOptions(dictionary = activeDictionary()) {
-  const search = dictionary?.settings?.search;
-  if (entrySearchRuntimeCache.dictionary === dictionary
-    && entrySearchRuntimeCache.search === search
-    && entrySearchRuntimeCache.options) {
-    return entrySearchRuntimeCache.options;
-  }
-  const normalizedSearch = entrySearchModel.normalizeEntrySearchSettings(search);
-  const options = entrySearchModel.searchSettingsQueryOptions(normalizedSearch);
-  entrySearchRuntimeCache = { dictionary, search, options };
-  return options;
-}
-
-function normalizeEntrySearchText(value, dictionary = activeDictionary()) {
-  return entrySearchQueryOptions(dictionary).normalizeText(value);
-}
-
-function entrySearchQuerySignature(dictionary = activeDictionary()) {
-  const { fields, fuzzyFields, normalization } = entrySearchQueryOptions(dictionary);
-  return [
-    [...fields].join(","),
-    [...fuzzyFields].join(","),
-    stableJson(normalization),
-  ].join("|");
-}
-
-function normalizeEditPageSwitchAction(value) {
+function normalizeEditPageSwitchAction(value, legacySaveValue = false) {
   return ["save", "discard", "prompt"].includes(value)
     ? value
-    : "discard";
+    : (legacySaveValue ? "save" : "discard");
 }
 
 function normalizeGlossFontFamily(value) {
@@ -2034,8 +1464,8 @@ function normalizeGlossFontSize(value) {
   return ["small", "medium", "large"].includes(value) ? value : "medium";
 }
 
-function normalizeGlossStyles(styles = {}) {
-  const fallbackFont = normalizeGlossFontFamily("serif");
+function normalizeGlossStyles(styles = {}, legacyFontFamily = "serif", legacySmallCaps = false) {
+  const fallbackFont = normalizeGlossFontFamily(legacyFontFamily);
   return Object.fromEntries(GLOSS_STYLE_KEYS.map((key) => {
     const style = styles?.[key] && typeof styles[key] === "object" ? styles[key] : {};
     return [key, {
@@ -2043,7 +1473,7 @@ function normalizeGlossStyles(styles = {}) {
       fontSize: normalizeGlossFontSize(style.fontSize),
       bold: Boolean(style.bold),
       italic: Boolean(style.italic ?? (key === "ft")),
-      ...(key === "glb" ? { smallCaps: Boolean(style.smallCaps) } : {}),
+      ...(key === "glb" ? { smallCaps: Boolean(style.smallCaps ?? legacySmallCaps) } : {}),
     }];
   }));
 }
@@ -2065,48 +1495,14 @@ function normalizeToolNavOrder(order = []) {
   return result;
 }
 
-function normalizeEntrySectionOrder(order = []) {
-  const source = Array.isArray(order) ? order : [];
-  const result = [];
-  source.forEach((item) => {
-    const section = String(item || "").trim();
-    if (DEFAULT_ENTRY_SECTION_ORDER.includes(section) && !result.includes(section)) {
-      result.push(section);
-    }
-  });
-  DEFAULT_ENTRY_SECTION_ORDER.forEach((section) => {
-    if (!result.includes(section)) {
-      result.push(section);
-    }
-  });
-  return result;
-}
-
-function normalizeEntryListPartDisplay(value) {
-  return ENTRY_LIST_PART_DISPLAY_OPTIONS.includes(value) ? value : "subtitle";
-}
-
-function entrySectionLabel(section) {
-  const labels = {
-    definitions: t("definitions"),
-    etymology: t("etymology"),
-    derived: t("derivedEntries"),
-    morphology: t("morphologyDisplay"),
-    notes: t("entryNotes"),
-  };
-  return labels[section] || section;
-}
-
 function toolNavLabel(view) {
   const labels = {
     editor: t("entryEditor"),
     docs: t("languageDocs"),
     corpus: t("corpus"),
     analysis: t("analysis"),
-    quality: t("qualityCheck"),
     ipa: t("ipaConfig"),
-    "morphology-functions": t("morphologyFunctions"),
-    "morphology-tables": t("morphologyTables"),
+    morphology: t("morphologyConfig"),
     settings: t("otherSettings"),
     manager: t("dictionaryManager"),
   };
@@ -2114,19 +1510,52 @@ function toolNavLabel(view) {
 }
 
 function normalizeTagDisplayMap(map = {}) {
-  return tagModel.normalizeTagDisplayMap(map);
+  if (!map || typeof map !== "object" || Array.isArray(map)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(map)
+      .map(([key, value]) => [String(key).trim(), String(value).trim()])
+      .filter(([key, value]) => key && value),
+  );
 }
 
 function normalizeRedHighlightTags(value) {
-  return tagModel.normalizeRedHighlightTags(value);
+  const items = Array.isArray(value)
+    ? value.map(String)
+    : String(value || "").split(/[\s,，、]+/);
+  const unique = [];
+  items
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .forEach((item) => {
+      if (!unique.includes(item)) {
+        unique.push(item);
+      }
+  });
+  return unique;
 }
 
 function normalizeTagList(value) {
-  return tagModel.normalizeTagList(value);
+  const items = Array.isArray(value) ? value.map(String) : splitList(value);
+  const unique = [];
+  items
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .forEach((item) => {
+      if (!unique.includes(item)) {
+        unique.push(item);
+      }
+  });
+  return unique;
 }
 
 function normalizeEntryListTagDisplayLimit(value) {
-  return tagModel.normalizeEntryListTagDisplayLimit(value);
+  const number = Number.parseInt(value, 10);
+  if (!Number.isFinite(number)) {
+    return DEFAULT_ENTRY_LIST_TAG_DISPLAY_LIMIT;
+  }
+  return Math.min(MAX_ENTRY_LIST_TAG_DISPLAY_LIMIT, Math.max(MIN_ENTRY_LIST_TAG_DISPLAY_LIMIT, number));
 }
 
 function entryListTagDisplayLimitInputIsValid() {
@@ -2214,7 +1643,7 @@ function normalizeCorpusBlock(block = {}, usedIds = new Set()) {
   return {
     ...block,
     id: reserveEntityId(block.id, "corpus-block", usedIds),
-    title: String(block.title || ""),
+    title: String(block.title || block.name || ""),
     attributes: normalizeCorpusAttributes(block.attributes),
     tags: uniqueList(block.tags),
     notes: String(block.notes || ""),
@@ -2244,7 +1673,7 @@ function normalizeCorpusUnit(unit = {}, usedIds = new Set()) {
   return {
     ...unit,
     id: reserveEntityId(unit.id, "corpus-unit", usedIds),
-    content: String(unit.content || ""),
+    content: String(unit.content || unit.text || ""),
     attributes: normalizeCorpusAttributes(unit.attributes),
     tags: uniqueList(unit.tags),
     notes: String(unit.notes || ""),
@@ -2270,29 +1699,69 @@ function normalizeCorpusUnitIds(unitIds = []) {
     : [];
 }
 
-function normalizeMorphology(morphology = {}, usedIds = new Set()) {
-  const normalized = morphologyModel.normalizeMorphology(morphology, {
-    usedIds,
-    reserveEntityId,
-    defaultGroupName: t("morphologyTable"),
-    defaultTableTitle: t("morphologyTable"),
-  });
+function normalizeMorphology(morphology = {}) {
   return {
-    ...normalized,
-    // Data analysis still consumes this temporary flattened table view. Remove
-    // it when analysis reads the canonical morphology model directly.
-    tables: legacyMorphologyTableViews(normalized.templateGroups),
+    functions: normalizeMorphologyFunctions(morphology.functions),
+    tables: Array.isArray(morphology.tables) ? morphology.tables.map(normalizeMorphologyTable) : [],
   };
 }
 
 function normalizeMorphologyFunctions(functions = {}) {
-  return morphologyModel.normalizeMorphologyFunctions(functions);
+  return {
+    leftV: uniqueList(functions.leftV),
+    rightV: uniqueList(functions.rightV),
+  };
+}
+
+function uniqueList(value) {
+  const items = Array.isArray(value) ? value.map(String) : splitList(value);
+  const unique = [];
+  items
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .forEach((item) => {
+      if (!unique.includes(item)) {
+        unique.push(item);
+      }
+    });
+  return unique;
+}
+
+function normalizeMorphologyTable(table = {}) {
+  const rows = Math.max(1, Number.parseInt(table.rows, 10) || 2);
+  const cols = Math.max(1, Number.parseInt(table.cols, 10) || 2);
+  const rowLabels = Array.from({ length: rows }, (_, index) => String(table.rowLabels?.[index] || `${index + 1}`));
+  const colLabels = Array.from({ length: cols }, (_, index) => String(table.colLabels?.[index] || `${index + 1}`));
+  const cells = {};
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      const key = morphologyCellKey(row, col);
+      cells[key] = normalizeMorphologyCell(table.cells?.[key]);
+    }
+  }
+  return {
+    id: table.id || uid("morph"),
+    name: String(table.name || t("morphologyTable")),
+    rows,
+    cols,
+    rowLabels,
+    colLabels,
+    matchTags: splitList(Array.isArray(table.matchTags) ? table.matchTags.join("，") : table.matchTags || ""),
+    cells,
+  };
 }
 
 function normalizeMorphologyCell(cell = {}) {
   return {
-    mode: "reference",
-    value: String(cell?.value ?? cell?.sourceText ?? ""),
+    mode: cell.mode === "replace" ? "replace" : "reference",
+    value: String(cell.value || ""),
+  };
+}
+
+function normalizeEntryMorphology(morphology = {}) {
+  return {
+    tableId: morphology.tableId || "auto",
+    overrides: normalizeMorphologyOverrides(morphology.overrides),
   };
 }
 
@@ -2300,92 +1769,92 @@ function normalizeMorphologyOverrides(overrides = {}) {
   if (!overrides || typeof overrides !== "object" || Array.isArray(overrides)) {
     return {};
   }
-  return Object.fromEntries(Object.entries(overrides)
-    .map(([key, value]) => [key, String(value || "").trim()])
-    .filter(([key, value]) => /^(\d+),(\d+)$/.test(key) && value));
-}
-
-function legacyMorphologyTableViews(templateGroups = []) {
-  return (templateGroups || []).flatMap((group) => (group.tables || []).map((table, tableIndex) => {
-    const cells = {};
-    Object.entries(table.cells || {}).forEach(([key, cell]) => {
-      cells[key] = normalizeMorphologyCell(cell);
-    });
-    return {
-      // The temporary analysis view pairs its first table with the template
-      // group ID used by the entry-side flattened overlay.
-      id: tableIndex === 0 ? group.id : table.id,
-      templateGroupId: group.id,
-      templateTableId: table.id,
-      name: table.title || group.name || t("morphologyTable"),
-      rows: table.rowCount,
-      cols: table.columnCount,
-      rowLabels: table.rowLabels || [],
-      colLabels: table.columnLabels || [],
-      matchTags: group.matchTags || [],
-      cells,
-    };
-  }));
-}
-
-function morphologyEditorView({ morphologyMode = "auto", morphologyGroups = [] } = {}) {
-  const explicitGroup = morphologyMode === "manual" ? morphologyGroups[0] : null;
-  const sourceGroups = explicitGroup ? [explicitGroup] : morphologyGroups;
-  if (explicitGroup?.templateGroupId) {
-    const overrides = {};
-    Object.values(explicitGroup.overrides || {}).forEach((cellMap) => {
-      Object.entries(cellMap || {}).forEach(([key, value]) => {
-        if (!overrides[key] && String(value || "").trim()) {
-          overrides[key] = String(value);
-        }
-      });
-    });
-    return { tableId: explicitGroup.templateGroupId, overrides };
-  }
-  const overrides = {};
-  sourceGroups.forEach((group) => Object.values(group.overrides || {}).forEach((cellMap) => {
-    Object.entries(cellMap || {}).forEach(([key, value]) => {
-      if (!overrides[key] && String(value || "").trim()) {
-        overrides[key] = String(value);
-      }
-    });
-  }));
-  return {
-    tableId: "auto",
-    overrides,
-  };
+  return Object.fromEntries(
+    Object.entries(overrides)
+      .map(([key, value]) => [key, String(value || "").trim()])
+      .filter(([, value]) => value),
+  );
 }
 
 function morphologyCellKey(row, col) {
-  return morphologyModel.morphologyCellKey(row, col);
+  return `${row},${col}`;
 }
 
 function normalizeIpaKeyboard(symbols) {
-  return ipaModel.normalizeIpaKeyboard(symbols);
+  const parsed = Array.isArray(symbols)
+    ? symbols.map(String)
+    : splitKeyboardSymbols(symbols || "ˈ ˌ");
+  const unique = [];
+  parsed
+    .map((symbol) => symbol.trim())
+    .filter(Boolean)
+    .forEach((symbol) => {
+      if (!unique.includes(symbol)) {
+        unique.push(symbol);
+      }
+    });
+  return unique.length ? unique : ["ˈ", "ˌ"];
 }
 
 function splitKeyboardSymbols(value) {
-  return ipaModel.splitKeyboardSymbols(value);
+  return String(value || "")
+    .split(/[\s,，、]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function normalizeIpaSettings(ipa = {}) {
-  return ipaModel.normalizeIpaSettings(ipa);
+  const defaultStress = Number.parseInt(ipa.defaultStress, 10);
+  const mappings = [
+    ...normalizeIpaRuleList(ipa.mappings),
+    ...normalizeIpaRuleList(ipa.stressMappings).map((rule) => ({
+      ...rule,
+      to: hasStressOutput(rule.to) ? rule.to : `ˈ${rule.to || rule.from}`,
+    })),
+  ];
+  return {
+    mappings,
+    syllable: {
+      vowels: ipa.syllable?.vowels || "aeiouAEIOU",
+      separator: ipa.syllable?.separator || ".",
+      onsetClusters: normalizeClusterList(ipa.syllable?.onsetClusters),
+      codaClusters: normalizeClusterList(ipa.syllable?.codaClusters),
+      complexPhonemes: normalizeClusterList(ipa.syllable?.complexPhonemes),
+    },
+    defaultStress: Number.isInteger(defaultStress) ? defaultStress : -2,
+    unstressMonosyllables: ipa.unstressMonosyllables !== false,
+  };
 }
 
 function normalizeClusterList(value) {
-  return ipaModel.normalizeClusterList(value);
+  const clusters = Array.isArray(value) ? value : String(value || "").split(/[,，、]/);
+  return [...new Set(clusters.map((cluster) => String(cluster).trim()).filter(Boolean))]
+    .sort((a, b) => b.length - a.length);
 }
 
 function normalizeOnsetClusters(value) {
-  return ipaModel.normalizeOnsetClusters(value);
+  return normalizeClusterList(value);
 }
 
 function hasStressOutput(value) {
-  return ipaModel.hasStressOutput(value);
+  const output = String(value || "");
+  return output.startsWith("'") || output.includes("ˈ");
+}
+
+function normalizeIpaRuleList(rules) {
+  return Array.isArray(rules)
+    ? rules.map(normalizeIpaRule).filter((rule) => rule.from || rule.to || rule.before || rule.after)
+    : [];
 }
 
 function normalizeIpaRule(rule = {}) {
-  return ipaModel.normalizeIpaRule(rule);
+  return {
+    id: rule.id || uid("ipa"),
+    from: String(rule.from || ""),
+    to: String(rule.to || ""),
+    before: String(rule.before || ""),
+    after: String(rule.after || ""),
+  };
 }
 
 function uid(prefix) {
@@ -2421,33 +1890,13 @@ function corpusEntityIdRecords(corpus = {}) {
 }
 
 function dictionaryEntityIdRecords(dictionary = {}) {
-  const records = [];
-  (dictionary.entries || []).forEach((entry) => {
-    records.push({
+  return [
+    ...(dictionary.entries || []).map((entry) => ({
       id: String(entry.id || "").trim(),
       typeKey: "entryEntity",
-    });
-    (entry.definitions || []).forEach((definition) => {
-      records.push({
-        id: String(definition.id || "").trim(),
-        typeKey: "definitionEntity",
-      });
-    });
-  });
-  (dictionary.morphology?.templateGroups || []).forEach((group) => {
-    records.push({
-      id: String(group.id || "").trim(),
-      typeKey: "morphologyTableEntity",
-    });
-    (group.tables || []).forEach((table) => {
-      records.push({
-        id: String(table.id || "").trim(),
-        typeKey: "morphologyTableEntity",
-      });
-    });
-  });
-  records.push(...corpusEntityIdRecords(dictionary.corpus));
-  return records.filter((record) => record.id);
+    })),
+    ...corpusEntityIdRecords(dictionary.corpus),
+  ].filter((record) => record.id);
 }
 
 function duplicateEntityIdGroups(records) {
@@ -2503,141 +1952,7 @@ function activeDictionary() {
 
 function selectedEntry() {
   const dictionary = activeDictionary();
-  if (
-    !dictionary
-    || !state.selectedEntryId
-    || selectedEntryDetailState.dictionaryId !== dictionary.id
-    || selectedEntryDetailState.entryId !== state.selectedEntryId
-    || selectedEntryDetailState.status !== "success"
-  ) {
-    return null;
-  }
-  return selectedEntryDetailState.entry;
-}
-
-function entryDetailCacheKey(dictionaryId, entryId) {
-  return `entry-detail\u0000${dictionaryId}\u0000${entryId}`;
-}
-
-function resetSelectedEntryDetailState() {
-  finishStaleContentUpdate("detail");
-  entryDetailHasSettledContent = false;
-  selectedEntryDetailLoadPromise = null;
-  selectedEntryDetailState = {
-    dictionaryId: "",
-    entryId: "",
-    status: "idle",
-    entry: null,
-    staleEntry: null,
-    error: null,
-    requestId: selectedEntryDetailState.requestId + 1,
-  };
-}
-
-function cacheSavedEntryDetail(dictionaryId, entry) {
-  if (!dictionaryId || !entry?.id) {
-    return;
-  }
-  entryDetailCache.set(entryDetailCacheKey(dictionaryId, entry.id), entry, { dictionaryId });
-  if (state.activeDictionaryId === dictionaryId && state.selectedEntryId === entry.id) {
-    selectedEntryDetailState = {
-      dictionaryId,
-      entryId: entry.id,
-      status: "success",
-      entry,
-      staleEntry: null,
-      error: null,
-      requestId: selectedEntryDetailState.requestId + 1,
-    };
-    finishStaleContentUpdate("detail");
-  }
-}
-
-async function ensureSelectedEntryDetailLoaded() {
-  const dictionary = activeDictionary();
-  const entryId = state.selectedEntryId;
-  if (!dictionary || !entryId) {
-    resetSelectedEntryDetailState();
-    return null;
-  }
-  if (
-    selectedEntryDetailState.dictionaryId === dictionary.id
-    && selectedEntryDetailState.entryId === entryId
-    && selectedEntryDetailState.status === "success"
-  ) {
-    return selectedEntryDetailState.entry;
-  }
-  if (
-    selectedEntryDetailState.dictionaryId === dictionary.id
-    && selectedEntryDetailState.entryId === entryId
-    && selectedEntryDetailState.status === "loading"
-  ) {
-    return selectedEntryDetailLoadPromise;
-  }
-  const requestId = selectedEntryDetailState.requestId + 1;
-  const staleEntry = selectedEntryDetailState.status === "success"
-    ? selectedEntryDetailState.entry
-    : selectedEntryDetailState.staleEntry;
-  const updateToken = beginStaleContentUpdate(
-    "detail",
-    Boolean(staleEntry && entryDetailHasSettledContent),
-  );
-  selectedEntryDetailState = {
-    dictionaryId: dictionary.id,
-    entryId,
-    status: "loading",
-    entry: null,
-    staleEntry,
-    error: null,
-    requestId,
-  };
-  try {
-    selectedEntryDetailLoadPromise = entryDetailCache.load({
-      key: entryDetailCacheKey(dictionary.id, entryId),
-      dictionaryId: dictionary.id,
-      load: () => api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entryId)}`),
-    });
-    const entry = await selectedEntryDetailLoadPromise;
-    if (
-      selectedEntryDetailState.requestId !== requestId
-      || state.activeDictionaryId !== dictionary.id
-      || state.selectedEntryId !== entryId
-    ) {
-      return entry;
-    }
-    selectedEntryDetailState = {
-      dictionaryId: dictionary.id,
-      entryId,
-      status: "success",
-      entry,
-      staleEntry: null,
-      error: null,
-      requestId,
-    };
-    finishStaleContentUpdate("detail", updateToken);
-    renderDetail();
-    return entry;
-  } catch (error) {
-    if (selectedEntryDetailState.requestId === requestId) {
-      selectedEntryDetailState = {
-        dictionaryId: dictionary.id,
-        entryId,
-        status: "error",
-        entry: null,
-        staleEntry: null,
-        error,
-        requestId,
-      };
-      finishStaleContentUpdate("detail", updateToken);
-      console.error(error);
-      renderDetail();
-    }
-    return null;
-  } finally {
-    if (selectedEntryDetailState.requestId === requestId) {
-      selectedEntryDetailLoadPromise = null;
-    }
-  }
+  return dictionary?.entries.find((entry) => entry.id === state.selectedEntryId) || null;
 }
 
 function selectedDictionaryConfig() {
@@ -2649,9 +1964,19 @@ function entryPart(entry) {
 }
 
 function entryParts(entry, dictionary = activeDictionary()) {
-  return tagModel.entryParts(entry, normalizeDictionarySettings(dictionary?.settings), {
-    normalizeText: searchNormalizationModel.normalizeStructuralKey,
-  });
+  const tags = entry?.tags || [];
+  if (!tags.length) {
+    return [];
+  }
+  const settings = normalizeDictionarySettings(dictionary?.settings);
+  if (!settings.manualPartOfSpeechTags) {
+    return tags[0] ? [tags[0]] : [];
+  }
+  const configuredParts = new Set(settings.partOfSpeechTags.map(normalize));
+  if (!configuredParts.size) {
+    return [];
+  }
+  return tags.filter((tag) => configuredParts.has(normalize(tag)));
 }
 
 function entryPartLabels(entry, dictionary = activeDictionary()) {
@@ -2663,29 +1988,31 @@ function entryPartText(entry, dictionary = activeDictionary()) {
 }
 
 function entryTagIsPart(entry, tagIndex, tag, dictionary = activeDictionary()) {
-  return tagModel.entryTagIsPart(entry, tagIndex, tag, normalizeDictionarySettings(dictionary?.settings), {
-    normalizeText: searchNormalizationModel.normalizeStructuralKey,
-  });
+  const settings = normalizeDictionarySettings(dictionary?.settings);
+  if (!settings.manualPartOfSpeechTags) {
+    return tagIndex === 0;
+  }
+  return entryParts(entry, dictionary).some((part) => normalize(part) === normalize(tag));
 }
 
 function displayTag(tag, dictionary = activeDictionary()) {
-  return tagModel.displayTag(tag, normalizeDictionarySettings(dictionary?.settings));
+  const value = String(tag || "");
+  return dictionary?.settings?.tagDisplayMap?.[value] || value;
 }
 
 function entryListDisplayTag(tag, settings = normalizeDictionarySettings(activeDictionary()?.settings)) {
-  return tagModel.entryListDisplayTag(tag, settings);
+  const value = String(tag || "");
+  return settings.entryListRawTagDisplay ? value : displayTag(value);
 }
 
 function tagIsRedHighlighted(tag, dictionary = activeDictionary()) {
-  return tagModel.tagIsRedHighlighted(tag, normalizeDictionarySettings(dictionary?.settings), {
-    normalizeText: searchNormalizationModel.normalizeStructuralKey,
-  });
+  const settings = normalizeDictionarySettings(dictionary?.settings);
+  const candidates = new Set(settings.redHighlightTags.map(normalize));
+  return candidates.has(normalize(tag)) || candidates.has(normalize(displayTag(tag, dictionary)));
 }
 
 function normalize(value) {
-  return searchNormalizationModel.normalizeSearchText(value, {
-    locale: currentLanguage === "zh" ? "zh-CN" : "en-US",
-  });
+  return String(value || "").trim().toLocaleLowerCase(currentLanguage === "zh" ? "zh-CN" : "en-US");
 }
 
 function splitList(value) {
@@ -2693,17 +2020,6 @@ function splitList(value) {
     .split(/[,\n，、]/)
     .map((item) => item.trim())
     .filter(Boolean);
-}
-
-function uniqueList(value) {
-  const unique = [];
-  splitList(Array.isArray(value) ? value.join("，") : value)
-    .forEach((item) => {
-      if (!unique.includes(item)) {
-        unique.push(item);
-      }
-    });
-  return unique;
 }
 
 function splitSourceText(value) {
@@ -2756,12 +2072,8 @@ function renderActiveView() {
     renderCorpus(dictionary);
     return;
   }
-  if (state.activeView === "morphology-functions") {
-    fillMorphologyFunctionsForm(dictionary);
-    return;
-  }
-  if (state.activeView === "morphology-tables") {
-    renderMorphologyTablesConfig(dictionary);
+  if (state.activeView === "morphology") {
+    renderMorphologyConfig(dictionary);
     return;
   }
   if (state.activeView === "ipa") {
@@ -2771,10 +2083,6 @@ function renderActiveView() {
   }
   if (state.activeView === "analysis") {
     renderAnalysis(dictionary);
-    return;
-  }
-  if (state.activeView === "quality") {
-    renderQuality(dictionary);
   }
 }
 
@@ -2784,14 +2092,11 @@ function rememberProcessScroll() {
   } else if (state.activeView === "analysis") {
     const analysisViewState = activeAnalysisViewState();
     analysisViewState.scrollByRoute[analysisRouteKey()] = window.scrollY;
-  } else if (state.activeView === "quality") {
-    const qualityViewState = activeQualityViewState();
-    qualityViewState.scrollBySubpage[qualityViewState.subpage] = window.scrollY;
   }
 }
 
 function restoreProcessScroll() {
-  if (state.activeView !== "docs" && state.activeView !== "analysis" && state.activeView !== "quality") {
+  if (state.activeView !== "docs" && state.activeView !== "analysis") {
     return;
   }
   requestAnimationFrame(() => {
@@ -2802,9 +2107,6 @@ function restoreProcessScroll() {
     } else if (state.activeView === "analysis") {
       const analysisViewState = activeAnalysisViewState();
       window.scrollTo({ top: analysisViewState.scrollByRoute[analysisRouteKey()] || 0, behavior: "auto" });
-    } else if (state.activeView === "quality") {
-      const qualityViewState = activeQualityViewState();
-      window.scrollTo({ top: qualityViewState.scrollBySubpage[qualityViewState.subpage] || 0, behavior: "auto" });
     }
   });
 }
@@ -2833,27 +2135,6 @@ function activeAnalysisViewState() {
 function forgetAnalysisViewState(dictionaryId) {
   if (dictionaryId) {
     analysisViewStates.delete(dictionaryId);
-  }
-}
-
-function createQualityViewState() {
-  return {
-    subpage: defaultQualityViewState.subpage,
-    scrollBySubpage: {},
-  };
-}
-
-function activeQualityViewState() {
-  const dictionaryId = state.activeDictionaryId || "__none__";
-  if (!qualityViewStates.has(dictionaryId)) {
-    qualityViewStates.set(dictionaryId, createQualityViewState());
-  }
-  return qualityViewStates.get(dictionaryId);
-}
-
-function forgetQualityViewState(dictionaryId) {
-  if (dictionaryId) {
-    qualityViewStates.delete(dictionaryId);
   }
 }
 
@@ -2894,7 +2175,7 @@ function ensureValidSelection() {
     state.selectedEntryId = firstLemmaEntry(dictionary)?.id || "";
   }
 
-  if (!["editor", "manager", "analysis", "quality", "settings", "docs", "corpus", "morphology-functions", "morphology-tables", "ipa"].includes(state.activeView)) {
+  if (!["editor", "manager", "analysis", "settings", "docs", "corpus", "morphology", "ipa"].includes(state.activeView)) {
     state.activeView = "editor";
   }
 
@@ -3001,59 +2282,11 @@ function entryBrowserCanScrollNow() {
   );
 }
 
-function entryCardScrollQueryIsReady() {
-  const dictionary = activeDictionary();
-  if (!dictionary || (advancedFilter && !advancedFilterUsesEntryQuery())) {
-    return true;
-  }
-  if (rootMode && rootGroupsQueryCanUseApi(dictionary)) {
-    return rootGroupsQueryState.status === "success"
-      && rootGroupsQueryState.key === rootGroupsQueryApiKey(dictionary);
-  }
-  if (!rootMode && entryQueryCanUseApi(dictionary)) {
-    return entryQueryState.status === "success"
-      && entryQueryState.key === entryQueryApiKey(dictionary);
-  }
-  return true;
-}
-
 function flushPendingEntryCardScroll() {
   if (!pendingEntryCardScroll) {
     return;
   }
-  const { entryId, options } = pendingEntryCardScroll;
-  ensureQueryWindowForEntryScroll(entryId, options);
-  const requestId = entryCardScrollRequestId += 1;
-  requestAnimationFrame(() => {
-    if (requestId !== entryCardScrollRequestId || !pendingEntryCardScroll) {
-      return;
-    }
-    if (!entryBrowserCanScrollNow() || !entryCardScrollQueryIsReady()) {
-      return;
-    }
-    let key = `entry:${entryId}`;
-    if (rootMode && !advancedFilter) {
-      key = options.rootId && options.rootId !== entryId
-        ? `derived:${options.rootId}:${entryId}`
-        : `root:${options.rootId || entryId}`;
-    }
-    const stableScrollOptions = {
-      isCurrent: () => requestId === entryCardScrollRequestId,
-    };
-    if (scrollVirtualListItemIntoViewStable(entryVirtualList, key, stableScrollOptions)) {
-      if (pendingEntryCardScroll?.entryId === entryId) {
-        pendingEntryCardScroll = null;
-      }
-      return;
-    }
-    const row = entryVirtualList.items.find((item) => item.value?.entry?.id === entryId || item.value?.group?.root?.id === entryId);
-    if (row) {
-      const scrolled = scrollVirtualListItemIntoViewStable(entryVirtualList, row.key, stableScrollOptions);
-      if (scrolled && pendingEntryCardScroll?.entryId === entryId) {
-        pendingEntryCardScroll = null;
-      }
-    }
-  });
+  scheduleEntryCardScroll(pendingEntryCardScroll.entryId, pendingEntryCardScroll.options);
 }
 
 function revealEntryBrowserForResults() {
@@ -3067,34 +2300,6 @@ function revealEntryBrowserForResults() {
   }
   shellState.browserCollapsedByView.editor = false;
   shellState.browserDrawerOpen = false;
-}
-
-function focusCurrentEntryInBrowser() {
-  const entryId = state.selectedEntryId;
-  if (!entryId) {
-    return;
-  }
-  if (
-    advancedFilter
-    && !advancedFilterUsesEntryQuery()
-    && !(advancedFilter.entryIds || []).includes(entryId)
-  ) {
-    showToast(t("currentEntryNotInList"));
-    return;
-  }
-
-  scheduleEntryCardScroll(entryId, { reportMissing: true });
-  if (mobileShellMode()) {
-    openMobileEntryBrowserDrawer();
-    return;
-  }
-  revealEntryBrowserForResults();
-  renderShellEntryBrowser();
-  scheduleEntryBrowserLayoutRefresh();
-  requestAnimationFrame(() => {
-    remeasureEntryVirtualList();
-    flushPendingEntryCardScroll();
-  });
 }
 
 function renderMobileAppBar() {
@@ -3468,18 +2673,14 @@ function renderAvailability() {
   elements.settingsPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "settings";
   elements.analysisNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "analysis";
   elements.analysisPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "analysis";
-  elements.qualityNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "quality";
-  elements.qualityPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "quality";
   elements.docsNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "docs";
   elements.docsPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "docs";
   elements.saveDocsButton.hidden = !backendAvailable || !hasDictionary || state.activeView !== "docs" || settings.docsAutoSave;
   elements.corpusNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "corpus";
   elements.corpusPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "corpus";
   elements.saveCorpusButton.hidden = !backendAvailable || !hasDictionary || state.activeView !== "corpus" || settings.corpusAutoSave;
-  elements.morphologyFunctionsNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "morphology-functions";
-  elements.morphologyFunctionsPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "morphology-functions";
-  elements.morphologyTablesNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "morphology-tables";
-  elements.morphologyTablesPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "morphology-tables";
+  elements.morphologyNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "morphology";
+  elements.morphologyPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "morphology";
   elements.ipaNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "ipa";
   elements.ipaPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "ipa";
   elements.batchIpaAllButton.disabled = !backendAvailable || !hasDictionary;
@@ -3503,12 +2704,10 @@ function renderView() {
   elements.editorView.classList.toggle("active", state.activeView === "editor");
   elements.dictionaryManagerView.classList.toggle("active", state.activeView === "manager");
   elements.analysisView.classList.toggle("active", state.activeView === "analysis");
-  elements.qualityView.classList.toggle("active", state.activeView === "quality");
   elements.settingsView.classList.toggle("active", state.activeView === "settings");
   elements.docsView.classList.toggle("active", state.activeView === "docs");
   elements.corpusView.classList.toggle("active", state.activeView === "corpus");
-  elements.morphologyFunctionsView.classList.toggle("active", state.activeView === "morphology-functions");
-  elements.morphologyTablesView.classList.toggle("active", state.activeView === "morphology-tables");
+  elements.morphologyView.classList.toggle("active", state.activeView === "morphology");
   elements.ipaView.classList.toggle("active", state.activeView === "ipa");
 }
 
@@ -3556,16 +2755,15 @@ function renderPartFilter() {
   if (advancedFilter) {
     rootMode = false;
     activePart = "";
-    if (!advancedFilterUsesEntryQuery()) {
-      searchQuery = "";
-      elements.searchInput.value = "";
-    }
+    searchQuery = "";
+    elements.searchInput.value = "";
   } else if (rootMode) {
     activePart = "";
     elements.partFilter.value = "";
   }
-  startEntryFacetsApiCheck(dictionary);
-  const usedParts = entryFacetsPartsForRender(dictionary) || localPartTags(dictionary);
+  const usedParts = dictionary
+    ? [...new Set(dictionary.entries.flatMap((entry) => entryParts(entry, dictionary)).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN"))
+    : [];
   const options = ["", NO_PART_FILTER_VALUE, ...usedParts];
   const current = activePart;
 
@@ -3580,7 +2778,7 @@ function renderPartFilter() {
 
   elements.partFilter.value = options.includes(current) ? current : "";
   elements.partFilter.disabled = rootMode || Boolean(advancedFilter);
-  elements.searchInput.disabled = Boolean(advancedFilter && !advancedFilterUsesEntryQuery());
+  elements.searchInput.disabled = Boolean(advancedFilter);
   activePart = elements.partFilter.value;
   elements.rootModeToggleButton.textContent = rootMode ? t("normalMode") : t("rootMode");
   elements.rootModeToggleButton.classList.toggle("active", rootMode);
@@ -3598,12 +2796,9 @@ function renderPartFilter() {
   } else {
     elements.advancedFilterLabel.removeAttribute("aria-label");
   }
-  const hasRootSearch = Boolean(normalizeEntrySearchText(searchQuery));
-  const rootGroupsReady = rootMode && rootGroupsQueryState.status === "success";
-  elements.expandAllRootsButton.disabled = rootMode
-    && (hasRootSearch || !rootGroupsReady || (rootExpansionMode === "all" && !collapsedRootEntries.size));
-  elements.collapseAllRootsButton.disabled = rootMode
-    && (hasRootSearch || !rootGroupsReady || (rootExpansionMode === "manual" && !expandedRootEntries.size));
+  const hasRootSearch = Boolean(normalize(searchQuery));
+  elements.expandAllRootsButton.disabled = rootMode && hasRootSearch;
+  elements.collapseAllRootsButton.disabled = rootMode && hasRootSearch;
 }
 
 function createVirtualListState(estimatedItemHeight) {
@@ -3621,18 +2816,6 @@ function createVirtualListState(estimatedItemHeight) {
     resizeObserver: null,
     viewportObserver: null,
     scrollHandler: null,
-    lastScrollAt: 0,
-    lastRenderAt: 0,
-    lastResizeFlushAt: 0,
-    renderThrottleTimer: 0,
-    resizeFrame: 0,
-    resizeThrottleTimer: 0,
-    resizeIdleTimer: 0,
-    pendingResizeAnchor: null,
-    pendingSizeUpdates: new Map(),
-    sizeCacheKeys: new Map(),
-    heightCache: new Map(),
-    onRangeChange: null,
   };
 }
 
@@ -3657,61 +2840,19 @@ function initializeVirtualList(virtualList, container) {
   }
   virtualList.resizeObserver?.disconnect();
   virtualList.viewportObserver?.disconnect();
-  if (virtualList.renderThrottleTimer) {
-    clearTimeout(virtualList.renderThrottleTimer);
-    virtualList.renderThrottleTimer = 0;
-  }
-  if (virtualList.resizeFrame) {
-    cancelAnimationFrame(virtualList.resizeFrame);
-    virtualList.resizeFrame = 0;
-  }
-  if (virtualList.resizeThrottleTimer) {
-    clearTimeout(virtualList.resizeThrottleTimer);
-    virtualList.resizeThrottleTimer = 0;
-  }
-  if (virtualList.resizeIdleTimer) {
-    clearTimeout(virtualList.resizeIdleTimer);
-    virtualList.resizeIdleTimer = 0;
-  }
-  virtualList.pendingResizeAnchor = null;
-  virtualList.pendingSizeUpdates.clear();
   virtualList.container = container;
-  virtualList.lastScrollAt = 0;
-  virtualList.lastResizeFlushAt = 0;
-  virtualList.scrollHandler = () => {
-    virtualList.lastScrollAt = performance.now();
-    if (virtualList.pendingSizeUpdates.size) {
-      scheduleVirtualListResizeIdleFlush(virtualList);
-    }
-    scheduleVirtualListThrottledRender(virtualList);
-  };
+  virtualList.scrollHandler = () => scheduleVirtualListRender(virtualList);
   container.addEventListener("scroll", virtualList.scrollHandler, { passive: true });
   if (typeof ResizeObserver === "undefined") {
     return;
   }
   virtualList.resizeObserver = new ResizeObserver((entries) => {
-    const activelyScrolling = virtualListIsActivelyScrolling(virtualList);
-    const anchor = activelyScrolling ? null : virtualListAnchor(virtualList);
+    const anchor = virtualListAnchor(virtualList);
     let changed = false;
     entries.forEach((entry) => {
       const key = entry.target.dataset.virtualKey;
-      const sizeCacheKey = entry.target.dataset.virtualSizeKey || "";
-      const item = virtualListItemByKey(virtualList, key);
-      if (!item || (sizeCacheKey && item.sizeCacheKey !== sizeCacheKey)) {
-        return;
-      }
       const height = entry.borderBoxSize?.[0]?.blockSize || entry.target.getBoundingClientRect().height;
-      const pendingUpdate = virtualList.pendingSizeUpdates.get(key);
-      const current = (typeof pendingUpdate === "number" ? pendingUpdate : pendingUpdate?.height)
-        || virtualList.sizes.get(key)
-        || 0;
-      if (key && height > 0 && Math.abs(current - height) > VIRTUAL_LIST_RESIZE_EPSILON) {
-        rememberVirtualListHeight(virtualList, item.sizeCacheKey, height);
-        if (activelyScrolling) {
-          virtualList.pendingSizeUpdates.set(key, { height, sizeCacheKey: item.sizeCacheKey });
-          changed = true;
-          return;
-        }
+      if (key && height > 0 && Math.abs((virtualList.sizes.get(key) || 0) - height) > 0.5) {
         virtualList.sizes.set(key, height);
         changed = true;
       }
@@ -3719,167 +2860,21 @@ function initializeVirtualList(virtualList, container) {
     if (!changed) {
       return;
     }
-    if (activelyScrolling) {
-      scheduleVirtualListResizeIdleFlush(virtualList);
-      return;
-    }
-    scheduleVirtualListResizeUpdate(virtualList, anchor);
+    rebuildVirtualListOffsets(virtualList);
+    restoreVirtualListAnchor(virtualList, anchor);
+    clampVirtualListScroll(virtualList);
+    scheduleVirtualListRender(virtualList);
   });
   virtualList.viewportObserver = new ResizeObserver((entries) => {
     const width = Math.round(entries[0]?.contentRect?.width || container.clientWidth);
     if (virtualList.width && width && width !== virtualList.width) {
-      virtualList.width = width;
       virtualList.sizes.clear();
-      virtualList.pendingSizeUpdates.clear();
-      refreshVirtualListCachedSizes(virtualList);
       rebuildVirtualListOffsets(virtualList);
-    } else {
-      virtualList.width = width;
     }
+    virtualList.width = width;
     scheduleVirtualListRender(virtualList);
   });
   virtualList.viewportObserver.observe(container);
-}
-
-function virtualListWidthBucket(virtualList, container = virtualList.container) {
-  const width = Math.round(virtualList.width || container?.clientWidth || 0);
-  if (!width) {
-    return 0;
-  }
-  return Math.max(0, Math.round(width / VIRTUAL_LIST_HEIGHT_CACHE_WIDTH_BUCKET) * VIRTUAL_LIST_HEIGHT_CACHE_WIDTH_BUCKET);
-}
-
-function virtualListSizeCacheKey(virtualList, rawKey, container = virtualList.container) {
-  if (!rawKey) {
-    return "";
-  }
-  return `${virtualListWidthBucket(virtualList, container)}|${rawKey}`;
-}
-
-function virtualListItemByKey(virtualList, key) {
-  const index = virtualList.indexByKey.get(key);
-  return index === undefined ? null : virtualList.items[index] || null;
-}
-
-function rememberVirtualListHeight(virtualList, sizeCacheKey, height) {
-  if (!sizeCacheKey || !(height > 0)) {
-    return;
-  }
-  if (virtualList.heightCache.has(sizeCacheKey)) {
-    virtualList.heightCache.delete(sizeCacheKey);
-  }
-  virtualList.heightCache.set(sizeCacheKey, height);
-  while (virtualList.heightCache.size > VIRTUAL_LIST_HEIGHT_CACHE_LIMIT) {
-    const oldestKey = virtualList.heightCache.keys().next().value;
-    virtualList.heightCache.delete(oldestKey);
-  }
-}
-
-function cachedVirtualListHeight(virtualList, sizeCacheKey) {
-  const height = virtualList.heightCache.get(sizeCacheKey);
-  return height > 0 ? height : 0;
-}
-
-function refreshVirtualListCachedSizes(virtualList) {
-  virtualList.sizeCacheKeys.clear();
-  virtualList.items.forEach((item) => {
-    item.sizeCacheKey = virtualListSizeCacheKey(virtualList, item.rawSizeCacheKey);
-    if (item.sizeCacheKey) {
-      virtualList.sizeCacheKeys.set(item.key, item.sizeCacheKey);
-      const cachedHeight = cachedVirtualListHeight(virtualList, item.sizeCacheKey);
-      if (cachedHeight) {
-        virtualList.sizes.set(item.key, cachedHeight);
-      }
-    }
-  });
-}
-
-function virtualListIsActivelyScrolling(virtualList) {
-  return performance.now() - (virtualList.lastScrollAt || 0) < VIRTUAL_LIST_ACTIVE_SCROLL_MS;
-}
-
-function applyVirtualListPendingSizeUpdates(virtualList) {
-  if (!virtualList.pendingSizeUpdates.size) {
-    return false;
-  }
-  let changed = false;
-  virtualList.pendingSizeUpdates.forEach((update, key) => {
-    const height = typeof update === "number" ? update : update?.height;
-    const sizeCacheKey = typeof update === "number" ? virtualList.sizeCacheKeys.get(key) : update?.sizeCacheKey;
-    if (key && height > 0 && sizeCacheKey && virtualList.sizeCacheKeys.get(key) !== sizeCacheKey) {
-      return;
-    }
-    if (key && height > 0 && Math.abs((virtualList.sizes.get(key) || 0) - height) > VIRTUAL_LIST_RESIZE_EPSILON) {
-      virtualList.sizes.set(key, height);
-      rememberVirtualListHeight(virtualList, sizeCacheKey, height);
-      changed = true;
-    }
-  });
-  virtualList.pendingSizeUpdates.clear();
-  return changed;
-}
-
-function scheduleVirtualListResizeIdleFlush(virtualList) {
-  if (!virtualList.pendingSizeUpdates.size) {
-    return;
-  }
-  const now = performance.now();
-  if (virtualList.resizeIdleTimer) {
-    clearTimeout(virtualList.resizeIdleTimer);
-  }
-  virtualList.resizeIdleTimer = setTimeout(() => {
-    virtualList.resizeIdleTimer = 0;
-    if (!virtualList.pendingSizeUpdates.size) {
-      return;
-    }
-    if (virtualList.resizeThrottleTimer) {
-      clearTimeout(virtualList.resizeThrottleTimer);
-      virtualList.resizeThrottleTimer = 0;
-    }
-    virtualList.lastResizeFlushAt = performance.now();
-    scheduleVirtualListResizeUpdate(virtualList, virtualListAnchor(virtualList));
-  }, VIRTUAL_LIST_RESIZE_IDLE_FLUSH_MS);
-  const elapsed = virtualList.lastResizeFlushAt ? now - virtualList.lastResizeFlushAt : 0;
-  const wait = virtualList.lastResizeFlushAt
-    ? Math.max(0, VIRTUAL_LIST_RESIZE_THROTTLE_MS - elapsed)
-    : VIRTUAL_LIST_RESIZE_THROTTLE_MS;
-  if (wait <= 0) {
-    virtualList.lastResizeFlushAt = now;
-    scheduleVirtualListResizeUpdate(virtualList, virtualListAnchor(virtualList));
-    return;
-  }
-  if (virtualList.resizeThrottleTimer) {
-    return;
-  }
-  virtualList.resizeThrottleTimer = setTimeout(() => {
-    virtualList.resizeThrottleTimer = 0;
-    if (!virtualList.pendingSizeUpdates.size) {
-      return;
-    }
-    virtualList.lastResizeFlushAt = performance.now();
-    scheduleVirtualListResizeUpdate(virtualList, virtualListAnchor(virtualList));
-  }, wait);
-}
-
-function scheduleVirtualListResizeUpdate(virtualList, anchor) {
-  if (!virtualList.pendingResizeAnchor) {
-    virtualList.pendingResizeAnchor = anchor;
-  }
-  if (virtualList.resizeFrame) {
-    return;
-  }
-  virtualList.resizeFrame = requestAnimationFrame(() => {
-    virtualList.resizeFrame = 0;
-    const pendingAnchor = virtualList.pendingResizeAnchor;
-    virtualList.pendingResizeAnchor = null;
-    applyVirtualListPendingSizeUpdates(virtualList);
-    rebuildVirtualListOffsets(virtualList);
-    if (!virtualListIsActivelyScrolling(virtualList)) {
-      restoreVirtualListAnchor(virtualList, pendingAnchor);
-    }
-    clampVirtualListScroll(virtualList);
-    scheduleVirtualListRender(virtualList);
-  });
 }
 
 function rebuildVirtualListOffsets(virtualList) {
@@ -3945,24 +2940,8 @@ function scheduleVirtualListRender(virtualList) {
   }
   virtualList.frame = requestAnimationFrame(() => {
     virtualList.frame = 0;
-    virtualList.lastRenderAt = performance.now();
     renderVirtualListWindow(virtualList);
   });
-}
-
-function scheduleVirtualListThrottledRender(virtualList) {
-  const elapsed = performance.now() - (virtualList.lastRenderAt || 0);
-  if (elapsed >= VIRTUAL_LIST_RENDER_THROTTLE_MS) {
-    scheduleVirtualListRender(virtualList);
-    return;
-  }
-  if (virtualList.renderThrottleTimer) {
-    return;
-  }
-  virtualList.renderThrottleTimer = setTimeout(() => {
-    virtualList.renderThrottleTimer = 0;
-    scheduleVirtualListRender(virtualList);
-  }, Math.max(0, VIRTUAL_LIST_RENDER_THROTTLE_MS - elapsed));
 }
 
 function renderVirtualListWindow(virtualList) {
@@ -3984,9 +2963,6 @@ function renderVirtualListWindow(virtualList) {
     const row = document.createElement("div");
     row.className = "virtual-list-row";
     row.dataset.virtualKey = item.key;
-    if (item.sizeCacheKey) {
-      row.dataset.virtualSizeKey = item.sizeCacheKey;
-    }
     row.append(virtualList.renderItem(item.value));
     fragment.append(row);
   }
@@ -3997,110 +2973,36 @@ function renderVirtualListWindow(virtualList) {
   virtualList.resizeObserver?.disconnect();
   container.replaceChildren(fragment);
   container.querySelectorAll(".virtual-list-row").forEach((row) => virtualList.resizeObserver?.observe(row));
-  virtualList.onRangeChange?.({
-    start,
-    end,
-    visibleStart: virtualListIndexAt(offsets, container.scrollTop),
-    visibleEnd: Math.min(items.length, virtualListIndexAt(offsets, container.scrollTop + viewportHeight) + 1),
-    items: items.slice(start, end).map((item) => item.value),
-  });
 }
 
 function renderVirtualList(container, virtualList, items, options) {
   initializeVirtualList(virtualList, container);
-  const preservedAnchor = virtualList.resetToken === options.resetToken
-    && !virtualListIsActivelyScrolling(virtualList)
-    ? virtualListAnchor(virtualList)
-    : null;
-  if (virtualList.renderThrottleTimer) {
-    clearTimeout(virtualList.renderThrottleTimer);
-    virtualList.renderThrottleTimer = 0;
-  }
-  if (virtualList.resizeFrame) {
-    cancelAnimationFrame(virtualList.resizeFrame);
-    virtualList.resizeFrame = 0;
-    virtualList.pendingResizeAnchor = null;
-  }
-  if (virtualList.resizeThrottleTimer) {
-    clearTimeout(virtualList.resizeThrottleTimer);
-    virtualList.resizeThrottleTimer = 0;
-  }
-  if (virtualList.resizeIdleTimer) {
-    clearTimeout(virtualList.resizeIdleTimer);
-    virtualList.resizeIdleTimer = 0;
-  }
-  virtualList.pendingSizeUpdates.clear();
   container.classList.add("virtualized-list");
   const resetScroll = virtualList.resetToken !== options.resetToken;
   virtualList.resetToken = options.resetToken;
   virtualList.renderItem = options.renderItem;
-  virtualList.onRangeChange = typeof options.onRangeChange === "function" ? options.onRangeChange : null;
-  const previousSizeCacheKeys = virtualList.sizeCacheKeys;
-  const nextSizeCacheKeys = new Map();
-  virtualList.items = items.map((value) => {
-    const key = String(options.getKey(value));
-    const estimatedHeight = options.getEstimatedHeight?.(value) || virtualList.estimatedItemHeight;
-    const rawSizeCacheKey = String(options.getSizeCacheKey?.(value, key) || `${options.resetToken}|${key}|${estimatedHeight}`);
-    const sizeCacheKey = virtualListSizeCacheKey(virtualList, rawSizeCacheKey, container);
-    nextSizeCacheKeys.set(key, sizeCacheKey);
-    const previousSizeCacheKey = previousSizeCacheKeys.get(key);
-    if (previousSizeCacheKey !== sizeCacheKey) {
-      virtualList.sizes.delete(key);
-      virtualList.pendingSizeUpdates.delete(key);
-    }
-    const cachedHeight = cachedVirtualListHeight(virtualList, sizeCacheKey);
-    if (cachedHeight && (!virtualList.sizes.get(key) || previousSizeCacheKey !== sizeCacheKey)) {
-      virtualList.sizes.set(key, cachedHeight);
-    }
-    return {
-      key,
-      estimatedHeight,
-      rawSizeCacheKey,
-      sizeCacheKey,
-      value,
-    };
-  });
-  virtualList.sizeCacheKeys = nextSizeCacheKeys;
+  virtualList.items = items.map((value) => ({
+    key: String(options.getKey(value)),
+    estimatedHeight: options.getEstimatedHeight?.(value) || virtualList.estimatedItemHeight,
+    value,
+  }));
   virtualList.indexByKey = new Map(virtualList.items.map((item, index) => [item.key, index]));
   if (resetScroll) {
     virtualList.sizes.clear();
-    virtualList.pendingSizeUpdates.clear();
-    refreshVirtualListCachedSizes(virtualList);
   }
   rebuildVirtualListOffsets(virtualList);
   if (resetScroll) {
     container.scrollTop = 0;
   }
   clampVirtualListScroll(virtualList);
-  restoreVirtualListAnchor(virtualList, preservedAnchor);
   renderVirtualListWindow(virtualList);
 }
 
 function renderVirtualListEmpty(container, virtualList, content) {
   initializeVirtualList(virtualList, container);
-  if (virtualList.renderThrottleTimer) {
-    clearTimeout(virtualList.renderThrottleTimer);
-    virtualList.renderThrottleTimer = 0;
-  }
-  if (virtualList.resizeFrame) {
-    cancelAnimationFrame(virtualList.resizeFrame);
-    virtualList.resizeFrame = 0;
-    virtualList.pendingResizeAnchor = null;
-  }
-  if (virtualList.resizeThrottleTimer) {
-    clearTimeout(virtualList.resizeThrottleTimer);
-    virtualList.resizeThrottleTimer = 0;
-  }
-  if (virtualList.resizeIdleTimer) {
-    clearTimeout(virtualList.resizeIdleTimer);
-    virtualList.resizeIdleTimer = 0;
-  }
-  virtualList.pendingSizeUpdates.clear();
   virtualList.resizeObserver?.disconnect();
   virtualList.items = [];
-  virtualList.onRangeChange = null;
   virtualList.indexByKey.clear();
-  virtualList.sizeCacheKeys.clear();
   virtualList.offsets = [0];
   container.classList.remove("virtualized-list");
   container.replaceChildren(content);
@@ -4289,17 +3191,8 @@ function setupAnalysisMasonryLayouts() {
   ).forEach((container) => setupMasonryLayout(container, ".analysis-card", 14));
 }
 
-function setupQualityMasonryLayouts() {
-  elements.qualityPanel.querySelectorAll(
-    ".analysis-grid:not(.analysis-summary-grid), .analysis-detail-grid, .analysis-wide-grid",
-  ).forEach((container) => setupMasonryLayout(container, ".analysis-card", 14));
-}
-
 function renderEntries() {
-  const dictionary = activeDictionary();
-  if (!dictionary) {
-    finishStaleContentUpdate("list");
-    entryListHasSettledContent = false;
+  if (!activeDictionary()) {
     renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noDictionary"), t("emptyDictionaryBody")));
     return;
   }
@@ -4309,242 +3202,41 @@ function renderEntries() {
     return;
   }
 
-  if (entryQueryCanUseApi(dictionary)) {
-    startEntryQueryApiCheck(dictionary);
-    const queryPages = entryQueryWindowForRender(dictionary);
-    if (!queryPages) {
-      if (entryQueryState.status === "loading") {
-        if (staleContentUpdateRetainsContent("list")) {
-          return;
-        }
-        entryListHasSettledContent = false;
-        renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(aText("加载中", "Loading"), ""));
-        return;
-      }
-      finishStaleContentUpdate("list");
-      entryListHasSettledContent = false;
-      renderVirtualListEmpty(
-        elements.entryList,
-        entryVirtualList,
-        emptyState(aText("无法加载词条列表", "Could not load entries"), aText("请刷新或稍后重试。", "Refresh or try again later.")),
-      );
-      return;
-    }
-    renderEntryRows(entryQueryState.items, {
-      pageInfo: entryQueryState.pageInfo,
-      windowPages: queryPages,
-      onRangeChange: (range) => handleEntryQueryWindowRange(dictionary, range),
-    });
-    finishStaleContentUpdate("list");
-    entryListHasSettledContent = true;
-    return;
-  }
-
-  finishStaleContentUpdate("list");
   const entries = filteredEntries();
-  renderEntryRows(entries);
-  entryListHasSettledContent = true;
-}
-
-function renderEntryRows(entries = [], options = {}) {
-  const windowPages = Array.isArray(options.windowPages) ? options.windowPages : null;
-  if (!entries.length && !windowPages?.some((page) => page.status !== "success" || page.items.length)) {
+  if (!entries.length) {
     renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noMatch"), t("noMatchBody")));
     return;
   }
 
-  const rows = windowPages
-    ? windowPages.flatMap((page) => page.status === "success"
-      ? page.items.map((entry) => ({
-        kind: "entry",
-        entry,
-        qualityIssues: advancedFilterIssuesForEntry(entry.id),
-        windowPageIndex: page.index,
-        windowEstimateScale: page.estimateScale || 1,
-      }))
-      : [{
-        kind: "window-placeholder",
-        windowPageIndex: page.index,
-        status: page.status,
-        estimatedHeight: Math.max(page.estimatedHeight || entryVirtualList.estimatedItemHeight, entryVirtualList.estimatedItemHeight),
-      }])
-    : entries.map((entry) => ({
-      kind: "entry",
-      entry,
-      qualityIssues: advancedFilterIssuesForEntry(entry.id),
-    }));
-  if (!windowPages && options.pageInfo?.hasMore) {
-    rows.push({
-      kind: "truncation",
-      loaded: entries.length,
-      total: options.pageInfo.total,
-      messageKey: "entryResultsTruncated",
-    });
-  }
-  const settingsSizeSignature = entryCardSettingsSizeSignature();
+  const rows = entries.map((entry) => ({ kind: "entry", entry }));
   renderVirtualList(elements.entryList, entryVirtualList, rows, {
     resetToken: entryVirtualResetToken(),
-    getKey: (row) => row.kind === "truncation"
-      ? `truncation:entries:${row.loaded}:${row.total}`
-      : row.kind === "window-placeholder"
-        ? `window-placeholder:entries:${row.windowPageIndex}`
-      : `entry:${row.entry.id}`,
-    getEstimatedHeight: (row) => row.kind === "truncation"
-      ? 44
-      : row.kind === "window-placeholder"
-        ? row.estimatedHeight
-      : estimateEntryCardHeight(row.entry, { qualityIssues: row.qualityIssues }) * (row.windowEstimateScale || 1),
-    getSizeCacheKey: (row) => row.kind === "truncation"
-      ? `truncation:entries:${currentLanguage}:${row.loaded}:${row.total}`
-      : row.kind === "window-placeholder"
-        ? `window-placeholder:entries:${row.windowPageIndex}:${Math.round(row.estimatedHeight)}`
-      : entryCardSizeCacheKey(row.entry, {
-        qualityIssues: row.qualityIssues,
-        role: "entry",
-        settingsSizeSignature,
-      }),
-    renderItem: (row) => row.kind === "truncation"
-      ? renderEntryQueryTruncationNotice(row)
-      : row.kind === "window-placeholder"
-        ? renderQueryWindowPlaceholder(row)
-      : createEntryCard(row.entry, { qualityIssues: row.qualityIssues }),
-    onRangeChange: options.onRangeChange,
+    getKey: (row) => `entry:${row.entry.id}`,
+    getEstimatedHeight: (row) => estimateEntryCardHeight(row.entry),
+    renderItem: (row) => createEntryCard(row.entry, { qualityIssues: advancedFilterIssuesForEntry(row.entry.id) }),
   });
-}
-
-function renderQueryWindowPlaceholder(row) {
-  const placeholder = document.createElement("div");
-  placeholder.className = "query-window-placeholder";
-  placeholder.style.height = `${Math.max(row.estimatedHeight || 0, entryVirtualList.estimatedItemHeight)}px`;
-  placeholder.setAttribute("role", "status");
-  placeholder.textContent = row.status === "loading" ? aText("加载中", "Loading") : "";
-  return placeholder;
 }
 
 function renderRootModeEntries() {
-  const dictionary = activeDictionary();
-  startRootGroupsQueryApiCheck(dictionary);
-  const groupPages = rootGroupsQueryForRender(dictionary);
-  if (!groupPages) {
-    if (rootGroupsQueryState.status === "loading") {
-      if (staleContentUpdateRetainsContent("list")) {
-        return;
-      }
-      entryListHasSettledContent = false;
-      renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(aText("加载中", "Loading"), ""));
-      return;
-    }
-    finishStaleContentUpdate("list");
-    entryListHasSettledContent = false;
-    renderVirtualListEmpty(
-      elements.entryList,
-      entryVirtualList,
-      emptyState(aText("无法加载词根模式", "Could not load root mode"), aText("请刷新或稍后重试。", "Refresh or try again later.")),
-    );
-    return;
-  }
-  renderRootModeGroups(rootGroupsQueryState.groups, {
-    pageInfo: rootGroupsQueryState.pageInfo,
-    windowPages: groupPages,
-    onRangeChange: (range) => handleRootGroupsWindowRange(dictionary, range),
-  });
-  finishStaleContentUpdate("list");
-  entryListHasSettledContent = true;
-}
-
-function renderRootModeGroups(groups = [], options = {}) {
-  const windowPages = Array.isArray(options.windowPages) ? options.windowPages : null;
-  if (!groups.length && !windowPages?.some((page) => page.status !== "success" || page.items.length)) {
+  const groups = rootModeGroups();
+  if (!groups.length) {
     renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noMatch"), t("noMatchBody")));
     return;
   }
 
   const rows = [];
-  const dictionary = activeDictionary();
-  const appendGroupRows = (group, windowPageIndex = null, windowEstimateScale = 1) => {
-    const expanded = rootGroupIsExpanded(group);
-    rows.push({ kind: "root", group, expanded, windowPageIndex, windowEstimateScale });
+  groups.forEach((group) => {
+    const expanded = expandedRootEntries.has(group.root.id) || Boolean(searchQuery && group.matchedDerived.length);
+    rows.push({ kind: "root", group, expanded });
     if (expanded) {
-      const derivedState = rootGroupDerivedState(dictionary, group.root.id);
-      if (derivedState?.status === "success") {
-        derivedState.items.forEach((entry) => rows.push({
-          kind: "derived",
-          entry,
-          rootId: group.root.id,
-          windowPageIndex,
-        }));
-      } else {
-        rows.push({
-          kind: "derived-placeholder",
-          rootId: group.root.id,
-          windowPageIndex,
-          status: derivedState?.status || "idle",
-          estimatedHeight: Math.max(44, group.derivedCount * 116) * (windowEstimateScale || 1),
-        });
-      }
+      group.derived.forEach((entry) => rows.push({ kind: "derived", entry, rootId: group.root.id }));
     }
-  };
-  if (windowPages) {
-    windowPages.forEach((page) => {
-      if (page.status === "success") {
-        page.items.forEach((group) => appendGroupRows(group, page.index, page.estimateScale || 1));
-      } else {
-        rows.push({
-          kind: "window-placeholder",
-          windowPageIndex: page.index,
-          status: page.status,
-          estimatedHeight: Math.max(page.estimatedHeight || 156, 156),
-        });
-      }
-    });
-  } else {
-    groups.forEach((group) => appendGroupRows(group));
-  }
-  if (!windowPages && options.pageInfo?.hasMore) {
-    rows.push({
-      kind: "truncation",
-      loaded: groups.length,
-      total: options.pageInfo.total,
-      messageKey: "rootGroupsTruncated",
-    });
-  }
-  const settingsSizeSignature = entryCardSettingsSizeSignature();
+  });
   renderVirtualList(elements.entryList, entryVirtualList, rows, {
     resetToken: entryVirtualResetToken(),
-    getKey: (row) => row.kind === "truncation"
-      ? `truncation:${row.truncationScope || "root-groups"}:${row.loaded}:${row.total}`
-      : row.kind === "window-placeholder"
-        ? `window-placeholder:root-groups:${row.windowPageIndex}`
-      : row.kind === "derived-placeholder"
-        ? `derived-status:${row.rootId}:${row.status}`
-      : row.kind === "root"
-        ? `root:${row.group.root.id}`
-        : `derived:${row.rootId}:${row.entry.id}`,
-    getEstimatedHeight: (row) => row.kind === "window-placeholder"
-      ? row.estimatedHeight
-      : row.kind === "derived-placeholder"
-        ? row.estimatedHeight
-      : row.kind === "truncation"
-        ? 44
-        : (row.kind === "root" ? 156 : 116) * (row.windowEstimateScale || 1),
-    getSizeCacheKey: (row) => row.kind === "truncation"
-      ? `truncation:root-groups:${currentLanguage}:${row.loaded}:${row.total}`
-      : row.kind === "window-placeholder"
-        ? `window-placeholder:root-groups:${row.windowPageIndex}:${Math.round(row.estimatedHeight)}`
-      : row.kind === "derived-placeholder"
-        ? `derived-status:${currentLanguage}:${row.rootId}:${row.status}:${Math.round(row.estimatedHeight)}`
-      : row.kind === "root"
-      ? entryCardSizeCacheKey(row.group.root, {
-        role: "root",
-        expanded: row.expanded,
-        derivedCount: row.group.derivedCount,
-        settingsSizeSignature,
-      })
-      : entryCardSizeCacheKey(row.entry, { role: "derived", rootId: row.rootId, settingsSizeSignature }),
-    renderItem: (row) => row.kind === "window-placeholder"
-      ? renderQueryWindowPlaceholder(row)
-      : renderRootModeRow(row),
-    onRangeChange: options.onRangeChange,
+    getKey: (row) => row.kind === "root" ? `root:${row.group.root.id}` : `derived:${row.rootId}:${row.entry.id}`,
+    getEstimatedHeight: (row) => row.kind === "root" ? 156 : 116,
+    renderItem: renderRootModeRow,
   });
 }
 
@@ -4552,1126 +3244,15 @@ function entryVirtualResetToken() {
   return [
     state.activeDictionaryId,
     rootMode ? "root" : "entries",
-    normalizeEntrySearchText(searchQuery),
+    normalize(searchQuery),
     activePart,
     entrySort,
-    entryQueryState.status === "success" ? "api" : "local",
-    rootGroupsQueryState.status === "success" ? "root-api" : "root-local",
     advancedFilter?.title || "",
     advancedFilter?.variantIndex ?? "",
   ].join("|");
-}
-
-function virtualListSignaturePart(value) {
-  return String(value ?? "").replace(/\s+/g, " ").trim();
-}
-
-function entryCardSettingsSizeSignature() {
-  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
-  return [
-    currentLanguage,
-    settings.entryListPolysemyDisplay,
-    settings.entryListTagDisplayLimit,
-    settings.entryListPartDisplay,
-    settings.entryListRawTagDisplay ? "raw-tags" : "display-tags",
-    settings.entryListTagFiltering ? "tag-filtering" : "no-tag-filtering",
-    entrySearchQuerySignature(),
-    settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
-    settings.partOfSpeechTags.join(","),
-    stableJson(settings.tagDisplayMap),
-    stableJson(settings.redHighlightTags),
-  ].map(virtualListSignaturePart).join(";");
-}
-
-function entryCardContentSizeSignature(entry) {
-  return [
-    entry.id,
-    entry.updatedAt,
-    entry.lemma,
-    entry.pronunciation,
-    entryPartText(entry),
-    (entry.tags || []).join(","),
-    entryDefinitionItems(entry).map((definition) => [
-      definition.id,
-      definition.meaning,
-      definition.example,
-      definition.note,
-    ].map(virtualListSignaturePart).join("~")).join("^"),
-  ].map(virtualListSignaturePart).join(";");
-}
-
-function entryCardSizeCacheKey(entry, options = {}) {
-  const issueSignature = (options.qualityIssues || [])
-    .map((issue) => [
-      issue.type,
-      issue.priority,
-      issue.module,
-      issue.title,
-    ].map(virtualListSignaturePart).join("~"))
-    .join("^");
-  return [
-    "entry-card",
-    state.activeDictionaryId,
-    rootMode ? "root-mode" : "entry-mode",
-    normalizeEntrySearchText(searchQuery),
-    activePart,
-    advancedFilter?.title || "",
-    advancedFilter?.variantIndex ?? "",
-    options.role || "entry",
-    options.rootId || "",
-    options.expanded ? "expanded" : "collapsed",
-    options.derivedCount ?? "",
-    options.settingsSizeSignature || entryCardSettingsSizeSignature(),
-    entryCardContentSizeSignature(entry),
-    issueSignature,
-  ].map(virtualListSignaturePart).join("|");
-}
-
-function rootGroupsQueryCanUseApi(dictionary = activeDictionary()) {
-  return Boolean(
-    backendAvailable
-    && dictionary
-    && rootMode
-    && !advancedFilter
-  );
-}
-
-function rootGroupsQueryApiKey(dictionary = activeDictionary()) {
-  if (!dictionary) {
-    return "";
-  }
-  return [
-    dictionary.id,
-    dictionary.updatedAt || "",
-    normalizeEntrySearchText(searchQuery, dictionary),
-    entrySort,
-    entrySearchQuerySignature(dictionary),
-  ].join("|");
-}
-
-function queryPageCacheKey(kind, key) {
-  return `${kind}\u0000${key}`;
-}
-
-function createQueryWindowPage(cursor = "", index = 0, status = "loading") {
-  return {
-    index,
-    offset: 0,
-    cursor: String(cursor || ""),
-    status,
-    items: [],
-    pageInfo: null,
-    error: null,
-    estimatedHeight: 0,
-    estimateScale: 1,
-    windowMetric: null,
-    lastAccessAt: performance.now(),
-  };
-}
-
-function rootSearchExpandsGroups() {
-  return Boolean(normalizeEntrySearchText(searchQuery));
-}
-
-function rootGroupDerivedCount(group) {
-  return Math.max(
-    0,
-    Number(group?.derivedCount) || (Array.isArray(group?.derived) ? group.derived.length : 0),
-  );
-}
-
-function rootGroupMatchedDerivedCount(group) {
-  return Math.max(
-    0,
-    Number(group?.matchedDerivedCount) || (Array.isArray(group?.matchedDerived) ? group.matchedDerived.length : 0),
-  );
-}
-
-function rootGroupIsExpanded(group) {
-  const rootId = group?.root?.id || "";
-  if (!rootId || !rootGroupDerivedCount(group)) {
-    return false;
-  }
-  if (rootSearchExpandsGroups() && rootGroupMatchedDerivedCount(group)) {
-    return true;
-  }
-  if (rootExpansionMode === "all") {
-    return !collapsedRootEntries.has(rootId);
-  }
-  return expandedRootEntries.has(rootId);
-}
-
-function rootGroupEstimatedHeight(group) {
-  const rootHeight = 156;
-  const derivedHeight = rootGroupIsExpanded(group)
-    ? rootGroupDerivedCount(group) * 116
-    : 0;
-  return rootHeight + derivedHeight;
-}
-
-function rootGroupWindowMetricHeight(metric = {}) {
-  const groupCount = Math.max(0, Number(metric.groupCount) || 0);
-  const derivedCount = Math.max(0, Number(metric.derivedCount) || 0);
-  const includeDerived = rootExpansionMode === "all" || rootSearchExpandsGroups();
-  return (groupCount * 156) + (includeDerived ? derivedCount * 116 : 0);
-}
-
-function applyRootGroupWindowMetrics(state, pageInfo = null) {
-  const metrics = Array.isArray(pageInfo?.windowMetrics) ? pageInfo.windowMetrics : [];
-  metrics.forEach((metric, index) => {
-    const page = state.pages[index];
-    if (!page) {
-      return;
-    }
-    page.windowMetric = metric;
-    if (page.status !== "success") {
-      page.estimatedHeight = rootGroupWindowMetricHeight(metric);
-      page.estimateScale = 1;
-    }
-  });
-}
-
-function refreshRootGroupWindowHeightEstimates() {
-  rootGroupsQueryState.pages.forEach((page) => {
-    page.estimateScale = 1;
-    if (page.status !== "success" && page.windowMetric) {
-      page.estimatedHeight = rootGroupWindowMetricHeight(page.windowMetric);
-    }
-  });
-}
-
-function resetRootExpansionState() {
-  rootExpansionMode = "manual";
-  expandedRootEntries.clear();
-  collapsedRootEntries.clear();
-  rootGroupDerivedStates.clear();
-  refreshRootGroupWindowHeightEstimates();
-}
-
-function preserveQueryWindowPageHeight(page, naturalHeight, hasWindowCursor) {
-  const safeNaturalHeight = Math.max(0, Number(naturalHeight) || 0);
-  const reservedHeight = Math.max(0, Number(page.estimatedHeight) || 0);
-  if (hasWindowCursor && reservedHeight > 0 && safeNaturalHeight > 0) {
-    page.estimateScale = reservedHeight / safeNaturalHeight;
-    return;
-  }
-  page.estimatedHeight = safeNaturalHeight;
-  page.estimateScale = 1;
-}
-
-function queryWindowLoadedItems(pages = []) {
-  return pages.flatMap((page) => page.status === "success" ? page.items : []);
-}
-
-function queryWindowAggregatePageInfo(pages = []) {
-  const successfulPage = [...pages].reverse().find((page) => page.pageInfo);
-  return successfulPage ? {
-    ...successfulPage.pageInfo,
-    hasMore: pages.some((page) => page.status !== "success"),
-  } : null;
-}
-
-function populateQueryWindowPages(state, firstPage, pageSize, estimatedItemHeight) {
-  if (firstPage.index !== 0 || state.pages.length !== 1 || !firstPage.pageInfo) {
-    return;
-  }
-  const total = Math.max(0, Number(firstPage.pageInfo.total) || 0);
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  state.windowCursor = firstPage.pageInfo.windowCursor || "";
-  for (let index = 1; index < pageCount; index += 1) {
-    const page = createQueryWindowPage(state.windowCursor, index, "unloaded");
-    page.offset = index * pageSize;
-    page.estimatedHeight = Math.min(pageSize, total - page.offset) * estimatedItemHeight;
-    state.pages.push(page);
-  }
-}
-
-function queryWindowPageHeight(virtualList, pageIndex, fallback = 0) {
-  const matching = virtualList.items.filter((item) => item.value?.windowPageIndex === pageIndex);
-  if (!matching.length) {
-    return fallback;
-  }
-  return matching.reduce((total, item) => (
-    total + (virtualList.sizes.get(item.key) || item.estimatedHeight || virtualList.estimatedItemHeight)
-  ), 0);
-}
-
-function evictDistantQueryWindowPages(
-  pages,
-  virtualList,
-  activePageIndexes = new Set(),
-  protectedEntryId = "",
-  options = {},
-) {
-  const loaded = pages.filter((page) => page.status === "success");
-  if (loaded.length <= QUERY_WINDOW_MAX_LOADED_PAGES) {
-    return false;
-  }
-  const activeIndexes = activePageIndexes.size ? [...activePageIndexes] : [loaded[loaded.length - 1].index];
-  const activeCenter = activeIndexes.reduce((sum, index) => sum + index, 0) / activeIndexes.length;
-  const protectedIds = protectedEntryId instanceof Set
-    ? protectedEntryId
-    : new Set([protectedEntryId].filter(Boolean));
-  const candidates = loaded
-    .filter((page) => !activePageIndexes.has(page.index))
-    .filter((page) => !page.items.some((item) => protectedIds.has(item.id || item.root?.id)))
-    .sort((left, right) => Math.abs(right.index - activeCenter) - Math.abs(left.index - activeCenter));
-  let remaining = loaded.length;
-  let changed = false;
-  for (const page of candidates) {
-    if (remaining <= QUERY_WINDOW_MAX_LOADED_PAGES) {
-      break;
-    }
-    page.estimatedHeight = queryWindowPageHeight(virtualList, page.index, page.estimatedHeight);
-    options.onEvict?.(page);
-    page.items = [];
-    page.status = "evicted";
-    page.error = null;
-    remaining -= 1;
-    changed = true;
-  }
-  return changed;
-}
-
-function compactRootGroupsQueryResult(result) {
-  const groups = Array.isArray(result?.items)
-    ? result.items.map((group) => ({
-      root: group.root || null,
-      derivedCount: Math.max(0, Number(group.derivedCount) || 0),
-      matchedDerivedCount: Math.max(0, Number(group.matchedDerivedCount) || 0),
-      rootMatches: Boolean(group.rootMatches),
-    })).filter((group) => group.root?.id)
-    : [];
-  return {
-    groups,
-    pageInfo: result?.pageInfo ? {
-      ...result.pageInfo,
-      windowMetrics: Array.isArray(result.pageInfo.windowMetrics)
-        ? result.pageInfo.windowMetrics.map((metric) => ({
-          groupCount: Math.max(0, Number(metric?.groupCount) || 0),
-          derivedCount: Math.max(0, Number(metric?.derivedCount) || 0),
-        }))
-        : [],
-    } : null,
-  };
-}
-
-function resetRootGroupsQueryState() {
-  rootGroupsQueryState = {
-    key: "",
-    status: "idle",
-    groups: [],
-    pageInfo: null,
-    error: null,
-    requestId: rootGroupsQueryState.requestId + 1,
-    pages: [],
-    visiblePageIndexes: new Set(),
-    windowCursor: "",
-    updateToken: 0,
-  };
-  rootGroupDerivedStates.clear();
-}
-
-function rootGroupsQueryParams(dictionary) {
-  const params = new URLSearchParams();
-  if (searchQuery.trim()) {
-    params.set("q", searchQuery.trim());
-  }
-  if (entrySort) {
-    params.set("sort", entrySort);
-  }
-  const { fields, fuzzyFields } = entrySearchQueryOptions(dictionary);
-  params.set("fields", [...fields].join(","));
-  if (fuzzyFields.size) {
-    params.set("fuzzyFields", [...fuzzyFields].join(","));
-  }
-  return params;
-}
-
-function rootGroupsQueryUrl(dictionary, options = {}) {
-  const params = rootGroupsQueryParams(dictionary);
-  params.set("limit", String(ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE));
-  Object.entries(options).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") {
-      params.set(key, String(value));
-    }
-  });
-  return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups?${params}`;
-}
-
-function rootGroupsLocationUrl(dictionary, entryId, options = {}) {
-  const params = rootGroupsQueryParams(dictionary);
-  params.set("entryId", entryId);
-  params.set("limit", String(ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE));
-  Object.entries(options).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") {
-      params.set(key, String(value));
-    }
-  });
-  return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups/location?${params}`;
-}
-
-function rootGroupsQueryForRender(dictionary) {
-  const key = rootGroupsQueryApiKey(dictionary);
-  if (rootGroupsQueryState.status !== "success" || rootGroupsQueryState.key !== key) {
-    return null;
-  }
-  return rootGroupsQueryState.pages;
-}
-
-function rootGroupDerivedStateKey(dictionary, rootId) {
-  return `${rootGroupsQueryApiKey(dictionary)}\u0000${rootId}`;
-}
-
-function rootGroupDerivedUrl(dictionary, rootId) {
-  const params = rootGroupsQueryParams(dictionary);
-  return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/root-groups/${encodeURIComponent(rootId)}/entries?${params}`;
-}
-
-function rootGroupDerivedState(dictionary, rootId) {
-  return rootGroupDerivedStates.get(rootGroupDerivedStateKey(dictionary, rootId)) || null;
-}
-
-function startRootGroupDerivedLoad(dictionary, rootId) {
-  const key = rootGroupDerivedStateKey(dictionary, rootId);
-  const current = rootGroupDerivedStates.get(key);
-  if (current && ["loading", "success", "error"].includes(current.status)) {
-    return;
-  }
-  const requestId = (current?.requestId || 0) + 1;
-  rootGroupDerivedStates.set(key, {
-    status: "loading",
-    items: [],
-    error: null,
-    requestId,
-  });
-  queryPageCache.load({
-    key: queryPageCacheKey("root-group-entries", key),
-    dictionaryId: dictionary.id,
-    load: () => api(rootGroupDerivedUrl(dictionary, rootId)),
-    transform: (result) => ({
-      items: Array.isArray(result?.items) ? result.items.filter((entry) => entry?.id) : [],
-    }),
-  })
-    .then((result) => {
-      const active = rootGroupDerivedStates.get(key);
-      if (
-        active?.requestId !== requestId
-        || rootGroupsQueryApiKey(activeDictionary()) !== rootGroupsQueryApiKey(dictionary)
-      ) {
-        return;
-      }
-      rootGroupDerivedStates.set(key, {
-        status: "success",
-        items: result.items,
-        error: null,
-        requestId,
-      });
-      renderEntries();
-      flushPendingEntryCardScroll();
-    })
-    .catch((error) => {
-      const active = rootGroupDerivedStates.get(key);
-      if (active?.requestId !== requestId) {
-        return;
-      }
-      rootGroupDerivedStates.set(key, {
-        status: "error",
-        items: [],
-        error,
-        requestId,
-      });
-      console.error(error);
-      renderEntries();
-    });
-}
-
-function syncRootGroupsQueryWindowState() {
-  rootGroupsQueryState.groups = queryWindowLoadedItems(rootGroupsQueryState.pages);
-  rootGroupsQueryState.pageInfo = queryWindowAggregatePageInfo(rootGroupsQueryState.pages);
-}
-
-function rootGroupsPageCacheKey(key, cursor = "") {
-  return queryPageCacheKey("root-groups", `${key}\u0000${cursor}`);
-}
-
-function invalidateQueryPageCacheAfterCursorStale(dictionary) {
-  if (dictionary?.id) {
-    queryPageCache.invalidateDictionary(dictionary.id);
-  }
-}
-
-function restartRootGroupsWindowAfterStale() {
-  const selectedEntryId = state.selectedEntryId;
-  const rootId = rootNavigationContextId;
-  resetRootGroupsQueryState();
-  renderEntries();
-  if (selectedEntryId) {
-    scheduleEntryCardScroll(selectedEntryId, rootId ? { rootId } : {});
-  }
-}
-
-function loadRootGroupsWindowPage(dictionary, page) {
-  const key = rootGroupsQueryState.key;
-  const requestId = rootGroupsQueryState.requestId;
-  const updateToken = rootGroupsQueryState.updateToken;
-  page.status = "loading";
-  page.error = null;
-  page.lastAccessAt = performance.now();
-  return queryPageCache.load({
-    key: rootGroupsPageCacheKey(key, `${rootGroupsQueryState.windowCursor || page.cursor}\u0000${page.offset}`),
-    dictionaryId: dictionary.id,
-    load: () => api(rootGroupsQueryUrl(dictionary, {
-      cursor: rootGroupsQueryState.windowCursor || page.cursor,
-      windowOffset: rootGroupsQueryState.windowCursor ? page.offset : "",
-      limit: ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE,
-    })),
-    transform: compactRootGroupsQueryResult,
-  })
-    .then((result) => {
-      if (
-        rootGroupsQueryState.requestId !== requestId
-        || rootGroupsQueryState.key !== key
-        || rootGroupsQueryApiKey(activeDictionary()) !== key
-        || !rootGroupsQueryState.pages.includes(page)
-      ) {
-        return;
-      }
-      page.estimatedHeight = queryWindowPageHeight(entryVirtualList, page.index, page.estimatedHeight);
-      page.status = "success";
-      page.items = result.groups;
-      page.pageInfo = result.pageInfo;
-      page.error = null;
-      page.lastAccessAt = performance.now();
-      populateQueryWindowPages(
-        rootGroupsQueryState,
-        page,
-        ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE,
-        156,
-      );
-      applyRootGroupWindowMetrics(rootGroupsQueryState, result.pageInfo);
-      const naturalHeight = result.groups.reduce((total, group) => total + rootGroupEstimatedHeight(group), 0);
-      preserveQueryWindowPageHeight(
-        page,
-        naturalHeight,
-        Boolean(rootGroupsQueryState.windowCursor),
-      );
-      rootGroupsQueryState.status = "success";
-      rootGroupsQueryState.error = null;
-      if (page.index === 0) {
-        rootGroupsQueryState.updateToken = 0;
-        finishStaleContentUpdate("list", updateToken);
-      }
-      syncRootGroupsQueryWindowState();
-      const protectedRootIds = new Set([rootNavigationContextId, state.selectedEntryId].filter(Boolean));
-      evictDistantQueryWindowPages(
-        rootGroupsQueryState.pages,
-        entryVirtualList,
-        rootGroupsQueryState.visiblePageIndexes,
-        protectedRootIds,
-        {
-          onEvict: (evictedPage) => {
-            evictedPage.items.forEach((group) => {
-              rootGroupDerivedStates.delete(rootGroupDerivedStateKey(dictionary, group.root.id));
-            });
-          },
-        },
-      );
-      syncRootGroupsQueryWindowState();
-      renderPartFilter();
-      renderEntries();
-      flushPendingEntryCardScroll();
-    })
-    .catch((error) => {
-      if (rootGroupsQueryState.requestId !== requestId || rootGroupsQueryState.key !== key) {
-        return;
-      }
-      if (error?.code === "query_cursor_stale") {
-        invalidateQueryPageCacheAfterCursorStale(dictionary);
-        restartRootGroupsWindowAfterStale();
-        return;
-      }
-      rootGroupsQueryState = {
-        key,
-        status: "error",
-        groups: [],
-        pageInfo: null,
-        error,
-        requestId,
-        pages: [],
-        visiblePageIndexes: new Set(),
-        windowCursor: "",
-        updateToken: 0,
-      };
-      if (page.index === 0) {
-        finishStaleContentUpdate("list", updateToken);
-      }
-      console.error(error);
-      renderPartFilter();
-      renderEntries();
-    });
-}
-
-function handleRootGroupsWindowRange(dictionary, range) {
-  if (rootGroupsQueryState.key !== rootGroupsQueryApiKey(dictionary) || rootGroupsQueryState.status !== "success") {
-    return;
-  }
-  const visiblePageIndexes = new Set(
-    range.items.map((row) => row?.windowPageIndex).filter((index) => Number.isInteger(index)),
-  );
-  rootGroupsQueryState.visiblePageIndexes = visiblePageIndexes;
-  visiblePageIndexes.forEach((index) => {
-    const page = rootGroupsQueryState.pages.find((candidate) => candidate.index === index);
-    if (!page) {
-      return;
-    }
-    page.lastAccessAt = performance.now();
-    if (["unloaded", "evicted"].includes(page.status)) {
-      loadRootGroupsWindowPage(dictionary, page);
-    }
-  });
-  const adjacentPageIndexes = new Set(
-    [...visiblePageIndexes].flatMap((index) => [index - 1, index + 1]).filter((index) => index >= 0),
-  );
-  adjacentPageIndexes.forEach((index) => {
-    const page = rootGroupsQueryState.pages.find((candidate) => candidate.index === index);
-    if (page?.status === "unloaded") {
-      loadRootGroupsWindowPage(dictionary, page);
-    }
-  });
-}
-
-function startRootGroupsQueryApiCheck(dictionary) {
-  if (!rootGroupsQueryCanUseApi(dictionary)) {
-    if (rootGroupsQueryState.status !== "idle") {
-      resetRootGroupsQueryState();
-    }
-    return;
-  }
-
-  const key = rootGroupsQueryApiKey(dictionary);
-  if (rootGroupsQueryState.key === key && ["loading", "success", "error"].includes(rootGroupsQueryState.status)) {
-    return;
-  }
-  if (rootGroupsQueryState.key && rootGroupsQueryState.key !== key) {
-    rootGroupDerivedStates.clear();
-  }
-
-  const requestId = rootGroupsQueryState.requestId + 1;
-  const updateToken = beginStaleContentUpdate("list", entryListHasSettledContent);
-  const firstPage = createQueryWindowPage("", 0);
-  firstPage.estimatedHeight = ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE * 156;
-  rootGroupsQueryState = {
-    key,
-    status: "loading",
-    groups: [],
-    pageInfo: null,
-    error: null,
-    requestId,
-    pages: [firstPage],
-    visiblePageIndexes: new Set([0]),
-    windowCursor: "",
-    updateToken,
-  };
-  loadRootGroupsWindowPage(dictionary, firstPage);
-}
-
-function entryQueryCanUseApi(dictionary = activeDictionary()) {
-  return Boolean(
-    backendAvailable
-    && dictionary
-    && (!advancedFilter || advancedFilterUsesEntryQuery())
-    && !rootMode
-  );
-}
-
-function entryQueryApiKey(dictionary = activeDictionary()) {
-  if (!dictionary) {
-    return "";
-  }
-  const settings = normalizeDictionarySettings(dictionary.settings);
-  return [
-    dictionary.id,
-    dictionary.updatedAt || "",
-    normalizeEntrySearchText(searchQuery, dictionary),
-    activePart,
-    stableJson(advancedFilterUsesEntryQuery() ? advancedFilter.filter : null),
-    stableJson(advancedFilterUsesEntryQuery() ? advancedFilter.search : null),
-    entrySort,
-    stableJson(settings.tagDisplayMap),
-    settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
-    settings.partOfSpeechTags.join(","),
-    entrySearchQuerySignature(dictionary),
-  ].join("|");
-}
-
-function compactEntryQueryResult(result) {
-  return {
-    items: Array.isArray(result?.items) ? result.items.filter((entry) => entry?.id) : [],
-    pageInfo: result?.pageInfo || null,
-  };
-}
-
-function entrySummaryDto(entry, dictionary = activeDictionary()) {
-  const parts = entryParts(entry, dictionary);
-  return {
-    id: entry.id,
-    lemma: entry.lemma || "",
-    pronunciation: entry.pronunciation || "",
-    tags: Array.isArray(entry.tags) ? [...entry.tags] : [],
-    definitionPreviews: (entry.definitions || []).map((definition, position) => ({
-      id: definition.id || "",
-      position,
-      meaning: definition.meaning || "",
-    })),
-    createdAt: entry.createdAt || "",
-    updatedAt: entry.updatedAt || "",
-    partOfSpeech: parts[0] || "",
-    parts,
-  };
-}
-
-function updateEntrySummaryDtoAfterSave(dictionary, entry) {
-  if (!dictionary || !entry?.id) {
-    return;
-  }
-  const summary = entrySummaryDto(entry, dictionary);
-  if (entryQueryState.status === "success") {
-    entryQueryState.pages.forEach((page) => {
-      if (page.status === "success") {
-        page.items = page.items.map((item) => (
-          item.id === entry.id
-            ? { ...summary, ...(Array.isArray(item.searchHits) ? { searchHits: item.searchHits } : {}) }
-            : item
-        ));
-      }
-    });
-    syncEntryQueryWindowState();
-    if (!rootMode && (!advancedFilter || advancedFilterUsesEntryQuery())) {
-      renderEntryRows(entryQueryState.items, {
-        pageInfo: entryQueryState.pageInfo,
-        windowPages: entryQueryState.pages,
-        onRangeChange: (range) => handleEntryQueryWindowRange(dictionary, range),
-      });
-    }
-  }
-  rootGroupsQueryState.pages.forEach((page) => {
-    if (page.status === "success") {
-      page.items = page.items.map((group) => (
-        group.root.id === entry.id ? { ...group, root: summary } : group
-      ));
-    }
-  });
-  syncRootGroupsQueryWindowState();
-  rootGroupDerivedStates.forEach((derivedState) => {
-    if (derivedState.status === "success") {
-      derivedState.items = derivedState.items.map((item) => (
-        item.id === entry.id ? { ...summary, rootGroupMatch: item.rootGroupMatch } : item
-      ));
-    }
-  });
-}
-
-function resetEntryQueryState() {
-  entryQueryState = {
-    key: "",
-    status: "idle",
-    items: [],
-    pageInfo: null,
-    error: null,
-    requestId: entryQueryState.requestId + 1,
-    pages: [],
-    visiblePageIndexes: new Set(),
-    windowCursor: "",
-    updateToken: 0,
-  };
-}
-
-function entryQueryParams(dictionary, descriptor = advancedFilterUsesEntryQuery() ? advancedFilter : null) {
-  const params = new URLSearchParams();
-  if (searchQuery.trim()) {
-    params.set("q", searchQuery.trim());
-  }
-  const usesStructuredFilter = advancedFilterVariantUsesEntryQuery(descriptor);
-  if (usesStructuredFilter) {
-    params.set("filter", entryQueryModel.serializeEntryFilter(descriptor.filter));
-  } else if (activePart) {
-    params.set("part", activePart);
-  }
-  if (entrySort) {
-    params.set("sort", entrySort);
-  }
-  const configuredSearch = entrySearchQueryOptions(dictionary);
-  const fields = usesStructuredFilter && descriptor.search?.fields?.length
-    ? new Set(descriptor.search.fields)
-    : configuredSearch.fields;
-  const fuzzyFields = usesStructuredFilter && Array.isArray(descriptor.search?.fuzzyFields)
-    ? new Set(descriptor.search.fuzzyFields)
-    : configuredSearch.fuzzyFields;
-  params.set("fields", [...fields].join(","));
-  if (fuzzyFields.size) {
-    params.set("fuzzyFields", [...fuzzyFields].join(","));
-  }
-  return params;
-}
-
-function advancedFilterVariantProbeUrl(dictionary, variant) {
-  const params = entryQueryParams(dictionary, variant);
-  params.set("limit", "1");
-  return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries?${params}`;
-}
-
-function entryQueryUrl(dictionary, options = {}) {
-  const params = entryQueryParams(dictionary);
-  params.set("limit", String(ENTRY_QUERY_WINDOW_PAGE_SIZE));
-  Object.entries(options).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") {
-      params.set(key, String(value));
-    }
-  });
-  return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries?${params}`;
-}
-
-function entryQueryLocationUrl(dictionary, entryId) {
-  const params = entryQueryParams(dictionary);
-  params.set("limit", String(ENTRY_QUERY_WINDOW_PAGE_SIZE));
-  return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entryId)}/location?${params}`;
-}
-
-function entryQueryWindowForRender(dictionary) {
-  const key = entryQueryApiKey(dictionary);
-  if (entryQueryState.status !== "success" || entryQueryState.key !== key) {
-    return null;
-  }
-  return entryQueryState.pages;
-}
-
-function syncEntryQueryWindowState() {
-  entryQueryState.items = queryWindowLoadedItems(entryQueryState.pages);
-  entryQueryState.pageInfo = queryWindowAggregatePageInfo(entryQueryState.pages);
-}
-
-function entryQueryPageCacheKey(key, cursor = "") {
-  return queryPageCacheKey("entries", `${key}\u0000${cursor}`);
-}
-
-function restartEntryQueryWindowAfterStale(dictionary) {
-  const selectedEntryId = state.selectedEntryId;
-  resetEntryQueryState();
-  renderEntries();
-  if (selectedEntryId) {
-    scheduleEntryCardScroll(selectedEntryId);
-  }
-}
-
-function loadEntryQueryWindowPage(dictionary, page) {
-  const key = entryQueryState.key;
-  const requestId = entryQueryState.requestId;
-  const updateToken = entryQueryState.updateToken;
-  page.status = "loading";
-  page.error = null;
-  page.lastAccessAt = performance.now();
-  return queryPageCache.load({
-    key: entryQueryPageCacheKey(key, `${entryQueryState.windowCursor || page.cursor}\u0000${page.offset}`),
-    dictionaryId: dictionary.id,
-    load: () => api(entryQueryUrl(dictionary, {
-      cursor: entryQueryState.windowCursor || page.cursor,
-      windowOffset: entryQueryState.windowCursor ? page.offset : "",
-      limit: ENTRY_QUERY_WINDOW_PAGE_SIZE,
-    })),
-    transform: compactEntryQueryResult,
-  })
-    .then((result) => {
-      if (
-        entryQueryState.requestId !== requestId
-        || entryQueryState.key !== key
-        || entryQueryApiKey(activeDictionary()) !== key
-        || !entryQueryState.pages.includes(page)
-      ) {
-        return;
-      }
-      page.estimatedHeight = queryWindowPageHeight(entryVirtualList, page.index, page.estimatedHeight);
-      page.status = "success";
-      page.items = result.items;
-      page.pageInfo = result.pageInfo;
-      page.error = null;
-      page.lastAccessAt = performance.now();
-      preserveQueryWindowPageHeight(
-        page,
-        result.items.reduce((total, entry) => (
-          total + estimateEntryCardHeight(entry, { qualityIssues: advancedFilterIssuesForEntry(entry.id) })
-        ), 0),
-        Boolean(entryQueryState.windowCursor),
-      );
-      populateQueryWindowPages(
-        entryQueryState,
-        page,
-        ENTRY_QUERY_WINDOW_PAGE_SIZE,
-        entryVirtualList.estimatedItemHeight,
-      );
-      entryQueryState.status = "success";
-      entryQueryState.error = null;
-      if (page.index === 0) {
-        if (advancedFilterUsesEntryQuery()) {
-          const activeVariant = advancedFilter.variants[advancedFilter.variantIndex];
-          if (activeVariant) {
-            activeVariant.available = Number(result.pageInfo?.total || 0) > 0;
-          }
-          if (advancedFilter.selectFirstOnLoad) {
-            advancedFilter.selectFirstOnLoad = false;
-            const firstEntry = result.items[0];
-            if (firstEntry) {
-              state.selectedEntryId = firstEntry.id;
-              editorMode = "display";
-              entryDraft = null;
-              ensureSelectedEntryDetailLoaded();
-              renderEditorEntrySelection();
-              scheduleEntryCardScroll(firstEntry.id);
-            }
-          }
-          renderPartFilter();
-        }
-        entryQueryState.updateToken = 0;
-        finishStaleContentUpdate("list", updateToken);
-      }
-      syncEntryQueryWindowState();
-      evictDistantQueryWindowPages(
-        entryQueryState.pages,
-        entryVirtualList,
-        entryQueryState.visiblePageIndexes,
-        state.selectedEntryId,
-      );
-      syncEntryQueryWindowState();
-      renderEntries();
-      flushPendingEntryCardScroll();
-    })
-    .catch((error) => {
-      if (entryQueryState.requestId !== requestId || entryQueryState.key !== key) {
-        return;
-      }
-      if (error?.code === "query_cursor_stale") {
-        invalidateQueryPageCacheAfterCursorStale(dictionary);
-        restartEntryQueryWindowAfterStale(dictionary);
-        return;
-      }
-      entryQueryState = {
-        key,
-        status: "error",
-        items: [],
-        pageInfo: null,
-        error,
-        requestId,
-        pages: [],
-        visiblePageIndexes: new Set(),
-        windowCursor: "",
-        updateToken: 0,
-      };
-      if (page.index === 0) {
-        finishStaleContentUpdate("list", updateToken);
-      }
-      console.error(error);
-      renderEntries();
-    });
-}
-
-function handleEntryQueryWindowRange(dictionary, range) {
-  if (entryQueryState.key !== entryQueryApiKey(dictionary) || entryQueryState.status !== "success") {
-    return;
-  }
-  const visiblePageIndexes = new Set(
-    range.items.map((row) => row?.windowPageIndex).filter((index) => Number.isInteger(index)),
-  );
-  entryQueryState.visiblePageIndexes = visiblePageIndexes;
-  visiblePageIndexes.forEach((index) => {
-    const page = entryQueryState.pages.find((candidate) => candidate.index === index);
-    if (!page) {
-      return;
-    }
-    page.lastAccessAt = performance.now();
-    if (["unloaded", "evicted"].includes(page.status)) {
-      loadEntryQueryWindowPage(dictionary, page);
-    }
-  });
-  const adjacentPageIndexes = new Set(
-    [...visiblePageIndexes].flatMap((index) => [index - 1, index + 1]).filter((index) => index >= 0),
-  );
-  adjacentPageIndexes.forEach((index) => {
-    const page = entryQueryState.pages.find((candidate) => candidate.index === index);
-    if (page?.status === "unloaded") {
-      loadEntryQueryWindowPage(dictionary, page);
-    }
-  });
-}
-
-function startEntryQueryApiCheck(dictionary) {
-  if (!entryQueryCanUseApi(dictionary)) {
-    if (entryQueryState.status !== "idle") {
-      resetEntryQueryState();
-    }
-    return;
-  }
-
-  const key = entryQueryApiKey(dictionary);
-  if (entryQueryState.key === key && ["loading", "success", "error"].includes(entryQueryState.status)) {
-    return;
-  }
-
-  const requestId = entryQueryState.requestId + 1;
-  const updateToken = beginStaleContentUpdate("list", entryListHasSettledContent);
-  const firstPage = createQueryWindowPage("", 0);
-  firstPage.estimatedHeight = ENTRY_QUERY_WINDOW_PAGE_SIZE * entryVirtualList.estimatedItemHeight;
-  entryQueryState = {
-    key,
-    status: "loading",
-    items: [],
-    pageInfo: null,
-    error: null,
-    requestId,
-    pages: [firstPage],
-    visiblePageIndexes: new Set([0]),
-    windowCursor: "",
-    updateToken,
-  };
-  loadEntryQueryWindowPage(dictionary, firstPage);
-}
-
-function localPartTags(dictionary = activeDictionary()) {
-  return dictionary
-    ? [...new Set((dictionary.entries || []).flatMap((entry) => entryParts(entry, dictionary)).filter(Boolean))]
-        .sort((a, b) => a.localeCompare(b, "zh-CN"))
-    : [];
-}
-
-function entryFacetsCanUseApi(dictionary = activeDictionary()) {
-  return Boolean(backendAvailable && dictionary);
-}
-
-function entryFacetsApiKey(dictionary = activeDictionary()) {
-  if (!dictionary) {
-    return "";
-  }
-  const settings = normalizeDictionarySettings(dictionary.settings);
-  return [
-    dictionary.id,
-    dictionary.updatedAt || "",
-    stableJson(settings.tagDisplayMap),
-    settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
-    settings.partOfSpeechTags.join(","),
-  ].join("|");
-}
-
-function compactEntryFacetsResult(result) {
-  return {
-    parts: Array.isArray(result?.parts)
-      ? result.parts.map((part) => part?.tag).filter(Boolean).sort((a, b) => a.localeCompare(b, "zh-CN"))
-      : [],
-  };
-}
-
-function resetEntryFacetsState() {
-  entryFacetsState = {
-    key: "",
-    status: "idle",
-    parts: [],
-    error: null,
-    requestId: entryFacetsState.requestId + 1,
-  };
-}
-
-function entryFacetsPartsForRender(dictionary) {
-  const key = entryFacetsApiKey(dictionary);
-  if (entryFacetsState.status !== "success" || entryFacetsState.key !== key) {
-    return null;
-  }
-  return entryFacetsState.parts;
-}
-
-function startEntryFacetsApiCheck(dictionary) {
-  if (!entryFacetsCanUseApi(dictionary)) {
-    if (entryFacetsState.status !== "idle") {
-      resetEntryFacetsState();
-    }
-    return;
-  }
-
-  const key = entryFacetsApiKey(dictionary);
-  if (entryFacetsState.key === key && ["loading", "success", "error"].includes(entryFacetsState.status)) {
-    return;
-  }
-
-  const requestId = entryFacetsState.requestId + 1;
-  const cacheKey = queryPageCacheKey("facets", key);
-  const cached = queryPageCache.get(cacheKey);
-  if (cached) {
-    entryFacetsState = {
-      key,
-      status: "success",
-      parts: cached.parts,
-      error: null,
-      requestId,
-    };
-    return;
-  }
-  entryFacetsState = {
-    key,
-    status: "loading",
-    parts: [],
-    error: null,
-    requestId,
-  };
-
-  queryPageCache.load({
-    key: cacheKey,
-    dictionaryId: dictionary.id,
-    load: () => api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/facets`),
-    transform: compactEntryFacetsResult,
-  })
-    .then((result) => {
-      if (entryFacetsState.requestId !== requestId || entryFacetsApiKey(activeDictionary()) !== key) {
-        return;
-      }
-      entryFacetsState = {
-        key,
-        status: "success",
-        parts: result.parts,
-        error: null,
-        requestId,
-      };
-      renderPartFilter();
-    })
-    .catch((error) => {
-      if (entryFacetsState.requestId !== requestId) {
-        return;
-      }
-      entryFacetsState = {
-        key,
-        status: "error",
-        parts: [],
-        error,
-        requestId,
-      };
-      console.error(error);
-      renderPartFilter();
-    });
 }
 
 function renderRootModeRow(row) {
-  if (row.kind === "truncation") {
-    return renderEntryQueryTruncationNotice(row);
-  }
-  if (row.kind === "derived-placeholder") {
-    if (row.status === "idle") {
-      startRootGroupDerivedLoad(activeDictionary(), row.rootId);
-    }
-    const placeholder = document.createElement("div");
-    placeholder.className = "entry-list-truncation-notice root-derived-placeholder";
-    placeholder.style.height = `${Math.max(32, row.estimatedHeight - 12)}px`;
-    placeholder.setAttribute("role", "status");
-    placeholder.textContent = row.status === "error"
-      ? aText("无法加载衍生词条", "Could not load derived entries")
-      : aText("加载中", "Loading");
-    return placeholder;
-  }
   if (row.kind === "derived") {
     const wrapper = document.createElement("div");
     wrapper.className = "root-derived-list virtual-root-derived-row";
@@ -5680,43 +3261,25 @@ function renderRootModeRow(row) {
     return wrapper;
   }
   const { group, expanded } = row;
-  if (expanded && !rootGroupDerivedState(activeDictionary(), group.root.id)) {
-    startRootGroupDerivedLoad(activeDictionary(), group.root.id);
-  }
   const wrapper = document.createElement("article");
   wrapper.className = "root-entry-group";
   wrapper.dataset.rootId = group.root.id;
   wrapper.append(createEntryCard(group.root, { root: true, rootId: group.root.id }));
-  if (group.derivedCount) {
+  if (group.derived.length) {
     const toggle = document.createElement("button");
-    const searchAutoExpanded = rootSearchExpandsGroups() && rootGroupMatchedDerivedCount(group) > 0;
     toggle.type = "button";
     toggle.className = `root-toggle-button${expanded ? " expanded" : ""}`;
-    toggle.disabled = searchAutoExpanded;
     toggle.dataset.appTooltip = "always";
     toggle.setAttribute("aria-label", expanded ? t("collapse") : t("expand"));
     toggle.innerHTML = '<span class="chevron-icon" aria-hidden="true"></span>';
     toggle.addEventListener("click", (event) => {
       event.stopPropagation();
       rootNavigationContextId = group.root.id;
-      if (rootExpansionMode === "all") {
-        if (collapsedRootEntries.has(group.root.id)) {
-          collapsedRootEntries.delete(group.root.id);
-        } else {
-          collapsedRootEntries.add(group.root.id);
-          rootGroupDerivedStates.delete(rootGroupDerivedStateKey(activeDictionary(), group.root.id));
-        }
-      } else if (expandedRootEntries.has(group.root.id)) {
+      if (expandedRootEntries.has(group.root.id)) {
         expandedRootEntries.delete(group.root.id);
-        rootGroupDerivedStates.delete(rootGroupDerivedStateKey(activeDictionary(), group.root.id));
       } else {
-        const derivedKey = rootGroupDerivedStateKey(activeDictionary(), group.root.id);
-        if (rootGroupDerivedStates.get(derivedKey)?.status === "error") {
-          rootGroupDerivedStates.delete(derivedKey);
-        }
         expandedRootEntries.add(group.root.id);
       }
-      renderPartFilter();
       renderEntries();
     });
     wrapper.append(toggle);
@@ -5724,41 +3287,24 @@ function renderRootModeRow(row) {
   return wrapper;
 }
 
-function renderEntryQueryTruncationNotice(row) {
-  const notice = document.createElement("div");
-  notice.className = "entry-list-truncation-notice";
-  notice.setAttribute("role", "status");
-  notice.textContent = formatText(row.messageKey, {
-    loaded: row.loaded,
-    total: row.total,
-  });
-  return notice;
-}
-
 function createEntryCard(entry, options = {}) {
+  const partText = entryPartText(entry);
   const settings = normalizeDictionarySettings(activeDictionary()?.settings);
-  const partText = settings.entryListPartDisplay === "chips" ? "" : entryPartText(entry);
-  const { fields: searchFields, fuzzyFields } = entrySearchQueryOptions();
-  const lemmaSearchEnabled = searchFields.has("lemma");
-  const pronunciationSearchEnabled = searchFields.has("pronunciation");
-  const tagSearchEnabled = searchFields.has("tags");
-  const definitionSearchEnabled = searchFields.has("definitions");
+  const contentFuzzyEnabled = Boolean(settings.fuzzySearch);
+  const tagFuzzyEnabled = Boolean(settings.tagFuzzySearch);
   const subtitle = [
-    entry.pronunciation ? highlightSearchText(entry.pronunciation, fuzzyFields.has("pronunciation"), pronunciationSearchEnabled) : "",
-    partText ? highlightSearchText(partText, fuzzyFields.has("tags"), tagSearchEnabled) : "",
+    entry.pronunciation ? highlightSearchText(entry.pronunciation, contentFuzzyEnabled) : "",
+    partText ? highlightSearchText(partText, tagFuzzyEnabled) : "",
   ].filter(Boolean).join(" · ");
   const meaningSummary = entryDefinitionSummary(entry, settings.entryListPolysemyDisplay);
   const searchSnippets = renderEntrySearchSnippets(entry);
-  const chipHtml = renderChips(entry, settings.entryListTagDisplayLimit, tagSearchEnabled, fuzzyFields.has("tags"), settings.entryListTagFiltering, {
-    includePartTags: settings.entryListPartDisplay !== "subtitle",
-  });
+  const chipHtml = renderChips(entry, settings.entryListTagDisplayLimit, true, tagFuzzyEnabled, settings.entryListTagFiltering);
   const qualityIssueHtml = renderEntryQualityIssueBadges(options.qualityIssues || []);
   const compactEntryCard = shouldUseCompactEntryCard(entry, { meaningSummary, searchSnippets });
   const footerHtml = [
     chipHtml ? `<div class="chip-row">${chipHtml}</div>` : "",
     qualityIssueHtml,
   ].filter(Boolean).join("");
-  const bodyOnlyEntryCard = !compactEntryCard && !footerHtml;
   const button = document.createElement("button");
   button.type = "button";
   button.className = [
@@ -5767,22 +3313,18 @@ function createEntryCard(entry, options = {}) {
     options.root ? "root-card" : "",
     options.derived ? "derived-entry-card" : "",
     compactEntryCard ? "compact-entry-card" : "",
-    bodyOnlyEntryCard ? "body-only-entry-card" : "",
   ].filter(Boolean).join(" ");
   button.dataset.entryId = entry.id;
-  if (entry.id === state.selectedEntryId) {
-    button.setAttribute("aria-current", "true");
-  }
   if (options.rootId) {
     button.dataset.rootId = options.rootId;
   }
   button.innerHTML = `
     <div class="entry-card-header">
-      <strong>${highlightSearchText(entry.lemma, fuzzyFields.has("lemma"), lemmaSearchEnabled)}</strong>
-      ${subtitle ? `<small>${subtitle}</small>` : ""}
+      <strong>${highlightSearchText(entry.lemma, contentFuzzyEnabled)}</strong>
+      <small>${subtitle}</small>
     </div>
     <div class="entry-card-body">
-      ${meaningSummary ? `<p>${highlightSearchText(meaningSummary, fuzzyFields.has("definitions"), definitionSearchEnabled)}</p>` : ""}
+      ${meaningSummary ? `<p>${highlightSearchText(meaningSummary, contentFuzzyEnabled)}</p>` : ""}
       ${searchSnippets}
     </div>
     ${footerHtml ? `<div class="entry-card-footer">${footerHtml}</div>` : ""}
@@ -5805,26 +3347,6 @@ function createEntryCard(entry, options = {}) {
   return button;
 }
 
-function renderEntryListSelection() {
-  elements.entryList.querySelectorAll(".entry-card[data-entry-id]").forEach((card) => {
-    const selected = card.dataset.entryId === state.selectedEntryId;
-    card.classList.toggle("active", selected);
-    if (selected) {
-      card.setAttribute("aria-current", "true");
-    } else {
-      card.removeAttribute("aria-current");
-    }
-  });
-}
-
-function renderEditorEntrySelection() {
-  closeEntryContextMenu();
-  renderEntryListSelection();
-  renderDetail();
-  renderLexicalNetwork();
-  scheduleEntryBrowserHeightUpdate();
-}
-
 function shouldUseCompactEntryCard(entry, options = {}) {
   const settings = normalizeDictionarySettings(activeDictionary()?.settings);
   const meaningSummary = options.meaningSummary ?? entryDefinitionSummary(entry, settings.entryListPolysemyDisplay);
@@ -5832,69 +3354,8 @@ function shouldUseCompactEntryCard(entry, options = {}) {
   return !meaningSummary && !searchSnippets;
 }
 
-const ENTRY_CARD_HEIGHT_ESTIMATES = {
-  compactNoFooter: 89,
-  compactFirstFooterLine: 33,
-  bodyNoFooter: 115,
-  bodyFirstFooterLine: 145,
-  noSubtitleReduction: 23,
-  noSubtitleWithFooterReduction: 7,
-  extraFooterLine: 30,
-  extraBodyLine: 23,
-};
-
-function estimateEntryQualityIssueLines(issues = []) {
-  if (!issues.length) {
-    return 0;
-  }
-  const listWidth = Math.max(0, entryVirtualList.container?.clientWidth || elements.entryList?.clientWidth || 340);
-  const basePerLine = listWidth < 300 ? 2 : listWidth < 420 ? 3 : 4;
-  const longestTitle = Math.max(
-    ...issues.map((issue) => String(issue.title || aText("质量问题", "Quality issue")).length),
-  );
-  const perLine = longestTitle > 18 ? Math.max(1, basePerLine - 1) : basePerLine;
-  return Math.max(1, Math.ceil(issues.length / perLine));
-}
-
-function estimateSearchSnippetCount(searchSnippets = "") {
-  return (String(searchSnippets).match(/class="search-snippet"/g) || []).length;
-}
-
-function estimateEntryCardHeight(entry, options = {}) {
-  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
-  const meaningSummary = options.meaningSummary ?? entryDefinitionSummary(entry, settings.entryListPolysemyDisplay);
-  const searchSnippets = options.searchSnippets ?? renderEntrySearchSnippets(entry);
-  const hasBody = Boolean(meaningSummary || searchSnippets);
-  const hasSubtitle = Boolean(entry.pronunciation || (settings.entryListPartDisplay !== "chips" && entryPartText(entry)));
-  const hasTagFooter = Boolean(
-    entryListTagItems(entry, { includePartTags: settings.entryListPartDisplay !== "subtitle" }).length
-      && settings.entryListTagDisplayLimit > 0,
-  );
-  const qualityIssueLines = estimateEntryQualityIssueLines(options.qualityIssues || []);
-  const footerLines = (hasTagFooter ? 1 : 0) + qualityIssueLines;
-  const searchSnippetCount = estimateSearchSnippetCount(searchSnippets);
-  const bodyLines = (meaningSummary ? 1 : 0) + searchSnippetCount;
-  const extraBodyLines = hasBody ? Math.max(0, bodyLines - 1) : 0;
-  const bodyHeight = extraBodyLines * ENTRY_CARD_HEIGHT_ESTIMATES.extraBodyLine;
-  if (!hasBody) {
-    const estimated = ENTRY_CARD_HEIGHT_ESTIMATES.compactNoFooter
-      + (footerLines
-        ? ENTRY_CARD_HEIGHT_ESTIMATES.compactFirstFooterLine
-          + Math.max(0, footerLines - 1) * ENTRY_CARD_HEIGHT_ESTIMATES.extraFooterLine
-        : 0);
-    return Math.max(66, estimated - (hasSubtitle ? 0 : ENTRY_CARD_HEIGHT_ESTIMATES.noSubtitleReduction));
-  }
-  const estimated = (footerLines
-    ? ENTRY_CARD_HEIGHT_ESTIMATES.bodyFirstFooterLine
-      + Math.max(0, footerLines - 1) * ENTRY_CARD_HEIGHT_ESTIMATES.extraFooterLine
-    : ENTRY_CARD_HEIGHT_ESTIMATES.bodyNoFooter)
-    + bodyHeight;
-  const subtitleReduction = hasSubtitle
-    ? 0
-    : (footerLines
-      ? ENTRY_CARD_HEIGHT_ESTIMATES.noSubtitleWithFooterReduction
-      : ENTRY_CARD_HEIGHT_ESTIMATES.noSubtitleReduction);
-  return Math.max(footerLines ? 138 : 92, estimated - subtitleReduction);
+function estimateEntryCardHeight(entry) {
+  return shouldUseCompactEntryCard(entry) ? 86 : entryVirtualList.estimatedItemHeight;
 }
 
 function closeEntryContextMenu() {
@@ -6054,16 +3515,9 @@ function updateHoveredEntryQualityIssueTooltipPlacement() {
 }
 
 function entryDefinitionMeanings(entry) {
-  return entryDefinitionItems(entry)
+  return (entry.definitions || [])
     .map((definition) => String(definition.meaning || "").trim())
     .filter(Boolean);
-}
-
-function entryDefinitionItems(entry = {}) {
-  if (Array.isArray(entry.definitions)) {
-    return entry.definitions;
-  }
-  return Array.isArray(entry.definitionPreviews) ? entry.definitionPreviews : [];
 }
 
 function entryDefinitionSummary(entry, showPolysemy = false) {
@@ -6087,6 +3541,11 @@ async function switchToEntry(entryId, options = {}) {
     return;
   }
 
+  const targetEntry = dictionary.entries.find((entry) => entry.id === entryId);
+  if (!targetEntry) {
+    return;
+  }
+
   const ready = await closePendingEditsForPageSwitch();
   if (!ready) {
     return;
@@ -6096,12 +3555,7 @@ async function switchToEntry(entryId, options = {}) {
   state.selectedEntryId = entryId;
   editorMode = "display";
   const navigationOptions = prepareRootModeEntryNavigation(entryId, options);
-  const detailLoadPromise = ensureSelectedEntryDetailLoaded();
-  renderEditorEntrySelection();
-  await detailLoadPromise;
-  if (state.selectedEntryId !== entryId) {
-    return;
-  }
+  render();
   scheduleEntryCardScroll(entryId, navigationOptions);
   closeMobileEntryBrowserDrawer();
 }
@@ -6111,36 +3565,27 @@ function prepareRootModeEntryNavigation(entryId, options = {}) {
     return options;
   }
 
-  let rootId = String(options.rootId || "");
-  if (!rootId) {
-    const loadedRoot = rootGroupsQueryState.pages
-      .filter((page) => page.status === "success")
-      .flatMap((page) => page.items)
-      .find((group) => group.root.id === entryId);
-    rootId = loadedRoot?.root?.id || "";
-  }
-  if (!rootId) {
-    for (const [key, derivedState] of rootGroupDerivedStates) {
-      if (derivedState.status === "success" && derivedState.items.some((entry) => entry.id === entryId)) {
-        rootId = key.slice(key.lastIndexOf("\u0000") + 1);
-        break;
-      }
-    }
-  }
-  if (!rootId) {
+  const matchingGroups = rootModeGroups()
+    .filter((group) => group.root.id === entryId || group.derived.some((entry) => entry.id === entryId));
+  if (!matchingGroups.length) {
     return options;
   }
 
-  const isDerivedEntry = rootId !== entryId;
-  rootNavigationContextId = rootId;
+  const requestedGroup = options.rootId
+    ? matchingGroups.find((group) => group.root.id === options.rootId)
+    : null;
+  const contextGroup = rootNavigationContextId
+    ? matchingGroups.find((group) => group.root.id === rootNavigationContextId)
+    : null;
+  const expandedGroup = matchingGroups.find((group) => expandedRootEntries.has(group.root.id));
+  const targetGroup = requestedGroup || contextGroup || expandedGroup || matchingGroups[0];
+  const isDerivedEntry = targetGroup.root.id !== entryId;
+
+  rootNavigationContextId = targetGroup.root.id;
   if (isDerivedEntry) {
-    if (rootExpansionMode === "all") {
-      collapsedRootEntries.delete(rootId);
-    } else {
-      expandedRootEntries.add(rootId);
-    }
+    expandedRootEntries.add(targetGroup.root.id);
   }
-  return { ...options, rootId };
+  return { ...options, rootId: targetGroup.root.id };
 }
 
 function scheduleEntryCardScroll(entryId, options = {}) {
@@ -6150,255 +3595,38 @@ function scheduleEntryCardScroll(entryId, options = {}) {
   pendingEntryCardScroll = {
     entryId,
     options: { ...options },
-    locationRequestKey: "",
   };
-  flushPendingEntryCardScroll();
-}
-
-function markPendingEntryLocationRequest(entryId, requestKey) {
-  if (!pendingEntryCardScroll || pendingEntryCardScroll.entryId !== entryId) {
-    return false;
-  }
-  if (pendingEntryCardScroll.locationRequestKey === requestKey) {
-    return false;
-  }
-  pendingEntryCardScroll.locationRequestKey = requestKey;
-  return true;
-}
-
-function clearPendingEntryLocationRequest(entryId, requestKey) {
-  if (
-    pendingEntryCardScroll?.entryId === entryId
-    && pendingEntryCardScroll.locationRequestKey === requestKey
-  ) {
-    pendingEntryCardScroll.locationRequestKey = "";
-  }
-}
-
-function startEntryQueryLocation(dictionary, entryId) {
-  const key = entryQueryState.key;
-  const requestId = entryQueryState.requestId;
-  const requestKey = `entry-location\u0000${key}\u0000${entryId}`;
-  if (!markPendingEntryLocationRequest(entryId, requestKey)) {
-    return;
-  }
-  queryPageCache.load({
-    key: queryPageCacheKey("entry-location", `${key}\u0000${entryId}`),
-    dictionaryId: dictionary.id,
-    load: () => api(entryQueryLocationUrl(dictionary, entryId)),
-    transform: (result) => ({
-      ...compactEntryQueryResult(result),
-      location: result?.location || null,
-    }),
-  })
-    .then((result) => {
-      if (
-        entryQueryState.requestId !== requestId
-        || entryQueryState.key !== key
-        || entryQueryApiKey(activeDictionary()) !== key
-        || pendingEntryCardScroll?.entryId !== entryId
-      ) {
-        return;
-      }
-      if (!result.location?.found) {
-        if (pendingEntryCardScroll?.options?.reportMissing) {
-          showToast(t("currentEntryNotInList"));
-        }
-        pendingEntryCardScroll = null;
-        return;
-      }
-      const page = entryQueryState.pages.find((candidate) => candidate.index === result.location.windowIndex);
-      if (!page) {
-        return;
-      }
-      page.estimatedHeight = queryWindowPageHeight(entryVirtualList, page.index, page.estimatedHeight);
-      page.offset = result.location.windowOffset;
-      page.cursor = result.pageInfo?.windowCursor || entryQueryState.windowCursor;
-      page.status = "success";
-      page.items = result.items;
-      page.pageInfo = result.pageInfo;
-      page.error = null;
-      page.lastAccessAt = performance.now();
-      entryQueryState.windowCursor = result.pageInfo?.windowCursor || entryQueryState.windowCursor;
-      preserveQueryWindowPageHeight(
-        page,
-        result.items.reduce((total, entry) => (
-          total + estimateEntryCardHeight(entry, { qualityIssues: advancedFilterIssuesForEntry(entry.id) })
-        ), 0),
-        Boolean(entryQueryState.windowCursor),
-      );
-      syncEntryQueryWindowState();
-      evictDistantQueryWindowPages(
-        entryQueryState.pages,
-        entryVirtualList,
-        new Set([page.index]),
-        entryId,
-      );
-      syncEntryQueryWindowState();
-      renderEntries();
-      flushPendingEntryCardScroll();
-    })
-    .catch((error) => {
-      if (error?.code === "query_cursor_stale") {
-        invalidateQueryPageCacheAfterCursorStale(dictionary);
-        restartEntryQueryWindowAfterStale(dictionary);
-        return;
-      }
-      console.error(error);
-      if (pendingEntryCardScroll?.entryId === entryId) {
-        pendingEntryCardScroll = null;
-      }
-    })
-    .finally(() => clearPendingEntryLocationRequest(entryId, requestKey));
-}
-
-function startRootGroupQueryLocation(dictionary, entryId, options = {}) {
-  const key = rootGroupsQueryState.key;
-  const requestId = rootGroupsQueryState.requestId;
-  const preferredRootId = String(options.rootId || "");
-  const requestKey = `root-location\u0000${key}\u0000${entryId}\u0000${preferredRootId}`;
-  if (!markPendingEntryLocationRequest(entryId, requestKey)) {
-    return;
-  }
-  queryPageCache.load({
-    key: queryPageCacheKey("root-group-location", `${key}\u0000${entryId}\u0000${preferredRootId}`),
-    dictionaryId: dictionary.id,
-    load: () => api(rootGroupsLocationUrl(dictionary, entryId, { preferredRootId })),
-    transform: (result) => ({
-      ...compactRootGroupsQueryResult(result),
-      location: result?.location || null,
-    }),
-  })
-    .then((result) => {
-      if (
-        rootGroupsQueryState.requestId !== requestId
-        || rootGroupsQueryState.key !== key
-        || rootGroupsQueryApiKey(activeDictionary()) !== key
-        || pendingEntryCardScroll?.entryId !== entryId
-      ) {
-        return;
-      }
-      if (!result.location?.found) {
-        if (pendingEntryCardScroll?.options?.reportMissing) {
-          showToast(t("currentEntryNotInList"));
-        }
-        pendingEntryCardScroll = null;
-        return;
-      }
-      const rootId = result.location.rootId;
-      const page = rootGroupsQueryState.pages.find((candidate) => candidate.index === result.location.windowIndex);
-      if (!page || !rootId) {
-        return;
-      }
-      rootNavigationContextId = rootId;
-      if (rootId !== entryId) {
-        if (rootExpansionMode === "all") {
-          collapsedRootEntries.delete(rootId);
-        } else {
-          expandedRootEntries.add(rootId);
-        }
-      }
-      pendingEntryCardScroll.options = {
-        ...pendingEntryCardScroll.options,
-        rootId,
-      };
-      page.estimatedHeight = queryWindowPageHeight(entryVirtualList, page.index, page.estimatedHeight);
-      page.offset = result.location.windowOffset;
-      page.cursor = result.pageInfo?.windowCursor || rootGroupsQueryState.windowCursor;
-      page.status = "success";
-      page.items = result.groups;
-      page.pageInfo = result.pageInfo;
-      page.error = null;
-      page.lastAccessAt = performance.now();
-      rootGroupsQueryState.windowCursor = result.pageInfo?.windowCursor || rootGroupsQueryState.windowCursor;
-      applyRootGroupWindowMetrics(rootGroupsQueryState, result.pageInfo);
-      preserveQueryWindowPageHeight(
-        page,
-        result.groups.reduce((total, group) => total + rootGroupEstimatedHeight(group), 0),
-        Boolean(rootGroupsQueryState.windowCursor),
-      );
-      syncRootGroupsQueryWindowState();
-      evictDistantQueryWindowPages(
-        rootGroupsQueryState.pages,
-        entryVirtualList,
-        new Set([page.index]),
-        new Set([rootId, entryId]),
-        {
-          onEvict: (evictedPage) => {
-            evictedPage.items.forEach((group) => {
-              rootGroupDerivedStates.delete(rootGroupDerivedStateKey(dictionary, group.root.id));
-            });
-          },
-        },
-      );
-      syncRootGroupsQueryWindowState();
-      renderEntries();
-      if (rootId !== entryId && !rootGroupDerivedState(dictionary, rootId)) {
-        startRootGroupDerivedLoad(dictionary, rootId);
-      }
-      flushPendingEntryCardScroll();
-    })
-    .catch((error) => {
-      if (error?.code === "query_cursor_stale") {
-        invalidateQueryPageCacheAfterCursorStale(dictionary);
-        restartRootGroupsWindowAfterStale();
-        return;
-      }
-      console.error(error);
-      if (pendingEntryCardScroll?.entryId === entryId) {
-        pendingEntryCardScroll = null;
-      }
-    })
-    .finally(() => clearPendingEntryLocationRequest(entryId, requestKey));
-}
-
-function ensureQueryWindowForEntryScroll(entryId, options = {}) {
-  const dictionary = activeDictionary();
-  if (!dictionary || (advancedFilter && !advancedFilterUsesEntryQuery())) {
-    return;
-  }
-  if (!rootMode && entryQueryState.status === "success") {
-    if (entryQueryState.pages.some((page) => page.items.some((entry) => entry.id === entryId))) {
+  const requestId = entryCardScrollRequestId += 1;
+  requestAnimationFrame(() => {
+    if (requestId !== entryCardScrollRequestId) {
       return;
     }
-    startEntryQueryLocation(dictionary, entryId);
-    return;
-  }
-  if (!rootMode || rootGroupsQueryState.status !== "success") {
-    return;
-  }
-  let rootId = String(options.rootId || "");
-  const loadedGroups = rootGroupsQueryState.pages
-    .filter((page) => page.status === "success")
-    .flatMap((page) => page.items);
-  if (!rootId && loadedGroups.some((group) => group.root.id === entryId)) {
-    rootId = entryId;
-  }
-  if (!rootId) {
-    for (const group of loadedGroups) {
-      const derivedState = rootGroupDerivedState(dictionary, group.root.id);
-      if (derivedState?.status === "success" && derivedState.items.some((entry) => entry.id === entryId)) {
-        rootId = group.root.id;
-        break;
+    if (!entryBrowserCanScrollNow()) {
+      return;
+    }
+    let key = `entry:${entryId}`;
+    if (rootMode && !advancedFilter) {
+      key = options.rootId && options.rootId !== entryId
+        ? `derived:${options.rootId}:${entryId}`
+        : `root:${options.rootId || entryId}`;
+    }
+    const stableScrollOptions = {
+      isCurrent: () => requestId === entryCardScrollRequestId,
+    };
+    if (scrollVirtualListItemIntoViewStable(entryVirtualList, key, stableScrollOptions)) {
+      if (pendingEntryCardScroll?.entryId === entryId) {
+        pendingEntryCardScroll = null;
+      }
+      return;
+    }
+    const row = entryVirtualList.items.find((item) => item.value?.entry?.id === entryId || item.value?.group?.root?.id === entryId);
+    if (row) {
+      const scrolled = scrollVirtualListItemIntoViewStable(entryVirtualList, row.key, stableScrollOptions);
+      if (scrolled && pendingEntryCardScroll?.entryId === entryId) {
+        pendingEntryCardScroll = null;
       }
     }
-  }
-  const loadedGroup = rootId ? loadedGroups.find((group) => group.root.id === rootId) : null;
-  if (!loadedGroup) {
-    startRootGroupQueryLocation(dictionary, entryId, options);
-    return;
-  }
-  rootNavigationContextId = rootId;
-  if (rootId !== entryId) {
-    if (rootExpansionMode === "all") {
-      collapsedRootEntries.delete(rootId);
-    } else {
-      expandedRootEntries.add(rootId);
-    }
-    if (!rootGroupDerivedState(dictionary, rootId)) {
-      startRootGroupDerivedLoad(dictionary, rootId);
-    }
-  }
+  });
 }
 
 async function closePendingEditsForPageSwitch() {
@@ -6411,44 +3639,35 @@ async function closePendingEditsForPageSwitch() {
   const inlineForm = partialEditForm();
   try {
     if (inlineForm) {
-      if (partialEntryFormIsDirty()) {
-        const action = settings.partialEditPageSwitchAction === "prompt"
-          ? await appEditSwitchPrompt(t("partialEditSwitchPrompt"))
-          : settings.partialEditPageSwitchAction;
-        if (action === "cancel" || action === false) {
+      const action = settings.partialEditPageSwitchAction === "prompt"
+        ? await appEditSwitchPrompt(t("partialEditSwitchPrompt"))
+        : settings.partialEditPageSwitchAction;
+      if (action === "cancel" || action === false) {
+        return false;
+      }
+      if (action === "save") {
+        const saved = await savePartialEdit({ preventDefault() {} });
+        if (!saved) {
           return false;
         }
-        if (action === "save") {
-          const saved = await savePartialEdit({ preventDefault() {} });
-          if (!saved) {
-            return false;
-          }
-        } else if (action === "discard") {
-          cancelPartialEdit();
-        }
-      } else {
+      } else if (action === "discard") {
         cancelPartialEdit();
       }
     }
 
     if (state.activeView === "editor" && editorMode === "edit" && !elements.entryForm.hidden) {
-      if (fullEntryFormIsDirty()) {
-        const action = settings.fullEditPageSwitchAction === "prompt"
-          ? await appEditSwitchPrompt(t("fullEditSwitchPrompt"))
-          : settings.fullEditPageSwitchAction;
-        if (action === "cancel" || action === false) {
+      const action = settings.fullEditPageSwitchAction === "prompt"
+        ? await appEditSwitchPrompt(t("fullEditSwitchPrompt"))
+        : settings.fullEditPageSwitchAction;
+      if (action === "cancel" || action === false) {
+        return false;
+      }
+      if (action === "save") {
+        const saved = await saveEntry({ preventDefault() {} });
+        if (!saved) {
           return false;
         }
-        if (action === "save") {
-          const saved = await saveEntry({ preventDefault() {} });
-          if (!saved) {
-            return false;
-          }
-        } else if (action === "discard") {
-          entryDraft = null;
-          editorMode = "display";
-        }
-      } else {
+      } else if (action === "discard") {
         entryDraft = null;
         editorMode = "display";
       }
@@ -6467,41 +3686,19 @@ function filteredEntries() {
     return [];
   }
 
-  if (advancedFilter && !advancedFilterUsesEntryQuery()) {
+  if (advancedFilter) {
     const ids = new Set(advancedFilter.entryIds || []);
     return [...dictionary.entries].filter((entry) => ids.has(entry.id)).sort(compareEntries);
   }
 
-  if (advancedFilterUsesEntryQuery()) {
-    return [];
-  }
-
-  const query = searchQuery;
-  const { fields, fuzzyFields } = entrySearchQueryOptions(dictionary);
+  const query = normalize(searchQuery);
+  const settings = normalizeDictionarySettings(dictionary?.settings);
+  const contentFuzzyEnabled = Boolean(settings.fuzzySearch);
+  const tagFuzzyEnabled = Boolean(settings.tagFuzzySearch);
 
   return [...dictionary.entries]
-    .filter((entry) => entryMatchesSearch(entry, dictionary, { query, fields, fuzzyFields, respectPart: true }))
+    .filter((entry) => entryMatchesSearch(entry, dictionary, { query, contentFuzzyEnabled, tagFuzzyEnabled, respectPart: true }))
     .sort(compareEntries);
-}
-
-function advancedFilterVariantUsesEntryQuery(variant) {
-  return Boolean(variant?.filter && typeof variant.filter === "object" && !Array.isArray(variant.filter));
-}
-
-function advancedFilterUsesEntryQuery() {
-  return advancedFilterVariantUsesEntryQuery(advancedFilter);
-}
-
-function advancedFilterStateForVariant(base, variant, variantIndex) {
-  return {
-    ...base,
-    title: variant.title,
-    filter: variant.filter,
-    search: variant.search,
-    entryIds: variant.entryIds,
-    issueMap: variant.issueMap,
-    variantIndex,
-  };
 }
 
 function entryViewSnapshot() {
@@ -6510,9 +3707,7 @@ function entryViewSnapshot() {
     activePart,
     entrySort,
     searchQuery,
-    rootExpansionMode,
     expandedRootEntries: [...expandedRootEntries],
-    collapsedRootEntries: [...collapsedRootEntries],
   };
 }
 
@@ -6521,19 +3716,15 @@ function restoreEntryViewSnapshot(snapshot = {}) {
   activePart = snapshot.activePart || "";
   entrySort = snapshot.entrySort || "lemmaAsc";
   searchQuery = snapshot.searchQuery || "";
-  rootExpansionMode = snapshot.rootExpansionMode === "all" ? "all" : "manual";
   expandedRootEntries.clear();
   (snapshot.expandedRootEntries || []).forEach((id) => expandedRootEntries.add(id));
-  collapsedRootEntries.clear();
-  (snapshot.collapsedRootEntries || []).forEach((id) => collapsedRootEntries.add(id));
-  refreshRootGroupWindowHeightEstimates();
   elements.searchInput.value = searchQuery;
   elements.sortSelect.value = entrySort;
 }
 
 async function enterAdvancedFilter(action) {
   const dictionary = activeDictionary();
-  if (!dictionary || !action?.variants?.length) {
+  if (!dictionary || (!action?.entryIds?.length && !action?.variants?.length)) {
     return;
   }
 
@@ -6544,45 +3735,37 @@ async function enterAdvancedFilter(action) {
 
   const previous = advancedFilter?.previous || entryViewSnapshot();
   const variants = normalizeAdvancedFilterVariants(action);
-  const activeVariant = variants.find((variant) => variant.available !== false) || variants[0];
-  if (!activeVariant) {
-    return;
-  }
-  advancedFilter = advancedFilterStateForVariant({
+  const activeVariant = variants[0] || {
+    title: action.title || t("advancedFilterMode"),
+    entryIds: entryIdsFrom(action.entryIds),
+  };
+  advancedFilter = {
+    title: activeVariant.title,
+    entryIds: activeVariant.entryIds,
+    issueMap: activeVariant.issueMap,
     meta: activeVariant.key && action.meta ? { ...action.meta, activeKey: activeVariant.key } : action.meta,
     previous,
     variants,
-    selectFirstOnLoad: false,
-  }, activeVariant, variants.indexOf(activeVariant));
+    variantIndex: 0,
+  };
   rootMode = false;
   activePart = "";
-  searchQuery = activeVariant.search?.text || "";
-  elements.searchInput.value = searchQuery;
+  searchQuery = "";
   state.activeView = "editor";
   revealEntryBrowserForResults();
-  if (advancedFilterUsesEntryQuery()) {
-    advancedFilter.selectFirstOnLoad = !action.preferredEntryId;
-    if (action.preferredEntryId) {
-      state.selectedEntryId = action.preferredEntryId;
-    }
-    resetEntryQueryState();
-  } else {
-    const ids = new Set(advancedFilter.entryIds);
-    const matchingEntries = [...dictionary.entries].filter((entry) => ids.has(entry.id)).sort(compareEntries);
-    const preferredEntry = action.preferredEntryId
-      ? matchingEntries.find((entry) => entry.id === action.preferredEntryId)
-      : null;
-    const firstEntry = preferredEntry || matchingEntries[0];
-    if (firstEntry) {
-      state.selectedEntryId = firstEntry.id;
-      editorMode = "display";
-      entryDraft = null;
-    }
+  const ids = new Set(advancedFilter.entryIds);
+  const filteredEntries = [...dictionary.entries].filter((entry) => ids.has(entry.id)).sort(compareEntries);
+  const preferredEntry = action.preferredEntryId
+    ? filteredEntries.find((entry) => entry.id === action.preferredEntryId)
+    : null;
+  const firstEntry = preferredEntry || filteredEntries[0];
+  if (firstEntry) {
+    state.selectedEntryId = firstEntry.id;
+    editorMode = "display";
+    entryDraft = null;
   }
   render();
-  if (state.selectedEntryId) {
-    scheduleEntryCardScroll(state.selectedEntryId);
-  }
+  scheduleEntryCardScroll(state.selectedEntryId);
 }
 
 async function applyTagFilter(entry, tagIndex, tag) {
@@ -6621,7 +3804,6 @@ function exitAdvancedFilter() {
   }
   const previous = advancedFilter.previous;
   advancedFilter = null;
-  resetEntryQueryState();
   restoreEntryViewSnapshot(previous);
   render();
 }
@@ -6629,30 +3811,18 @@ function exitAdvancedFilter() {
 function normalizeAdvancedFilterVariants(action, options = {}) {
   const variants = action?.variants?.length
     ? action.variants
-    : [action];
+    : [{ title: action?.title || t("advancedFilterMode"), entryIds: action?.entryIds || [] }];
   return variants
     .map((variant) => {
-      const usesEntryQuery = advancedFilterVariantUsesEntryQuery(variant);
-      const entryIds = usesEntryQuery ? [] : entryIdsFrom(variant.entryIds);
-      const filter = usesEntryQuery ? entryQueryModel.normalizeEntryFilter(variant.filter) : null;
-      const search = usesEntryQuery && variant.search
-        ? entryQueryModel.normalizeEntrySearch(variant.search)
-        : null;
+      const entryIds = entryIdsFrom(variant.entryIds);
       return {
         key: variant.key || "",
         title: variant.title || t("advancedFilterMode"),
-        filter,
-        search,
         entryIds,
-        issueMap: usesEntryQuery ? {} : advancedFilterIssueMapFromIssues(variant.issues, entryIds),
-        available: usesEntryQuery ? variant.available !== false : entryIds.length > 0,
+        issueMap: advancedFilterIssueMapFromIssues(variant.issues, entryIds),
       };
     })
-    .filter((variant, index) => (
-      advancedFilterVariantUsesEntryQuery(variant)
-      || variant.entryIds.length
-      || (options.keepFirstEmpty && index === 0)
-    ));
+    .filter((variant, index) => variant.entryIds.length || (options.keepFirstEmpty && index === 0));
 }
 
 function advancedFilterIssueMapFromIssues(issues = [], entryIds = []) {
@@ -6691,7 +3861,7 @@ function advancedFilterDisplayTitle() {
   }
   if (advancedFilter.meta?.type === "quality" && dictionary) {
     const action = qualityIssueFilterAction(
-      getQualityViewReport(dictionary),
+      buildDictionaryAnalysis(dictionary),
       advancedFilter.meta.group,
       advancedFilter.meta.activeKey,
       { allowEmptyActive: true },
@@ -6718,6 +3888,8 @@ function localizeAdvancedFilterTitle(title) {
     ["中优先级质量问题", aText("中优先级质量问题", "Medium-priority quality issues")],
     ["Low-priority quality issues", aText("低优先级质量问题", "Low-priority quality issues")],
     ["低优先级质量问题", aText("低优先级质量问题", "Low-priority quality issues")],
+    ["Derived entries", aText("衍生词", "Derived entries")],
+    ["衍生词", aText("衍生词", "Derived entries")],
     ["Has definitions", aText("有释义", "Has definitions")],
     ["有释义", aText("有释义", "Has definitions")],
     ["No definitions", aText("无释义", "No definitions")],
@@ -6810,11 +3982,12 @@ function tagAdvancedFilterAction(tag, options = {}) {
   if (!dictionary || !tag) {
     return null;
   }
-  return entryFilterAction(analysisFilterTitle(t("tags"), displayTag(tag, dictionary)), {
-    tags: { values: [tag], mode: "any" },
-  }, {
+  const normalizedTag = normalize(tag);
+  const entryIds = dictionary.entries
+    .filter((candidate) => (candidate.tags || []).some((item) => normalize(item) === normalizedTag))
+    .map((candidate) => candidate.id);
+  return advancedFilterAction(analysisFilterTitle(t("tags"), displayTag(tag, dictionary)), entryIds, {
     allowEmptyActive: Boolean(options.allowEmptyActive),
-    available: options.allowEmptyActive ? true : undefined,
     key: "tag",
     meta: { type: "tag", tag },
   });
@@ -6830,16 +4003,16 @@ function rebuildAdvancedFilterAction(options = {}) {
     return null;
   }
   const allowEmptyActive = Boolean(options.allowEmptyActive);
-  if (advancedFilterUsesEntryQuery()) {
-    return null;
-  }
   if (advancedFilter.meta?.type === "quality") {
     return qualityIssueFilterAction(
-      getQualityViewReport(dictionary),
+      buildDictionaryAnalysis(dictionary),
       advancedFilter.meta.group,
       advancedFilter.meta.activeKey,
       { allowEmptyActive },
     );
+  }
+  if (advancedFilter.meta?.type === "tag") {
+    return tagAdvancedFilterAction(advancedFilter.meta.tag, { allowEmptyActive });
   }
   return null;
 }
@@ -6853,15 +4026,15 @@ function applyAdvancedFilterAction(action, options = {}) {
   if (!activeVariant) {
     return false;
   }
-  advancedFilter = advancedFilterStateForVariant({
+  advancedFilter = {
     ...advancedFilter,
+    title: activeVariant.title,
+    entryIds: activeVariant.entryIds,
+    issueMap: activeVariant.issueMap,
     meta: activeVariant.key && action.meta ? { ...action.meta, activeKey: activeVariant.key } : action.meta,
     variants,
-  }, activeVariant, 0);
-  if (advancedFilterUsesEntryQuery()) {
-    resetEntryQueryState();
-    return true;
-  }
+    variantIndex: 0,
+  };
   const dictionary = activeDictionary();
   const ids = new Set(advancedFilter.entryIds || []);
   if (dictionary && ids.size && !ids.has(state.selectedEntryId)) {
@@ -6875,15 +4048,6 @@ function applyAdvancedFilterAction(action, options = {}) {
 function refreshAdvancedFilterState() {
   if (!advancedFilter) {
     return false;
-  }
-  if (advancedFilterUsesEntryQuery()) {
-    const dictionary = activeDictionary();
-    if (!dictionary) {
-      return false;
-    }
-    queryPageCache.invalidateDictionary(dictionary.id);
-    resetEntryQueryState();
-    return true;
   }
   const action = rebuildAdvancedFilterAction({ allowEmptyActive: true });
   if (action) {
@@ -6907,31 +4071,13 @@ function refreshAdvancedFilterState() {
   return true;
 }
 
-async function refreshAdvancedFilter() {
+function refreshAdvancedFilter() {
   if (!refreshAdvancedFilterState()) {
     return;
   }
-  const refreshTarget = advancedFilter;
-  const dictionary = activeDictionary();
   revealEntryBrowserForResults();
   render();
-  if (advancedFilterUsesEntryQuery()) {
-    scheduleEntryCardScroll(state.selectedEntryId);
-    const results = await Promise.allSettled(
-      advancedFilter.variants.map((variant) => api(advancedFilterVariantProbeUrl(dictionary, variant))),
-    );
-    if (advancedFilter !== refreshTarget) {
-      return;
-    }
-    results.forEach((result, index) => {
-      if (result.status === "fulfilled") {
-        advancedFilter.variants[index].available = Number(result.value?.pageInfo?.total || 0) > 0;
-      } else {
-        console.error(result.reason);
-      }
-    });
-    renderPartFilter();
-  } else if (advancedFilter?.entryIds?.length && advancedFilter.entryIds.includes(state.selectedEntryId)) {
+  if (advancedFilter?.entryIds?.length && advancedFilter.entryIds.includes(state.selectedEntryId)) {
     scheduleEntryCardScroll(state.selectedEntryId);
   }
 }
@@ -6944,8 +4090,7 @@ function nextAdvancedFilterVariantIndex() {
   const currentIndex = Math.max(0, advancedFilter.variantIndex || 0);
   for (let step = 1; step < variants.length; step += 1) {
     const index = (currentIndex + step) % variants.length;
-    const variant = variants[index];
-    if (advancedFilterVariantUsesEntryQuery(variant) ? variant.available !== false : variant?.entryIds?.length) {
+    if (variants[index]?.entryIds?.length) {
       return index;
     }
   }
@@ -6966,17 +4111,14 @@ function cycleAdvancedFilterVariant() {
     return;
   }
   const next = advancedFilter.variants[nextIndex];
-  advancedFilter = advancedFilterStateForVariant({
+  advancedFilter = {
     ...advancedFilter,
+    title: next.title,
+    entryIds: next.entryIds,
+    issueMap: next.issueMap,
     meta: next.key && advancedFilter.meta ? { ...advancedFilter.meta, activeKey: next.key } : advancedFilter.meta,
-    selectFirstOnLoad: advancedFilterVariantUsesEntryQuery(next),
-  }, next, nextIndex);
-  if (advancedFilterUsesEntryQuery()) {
-    resetEntryQueryState();
-    revealEntryBrowserForResults();
-    render();
-    return;
-  }
+    variantIndex: nextIndex,
+  };
   const ids = new Set(advancedFilter.entryIds);
   if (!ids.has(state.selectedEntryId)) {
     const firstEntry = [...dictionary.entries].filter((entry) => ids.has(entry.id)).sort(compareEntries)[0];
@@ -6988,75 +4130,135 @@ function cycleAdvancedFilterVariant() {
 }
 
 function entryMatchesSearch(entry, dictionary = activeDictionary(), options = {}) {
-  const query = options.query ?? searchQuery;
-  const searchOptions = entrySearchQueryOptions(dictionary);
-  const fields = options.fields ?? searchOptions.fields;
-  const fuzzyFields = options.fuzzyFields ?? searchOptions.fuzzyFields;
+  const query = options.query ?? normalize(searchQuery);
+  const settings = normalizeDictionarySettings(dictionary?.settings);
+  const contentFuzzyEnabled = options.contentFuzzyEnabled ?? Boolean(settings.fuzzySearch);
+  const tagFuzzyEnabled = options.tagFuzzyEnabled ?? Boolean(settings.tagFuzzySearch);
   const respectPart = options.respectPart ?? true;
   const parts = entryParts(entry, dictionary);
   const matchesPart = !respectPart
     || !activePart
     || (activePart === NO_PART_FILTER_VALUE ? !parts.length : parts.includes(activePart));
-  return matchesPart && entrySearchModel.entryMatchesSearchText(entry, dictionary, query, {
-    normalizeText: searchOptions.normalizeText,
-    fields,
-    fuzzyFields,
-  });
+  const tagSearchable = [
+    ...parts,
+    ...parts.map((part) => displayTag(part, dictionary)),
+    ...(entry.tags || []),
+    ...(entry.tags || []).map((tag) => displayTag(tag, dictionary)),
+  ]
+    .map(normalize)
+    .join(" ");
+  const contentSearchable = [
+    entry.lemma,
+    entry.pronunciation,
+    entry.notes,
+    entry.etymology?.description,
+    ...entry.definitions.flatMap((definition) => [definition.meaning, definition.example, definition.note]),
+    ...morphologySearchStrings(entry, dictionary),
+  ]
+    .map(normalize)
+    .join(" ");
+  return matchesPart && (
+    !query ||
+    textMatches(tagSearchable, query, tagFuzzyEnabled) ||
+    textMatches(contentSearchable, query, contentFuzzyEnabled)
+  );
 }
 
 function dictionaryStatsText(dictionary) {
   if (!dictionary) {
     return "";
   }
-  return `${dictionaryEntryCount(dictionary)} ${t("entries")} · ${dictionaryRootCountSummary(dictionary)} ${t("roots")}`;
-}
-
-function dictionaryManagerStatsText(dictionary) {
-  return `${dictionaryEntryCount(dictionary)} ${t("entries")}`;
-}
-
-function dictionaryEntryCount(dictionary) {
-  const summaryCount = dictionary?.summary?.entryCount;
-  return Number.isFinite(summaryCount) ? summaryCount : dictionary?.entries?.length || 0;
-}
-
-function dictionaryRootCountSummary(dictionary) {
-  const summaryCount = dictionary?.summary?.rootCount;
-  return Number.isFinite(summaryCount) ? summaryCount : dictionaryRootCount(dictionary);
+  return `${dictionary.entries.length} ${t("entries")} · ${dictionaryRootCount(dictionary)} ${t("roots")}`;
 }
 
 function dictionaryRootCount(dictionary) {
-  return entryRelationsModel.rootCount(dictionary, { normalizeText: normalize, compareEntries });
+  return rootModeGroups(dictionary, { query: "" }).length;
 }
 
 function rootModeGroups(dictionary = activeDictionary(), options = {}) {
   if (!dictionary) {
     return [];
   }
-  const searchOptions = entrySearchQueryOptions(dictionary);
-  const query = options.query ?? searchQuery;
-  const normalizedQuery = searchOptions.normalizeText(query);
-  const { fields, fuzzyFields } = searchOptions;
+  const query = normalize(options.query ?? searchQuery);
+  const settings = normalizeDictionarySettings(dictionary.settings);
   const matchOptions = {
     query,
-    fields,
-    fuzzyFields,
+    contentFuzzyEnabled: Boolean(settings.fuzzySearch),
+    tagFuzzyEnabled: Boolean(settings.tagFuzzySearch),
     respectPart: false,
   };
-  return entryRelationsModel.rootModeGroups(dictionary, {
-    query: normalizedQuery,
-    normalizeText: normalize,
-    compareEntries,
-    matchesEntry: (entry) => entryMatchesSearch(entry, dictionary, matchOptions),
+  const entries = [...dictionary.entries].sort(compareEntries);
+  const groups = new Map();
+
+  entries.forEach((entry) => {
+    if (!entryHasSources(entry)) {
+      ensureRootGroup(groups, entry);
+    }
   });
+
+  entries.forEach((entry) => {
+    if (!entryHasSources(entry)) {
+      return;
+    }
+    const roots = sourceRootEntries(entry, dictionary);
+    if (!roots.length) {
+      ensureRootGroup(groups, entry);
+      return;
+    }
+    roots.forEach((root) => {
+      const group = ensureRootGroup(groups, root);
+      if (!group.derived.some((item) => item.id === entry.id)) {
+        group.derived.push(entry);
+      }
+    });
+  });
+
+  return [...groups.values()]
+    .map((group) => {
+      const rootMatches = entryMatchesSearch(group.root, dictionary, matchOptions);
+      const matchedDerived = group.derived.filter((entry) => entryMatchesSearch(entry, dictionary, matchOptions));
+      return {
+        ...group,
+        derived: (query && !rootMatches ? matchedDerived : group.derived).sort(compareEntries),
+        matchedDerived,
+        rootMatches,
+      };
+    })
+    .filter((group) => !query || group.rootMatches || group.matchedDerived.length)
+    .sort((a, b) => compareEntries(a.root, b.root));
+}
+
+function ensureRootGroup(groups, entry) {
+  if (!groups.has(entry.id)) {
+    groups.set(entry.id, { root: entry, derived: [], matchedDerived: [] });
+  }
+  return groups.get(entry.id);
 }
 
 function entryHasSources(entry) {
-  return entryRelationsModel.entryHasSources(entry);
+  return Boolean(entry?.etymology?.sources?.length);
 }
 
 function sourceRootEntries(entry, dictionary = activeDictionary(), seen = new Set()) {
-  return entryRelationsModel.sourceRootEntries(entry, dictionary, { normalizeText: normalize, compareEntries }, seen);
+  const roots = [];
+  (entry.etymology?.sources || []).forEach((sourceName) => {
+    const source = resolveSourceEntry(sourceName, dictionary);
+    if (!source || seen.has(source.id)) {
+      return;
+    }
+    seen.add(source.id);
+    if (!entryHasSources(source)) {
+      roots.push(source);
+      return;
+    }
+    const ancestors = sourceRootEntries(source, dictionary, seen);
+    if (ancestors.length) {
+      roots.push(...ancestors);
+    } else {
+      roots.push(source);
+    }
+  });
+  return roots;
 }
 
 function compareEntries(a, b) {
@@ -7082,59 +4284,33 @@ function compareEntries(a, b) {
 }
 
 function textMatches(text, query, fuzzyEnabled = false) {
-  const searchOptions = entrySearchQueryOptions();
-  return entrySearchModel.textMatches(text, query, {
-    fuzzy: Boolean(fuzzyEnabled),
-    normalizeText: searchOptions.normalizeText,
-  });
+  if (!query) {
+    return true;
+  }
+  if (text.includes(query)) {
+    return true;
+  }
+  return fuzzyEnabled && fuzzyScore(text, query) > 0;
 }
 
-function highlightSearchText(value, fuzzyEnabled = false, searchEnabled = true) {
+function highlightSearchText(value, fuzzyEnabled = Boolean(activeDictionary()?.settings?.fuzzySearch)) {
   const text = String(value || "");
-  const searchOptions = entrySearchQueryOptions();
-  const query = searchOptions.normalizeText(searchQuery);
+  const query = normalize(searchQuery);
   if (!normalizeDictionarySettings(activeDictionary()?.settings).searchHighlight) {
     return escapeHtml(text);
   }
-  if (!text || !query || !searchEnabled) {
+  if (!text || !query) {
     return escapeHtml(text);
   }
 
-  const normalized = searchOptions.normalizeTextWithMap(text);
-  const normalizedText = normalized.text;
-  let normalizedCursor = 0;
-  let index = normalizedText.indexOf(query, normalizedCursor);
+  const normalizedText = normalize(text);
+  const index = normalizedText.indexOf(query);
   if (index >= 0) {
-    const ranges = [];
-    while (index >= 0) {
-      const covered = normalized.map.slice(index, index + query.length);
-      if (covered.length) {
-        ranges.push({
-          start: Math.min(...covered.map((item) => item.start)),
-          end: Math.max(...covered.map((item) => item.end)),
-        });
-      }
-      normalizedCursor = index + query.length;
-      index = normalizedText.indexOf(query, normalizedCursor);
-    }
-    const merged = ranges.reduce((result, range) => {
-      const previous = result[result.length - 1];
-      if (previous && range.start <= previous.end) {
-        previous.end = Math.max(previous.end, range.end);
-      } else {
-        result.push({ ...range });
-      }
-      return result;
-    }, []);
-    const html = [];
-    let cursor = 0;
-    merged.forEach((range) => {
-      html.push(escapeHtml(text.slice(cursor, range.start)));
-      html.push(`<mark>${escapeHtml(text.slice(range.start, range.end))}</mark>`);
-      cursor = range.end;
-    });
-    html.push(escapeHtml(text.slice(cursor)));
-    return html.join("");
+    return [
+      escapeHtml(text.slice(0, index)),
+      `<mark>${escapeHtml(text.slice(index, index + query.length))}</mark>`,
+      escapeHtml(text.slice(index + query.length)),
+    ].join("");
   }
 
   if (!fuzzyEnabled || fuzzyScore(text, query) <= 0) {
@@ -7145,11 +4321,10 @@ function highlightSearchText(value, fuzzyEnabled = false, searchEnabled = true) 
 
 function highlightFuzzyText(value, query) {
   const text = String(value || "");
-  const normalizeSearch = entrySearchQueryOptions().normalizeText;
   let queryIndex = 0;
   let html = "";
   for (const char of text) {
-    if (queryIndex < query.length && normalizeSearch(char) === query[queryIndex]) {
+    if (queryIndex < query.length && normalize(char) === query[queryIndex]) {
       html += `<mark>${escapeHtml(char)}</mark>`;
       queryIndex += 1;
     } else {
@@ -7160,78 +4335,28 @@ function highlightFuzzyText(value, query) {
 }
 
 function renderEntrySearchSnippets(entry) {
-  const dictionary = activeDictionary();
-  const searchOptions = entrySearchQueryOptions(dictionary);
-  const query = searchQuery;
-  if (!searchOptions.normalizeText(query)) {
+  const query = normalize(searchQuery);
+  if (!query) {
     return "";
   }
-  const { fields: searchFields, fuzzyFields } = searchOptions;
-  const labels = {
-    definitions: t("meaning"),
-    examples: t("example"),
-    notes: t("entryNotes"),
-    etymology: t("etymology"),
-    morphology: t("morphologyDisplay"),
-  };
-  const firstDisplayedDefinitionIndex = entryDefinitionItems(entry).findIndex((definition) => (
-    Boolean(String(definition?.meaning || "").trim())
-  ));
-  const labelOrder = Object.keys(labels);
-  const apiHits = Array.isArray(entry.searchHits) ? entry.searchHits : null;
-  const hitLabel = (hit) => {
-    if (hit.field !== "notes") {
-      return labels[hit.field];
-    }
-    if (hit.sourceType === "definition") {
-      return t("definitionNote");
-    }
-    if (hit.sourceType === "morphologyGroup") {
-      return t("morphologyGroupNote");
-    }
-    return t("entryNotes");
-  };
-  const candidates = apiHits
-    ? apiHits
-        .filter((hit) => Object.hasOwn(labels, hit.field))
-        .sort((left, right) => labelOrder.indexOf(left.field) - labelOrder.indexOf(right.field))
-        .map((hit) => ({
-          field: hit.field,
-          label: hitLabel(hit),
-          value: hit.value,
-          index: Number(hit.sourcePosition) || 0,
-        }))
-        .filter(({ field, index }) => field !== "definitions" || index !== firstDisplayedDefinitionIndex)
-    : (() => {
-        const records = entrySearchModel.entrySearchValueRecords(entry, dictionary, {
-          fields: searchFields,
-          normalizeText: searchOptions.normalizeText,
-        });
-        return records
-          .filter((record) => Object.hasOwn(labels, record.field))
-          .sort((left, right) => labelOrder.indexOf(left.field) - labelOrder.indexOf(right.field))
-          .map((record) => ({
-            field: record.field,
-            label: hitLabel(record),
-            value: record.value,
-            index: Number(record.sourcePosition) || 0,
-          }))
-          .filter(({ field, value, index }) => (
-            entrySearchModel.textMatches(value, query, {
-              fuzzy: fuzzyFields.has(field),
-              normalizeText: searchOptions.normalizeText,
-            })
-            && (field !== "definitions" || index !== firstDisplayedDefinitionIndex)
-          ));
-      })();
-  const snippets = candidates
+  const dictionary = activeDictionary();
+  const fuzzyEnabled = Boolean(dictionary?.settings?.fuzzySearch);
+  const fields = [
+    ...entry.definitions.flatMap((definition) => [
+      [t("example"), definition.example],
+      [t("definitionNote"), definition.note],
+    ]),
+    [t("entryNotes"), entry.notes],
+    [t("etymology"), entry.etymology?.description],
+    ...morphologySearchStrings(entry, dictionary).map((value) => [t("morphologyDisplay"), value]),
+  ];
+  const snippets = fields
+    .filter(([, value]) => value && textMatches(normalize(value), query, fuzzyEnabled))
     .slice(0, 2)
-    .map(({ field, label, value, index }) => `
+    .map(([label, value]) => `
       <span class="search-snippet">
-        <b>${escapeHtml(field === "definitions"
-          ? (currentLanguage === "zh" ? `${label}${index + 1}` : `${label} ${index + 1}`)
-          : label)}</b>
-        ${highlightSearchText(compactSearchSnippet(value), fuzzyFields.has(field), true)}
+        <b>${escapeHtml(label)}</b>
+        ${highlightSearchText(compactSearchSnippet(value), fuzzyEnabled)}
       </span>
     `)
     .join("");
@@ -7244,73 +4369,52 @@ function compactSearchSnippet(value) {
 }
 
 function fuzzyScore(value, query) {
-  return entrySearchModel.fuzzyScore(value, query, { normalizeText: entrySearchQueryOptions().normalizeText });
+  const text = normalize(value);
+  const needle = normalize(query);
+  if (!needle) {
+    return 0;
+  }
+  if (text.includes(needle)) {
+    return 100 + needle.length;
+  }
+
+  let score = 0;
+  let lastIndex = -1;
+  for (const char of needle) {
+    const index = text.indexOf(char, lastIndex + 1);
+    if (index < 0) {
+      return 0;
+    }
+    score += index === lastIndex + 1 ? 6 : 2;
+    lastIndex = index;
+  }
+  return score - Math.max(0, text.length - needle.length) * 0.02;
 }
 
 function renderDetail() {
   const dictionary = activeDictionary();
+  const entry = selectedEntry();
   const isEditing = editorMode === "edit";
 
+  elements.entryDisplay.hidden = isEditing || !dictionary || !entry;
+  elements.entryForm.hidden = !dictionary || !isEditing;
+
   if (!dictionary) {
-    finishStaleContentUpdate("detail");
-    entryDetailHasSettledContent = false;
-    elements.entryDisplay.hidden = true;
-    elements.entryForm.hidden = true;
     return;
   }
 
   if (isEditing) {
-    finishStaleContentUpdate("detail");
-    elements.entryDisplay.hidden = true;
-    elements.entryForm.hidden = false;
-    fillEntryForm(selectedEntry() || entryDraft);
+    fillEntryForm(entry || entryDraft);
     return;
   }
-
-  const detailStateMatchesSelection = selectedEntryDetailState.dictionaryId === dictionary.id
-    && selectedEntryDetailState.entryId === state.selectedEntryId;
-  if (
-    state.selectedEntryId
-    && !selectedEntry()
-    && !(detailStateMatchesSelection && selectedEntryDetailState.status === "error")
-  ) {
-    ensureSelectedEntryDetailLoaded();
-  }
-  const entry = selectedEntry();
-  const retainingStaleDetail = Boolean(
-    !entry
-    && selectedEntryDetailState.dictionaryId === dictionary.id
-    && selectedEntryDetailState.entryId === state.selectedEntryId
-    && selectedEntryDetailState.status === "loading"
-    && selectedEntryDetailState.staleEntry
-    && staleContentUpdateRetainsContent("detail")
-  );
-
-  elements.entryForm.hidden = true;
-  if (retainingStaleDetail) {
-    elements.entryDisplay.hidden = false;
-    return;
-  }
-
-  elements.entryDisplay.hidden = !entry && !state.selectedEntryId;
 
   if (!entry) {
     elements.entryDisplay.hidden = false;
     renderEmptyDetail();
-    entryDetailHasSettledContent = false;
-    if (state.selectedEntryId) {
-      if (selectedEntryDetailState.status === "error") {
-        elements.displayLemma.textContent = aText("无法加载词条详情", "Could not load entry details");
-      } else {
-        elements.displayLemma.textContent = aText("加载中", "Loading");
-      }
-    }
     return;
   }
 
-  elements.entryDisplay.hidden = false;
   renderEntryDisplay(entry);
-  entryDetailHasSettledContent = true;
 }
 
 function renderEmptyDetail() {
@@ -7323,7 +4427,6 @@ function renderEmptyDetail() {
   delete elements.displayPart.dataset.entryTagIndex;
   delete elements.displayPart.dataset.entryTagValue;
   elements.displayTags.innerHTML = "";
-  elements.displayDefinitionsSection.hidden = false;
   elements.displayDefinitions.innerHTML = "";
   elements.displayDefinitions.append(emptyState(t("noEntries"), t("noEntriesBody")));
   elements.displayEtymologySection.hidden = true;
@@ -7331,12 +4434,10 @@ function renderEmptyDetail() {
   elements.displayMorphologySection.hidden = true;
   elements.displayEntryNotesSection.hidden = true;
   elements.editEntryButton.hidden = true;
-  elements.focusEntryListButton.hidden = true;
   elements.openLexicalNetworkButton.hidden = true;
 }
 
 function renderEntryDisplay(entry) {
-  const showEmptySections = normalizeDictionarySettings(activeDictionary()?.settings).showEmptyEntrySections;
   const partTags = (entry.tags || [])
     .map((tag, index) => ({ tag, index }))
     .filter(({ tag, index }) => entryTagIsPart(entry, index, tag));
@@ -7344,7 +4445,6 @@ function renderEntryDisplay(entry) {
     .map((tag, index) => ({ tag, index }))
     .filter(({ tag, index }) => !entryTagIsPart(entry, index, tag));
   elements.editEntryButton.hidden = false;
-  elements.focusEntryListButton.hidden = false;
   elements.openLexicalNetworkButton.hidden = false;
   elements.displayLemma.textContent = entry.lemma;
   elements.displayPronunciation.textContent = entry.pronunciation;
@@ -7362,7 +4462,6 @@ function renderEntryDisplay(entry) {
 
   elements.displayDefinitions.innerHTML = "";
   const visibleDefinitions = (entry.definitions || []).filter((definition) => definition.meaning || definition.example || definition.note);
-  elements.displayDefinitionsSection.hidden = !visibleDefinitions.length && !showEmptySections;
   if (!visibleDefinitions.length) {
     elements.displayDefinitions.append(emptyState(t("missingDefinition"), ""));
   }
@@ -7380,53 +4479,33 @@ function renderEntryDisplay(entry) {
     elements.displayDefinitions.append(item);
   });
 
-  renderEntryRelationSections(entry, showEmptySections);
-  renderMorphologyDisplay(entry, showEmptySections);
-  elements.displayEntryNotesSection.hidden = !entry.notes && !showEmptySections;
+  renderEtymology(entry);
+  renderDerivedEntries(entry);
+  renderMorphologyDisplay(entry);
+  elements.displayEntryNotesSection.hidden = !entry.notes;
   elements.displayEntryNotes.textContent = entry.notes || "";
-  applyEntryDisplaySectionOrder();
 }
 
-function applyEntryDisplaySectionOrder() {
-  const sections = {
-    definitions: elements.displayDefinitionsSection,
-    etymology: elements.displayEtymologySection,
-    derived: elements.displayDerivedSection,
-    morphology: elements.displayMorphologySection,
-    notes: elements.displayEntryNotesSection,
-  };
-  normalizeEntrySectionOrder(activeDictionary()?.settings?.entrySectionOrder)
-    .forEach((section) => elements.entryDisplay.append(sections[section]));
-}
-
-function renderEntryRelationSections(entry, showEmptySections = false) {
-  const relationState = entryRelationStateForEntry(activeDictionary(), entry);
-  renderEtymology(entry, showEmptySections, relationState);
-  renderDerivedEntries(entry, relationState);
-}
-
-function renderEtymology(entry, showEmptySections = false, relationState = { status: "loading", relation: null }) {
+function renderEtymology(entry) {
+  const dictionary = activeDictionary();
   const sources = entry.etymology?.sources || [];
   const description = entry.etymology?.description || "";
-  elements.displayEtymologySection.hidden = !sources.length && !description && !showEmptySections;
+  elements.displayEtymologySection.hidden = !sources.length && !description;
   elements.displayEtymology.innerHTML = "";
 
   if (sources.length) {
     const sourceRow = document.createElement("div");
     sourceRow.className = "source-row";
-    const resolvedSources = relationState.status === "success"
-      ? relationState.relation.sources || []
-      : sources.map((sourceText) => ({ sourceText, matchedEntryId: "", matchedLemma: "" }));
-    resolvedSources.forEach((sourceRelation) => {
-      const sourceName = sourceRelation.sourceText || "";
-      if (relationState.status === "success" && sourceRelation.matchedEntryId) {
+    sources.forEach((sourceName) => {
+      const source = resolveSourceEntry(sourceName, dictionary);
+      if (source) {
         const button = document.createElement("button");
         button.className = "source-link";
         button.type = "button";
-        button.textContent = sourceRelation.matchedLemma || sourceName;
-        button.addEventListener("click", () => switchToEntry(sourceRelation.matchedEntryId));
+        button.textContent = source.lemma;
+        button.addEventListener("click", () => switchToEntry(source.id));
         sourceRow.append(button);
-      } else if (relationState.status === "success") {
+      } else {
         const pending = document.createElement("button");
         pending.type = "button";
         pending.className = "source-link pending-source";
@@ -7434,11 +4513,6 @@ function renderEtymology(entry, showEmptySections = false, relationState = { sta
         pending.setAttribute("aria-label", formatText("createSourceEntry", { source: sourceName }));
         pending.addEventListener("click", () => beginSourceEntry(sourceName));
         sourceRow.append(pending);
-      } else {
-        const loading = document.createElement("span");
-        loading.className = "source-link pending-source";
-        loading.textContent = sourceName;
-        sourceRow.append(loading);
       }
     });
     elements.displayEtymology.append(sourceRow);
@@ -7459,38 +4533,23 @@ async function beginSourceEntry(sourceName) {
   return beginNewEntry({ lemma });
 }
 
-function renderDerivedEntries(entry, relationState = entryRelationStateForEntry(activeDictionary(), entry)) {
-  const derived = relationState.status === "success" ? relationState.relation.derivedEntries || [] : [];
+function renderDerivedEntries(entry) {
+  const dictionary = activeDictionary();
+  const derived = findDerivedEntries(entry, dictionary);
   elements.displayDerivedSection.hidden = !derived.length;
-  renderDerivedEntryList(elements.displayDerived, derived, activeDictionary(), { interactive: true });
-}
+  elements.displayDerived.innerHTML = "";
 
-function renderFullEditDerivedEntries(entry) {
-  const relationState = entry?.id
-    ? entryRelationStateForEntry(activeDictionary(), entry)
-    : { status: "idle", relation: null };
-  const derived = relationState.status === "success" ? relationState.relation.derivedEntries || [] : [];
-  elements.fullEditDerivedSection.hidden = !derived.length;
-  renderDerivedEntryList(elements.fullEditDerived, derived, activeDictionary(), { interactive: false });
-}
-
-function renderDerivedEntryList(container, derived = [], dictionary = activeDictionary(), { interactive = true } = {}) {
-  container.innerHTML = "";
   derived.forEach((derivedEntry) => {
-    const card = document.createElement(interactive ? "button" : "div");
-    if (interactive) {
-      card.type = "button";
-    }
-    card.className = interactive ? "derived-link" : "derived-link derived-readonly";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "derived-link";
     const partText = entryPartText(derivedEntry, dictionary);
-    card.innerHTML = `
+    button.innerHTML = `
       <strong>${escapeHtml(derivedEntry.lemma)}</strong>
       ${partText ? `<span>${escapeHtml(partText)}</span>` : ""}
     `;
-    if (interactive) {
-      card.addEventListener("click", () => switchToEntry(derivedEntry.id));
-    }
-    container.append(card);
+    button.addEventListener("click", () => switchToEntry(derivedEntry.id));
+    elements.displayDerived.append(button);
   });
 }
 
@@ -7504,13 +4563,10 @@ async function openLexicalNetwork() {
   if (!entry) {
     return;
   }
-  resetLexicalNetworkScene();
   networkEntryId = entry.id;
-  networkPreviousFocusId = "";
   networkOpen = true;
   editorMode = "display";
   renderLexicalNetwork();
-  window.requestAnimationFrame(() => elements.lexicalNetworkPanel.focus());
 }
 
 function closeLexicalNetwork() {
@@ -7523,24 +4579,22 @@ function closeLexicalNetwork() {
     editorMode = "display";
   }
   networkOpen = false;
-  resetLexicalNetworkScene();
-  if (targetEntryId) {
-    ensureSelectedEntryDetailLoaded();
-  }
-  renderEditorEntrySelection();
+  render();
   if (targetEntryId) {
     scheduleEntryCardScroll(targetEntryId, navigationOptions);
   }
-  elements.openLexicalNetworkButton.focus();
 }
 
 function navigateLexicalNetwork(entryId) {
   if (!entryId || entryId === networkEntryId) {
     return;
   }
-  networkPreviousFocusId = networkEntryId;
-  networkEntryId = entryId;
-  renderLexicalNetwork();
+  elements.lexicalNetworkPanel.classList.add("moving");
+  window.setTimeout(() => {
+    networkEntryId = entryId;
+    renderLexicalNetwork();
+    elements.lexicalNetworkPanel.classList.remove("moving");
+  }, 160);
 }
 
 function renderLexicalNetwork() {
@@ -7550,515 +4604,58 @@ function renderLexicalNetwork() {
   }
 
   const dictionary = activeDictionary();
-  const entry = dictionary?.entries.find((item) => item.id === networkEntryId)
-    || networkScene.nodes.get(networkEntryId)?.entry
-    || selectedEntry();
+  const entry = dictionary?.entries.find((item) => item.id === networkEntryId) || selectedEntry();
   if (!dictionary || !entry) {
     elements.lexicalNetworkOverlay.hidden = true;
     networkOpen = false;
-    resetLexicalNetworkScene();
     return;
   }
 
   networkEntryId = entry.id;
   elements.networkTitle.textContent = entry.lemma;
-  const relation = lexicalNetworkRelationForEntry(dictionary, entry);
-  renderLexicalNetworkScene(entry, relation);
+  const sources = (entry.etymology?.sources || [])
+    .map((source) => resolveSourceEntry(source, dictionary))
+    .filter(Boolean);
+  const derived = findDerivedEntries(entry, dictionary);
+
+  renderNetworkNodeList(elements.networkSources, sources);
+  renderNetworkNodeList(elements.networkDerived, derived);
+  elements.networkFocus.innerHTML = "";
+  elements.networkFocus.append(createNetworkNode(entry, true));
 }
 
-const NETWORK_SVG_NS = "http://www.w3.org/2000/svg";
-const NETWORK_TRANSITION_MS = 300;
-
-function resetLexicalNetworkScene() {
-  if (networkLayoutFrame) {
-    window.cancelAnimationFrame(networkLayoutFrame);
-    networkLayoutFrame = 0;
-  }
-  hideAppTooltip();
-  networkNodeElements.clear();
-  networkEdgeElements.clear();
-  if (elements.networkNodes) {
-    elements.networkNodes.replaceChildren();
-  }
-  if (elements.networkEdges) {
-    elements.networkEdges.replaceChildren();
-  }
-  networkScene = {
-    focusEntryId: "",
-    nodes: new Map(),
-    edges: new Map(),
-    positions: new Map(),
-  };
-}
-
-function createNetworkSvgElement(name, attributes = {}) {
-  const element = document.createElementNS(NETWORK_SVG_NS, name);
-  Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, String(value)));
-  return element;
-}
-
-function renderLexicalNetworkScene(focusEntry, relation) {
-  if (!elements.networkViewport || !elements.networkSvg) {
+function renderNetworkNodeList(container, entries) {
+  container.innerHTML = "";
+  if (!entries.length) {
+    container.append(emptyState(t("none"), ""));
     return;
   }
-  const nextScene = buildLexicalNetworkScene(focusEntry, relation);
-  const layout = layoutLexicalNetworkScene(nextScene);
-  nextScene.positions = layout.positions;
-  nextScene.layout = layout;
-
-  elements.networkViewport.dataset.layout = layout.orientation;
-  elements.networkViewport.style.setProperty("--network-derived-label-top", `${layout.derivedLabelTop || 14}px`);
-  elements.networkSvg.setAttribute("viewBox", `0 0 ${layout.width} ${layout.height}`);
-  elements.networkSvg.style.height = `${layout.height}px`;
-  const sourceCount = [...nextScene.nodes.values()].filter((node) => node.role === "source").length;
-  const derivedCount = [...nextScene.nodes.values()].filter((node) => node.role === "derived").length;
-  elements.networkSourceLabel.textContent = `${t("source")} · ${sourceCount}`;
-  elements.networkDerivedLabel.textContent = `${t("derivedEntries")} · ${derivedCount}`;
-  renderLexicalNetworkStatus(relation.status);
-  updateLexicalNetworkEdges(nextScene);
-  updateLexicalNetworkNodes(nextScene);
-  networkScene = nextScene;
+  entries.forEach((entry) => container.append(createNetworkNode(entry, false)));
 }
 
-function buildLexicalNetworkScene(focusEntry, relation) {
-  const nodes = new Map();
-  const edges = new Map();
-  const addNode = (entry, role) => {
-    if (!entry?.id) {
-      return;
-    }
-    const previous = nodes.get(entry.id);
-    nodes.set(entry.id, {
-      id: entry.id,
-      entry,
-      role: entry.id === focusEntry.id ? "focus" : previous?.role || role,
-    });
-  };
-  const addEdge = (fromEntry, toEntry) => {
-    if (!fromEntry?.id || !toEntry?.id || fromEntry.id === toEntry.id) {
-      return;
-    }
-    const key = `${fromEntry.id}\u0000${toEntry.id}`;
-    edges.set(key, { key, fromId: fromEntry.id, toId: toEntry.id });
-  };
-
-  addNode(focusEntry, "focus");
-  if (relation.status === "success") {
-    relation.sources.forEach((source) => {
-      addNode(source, "source");
-      addEdge(source, focusEntry);
-    });
-    relation.derivedEntries.forEach((derived) => {
-      addNode(derived, "derived");
-      addEdge(focusEntry, derived);
-    });
-  } else {
-    const previousFocus = networkScene.nodes.get(networkPreviousFocusId);
-    const oldToNewKey = `${networkPreviousFocusId}\u0000${focusEntry.id}`;
-    const newToOldKey = `${focusEntry.id}\u0000${networkPreviousFocusId}`;
-    if (previousFocus && networkScene.edges.has(oldToNewKey)) {
-      addNode(previousFocus.entry, "source");
-      addEdge(previousFocus.entry, focusEntry);
-    } else if (previousFocus && networkScene.edges.has(newToOldKey)) {
-      addNode(previousFocus.entry, "derived");
-      addEdge(focusEntry, previousFocus.entry);
-    }
-  }
-
-  return {
-    focusEntryId: focusEntry.id,
-    nodes,
-    edges,
-    positions: new Map(),
-  };
-}
-
-function layoutLexicalNetworkScene(scene) {
-  const viewportWidth = Math.max(300, Math.floor(elements.networkViewport.clientWidth || 960));
-  const sources = [...scene.nodes.values()].filter((node) => node.role === "source");
-  const derived = [...scene.nodes.values()].filter((node) => node.role === "derived");
-  const positions = new Map();
-  if (viewportWidth < 720) {
-    const width = viewportWidth;
-    const nodeWidth = Math.min(280, width - 40);
-    const nodeHeight = 72;
-    const focusHeight = 108;
-    const gap = 18;
-    const topPadding = 52;
-    let cursorY = topPadding;
-    sources.forEach((node) => {
-      positions.set(node.id, { x: width / 2, y: cursorY + nodeHeight / 2, width: nodeWidth, height: nodeHeight });
-      cursorY += nodeHeight + gap;
-    });
-    if (sources.length) {
-      cursorY += 26;
-    }
-    positions.set(scene.focusEntryId, { x: width / 2, y: cursorY + focusHeight / 2, width: nodeWidth, height: focusHeight });
-    cursorY += focusHeight + (derived.length ? 44 : 22);
-    const derivedLabelTop = cursorY - 34;
-    derived.forEach((node) => {
-      positions.set(node.id, { x: width / 2, y: cursorY + nodeHeight / 2, width: nodeWidth, height: nodeHeight });
-      cursorY += nodeHeight + gap;
-    });
-    return {
-      orientation: "vertical",
-      width,
-      height: Math.max(420, cursorY + 28),
-      derivedLabelTop,
-      positions,
-    };
-  }
-
-  const width = viewportWidth;
-  const nodeWidth = Math.min(230, Math.max(168, (width - 210) / 3));
-  const nodeHeight = 72;
-  const focusWidth = Math.min(250, nodeWidth + 22);
-  const focusHeight = 118;
-  const maxSideCount = Math.max(1, sources.length, derived.length);
-  const height = Math.max(520, maxSideCount * 92 + 112);
-  const sideTop = 74;
-  const sideBottom = height - 38;
-  const sideY = (items, index) => {
-    if (items.length <= 1) {
-      return height / 2;
-    }
-    return sideTop + ((sideBottom - sideTop) * index) / (items.length - 1);
-  };
-  const leftX = 34 + nodeWidth / 2;
-  const rightX = width - 34 - nodeWidth / 2;
-  sources.forEach((node, index) => {
-    positions.set(node.id, { x: leftX, y: sideY(sources, index), width: nodeWidth, height: nodeHeight });
-  });
-  derived.forEach((node, index) => {
-    positions.set(node.id, { x: rightX, y: sideY(derived, index), width: nodeWidth, height: nodeHeight });
-  });
-  positions.set(scene.focusEntryId, { x: width / 2, y: height / 2, width: focusWidth, height: focusHeight });
-  return { orientation: "horizontal", width, height, positions };
-}
-
-function renderLexicalNetworkStatus(status) {
-  if (!elements.networkStatus) {
-    return;
-  }
-  elements.networkStatus.classList.toggle("error", status === "error");
-  if (status === "loading") {
-    elements.networkStatus.textContent = t("lexicalNetworkLoading");
-    elements.networkStatus.hidden = false;
-    return;
-  }
-  if (status === "error") {
-    elements.networkStatus.textContent = t("lexicalNetworkLoadFailed");
-    elements.networkStatus.hidden = false;
-    return;
-  }
-  elements.networkStatus.textContent = "";
-  elements.networkStatus.hidden = true;
-}
-
-function networkNodeTransform(position) {
-  return `translate(${position.x} ${position.y})`;
-}
-
-function networkEntrySubtitle(entry) {
-  return [entry?.pronunciation || "", entryPartText(entry)].filter(Boolean).join(" · ");
-}
-
-function networkTruncatedLabel(value, width, fontSize = 16) {
-  const text = String(value || "");
-  const limit = Math.max(8, Math.floor(width / (fontSize * 0.62)));
-  return text.length > limit ? `${text.slice(0, Math.max(1, limit - 1))}…` : text;
-}
-
-function networkNodeTooltipHtml(entry) {
+function createNetworkNode(entry, isFocus = false) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `network-node${isFocus ? " focus" : ""}`;
   const partText = entryPartText(entry);
   const settings = normalizeDictionarySettings(activeDictionary()?.settings);
-  return `
-    <div class="network-tooltip-content">
-      <b>${escapeHtml(entry.lemma || "")}</b>
+  const meaningHtml = renderNetworkMeaningHtml(entry, settings.networkPolysemyDisplay);
+  button.innerHTML = `
+    <strong>${escapeHtml(entry.lemma)}</strong>
+    <span>${escapeHtml([entry.pronunciation, partText].filter(Boolean).join(" · "))}</span>
+    <div class="network-card" role="tooltip">
+      <b>${escapeHtml(entry.lemma)}</b>
       ${entry.pronunciation ? `<span>${escapeHtml(entry.pronunciation)}</span>` : ""}
       ${partText ? `<span>${escapeHtml(partText)}</span>` : ""}
-      ${renderNetworkMeaningHtml(entry, settings.networkPolysemyDisplay)}
+      ${meaningHtml}
     </div>
   `;
-}
-
-function createLexicalNetworkNodeElement(node, initialPosition) {
-  const group = createNetworkSvgElement("g", {
-    class: `network-svg-node ${node.role}`,
-    transform: networkNodeTransform(initialPosition),
-    tabindex: "0",
-    role: "button",
-  });
-  const rect = createNetworkSvgElement("rect", { rx: "10", ry: "10" });
-  const lemma = createNetworkSvgElement("text", { class: "network-node-lemma", "text-anchor": "middle" });
-  const subtitle = createNetworkSvgElement("text", { class: "network-node-subtitle", "text-anchor": "middle" });
-  group.append(rect, lemma, subtitle);
-  group.addEventListener("click", () => navigateLexicalNetwork(node.id));
-  group.addEventListener("keydown", (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      navigateLexicalNetwork(node.id);
-    }
-  });
-  elements.networkNodes.append(group);
-  return group;
-}
-
-function updateLexicalNetworkNodeElement(group, node, position) {
-  group.dataset.networkActive = "true";
-  group.dataset.entryId = node.id;
-  group.dataset.appTooltip = "always";
-  group.dataset.appTooltipWrap = "true";
-  group.dataset.appTooltipHtml = networkNodeTooltipHtml(node.entry);
-  const subtitleText = networkEntrySubtitle(node.entry);
-  group.setAttribute("aria-label", [node.entry.lemma, subtitleText].filter(Boolean).join(", "));
-  group.classList.toggle("focus", node.role === "focus");
-  group.classList.toggle("source", node.role === "source");
-  group.classList.toggle("derived", node.role === "derived");
-  const rect = group.querySelector("rect");
-  rect.setAttribute("x", String(-position.width / 2));
-  rect.setAttribute("y", String(-position.height / 2));
-  rect.setAttribute("width", String(position.width));
-  rect.setAttribute("height", String(position.height));
-  const lemma = group.querySelector(".network-node-lemma");
-  lemma.textContent = networkTruncatedLabel(node.entry.lemma, position.width - 28, node.role === "focus" ? 24 : 16);
-  lemma.setAttribute("y", node.role === "focus" ? "-6" : "-5");
-  const subtitle = group.querySelector(".network-node-subtitle");
-  subtitle.textContent = networkTruncatedLabel(subtitleText, position.width - 28, 13);
-  subtitle.setAttribute("y", node.role === "focus" ? "25" : "20");
-}
-
-function updateLexicalNetworkNodes(scene) {
-  const oldPositions = networkScene.positions;
-  scene.nodes.forEach((node, id) => {
-    const position = scene.positions.get(id);
-    let group = networkNodeElements.get(id);
-    if (!group) {
-      const origin = oldPositions.get(id)
-        || oldPositions.get(networkScene.focusEntryId)
-        || scene.positions.get(scene.focusEntryId)
-        || position;
-      group = createLexicalNetworkNodeElement(node, origin);
-      group.style.opacity = "0";
-      networkNodeElements.set(id, group);
-    }
-    updateLexicalNetworkNodeElement(group, node, position);
-    window.requestAnimationFrame(() => {
-      if (group.dataset.networkActive !== "true") {
-        return;
-      }
-      group.style.opacity = "1";
-      group.setAttribute("transform", networkNodeTransform(position));
-    });
-  });
-
-  [...networkNodeElements.entries()].forEach(([id, group]) => {
-    if (scene.nodes.has(id)) {
-      return;
-    }
-    if (activeAppTooltipTarget === group) {
-      hideAppTooltip();
-    }
-    group.dataset.networkActive = "false";
-    group.style.opacity = "0";
-    const focusPosition = scene.positions.get(scene.focusEntryId);
-    if (focusPosition) {
-      group.setAttribute("transform", networkNodeTransform(focusPosition));
-    }
-    window.setTimeout(() => {
-      if (group.dataset.networkActive === "false") {
-        group.remove();
-        networkNodeElements.delete(id);
-      }
-    }, NETWORK_TRANSITION_MS);
-  });
-}
-
-function networkEdgePath(from, to, orientation) {
-  if (orientation === "vertical") {
-    const startX = from.x;
-    const startY = from.y + from.height / 2;
-    const endX = to.x;
-    const endY = to.y - to.height / 2;
-    const middleY = startY + (endY - startY) / 2;
-    return `M ${startX} ${startY} C ${startX} ${middleY}, ${endX} ${middleY}, ${endX} ${endY}`;
-  }
-  const direction = to.x >= from.x ? 1 : -1;
-  const startX = from.x + direction * from.width / 2;
-  const startY = from.y;
-  const endX = to.x - direction * to.width / 2;
-  const endY = to.y;
-  const middleX = startX + (endX - startX) / 2;
-  return `M ${startX} ${startY} C ${middleX} ${startY}, ${middleX} ${endY}, ${endX} ${endY}`;
-}
-
-function updateLexicalNetworkEdges(scene) {
-  scene.edges.forEach((edge, key) => {
-    const from = scene.positions.get(edge.fromId);
-    const to = scene.positions.get(edge.toId);
-    if (!from || !to) {
-      return;
-    }
-    let path = networkEdgeElements.get(key);
-    if (!path) {
-      path = createNetworkSvgElement("path", {
-        class: "network-edge",
-        "marker-end": "url(#networkArrow)",
-      });
-      path.style.opacity = "0";
-      const origin = networkScene.positions.get(edge.fromId)
-        || networkScene.positions.get(networkScene.focusEntryId)
-        || from;
-      path.setAttribute("d", networkEdgePath(origin, origin, scene.layout.orientation));
-      elements.networkEdges.append(path);
-      networkEdgeElements.set(key, path);
-    }
-    path.dataset.networkActive = "true";
-    const nextPath = networkEdgePath(from, to, scene.layout.orientation);
-    window.requestAnimationFrame(() => {
-      if (path.dataset.networkActive !== "true") {
-        return;
-      }
-      path.style.opacity = "1";
-      path.setAttribute("d", nextPath);
-    });
-  });
-
-  [...networkEdgeElements.entries()].forEach(([key, path]) => {
-    if (scene.edges.has(key)) {
-      return;
-    }
-    path.dataset.networkActive = "false";
-    path.style.opacity = "0";
-    window.setTimeout(() => {
-      if (path.dataset.networkActive === "false") {
-        path.remove();
-        networkEdgeElements.delete(key);
-      }
-    }, NETWORK_TRANSITION_MS);
-  });
-}
-
-function scheduleLexicalNetworkLayout() {
-  if (!networkOpen || networkLayoutFrame) {
-    return;
-  }
-  networkLayoutFrame = window.requestAnimationFrame(() => {
-    networkLayoutFrame = 0;
-    renderLexicalNetwork();
-  });
-}
-
-function entryRelationKey(dictionary, entryId) {
-  return [
-    dictionary?.id || "",
-    entryId || "",
-    dictionary?.updatedAt || "",
-  ].join("|");
-}
-
-function entryRelationStateForEntry(dictionary, entry) {
-  if (!backendAvailable || !dictionary?.id || !entry?.id) {
-    return { status: "error", relation: null };
-  }
-
-  const key = entryRelationKey(dictionary, entry.id);
-  const cached = entryRelationsCache.get(key);
-  if (cached) {
-    entryRelationsCache.delete(key);
-    entryRelationsCache.set(key, cached);
-  }
-  if (cached?.status === "success") {
-    return { status: "success", relation: cached.relation };
-  }
-  if (!cached) {
-    fetchEntryRelation(dictionary, entry, key);
-  }
-  return {
-    status: cached?.status || "loading",
-    relation: null,
-  };
-}
-
-function lexicalNetworkRelationForEntry(dictionary, entry) {
-  const relationState = entryRelationStateForEntry(dictionary, entry);
-  if (relationState.status !== "success") {
-    return { status: relationState.status, sources: [], derivedEntries: [], rootGroup: null };
-  }
-  return { status: "success", ...apiLexicalNetworkRelation(relationState.relation) };
-}
-
-function apiLexicalNetworkRelation(relation) {
-  const relatedEntries = [
-    ...(relation.derivedEntries || []),
-    ...(relation.rootGroup?.entries || []),
-    ...(relation.sources || []).map((source) => source.matchedEntry).filter(Boolean),
-  ];
-  const byId = new Map(relatedEntries.map((entry) => [entry.id, entry]));
-  return {
-    sources: (relation.sources || [])
-      .map((source) => source.matchedEntry || byId.get(source.matchedEntryId))
-      .filter(Boolean),
-    derivedEntries: relation.derivedEntries || [],
-    rootGroup: relation.rootGroup || null,
-  };
-}
-
-function refreshEntryRelationConsumers(entryId, key) {
-  if (entryRelationKey(activeDictionary(), entryId) !== key) {
-    return;
-  }
-  const entry = selectedEntry();
-  if (entry?.id === entryId) {
-    if (editorMode === "edit") {
-      renderFullEditDerivedEntries(entry);
-    } else {
-      const showEmptySections = normalizeDictionarySettings(activeDictionary()?.settings).showEmptyEntrySections;
-      renderEntryRelationSections(entry, showEmptySections);
-    }
-  }
-  if (networkOpen && networkEntryId === entryId) {
-    renderLexicalNetwork();
-  }
-}
-
-function fetchEntryRelation(dictionary, entry, key) {
-  entryRelationsCache.set(key, { status: "loading", relation: null, error: null });
-  trimEntryRelationsCache(key);
-  api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entry-relations/${encodeURIComponent(entry.id)}`)
-    .then((relation) => {
-      entryRelationsCache.set(key, { status: "success", relation, error: null });
-      refreshEntryRelationConsumers(entry.id, key);
-    })
-    .catch((error) => {
-      entryRelationsCache.set(key, { status: "error", relation: null, error });
-      console.error("Entry relations API unavailable.", error);
-      refreshEntryRelationConsumers(entry.id, key);
-    });
-}
-
-function trimEntryRelationsCache(protectedKey = "") {
-  while (entryRelationsCache.size > ENTRY_RELATIONS_CACHE_MAX) {
-    const oldestKey = entryRelationsCache.keys().next().value;
-    if (!oldestKey) {
-      return;
-    }
-    if (oldestKey === protectedKey) {
-      const protectedValue = entryRelationsCache.get(oldestKey);
-      entryRelationsCache.delete(oldestKey);
-      entryRelationsCache.set(oldestKey, protectedValue);
-      continue;
-    }
-    entryRelationsCache.delete(oldestKey);
-  }
+  button.addEventListener("click", () => navigateLexicalNetwork(entry.id));
+  return button;
 }
 
 function renderNetworkMeaningHtml(entry, showPolysemy = false) {
   const meanings = entryDefinitionMeanings(entry);
-  const preview = entryDefinitionItems(entry).map((definition) => definition.meaning).find(Boolean) || "";
-  if (!meanings.length && preview) {
-    return `<div class="network-definition-list"><p>${escapeHtml(preview)}</p></div>`;
-  }
   if (!meanings.length) {
     return "";
   }
@@ -8067,6 +4664,23 @@ function renderNetworkMeaningHtml(entry, showPolysemy = false) {
   return `<div class="network-definition-list">${visibleMeanings.map((meaning, index) => `
     <p>${escapeHtml(numbered ? `${index + 1}. ${meaning}` : meaning)}</p>
   `).join("")}</div>`;
+}
+
+function findDerivedEntries(entry, dictionary = activeDictionary()) {
+  const currentKeys = new Set([normalize(entry.id), normalize(entry.lemma)].filter(Boolean));
+  return (dictionary?.entries || [])
+    .filter((candidate) => {
+      if (candidate.id === entry.id) {
+        return false;
+      }
+      return (candidate.etymology?.sources || []).some((source) => currentKeys.has(normalize(source)));
+    })
+    .sort((a, b) => a.lemma.localeCompare(b.lemma, "zh-CN"));
+}
+
+function resolveSourceEntry(sourceName, dictionary = activeDictionary()) {
+  const normalized = normalize(sourceName);
+  return dictionary?.entries.find((entry) => normalize(entry.lemma) === normalized || normalize(entry.id) === normalized) || null;
 }
 
 function glossStyleClassNames(key, settings) {
@@ -8106,7 +4720,24 @@ function renderExampleHtml(example, rawSettings = {}) {
 }
 
 function parseGloss(example) {
-  return qualityModel.parseGloss(example);
+  const gloss = { gla: [], glb: [], glc: [], ft: "" };
+  let hasGloss = false;
+  String(example || "")
+    .replaceAll("\\n", "\n")
+    .split(/\r?\n/)
+    .forEach((line) => {
+      const match = line.match(/^\\(gla|glb|glc|ft)\s*(.*)$/);
+      if (!match) {
+        return;
+      }
+      hasGloss = true;
+      if (match[1] === "ft") {
+        gloss.ft = match[2].trim();
+      } else {
+        gloss[match[1]] = match[2].trim().split(/\s+/).filter(Boolean);
+      }
+    });
+  return hasGloss ? gloss : null;
 }
 
 function renderSmallCaps(value) {
@@ -8118,20 +4749,14 @@ function renderSmallCaps(value) {
   });
 }
 
-function entryListTagItems(entry, { includePartTags = true, dictionary = activeDictionary() } = {}) {
-  return (entry.tags || [])
-    .map((tag, index) => ({ tag, index }))
-    .filter(({ tag, index }) => includePartTags || !entryTagIsPart(entry, index, tag, dictionary));
-}
-
-function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = false, clickable = false, { includePartTags = true } = {}) {
-  const tags = entryListTagItems(entry, { includePartTags });
+function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = Boolean(activeDictionary()?.settings?.tagFuzzySearch), clickable = false) {
+  const tags = entry.tags || [];
   const settings = normalizeDictionarySettings(activeDictionary()?.settings);
   const hasHiddenTags = tags.length > limit;
   const visibleLimit = hasHiddenTags ? Math.max(1, limit - 1) : limit;
   const chips = tags
     .slice(0, visibleLimit)
-    .map(({ tag, index }) => {
+    .map((tag, index) => {
       const text = entryListDisplayTag(tag, settings);
       const classes = ["chip", entryTagIsPart(entry, index, tag) ? "part-chip" : "", tagIsRedHighlighted(tag) ? "highlight-tag" : ""].filter(Boolean).join(" ");
       const tagAttributes = clickable
@@ -8144,10 +4769,11 @@ function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = false, 
     })
     .join("");
   const hiddenTagTitle = hasHiddenTags
-    ? tags.slice(visibleLimit).map(({ tag }) => entryListDisplayTag(tag, settings)).join(", ")
+    ? tags.slice(visibleLimit).map((tag) => entryListDisplayTag(tag, settings)).join(", ")
     : "";
   const hiddenTagTooltipHtml = hasHiddenTags
-    ? `<span class="app-tooltip-chip-list">${tags.slice(visibleLimit).map(({ tag, index }) => {
+    ? `<span class="app-tooltip-chip-list">${tags.slice(visibleLimit).map((tag, offset) => {
+      const index = visibleLimit + offset;
       const classes = ["chip", entryTagIsPart(entry, index, tag) ? "part-chip" : "", tagIsRedHighlighted(tag) ? "highlight-tag" : ""].filter(Boolean).join(" ");
       return `<span class="${classes}">${escapeHtml(entryListDisplayTag(tag, settings))}</span>`;
     }).join("")}</span>`
@@ -8184,31 +4810,35 @@ function morphologyTables(dictionary = activeDictionary()) {
 }
 
 function resolveEntryMorphologyTable(entry, dictionary = activeDictionary()) {
-  const selected = entry?.morphology?.tableId || "auto";
+  const tables = morphologyTables(dictionary);
+  const selected = entry.morphology?.tableId || "auto";
   if (selected === "none") {
     return null;
   }
-  const tables = morphologyTables(dictionary);
-  if (selected !== "auto") {
+  if (selected && selected !== "auto") {
     return tables.find((table) => table.id === selected) || null;
   }
-  const entryTags = new Set((entry?.tags || []).map(searchNormalizationModel.normalizeStructuralKey));
-  return tables.find((table) => table.matchTags.some((tag) => entryTags.has(searchNormalizationModel.normalizeStructuralKey(tag)))) || null;
+  const entryTags = new Set((entry.tags || []).map(normalize));
+  return tables.find((table) => table.matchTags.some((tag) => entryTags.has(normalize(tag)))) || null;
 }
 
 function morphologyCellValue(entry, table, row, col, dictionary = activeDictionary()) {
   const key = morphologyCellKey(row, col);
-  const override = entry?.morphology?.overrides?.[key];
-  return override || morphologyCellDefaultValue(entry, table, row, col, dictionary);
+  const override = entry.morphology?.overrides?.[key];
+  if (override) {
+    return override;
+  }
+  return morphologyCellDefaultValue(entry, table, row, col, dictionary);
 }
 
 function morphologyCellDefaultValue(entry, table, row, col, dictionary = activeDictionary()) {
   const key = morphologyCellKey(row, col);
-  const rule = String(table?.cells?.[key]?.value || "").trim();
+  const cell = table.cells?.[key] || normalizeMorphologyCell();
+  const rule = cell.value.trim();
   if (!rule) {
-    return "";
+    return entry.lemma;
   }
-  return applyMorphologyRuleSyntax(entry?.lemma || "", rule, morphologyFunctionConfig(dictionary));
+  return applyMorphologyRuleSyntax(entry.lemma, rule, morphologyFunctionConfig(dictionary));
 }
 
 function morphologyFunctionConfig(dictionary = activeDictionary()) {
@@ -8216,11 +4846,320 @@ function morphologyFunctionConfig(dictionary = activeDictionary()) {
 }
 
 function applyMorphologyRuleSyntax(lemma, rule, functions = normalizeMorphologyFunctions()) {
-  return morphologyModel.applyMorphologyRuleSyntax(lemma, rule, functions);
+  const text = expandMorphologyReferences(rule, lemma);
+  let output = "";
+  let index = 0;
+
+  while (index < text.length) {
+    if (text[index] === "/") {
+      const end = text.indexOf("/", index + 1);
+      if (end >= 0) {
+        output += evaluateMorphologyConditionBlock(
+          text.slice(index + 1, end),
+          output,
+          morphologyRightContext(text.slice(end + 1), lemma),
+          lemma,
+          functions
+        );
+        index = end + 1;
+        continue;
+      }
+    }
+
+    output += text[index];
+    index += 1;
+  }
+
+  return output;
+}
+
+function evaluateMorphologyConditionBlock(block, leftContext, rightContext, lemma, functions = normalizeMorphologyFunctions()) {
+  const clauses = String(block || "").split(/;/);
+  for (const clause of clauses) {
+    const parsed = parseMorphologyConditionClause(clause);
+    if (!parsed) {
+      continue;
+    }
+    if (parsed.type === "else" || morphologyConditionMatches(parsed.condition, leftContext, rightContext, functions)) {
+      return renderMorphologyConditionOutput(parsed.output, lemma);
+    }
+  }
+  return "";
+}
+
+function parseMorphologyConditionClause(clause) {
+  const text = String(clause || "").trim();
+  if (!text) {
+    return null;
+  }
+  const equalsIndex = text.indexOf("=");
+  const left = equalsIndex >= 0 ? text.slice(0, equalsIndex).trim() : text.trim();
+  const output = equalsIndex >= 0 ? text.slice(equalsIndex + 1).trim() : "";
+  if (left.toLowerCase() === "else") {
+    return { type: "else", output };
+  }
+  return { type: "condition", condition: left, output };
+}
+
+function morphologyConditionMatches(condition, leftContext, rightContext, functions = normalizeMorphologyFunctions()) {
+  const call = parseMorphologyFunctionCondition(condition);
+  if (!call || !call.options.length || call.invalidOffset) {
+    return false;
+  }
+  if (call.name === "left" || call.name === "right") {
+    const found = nthDirectionalCharacter(call.name === "left" ? leftContext : rightContext, call.name, call.offset);
+    return Boolean(found && call.options.includes(found));
+  }
+
+  const recognized = functions[call.name] || [];
+  if (!recognized.length) {
+    return false;
+  }
+  const nearest = call.name === "rightV"
+    ? nearestRightMatch(rightContext, recognized)
+    : nearestLeftMatch(leftContext, recognized);
+  return Boolean(nearest && call.options.includes(nearest));
+}
+
+function parseMorphologyFunctionCondition(condition) {
+  const match = String(condition || "").match(/^(leftV|rightV|left|right)\(([^()]*)\)(?:\(([^()]*)\))?$/i);
+  if (!match) {
+    return null;
+  }
+  const name = morphologyFunctionName(match[1]);
+  const rawOffset = match[3];
+  const offset = rawOffset === undefined ? 1 : Number.parseInt(rawOffset, 10);
+  const invalidOffset = rawOffset !== undefined && (!/^[1-9]\d*$/.test(rawOffset.trim()) || !Number.isInteger(offset));
+  return {
+    name,
+    options: splitList(match[2]),
+    offset: invalidOffset ? 1 : offset,
+    invalidOffset,
+  };
+}
+
+function morphologyFunctionName(name) {
+  const normalized = String(name || "").toLowerCase();
+  if (normalized === "rightv") {
+    return "rightV";
+  }
+  if (normalized === "left") {
+    return "left";
+  }
+  if (normalized === "right") {
+    return "right";
+  }
+  return "leftV";
+}
+
+function nthDirectionalCharacter(context, direction, offset) {
+  const chars = Array.from(String(context || ""));
+  if (chars.length < offset) {
+    return "";
+  }
+  return direction === "right" ? chars[offset - 1] : chars[chars.length - offset];
+}
+
+function nearestLeftMatch(context, options) {
+  const text = String(context || "");
+  const candidates = [...options].sort((a, b) => b.length - a.length);
+  for (let index = text.length - 1; index >= 0; index -= 1) {
+    const found = candidates.find((candidate) => text.startsWith(candidate, index));
+    if (found) {
+      return found;
+    }
+  }
+  return "";
+}
+
+function nearestRightMatch(context, options) {
+  const text = String(context || "");
+  const candidates = [...options].sort((a, b) => b.length - a.length);
+  for (let index = 0; index < text.length; index += 1) {
+    const found = candidates.find((candidate) => text.startsWith(candidate, index));
+    if (found) {
+      return found;
+    }
+  }
+  return "";
+}
+
+function morphologyRightContext(fragment, lemma) {
+  const text = expandMorphologyReferences(fragment, lemma);
+  let context = "";
+  let index = 0;
+
+  while (index < text.length) {
+    if (text[index] === "/") {
+      const end = text.indexOf("/", index + 1);
+      if (end >= 0) {
+        index = end + 1;
+        continue;
+      }
+    }
+
+    context += text[index];
+    index += 1;
+  }
+
+  return context;
+}
+
+function renderMorphologyConditionOutput(output, lemma) {
+  return expandMorphologyReferences(output, lemma);
+}
+
+function expandMorphologyReferences(value, lemma) {
+  const text = String(value || "");
+  let rendered = "";
+  let index = 0;
+
+  while (index < text.length) {
+    const reference = consumeMorphologyReference(text, index, lemma);
+    if (reference) {
+      rendered += reference.value;
+      index = reference.nextIndex;
+      continue;
+    }
+    rendered += text[index];
+    index += 1;
+  }
+
+  return rendered;
+}
+
+function consumeMorphologyReference(text, index, lemma) {
+  if (text[index] !== "{") {
+    return null;
+  }
+  const end = text.indexOf("}", index + 1);
+  if (end < 0) {
+    return null;
+  }
+  return {
+    value: renderMorphologyReference(text.slice(index + 1, end), lemma),
+    nextIndex: end + 1,
+  };
+}
+
+function renderMorphologyReference(body, lemma) {
+  const text = String(body || "").trim();
+  if (!text || text.toLowerCase() === "lemma") {
+    return lemma;
+  }
+
+  const replacements = text
+    .split(",")
+    .map(parseMorphologyReplacement)
+    .filter((replacement) => replacement?.valid);
+
+  if (!replacements.length) {
+    return lemma;
+  }
+
+  return applyMorphologyReplacements(lemma, replacements);
+}
+
+function parseMorphologyReplacement(item) {
+  const equalsIndex = String(item || "").indexOf("=");
+  if (equalsIndex < 0) {
+    return { valid: false, reason: "missing =" };
+  }
+  const rawTarget = item.slice(0, equalsIndex).trim();
+  const to = item.slice(equalsIndex + 1).trim();
+  const selectorMatch = rawTarget.match(/^(.*?)(?:\[([^\]]*)\])?$/);
+  const from = selectorMatch?.[1]?.trim() || "";
+  const rawSelector = selectorMatch?.[2]?.trim();
+  if (!from) {
+    return { valid: false, reason: "missing target" };
+  }
+  if (rawSelector === "*") {
+    return { valid: true, from, to, selector: "*" };
+  }
+  if (rawSelector === undefined) {
+    return { valid: true, from, to, selector: 1 };
+  }
+  if (rawSelector === "") {
+    return { valid: false, reason: "invalid selector []" };
+  }
+  if (!/^-?[1-9]\d*$/.test(rawSelector)) {
+    return { valid: false, reason: `invalid selector [${rawSelector}]` };
+  }
+  return { valid: true, from, to, selector: Number.parseInt(rawSelector, 10) };
+}
+
+function applyMorphologyReplacements(lemma, replacements) {
+  const scheduled = [];
+  replacements.forEach((replacement, order) => {
+    morphologyReplacementTargets(lemma, replacement).forEach((target) => {
+      for (let index = scheduled.length - 1; index >= 0; index -= 1) {
+        if (rangesOverlap(scheduled[index], target)) {
+          scheduled.splice(index, 1);
+        }
+      }
+      scheduled.push({ ...target, to: replacement.to, order });
+    });
+  });
+
+  if (!scheduled.length) {
+    return lemma;
+  }
+
+  scheduled.sort((a, b) => a.start - b.start || a.order - b.order);
+  let output = "";
+  let cursor = 0;
+  scheduled.forEach((item) => {
+    if (item.start < cursor) {
+      return;
+    }
+    output += lemma.slice(cursor, item.start);
+    output += item.to;
+    cursor = item.end;
+  });
+  return output + lemma.slice(cursor);
+}
+
+function morphologyReplacementTargets(lemma, replacement) {
+  const matches = morphologyReplacementMatches(lemma, replacement.from);
+  if (replacement.selector === "*") {
+    return matches;
+  }
+  const index = replacement.selector > 0
+    ? replacement.selector - 1
+    : matches.length + replacement.selector;
+  return matches[index] ? [matches[index]] : [];
+}
+
+function morphologyReplacementMatches(lemma, target) {
+  const matches = [];
+  let index = 0;
+  while (index <= lemma.length - target.length) {
+    const found = lemma.indexOf(target, index);
+    if (found < 0) {
+      break;
+    }
+    matches.push({ start: found, end: found + target.length });
+    index = found + Math.max(1, target.length);
+  }
+  return matches;
+}
+
+function rangesOverlap(a, b) {
+  return a.start < b.end && b.start < a.end;
 }
 
 function morphologySearchStrings(entry, dictionary = activeDictionary()) {
-  return morphologyModel.morphologySearchStrings(entry, dictionary);
+  const table = resolveEntryMorphologyTable(entry, dictionary);
+  if (!table) {
+    return [];
+  }
+  const values = [];
+  for (let row = 0; row < table.rows; row += 1) {
+    for (let col = 0; col < table.cols; col += 1) {
+      values.push(morphologyCellValue(entry, table, row, col, dictionary));
+    }
+  }
+  return values;
 }
 
 function renderAnalysis(dictionary = activeDictionary()) {
@@ -8235,124 +5174,15 @@ function renderAnalysis(dictionary = activeDictionary()) {
 
   analysisFilterRegistry.clear();
   analysisFilterCounter = 0;
-  const page = activeAnalysisPage();
-  const subpage = activeAnalysisSubpage(page);
-  const report = getAnalysisReport(dictionary, { page, subpage });
-  elements.analysisPanel.innerHTML = renderAnalysisPage(report, page, subpage);
+  const report = buildDictionaryAnalysis(dictionary);
+  elements.analysisPanel.innerHTML = renderAnalysisPage(report);
   setupAnalysisMasonryLayouts();
 }
 
-function activeAnalysisPage() {
+function renderAnalysisPage(report) {
   const analysisViewState = activeAnalysisViewState();
-  const page = ["overview", "entries", "ipa", "morphology", "activity"].includes(analysisViewState.page)
-    ? analysisViewState.page
-    : "overview";
-  analysisViewState.page = page;
-  return page;
-}
-
-function getAnalysisReport(dictionary, route = {}) {
-  const page = route.page || activeAnalysisPage();
-  const subpage = route.subpage ?? activeAnalysisSubpage(page);
-  return buildAnalysisReportForRoute(dictionary, page, subpage);
-}
-
-function analysisBaseCacheKey(dictionary) {
-  return stableJson({
-    dictionaryId: dictionary?.id || "",
-    dictionaryUpdatedAt: dictionary?.updatedAt || "",
-    language: currentLanguage,
-    settings: dictionary?.settings || {},
-    morphology: dictionary?.morphology || {},
-    entries: (dictionary?.entries || []).map((entry) => ({
-      id: entry.id || "",
-      lemma: entry.lemma || "",
-      pronunciation: entry.pronunciation || "",
-      tags: entry.tags || [],
-      definitions: (entry.definitions || []).map((definition) => ({
-        id: definition.id || "",
-        meaning: definition.meaning || "",
-        example: definition.example || "",
-      })),
-      notes: entry.notes || "",
-      etymology: {
-        sources: entry.etymology?.sources || [],
-      },
-      morphologyGroups: entry.morphologyGroups || [],
-      createdAt: entry.createdAt || "",
-      updatedAt: entry.updatedAt || "",
-    })),
-  });
-}
-
-function analysisSliceCacheKey(context, dep) {
-  return stableJson({
-    base: context.cacheBaseKey,
-    dep,
-    searchQuery: dep === "search" ? normalizeEntrySearchText(searchQuery, context.dictionary) : "",
-    entrySort: dep === "relation" || dep === "rootFamilies" ? entrySort : "",
-    rootFamilyLimit: dep === "rootFamilies" ? analysisRootFamilyLimit() : "",
-  });
-}
-
-function analysisRootFamilyLimit() {
-  return DEFAULT_ANALYSIS_ROOT_FAMILY_LIMIT;
-}
-
-function renderQuality(dictionary = activeDictionary()) {
-  if (!elements.qualityPanel) {
-    return;
-  }
-  disconnectMasonryLayoutsWithin(elements.qualityPanel);
-  if (!dictionary) {
-    elements.qualityPanel.innerHTML = "";
-    return;
-  }
-
-  analysisFilterRegistry.clear();
-  analysisFilterCounter = 0;
-  const report = getQualityViewReport(dictionary);
-  elements.qualityPanel.innerHTML = renderQualityPage(report);
-  setupQualityMasonryLayouts();
-}
-
-function getQualityViewReport(dictionary) {
-  const key = qualityReportCacheKey(dictionary);
-  if (qualityReportCache?.key === key) {
-    return qualityReportCache.report;
-  }
-  const report = buildQualityViewReport(dictionary);
-  qualityReportCache = { key, report };
-  return report;
-}
-
-function qualityReportCacheKey(dictionary) {
-  return stableJson({
-    dictionaryId: dictionary?.id || "",
-    dictionaryUpdatedAt: dictionary?.updatedAt || "",
-    language: currentLanguage,
-    settings: {
-      ipa: dictionary?.settings?.ipa || {},
-    },
-    entries: (dictionary?.entries || []).map((entry) => ({
-      id: entry.id || "",
-      lemma: entry.lemma || "",
-      pronunciation: entry.pronunciation || "",
-      tags: entry.tags || [],
-      definitions: (entry.definitions || []).map((definition) => ({
-        id: definition.id || "",
-        meaning: definition.meaning || "",
-        example: definition.example || "",
-      })),
-      etymology: {
-        sources: entry.etymology?.sources || [],
-      },
-      updatedAt: entry.updatedAt || "",
-    })),
-  });
-}
-
-function renderAnalysisPage(report, page = activeAnalysisPage(), subpage = activeAnalysisSubpage(page)) {
+  const page = analysisViewState.page || "overview";
+  const subpage = activeAnalysisSubpage(page);
   return `
     ${analysisPageNav(page)}
     ${analysisSubpageNav(page, subpage, report)}
@@ -8369,6 +5199,7 @@ function analysisPageNav(activePage) {
     ["ipa", "IPA"],
     ["morphology", aText("形态学", "Morphology")],
     ["activity", aText("编辑进度", "Activity")],
+    ["quality", aText("质量检查", "Quality")],
   ];
   return `<nav class="analysis-page-tabs">${pages.map(([page, label]) => `
     <button type="button" class="${page === activePage ? "active" : ""}" data-analysis-page="${escapeHtml(page)}">${escapeHtml(label)}</button>
@@ -8376,6 +5207,16 @@ function analysisPageNav(activePage) {
 }
 
 function analysisSubpageNav(page, activeSubpage, report = null) {
+  if (page === "quality") {
+    return `<div class="analysis-subpage-tab-groups quality-subpage-tab-groups">${analysisQualitySubpageGroups().map((group) => `
+      <div class="analysis-subpage-tab-group">
+        <span>${escapeHtml(group.label)}</span>
+        <nav class="analysis-subpage-tabs">${group.subpages.map(([subpage, label]) => `
+          ${renderAnalysisQualitySubpageButton(subpage, label, activeSubpage, report)}
+        `).join("")}</nav>
+      </div>
+    `).join("")}</div>`;
+  }
   const subpages = analysisSubpages(page);
   if (!subpages.length) {
     return "";
@@ -8408,48 +5249,20 @@ function analysisSubpages(page) {
       ["created", aText("新增日期", "Created")],
       ["latest", aText("最近修改", "Recent")],
     ],
+    quality: analysisQualitySubpageGroups().flatMap((group) => group.subpages),
   };
   return subpages[page] || [];
 }
 
-function renderQualityPage(report) {
-  const subpage = activeQualitySubpage();
-  return `
-    ${qualitySubpageNav(subpage, report)}
-    <section class="analysis-page-body">
-      ${qualityPageBody(report, subpage)}
-    </section>
-  `;
-}
-
-function qualitySubpageNav(activeSubpage, report = null) {
-  return `<div class="analysis-subpage-tab-groups quality-subpage-tab-groups">${qualitySubpageGroups().map((group) => `
-    <div class="analysis-subpage-tab-group">
-      <span>${escapeHtml(group.label)}</span>
-      <nav class="analysis-subpage-tabs">${group.subpages.map(([subpage, label]) => `
-        ${renderQualitySubpageButton(subpage, label, activeSubpage, report)}
-      `).join("")}</nav>
-    </div>
-  `).join("")}</div>`;
-}
-
-function renderQualitySubpageButton(subpage, label, activeSubpage, report = null) {
-  const count = report ? qualitySubpageEntryCount(report, subpage) : null;
+function renderAnalysisQualitySubpageButton(subpage, label, activeSubpage, report = null) {
+  const count = report ? analysisQualitySubpageEntryCount(report, subpage) : null;
   const isActive = subpage === activeSubpage;
   const disabled = count === 0 && !isActive;
   const countBadge = count === null ? "" : `<span class="analysis-tab-count">${escapeHtml(count)}</span>`;
-  return `<button type="button" class="${isActive ? "active" : ""}" data-quality-subpage="${escapeHtml(subpage)}" ${disabled ? "disabled" : ""}>${escapeHtml(label)}${countBadge}</button>`;
+  return `<button type="button" class="${isActive ? "active" : ""}" data-analysis-subpage="${escapeHtml(subpage)}" ${disabled ? "disabled" : ""}>${escapeHtml(label)}${countBadge}</button>`;
 }
 
-function activeQualitySubpage() {
-  const qualityViewState = activeQualityViewState();
-  const subpages = qualitySubpageGroups().flatMap((group) => group.subpages);
-  return subpages.some(([subpage]) => subpage === qualityViewState.subpage)
-    ? qualityViewState.subpage
-    : subpages[0]?.[0] || "issues";
-}
-
-function qualitySubpageGroups() {
+function analysisQualitySubpageGroups() {
   return [
     {
       label: aText("按优先度", "By priority"),
@@ -8487,21 +5300,29 @@ function analysisPageBody(report, page, subpage) {
   if (page === "activity") {
     return renderAnalysisActivityPage(report, subpage);
   }
+  if (page === "quality") {
+    return renderAnalysisQualityPage(report, subpage);
+  }
   return renderAnalysisOverview(report);
 }
 
 function renderAnalysisOverview(report) {
+  const issueEntries = qualityIssuesWithEntries(report.issues);
+  const highIssues = issueEntries.filter((issue) => issue.severity === "high");
+  const highIssueEntryIds = entryIdsFrom(highIssues.map((issue) => issue.entryId));
   return `
     <section class="analysis-grid analysis-summary-grid">
       ${analysisMetricCard(aText("词条", "Entries"), report.entries.length, `${report.rootCount} ${aText("个词根", "roots")}`, viewAction("editor"))}
-      ${analysisMetricCard(aText("衍生词", "Derived"), report.derivedCount, `${report.isolatedRootCount} ${aText("个孤立词根", "isolated roots")}`, entryFilterAction(aText("有来源", "Has sources"), { presence: [{ field: "source", present: true }] }, { count: report.sourceEntryCount }))}
-      ${analysisMetricCard(aText("释义覆盖", "Definition Coverage"), percentText(report.coverage.definitions), `${report.definitionCount} ${aText("条释义", "definitions")}`, binaryPresenceFilterAction(aText("有释义", "Has definitions"), "definition", report.definitionEntryCount, aText("无释义", "No definitions"), report.noDefinitionEntryCount))}
-      ${analysisMetricCard("IPA", percentText(report.coverage.ipa), `${report.ipa.syllableAverage} ${aText("平均音节", "avg syllables")}`, binaryPresenceFilterAction(aText("有 IPA", "Has IPA"), "ipa", report.ipaEntryCount, aText("无 IPA", "No IPA"), report.noIpaEntryCount))}
+      ${analysisMetricCard(aText("衍生词", "Derived"), report.derivedCount, `${report.isolatedRootCount} ${aText("个孤立词根", "isolated roots")}`, advancedFilterAction(aText("衍生词", "Derived entries"), report.derivedEntryIds))}
+      ${analysisMetricCard(aText("释义覆盖", "Definition Coverage"), percentText(report.coverage.definitions), `${report.definitionCount} ${aText("条释义", "definitions")}`, advancedFilterAction(aText("有释义", "Has definitions"), report.definitionEntryIds, { variants: [{ title: aText("无释义", "No definitions"), entryIds: report.noDefinitionEntryIds }] }))}
+      ${analysisMetricCard("IPA", percentText(report.coverage.ipa), `${report.ipa.syllableAverage} ${aText("平均音节", "avg syllables")}`, advancedFilterAction(aText("有 IPA", "Has IPA"), report.ipaEntryIds, { variants: [{ title: aText("无 IPA", "No IPA"), entryIds: report.noIpaEntryIds }] }))}
       ${analysisMetricCard(aText("形态学", "Morphology"), percentText(report.coverage.morphology), `${report.morphology.generatedForms} ${aText("个生成形式", "generated forms")}`, advancedFilterAction(aText("有形态表格", "Has morphology table"), report.morphologyEntryIds, { variants: [{ title: aText("无形态表格", "No morphology table"), entryIds: report.noMorphologyEntryIds }] }))}
+      ${analysisMetricCard(aText("质量问题", "Quality Issues"), report.issues.length, `${highIssueEntryIds.length} ${aText("个高优先级", "high priority")}`, qualityIssueFilterAction(report, "priority", "all"))}
     </section>
     <section class="analysis-grid">
       ${analysisCard(aText("词性分布", "Part of Speech"), analysisBarList(report.parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") }))}
-      ${analysisCard(aText("覆盖率", "Coverage"), analysisCoverageList(report.coverageRows))}
+      ${analysisCard(aText("标签频率", "Tag Frequency"), analysisBarList(report.tags, { empty: aText("暂无标签", "No tags yet") }))}
+      ${analysisCard(aText("词根家族排行", "Root Families"), analysisBarList(report.rootFamilies, { empty: aText("暂无衍生关系", "No derivation links yet") }))}
       ${analysisCard(aText("编辑进度", "Editing Progress"), analysisActivityList({
         created: report.activity.created.slice(-10),
         updated: report.activity.updated.slice(-10),
@@ -8550,7 +5371,7 @@ function renderAnalysisIpaPage(report, subpage) {
   }
   return `<section class="analysis-detail-grid">
     ${analysisCard(aText("音节数分布", "Syllable Counts"), analysisBarList(report.ipa.allSyllableCounts, { empty: aText("暂无 IPA", "No IPA yet") }))}
-    ${analysisCard(aText("IPA 覆盖", "IPA Coverage"), analysisCoverageList([["IPA", report.coverage.ipa, binaryPresenceFilterAction(aText("有 IPA", "Has IPA"), "ipa", report.ipaEntryCount, aText("无 IPA", "No IPA"), report.noIpaEntryCount)]]))}
+    ${analysisCard(aText("IPA 覆盖", "IPA Coverage"), analysisCoverageList([["IPA", report.coverage.ipa, advancedFilterAction(aText("有 IPA", "Has IPA"), report.ipaEntryIds, { variants: [{ title: aText("无 IPA", "No IPA"), entryIds: report.noIpaEntryIds }] })]]))}
   </section>`;
 }
 
@@ -8580,8 +5401,8 @@ function renderAnalysisActivityPage(report, subpage) {
   return `<section class="analysis-detail-grid">${analysisCard(aText("编辑日期", "Updated Date"), analysisBarList(report.activity.updated, { empty: aText("暂无编辑记录", "No edit records") }))}</section>`;
 }
 
-function qualityPageBody(report, subpage) {
-  const filterBar = renderQualityFilterBar(report, subpage);
+function renderAnalysisQualityPage(report, subpage) {
+  const filterBar = renderAnalysisQualityFilterBar(report, subpage);
   if (["lemma", "tags", "ipa", "other"].includes(subpage)) {
     const moduleIssues = qualityIssuesByModule(report, subpage);
     return `${filterBar}<section class="analysis-detail-grid">${analysisCard(qualityIssueModuleLabel(subpage), analysisIssueList(moduleIssues, { limit: Infinity }))}</section>`;
@@ -8591,7 +5412,10 @@ function qualityPageBody(report, subpage) {
   }
   if (subpage === "gloss") {
     const glossIssues = qualityIssuesByModule(report, "gloss");
-    return `${filterBar}<section class="analysis-detail-grid">${analysisCard(aText("Glossed 例句问题", "Glossed Example Issues"), analysisIssueList(glossIssues, { limit: Infinity }))}</section>`;
+    return `${filterBar}<section class="analysis-detail-grid">
+      ${analysisCard(aText("Glossed 例句", "Glossed Examples"), analysisFactList([[aText("Glossed 例句", "Glossed examples"), report.glossExamples, advancedFilterAction(aText("Glossed 例句", "Glossed examples"), report.glossEntryIds)]]))}
+      ${analysisCard(aText("Glossed 例句问题", "Glossed Example Issues"), analysisIssueList(glossIssues, { limit: Infinity }))}
+    </section>`;
   }
   if (["high", "medium", "low"].includes(subpage)) {
     const issues = report.issues.filter((issue) => issue.severity === subpage);
@@ -8600,10 +5424,10 @@ function qualityPageBody(report, subpage) {
   return `${filterBar}<section class="analysis-detail-grid">${analysisCard(aText("质量检查", "Quality Checks"), analysisIssueList(report.issues, { limit: Infinity }))}</section>`;
 }
 
-function renderQualityFilterBar(report, subpage) {
-  const label = qualitySubpageLabel(subpage);
-  const count = qualitySubpageEntryCount(report, subpage);
-  const action = qualityFilterActionForSubpage(report, subpage);
+function renderAnalysisQualityFilterBar(report, subpage) {
+  const label = analysisQualitySubpageLabel(subpage);
+  const count = analysisQualitySubpageEntryCount(report, subpage);
+  const action = analysisQualityFilterActionForSubpage(report, subpage);
   const attrs = analysisActionAttributes(action);
   return `
     <section class="analysis-quality-current" aria-label="${escapeHtml(aText("质量检查高级筛选", "Quality advanced filters"))}">
@@ -8616,10 +5440,10 @@ function renderQualityFilterBar(report, subpage) {
 }
 
 function qualityIssuesWithEntries(issues = []) {
-  return qualityModel.qualityIssuesWithEntries(issues);
+  return (issues || []).filter((issue) => issue.entryId);
 }
 
-function qualitySubpageKey(subpage) {
+function analysisQualitySubpageKey(subpage) {
   const priorityMap = {
     issues: "all",
     high: "high",
@@ -8636,18 +5460,18 @@ function qualitySubpageKey(subpage) {
   return { group: "priority", key: "all" };
 }
 
-function qualitySubpageLabel(subpage) {
-  const labels = Object.fromEntries(qualitySubpageGroups().flatMap((group) => group.subpages));
+function analysisQualitySubpageLabel(subpage) {
+  const labels = Object.fromEntries(analysisQualitySubpageGroups().flatMap((group) => group.subpages));
   return labels[subpage] || labels.issues || aText("全部问题", "All Issues");
 }
 
-function qualitySubpageEntryCount(report, subpage) {
-  const action = qualityFilterActionForSubpage(report, subpage);
+function analysisQualitySubpageEntryCount(report, subpage) {
+  const action = analysisQualityFilterActionForSubpage(report, subpage);
   return action?.entryIds?.length || 0;
 }
 
-function qualityFilterActionForSubpage(report, subpage) {
-  const { group, key } = qualitySubpageKey(subpage);
+function analysisQualityFilterActionForSubpage(report, subpage) {
+  const { group, key } = analysisQualitySubpageKey(subpage);
   return qualityIssueFilterAction(report, group, key);
 }
 
@@ -8713,11 +5537,11 @@ function qualityIssueAdvancedFilterAction(title, issues = [], variants = [], opt
 }
 
 function qualityIssuesByModule(report, module) {
-  return qualityModel.qualityIssuesByModule(report, module);
+  return (report.issues || []).filter((issue) => (issue.module || "other") === module);
 }
 
 function qualityIssueEntryIdsByModule(report, module) {
-  return qualityModel.qualityIssueEntryIdsByModule(report, module);
+  return entryIdsFrom(qualityIssuesByModule(report, module).map((issue) => issue.entryId));
 }
 
 function qualityIssueModuleLabel(module) {
@@ -8745,11 +5569,15 @@ function qualityIssueModuleFilterTitle(module) {
   return qualityIssueModuleLabel(module);
 }
 
+function countPrimaryStressMarks(value) {
+  return [...String(value || "")].filter((char) => char === "ˈ" || char === IPA_STRESS_MARKER).length;
+}
+
 function analysisFactRows(report) {
   return [
-    [aText("例句数量", "Examples"), report.examples, binaryPresenceFilterAction(aText("有例句", "Has examples"), "example", report.exampleEntryCount, aText("无例句", "No examples"), report.noExampleEntryCount)],
+    [aText("例句数量", "Examples"), report.examples, binaryCoverageFilterAction(aText("有例句", "Has examples"), report.exampleEntryIds, aText("无例句", "No examples"), report.noExampleEntryIds)],
     [aText("Glossed 例句", "Glossed examples"), report.glossExamples, advancedFilterAction(aText("Glossed 例句", "Glossed examples"), report.glossEntryIds)],
-    [aText("多来源词条", "Multi-source entries"), report.multiSourceCount, entryFilterAction(aText("多来源词条", "Multi-source entries"), { sourceCount: { min: 2 } }, { count: report.multiSourceCount })],
+    [aText("多来源词条", "Multi-source entries"), report.multiSourceCount, advancedFilterAction(aText("多来源词条", "Multi-source entries"), report.multiSourceEntryIds)],
     [aText("当前搜索命中", "Current search matches"), report.searchMatches, viewAction("editor")],
   ];
 }
@@ -8773,109 +5601,88 @@ function analysisIpaMismatchRows(report) {
   ];
 }
 
-function buildQualityViewReport(dictionary) {
-  return qualityModel.buildQualityReport(dictionary, {
-    text: aText,
-    normalizeText: normalize,
-  });
-}
-
 function buildDictionaryAnalysis(dictionary) {
-  return buildAnalysisReportForRoute(dictionary, "all", "");
-}
-
-function buildAnalysisReportForRoute(dictionary, page = "overview", subpage = "") {
-  return analysisModel.buildReportForRoute(dictionary, { page, subpage }, {
-    buildContext: buildAnalysisContext,
-    builders: analysisSliceBuilders(),
-    composeReport: composeLegacyAnalysisReport,
-    maxCacheEntries: 24,
-    sliceCacheKey: analysisSliceCacheKey,
-  });
-}
-
-function buildAnalysisContext(dictionary) {
   const entries = dictionary.entries || [];
-  return {
-    dictionary,
-    entries,
-    total: entries.length || 1,
-    query: dictionaryQueryModel.createDictionaryQueryContext(dictionary, {
-      normalizeText: normalize,
-      compareEntries,
-      entryHasSources,
-    }),
-    cacheBaseKey: analysisBaseCacheKey(dictionary),
-  };
-}
-
-function composeLegacyAnalysisReport(context, slices) {
-  return {
-    entries: context.entries,
-    ...slices.relation,
-    ...slices.rootFamilies,
-    ...slices.coverage,
-    ...slices.tags,
-    ...slices.forms,
-    ipa: slices.ipa,
-    morphology: slices.morphology,
-    ...slices.search,
-    activity: slices.activity,
-  };
-}
-
-function analysisSliceBuilders() {
-  return {
-    relation: buildAnalysisRelationSlice,
-    rootFamilies: buildAnalysisRootFamiliesSlice,
-    coverage: buildAnalysisCoverageSlice,
-    tags: buildAnalysisTagSlice,
-    forms: buildAnalysisFormSlice,
-    ipa: buildAnalysisIpaSlice,
-    morphology: buildAnalysisMorphologySlice,
-    search: buildAnalysisSearchSlice,
-    activity: buildAnalysisActivitySlice,
-  };
-}
-
-function buildAnalysisRelationSlice(context) {
-  return context.query.relationSummary();
-}
-
-function buildAnalysisRootFamiliesSlice(context) {
-  const rootFamilyGroups = context.query.rootFamilies({
-    limit: analysisRootFamilyLimit(),
-    includeAll: true,
-  });
-  const familyRow = (group) => [group.lemma, group.derivedCount, directEntryAction(group.rootId)];
-  return {
-    rootFamilies: rootFamilyGroups.rows.map(familyRow),
-    allRootFamilies: rootFamilyGroups.allRows.map(familyRow),
-  };
-}
-
-function buildAnalysisCoverageSlice(context) {
-  const { dictionary, entries, total } = context;
+  const total = entries.length || 1;
+  const rootGroups = rootModeGroups(dictionary, { query: "" });
+  const derivedEntries = entries.filter(entryHasSources);
+  const derivedIdSet = new Set(derivedEntries.map((entry) => entry.id));
+  const isolatedRootCount = rootGroups.filter((group) => !group.derived.length && !derivedIdSet.has(group.root.id)).length;
+  const parts = new Map();
+  const tags = new Map();
+  const tagCombos = new Map();
+  const initialLetters = new Map();
+  const wordLengths = new Map();
+  const characters = new Map();
+  const bigrams = new Map();
+  const issues = [];
+  const networkIssues = [];
+  const duplicateLemmas = new Map();
+  const normalizedTagForms = new Map();
+  const definitionEntryIds = new Set();
+  const exampleEntryIds = new Set();
   const glossEntryIds = new Set();
+  const noteEntryIds = new Set();
+  const sourceEntryIds = new Set();
+  const ipaEntryIds = new Set();
   const morphologyEntryIds = new Set();
-  let definitionEntryCount = 0;
-  let exampleEntryCount = 0;
-  let noteEntryCount = 0;
-  let sourceEntryCount = 0;
-  let ipaEntryCount = 0;
+  const multiSourceEntryIds = new Set();
+
   let definitionCount = 0;
   let examples = 0;
   let glossExamples = 0;
+  let entriesWithDefinition = 0;
+  let entriesWithExample = 0;
+  let entriesWithNotes = 0;
+  let entriesWithSource = 0;
+  let entriesWithIpa = 0;
+  let entriesWithMorphology = 0;
+  let multiSourceCount = 0;
 
   entries.forEach((entry) => {
+    const lemmaKey = normalize(entry.lemma);
+    if (lemmaKey) {
+      mapPush(duplicateLemmas, lemmaKey, entry);
+    }
+    const entryPartTags = entryParts(entry, dictionary);
+    if (entryPartTags.length) {
+      entryPartTags.forEach((part) => incrementEntry(parts, part, entry));
+    } else {
+      incrementEntry(parts, NO_PART_FILTER_VALUE, entry);
+    }
+    (entry.tags || []).forEach((tag) => {
+      incrementEntry(tags, tag, entry);
+      const compact = normalize(tag).replace(/[^\p{L}\p{N}]+/gu, "");
+      if (compact) {
+        mapPush(normalizedTagForms, compact, tag);
+      }
+    });
+    if ((entry.tags || []).length > 1) {
+      incrementEntry(tagCombos, entry.tags.map((tag) => displayTag(tag, dictionary)).join(" + "), entry);
+    }
+
+    const lemma = String(entry.lemma || "");
+    if (lemma) {
+      incrementEntry(wordLengths, String(Array.from(lemma).length), entry);
+      incrementEntry(initialLetters, Array.from(lemma.trim())[0] || "", entry);
+      Array.from(lemma.replace(/\s+/g, "")).forEach((char) => incrementEntry(characters, char, entry));
+      Array.from(lemma.replace(/\s+/g, "")).forEach((char, index, chars) => {
+        if (index < chars.length - 1) {
+          incrementEntry(bigrams, `${char}${chars[index + 1]}`, entry);
+        }
+      });
+    }
+
     const definitions = entry.definitions || [];
     const meaningfulDefinitions = definitions.filter((definition) => definition.meaning);
     definitionCount += meaningfulDefinitions.length;
     if (meaningfulDefinitions.length) {
-      definitionEntryCount += 1;
+      entriesWithDefinition += 1;
+      definitionEntryIds.add(entry.id);
     }
     if (definitions.some((definition) => definition.example)) {
-      exampleEntryCount += 1;
+      entriesWithExample += 1;
+      exampleEntryIds.add(entry.id);
     }
     examples += definitions.filter((definition) => definition.example).length;
     definitions.forEach((definition) => {
@@ -8883,124 +5690,166 @@ function buildAnalysisCoverageSlice(context) {
       if (gloss) {
         glossExamples += 1;
         glossEntryIds.add(entry.id);
+        const missing = ["gla", "glb", "ft"].filter((key) => key === "ft" ? !gloss.ft : !gloss[key]?.length);
+        if (missing.length) {
+          addIssue(issues, "medium", entry, aText("Gloss 不完整", "Incomplete gloss"), `${aText("缺少", "Missing")}: ${missing.map((key) => `\\${key}`).join(", ")}`, "gloss");
+        } else if (gloss.gla.length !== gloss.glb.length) {
+          addIssue(issues, "medium", entry, aText("Gloss 对齐数量不一致", "Gloss alignment mismatch"), `\\gla ${gloss.gla.length} / \\glb ${gloss.glb.length}`, "gloss");
+        }
       }
     });
+
     if (entry.notes) {
-      noteEntryCount += 1;
+      entriesWithNotes += 1;
+      noteEntryIds.add(entry.id);
     }
     if (entryHasSources(entry)) {
-      sourceEntryCount += 1;
+      entriesWithSource += 1;
+      sourceEntryIds.add(entry.id);
+    }
+    if ((entry.etymology?.sources || []).length > 1) {
+      multiSourceCount += 1;
+      multiSourceEntryIds.add(entry.id);
     }
     if (entry.pronunciation) {
-      ipaEntryCount += 1;
+      entriesWithIpa += 1;
+      ipaEntryIds.add(entry.id);
     }
     if (resolveEntryMorphologyTable(entry, dictionary)) {
+      entriesWithMorphology += 1;
       morphologyEntryIds.add(entry.id);
     }
   });
 
-  const noMorphologyEntryIds = entries
-    .filter((entry) => !resolveEntryMorphologyTable(entry, dictionary))
-    .map((entry) => entry.id);
-  const entryTotal = entries.length;
-  const noDefinitionEntryCount = entryTotal - definitionEntryCount;
-  const noExampleEntryCount = entryTotal - exampleEntryCount;
-  const noNoteEntryCount = entryTotal - noteEntryCount;
-  const noSourceEntryCount = entryTotal - sourceEntryCount;
-  const noIpaEntryCount = entryTotal - ipaEntryCount;
-  const coverage = {
-    definitions: definitionEntryCount / total,
-    examples: exampleEntryCount / total,
-    notes: noteEntryCount / total,
-    sources: sourceEntryCount / total,
-    ipa: ipaEntryCount / total,
-    morphology: morphologyEntryIds.size / total,
-  };
-  const coverageRows = [
-    [aText("有释义", "Definitions"), coverage.definitions, binaryPresenceFilterAction(aText("有释义", "Has definitions"), "definition", definitionEntryCount, aText("无释义", "No definitions"), noDefinitionEntryCount)],
-    [aText("有例句", "Examples"), coverage.examples, binaryPresenceFilterAction(aText("有例句", "Has examples"), "example", exampleEntryCount, aText("无例句", "No examples"), noExampleEntryCount)],
-    [aText("有备注", "Notes"), coverage.notes, binaryPresenceFilterAction(aText("有备注", "Has notes"), "entryNote", noteEntryCount, aText("无备注", "No notes"), noNoteEntryCount)],
-    [aText("有来源", "Sources"), coverage.sources, binaryPresenceFilterAction(aText("有来源", "Has sources"), "source", sourceEntryCount, aText("无来源", "No sources"), noSourceEntryCount)],
-    ["IPA", coverage.ipa, binaryPresenceFilterAction(aText("有 IPA", "Has IPA"), "ipa", ipaEntryCount, aText("无 IPA", "No IPA"), noIpaEntryCount)],
-    [aText("形态表格", "Morphology table"), coverage.morphology, binaryFeatureFilterAction(aText("有形态表格", "Has morphology table"), [...morphologyEntryIds], aText("无形态表格", "No morphology table"), noMorphologyEntryIds)],
-  ];
-
-  return {
-    definitionCount,
-    examples,
-    glossExamples,
-    definitionEntryCount,
-    exampleEntryCount,
-    glossEntryIds: [...glossEntryIds],
-    noteEntryCount,
-    sourceEntryCount,
-    ipaEntryCount,
-    morphologyEntryIds: [...morphologyEntryIds],
-    noDefinitionEntryCount,
-    noExampleEntryCount,
-    noNoteEntryCount,
-    noSourceEntryCount,
-    noIpaEntryCount,
-    noMorphologyEntryIds,
-    coverage,
-    coverageRows,
-  };
-}
-
-function buildAnalysisTagSlice(context) {
-  const { dictionary, entries } = context;
-  const parts = new Map();
-  const tags = new Map();
-  const tagCombos = new Map();
-
-  entries.forEach((entry) => {
-    const entryPartTags = entryParts(entry, dictionary);
-    if (entryPartTags.length) {
-      entryPartTags.forEach((part) => increment(parts, part));
-    } else {
-      increment(parts, NO_PART_FILTER_VALUE);
+  duplicateLemmas.forEach((items) => {
+    if (items.length > 1) {
+      items.forEach((entry) => addIssue(issues, "high", entry, aText("重复词形", "Duplicate lemma"), items.map((item) => item.lemma).join(", "), "lemma"));
     }
-    (entry.tags || []).forEach((tag) => {
-      increment(tags, tag);
-    });
-    if ((entry.tags || []).length > 1) {
-      incrementEntry(tagCombos, entry.tags.map((tag) => displayTag(tag, dictionary)).join(" + "), entry);
+  });
+  normalizedTagForms.forEach((forms) => {
+    const unique = [...new Set(forms)];
+    if (unique.length > 1) {
+      issues.push({
+        severity: "low",
+        title: aText("近似标签可能不一致", "Near-duplicate tags"),
+        detail: unique.join(", "),
+        module: "tags",
+      });
     }
   });
 
+  entries.forEach((entry) => {
+    if (!entry.lemma) {
+      addIssue(issues, "high", entry, aText("缺少词形", "Missing lemma"), "", "lemma");
+    }
+    if (!(entry.tags || []).length) {
+      addIssue(issues, "high", entry, aText("缺少标签", "Missing tags"), "", "tags");
+    }
+    if (!(entry.definitions || []).some((definition) => definition.meaning)) {
+      addIssue(issues, "high", entry, aText("缺少释义", "Missing definition"), "");
+    }
+    if (!entry.pronunciation) {
+      addIssue(issues, "low", entry, aText("缺少 IPA", "Missing IPA"), "", "ipa");
+    } else {
+      const primaryStressCount = countPrimaryStressMarks(entry.pronunciation);
+      if (primaryStressCount > 1) {
+        addIssue(
+          issues,
+          "medium",
+          entry,
+          aText("多个主重音", "Multiple primary stresses"),
+          `${aText("主重音数量", "Primary stress count")}: ${primaryStressCount}`,
+          "ipa",
+        );
+      }
+    }
+    (entry.tags || []).filter((tag) => Array.from(tag).length > 24).forEach((tag) => {
+      addIssue(issues, "low", entry, aText("标签过长", "Long tag"), tag, "tags");
+    });
+    (entry.etymology?.sources || []).forEach((sourceName) => {
+      if (!resolveSourceEntry(sourceName, dictionary)) {
+        addIssue(networkIssues, "medium", entry, aText("未解析来源", "Unresolved source"), sourceName, "network");
+        addIssue(issues, "medium", entry, aText("未解析来源", "Unresolved source"), sourceName, "network");
+      }
+    });
+    const cycle = sourceCycleForEntry(entry, dictionary);
+    if (cycle.length) {
+      const detail = cycle.map((item) => item.lemma).join(" → ");
+      addIssue(networkIssues, "high", entry, aText("词源循环引用", "Etymology cycle"), detail, "network");
+      addIssue(issues, "high", entry, aText("词源循环引用", "Etymology cycle"), detail, "network");
+    }
+  });
+
+  const ipa = analyzeIpa(entries, dictionary);
+  const morphology = analyzeMorphology(entries, dictionary);
+  const coverage = {
+    definitions: entriesWithDefinition / total,
+    examples: entriesWithExample / total,
+    notes: entriesWithNotes / total,
+    sources: entriesWithSource / total,
+    ipa: entriesWithIpa / total,
+    morphology: entriesWithMorphology / total,
+  };
+  const noDefinitionEntryIds = entries
+    .filter((entry) => !(entry.definitions || []).some((definition) => definition.meaning))
+    .map((entry) => entry.id);
+  const noExampleEntryIds = entries
+    .filter((entry) => !(entry.definitions || []).some((definition) => definition.example))
+    .map((entry) => entry.id);
+  const noNoteEntryIds = entries
+    .filter((entry) => !entry.notes)
+    .map((entry) => entry.id);
+  const noSourceEntryIds = entries
+    .filter((entry) => !entryHasSources(entry))
+    .map((entry) => entry.id);
+  const noIpaEntryIds = entries
+    .filter((entry) => !entry.pronunciation)
+    .map((entry) => entry.id);
+  const noMorphologyEntryIds = entries
+    .filter((entry) => !resolveEntryMorphologyTable(entry, dictionary))
+    .map((entry) => entry.id);
+  const coverageRows = [
+    [aText("有释义", "Definitions"), coverage.definitions, binaryCoverageFilterAction(aText("有释义", "Has definitions"), [...definitionEntryIds], aText("无释义", "No definitions"), noDefinitionEntryIds)],
+    [aText("有例句", "Examples"), coverage.examples, binaryCoverageFilterAction(aText("有例句", "Has examples"), [...exampleEntryIds], aText("无例句", "No examples"), noExampleEntryIds)],
+    [aText("有备注", "Notes"), coverage.notes, binaryCoverageFilterAction(aText("有备注", "Has notes"), [...noteEntryIds], aText("无备注", "No notes"), noNoteEntryIds)],
+    [aText("有来源", "Sources"), coverage.sources, binaryCoverageFilterAction(aText("有来源", "Has sources"), [...sourceEntryIds], aText("无来源", "No sources"), noSourceEntryIds)],
+    ["IPA", coverage.ipa, binaryCoverageFilterAction(aText("有 IPA", "Has IPA"), [...ipaEntryIds], aText("无 IPA", "No IPA"), noIpaEntryIds)],
+    [aText("形态表格", "Morphology table"), coverage.morphology, binaryCoverageFilterAction(aText("有形态表格", "Has morphology table"), [...morphologyEntryIds], aText("无形态表格", "No morphology table"), noMorphologyEntryIds)],
+  ];
+  const searchMatchEntries = normalize(searchQuery)
+    ? entries.filter((entry) => entryMatchesSearch(entry, dictionary))
+    : entries;
+
   return {
+    entries,
+    rootCount: rootGroups.length,
+    derivedCount: derivedEntries.length,
+    derivedEntryIds: derivedEntries.map((entry) => entry.id),
+    isolatedRootCount,
+    definitionCount,
+    examples,
+    glossExamples,
+    multiSourceCount,
+    definitionEntryIds: [...definitionEntryIds],
+    exampleEntryIds: [...exampleEntryIds],
+    glossEntryIds: [...glossEntryIds],
+    noteEntryIds: [...noteEntryIds],
+    sourceEntryIds: [...sourceEntryIds],
+    ipaEntryIds: [...ipaEntryIds],
+    morphologyEntryIds: [...morphologyEntryIds],
+    noDefinitionEntryIds,
+    noExampleEntryIds,
+    noNoteEntryIds,
+    noSourceEntryIds,
+    noIpaEntryIds,
+    noMorphologyEntryIds,
+    multiSourceEntryIds: [...multiSourceEntryIds],
     parts: partEntryMapItems(parts, 12, dictionary),
     allParts: partEntryMapItems(parts, Number.MAX_SAFE_INTEGER, dictionary),
     tags: tagEntryMapItems(tags, 16, dictionary),
     allTags: tagEntryMapItems(tags, Number.MAX_SAFE_INTEGER, dictionary),
     tagCombos: topEntryMapItems(tagCombos, 10, aText("标签组合", "Tag Combination")),
     allTagCombos: topEntryMapItems(tagCombos, Number.MAX_SAFE_INTEGER, aText("标签组合", "Tag Combination")),
-  };
-}
-
-function buildAnalysisFormSlice(context) {
-  const { entries } = context;
-  const initialLetters = new Map();
-  const wordLengths = new Map();
-  const characters = new Map();
-  const bigrams = new Map();
-
-  entries.forEach((entry) => {
-    const lemma = String(entry.lemma || "");
-    if (!lemma) {
-      return;
-    }
-    incrementEntry(wordLengths, String(Array.from(lemma).length), entry);
-    incrementEntry(initialLetters, Array.from(lemma.trim())[0] || "", entry);
-    Array.from(lemma.replace(/\s+/g, "")).forEach((char) => incrementEntry(characters, char, entry));
-    Array.from(lemma.replace(/\s+/g, "")).forEach((char, index, chars) => {
-      if (index < chars.length - 1) {
-        incrementEntry(bigrams, `${char}${chars[index + 1]}`, entry);
-      }
-    });
-  });
-
-  return {
     initialLetters: topEntryMapItems(initialLetters, 14, aText("首字母", "Initial Letter")),
     allInitialLetters: topEntryMapItems(initialLetters, Number.MAX_SAFE_INTEGER, aText("首字母", "Initial Letter")),
     wordLengths: numericEntryMapItems(wordLengths, aText("词长", "Word Length")),
@@ -9009,30 +5858,30 @@ function buildAnalysisFormSlice(context) {
     allCharacters: topEntryMapItems(characters, Number.MAX_SAFE_INTEGER, aText("正写法字符", "Orthographic Character")),
     bigrams: topEntryMapItems(bigrams, 16, aText("正写法双字符组合", "Orthographic Bigram")),
     allBigrams: topEntryMapItems(bigrams, Number.MAX_SAFE_INTEGER, aText("正写法双字符组合", "Orthographic Bigram")),
-  };
-}
-
-function buildAnalysisIpaSlice(context) {
-  return analyzeIpa(context.entries, context.dictionary);
-}
-
-function buildAnalysisMorphologySlice(context) {
-  return analyzeMorphology(context.entries, context.dictionary);
-}
-
-function buildAnalysisSearchSlice(context) {
-  const { dictionary, entries } = context;
-  const searchMatchEntries = normalizeEntrySearchText(searchQuery, dictionary)
-    ? entries.filter((entry) => entryMatchesSearch(entry, dictionary))
-    : entries;
-  return {
+    rootFamilies: rootGroups
+      .filter((group) => group.derived.length)
+      .sort((a, b) => b.derived.length - a.derived.length)
+      .slice(0, 12)
+      .map((group) => [group.root.lemma, group.derived.length, directEntryAction(group.root.id)]),
+    allRootFamilies: rootGroups
+      .filter((group) => group.derived.length)
+      .sort((a, b) => b.derived.length - a.derived.length)
+      .map((group) => [group.root.lemma, group.derived.length, directEntryAction(group.root.id)]),
+    ipa,
+    morphology,
+    coverage,
+    coverageRows,
+    issues,
     searchMatches: searchMatchEntries.length,
+    searchMatchEntryIds: searchMatchEntries.map((entry) => entry.id),
     searchFields: analyzeSearchFields(entries, dictionary),
+    networkIssues: networkIssues.length ? networkIssues : [{
+      severity: "ok",
+      title: aText("未发现词源网络问题", "No etymology network issues found"),
+      detail: `${derivedEntries.length} ${aText("个衍生词", "derived entries")} / ${multiSourceCount} ${aText("个多来源词条", "multi-source entries")}`,
+    }],
+    activity: analyzeActivity(entries),
   };
-}
-
-function buildAnalysisActivitySlice(context) {
-  return analyzeActivity(context.entries);
 }
 
 function analyzeIpa(entries, dictionary) {
@@ -9156,15 +6005,15 @@ function analyzeActivity(entries) {
     const createdDay = dateBucket(entry.createdAt);
     const updatedDay = dateBucket(entry.updatedAt);
     if (createdDay) {
-      increment(created, createdDay);
+      incrementEntry(created, createdDay, entry);
     }
     if (updatedDay) {
-      increment(updated, updatedDay);
+      incrementEntry(updated, updatedDay, entry);
     }
   });
   return {
-    created: numericDateEntryItems(created, aText("新增日期", "Created Date"), "created"),
-    updated: numericDateEntryItems(updated, aText("编辑日期", "Updated Date"), "updated"),
+    created: numericDateEntryItems(created, aText("新增日期", "Created Date")),
+    updated: numericDateEntryItems(updated, aText("编辑日期", "Updated Date")),
     latest: [...entries]
       .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
       .map((entry) => [entry.lemma || aText("无词形", "No lemma"), dateBucket(entry.updatedAt) || "", directEntryAction(entry.id)]),
@@ -9172,52 +6021,32 @@ function analyzeActivity(entries) {
 }
 
 function analyzeSearchFields(entries, dictionary) {
-  const searchOptions = entrySearchQueryOptions(dictionary);
-  const query = searchQuery;
-  if (!searchOptions.normalizeText(query)) {
+  const query = normalize(searchQuery);
+  if (!query) {
     return [];
   }
-  const { fields: searchFields, fuzzyFields } = searchOptions;
+  const settings = normalizeDictionarySettings(dictionary.settings);
   const counts = new Map();
   entries.forEach((entry) => {
-    const fieldValues = entrySearchModel.entrySearchFieldValues(entry, dictionary, {
-      fields: searchFields,
-      normalizeText: searchOptions.normalizeText,
-    });
+    const parts = entryParts(entry, dictionary);
     const fieldGroups = [
-      ["lemma", aText("词形", "Lemma"), fieldValues.lemma],
-      ["tags", aText("标签", "Tags"), fieldValues.tags],
-      ["definitions", aText("释义", "Definitions"), fieldValues.definitions],
-      ["examples", aText("例句", "Examples"), fieldValues.examples],
-      ["etymology", aText("词源", "Etymology"), fieldValues.etymology],
-      ["pronunciation", "IPA", fieldValues.pronunciation],
-      ["morphology", aText("形态形式", "Morphology forms"), fieldValues.morphology],
-      ["notes", aText("备注", "Notes"), fieldValues.notes],
+      [aText("词形", "Lemma"), [entry.lemma], settings.fuzzySearch],
+      [aText("标签", "Tags"), [...parts, ...parts.map((part) => displayTag(part, dictionary)), ...(entry.tags || []), ...(entry.tags || []).map((tag) => displayTag(tag, dictionary))], settings.tagFuzzySearch],
+      [aText("释义", "Definitions"), (entry.definitions || []).map((definition) => definition.meaning), settings.fuzzySearch],
+      [aText("例句", "Examples"), (entry.definitions || []).map((definition) => definition.example), settings.fuzzySearch],
+      [aText("词源", "Etymology"), [...(entry.etymology?.sources || []), entry.etymology?.description], settings.fuzzySearch],
+      ["IPA", [entry.pronunciation], settings.fuzzySearch],
+      [aText("形态形式", "Morphology forms"), morphologySearchStrings(entry, dictionary), settings.fuzzySearch],
+      [aText("备注", "Notes"), [entry.notes, ...(entry.definitions || []).map((definition) => definition.note)], settings.fuzzySearch],
     ];
-    fieldGroups.forEach(([field, label, values]) => {
-      if (values.some((value) => textMatches(value, query, fuzzyFields.has(field)))) {
-        const current = counts.get(field) || { label, count: 0 };
-        current.count += 1;
-        counts.set(field, current);
+    fieldGroups.forEach(([label, values, fuzzy]) => {
+      const text = values.map(normalize).join(" ");
+      if (textMatches(text, query, Boolean(fuzzy))) {
+        incrementEntry(counts, label, entry);
       }
     });
   });
-  return [...counts.entries()]
-    .sort((left, right) => right[1].count - left[1].count || left[1].label.localeCompare(right[1].label, "zh-CN"))
-    .slice(0, 10)
-    .map(([field, item]) => [
-      item.label,
-      item.count,
-      entryFilterAction(analysisFilterTitle(aText("搜索字段", "Search Field"), item.label), {}, {
-        count: item.count,
-        search: {
-          text: query,
-          fields: [field],
-          fuzzyFields: fuzzyFields.has(field) ? [field] : [],
-        },
-        meta: { type: "search-field", field },
-      }),
-    ]);
+  return topEntryMapItems(counts, 10, aText("搜索字段", "Search Field"));
 }
 
 function analysisMetricCard(label, value, note = "", action = null) {
@@ -9305,12 +6134,53 @@ function analysisIssueList(issues, options = {}) {
   `).join("")}</ul>`;
 }
 
+function addIssue(list, severity, entry, title, detail = "", module = "other") {
+  list.push({
+    severity,
+    entryId: entry?.id || "",
+    entryLemma: entry?.lemma || "",
+    title,
+    detail,
+    module,
+  });
+}
+
+function sourceCycleForEntry(entry, dictionary) {
+  const path = [];
+  const seen = new Set();
+  const visit = (current) => {
+    if (!current) {
+      return [];
+    }
+    if (seen.has(current.id)) {
+      const index = path.findIndex((item) => item.id === current.id);
+      return index >= 0 ? [...path.slice(index), current] : [current];
+    }
+    seen.add(current.id);
+    path.push(current);
+    for (const sourceName of current.etymology?.sources || []) {
+      const source = resolveSourceEntry(sourceName, dictionary);
+      const cycle = visit(source);
+      if (cycle.length) {
+        return cycle;
+      }
+    }
+    path.pop();
+    seen.delete(current.id);
+    return [];
+  };
+  return visit(entry);
+}
+
 function cleanIpaText(value) {
-  return ipaModel.cleanIpaText(value);
+  return String(value || "")
+    .replace(/[\/\[\]]/g, "")
+    .replace(/[ˈˌ]/g, "")
+    .trim();
 }
 
 function normalizeIpaCompare(value) {
-  return ipaModel.normalizeIpaCompare(value);
+  return cleanIpaText(value).replace(/\s+/g, "");
 }
 
 function dateBucket(value) {
@@ -9339,52 +6209,7 @@ function analysisFilterTitle(label, value = "") {
   return value ? `${label}: ${value}` : label;
 }
 
-function entryFilterAction(title, filter, options = {}) {
-  const available = options.available ?? (options.count === undefined ? true : Number(options.count) > 0);
-  if (!available && !options.allowEmptyActive) {
-    return null;
-  }
-  const createVariant = (variantTitle, variantFilter, variant = {}) => ({
-    key: variant.key || "",
-    title: variantTitle,
-    filter: entryQueryModel.normalizeEntryFilter(variantFilter),
-    search: variant.search ? entryQueryModel.normalizeEntrySearch(variant.search) : null,
-    available: variant.available ?? (variant.count === undefined ? true : Number(variant.count) > 0),
-  });
-  const variants = [
-    createVariant(title, filter, {
-      key: options.key,
-      search: options.search,
-      available,
-    }),
-    ...(options.variants || []).map((variant) => createVariant(
-      variant.title,
-      variant.filter,
-      variant,
-    )),
-  ];
-  return {
-    type: "advanced-filter",
-    title,
-    variants,
-    meta: options.meta || null,
-  };
-}
-
-function binaryPresenceFilterAction(activeTitle, field, activeCount, alternateTitle, alternateCount) {
-  return entryFilterAction(activeTitle, {
-    presence: [{ field, present: true }],
-  }, {
-    count: activeCount,
-    variants: [{
-      title: alternateTitle,
-      filter: { presence: [{ field, present: false }] },
-      count: alternateCount,
-    }],
-  });
-}
-
-function binaryFeatureFilterAction(activeTitle, activeEntryIds, alternateTitle, alternateEntryIds) {
+function binaryCoverageFilterAction(activeTitle, activeEntryIds, alternateTitle, alternateEntryIds) {
   const activeIds = entryIdsFrom(activeEntryIds);
   const alternateIds = entryIdsFrom(alternateEntryIds);
   return activeIds.length
@@ -9491,18 +6316,18 @@ function topEntryMapItems(map, limit = 12, title = "") {
 
 function partEntryMapItems(map, limit = 12, dictionary = activeDictionary()) {
   return [...map.entries()]
-    .sort((a, b) => Number(b[1]) - Number(a[1]) || String(partDisplayLabel(a[0], dictionary)).localeCompare(String(partDisplayLabel(b[0], dictionary)), "zh-CN"))
+    .sort((a, b) => b[1].count - a[1].count || String(partDisplayLabel(a[0], dictionary)).localeCompare(String(partDisplayLabel(b[0], dictionary)), "zh-CN"))
     .slice(0, limit)
-    .map(([part, count]) => [partDisplayLabel(part, dictionary), Number(count), partFilterAction(part)]);
+    .map(([part, item]) => [partDisplayLabel(part, dictionary), item.count, partFilterAction(part)]);
 }
 
 function tagEntryMapItems(map, limit = 12, dictionary = activeDictionary()) {
   return [...map.entries()]
-    .sort((a, b) => Number(b[1]) - Number(a[1]) || String(displayTag(a[0], dictionary)).localeCompare(String(displayTag(b[0], dictionary)), "zh-CN"))
+    .sort((a, b) => b[1].count - a[1].count || String(displayTag(a[0], dictionary)).localeCompare(String(displayTag(b[0], dictionary)), "zh-CN"))
     .slice(0, limit)
-    .map(([tag, count]) => [
+    .map(([tag, item]) => [
       displayTag(tag, dictionary),
-      Number(count),
+      item.count,
       tagIsPartFilterCandidate(tag, dictionary) ? partFilterAction(tag) : tagAdvancedFilterAction(tag),
     ]);
 }
@@ -9512,10 +6337,9 @@ function partDisplayLabel(part, dictionary = activeDictionary()) {
 }
 
 function tagIsPartFilterCandidate(tag, dictionary = activeDictionary()) {
-  const structuralTag = searchNormalizationModel.normalizeStructuralKey(tag);
-  return Boolean(structuralTag)
-    && (dictionary?.entries || []).some((entry) => entryParts(entry, dictionary)
-      .some((part) => searchNormalizationModel.normalizeStructuralKey(part) === structuralTag));
+  const normalizedTag = normalize(tag);
+  return Boolean(normalizedTag)
+    && (dictionary?.entries || []).some((entry) => entryParts(entry, dictionary).some((part) => normalize(part) === normalizedTag));
 }
 
 function numericMapItems(map) {
@@ -9532,61 +6356,28 @@ function numericDateItems(map) {
   return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
 
-function numericDateEntryItems(map, title = "", field = "updated") {
+function numericDateEntryItems(map, title = "") {
   return [...map.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([label, count]) => [
-      label,
-      Number(count),
-      entryFilterAction(analysisFilterTitle(title, label), {
-        activityDays: [{ field, day: label }],
-      }, { count }),
-    ]);
+    .map(([label, item]) => [label, item.count, advancedFilterAction(analysisFilterTitle(title, label), [...item.entryIds])]);
 }
 
-function renderMorphologyDisplay(entry, showEmptySections = false) {
-  const dictionary = activeDictionary();
-  const resolvedGroups = morphologyModel
-    .resolveEntryMorphologyGroups(entry, dictionary, { normalizeText: searchNormalizationModel.normalizeStructuralKey })
-    .filter(({ templateGroup }) => templateGroup.tables.length);
-  elements.displayMorphologySection.hidden = !resolvedGroups.length && !showEmptySections;
+function renderMorphologyDisplay(entry) {
+  const table = resolveEntryMorphologyTable(entry);
+  elements.displayMorphologySection.hidden = !table;
   elements.displayMorphology.innerHTML = "";
-  if (!resolvedGroups.length) {
+  if (!table) {
     return;
   }
-  const groups = document.createElement("div");
-  groups.className = "morphology-display-groups";
-  resolvedGroups.forEach(({ templateGroup, entryGroup }) => {
-    const group = document.createElement("section");
-    group.className = "morphology-display-group";
-    const groupTitle = entryGroup?.title || templateGroup.name || t("morphologyGroup");
-    const groupNotes = String(entryGroup?.notes || "").trim();
-    const tableCards = templateGroup.tables.map((table) => {
-      const rows = [];
-      rows.push(`<tr><th scope="col" aria-label="${escapeHtml(t("rowLabels"))}"></th>${table.columnLabels.map((label) => `<th scope="col">${escapeHtml(label)}</th>`).join("")}</tr>`);
-      for (let row = 0; row < table.rowCount; row += 1) {
-        rows.push(`<tr><th>${escapeHtml(table.rowLabels[row])}</th>${Array.from({ length: table.columnCount }, (_, col) => {
-          const value = morphologyModel.morphologyCellValue(entry, entryGroup, table, row, col, dictionary);
-          return `<td>${escapeHtml(value)}</td>`;
-        }).join("")}</tr>`);
-      }
-      return `
-        <section class="morphology-display-table">
-          <h5>${escapeHtml(table.title || groupTitle)}</h5>
-          <div class="morphology-table-scroll"><table class="morphology-table">${rows.join("")}</table></div>
-        </section>
-      `;
-    }).join("");
-    group.innerHTML = `
-      <div class="morphology-display-group-heading">
-        <h4>${escapeHtml(groupTitle)}</h4>
-        ${groupNotes ? `<p class="morphology-display-group-note">${escapeHtml(groupNotes)}</p>` : ""}
-      </div>
-      <div class="morphology-display-table-grid">${tableCards}</div>
-    `;
-    groups.append(group);
-  });
-  elements.displayMorphology.append(groups);
+  const wrapper = document.createElement("div");
+  wrapper.className = "morphology-table-scroll";
+  const rows = [];
+  rows.push(`<tr><th>${escapeHtml(table.name)}</th>${table.colLabels.map((label) => `<th>${escapeHtml(label)}</th>`).join("")}</tr>`);
+  for (let row = 0; row < table.rows; row += 1) {
+    rows.push(`<tr><th>${escapeHtml(table.rowLabels[row])}</th>${Array.from({ length: table.cols }, (_, col) => `<td>${escapeHtml(morphologyCellValue(entry, table, row, col, activeDictionary()))}</td>`).join("")}</tr>`);
+  }
+  wrapper.innerHTML = `<table class="morphology-table">${rows.join("")}</table>`;
+  elements.displayMorphology.append(wrapper);
 }
 
 function renderDictionaryManager() {
@@ -9605,7 +6396,7 @@ function renderDictionaryManager() {
     card.innerHTML = `
       <div>
         <strong>${escapeHtml(dictionary.name)}</strong>
-        <small>${escapeHtml(dictionaryManagerStatsText(dictionary))}</small>
+        <small>${escapeHtml(dictionaryStatsText(dictionary))}</small>
       </div>
       <p>${escapeHtml(dictionary.description || t("noDescription"))}</p>
       <div class="card-actions">
@@ -9642,10 +6433,9 @@ function fillEntryForm(entry) {
     lemma: "",
     pronunciation: "",
     tags: [],
-    definitions: [],
+    definitions: [normalizeDefinition()],
     etymology: { sources: [], description: "" },
-    morphologyMode: "auto",
-    morphologyGroups: [],
+    morphology: { tableId: "auto", overrides: {} },
     notes: "",
   };
   const formEntry = entry || blankEntry;
@@ -9660,171 +6450,151 @@ function fillEntryForm(entry) {
   elements.notesInput.value = formEntry.notes || "";
   elements.sourceEntryInput.value = (formEntry.etymology?.sources || []).join("，");
   elements.etymologyDescriptionInput.value = formEntry.etymology?.description || "";
-  renderDefinitionFormList(formEntry.definitions);
+  renderDefinitionFormList(formEntry.definitions || [normalizeDefinition()]);
   renderEntryMorphologyControls(formEntry);
-  renderFullEditDerivedEntries(formEntry);
-  applyFullEntrySectionOrder();
   renderIpaKeyboard(activeDictionary());
 }
 
-function applyFullEntrySectionOrder() {
-  const sections = Object.fromEntries(
-    [...elements.entryForm.querySelectorAll("[data-entry-form-section]")]
-      .map((section) => [section.dataset.entryFormSection, section]),
-  );
-  const actions = elements.entryForm.querySelector(".form-actions");
-  if (!actions) {
-    return;
-  }
-  normalizeEntrySectionOrder(activeDictionary()?.settings?.entrySectionOrder)
-    .forEach((section) => actions.before(sections[section]));
-}
-
 function renderEntryMorphologyControls(entry) {
-  renderMorphologyEntryControls(elements.entryMorphologyControls, entry, { full: true });
+  const tables = morphologyTables();
+  const current = entry.morphology?.tableId || "auto";
+  elements.entryMorphologyTableSelect.innerHTML = [
+    `<option value="auto">${escapeHtml(t("morphologyAuto"))}</option>`,
+    `<option value="none">${escapeHtml(t("morphologyNone"))}</option>`,
+    ...tables.map((table) => `<option value="${escapeHtml(table.id)}">${escapeHtml(table.name)}</option>`),
+  ].join("");
+  elements.entryMorphologyTableSelect.value = ["auto", "none", ...tables.map((table) => table.id)].includes(current) ? current : "auto";
+  renderEntryMorphologyOverrides(entry);
 }
 
-function morphologyFormPreviewEntry(entry = {}, full = false) {
-  return {
-    ...entry,
-    lemma: full ? elements.lemmaInput.value.trim() : entry.lemma || "",
-    tags: full ? splitList(elements.tagsInput.value) : entry.tags || [],
-  };
-}
-
-function morphologyEditorResolvedGroups(entry, dictionary) {
-  return morphologyModel.resolveEntryMorphologyGroups(entry, dictionary, { normalizeText: searchNormalizationModel.normalizeStructuralKey })
-    .filter(({ templateGroup }) => templateGroup.tables.length);
-}
-
-function renderMorphologyEntryControls(host, entry = {}, { full = false } = {}) {
-  if (!host) {
-    return;
-  }
+function selectedEntryMorphologyTableForForm(entry = selectedEntry()) {
   const dictionary = activeDictionary();
-  const previewEntry = morphologyFormPreviewEntry(entry, full);
-  const state = morphologyModel.normalizeEntryMorphologyState(entry);
-  const resolved = morphologyEditorResolvedGroups({ ...previewEntry, ...state }, dictionary);
-  const manualGroups = state.morphologyGroups.map((entryGroup) => ({
-    templateGroup: normalizeMorphology(dictionary?.morphology).templateGroups.find((group) => group.id === entryGroup.templateGroupId),
-    entryGroup,
-  })).filter(({ templateGroup }) => templateGroup);
-  const groups = state.morphologyMode === "manual" ? manualGroups : resolved;
-  const availableGroups = normalizeMorphology(dictionary?.morphology).templateGroups;
-  host.innerHTML = `
-    <div class="entry-morphology-mode-row" data-morphology-mode="${escapeHtml(state.morphologyMode)}">
-      <strong>${escapeHtml(state.morphologyMode === "auto" ? t("morphologyAuto") : t("morphologyManual"))}</strong>
-      <button class="secondary-button" type="button" data-action="toggle-entry-morphology-mode">${escapeHtml(state.morphologyMode === "auto" ? t("switchToManualMorphology") : t("restoreAutoMorphology"))}</button>
-    </div>
-    ${state.morphologyMode === "manual" ? `
-      <div class="entry-morphology-add-row">
-        <select data-field="addMorphologyGroup">${availableGroups.map((group) => `<option value="${escapeHtml(group.id)}">${escapeHtml(group.name)}</option>`).join("")}</select>
-        <button class="primary-button" type="button" data-action="add-entry-morphology-group">${escapeHtml(t("addEntryMorphologyGroup"))}</button>
-      </div>` : ""}
-    <p class="field-help">${escapeHtml(t("morphologyOverrideHelp"))}</p>
-    <div class="entry-morphology-group-list">${groups.map(({ templateGroup, entryGroup }, index) => renderEntryMorphologyGroupEditor(templateGroup, entryGroup, previewEntry, state.morphologyMode, index, groups.length)).join("")}</div>
-  `;
-}
-
-function renderEntryMorphologyGroupEditor(templateGroup, entryGroup, entry, mode, index = 0, total = 1) {
-  const group = entryGroup || { templateGroupId: templateGroup.id, title: "", notes: "", overrides: {} };
-  const tables = templateGroup.tables.map((table) => renderEntryMorphologyOverrideTable(table, group, entry)).join("");
-  return `
-    <section class="entry-morphology-group-card" data-template-group-id="${escapeHtml(templateGroup.id)}">
-      <div class="entry-morphology-group-heading">
-        <div>
-          <strong>${escapeHtml(templateGroup.name)}</strong>
-          <span class="field-help">${escapeHtml(mode === "auto" ? t("morphologyAuto") : t("morphologyManual"))}</span>
-        </div>
-        ${mode === "manual" ? `<div class="panel-actions"><button class="secondary-button" type="button" data-action="move-entry-morphology-group-up" ${index === 0 ? "disabled" : ""}>${escapeHtml(t("moveUp"))}</button><button class="secondary-button" type="button" data-action="move-entry-morphology-group-down" ${index === total - 1 ? "disabled" : ""}>${escapeHtml(t("moveDown"))}</button><button class="danger-ghost" type="button" data-action="remove-entry-morphology-group">${escapeHtml(t("removeEntryMorphologyGroup"))}</button></div>` : ""}
-      </div>
-      <div class="entry-morphology-group-fields">
-        <label><span>${escapeHtml(t("entryMorphologyGroupTitle"))}</span><input data-field="entryMorphologyTitle" value="${escapeHtml(group.title || "")}" placeholder="${escapeHtml(t("useTemplateGroupTitle"))}"></label>
-        <label><span>${escapeHtml(t("entryMorphologyGroupNotes"))}</span><textarea data-field="entryMorphologyNotes" rows="2">${escapeHtml(group.notes || "")}</textarea></label>
-      </div>
-      ${tables}
-    </section>
-  `;
-}
-
-function renderEntryMorphologyOverrideTable(table, entryGroup, entry) {
-  const rows = [`<tr><th></th>${table.columnLabels.map((label) => `<th>${escapeHtml(label)}</th>`).join("")}</tr>`];
-  for (let row = 0; row < table.rowCount; row += 1) {
-    rows.push(`<tr><th>${escapeHtml(table.rowLabels[row])}</th>${Array.from({ length: table.columnCount }, (_, column) => {
-      const key = morphologyCellKey(row, column);
-      const value = entryGroup.overrides?.[table.id]?.[key] || "";
-      const placeholder = morphologyModel.morphologyCellDefaultValue(entry, table, row, column, activeDictionary());
-      return `<td><input class="morphology-override-input" data-morphology-table-id="${escapeHtml(table.id)}" data-morphology-override="${escapeHtml(key)}" value="${escapeHtml(value)}" placeholder="${escapeHtml(placeholder)}"></td>`;
-    }).join("")}</tr>`);
+  const tableId = elements.entryMorphologyTableSelect.value;
+  if (tableId === "none") {
+    return null;
   }
-  return `<section class="entry-morphology-override-table"><h5>${escapeHtml(table.title)}</h5><div class="morphology-table-scroll"><table class="morphology-table">${rows.join("")}</table></div></section>`;
-}
-
-function collectMorphologyEntryState(host, entry = {}) {
-  const morphologyMode = host?.querySelector("[data-morphology-mode]")?.dataset.morphologyMode || "auto";
-  const visibleGroups = [...(host?.querySelectorAll(".entry-morphology-group-card") || [])].map((card) => {
-    const overrides = {};
-    card.querySelectorAll("[data-morphology-override]").forEach((input) => {
-      const tableId = input.dataset.morphologyTableId;
-      const value = input.value.trim();
-      if (!tableId || !value) {
-        return;
-      }
-      if (!overrides[tableId]) {
-        overrides[tableId] = {};
-      }
-      overrides[tableId][input.dataset.morphologyOverride] = value;
-    });
-    return {
-      templateGroupId: card.dataset.templateGroupId,
-      title: card.querySelector('[data-field="entryMorphologyTitle"]')?.value.trim() || "",
-      notes: card.querySelector('[data-field="entryMorphologyNotes"]')?.value.trim() || "",
-      overrides,
+  if (tableId === "auto") {
+    const previewEntry = {
+      ...(entry || {}),
+      lemma: elements.lemmaInput.value.trim(),
+      tags: splitList(elements.tagsInput.value),
+      morphology: { tableId: "auto", overrides: {} },
     };
-  });
-  const previous = entry.morphologyGroups || [];
-  const morphologyGroups = morphologyMode === "auto"
-    ? [...previous.filter((group) => !visibleGroups.some((visible) => visible.templateGroupId === group.templateGroupId)), ...visibleGroups]
-    : visibleGroups;
-  return morphologyModel.normalizeEntryMorphologyState({ morphologyMode, morphologyGroups });
+    return resolveEntryMorphologyTable(previewEntry, dictionary);
+  }
+  return morphologyTables(dictionary).find((table) => table.id === tableId) || null;
 }
 
-async function toggleMorphologyEditorMode(host, entry = {}, { full = false } = {}) {
-  const current = collectMorphologyEntryState(host, entry);
-  const previewEntry = morphologyFormPreviewEntry({ ...entry, ...current }, full);
-  if (current.morphologyMode === "auto") {
-    const confirmed = await appConfirm(t("switchToManualMorphologyConfirm"));
-    if (!confirmed) {
-      return;
+function renderEntryMorphologyOverrides(entry = selectedEntry(), keepValues = false) {
+  const previous = keepValues ? collectEntryMorphologyOverrides() : normalizeMorphologyOverrides(entry?.morphology?.overrides);
+  const table = selectedEntryMorphologyTableForForm(entry);
+  elements.entryMorphologyOverrides.innerHTML = "";
+  if (!table) {
+    return;
+  }
+  const previewEntry = {
+    ...(entry || {}),
+    lemma: elements.lemmaInput.value.trim() || entry?.lemma || "",
+    tags: splitList(elements.tagsInput.value),
+    morphology: { tableId: elements.entryMorphologyTableSelect.value, overrides: {} },
+  };
+  const help = document.createElement("p");
+  help.className = "field-help";
+  help.textContent = t("morphologyOverrideHelp");
+  elements.entryMorphologyOverrides.append(help);
+  const grid = document.createElement("div");
+  grid.className = "morphology-override-list";
+  for (let row = 0; row < table.rows; row += 1) {
+    for (let col = 0; col < table.cols; col += 1) {
+      const key = morphologyCellKey(row, col);
+      const label = `${table.rowLabels[row]} / ${table.colLabels[col]}`;
+      const defaultValue = morphologyCellDefaultValue(previewEntry, table, row, col);
+      grid.insertAdjacentHTML("beforeend", `
+        <label>
+          <span>${escapeHtml(label)}</span>
+          <input class="morphology-override-input" data-morphology-override="${escapeHtml(key)}" value="${escapeHtml(previous[key] || "")}" placeholder="${escapeHtml(defaultValue)}">
+        </label>
+      `);
     }
-    const morphologyGroups = morphologyModel.materializeAutomaticMorphologyGroups(
-      previewEntry,
-      activeDictionary(),
-      {
-        normalizeText: searchNormalizationModel.normalizeStructuralKey,
-      },
-    );
-    renderMorphologyEntryControls(host, {
-      ...previewEntry,
-      morphologyMode: "manual",
-      morphologyGroups,
-    }, { full });
-    return;
   }
-  const confirmed = await appConfirm(t("restoreAutoMorphologyConfirm"), { danger: true });
-  if (!confirmed) {
-    return;
-  }
-  renderMorphologyEntryControls(host, {
-    ...previewEntry,
-    morphologyMode: "auto",
-    morphologyGroups: [],
-  }, { full });
+  elements.entryMorphologyOverrides.append(grid);
+}
+
+function collectEntryMorphologyOverrides() {
+  return normalizeMorphologyOverrides(Object.fromEntries(
+    [...elements.entryMorphologyOverrides.querySelectorAll("[data-morphology-override]")]
+      .map((input) => [input.dataset.morphologyOverride, input.value]),
+  ));
 }
 
 function renderPartialMorphologyControls(entry) {
   const body = partialEditBody();
-  renderMorphologyEntryControls(body?.querySelector(".partial-morphology-controls"), entry);
+  const select = body?.querySelector('[data-field="morphologyTable"]');
+  const host = body?.querySelector(".partial-morphology-overrides");
+  if (!select || !host) {
+    return;
+  }
+  const tables = morphologyTables();
+  const current = entry.morphology?.tableId || "auto";
+  select.innerHTML = [
+    `<option value="auto">${escapeHtml(t("morphologyAuto"))}</option>`,
+    `<option value="none">${escapeHtml(t("morphologyNone"))}</option>`,
+    ...tables.map((table) => `<option value="${escapeHtml(table.id)}">${escapeHtml(table.name)}</option>`),
+  ].join("");
+  select.value = ["auto", "none", ...tables.map((table) => table.id)].includes(current) ? current : "auto";
+  select.addEventListener("change", () => renderPartialMorphologyOverrides({}, select.value));
+  renderPartialMorphologyOverrides(entry.morphology?.overrides, select.value);
+}
+
+function partialMorphologyTable(tableId) {
+  if (tableId === "none") {
+    return null;
+  }
+  if (tableId === "auto") {
+    return resolveEntryMorphologyTable({
+      ...(selectedEntry() || {}),
+      morphology: { tableId: "auto", overrides: {} },
+    });
+  }
+  return morphologyTables().find((table) => table.id === tableId) || null;
+}
+
+function renderPartialMorphologyOverrides(overrides = {}, tableId = partialEditBody()?.querySelector('[data-field="morphologyTable"]')?.value || "auto") {
+  const body = partialEditBody();
+  const host = body?.querySelector(".partial-morphology-overrides");
+  if (!host) {
+    return;
+  }
+  const table = partialMorphologyTable(tableId);
+  host.innerHTML = "";
+  if (!table) {
+    return;
+  }
+  host.insertAdjacentHTML("beforeend", `<p class="field-help">${escapeHtml(t("morphologyOverrideHelp"))}</p>`);
+  const grid = document.createElement("div");
+  grid.className = "morphology-override-list";
+  const normalizedOverrides = normalizeMorphologyOverrides(overrides);
+  const previewEntry = selectedEntry() || {};
+  for (let row = 0; row < table.rows; row += 1) {
+    for (let col = 0; col < table.cols; col += 1) {
+      const key = morphologyCellKey(row, col);
+      const defaultValue = morphologyCellDefaultValue(previewEntry, table, row, col);
+      grid.insertAdjacentHTML("beforeend", `
+        <label>
+          <span>${escapeHtml(table.rowLabels[row])} / ${escapeHtml(table.colLabels[col])}</span>
+          <input class="morphology-override-input" data-morphology-override="${escapeHtml(key)}" value="${escapeHtml(normalizedOverrides[key] || "")}" placeholder="${escapeHtml(defaultValue)}">
+        </label>
+      `);
+    }
+  }
+  host.append(grid);
+}
+
+function collectPartialMorphologyOverrides() {
+  return normalizeMorphologyOverrides(Object.fromEntries(
+    [...(partialEditBody()?.querySelectorAll("[data-morphology-override]") || [])]
+      .map((input) => [input.dataset.morphologyOverride, input.value]),
+  ));
 }
 
 function definitionFormStateFromCard(card) {
@@ -9894,13 +6664,9 @@ function definitionFormCardHtml(definition, index, removeAction) {
   `;
 }
 
-function definitionEditorItems(definitions) {
-  return Array.isArray(definitions) && definitions.length ? definitions : [normalizeDefinition()];
-}
-
-function renderDefinitionFormList(definitions = []) {
+function renderDefinitionFormList(definitions) {
   elements.definitionFormList.innerHTML = "";
-  definitionEditorItems(definitions).forEach((definition, index) => {
+  definitions.forEach((definition, index) => {
     const block = document.createElement("article");
     block.className = "definition-form-card";
     block.dataset.definitionId = definition.id || uid("def");
@@ -9949,79 +6715,6 @@ function collectDefinitions() {
     .filter((definition) => definition.meaning || definition.example || definition.note);
 }
 
-function entrySemanticSnapshot(entry = {}) {
-  const morphologyState = morphologyModel.normalizeEntryMorphologyState(entry);
-  return {
-    lemma: String(entry.lemma || "").trim(),
-    pronunciation: String(entry.pronunciation || "").trim(),
-    tags: Array.isArray(entry.tags)
-      ? entry.tags.map((tag) => String(tag || "").trim()).filter(Boolean)
-      : [],
-    definitions: (entry.definitions || [])
-      .map((definition) => ({
-        id: String(definition?.id || ""),
-        meaning: String(definition?.meaning || "").trim(),
-        example: String(definition?.example || "").trim(),
-        note: String(definition?.note || "").trim(),
-      }))
-      .filter((definition) => definition.meaning || definition.example || definition.note),
-    etymology: {
-      sources: Array.isArray(entry.etymology?.sources)
-        ? entry.etymology.sources.map((source) => String(source || "").trim()).filter(Boolean)
-        : [],
-      description: String(entry.etymology?.description || "").trim(),
-    },
-    morphologyMode: morphologyState.morphologyMode,
-    morphologyGroups: morphologyState.morphologyGroups.map((group) => ({
-      templateGroupId: String(group.templateGroupId || ""),
-      title: String(group.title || "").trim(),
-      notes: String(group.notes || "").trim(),
-      overrides: group.overrides || {},
-    })),
-    notes: String(entry.notes || "").trim(),
-  };
-}
-
-function entriesHaveSameSemantics(left, right) {
-  return stableJson(entrySemanticSnapshot(left)) === stableJson(entrySemanticSnapshot(right));
-}
-
-function fullEntryFormCandidate(existing = selectedEntry()) {
-  const lemma = elements.lemmaInput.value.trim();
-  const tags = splitList(elements.tagsInput.value);
-  const morphologyState = collectMorphologyEntryState(elements.entryMorphologyControls, {
-    ...(existing || {}),
-    lemma,
-    tags,
-  });
-  return {
-    ...(existing || {}),
-    id: existing?.id || "",
-    lemma,
-    pronunciation: elements.pronunciationInput.value.trim(),
-    tags,
-    definitions: collectDefinitions(),
-    etymology: {
-      sources: splitSourceText(elements.sourceEntryInput.value),
-      description: elements.etymologyDescriptionInput.value.trim(),
-    },
-    morphologyMode: morphologyState.morphologyMode,
-    morphologyGroups: morphologyState.morphologyGroups,
-    notes: elements.notesInput.value.trim(),
-  };
-}
-
-function fullEntryFormIsDirty() {
-  if (elements.entryForm.hidden) {
-    return false;
-  }
-  const existing = selectedEntry();
-  const candidate = fullEntryFormCandidate(existing);
-  return existing
-    ? !entriesHaveSameSemantics(candidate, existing)
-    : !entriesHaveSameSemantics(candidate, createEntryDraft());
-}
-
 function completeSourceAtCursor(input = elements.sourceEntryInput) {
   const dictionary = activeDictionary();
   if (!dictionary) {
@@ -10050,22 +6743,21 @@ function completeSourceAtCursor(input = elements.sourceEntryInput) {
 }
 
 function sourceCompletionCandidates(prefix, dictionary = activeDictionary()) {
-  const normalizeSearch = entrySearchQueryOptions(dictionary).normalizeText;
-  const normalizedPrefix = normalizeSearch(prefix);
+  const normalizedPrefix = normalize(prefix);
   if (!dictionary || !normalizedPrefix) {
     return [];
   }
-  const fuzzyEnabled = normalizeDictionarySettings(dictionary.settings).search.etymologyAutocomplete.fuzzy;
+  const fuzzyEnabled = Boolean(dictionary.settings?.sourceFuzzyCompletion);
   return dictionary.entries
     .map((entry) => {
-      const lemma = normalizeSearch(entry.lemma);
+      const lemma = normalize(entry.lemma);
       let score = 0;
       if (lemma.startsWith(normalizedPrefix)) {
         score = 1000 - Math.abs(lemma.length - normalizedPrefix.length);
       } else if (fuzzyEnabled && lemma.includes(normalizedPrefix)) {
         score = 700 - lemma.indexOf(normalizedPrefix);
       } else if (fuzzyEnabled) {
-        score = entrySearchModel.fuzzyScore(entry.lemma, prefix, { normalizeText: normalizeSearch });
+        score = fuzzyScore(lemma, normalizedPrefix);
       }
       return { entry, score };
     })
@@ -10267,118 +6959,6 @@ function collectGlossStyleForm() {
   return normalizeGlossStyles(styles);
 }
 
-function collectEntrySearchSettingsForm() {
-  const fields = Object.fromEntries(ENTRY_SEARCH_FIELD_KEYS.map((field) => {
-    const enabled = elements.searchFieldEnabledInputs.find((input) => input.dataset.searchEnabled === field);
-    const fuzzy = elements.searchFieldFuzzyInputs.find((input) => input.dataset.searchFuzzy === field);
-    return [field, {
-      enabled: Boolean(enabled?.checked),
-      fuzzy: Boolean(fuzzy?.checked),
-    }];
-  }));
-  return entrySearchModel.normalizeEntrySearchSettings({
-    fields,
-    normalization: {
-      unicodeNormalization: elements.searchNfcInput?.checked ? "nfc" : "none",
-      caseFolding: Boolean(elements.searchCaseFoldingInput?.checked),
-      customRules: collectSearchNormalizationRules(),
-    },
-    etymologyAutocomplete: {
-      fuzzy: Boolean(elements.sourceFuzzyInput?.checked),
-    },
-  });
-}
-
-function createSearchNormalizationRuleCard(rule = {}) {
-  const card = document.createElement("div");
-  card.className = "search-normalization-rule-card";
-  card.innerHTML = `
-    <label>
-      <span>${escapeHtml(t("searchCanonical"))}</span>
-      <input type="text" data-search-rule-canonical value="${escapeHtml(rule.canonical || "")}">
-    </label>
-    <label>
-      <span>${escapeHtml(t("searchVariants"))}</span>
-      <textarea data-search-rule-variants>${escapeHtml((rule.variants || []).join("\n"))}</textarea>
-    </label>
-    <button class="danger-ghost" type="button" data-action="remove-search-normalization-rule">${escapeHtml(t("removeSearchNormalizationRule"))}</button>
-  `;
-  return card;
-}
-
-function collectSearchNormalizationRules() {
-  return [...(elements.searchNormalizationRuleList?.children || [])].map((card) => ({
-    canonical: card.querySelector("[data-search-rule-canonical]")?.value.trim() || "",
-    variants: String(card.querySelector("[data-search-rule-variants]")?.value || "")
-      .split(/\r?\n/)
-      .map((value) => value.trim())
-      .filter(Boolean),
-  }));
-}
-
-function fillSearchNormalizationRules(rules = []) {
-  if (!elements.searchNormalizationRuleList) {
-    return;
-  }
-  elements.searchNormalizationRuleList.replaceChildren(
-    ...rules.map((rule) => createSearchNormalizationRuleCard(rule)),
-  );
-}
-
-function fillEntrySearchSettingsForm(search) {
-  const normalized = entrySearchModel.normalizeEntrySearchSettings(search);
-  elements.searchFieldEnabledInputs.forEach((input) => {
-    input.checked = normalized.fields[input.dataset.searchEnabled]?.enabled ?? true;
-  });
-  elements.searchFieldFuzzyInputs.forEach((input) => {
-    input.checked = normalized.fields[input.dataset.searchFuzzy]?.fuzzy ?? true;
-  });
-  elements.searchNfcInput.checked = normalized.normalization.unicodeNormalization === "nfc";
-  elements.searchCaseFoldingInput.checked = normalized.normalization.caseFolding;
-  fillSearchNormalizationRules(normalized.normalization.customRules);
-  elements.sourceFuzzyInput.checked = normalized.etymologyAutocomplete.fuzzy;
-  syncEntrySearchSettingsControls();
-}
-
-function searchNormalizationValidationMessage(error = {}) {
-  if (["empty_canonical", "invalid_canonical"].includes(error.code)) {
-    return t("searchNormalizationEmptyCanonical");
-  }
-  if (["empty_variants", "empty_variant", "invalid_variants", "invalid_variant"].includes(error.code)) {
-    return t("searchNormalizationEmptyVariants");
-  }
-  if (error.code === "conflicting_variant") {
-    return t("searchNormalizationConflictingVariant");
-  }
-  return t("searchNormalizationInvalidRule");
-}
-
-function validateSearchNormalizationForm(search) {
-  const runtime = searchNormalizationModel.createConfiguredSearchNormalizer(search.normalization);
-  const error = runtime.errors[0];
-  if (!error) {
-    return true;
-  }
-  showToast(searchNormalizationValidationMessage(error));
-  const card = elements.searchNormalizationRuleList?.children[error.index];
-  card?.querySelector(error.code.includes("canonical")
-    ? "[data-search-rule-canonical]"
-    : "[data-search-rule-variants]")?.focus();
-  return false;
-}
-
-function syncEntrySearchSettingsControls() {
-  elements.searchFieldEnabledInputs.forEach((enabledInput) => {
-    const field = enabledInput.dataset.searchEnabled;
-    const fuzzyInput = elements.searchFieldFuzzyInputs.find((input) => input.dataset.searchFuzzy === field);
-    const row = enabledInput.closest(".search-field-setting");
-    if (fuzzyInput) {
-      fuzzyInput.disabled = !enabledInput.checked;
-    }
-    row?.classList.toggle("is-search-disabled", !enabledInput.checked);
-  });
-}
-
 function fillSettingsForm(dictionary) {
   const settings = normalizeDictionarySettings(dictionary?.settings);
   fillGlossStyleForm(settings.glossStyles);
@@ -10391,7 +6971,6 @@ function fillSettingsForm(dictionary) {
   elements.tagDisplayMapInput.value = serializeTagDisplayMap(settings.tagDisplayMap);
   elements.entryListRawTagDisplayInput.checked = settings.entryListRawTagDisplay;
   elements.entryListTagDisplayLimitInput.value = settings.entryListTagDisplayLimit;
-  elements.entryListPartDisplayInput.value = settings.entryListPartDisplay;
   elements.manualPartOfSpeechTagsInput.checked = settings.manualPartOfSpeechTags;
   elements.partOfSpeechTagsInput.value = settings.partOfSpeechTags.join(", ");
   syncPartOfSpeechTagSettingsControls();
@@ -10400,8 +6979,9 @@ function fillSettingsForm(dictionary) {
   elements.entryListTagFilteringInput.checked = settings.entryListTagFiltering;
   elements.entryListPolysemyInput.checked = settings.entryListPolysemyDisplay;
   elements.networkPolysemyInput.checked = settings.networkPolysemyDisplay;
-  elements.showEmptyEntrySectionsInput.checked = settings.showEmptyEntrySections;
-  fillEntrySearchSettingsForm(settings.search);
+  elements.fuzzySearchInput.checked = settings.fuzzySearch;
+  elements.tagFuzzySearchInput.checked = settings.tagFuzzySearch;
+  elements.sourceFuzzyInput.checked = settings.sourceFuzzyCompletion;
   elements.searchHighlightInput.checked = settings.searchHighlight;
   elements.savePartialOnSwitchInput.value = settings.partialEditPageSwitchAction;
   elements.saveFullOnSwitchInput.value = settings.fullEditPageSwitchAction;
@@ -10411,7 +6991,6 @@ function fillSettingsForm(dictionary) {
   elements.allowEmptyTagsInput.checked = settings.allowEmptyTags;
   elements.allowEmptyDefinitionsInput.checked = settings.allowEmptyDefinitions;
   elements.ipaKeyboardInput.value = normalizeIpaKeyboard(settings.ipaKeyboard).join(" ");
-  renderEntrySectionOrderEditor(settings.entrySectionOrder);
   renderToolNavOrderEditor(settings.toolNavOrder);
   setupMasonryLayout(elements.settingsForm, ".settings-section, .form-actions", 18);
 }
@@ -10441,48 +7020,13 @@ function renderToolNavOrderEditor(order = DEFAULT_TOOL_NAV_ORDER) {
   });
 }
 
-function renderEntrySectionOrderEditor(order = DEFAULT_ENTRY_SECTION_ORDER) {
-  if (!elements.entrySectionOrderList) {
-    return;
-  }
-  elements.entrySectionOrderList.innerHTML = "";
-  normalizeEntrySectionOrder(order).forEach((section) => {
-    const card = document.createElement("article");
-    card.className = "tool-order-card";
-    card.draggable = true;
-    card.dataset.entrySection = section;
-    card.innerHTML = `
-      <span class="tool-order-handle" aria-hidden="true">⋮⋮</span>
-      <strong>${escapeHtml(entrySectionLabel(section))}</strong>
-    `;
-    elements.entrySectionOrderList.append(card);
-  });
-}
-
 function collectToolNavOrder() {
   return normalizeToolNavOrder([...elements.toolNavOrderList?.querySelectorAll(".tool-order-card") || []]
     .map((card) => card.dataset.view));
 }
 
-function collectEntrySectionOrder() {
-  return normalizeEntrySectionOrder([...elements.entrySectionOrderList?.querySelectorAll(".tool-order-card") || []]
-    .map((card) => card.dataset.entrySection));
-}
-
 function toolOrderInsertBefore(y) {
   const cards = [...(elements.toolNavOrderList?.querySelectorAll(".tool-order-card:not(.dragging)") || [])];
-  return cards.reduce((closest, card) => {
-    const box = card.getBoundingClientRect();
-    const offset = y - box.top - box.height / 2;
-    if (offset < 0 && offset > closest.offset) {
-      return { offset, card };
-    }
-    return closest;
-  }, { offset: Number.NEGATIVE_INFINITY, card: null }).card;
-}
-
-function entrySectionOrderInsertBefore(y) {
-  const cards = [...(elements.entrySectionOrderList?.querySelectorAll(".tool-order-card:not(.dragging)") || [])];
   return cards.reduce((closest, card) => {
     const box = card.getBoundingClientRect();
     const offset = y - box.top - box.height / 2;
@@ -10560,6 +7104,7 @@ function renderIpaRuleList(container, rules) {
 function createIpaRuleCard(rule = normalizeIpaRule()) {
   const card = document.createElement("article");
   card.className = "ipa-rule-card";
+  card.dataset.ruleId = rule.id || uid("ipa");
   card.innerHTML = `
     <div class="ipa-rule-grid">
       <button class="ipa-rule-drag-handle" type="button" draggable="true" data-app-tooltip="always" aria-label="${escapeHtml(t("reorderIpaRule"))}">⋮⋮</button>
@@ -10587,12 +7132,14 @@ function ipaRuleInsertBefore(container, y) {
 
 function finishIpaRuleDrag() {
   elements.ipaMappingList.querySelector(".ipa-rule-card.dragging")?.classList.remove("dragging");
+  draggedIpaRuleId = "";
   renderIpaSandbox();
 }
 
 function collectIpaRuleList(container) {
   return [...container.querySelectorAll(".ipa-rule-card")]
     .map((card) => normalizeIpaRule({
+      id: card.dataset.ruleId || uid("ipa"),
       from: card.querySelector('[data-field="from"]').value.trim(),
       to: card.querySelector('[data-field="to"]').value.trim(),
       before: card.querySelector('[data-field="before"]').value.trim(),
@@ -10651,7 +7198,6 @@ function settingsFormSnapshot() {
     tagDisplayMap: normalizeTagDisplayMap(parseTagDisplayMap(elements.tagDisplayMapInput.value)),
     entryListRawTagDisplay: elements.entryListRawTagDisplayInput.checked,
     entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(elements.entryListTagDisplayLimitInput.value),
-    entryListPartDisplay: normalizeEntryListPartDisplay(elements.entryListPartDisplayInput.value),
     manualPartOfSpeechTags: elements.manualPartOfSpeechTagsInput.checked,
     partOfSpeechTags: normalizeTagList(elements.partOfSpeechTagsInput.value),
     tagSortOrder: normalizeTagList(elements.tagSortOrderInput.value),
@@ -10659,9 +7205,9 @@ function settingsFormSnapshot() {
     entryListTagFiltering: elements.entryListTagFilteringInput.checked,
     entryListPolysemyDisplay: elements.entryListPolysemyInput.checked,
     networkPolysemyDisplay: elements.networkPolysemyInput.checked,
-    showEmptyEntrySections: elements.showEmptyEntrySectionsInput.checked,
-    entrySectionOrder: collectEntrySectionOrder(),
-    search: collectEntrySearchSettingsForm(),
+    fuzzySearch: elements.fuzzySearchInput.checked,
+    tagFuzzySearch: elements.tagFuzzySearchInput.checked,
+    sourceFuzzyCompletion: elements.sourceFuzzyInput.checked,
     searchHighlight: elements.searchHighlightInput.checked,
     partialEditPageSwitchAction: normalizeEditPageSwitchAction(elements.savePartialOnSwitchInput.value),
     fullEditPageSwitchAction: normalizeEditPageSwitchAction(elements.saveFullOnSwitchInput.value),
@@ -10688,7 +7234,6 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     tagDisplayMap: settings.tagDisplayMap,
     entryListRawTagDisplay: settings.entryListRawTagDisplay,
     entryListTagDisplayLimit: settings.entryListTagDisplayLimit,
-    entryListPartDisplay: settings.entryListPartDisplay,
     manualPartOfSpeechTags: settings.manualPartOfSpeechTags,
     partOfSpeechTags: settings.partOfSpeechTags,
     tagSortOrder: settings.tagSortOrder,
@@ -10696,9 +7241,9 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     entryListTagFiltering: settings.entryListTagFiltering,
     entryListPolysemyDisplay: settings.entryListPolysemyDisplay,
     networkPolysemyDisplay: settings.networkPolysemyDisplay,
-    showEmptyEntrySections: settings.showEmptyEntrySections,
-    entrySectionOrder: settings.entrySectionOrder,
-    search: settings.search,
+    fuzzySearch: settings.fuzzySearch,
+    tagFuzzySearch: settings.tagFuzzySearch,
+    sourceFuzzyCompletion: settings.sourceFuzzyCompletion,
     searchHighlight: settings.searchHighlight,
     partialEditPageSwitchAction: settings.partialEditPageSwitchAction,
     fullEditPageSwitchAction: settings.fullEditPageSwitchAction,
@@ -10732,15 +7277,8 @@ function ipaFormSnapshot() {
   };
 }
 
-function morphologyFunctionsFormSnapshot() {
-  return normalizeMorphologyFunctions(collectMorphologyFunctions());
-}
-
-function morphologyTablesFormSnapshot() {
-  return normalizeMorphology({
-    functions: morphologyFunctionConfig(),
-    templateGroups: collectMorphologyTemplateGroups(),
-  });
+function morphologyFormSnapshot() {
+  return normalizeMorphology({ functions: collectMorphologyFunctions(), tables: collectMorphologyTables() });
 }
 
 function savedMorphologySnapshot(dictionary = activeDictionary()) {
@@ -10769,12 +7307,8 @@ function dictionaryFormIsDirty() {
   return stableJson(dictionaryFormSnapshot()) !== stableJson(savedDictionarySnapshot());
 }
 
-function morphologyFunctionsFormIsDirty() {
-  return stableJson(morphologyFunctionsFormSnapshot()) !== stableJson(savedMorphologySnapshot().functions);
-}
-
-function morphologyTablesFormIsDirty() {
-  return stableJson(morphologyTablesFormSnapshot().templateGroups) !== stableJson(savedMorphologySnapshot().templateGroups);
+function morphologyFormIsDirty() {
+  return stableJson(morphologyFormSnapshot()) !== stableJson(savedMorphologySnapshot());
 }
 
 async function confirmLeaveUnsavedDictionaryForm() {
@@ -10829,8 +7363,23 @@ function invalidSettingsRenderPatternInput() {
 }
 
 function collectDictionarySettingsFromForm(existing = {}) {
+  const {
+    glossSmallCaps,
+    glossFontFamily,
+    glossFont,
+    glossStyles,
+    corpusGlossAlign,
+    savePartialEditOnSwitch,
+    saveFullEditOnSwitch,
+    savePartialEditOnPageSwitch,
+    saveFullEditOnPageSwitch,
+    partialEditPageSwitchAction,
+    fullEditPageSwitchAction,
+    ...existingSettings
+  } = existing || {};
+
   return {
-    ...(existing || {}),
+    ...existingSettings,
     glossStyles: collectGlossStyleForm(),
     corpusUnitCardRenderPattern: elements.corpusUnitCardRenderPatternInput.value.trim(),
     corpusUnitCardGlossAlign: elements.corpusUnitCardGlossAlignInput.checked,
@@ -10843,7 +7392,6 @@ function collectDictionarySettingsFromForm(existing = {}) {
     tagDisplayMap: parseTagDisplayMap(elements.tagDisplayMapInput.value),
     entryListRawTagDisplay: elements.entryListRawTagDisplayInput.checked,
     entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(elements.entryListTagDisplayLimitInput.value),
-    entryListPartDisplay: normalizeEntryListPartDisplay(elements.entryListPartDisplayInput.value),
     manualPartOfSpeechTags: elements.manualPartOfSpeechTagsInput.checked,
     partOfSpeechTags: normalizeTagList(elements.partOfSpeechTagsInput.value),
     tagSortOrder: normalizeTagList(elements.tagSortOrderInput.value),
@@ -10851,9 +7399,9 @@ function collectDictionarySettingsFromForm(existing = {}) {
     entryListTagFiltering: elements.entryListTagFilteringInput.checked,
     entryListPolysemyDisplay: elements.entryListPolysemyInput.checked,
     networkPolysemyDisplay: elements.networkPolysemyInput.checked,
-    showEmptyEntrySections: elements.showEmptyEntrySectionsInput.checked,
-    entrySectionOrder: collectEntrySectionOrder(),
-    search: collectEntrySearchSettingsForm(),
+    fuzzySearch: elements.fuzzySearchInput.checked,
+    tagFuzzySearch: elements.tagFuzzySearchInput.checked,
+    sourceFuzzyCompletion: elements.sourceFuzzyInput.checked,
     searchHighlight: elements.searchHighlightInput.checked,
     partialEditPageSwitchAction: normalizeEditPageSwitchAction(elements.savePartialOnSwitchInput.value),
     fullEditPageSwitchAction: normalizeEditPageSwitchAction(elements.saveFullOnSwitchInput.value),
@@ -10865,7 +7413,7 @@ function collectDictionarySettingsFromForm(existing = {}) {
   };
 }
 
-async function saveSettings(event, options = {}) {
+async function saveSettings(event) {
   event.preventDefault();
   const dictionary = activeDictionary();
   if (!dictionary) {
@@ -10873,26 +7421,9 @@ async function saveSettings(event, options = {}) {
     return false;
   }
 
-  if (!settingsFormIsDirty()) {
-    if (options.showToast !== false) {
-      showToast(t("noChangesToSave"));
-    }
-    return true;
-  }
-
   if (!entryListTagDisplayLimitInputIsValid()) {
     showToast(t("entryListTagDisplayLimitInvalid"));
     elements.entryListTagDisplayLimitInput.focus();
-    return false;
-  }
-
-  const entrySearchSettings = collectEntrySearchSettingsForm();
-  if (!entrySearchModel.searchSettingsHaveEnabledField(entrySearchSettings)) {
-    showToast(t("searchFieldRequired"));
-    elements.searchFieldEnabledInputs[0]?.focus();
-    return false;
-  }
-  if (!validateSearchNormalizationForm(entrySearchSettings)) {
     return false;
   }
 
@@ -10906,39 +7437,27 @@ async function saveSettings(event, options = {}) {
     return false;
   }
 
-  const settings = collectDictionarySettingsFromForm(dictionary.settings);
-  if (!settings.docsAutoSave) {
+  dictionary.settings = collectDictionarySettingsFromForm(dictionary.settings);
+  if (!dictionary.settings.docsAutoSave) {
     clearTimeout(docsSaveTimer);
   }
-  if (!settings.corpusAutoSave) {
+  if (!dictionary.settings.corpusAutoSave) {
     clearTimeout(corpusSaveTimer);
   }
-  try {
-    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/settings`, {
-      method: "PUT",
-      body: JSON.stringify(settings),
-    });
-    applyDictionaryModulePayload(saved);
-    resetEntryReadStateAfterSave();
-    render();
-    if (options.showToast !== false) {
-      showToast(t("dictionarySaved"));
-    }
-    return true;
-  } catch (error) {
-    showApiErrorToast(error, "dictionarySaveFailed");
-    return false;
-  }
+  dictionary.updatedAt = new Date().toISOString();
+  await persistDictionary(dictionary);
+  showToast(t("dictionarySaved"));
+  return true;
 }
 
 async function applyTagSortOrder() {
-  let dictionary = activeDictionary();
+  const dictionary = activeDictionary();
   if (!dictionary) {
     showToast(t("createDictionaryFirstToast"));
     return;
   }
 
-  let order = normalizeTagList(elements.tagSortOrderInput.value);
+  const order = normalizeTagList(elements.tagSortOrderInput.value);
   if (!order.length) {
     await appConfirm(t("tagOrderEmpty"), {
       title: t("tagOrderSettings"),
@@ -10958,23 +7477,6 @@ async function applyTagSortOrder() {
     return;
   }
 
-  if (settingsFormIsDirty()) {
-    const shouldSave = await appConfirm(t("tagOrderUnsavedSettingsConfirm"), {
-      title: t("tagOrderSettings"),
-      confirmText: t("saveAndApply"),
-      cancelText: t("cancel"),
-    });
-    if (!shouldSave) {
-      return;
-    }
-    const saved = await saveSettings({ preventDefault() {} }, { showToast: false });
-    if (!saved) {
-      return;
-    }
-    dictionary = activeDictionary();
-    order = normalizeTagList(dictionary.settings?.tagSortOrder);
-  }
-
   const confirmed = await appConfirm(t("tagOrderConfirm"), {
     title: t("tagOrderSettings"),
   });
@@ -10982,31 +7484,24 @@ async function applyTagSortOrder() {
     return;
   }
 
+  const now = new Date().toISOString();
   let changedEntries = 0;
-  const settings = dictionary.settings;
-  const updates = (dictionary.entries || []).map((entry) => {
+  dictionary.settings = collectDictionarySettingsFromForm(dictionary.settings);
+  dictionary.entries = (dictionary.entries || []).map((entry) => {
     const sortedTags = arrangeTagsByOrder(entry.tags || [], order);
     if (stableJson(sortedTags) === stableJson(entry.tags || [])) {
-      return null;
+      return entry;
     }
     changedEntries += 1;
     return {
-      id: entry.id,
-      patch: { tags: sortedTags },
+      ...entry,
+      tags: sortedTags,
+      updatedAt: now,
     };
-  }).filter(Boolean);
-  try {
-    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`, {
-      method: "PATCH",
-      body: JSON.stringify({ settings, updates }),
-    });
-    applyEntryPatchPayload(saved);
-    resetEntryReadStateAfterSave();
-    render();
-    showToast(`${t("tagOrderApplied")}${changedEntries ? ` · ${changedEntries} ${t("entries")}` : ""}`);
-  } catch (error) {
-    showApiErrorToast(error, "saveFailed");
-  }
+  });
+  dictionary.updatedAt = now;
+  await persistDictionary(dictionary);
+  showToast(`${t("tagOrderApplied")}${changedEntries ? ` · ${changedEntries} ${t("entries")}` : ""}`);
 }
 
 function renderLanguageDocs(dictionary) {
@@ -11052,38 +7547,18 @@ async function saveLanguageDocs(showSavedToast = true) {
     return false;
   }
   clearTimeout(docsSaveTimer);
-  if (!docsFormIsDirty(dictionary)) {
-    if (showSavedToast) {
-      showToast(t("noChangesToSave"));
-    }
-    return true;
-  }
   const draft = ensureDocsDraft(dictionary);
   const docs = {
     ...(dictionary.docs || {}),
     markdown: draft.markdown,
   };
-  try {
-    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/docs`, {
-      method: "PUT",
-      body: JSON.stringify(docs),
-    });
-    applyDictionaryModulePayload(saved);
-    docsDraftState = null;
-    render();
-    renderLanguageDocs(activeDictionary());
-    if (showSavedToast) {
-      showToast(t("docsSaved"));
-    }
-    return true;
-  } catch (error) {
-    if (showSavedToast) {
-      showApiErrorToast(error, "saveFailed");
-    } else {
-      console.error(error);
-    }
-    return false;
+  await persistDictionaryPatch(dictionary.id, { docs, updatedAt: new Date().toISOString() });
+  docsDraftState = null;
+  renderLanguageDocs(activeDictionary());
+  if (showSavedToast) {
+    showToast(t("docsSaved"));
   }
+  return true;
 }
 
 function scheduleDocsSave() {
@@ -11532,7 +8007,6 @@ function renderCorpusItemList(corpus, viewState) {
     renderVirtualList(elements.corpusItemList, corpusVirtualList, blocks, {
       resetToken: corpusVirtualResetToken(viewState),
       getKey: (block) => `block:${block.id}`,
-      getSizeCacheKey: (block) => corpusItemSizeCacheKey("block", block, viewState),
       renderItem: (block) => createCorpusBlockCard(block, viewState),
     });
     return;
@@ -11553,38 +8027,12 @@ function renderCorpusItemList(corpus, viewState) {
     resetToken: corpusVirtualResetToken(viewState),
     getKey: (unit) => `unit:${unit.id}`,
     getEstimatedHeight: () => 92,
-    getSizeCacheKey: (unit) => corpusItemSizeCacheKey("unit", unit, viewState),
     renderItem: (unit) => createCorpusUnitCard(unit, corpus, viewState),
   });
 }
 
 function corpusVirtualResetToken(viewState) {
   return [state.activeDictionaryId, viewState.mode, normalize(viewState.query)].join("|");
-}
-
-function corpusItemSizeCacheKey(kind, item, viewState) {
-  return [
-    `corpus-${kind}`,
-    state.activeDictionaryId,
-    currentLanguage,
-    normalize(viewState.query),
-    viewState.mode,
-    item.id,
-    item.updatedAt,
-    item.title,
-    item.content,
-    item.notes,
-    (item.tags || []).join(","),
-    stableJson(item.attributes || {}),
-    kind === "block" ? stableJson((item.layers || []).map((layer) => ({
-      id: layer.id,
-      name: layer.name,
-      speaker: layer.speaker,
-      modality: layer.modality,
-      notes: layer.notes,
-      tags: layer.tags || [],
-    }))) : "",
-  ].map(virtualListSignaturePart).join("|");
 }
 
 function createCorpusBlockCard(block, viewState) {
@@ -11888,19 +8336,18 @@ async function runCorpusSaveQueue() {
     }
     syncCorpusEditorToDraft();
     const snapshot = cloneCorpus(ensureCorpusDraft(dictionary));
-    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/corpus`, {
-      method: "PUT",
-      body: JSON.stringify(snapshot),
-    });
-    const normalized = applyDictionaryModulePayload(saved);
+    const saved = await persistDictionaryPatch(dictionary.id, {
+      corpus: snapshot,
+      updatedAt: new Date().toISOString(),
+    }, { refresh: false });
     savedAny = true;
     clearTimeout(corpusSaveTimer);
     corpusSaveTimer = null;
 
     // Input may have changed the live draft while this snapshot was being saved.
     if (
-      corpusDraftState?.dictionaryId === normalized.id
-      && stableJson(corpusDraftState.corpus) !== stableJson(normalized.corpus)
+      corpusDraftState?.dictionaryId === saved.id
+      && stableJson(corpusDraftState.corpus) !== stableJson(saved.corpus)
     ) {
       corpusSaveRequested = true;
     }
@@ -11915,15 +8362,12 @@ function saveCorpus(showSavedToast = true) {
     return Promise.resolve(false);
   }
   syncCorpusEditorToDraft();
-  ensureCorpusDraft(dictionary);
+  const corpus = ensureCorpusDraft(dictionary);
+  if (!validateDictionaryEntityIds({ ...dictionary, corpus })) {
+    return Promise.resolve(false);
+  }
   clearTimeout(corpusSaveTimer);
   corpusSaveTimer = null;
-  if (!corpusFormIsDirty(dictionary)) {
-    if (showSavedToast) {
-      showToast(t("noChangesToSave"));
-    }
-    return Promise.resolve(true);
-  }
   corpusSaveRequested = true;
   if (!corpusSavePromise) {
     corpusSavePromise = runCorpusSaveQueue().finally(() => {
@@ -11939,9 +8383,6 @@ function saveCorpus(showSavedToast = true) {
       showToast(t("corpusSaved"));
     }
     return saved;
-  }).catch((error) => {
-    showApiErrorToast(error, "saveFailed");
-    return false;
   });
 }
 
@@ -12005,103 +8446,47 @@ function moveArrayItem(items, index, offset) {
   items.splice(nextIndex, 0, item);
 }
 
-function fillMorphologyFunctionsForm(dictionary) {
-  const functions = morphologyFunctionConfig(dictionary);
-  elements.morphologyLeftVObjectsInput.value = functions.leftV.join("，");
-  elements.morphologyRightVObjectsInput.value = functions.rightV.join("，");
-}
-
-function renderMorphologyTablesConfig(dictionary) {
+function renderMorphologyConfig(dictionary) {
   if (!elements.morphologyTableList) {
     return;
   }
+  const morphology = normalizeMorphology(dictionary?.morphology);
+  const tables = morphology.tables;
   elements.morphologyTableList.innerHTML = "";
+  elements.morphologyLeftVObjectsInput.value = morphology.functions.leftV.join("，");
+  elements.morphologyRightVObjectsInput.value = morphology.functions.rightV.join("，");
   if (!dictionary) {
     return;
   }
-  const groups = normalizeMorphology(dictionary.morphology).templateGroups;
-  groups.forEach((group, index) => elements.morphologyTableList.append(createMorphologyGroupEditor(group, index)));
-}
-
-function createMorphologyGroupEditor(group, index) {
-  const card = document.createElement("section");
-  card.className = "morphology-group-card";
-  card.dataset.templateGroupId = group.id;
-  card.dataset.groupName = group.name;
-  card.dataset.groupNotes = group.notes || "";
-  card.dataset.groupCreatedAt = group.createdAt || "";
-  card.dataset.groupUpdatedAt = group.updatedAt || "";
-  card.innerHTML = `
-    <div class="morphology-group-config-grid">
-      <div class="morphology-group-primary-fields">
-        <div class="morphology-group-header">
-          <div class="morphology-group-title-row">
-            <button class="morphology-drag-handle" type="button" draggable="true" data-action="drag-morphology-group" aria-label="${escapeHtml(t("dragMorphologyTableGroup"))}">⋮⋮</button>
-            <div>
-              <p class="eyebrow">${escapeHtml(t("morphologyTableGroup"))} ${index + 1}</p>
-              <input data-field="name" value="${escapeHtml(group.name)}" aria-label="${escapeHtml(t("morphologyTableGroupName"))}">
-            </div>
-          </div>
-        </div>
-        <div class="morphology-group-fields">
-          <label>
-            <span>${escapeHtml(t("autoMatchTags"))}</span>
-            <input data-field="matchTags" value="${escapeHtml(group.matchTags.join("，"))}">
-          </label>
-        </div>
-      </div>
-      <label class="morphology-group-notes-field">
-        <span>${escapeHtml(t("morphologyTableGroupNotes"))}</span>
-        <textarea data-field="notes" rows="3">${escapeHtml(group.notes || "")}</textarea>
-      </label>
-      <div class="morphology-group-delete-action">
-        <button class="danger-ghost" type="button" data-action="remove-morphology-group">${escapeHtml(t("removeMorphologyTableGroup"))}</button>
-      </div>
-    </div>
-    <div class="morphology-group-table-toolbar">
-      <span>${escapeHtml(t("morphologyTables"))}</span>
-      <button class="primary-button" type="button" data-action="add-morphology-table">${escapeHtml(t("addMorphologyTable"))}</button>
-    </div>
-    <div class="morphology-group-table-list"></div>
-  `;
-  const tableList = card.querySelector(".morphology-group-table-list");
-  if (group.tables.length) {
-    group.tables.forEach((table) => tableList.append(createMorphologyTableEditor(table)));
-  } else {
-    tableList.append(emptyState(t("morphologyTable"), t("emptyMorphologyTableGroup")));
-  }
-  return card;
+  tables.forEach((table) => elements.morphologyTableList.append(createMorphologyTableEditor(table)));
 }
 
 function createMorphologyTableEditor(table) {
   const card = document.createElement("article");
   card.className = "morphology-config-card";
-  card.dataset.templateTableId = table.id;
-  card.dataset.tableCreatedAt = table.createdAt || "";
-  card.dataset.tableUpdatedAt = table.updatedAt || "";
+  card.dataset.tableId = table.id;
   const expanded = expandedMorphologyTables.has(table.id);
+  const matchTags = table.matchTags.length ? table.matchTags.join(", ") : t("none");
   card.classList.toggle("is-collapsed", !expanded);
   card.innerHTML = `
     <div class="morphology-card-header">
-      <div class="morphology-table-title-row">
-        <button class="morphology-drag-handle" type="button" draggable="true" data-action="drag-morphology-table" aria-label="${escapeHtml(t("dragMorphologyTable"))}">⋮⋮</button>
-        <div>
-          <div class="morphology-card-title-row">
-            <input data-field="title" value="${escapeHtml(table.title)}" aria-label="${escapeHtml(t("tableName"))}">
-            <button class="morphology-table-toggle${expanded ? " is-expanded" : ""}" type="button" data-action="toggle-morphology-table" data-app-tooltip="always" aria-expanded="${expanded}" aria-label="${escapeHtml(expanded ? t("collapse") : t("expand"))}">
-              <svg class="morphology-table-toggle-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg>
-            </button>
-          </div>
+      <div>
+        <p class="eyebrow">${escapeHtml(t("morphologyTable"))}</p>
+        <div class="morphology-card-title-row">
+          <input data-field="name" value="${escapeHtml(table.name)}" aria-label="${escapeHtml(t("tableName"))}">
+          <span class="morphology-card-summary">${table.rows} × ${table.cols} · ${escapeHtml(matchTags)}</span>
         </div>
       </div>
       <div class="panel-actions">
+        <button class="secondary-button" type="button" data-action="toggle-morphology-table" aria-expanded="${expanded}">${escapeHtml(expanded ? t("collapse") : t("expand"))}</button>
         <button class="danger-ghost" type="button" data-action="remove-morphology-table">${escapeHtml(t("removeTable"))}</button>
       </div>
     </div>
     <div class="morphology-card-body" ${expanded ? "" : "hidden"}>
       <div class="form-grid">
-        <label><span>${escapeHtml(t("rowCount"))}</span><input data-field="rows" type="number" min="1" value="${table.rowCount}"></label>
-        <label><span>${escapeHtml(t("columnCount"))}</span><input data-field="cols" type="number" min="1" value="${table.columnCount}"></label>
+        <label><span>${escapeHtml(t("rowCount"))}</span><input data-field="rows" type="number" min="1" value="${table.rows}"></label>
+        <label><span>${escapeHtml(t("columnCount"))}</span><input data-field="cols" type="number" min="1" value="${table.cols}"></label>
+        <label><span>${escapeHtml(t("autoMatchTags"))}</span><input data-field="matchTags" value="${escapeHtml(table.matchTags.join("，"))}"></label>
       </div>
       <button class="secondary-button" type="button" data-action="resize-morphology-table">${escapeHtml(t("applySize"))}</button>
       <div class="morphology-edit-scroll">${renderMorphologyRuleInputs(table)}</div>
@@ -12115,21 +8500,21 @@ function renderMorphologyRuleInputs(table) {
     <thead>
       <tr>
         <th></th>
-        ${table.columnLabels.map((label, col) => `
+        ${table.colLabels.map((label, col) => `
           <th><input data-col-label="${col}" value="${escapeHtml(label)}" aria-label="${escapeHtml(t("columnLabels"))} ${col + 1}"></th>
         `).join("")}
       </tr>
     </thead>
   `;
   const rows = [];
-  for (let row = 0; row < table.rowCount; row += 1) {
+  for (let row = 0; row < table.rows; row += 1) {
     const cells = [];
-    for (let col = 0; col < table.columnCount; col += 1) {
+    for (let col = 0; col < table.cols; col += 1) {
       const key = morphologyCellKey(row, col);
       const cell = table.cells[key] || normalizeMorphologyCell();
       cells.push(`
         <td class="morphology-rule-cell" data-cell="${escapeHtml(key)}">
-          <textarea data-field="value" rows="2">${escapeHtml(cell.sourceText)}</textarea>
+          <textarea data-field="value" rows="2" placeholder="{}">${escapeHtml(cell.value)}</textarea>
         </td>
       `);
     }
@@ -12143,66 +8528,30 @@ function renderMorphologyRuleInputs(table) {
   return `<table class="morphology-edit-table">${header}<tbody>${rows.join("")}</tbody></table>`;
 }
 
-function collectMorphologyTemplateGroups() {
-  const groups = [...elements.morphologyTableList.querySelectorAll(".morphology-group-card")].map((groupCard) => ({
-    id: groupCard.dataset.templateGroupId,
-    name: groupCard.querySelector('[data-field="name"]')?.value.trim() || groupCard.dataset.groupName || t("morphologyTableGroup"),
-    matchTags: splitList(groupCard.querySelector('[data-field="matchTags"]')?.value),
-    notes: groupCard.querySelector('[data-field="notes"]')?.value || groupCard.dataset.groupNotes || "",
-    createdAt: groupCard.dataset.groupCreatedAt || "",
-    updatedAt: groupCard.dataset.groupUpdatedAt || "",
-    tables: [...groupCard.querySelectorAll(".morphology-config-card")].map((tableCard) => {
-      const rowCount = Math.max(1, Number.parseInt(tableCard.querySelector('[data-field="rows"]').value, 10) || 1);
-      const columnCount = Math.max(1, Number.parseInt(tableCard.querySelector('[data-field="cols"]').value, 10) || 1);
-      const rowLabels = Array.from({ length: rowCount }, (_, index) => tableCard.querySelector(`[data-row-label="${index}"]`)?.value.trim() || `${index + 1}`);
-      const columnLabels = Array.from({ length: columnCount }, (_, index) => tableCard.querySelector(`[data-col-label="${index}"]`)?.value.trim() || `${index + 1}`);
-      const cells = {};
-      tableCard.querySelectorAll(".morphology-rule-cell").forEach((cellNode) => {
-        cells[cellNode.dataset.cell] = { sourceText: cellNode.querySelector('[data-field="value"]').value };
+function collectMorphologyTables() {
+  return [...elements.morphologyTableList.querySelectorAll(".morphology-config-card")].map((card) => {
+    const rows = Math.max(1, Number.parseInt(card.querySelector('[data-field="rows"]').value, 10) || 1);
+    const cols = Math.max(1, Number.parseInt(card.querySelector('[data-field="cols"]').value, 10) || 1);
+    const rowLabels = Array.from({ length: rows }, (_, index) => card.querySelector(`[data-row-label="${index}"]`)?.value.trim() || `${index + 1}`);
+    const colLabels = Array.from({ length: cols }, (_, index) => card.querySelector(`[data-col-label="${index}"]`)?.value.trim() || `${index + 1}`);
+    const cells = {};
+    card.querySelectorAll(".morphology-rule-cell").forEach((cellNode) => {
+      cells[cellNode.dataset.cell] = normalizeMorphologyCell({
+        mode: "reference",
+        value: cellNode.querySelector('[data-field="value"]').value,
       });
-      return {
-        id: tableCard.dataset.templateTableId,
-        title: tableCard.querySelector('[data-field="title"]').value.trim(),
-        rowCount,
-        columnCount,
-        rowLabels,
-        columnLabels,
-        cells,
-        createdAt: tableCard.dataset.tableCreatedAt || "",
-        updatedAt: tableCard.dataset.tableUpdatedAt || "",
-      };
-    }),
-  }));
-  return normalizeMorphology({ templateGroups: groups }).templateGroups;
-}
-
-function newMorphologyTableGroup(position) {
-  return normalizeMorphology({
-    templateGroups: [{
-      id: uid("morph"),
-      name: `${t("morphologyTableGroup")} ${position + 1}`,
-      matchTags: [],
-      tables: [],
-    }],
-  }).templateGroups[0];
-}
-
-function newMorphologyTemplateTable(position) {
-  return normalizeMorphology({
-    templateGroups: [{
-      id: "morph-editor-preview",
-      tables: [{
-        id: uid("mtable"),
-        title: `${t("morphologyTable")} ${position + 1}`,
-        rowCount: 2,
-        columnCount: 2,
-      }],
-    }],
-  }).templateGroups[0].tables[0];
-}
-
-function applyMorphologyTableSizeChanges() {
-  renderMorphologyTablesConfig({ morphology: morphologyTablesFormSnapshot() });
+    });
+    return normalizeMorphologyTable({
+      id: card.dataset.tableId,
+      name: card.querySelector('[data-field="name"]').value.trim(),
+      rows,
+      cols,
+      rowLabels,
+      colLabels,
+      matchTags: splitList(card.querySelector('[data-field="matchTags"]').value),
+      cells,
+    });
+  });
 }
 
 function collectMorphologyFunctions() {
@@ -12213,79 +8562,128 @@ function collectMorphologyFunctions() {
 }
 
 function validateMorphologyFunctionUsage(morphology) {
-  return morphologyModel.validateMorphologyFunctionUsage(morphology);
+  const normalized = normalizeMorphology(morphology);
+  const errors = [];
+  normalized.tables.forEach((table) => {
+    Object.values(table.cells).forEach((cell) => {
+      extractMorphologyFunctionCalls(cell.value).forEach((call) => {
+        if (call.invalidOffset) {
+          errors.push(`${table.name}: ${call.name} offset must be a positive integer`);
+          return;
+        }
+        if (call.name === "left" || call.name === "right") {
+          return;
+        }
+        const configured = normalized.functions[call.name] || [];
+        if (!configured.length) {
+          errors.push(`${table.name}: ${call.name} not configured`);
+          return;
+        }
+        const invalid = call.options.filter((option) => !configured.includes(option));
+        if (invalid.length) {
+          errors.push(`${table.name}: ${call.name}(${invalid.join(", ")})`);
+        }
+      });
+    });
+  });
+  return errors;
 }
 
 function validateMorphologyReferenceSyntax(morphology) {
-  return morphologyModel.validateMorphologyReferenceSyntax(morphology, { labelForCell: morphologyCellErrorLabel });
+  const normalized = normalizeMorphology(morphology);
+  const errors = [];
+  normalized.tables.forEach((table) => {
+    Object.entries(table.cells).forEach(([key, cell]) => {
+      const label = morphologyCellErrorLabel(table, key);
+      extractMorphologyReferences(cell.value).forEach((reference) => {
+        if (reference.unterminated) {
+          errors.push(`${label}: missing }`);
+          return;
+        }
+        const body = reference.body.trim();
+        if (!body || body.toLowerCase() === "lemma") {
+          return;
+        }
+        body.split(",").forEach((part) => {
+          const parsed = parseMorphologyReplacement(part);
+          if (!parsed.valid) {
+            errors.push(`${label}: {${body}} - ${parsed.reason}`);
+          }
+        });
+      });
+    });
+  });
+  return errors;
 }
 
 function extractMorphologyReferences(value) {
-  return morphologyModel.extractMorphologyReferences(value);
+  const references = [];
+  const text = String(value || "");
+  let index = 0;
+  while (index < text.length) {
+    if (text[index] !== "{") {
+      index += 1;
+      continue;
+    }
+    const end = text.indexOf("}", index + 1);
+    if (end < 0) {
+      references.push({ body: text.slice(index + 1), unterminated: true });
+      break;
+    }
+    references.push({ body: text.slice(index + 1, end), unterminated: false });
+    index = end + 1;
+  }
+  return references;
 }
 
 function morphologyCellErrorLabel(table, key) {
-  return morphologyModel.morphologyCellErrorLabel(table, key);
+  const match = String(key || "").match(/^r(\d+)c(\d+)$/);
+  if (!match) {
+    return table.name;
+  }
+  const row = Number.parseInt(match[1], 10);
+  const col = Number.parseInt(match[2], 10);
+  const rowLabel = table.rowLabels[row] || `${row + 1}`;
+  const colLabel = table.colLabels[col] || `${col + 1}`;
+  return `${table.name}: ${rowLabel} / ${colLabel}`;
 }
 
 function extractMorphologyFunctionCalls(rule) {
-  return morphologyModel.extractMorphologyFunctionCalls(rule);
+  const calls = [];
+  const text = String(rule || "");
+  let index = 0;
+  while (index < text.length) {
+    if (text[index] !== "/") {
+      index += 1;
+      continue;
+    }
+    const end = text.indexOf("/", index + 1);
+    if (end < 0) {
+      break;
+    }
+    String(text.slice(index + 1, end) || "")
+      .split(/;/)
+      .map(parseMorphologyConditionClause)
+      .filter((clause) => clause?.type === "condition")
+      .forEach((clause) => {
+        const call = parseMorphologyFunctionCondition(clause.condition);
+        if (call) {
+          calls.push(call);
+        }
+      });
+    index = end + 1;
+  }
+  return calls;
 }
 
-async function saveMorphologyFunctions(event) {
+async function saveMorphologyConfig(event) {
   event.preventDefault();
   const dictionary = activeDictionary();
   if (!dictionary) {
     showToast(t("createDictionaryFirstToast"));
     return false;
   }
-  if (!morphologyFunctionsFormIsDirty()) {
-    showToast(t("noChangesToSave"));
-    return true;
-  }
-  const morphology = normalizeMorphology({
-    ...dictionary.morphology,
-    functions: collectMorphologyFunctions(),
-  });
-  const functionErrors = validateMorphologyFunctionUsage(morphology);
-  if (functionErrors.length) {
-    await appConfirm(functionErrors.join("\n"), {
-      title: t("invalidMorphologyFunctionObjects"),
-      alert: true,
-    });
-    return false;
-  }
-  try {
-    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/morphology`, {
-      method: "PUT",
-      body: JSON.stringify(morphology),
-    });
-    applyDictionaryModulePayload(saved);
-    resetEntryReadStateAfterSave();
-    render();
-    showToast(t("dictionarySaved"));
-    return true;
-  } catch (error) {
-    showApiErrorToast(error, "dictionarySaveFailed");
-    return false;
-  }
-}
-
-async function saveMorphologyTables(event) {
-  event.preventDefault();
-  const dictionary = activeDictionary();
-  if (!dictionary) {
-    showToast(t("createDictionaryFirstToast"));
-    return false;
-  }
-  if (!morphologyTablesFormIsDirty()) {
-    showToast(t("noChangesToSave"));
-    return true;
-  }
-  const morphology = normalizeMorphology({
-    functions: morphologyFunctionConfig(dictionary),
-    templateGroups: collectMorphologyTemplateGroups(),
-  });
+  const morphology = normalizeMorphology({ functions: collectMorphologyFunctions(), tables: collectMorphologyTables() });
   const syntaxErrors = validateMorphologyReferenceSyntax(morphology);
   if (syntaxErrors.length) {
     await appConfirm(syntaxErrors.join("\n"), {
@@ -12294,20 +8692,19 @@ async function saveMorphologyTables(event) {
     });
     return false;
   }
-  try {
-    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/morphology`, {
-      method: "PUT",
-      body: JSON.stringify(morphology),
+  const functionErrors = validateMorphologyFunctionUsage(morphology);
+  if (functionErrors.length) {
+    await appConfirm(functionErrors.join("\n"), {
+      title: t("invalidMorphologyFunctionObjects"),
+      alert: true,
     });
-    applyDictionaryModulePayload(saved);
-    resetEntryReadStateAfterSave();
-    render();
-    showToast(t("dictionarySaved"));
-    return true;
-  } catch (error) {
-    showApiErrorToast(error, "dictionarySaveFailed");
     return false;
   }
+  dictionary.morphology = morphology;
+  dictionary.updatedAt = new Date().toISOString();
+  await persistDictionary(dictionary);
+  showToast(t("dictionarySaved"));
+  return true;
 }
 
 function renderMarkdown(markdown) {
@@ -12411,7 +8808,7 @@ function parseIpaDefaultStressInput() {
   return Number.parseInt(value, 10);
 }
 
-async function saveIpaSettings(event, options = {}) {
+async function saveIpaSettings(event) {
   event.preventDefault();
   const dictionary = activeDictionary();
   if (!dictionary) {
@@ -12426,34 +8823,43 @@ async function saveIpaSettings(event, options = {}) {
     return false;
   }
 
-  if (!ipaFormIsDirty()) {
-    if (options.showToast !== false) {
-      showToast(t("noChangesToSave"));
-    }
-    return true;
-  }
-
-  const ipa = ipaSettingsFromForm();
-  try {
-    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/settings/ipa`, {
-      method: "PUT",
-      body: JSON.stringify(ipa),
-    });
-    applyDictionaryModulePayload(saved);
-    resetEntryReadStateAfterSave();
-    render();
-    if (options.showToast !== false) {
-      showToast(t("ipaSaved"));
-    }
-    return true;
-  } catch (error) {
-    showApiErrorToast(error, "dictionarySaveFailed");
-    return false;
-  }
+  dictionary.settings = {
+    ...(dictionary.settings || {}),
+    ipa: normalizeIpaSettings({
+      mappings: collectIpaRuleList(elements.ipaMappingList),
+      syllable: {
+        vowels: elements.ipaVowelsInput.value.trim() || "aeiouAEIOU",
+        separator: elements.ipaSyllableSeparatorInput.value.trim() || ".",
+        onsetClusters: normalizeClusterList(elements.ipaOnsetClustersInput.value),
+        codaClusters: normalizeClusterList(elements.ipaCodaClustersInput.value),
+        complexPhonemes: normalizeClusterList(elements.ipaComplexPhonemesInput.value),
+      },
+      defaultStress,
+      unstressMonosyllables: elements.ipaUnstressMonosyllablesInput.checked,
+    }),
+  };
+  dictionary.updatedAt = new Date().toISOString();
+  await persistDictionary(dictionary);
+  showToast(t("ipaSaved"));
+  return true;
 }
 
 function generateIpaFromLemma(lemma, ipaSettings = activeDictionary()?.settings?.ipa) {
-  return ipaModel.generateIpaFromLemma(lemma, ipaSettings);
+  const ipa = normalizeIpaSettings(ipaSettings);
+  const source = String(lemma || "").trim();
+  if (!source) {
+    return "";
+  }
+
+  const mapped = applyIpaMappings(source, ipa);
+  const syllabified = syllabifyIpaOutput(mapped.output, ipa.syllable);
+  const syllables = syllabified.syllables;
+  const stressIndex = resolveIpaStressIndex(syllables, syllabified.stressIndex, ipa);
+  const separator = ipa.syllable.separator || ".";
+  const body = syllables
+    .map((syllable, index) => (index === stressIndex ? `ˈ${syllable}` : syllable))
+    .join(separator);
+  return `/${body}/`;
 }
 
 function ipaSettingsFromForm() {
@@ -12473,11 +8879,29 @@ function ipaSettingsFromForm() {
 }
 
 function ipaPipelinePreview(source, ipa = ipaSettingsFromForm()) {
-  return ipaModel.ipaPipelinePreview(source, ipa);
+  const input = String(source || "").trim();
+  if (!input) {
+    return { mapped: "", syllables: "", final: "" };
+  }
+
+  const mapped = applyIpaMappings(input, ipa).output;
+  const syllabified = syllabifyIpaOutput(mapped, ipa.syllable);
+  const syllables = syllabified.syllables;
+  const stressIndex = resolveIpaStressIndex(syllables, syllabified.stressIndex, ipa);
+  const separator = ipa.syllable.separator || ".";
+  const syllableText = syllables.join(separator);
+  const finalBody = syllables
+    .map((syllable, index) => (index === stressIndex ? `ˈ${syllable}` : syllable))
+    .join(separator);
+  return {
+    mapped: displayIpaStage(mapped),
+    syllables: syllableText,
+    final: `/${finalBody}/`,
+  };
 }
 
 function displayIpaStage(value) {
-  return ipaModel.displayIpaStage(value);
+  return String(value || "").replaceAll(IPA_STRESS_MARKER, "ˈ");
 }
 
 function renderIpaSandbox() {
@@ -12491,47 +8915,213 @@ function renderIpaSandbox() {
 }
 
 function applyIpaMappings(source, ipa) {
-  return ipaModel.applyIpaMappings(source, ipa);
+  const rules = ipa.mappings.filter((rule) => rule.from);
+
+  const chunks = [];
+  let index = 0;
+
+  while (index < source.length) {
+    const rule = rules.find((candidate) => ruleMatchesAt(source, index, candidate));
+    if (!rule) {
+      chunks.push(source[index]);
+      index += 1;
+      continue;
+    }
+
+    const rawOutput = rule.to || rule.from;
+    let markedOutput = rawOutput.startsWith("'")
+      ? `${IPA_STRESS_MARKER}${rawOutput.slice(1)}`
+      : rawOutput.replaceAll("ˈ", IPA_STRESS_MARKER);
+    chunks.push(markedOutput);
+    index += rule.from.length;
+  }
+
+  return { output: chunks.join("") };
 }
 
 function ruleMatchesAt(source, index, rule) {
-  return ipaModel.ruleMatchesAt(source, index, rule);
+  if (!source.startsWith(rule.from, index)) {
+    return false;
+  }
+  const before = source.slice(0, index);
+  const after = source.slice(index + rule.from.length);
+  return conditionMatches(before, rule.before, true) && conditionMatches(after, rule.after, false);
 }
 
 function conditionMatches(value, condition, matchEnd) {
-  return ipaModel.conditionMatches(value, condition, matchEnd);
+  if (!condition) {
+    return true;
+  }
+  try {
+    const pattern = matchEnd ? `${condition}$` : `^${condition}`;
+    return new RegExp(pattern).test(value);
+  } catch {
+    return matchEnd ? value.endsWith(condition) : value.startsWith(condition);
+  }
 }
 
 function splitIntoSyllables(value, syllableSettings = {}) {
-  return ipaModel.splitIntoSyllables(value, syllableSettings);
+  const separator = syllableSettings.separator || ".";
+  const text = String(value || "").replaceAll("ˈ", "");
+  if (!text) {
+    return [""];
+  }
+  if (separator && text.includes(separator)) {
+    return text.split(separator).filter(Boolean);
+  }
+
+  const vowels = new Set(Array.from(String(syllableSettings.vowels || "aeiouAEIOU")));
+  const tokens = tokenizePhonemeUnits(text, syllableSettings.complexPhonemes);
+  const vowelTokenIndexes = tokens.reduce((positions, token, index) => {
+    if (vowels.has(token.value)) {
+      positions.push(index);
+    }
+    return positions;
+  }, []);
+  if (vowelTokenIndexes.length <= 1) {
+    return [text];
+  }
+
+  const syllables = [];
+  let start = 0;
+  vowelTokenIndexes.forEach((tokenIndex, index) => {
+    if (index === vowelTokenIndexes.length - 1) {
+      return;
+    }
+    const currentVowel = tokens[tokenIndex];
+    const nextVowel = tokens[vowelTokenIndexes[index + 1]];
+    const between = text.slice(currentVowel.end, nextVowel.start);
+    const codaCluster = matchingCodaCluster(between, syllableSettings);
+    const onsetCluster = matchingOnsetCluster(between, syllableSettings);
+    const breakAt = codaCluster
+      ? currentVowel.end + codaCluster.length
+      : onsetCluster
+        ? nextVowel.start - onsetCluster.length
+        : middleTokenBreak(currentVowel.end, between, syllableSettings.complexPhonemes);
+    syllables.push(text.slice(start, breakAt));
+    start = breakAt;
+  });
+  syllables.push(text.slice(start));
+  return syllables.filter(Boolean);
 }
 
 function tokenizePhonemeUnits(value, complexPhonemes = []) {
-  return ipaModel.tokenizePhonemeUnits(value, complexPhonemes);
+  const phonemes = normalizeClusterList(complexPhonemes);
+  const text = String(value || "");
+  const tokens = [];
+  let index = 0;
+
+  while (index < text.length) {
+    const phoneme = phonemes.find((candidate) => text.startsWith(candidate, index));
+    if (phoneme) {
+      tokens.push({ value: phoneme, start: index, end: index + phoneme.length });
+      index += phoneme.length;
+      continue;
+    }
+
+    const char = Array.from(text.slice(index))[0];
+    tokens.push({ value: char, start: index, end: index + char.length });
+    index += char.length;
+  }
+
+  return tokens;
+}
+
+function tokenBoundaryPrefixes(tokens) {
+  const prefixes = [];
+  let value = "";
+  tokens.forEach((token) => {
+    value += token.value;
+    prefixes.push(value);
+  });
+  return prefixes;
+}
+
+function tokenBoundarySuffixes(tokens) {
+  const suffixes = [];
+  let value = "";
+  [...tokens].reverse().forEach((token) => {
+    value = `${token.value}${value}`;
+    suffixes.push(value);
+  });
+  return suffixes;
 }
 
 function matchingCodaCluster(between, syllableSettings = {}) {
-  return ipaModel.matchingCodaCluster(between, syllableSettings);
+  const tokens = tokenizePhonemeUnits(between, syllableSettings.complexPhonemes);
+  const prefixes = tokenBoundaryPrefixes(tokens);
+  return normalizeClusterList(syllableSettings.codaClusters).find((cluster) => prefixes.includes(cluster)) || "";
 }
 
 function matchingOnsetCluster(between, syllableSettings = {}) {
-  return ipaModel.matchingOnsetCluster(between, syllableSettings);
+  const tokens = tokenizePhonemeUnits(between, syllableSettings.complexPhonemes);
+  const suffixes = tokenBoundarySuffixes(tokens);
+  return normalizeClusterList(syllableSettings.onsetClusters).find((cluster) => suffixes.includes(cluster)) || "";
 }
 
 function middleTokenBreak(start, between, complexPhonemes = []) {
-  return ipaModel.middleTokenBreak(start, between, complexPhonemes);
+  const tokens = tokenizePhonemeUnits(between, complexPhonemes);
+  const codaTokenCount = Math.floor(tokens.length / 2);
+  const codaLength = tokens
+    .slice(0, codaTokenCount)
+    .reduce((length, token) => length + token.value.length, 0);
+  return start + codaLength;
 }
 
 function syllabifyIpaOutput(value, syllableSettings = {}) {
-  return ipaModel.syllabifyIpaOutput(value, syllableSettings);
+  const text = String(value || "");
+  let markerIndex = null;
+  let cleanIndex = 0;
+  let cleanText = "";
+
+  for (const char of text) {
+    if (char === IPA_STRESS_MARKER) {
+      if (markerIndex === null) {
+        markerIndex = cleanIndex;
+      }
+      continue;
+    }
+    cleanText += char;
+    cleanIndex += 1;
+  }
+
+  const syllables = splitIntoSyllables(cleanText, syllableSettings);
+  if (markerIndex === null) {
+    return { syllables, stressIndex: null };
+  }
+
+  let offset = 0;
+  const stressIndex = syllables.findIndex((syllable) => {
+    const nextOffset = offset + syllable.length;
+    const contains = markerIndex < nextOffset;
+    offset = nextOffset;
+    return contains;
+  });
+  return {
+    syllables,
+    stressIndex: stressIndex >= 0 ? stressIndex : Math.max(0, syllables.length - 1),
+  };
 }
 
 function defaultStressIndex(length, defaultStress) {
-  return ipaModel.defaultStressIndex(length, defaultStress);
+  if (length <= 0) {
+    return null;
+  }
+  if (defaultStress === 0) {
+    return null;
+  }
+  if (defaultStress > 0) {
+    return Math.min(defaultStress - 1, length - 1);
+  }
+  return Math.max(length + defaultStress, 0);
 }
 
 function resolveIpaStressIndex(syllables, explicitStressIndex, ipa = normalizeIpaSettings()) {
-  return ipaModel.resolveIpaStressIndex(syllables, explicitStressIndex, ipa);
+  const length = syllables.length;
+  if (length <= 0 || (ipa.unstressMonosyllables && length === 1)) {
+    return null;
+  }
+  return explicitStressIndex ?? defaultStressIndex(length, ipa.defaultStress);
 }
 
 function applyAutoIpa(targetInput = elements.pronunciationInput, lemmaInput = elements.lemmaInput) {
@@ -12545,7 +9135,7 @@ function applyAutoIpa(targetInput = elements.pronunciationInput, lemmaInput = el
 }
 
 async function batchGenerateIpa(mode) {
-  let dictionary = activeDictionary();
+  const dictionary = activeDictionary();
   if (!dictionary) {
     showToast(t("createDictionaryFirstToast"));
     return;
@@ -12556,22 +9146,7 @@ async function batchGenerateIpa(mode) {
     elements.ipaDefaultStressInput.focus();
     return;
   }
-  if (ipaFormIsDirty()) {
-    const shouldSave = await appConfirm(t("batchIpaUnsavedSettingsConfirm"), {
-      title: t("autoIpa"),
-      confirmText: t("saveAndGenerate"),
-      cancelText: t("cancel"),
-    });
-    if (!shouldSave) {
-      return;
-    }
-    const saved = await saveIpaSettings({ preventDefault() {} }, { showToast: false });
-    if (!saved) {
-      return;
-    }
-    dictionary = activeDictionary();
-  }
-  const ipaSettings = dictionary.settings?.ipa;
+  const ipaSettings = ipaSettingsFromForm();
   const overwrite = mode === "all";
   const targets = dictionary.entries.filter((entry) => entry.lemma && (overwrite || !entry.pronunciation));
   if (!targets.length) {
@@ -12584,22 +9159,15 @@ async function batchGenerateIpa(mode) {
   if (!confirmed) {
     return;
   }
-  const updates = targets.map((entry) => ({
-    id: entry.id,
-    patch: { pronunciation: generateIpaFromLemma(entry.lemma, ipaSettings) },
-  }));
-  try {
-    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`, {
-      method: "PATCH",
-      body: JSON.stringify({ updates }),
-    });
-    applyEntryPatchPayload(saved);
-    resetEntryReadStateAfterSave();
-    render();
-    showToast(`${t("batchIpaUpdated")} ${targets.length}`);
-  } catch (error) {
-    showApiErrorToast(error, "saveFailed");
-  }
+  const now = new Date().toISOString();
+  targets.forEach((entry) => {
+    entry.pronunciation = generateIpaFromLemma(entry.lemma, ipaSettings);
+    entry.updatedAt = now;
+  });
+  dictionary.updatedAt = now;
+  await persistDictionary(dictionary);
+  await refreshState();
+  showToast(`${t("batchIpaUpdated")} ${targets.length}`);
 }
 
 function emptyState(title, body) {
@@ -12631,7 +9199,6 @@ async function openPartialEdit(section) {
   const form = document.createElement("form");
   form.className = "inline-partial-edit-form";
   form.autocomplete = "off";
-  form.noValidate = true;
   form.innerHTML = `
     <div class="form-heading compact-heading">
       <div>
@@ -12642,7 +9209,7 @@ async function openPartialEdit(section) {
     </div>
     <div class="partial-edit-body"></div>
     <div class="form-actions">
-      <button class="primary-button" type="submit">${escapeHtml(t("save"))}</button>
+      <button class="primary-button" type="submit">${escapeHtml(t("saveConfig"))}</button>
     </div>
   `;
   host.append(form);
@@ -12652,7 +9219,7 @@ async function openPartialEdit(section) {
     body.innerHTML = `
       <label>
         <span>${escapeHtml(t("lemma"))}</span>
-        <input data-field="lemma" aria-required="true" maxlength="80" value="${escapeHtml(entry.lemma)}">
+        <input data-field="lemma" required maxlength="80" value="${escapeHtml(entry.lemma)}">
       </label>
       <label>
         <span>${escapeHtml(t("pronunciation"))}</span>
@@ -12673,7 +9240,7 @@ async function openPartialEdit(section) {
     list.className = "definition-form-list";
     list.dataset.partialDefinitions = "true";
     body.append(list);
-    renderPartialDefinitionList(entry.definitions);
+    renderPartialDefinitionList(entry.definitions || [normalizeDefinition()]);
     const addButton = document.createElement("button");
     addButton.type = "button";
     addButton.className = "secondary-button additive-button";
@@ -12702,7 +9269,11 @@ async function openPartialEdit(section) {
     `;
   } else if (section === "morphology") {
     body.innerHTML = `
-      <div class="partial-morphology-controls"></div>
+      <label>
+        <span>${escapeHtml(t("morphologyTable"))}</span>
+        <select data-field="morphologyTable"></select>
+      </label>
+      <div class="partial-morphology-overrides"></div>
     `;
     renderPartialMorphologyControls(entry);
   } else {
@@ -12725,13 +9296,13 @@ function partialEditTitle(section) {
   return titles[section] || t("partialEdit");
 }
 
-function renderPartialDefinitionList(definitions = []) {
+function renderPartialDefinitionList(definitions) {
   const list = partialEditBody()?.querySelector('[data-partial-definitions="true"]');
   if (!list) {
     return;
   }
   list.innerHTML = "";
-  definitionEditorItems(definitions).forEach((definition, index) => {
+  definitions.forEach((definition, index) => {
     const card = document.createElement("article");
     card.className = "definition-form-card";
     card.dataset.definitionId = definition.id || uid("def");
@@ -12749,52 +9320,30 @@ function updatePartialRemoveDefinitionButtons(list = partialEditBody()?.querySel
   });
 }
 
-function joinEntryRequirementMessages(messages) {
-  return messages.join(currentLanguage === "en" ? " · " : "；");
-}
-
 function entrySaveRequirementMessage(entry, dictionary = activeDictionary()) {
-  return joinEntryRequirementMessages([
-    ...entryBasicRequirementMessages(entry, dictionary),
-    ...entryDefinitionsRequirementMessages(entry, dictionary),
-  ]);
-}
-
-function entryBasicRequirementMessages(entry, dictionary = activeDictionary()) {
-  const settings = normalizeDictionarySettings(dictionary?.settings);
-  const messages = [];
-  if (!entry.lemma?.trim()) {
-    messages.push(t("requiredEntry"));
-  }
-  if (!settings.allowEmptyPronunciation && !entry.pronunciation?.trim()) {
-    messages.push(t("requiredPronunciation"));
-  }
-  if (!settings.allowEmptyTags && !(entry.tags || []).length) {
-    messages.push(t("requiredTags"));
-  }
-  return messages;
-}
-
-function entryDefinitionsRequirementMessages(entry, dictionary = activeDictionary()) {
-  const settings = normalizeDictionarySettings(dictionary?.settings);
-  const messages = [];
-  if (!settings.allowEmptyDefinitions && !(entry.definitions || []).some((definition) => definition.meaning)) {
-    messages.push(t("requiredDefinition"));
-  }
-  return messages;
+  return entryBasicRequirementMessage(entry, dictionary) || entryDefinitionsRequirementMessage(entry, dictionary);
 }
 
 function entryBasicRequirementMessage(entry, dictionary = activeDictionary()) {
-  return joinEntryRequirementMessages(entryBasicRequirementMessages(entry, dictionary));
+  const settings = normalizeDictionarySettings(dictionary?.settings);
+  if (!entry.lemma?.trim()) {
+    return t("requiredEntry");
+  }
+  if (!settings.allowEmptyPronunciation && !entry.pronunciation?.trim()) {
+    return t("requiredPronunciation");
+  }
+  if (!settings.allowEmptyTags && !(entry.tags || []).length) {
+    return t("requiredTags");
+  }
+  return "";
 }
 
 function entryDefinitionsRequirementMessage(entry, dictionary = activeDictionary()) {
-  return joinEntryRequirementMessages(entryDefinitionsRequirementMessages(entry, dictionary));
-}
-
-function entryApiPayload(entry = {}) {
-  const { morphology: _editorMorphology, ...payload } = entry;
-  return payload;
+  const settings = normalizeDictionarySettings(dictionary?.settings);
+  if (!settings.allowEmptyDefinitions && !(entry.definitions || []).some((definition) => definition.meaning)) {
+    return t("requiredDefinition");
+  }
+  return "";
 }
 
 function collectPartialDefinitions() {
@@ -12802,50 +9351,6 @@ function collectPartialDefinitions() {
   return definitionFormStates(list)
     .map(({ id, meaning, example, note }) => ({ id, meaning, example, note }))
     .filter((definition) => definition.meaning || definition.example || definition.note);
-}
-
-function partialEntryFormCandidate(entry = selectedEntry(), body = partialEditBody()) {
-  if (!entry || !body) {
-    return null;
-  }
-  if (partialEditSection === "basic") {
-    return {
-      ...entry,
-      lemma: body.querySelector('[data-field="lemma"]').value.trim(),
-      pronunciation: body.querySelector('[data-field="pronunciation"]').value.trim(),
-      tags: splitList(body.querySelector('[data-field="tags"]').value),
-    };
-  }
-  if (partialEditSection === "definitions") {
-    return { ...entry, definitions: collectPartialDefinitions() };
-  }
-  if (partialEditSection === "etymology") {
-    return {
-      ...entry,
-      etymology: {
-        sources: splitSourceText(body.querySelector('[data-field="sources"]').value),
-        description: body.querySelector('[data-field="description"]').value.trim(),
-      },
-    };
-  }
-  if (partialEditSection === "notes") {
-    return { ...entry, notes: body.querySelector('[data-field="notes"]').value.trim() };
-  }
-  if (partialEditSection === "morphology") {
-    const morphologyState = collectMorphologyEntryState(body.querySelector(".partial-morphology-controls"), entry);
-    return {
-      ...entry,
-      morphologyMode: morphologyState.morphologyMode,
-      morphologyGroups: morphologyState.morphologyGroups,
-    };
-  }
-  return { ...entry };
-}
-
-function partialEntryFormIsDirty() {
-  const entry = selectedEntry();
-  const candidate = partialEntryFormCandidate(entry);
-  return Boolean(entry && candidate && !entriesHaveSameSemantics(candidate, entry));
 }
 
 async function savePartialEdit(event) {
@@ -12857,55 +9362,58 @@ async function savePartialEdit(event) {
     return false;
   }
 
+  const now = new Date().toISOString();
   const previousLemma = entry.lemma || "";
-  const nextEntry = partialEntryFormCandidate(entry, body);
-  if (!nextEntry) {
-    return false;
-  }
 
   if (partialEditSection === "basic") {
+    const lemma = body.querySelector('[data-field="lemma"]').value.trim();
+    const tags = splitList(body.querySelector('[data-field="tags"]').value);
+    const nextEntry = {
+      ...entry,
+      lemma,
+      pronunciation: body.querySelector('[data-field="pronunciation"]').value.trim(),
+      tags,
+    };
     const message = entryBasicRequirementMessage(nextEntry, dictionary);
     if (message) {
       showToast(message);
       return false;
     }
+    entry.lemma = nextEntry.lemma;
+    entry.pronunciation = nextEntry.pronunciation;
+    entry.tags = nextEntry.tags;
   } else if (partialEditSection === "definitions") {
-    const message = entryDefinitionsRequirementMessage(nextEntry, dictionary);
+    const definitions = collectPartialDefinitions();
+    const message = entryDefinitionsRequirementMessage({ ...entry, definitions }, dictionary);
     if (message) {
       showToast(message);
       return false;
     }
+    entry.definitions = definitions;
+  } else if (partialEditSection === "etymology") {
+    entry.etymology = {
+      sources: splitSourceText(body.querySelector('[data-field="sources"]').value),
+      description: body.querySelector('[data-field="description"]').value.trim(),
+    };
+  } else if (partialEditSection === "notes") {
+    entry.notes = body.querySelector('[data-field="notes"]').value.trim();
+  } else if (partialEditSection === "morphology") {
+    entry.morphology = {
+      tableId: body.querySelector('[data-field="morphologyTable"]').value || "auto",
+      overrides: collectPartialMorphologyOverrides(),
+    };
   }
 
-  if (entriesHaveSameSemantics(nextEntry, entry)) {
-    cancelPartialEdit();
-    render();
-    showToast(t("noChangesToSave"));
-    return true;
+  entry.updatedAt = now;
+  dictionary.updatedAt = now;
+  const shouldScrollAfterSave = partialEditSection === "basic" && previousLemma !== entry.lemma;
+  await persistDictionary(dictionary);
+  cancelPartialEdit();
+  if (shouldScrollAfterSave) {
+    scheduleEntryCardScroll(entry.id, prepareRootModeEntryNavigation(entry.id));
   }
-
-  const shouldScrollAfterSave = partialEditSection === "basic" && previousLemma !== nextEntry.lemma;
-  try {
-    const savedEntry = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entry.id)}`, {
-      method: "PUT",
-      body: JSON.stringify(entryApiPayload(nextEntry)),
-    });
-    upsertEntryInDictionary(dictionary.id, savedEntry);
-    state.selectedEntryId = savedEntry.id;
-    cacheSavedEntryDetail(dictionary.id, savedEntry);
-    updateEntrySummaryDtoAfterSave(activeDictionary(), savedEntry);
-    cancelPartialEdit();
-    resetEntryReadStateAfterSave();
-    render();
-    if (shouldScrollAfterSave) {
-      scheduleEntryCardScroll(savedEntry.id, prepareRootModeEntryNavigation(savedEntry.id));
-    }
-    showToast(t("savedEntry"));
-    return true;
-  } catch (error) {
-    showApiErrorToast(error, "saveFailed");
-    return false;
-  }
+  showToast(t("savedEntry"));
+  return true;
 }
 
 function partialEditBody() {
@@ -12929,10 +9437,9 @@ function createEntryDraft(overrides = {}) {
     lemma: "",
     pronunciation: "",
     tags: [],
-    definitions: [],
+    definitions: [normalizeDefinition()],
     etymology: { sources: [], description: "" },
-    morphologyMode: "auto",
-    morphologyGroups: [],
+    morphology: { tableId: "auto", overrides: {} },
     notes: "",
     ...overrides,
   };
@@ -13011,62 +9518,57 @@ async function saveEntry(event) {
     showToast(t("createDictionaryFirstToast"));
     return false;
   }
+  if (!validateDictionaryEntityIds(dictionary)) {
+    return false;
+  }
 
-  const entryId = elements.entryId.value || "";
+  const now = new Date().toISOString();
+  const entryId = elements.entryId.value || uniqueDictionaryEntityId("entry", dictionary);
   const existing = dictionary.entries.find((entry) => entry.id === entryId);
   const wasNewEntry = !existing;
   const previousLemma = existing?.lemma || "";
-  const candidate = fullEntryFormCandidate(existing);
+  const definitions = collectDefinitions();
+  const entry = {
+    id: entryId,
+    lemma: elements.lemmaInput.value.trim(),
+    pronunciation: elements.pronunciationInput.value.trim(),
+    tags: splitList(elements.tagsInput.value),
+    definitions,
+    etymology: {
+      sources: splitSourceText(elements.sourceEntryInput.value),
+      description: elements.etymologyDescriptionInput.value.trim(),
+    },
+    morphology: {
+      tableId: elements.entryMorphologyTableSelect.value || "auto",
+      overrides: collectEntryMorphologyOverrides(),
+    },
+    notes: elements.notesInput.value.trim(),
+    createdAt: existing?.createdAt || now,
+    updatedAt: now,
+  };
 
-  const requirementMessage = entrySaveRequirementMessage(candidate, dictionary);
+  const requirementMessage = entrySaveRequirementMessage(entry, dictionary);
   if (requirementMessage) {
     showToast(requirementMessage);
     return false;
   }
 
-  if (!wasNewEntry && entriesHaveSameSemantics(candidate, existing)) {
-    entryDraft = null;
-    editorMode = "display";
-    render();
-    showToast(t("noChangesToSave"));
-    return true;
+  if (existing) {
+    Object.assign(existing, entry);
+  } else {
+    dictionary.entries.push(entry);
   }
 
-  const now = new Date().toISOString();
-  const entry = {
-    ...candidate,
-    id: entryId || uniqueDictionaryEntityId("entry", dictionary),
-    createdAt: existing?.createdAt || now,
-    updatedAt: now,
-  };
-
-  try {
-    const savedEntry = await api(
-      wasNewEntry
-        ? `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`
-        : `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entry.id)}`,
-      {
-        method: wasNewEntry ? "POST" : "PUT",
-        body: JSON.stringify(entryApiPayload(entry)),
-      },
-    );
-    upsertEntryInDictionary(dictionary.id, savedEntry);
-    state.selectedEntryId = savedEntry.id;
-    cacheSavedEntryDetail(dictionary.id, savedEntry);
-    updateEntrySummaryDtoAfterSave(activeDictionary(), savedEntry);
-    entryDraft = null;
-    editorMode = "display";
-    resetEntryReadStateAfterSave();
-    render();
-    if (wasNewEntry || previousLemma !== savedEntry.lemma) {
-      scheduleEntryCardScroll(savedEntry.id, prepareRootModeEntryNavigation(savedEntry.id));
-    }
-    showToast(t("savedEntry"));
-    return true;
-  } catch (error) {
-    showApiErrorToast(error, "saveFailed");
-    return false;
+  dictionary.updatedAt = now;
+  state.selectedEntryId = entry.id;
+  entryDraft = null;
+  editorMode = "display";
+  await persistDictionary(dictionary);
+  if (wasNewEntry || previousLemma !== entry.lemma) {
+    scheduleEntryCardScroll(entry.id, prepareRootModeEntryNavigation(entry.id));
   }
+  showToast(t("savedEntry"));
+  return true;
 }
 
 async function deleteSelectedEntry() {
@@ -13085,26 +9587,18 @@ async function deleteEntryById(entryId) {
     return false;
   }
 
-  const nextEntries = dictionary.entries.filter((item) => item.id !== entry.id);
-  try {
-    const deleted = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entry.id)}`, {
-      method: "DELETE",
-    });
-    removeEntryFromDictionary(dictionary.id, entry.id, deleted);
-    if (state.selectedEntryId === entry.id || !nextEntries.some((item) => item.id === state.selectedEntryId)) {
-      state.selectedEntryId = firstLemmaEntry({ ...dictionary, entries: nextEntries })?.id || "";
-      editorMode = "display";
-      entryDraft = null;
-      cancelPartialEdit();
-    }
-    resetEntryReadStateAfterSave();
-    render();
-    showToast(t("deletedEntry"));
-    return true;
-  } catch (error) {
-    showApiErrorToast(error, "saveFailed");
-    return false;
+  dictionary.entries = dictionary.entries.filter((item) => item.id !== entry.id);
+  dictionary.updatedAt = new Date().toISOString();
+  if (state.selectedEntryId === entry.id || !dictionary.entries.some((item) => item.id === state.selectedEntryId)) {
+    state.selectedEntryId = firstLemmaEntry(dictionary)?.id || "";
+    editorMode = "display";
+    entryDraft = null;
+    cancelPartialEdit();
   }
+  await persistDictionary(dictionary);
+  render();
+  showToast(t("deletedEntry"));
+  return true;
 }
 
 async function prepareNewDictionary() {
@@ -13132,20 +9626,19 @@ async function saveDictionary(event) {
     return false;
   }
 
-  if (dictionaryId && !dictionaryFormIsDirty()) {
-    showToast(t("noChangesToSave"));
-    return true;
-  }
-
   try {
     if (dictionaryId) {
-      const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionaryId)}/meta`, {
+      const existing = selectedDictionaryConfig();
+      const updated = {
+        ...existing,
+        ...payload,
+        updatedAt: new Date().toISOString(),
+      };
+      await api(`/api/dictionaries/${encodeURIComponent(dictionaryId)}`, {
         method: "PUT",
-        body: JSON.stringify(payload),
+        body: JSON.stringify(updated),
       });
-      updateDictionaryMetadataInState(saved);
       state.selectedDictionaryConfigId = dictionaryId;
-      render();
       showToast(t("dictionarySaved"));
     } else {
       const created = await api("/api/dictionaries", {
@@ -13154,7 +9647,6 @@ async function saveDictionary(event) {
       });
       state.selectedDictionaryConfigId = created.id;
       state.activeDictionaryId = created.id;
-      resetRootExpansionState();
       state.selectedEntryId = "";
       editorMode = "display";
       showToast(t("dictionaryCreated"));
@@ -13163,171 +9655,48 @@ async function saveDictionary(event) {
     await refreshState();
     return true;
   } catch (error) {
-    showApiErrorToast(error, "dictionarySaveFailed");
+    showToast(t("dictionarySaveFailed"));
+    console.error(error);
     return false;
   }
 }
 
-function invalidateDictionaryQueryCache(dictionaryId) {
-  queryPageCache.invalidateDictionary(dictionaryId);
-  entryDetailCache.invalidateDictionary(dictionaryId);
-  if (selectedEntryDetailState.dictionaryId === dictionaryId) {
-    resetSelectedEntryDetailState();
+async function persistDictionary(dictionary) {
+  try {
+    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}`, {
+      method: "PUT",
+      body: JSON.stringify(dictionary),
+    });
+    await refreshState();
+    return saved;
+  } catch (error) {
+    showToast(t("saveFailed"));
+    console.error(error);
+    throw error;
   }
 }
 
-function replaceDictionaryInState(saved) {
-  const normalized = normalizeDictionary(saved);
-  invalidateDictionaryQueryCache(normalized.id);
-  const dictionaryIndex = state.dictionaries.findIndex((dictionary) => dictionary.id === normalized.id);
-  if (dictionaryIndex >= 0) {
-    state.dictionaries[dictionaryIndex] = normalized;
-  } else {
-    state.dictionaries.push(normalized);
+async function persistDictionaryPatch(dictionaryId, patch, { refresh = true } = {}) {
+  try {
+    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionaryId)}`, {
+      method: "PUT",
+      body: JSON.stringify(patch),
+    });
+    if (refresh) {
+      await refreshState();
+      return saved;
+    }
+    const normalized = normalizeDictionary(saved);
+    const dictionaryIndex = state.dictionaries.findIndex((dictionary) => dictionary.id === dictionaryId);
+    if (dictionaryIndex >= 0) {
+      state.dictionaries[dictionaryIndex] = normalized;
+    }
+    return normalized;
+  } catch (error) {
+    showToast(t("saveFailed"));
+    console.error(error);
+    throw error;
   }
-  loadedDictionaryIds.add(normalized.id);
-  return normalized;
-}
-
-function replaceLoadedDictionarySource(dictionaryId, source) {
-  const dictionaryIndex = state.dictionaries.findIndex((dictionary) => dictionary.id === dictionaryId);
-  if (dictionaryIndex < 0) {
-    return null;
-  }
-  const normalized = normalizeDictionary(source);
-  invalidateDictionaryQueryCache(dictionaryId);
-  state.dictionaries[dictionaryIndex] = normalized;
-  loadedDictionaryIds.add(normalized.id);
-  return normalized;
-}
-
-function updateDictionarySummaryFromEntries(dictionary, options = {}) {
-  const previousSummary = normalizeDictionarySummary(dictionary.summary);
-  return {
-    entryCount: dictionary.entries.length,
-    rootCount: options.recomputeRootCount === false
-      ? previousSummary?.rootCount ?? null
-      : dictionaryRootCount(dictionary),
-  };
-}
-
-function updateDictionaryMetadataInState(payload) {
-  if (!payload?.id) {
-    return null;
-  }
-  const dictionaryIndex = state.dictionaries.findIndex((dictionary) => dictionary.id === payload.id);
-  if (dictionaryIndex < 0) {
-    return null;
-  }
-  invalidateDictionaryQueryCache(payload.id);
-  const current = state.dictionaries[dictionaryIndex];
-  const next = {
-    ...current,
-    ...(Object.hasOwn(payload, "name") ? { name: payload.name } : {}),
-    ...(Object.hasOwn(payload, "language") ? { language: payload.language } : {}),
-    ...(Object.hasOwn(payload, "description") ? { description: payload.description } : {}),
-    ...(Object.hasOwn(payload, "createdAt") ? { createdAt: payload.createdAt } : {}),
-    ...(Object.hasOwn(payload, "updatedAt") ? { updatedAt: payload.updatedAt } : {}),
-    ...(Object.hasOwn(payload, "summary") ? { summary: normalizeDictionarySummary(payload.summary) } : {}),
-  };
-  state.dictionaries[dictionaryIndex] = next;
-  return next;
-}
-
-function applyDictionaryModulePayload(payload) {
-  if (!payload?.id) {
-    return null;
-  }
-  const dictionary = state.dictionaries.find((item) => item.id === payload.id);
-  if (!dictionary) {
-    return null;
-  }
-  const next = {
-    ...dictionary,
-    ...(Object.hasOwn(payload, "updatedAt") ? { updatedAt: payload.updatedAt } : {}),
-    ...(Object.hasOwn(payload, "settings") ? { settings: payload.settings } : {}),
-    ...(Object.hasOwn(payload, "docs") ? { docs: payload.docs } : {}),
-    ...(Object.hasOwn(payload, "corpus") ? { corpus: payload.corpus } : {}),
-    ...(Object.hasOwn(payload, "morphology") ? { morphology: payload.morphology } : {}),
-  };
-  const normalized = replaceLoadedDictionarySource(payload.id, next);
-  if (normalized) {
-    normalized.summary = normalizeDictionarySummary(dictionary.summary);
-  }
-  return normalized;
-}
-
-function upsertEntryInDictionary(dictionaryId, entry, options = {}) {
-  if (!entry?.id) {
-    return null;
-  }
-  const dictionary = state.dictionaries.find((item) => item.id === dictionaryId);
-  if (!dictionary) {
-    return null;
-  }
-  const entries = [...dictionary.entries];
-  const entryIndex = entries.findIndex((item) => item.id === entry.id);
-  if (entryIndex >= 0) {
-    entries[entryIndex] = entry;
-  } else {
-    entries.push(entry);
-  }
-  const normalized = replaceLoadedDictionarySource(dictionaryId, {
-    ...dictionary,
-    updatedAt: options.updatedAt || entry.updatedAt || dictionary.updatedAt,
-    entries,
-  });
-  if (normalized) {
-    normalized.summary = updateDictionarySummaryFromEntries(normalized, { recomputeRootCount: options.recomputeRootCount });
-  }
-  return normalized?.entries.find((item) => item.id === entry.id) || null;
-}
-
-function removeEntryFromDictionary(dictionaryId, entryId, payload = {}) {
-  const dictionary = state.dictionaries.find((item) => item.id === dictionaryId);
-  if (!dictionary) {
-    return null;
-  }
-  const normalized = replaceLoadedDictionarySource(dictionaryId, {
-    ...dictionary,
-    updatedAt: payload.updatedAt || dictionary.updatedAt,
-    entries: dictionary.entries.filter((entry) => entry.id !== entryId),
-  });
-  if (normalized) {
-    normalized.summary = updateDictionarySummaryFromEntries(normalized);
-  }
-  return normalized;
-}
-
-function applyEntryPatchPayload(payload) {
-  if (!payload?.id) {
-    return null;
-  }
-  const dictionary = state.dictionaries.find((item) => item.id === payload.id);
-  if (!dictionary) {
-    return null;
-  }
-  const changedEntries = Array.isArray(payload.entries) ? payload.entries : [];
-  const changedById = new Map(changedEntries.map((entry) => [entry.id, entry]));
-  const nextEntries = dictionary.entries.map((entry) => changedById.get(entry.id) || entry);
-  const normalized = replaceLoadedDictionarySource(payload.id, {
-    ...dictionary,
-    updatedAt: payload.updatedAt || dictionary.updatedAt,
-    ...(Object.hasOwn(payload, "settings") ? { settings: payload.settings } : {}),
-    entries: nextEntries,
-  });
-  if (normalized) {
-    normalized.summary = updateDictionarySummaryFromEntries(normalized, { recomputeRootCount: false });
-  }
-  return normalized;
-}
-
-function resetEntryReadStateAfterSave() {
-  resetEntryQueryState();
-  resetEntryFacetsState();
-  resetRootGroupsQueryState();
-  entryRelationsCache.clear();
-  rootGroupDerivedStates.clear();
 }
 
 async function activateDictionary(dictionaryId) {
@@ -13339,7 +9708,6 @@ async function activateDictionary(dictionaryId) {
   try {
     await api(`/api/dictionaries/${encodeURIComponent(dictionaryId)}/activate`, { method: "POST" });
     state.activeDictionaryId = dictionary.id;
-    resetRootExpansionState();
     state.selectedDictionaryConfigId = dictionary.id;
     state.selectedEntryId = firstLemmaEntry(dictionary)?.id || "";
     editorMode = "display";
@@ -13351,7 +9719,8 @@ async function activateDictionary(dictionaryId) {
     await refreshState();
     showToast(`${t("switchedTo")} “${dictionary.name}”`);
   } catch (error) {
-    showApiErrorToast(error, "dictionarySwitchFailed");
+    showToast(t("dictionarySwitchFailed"));
+    console.error(error);
   }
 }
 
@@ -13361,7 +9730,7 @@ async function deleteSelectedDictionary() {
     return;
   }
 
-  const confirmed = await appConfirm(`${t("deleteConfirmDictionary")} “${dictionary.name}” ${t("andItsEntries")} ${dictionaryEntryCount(dictionary)} ${t("entries")}?`, { danger: true });
+  const confirmed = await appConfirm(`${t("deleteConfirmDictionary")} “${dictionary.name}” ${t("andItsEntries")} ${dictionary.entries.length} ${t("entries")}?`, { danger: true });
   if (!confirmed) {
     return;
   }
@@ -13369,7 +9738,6 @@ async function deleteSelectedDictionary() {
   try {
     await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}`, { method: "DELETE" });
     forgetAnalysisViewState(dictionary.id);
-    forgetQualityViewState(dictionary.id);
     corpusViewStates.delete(dictionary.id);
     if (corpusDraftState?.dictionaryId === dictionary.id) {
       corpusDraftState = null;
@@ -13379,12 +9747,12 @@ async function deleteSelectedDictionary() {
     }
     state.selectedDictionaryConfigId = "";
     state.selectedEntryId = "";
-    resetRootExpansionState();
     editorMode = "display";
     await refreshState();
     showToast(t("dictionaryDeleted"));
   } catch (error) {
-    showApiErrorToast(error, "dictionaryDeleteFailed");
+    showToast(t("dictionaryDeleteFailed"));
+    console.error(error);
   }
 }
 
@@ -13415,10 +9783,6 @@ function dictionaryFromImportPayload(payload) {
   return payload && typeof payload === "object" && !Array.isArray(payload) ? payload : null;
 }
 
-function isValidDictionaryId(id) {
-  return /^dict-[a-z0-9-]+$/i.test(String(id || "").trim());
-}
-
 function importData(event) {
   const file = event.target.files[0];
   if (!file) {
@@ -13436,25 +9800,11 @@ function importData(event) {
       if (!validateDictionaryEntityIds(normalizeDictionary(dictionary))) {
         return;
       }
-      const dictionaryId = String(dictionary.id || "").trim();
-      let regenerateId = false;
-      if (dictionaryId && !isValidDictionaryId(dictionaryId)) {
-        regenerateId = await appConfirm(formatText("importInvalidIdMessage", {
-          id: dictionaryId,
-        }), {
-          title: t("importInvalidIdTitle"),
-          confirmText: t("importAndRegenerateId"),
-          cancelText: t("cancel"),
-        });
-        if (!regenerateId) {
-          return;
-        }
-      }
-      const existing = !regenerateId ? state.dictionaries.find((item) => item.id === dictionaryId) : null;
+      const existing = state.dictionaries.find((item) => item.id === dictionary.id);
       let overwrite = false;
       if (existing) {
         overwrite = await appConfirm(formatText("importOverwriteMessage", {
-          id: dictionaryId,
+          id: dictionary.id,
           name: dictionary.name || t("unnamedDictionary"),
         }), {
           title: t("importOverwriteTitle"),
@@ -13466,22 +9816,13 @@ function importData(event) {
           return;
         }
       }
-      const query = new URLSearchParams();
-      if (overwrite) {
-        query.set("overwrite", "true");
-      }
-      if (regenerateId) {
-        query.set("regenerateId", "true");
-      }
-      const importUrl = `/api/import${query.toString() ? `?${query}` : ""}`;
-      await api(importUrl, {
+      await api(`/api/import${overwrite ? "?overwrite=true" : ""}`, {
         method: "POST",
         body: JSON.stringify(imported),
       });
       if (overwrite) {
         corpusViewStates.delete(dictionary.id);
         forgetAnalysisViewState(dictionary.id);
-        forgetQualityViewState(dictionary.id);
         if (corpusDraftState?.dictionaryId === dictionary.id) {
           corpusDraftState = null;
         }
@@ -13494,7 +9835,8 @@ function importData(event) {
       await refreshState();
       showToast(t("imported"));
     } catch (error) {
-      showApiErrorToast(error, "importFailed");
+      showToast(t("importFailed"));
+      console.error(error);
     } finally {
       elements.importInput.value = "";
     }
@@ -13508,14 +9850,12 @@ async function refreshState() {
   backendMessage = "";
   currentLanguage = normalizeUiLanguage(serverState.uiLanguage);
   currentTheme = normalizeUiTheme(serverState.uiTheme);
-  await applyServerState({
+  state = normalizeState({
     ...serverState,
     selectedEntryId: state.selectedEntryId,
     selectedDictionaryConfigId: state.selectedDictionaryConfigId || serverState.activeDictionaryId,
     activeView: state.activeView,
   });
-  resetEntryQueryState();
-  resetEntryFacetsState();
   render();
 }
 
@@ -13554,14 +9894,9 @@ async function confirmLeaveUnsavedConfigView() {
       save: () => saveIpaSettings({ preventDefault() {} }),
     });
   }
-  if (state.activeView === "morphology-functions" && morphologyFunctionsFormIsDirty()) {
+  if (state.activeView === "morphology" && morphologyFormIsDirty()) {
     return confirmUnsavedChanges(t("unsavedMorphologyConfirm"), {
-      save: () => saveMorphologyFunctions({ preventDefault() {} }),
-    });
-  }
-  if (state.activeView === "morphology-tables" && morphologyTablesFormIsDirty()) {
-    return confirmUnsavedChanges(t("unsavedMorphologyConfirm"), {
-      save: () => saveMorphologyTables({ preventDefault() {} }),
+      save: () => saveMorphologyConfig({ preventDefault() {} }),
     });
   }
   const settings = normalizeDictionarySettings(activeDictionary().settings);
@@ -13644,8 +9979,8 @@ function flushAutomaticModuleSaves() {
   if (queued) {
     return;
   }
-  fetch(autosavePath, {
-    method: "POST",
+  fetch(`/api/dictionaries/${encodeURIComponent(dictionary.id)}`, {
+    method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: payload,
     keepalive: true,
@@ -13662,17 +9997,13 @@ function escapeHtml(value) {
 }
 
 elements.searchInput.addEventListener("input", (event) => {
-  if (advancedFilter && !advancedFilterUsesEntryQuery()) {
+  if (advancedFilter) {
     event.target.value = "";
     return;
   }
   searchQuery = event.target.value;
   renderPartFilter();
-  window.clearTimeout(entrySearchDebounceTimer);
-  entrySearchDebounceTimer = window.setTimeout(() => {
-    entrySearchDebounceTimer = 0;
-    renderEntries();
-  }, ENTRY_SEARCH_DEBOUNCE_MS);
+  renderEntries();
 });
 
 elements.rootModeToggleButton.addEventListener("click", () => {
@@ -13690,27 +10021,18 @@ elements.rootModeToggleButton.addEventListener("click", () => {
 });
 
 elements.expandAllRootsButton.addEventListener("click", () => {
-  if (
-    advancedFilter
-    || normalizeEntrySearchText(searchQuery)
-    || rootGroupsQueryState.status !== "success"
-  ) {
+  if (advancedFilter || normalize(searchQuery)) {
     return;
   }
-  rootExpansionMode = "all";
-  expandedRootEntries.clear();
-  collapsedRootEntries.clear();
-  refreshRootGroupWindowHeightEstimates();
-  renderPartFilter();
+  rootModeGroups().forEach((group) => expandedRootEntries.add(group.root.id));
   renderEntries();
 });
 
 elements.collapseAllRootsButton.addEventListener("click", () => {
-  if (advancedFilter || normalizeEntrySearchText(searchQuery)) {
+  if (advancedFilter || normalize(searchQuery)) {
     return;
   }
-  resetRootExpansionState();
-  renderPartFilter();
+  expandedRootEntries.clear();
   renderEntries();
 });
 
@@ -13769,7 +10091,7 @@ elements.entryDisplay.addEventListener("contextmenu", (event) => {
   openPartialEdit(section.dataset.editSection);
 });
 
-elements.entryDisplay.addEventListener("click", async (event) => {
+elements.entryDisplay.addEventListener("click", (event) => {
   const tagTarget = event.target.closest("[data-entry-tag-index]");
   if (tagTarget && elements.entryDisplay.contains(tagTarget)) {
     const entry = selectedEntry();
@@ -13795,41 +10117,6 @@ elements.entryDisplay.addEventListener("click", async (event) => {
     if (lemmaInput && pronunciationInput) {
       applyAutoIpa(pronunciationInput, lemmaInput);
     }
-    return;
-  }
-
-  const morphologyAction = event.target.closest("[data-action]")?.dataset.action;
-  if (morphologyAction === "toggle-entry-morphology-mode") {
-    const entry = selectedEntry() || {};
-    await toggleMorphologyEditorMode(partialEditBody()?.querySelector(".partial-morphology-controls"), entry);
-    return;
-  }
-  if (morphologyAction === "move-entry-morphology-group-up" || morphologyAction === "move-entry-morphology-group-down") {
-    const card = event.target.closest(".entry-morphology-group-card");
-    const list = card?.parentElement;
-    if (card && list) {
-      if (morphologyAction.endsWith("up") && card.previousElementSibling) {
-        list.insertBefore(card, card.previousElementSibling);
-      } else if (morphologyAction.endsWith("down") && card.nextElementSibling) {
-        list.insertBefore(card.nextElementSibling, card);
-      }
-    }
-    return;
-  }
-  if (morphologyAction === "remove-entry-morphology-group") {
-    event.target.closest(".entry-morphology-group-card")?.remove();
-    return;
-  }
-  if (morphologyAction === "add-entry-morphology-group") {
-    const entry = selectedEntry() || {};
-    const host = partialEditBody()?.querySelector(".partial-morphology-controls");
-    const current = collectMorphologyEntryState(host, entry);
-    const selected = host?.querySelector('[data-field="addMorphologyGroup"]')?.value || "";
-    if (selected && !current.morphologyGroups.some((group) => group.templateGroupId === selected)) {
-      current.morphologyGroups.push({ templateGroupId: selected, title: "", notes: "", overrides: {} });
-    }
-    current.morphologyMode = "manual";
-    renderMorphologyEntryControls(host, { ...entry, ...current });
     return;
   }
 
@@ -13961,21 +10248,17 @@ elements.entryBrowserToggleButton.addEventListener("click", toggleEntryBrowser);
 elements.backToEditorButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromSettingsButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromAnalysisButton.addEventListener("click", () => showView("editor"));
-elements.backToEditorFromQualityButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromDocsButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromCorpusButton.addEventListener("click", () => showView("editor"));
-elements.backToEditorFromMorphologyFunctionsButton.addEventListener("click", () => showView("editor"));
-elements.backToEditorFromMorphologyTablesButton.addEventListener("click", () => showView("editor"));
+elements.backToEditorFromMorphologyButton.addEventListener("click", () => showView("editor"));
 elements.backToEditorFromIpaButton.addEventListener("click", () => showView("editor"));
 elements.addDictionaryButton.addEventListener("click", prepareNewDictionary);
 elements.emptyCreateDictionaryButton.addEventListener("click", () => showView("manager"));
 elements.settingsOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.analysisOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
-elements.qualityOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.docsOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.corpusOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
-elements.morphologyFunctionsOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
-elements.morphologyTablesOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
+elements.morphologyOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.ipaOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.newEntryButton.addEventListener("click", () => beginNewEntry());
 elements.entryListNewEntryButton.addEventListener("click", async () => {
@@ -13985,6 +10268,13 @@ elements.entryListNewEntryButton.addEventListener("click", async () => {
 });
 elements.editEntryButton.addEventListener("click", beginEditEntry);
 elements.analysisPanel.addEventListener("click", (event) => {
+  const qualityInfoButton = event.target.closest('[data-action="quality-filter-info"]');
+  if (qualityInfoButton) {
+    appInfoDialog(t("qualityFilterInfoTitle"), {
+      text: t("qualityFilterInfoBody"),
+    });
+    return;
+  }
   const pageButton = event.target.closest("[data-analysis-page]");
   if (pageButton) {
     rememberProcessScroll();
@@ -14057,77 +10347,9 @@ elements.analysisPanel.addEventListener("click", (event) => {
   advancedFilter = null;
   switchToEntry(target.dataset.entryId);
 });
-elements.qualityPanel.addEventListener("click", (event) => {
-  const qualityInfoButton = event.target.closest('[data-action="quality-filter-info"]');
-  if (qualityInfoButton) {
-    appInfoDialog(t("qualityFilterInfoTitle"), {
-      text: t("qualityFilterInfoBody"),
-    });
-    return;
-  }
-  const subpageButton = event.target.closest("[data-quality-subpage]");
-  if (subpageButton) {
-    rememberProcessScroll();
-    const qualityViewState = activeQualityViewState();
-    qualityViewState.subpage = subpageButton.dataset.qualitySubpage || "issues";
-    renderQuality(activeDictionary());
-    restoreProcessScroll();
-    return;
-  }
-  const viewTarget = event.target.closest("[data-view-target]");
-  if (viewTarget) {
-    advancedFilter = null;
-    state.activeView = viewTarget.dataset.viewTarget || "editor";
-    if (state.activeView === "editor") {
-      revealEntryBrowserForResults();
-    }
-    render();
-    return;
-  }
-  const partFilterTarget = event.target.closest("[data-part-filter-value]");
-  if (partFilterTarget) {
-    advancedFilter = null;
-    rootMode = false;
-    activePart = partFilterTarget.dataset.partFilterValue || "";
-    searchQuery = "";
-    state.activeView = "editor";
-    revealEntryBrowserForResults();
-    const dictionary = activeDictionary();
-    const firstEntry = dictionary
-      ? [...dictionary.entries]
-        .filter((entry) => {
-          const parts = entryParts(entry, dictionary);
-          return activePart === NO_PART_FILTER_VALUE ? !parts.length : parts.includes(activePart);
-        })
-        .sort(compareEntries)[0]
-      : null;
-    if (firstEntry) {
-      state.selectedEntryId = firstEntry.id;
-      editorMode = "display";
-      entryDraft = null;
-    }
-    render();
-    scheduleEntryCardScroll(state.selectedEntryId);
-    return;
-  }
-  const filterTarget = event.target.closest("[data-advanced-filter-id]");
-  if (filterTarget) {
-    const action = analysisFilterRegistry.get(filterTarget.dataset.advancedFilterId);
-    enterAdvancedFilter(action);
-    return;
-  }
-  const target = event.target.closest("[data-entry-id]");
-  if (!target) {
-    return;
-  }
-  state.activeView = "editor";
-  advancedFilter = null;
-  switchToEntry(target.dataset.entryId);
-});
 elements.advancedFilterRefreshButton.addEventListener("click", refreshAdvancedFilter);
 elements.advancedFilterCycleButton.addEventListener("click", cycleAdvancedFilterVariant);
 elements.advancedFilterExitButton.addEventListener("click", exitAdvancedFilter);
-elements.focusEntryListButton.addEventListener("click", focusCurrentEntryInBrowser);
 elements.openLexicalNetworkButton.addEventListener("click", openLexicalNetwork);
 elements.closeLexicalNetworkButton.addEventListener("click", closeLexicalNetwork);
 elements.lexicalNetworkOverlay.addEventListener("click", (event) => {
@@ -14141,66 +10363,14 @@ elements.clearEntryButton.addEventListener("click", clearEntryForm);
 elements.deleteEntryButton.addEventListener("click", deleteSelectedEntry);
 elements.entryForm.addEventListener("submit", saveEntry);
 elements.dictionaryForm.addEventListener("submit", saveDictionary);
+elements.entryMorphologyTableSelect.addEventListener("change", () => renderEntryMorphologyOverrides(null, false));
 elements.tagsInput.addEventListener("input", () => {
-  const baseEntry = entryDraft || selectedEntry() || {};
-  const current = collectMorphologyEntryState(elements.entryMorphologyControls, baseEntry);
-  if (current.morphologyMode === "auto") {
-    renderMorphologyEntryControls(elements.entryMorphologyControls, {
-      ...baseEntry,
-      ...current,
-      tags: splitList(elements.tagsInput.value),
-    }, { full: true });
+  if (elements.entryMorphologyTableSelect.value === "auto") {
+    renderEntryMorphologyOverrides(null, true);
   }
-});
-elements.entryMorphologyControls.addEventListener("click", async (event) => {
-  const action = event.target.closest("[data-action]")?.dataset.action;
-  if (action === "toggle-entry-morphology-mode") {
-    await toggleMorphologyEditorMode(elements.entryMorphologyControls, entryDraft || selectedEntry() || {}, { full: true });
-    return;
-  }
-  if (action === "move-entry-morphology-group-up" || action === "move-entry-morphology-group-down") {
-    const card = event.target.closest(".entry-morphology-group-card");
-    const list = card?.parentElement;
-    if (card && list) {
-      if (action.endsWith("up") && card.previousElementSibling) {
-        list.insertBefore(card, card.previousElementSibling);
-      } else if (action.endsWith("down") && card.nextElementSibling) {
-        list.insertBefore(card.nextElementSibling, card);
-      }
-    }
-    return;
-  }
-  if (action === "remove-entry-morphology-group") {
-    event.target.closest(".entry-morphology-group-card")?.remove();
-    return;
-  }
-  if (action !== "add-entry-morphology-group") {
-    return;
-  }
-  const baseEntry = entryDraft || selectedEntry() || {};
-  const current = collectMorphologyEntryState(elements.entryMorphologyControls, baseEntry);
-  const selected = elements.entryMorphologyControls.querySelector('[data-field="addMorphologyGroup"]')?.value || "";
-  if (selected && !current.morphologyGroups.some((group) => group.templateGroupId === selected)) {
-    current.morphologyGroups.push({ templateGroupId: selected, title: "", notes: "", overrides: {} });
-  }
-  current.morphologyMode = "manual";
-  renderMorphologyEntryControls(elements.entryMorphologyControls, { ...baseEntry, ...current }, { full: true });
 });
 elements.settingsForm.addEventListener("submit", saveSettings);
 elements.manualPartOfSpeechTagsInput.addEventListener("change", syncPartOfSpeechTagSettingsControls);
-elements.searchFieldEnabledInputs.forEach((input) => {
-  input.addEventListener("change", syncEntrySearchSettingsControls);
-});
-elements.addSearchNormalizationRuleButton?.addEventListener("click", () => {
-  const card = createSearchNormalizationRuleCard();
-  elements.searchNormalizationRuleList.append(card);
-  card.querySelector("[data-search-rule-canonical]")?.focus();
-});
-elements.searchNormalizationRuleList?.addEventListener("click", (event) => {
-  if (event.target.closest('[data-action="remove-search-normalization-rule"]')) {
-    event.target.closest(".search-normalization-rule-card")?.remove();
-  }
-});
 elements.tagOrderInfoButton.addEventListener("click", () => {
   appInfoDialog(t("tagOrderSettings"), {
     text: t("tagOrderInfoBody"),
@@ -14238,38 +10408,6 @@ elements.toolNavOrderList.addEventListener("drop", (event) => {
   event.preventDefault();
   elements.toolNavOrderList.querySelector(".tool-order-card.dragging")?.classList.remove("dragging");
   draggedToolNavView = "";
-});
-elements.entrySectionOrderList.addEventListener("dragstart", (event) => {
-  const card = event.target.closest(".tool-order-card");
-  if (!card) {
-    return;
-  }
-  draggedEntrySectionId = card.dataset.entrySection || "";
-  card.classList.add("dragging");
-  event.dataTransfer.effectAllowed = "move";
-  event.dataTransfer.setData("text/plain", draggedEntrySectionId);
-});
-elements.entrySectionOrderList.addEventListener("dragover", (event) => {
-  event.preventDefault();
-  const dragging = elements.entrySectionOrderList.querySelector(".tool-order-card.dragging");
-  if (!dragging) {
-    return;
-  }
-  const before = entrySectionOrderInsertBefore(event.clientY);
-  if (before) {
-    elements.entrySectionOrderList.insertBefore(dragging, before);
-  } else {
-    elements.entrySectionOrderList.append(dragging);
-  }
-});
-elements.entrySectionOrderList.addEventListener("dragend", () => {
-  elements.entrySectionOrderList.querySelector(".tool-order-card.dragging")?.classList.remove("dragging");
-  draggedEntrySectionId = "";
-});
-elements.entrySectionOrderList.addEventListener("drop", (event) => {
-  event.preventDefault();
-  elements.entrySectionOrderList.querySelector(".tool-order-card.dragging")?.classList.remove("dragging");
-  draggedEntrySectionId = "";
 });
 elements.corpusModeControl.addEventListener("click", (event) => {
   const button = event.target.closest("[data-corpus-mode]");
@@ -14464,21 +10602,7 @@ window.addEventListener("scroll", () => {
 elements.docsMarkdownInput.addEventListener("scroll", rememberDocsPaneScroll, { passive: true });
 elements.docsPreview.addEventListener("scroll", rememberDocsPaneScroll, { passive: true });
 elements.saveDocsButton.addEventListener("click", () => saveLanguageDocs(true));
-elements.morphologyFunctionsForm.addEventListener("submit", saveMorphologyFunctions);
-elements.morphologyTablesForm.addEventListener("submit", saveMorphologyTables);
-elements.morphologyTablesForm.addEventListener("keydown", (event) => {
-  if (event.key !== "Enter" || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) {
-    return;
-  }
-  const input = event.target;
-  if (!input?.matches?.("input")) {
-    return;
-  }
-  event.preventDefault();
-  if (input.matches('[data-field="rows"], [data-field="cols"]')) {
-    applyMorphologyTableSizeChanges();
-  }
-});
+elements.morphologyForm.addEventListener("submit", saveMorphologyConfig);
 elements.morphologySyntaxButton.addEventListener("click", () => {
   appInfoDialog(t("morphologySyntaxTitle"), {
     html: morphologySyntaxInfoHtml(),
@@ -14498,34 +10622,12 @@ elements.confirmDialog.addEventListener("click", (event) => {
     closeConfirmDialog(confirmDialogResults.cancel);
   }
 });
-elements.addMorphologyTableGroupButton.addEventListener("click", () => {
-  const morphology = morphologyTablesFormSnapshot();
-  morphology.templateGroups.push(newMorphologyTableGroup(morphology.templateGroups.length));
-  renderMorphologyTablesConfig({ morphology });
+elements.addMorphologyTableButton.addEventListener("click", () => {
+  const tables = collectMorphologyTables();
+  tables.push(normalizeMorphologyTable({ name: `${t("morphologyTable")} ${tables.length + 1}` }));
+  renderMorphologyConfig({ morphology: { tables } });
 });
 elements.morphologyTableList.addEventListener("click", (event) => {
-  const addTableButton = event.target.closest('[data-action="add-morphology-table"]');
-  if (addTableButton) {
-    const groupCard = addTableButton.closest(".morphology-group-card");
-    const morphology = morphologyTablesFormSnapshot();
-    const group = morphology.templateGroups.find((item) => item.id === groupCard?.dataset.templateGroupId);
-    if (group) {
-      const table = newMorphologyTemplateTable(group.tables.length);
-      group.tables.push(table);
-      expandedMorphologyTables.add(table.id);
-      renderMorphologyTablesConfig({ morphology });
-    }
-    return;
-  }
-
-  const removeGroupButton = event.target.closest('[data-action="remove-morphology-group"]');
-  if (removeGroupButton) {
-    removeGroupButton.closest(".morphology-group-card")?.querySelectorAll(".morphology-config-card")
-      .forEach((tableCard) => expandedMorphologyTables.delete(tableCard.dataset.templateTableId));
-    removeGroupButton.closest(".morphology-group-card")?.remove();
-    return;
-  }
-
   const toggleButton = event.target.closest('[data-action="toggle-morphology-table"]');
   if (toggleButton) {
     const card = toggleButton.closest(".morphology-config-card");
@@ -14533,101 +10635,27 @@ elements.morphologyTableList.addEventListener("click", (event) => {
     const expanded = body.hidden;
     body.hidden = !expanded;
     card.classList.toggle("is-collapsed", !expanded);
-    toggleButton.classList.toggle("is-expanded", expanded);
+    toggleButton.textContent = expanded ? t("collapse") : t("expand");
     toggleButton.setAttribute("aria-expanded", String(expanded));
-    toggleButton.setAttribute("aria-label", expanded ? t("collapse") : t("expand"));
-    hideAppTooltip();
     if (expanded) {
-      expandedMorphologyTables.add(card.dataset.templateTableId);
+      expandedMorphologyTables.add(card.dataset.tableId);
     } else {
-      expandedMorphologyTables.delete(card.dataset.templateTableId);
+      expandedMorphologyTables.delete(card.dataset.tableId);
     }
     return;
   }
 
   const removeButton = event.target.closest('[data-action="remove-morphology-table"]');
   if (removeButton) {
-    expandedMorphologyTables.delete(removeButton.closest(".morphology-config-card").dataset.templateTableId);
+    expandedMorphologyTables.delete(removeButton.closest(".morphology-config-card").dataset.tableId);
     removeButton.closest(".morphology-config-card").remove();
     return;
   }
   const resizeButton = event.target.closest('[data-action="resize-morphology-table"]');
   if (resizeButton) {
-    applyMorphologyTableSizeChanges();
+    const tables = collectMorphologyTables();
+    renderMorphologyConfig({ morphology: { tables } });
   }
-});
-elements.morphologyTableList.addEventListener("dragstart", (event) => {
-  const tableHandle = event.target.closest('[data-action="drag-morphology-table"]');
-  if (tableHandle) {
-    const tableCard = tableHandle.closest(".morphology-config-card");
-    if (!tableCard) {
-      event.preventDefault();
-      return;
-    }
-    draggedMorphologyTableId = tableCard.dataset.templateTableId || "";
-    tableCard.classList.add("dragging");
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", draggedMorphologyTableId);
-    event.stopPropagation();
-    return;
-  }
-  const groupHandle = event.target.closest('[data-action="drag-morphology-group"]');
-  const groupCard = groupHandle?.closest(".morphology-group-card");
-  if (!groupCard) {
-    event.preventDefault();
-    return;
-  }
-  draggedMorphologyGroupId = groupCard.dataset.templateGroupId || "";
-  groupCard.classList.add("dragging");
-  event.dataTransfer.effectAllowed = "move";
-  event.dataTransfer.setData("text/plain", draggedMorphologyGroupId);
-});
-elements.morphologyTableList.addEventListener("dragover", (event) => {
-  if (draggedMorphologyTableId) {
-    const dragging = elements.morphologyTableList.querySelector(".morphology-config-card.dragging");
-    const target = event.target.closest(".morphology-config-card");
-    const targetList = event.target.closest(".morphology-group-table-list");
-    if (!dragging || !targetList || dragging.parentElement !== targetList || target === dragging) {
-      return;
-    }
-    event.preventDefault();
-    if (target) {
-      const bounds = target.getBoundingClientRect();
-      targetList.insertBefore(dragging, event.clientY < bounds.top + bounds.height / 2 ? target : target.nextSibling);
-    } else {
-      targetList.append(dragging);
-    }
-    return;
-  }
-  if (!draggedMorphologyGroupId) {
-    return;
-  }
-  const dragging = elements.morphologyTableList.querySelector(".morphology-group-card.dragging");
-  const target = event.target.closest(".morphology-group-card");
-  const targetList = event.target.closest(".morphology-table-list");
-  if (!dragging || !targetList || target === dragging) {
-    return;
-  }
-  event.preventDefault();
-  if (target) {
-    const bounds = target.getBoundingClientRect();
-    targetList.insertBefore(dragging, event.clientY < bounds.top + bounds.height / 2 ? target : target.nextSibling);
-  } else {
-    targetList.append(dragging);
-  }
-});
-elements.morphologyTableList.addEventListener("dragend", () => {
-  elements.morphologyTableList.querySelectorAll(".morphology-group-card.dragging, .morphology-config-card.dragging")
-    .forEach((card) => card.classList.remove("dragging"));
-  draggedMorphologyGroupId = "";
-  draggedMorphologyTableId = "";
-});
-elements.morphologyTableList.addEventListener("drop", (event) => {
-  event.preventDefault();
-  elements.morphologyTableList.querySelectorAll(".morphology-group-card.dragging, .morphology-config-card.dragging")
-    .forEach((card) => card.classList.remove("dragging"));
-  draggedMorphologyGroupId = "";
-  draggedMorphologyTableId = "";
 });
 elements.docsModeControl.addEventListener("click", (event) => {
   const button = event.target.closest("[data-doc-mode]");
@@ -14656,13 +10684,14 @@ elements.ipaMappingList.addEventListener("dragstart", (event) => {
     event.preventDefault();
     return;
   }
+  draggedIpaRuleId = card.dataset.ruleId || "";
   card.classList.add("dragging");
   event.dataTransfer.effectAllowed = "move";
-  event.dataTransfer.setData("text/plain", "ipa-rule");
+  event.dataTransfer.setData("text/plain", draggedIpaRuleId);
 });
 elements.ipaMappingList.addEventListener("dragover", (event) => {
   const dragging = elements.ipaMappingList.querySelector(".ipa-rule-card.dragging");
-  if (!dragging) {
+  if (!dragging || !draggedIpaRuleId) {
     return;
   }
   event.preventDefault();
@@ -14716,7 +10745,8 @@ elements.themeToggleButton.addEventListener("click", async () => {
     state.uiTheme = previousTheme;
     cacheUiPreferences({ uiTheme: previousTheme });
     render();
-    showApiErrorToast(error, "themeSaveFailed");
+    showToast(t("themeSaveFailed"));
+    console.error(error);
   } finally {
     elements.themeToggleButton.disabled = false;
   }
@@ -14744,7 +10774,8 @@ elements.languageToggleButton.addEventListener("click", async () => {
     state.uiLanguage = previousLanguage;
     refreshAdvancedFilterLocalization();
     render();
-    showApiErrorToast(error, "languageSaveFailed");
+    showToast(t("languageSaveFailed"));
+    console.error(error);
   } finally {
     elements.languageToggleButton.disabled = false;
   }
@@ -14835,11 +10866,6 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (event.key === "Escape" && networkOpen) {
-    closeLexicalNetwork();
-    return;
-  }
-
   if (event.key === "Escape" && closeMobileDrawers()) {
     return;
   }
@@ -14900,15 +10926,9 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (state.activeView === "morphology-functions" && !elements.morphologyFunctionsForm.hidden) {
+  if (state.activeView === "morphology" && !elements.morphologyForm.hidden) {
     event.preventDefault();
-    elements.morphologyFunctionsForm.requestSubmit();
-    return;
-  }
-
-  if (state.activeView === "morphology-tables" && !elements.morphologyTablesForm.hidden) {
-    event.preventDefault();
-    elements.morphologyTablesForm.requestSubmit();
+    elements.morphologyForm.requestSubmit();
   }
 });
 
@@ -14943,7 +10963,6 @@ window.addEventListener("resize", () => {
   renderShellNav();
   renderMobileAppBar();
   scheduleEntryBrowserLayoutRefresh(120);
-  scheduleLexicalNetworkLayout();
 });
 elements.appShell.addEventListener("transitionend", (event) => {
   if (event.propertyName === "grid-template-columns") {
