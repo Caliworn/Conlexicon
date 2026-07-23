@@ -298,7 +298,8 @@ query kind
 - 定位层已完成并接入自动滚动：`/entries/:entryId/location` 返回当前普通查询下的目标窗口，`/root-groups/location` 通过稳定拓扑候选根和会话组下标返回父级窗口；严格及 fuzzy 搜索共同复用 `entryId -> resultIndex`，词根会话复用 `rootId -> resultIndex`。无搜索的结构筛选仍在 SQL 内计算位置。目标存在但被查询排除时返回明确的 `found: false`，而不是伪造首窗。词根衍生词定位先加载父级窗口，再按需读取整组子项；前端不再调用 `filteredEntries()` / `rootModeGroups()` 猜测未加载窗口。
 - 产品前端不再请求临时 `limit=10000`，窗口大小固定为上述小批次；repository 保留原有大页硬上限，供显式基准和诊断工具使用，不进入正常 UI 路径。
 - `/root-groups/:rootId/entries` 不复用父级分页协议：后端通过查询会话的 `rootId → group` 索引直接定位并返回整组，不处理 cursor、`windowOffset` 或 `limit`，也不设置单组 2000 条硬上限。`/entry-relations/:entryId` 同时通过稳定拓扑的 `entryId → rootIds` 和 `rootId → group` 索引定位同根组，不再逐请求递归扫描祖先与后代。
-- 查询型高级筛选刷新只按当前 EntryQuery key 前缀失效 entries 页面和对应定位缓存，不再清空同词典的词根、facets 或其他查询页面。循环变体可用性由批量 `/entries/probe` 布尔结果更新，前端以当前筛选对象和词典版本拒绝过期响应；当前变体复用正常首窗总数。
+- 查询型高级筛选刷新只按当前 EntryQuery key 前缀失效 entries 页面和对应定位缓存，不再清空同词典的词根、facets 或其他查询页面。循环变体使用按词典版本和规范化 filter 缓存的结构事实；批量 `/entries/filter-facts` 不接受搜索条件。无搜索首窗总数可直接写入精确结构事实，有搜索且命中时可证明结构非空，搜索零命中则不再误判结构为空。
+- 前端对仍属于当前词典版本的响应先按查询或 filter 身份写入缓存，再决定是否更新当前界面；用户在请求期间切换变体不会浪费有效结果。成功写入后页面缓存和结构事实都失效，并自动重新读取当前查询、补齐活动高级筛选的未知结构事实。
 - 全局展开状态使用 `manual/all` 两种模式；`all` 下单组收起记录为例外。父级窗口淘汰只释放衍生词 DTO，不清除展开意图；“全部展开”和“全部收起”都会清空上一轮手动展开/收起例外。“全部收起”同时释放已加载的组内数据。
 
 ### Q4 后：stale-while-revalidate 与词条切换局部渲染（已完成）

@@ -537,13 +537,125 @@ fieldset {
   z-index: 2;
 }
 
-.filter-row input {
+.entry-search-control {
+  position: relative;
+  display: grid;
   grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  gap: 10px;
+}
+
+.entry-search-control input {
+  grid-column: 1;
   min-width: 0;
 }
 
 .filter-row select {
   min-width: 0;
+}
+
+.secondary-button.entry-search-config-button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  place-items: center;
+  background: var(--surface);
+}
+
+.secondary-button.entry-search-config-button .nav-icon {
+  width: 19px;
+  height: 19px;
+  margin: 0;
+}
+
+.secondary-button.entry-search-config-button.active,
+.secondary-button.entry-search-config-button[aria-expanded="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.entry-search-config-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 12;
+  display: grid;
+  width: min(320px, 100%);
+  max-height: min(520px, calc(100dvh - 96px));
+  gap: 10px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.entry-search-config-menu > strong {
+  font-size: 0.9rem;
+}
+
+.entry-search-config-header,
+.entry-search-config-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px 72px;
+  align-items: center;
+  gap: 6px;
+}
+
+.entry-search-config-header {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 7px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.entry-search-config-header span:not(:first-child),
+.entry-search-config-field label {
+  text-align: center;
+}
+
+.entry-search-config-fields {
+  display: grid;
+  gap: 4px;
+}
+
+.entry-search-config-field {
+  min-height: 32px;
+  border-radius: 6px;
+  padding: 3px 0;
+  font-size: 0.82rem;
+}
+
+.entry-search-config-field:hover {
+  background: var(--accent-soft);
+}
+
+.entry-search-config-field label {
+  display: grid;
+  min-height: 28px;
+  place-items: center;
+}
+
+.entry-search-config-field input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.entry-search-config-field.is-search-disabled {
+  color: var(--muted);
+}
+
+.entry-search-default-button {
+  justify-self: stretch;
+  min-height: 36px;
+  font-size: 0.78rem;
 }
 
 .secondary-button.entry-list-new-button {

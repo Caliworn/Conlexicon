@@ -148,7 +148,24 @@
           <section class="content-grid" id="editorContentGrid" data-browser-state="expanded">
             <section class="entry-browser view-browser" id="entryBrowser" data-i18n-aria-label="entryBrowser" aria-label="词条列表">
               <div class="filter-row">
-                <input id="searchInput" type="search" data-i18n-placeholder="searchPlaceholder" placeholder="搜索词形、释义、标签">
+                <div class="entry-search-control" id="entrySearchControl">
+                  <input id="searchInput" type="search" data-i18n-placeholder="searchPlaceholder" placeholder="搜索词形、释义、标签">
+                  <button class="secondary-button entry-search-config-button" id="entrySearchConfigButton" type="button" aria-controls="entrySearchConfigMenu" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="currentSearchSettings" aria-label="当前搜索设置">
+                    <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M4 7h10M18 7h2M14 5v4M4 17h2M10 17h10M10 15v4M4 12h5M13 12h7M9 10v4"></path>
+                    </svg>
+                  </button>
+                  <div class="entry-search-config-menu" id="entrySearchConfigMenu" role="dialog" data-i18n-aria-label="currentSearchSettings" aria-label="当前搜索设置" hidden>
+                    <strong data-i18n="currentSearchSettings">当前搜索设置</strong>
+                    <div class="entry-search-config-header" aria-hidden="true">
+                      <span data-i18n="searchField">字段</span>
+                      <span data-i18n="searchFieldEnabled">参与搜索</span>
+                      <span data-i18n="searchFieldFuzzy">模糊匹配</span>
+                    </div>
+                    <div class="entry-search-config-fields" id="entrySearchConfigFields"></div>
+                    <button class="secondary-button entry-search-default-button" id="entrySearchDefaultButton" type="button" data-i18n="restoreSearchDefaults">恢复词典默认值</button>
+                  </div>
+                </div>
                 <select id="partFilter" data-i18n-aria-label="partFilterLabel" aria-label="词性筛选">
                   <option value="" data-i18n="allParts">全部词性</option>
                 </select>
@@ -679,12 +696,12 @@
                 <div class="form-heading compact-heading">
                   <div>
                     <p class="eyebrow" data-i18n="searchSettings">搜索</p>
-                    <h3 data-i18n="fuzzySearch">模糊匹配</h3>
                   </div>
                 </div>
                 <div class="subsection-title">
-                  <h3 data-i18n="searchFields">搜索字段</h3>
+                  <h3 data-i18n="defaultSearchFields">默认搜索字段</h3>
                 </div>
+                <p class="muted-text" data-i18n="searchDefaultsHelp">设置当前词典在新会话中使用的默认搜索字段和匹配方式。列表控制栏中的调整仅在本次运行期间生效。</p>
                 <div class="search-field-settings" role="group" data-i18n-aria-label="searchFields">
                   <div class="search-field-settings-header" aria-hidden="true">
                     <span data-i18n="searchField">字段</span>

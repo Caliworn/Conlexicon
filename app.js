@@ -11,6 +11,8 @@ let state = {
 let backendAvailable = true;
 let backendMessage = "";
 let searchQuery = "";
+const runtimeEntrySearchProfiles = new Map();
+let entrySearchConfigOpen = false;
 const ENTRY_SEARCH_DEBOUNCE_MS = 250;
 const ENTRY_QUERY_WINDOW_PAGE_SIZE = 200;
 const ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE = 100;
@@ -61,6 +63,8 @@ const entryDetailCache = new QueryPageCache({
   maxEntries: 12,
   maxBytes: 12 * 1024 * 1024,
 });
+const entryFilterFactsByDictionaryVersion = new Map();
+const entryFilterFactsInFlight = new Map();
 let docsViewMode = "split";
 let docsSaveTimer = null;
 let corpusSaveTimer = null;
@@ -390,8 +394,17 @@ const i18n = {
     searchSettings: "搜索",
     searchDisplay: "显示",
     save: "保存",
-    fuzzySearch: "模糊匹配",
     searchFields: "搜索字段",
+    defaultSearchFields: "默认搜索字段",
+    searchDefaultsHelp: "设置当前词典在新会话中使用的默认搜索字段和匹配方式。列表控制栏中的调整仅在本次运行期间生效。",
+    currentSearchSettings: "当前搜索设置",
+    restoreSearchDefaults: "恢复词典默认值",
+    searchSettingsSummary: "搜索范围：{fields}；{matching}",
+    searchSettingsAllFields: "全部字段",
+    searchSettingsFieldCount: "{count} 个字段",
+    searchSettingsMixedMatching: "混合匹配",
+    searchSettingsFuzzyMatching: "模糊匹配",
+    searchSettingsStrictMatching: "严格匹配",
     searchField: "字段",
     searchFieldEnabled: "参与搜索",
     searchFieldFuzzy: "模糊匹配",
@@ -896,8 +909,17 @@ const i18n = {
     searchSettings: "Search",
     searchDisplay: "Display",
     save: "Save",
-    fuzzySearch: "Fuzzy Matching",
     searchFields: "Search Fields",
+    defaultSearchFields: "Default Search Fields",
+    searchDefaultsHelp: "Set the default search fields and matching behavior for this dictionary in new sessions. Changes in the entry-list toolbar last only for the current run.",
+    currentSearchSettings: "Current Search Settings",
+    restoreSearchDefaults: "Restore Dictionary Defaults",
+    searchSettingsSummary: "Search scope: {fields}; {matching}",
+    searchSettingsAllFields: "All fields",
+    searchSettingsFieldCount: "{count} fields",
+    searchSettingsMixedMatching: "Mixed matching",
+    searchSettingsFuzzyMatching: "Fuzzy matching",
+    searchSettingsStrictMatching: "Strict matching",
     searchField: "Field",
     searchFieldEnabled: "Search",
     searchFieldFuzzy: "Fuzzy",
@@ -1294,6 +1316,11 @@ const elements = {
   advancedFilterRefreshButton: document.querySelector("#advancedFilterRefreshButton"),
   advancedFilterCycleButton: document.querySelector("#advancedFilterCycleButton"),
   advancedFilterExitButton: document.querySelector("#advancedFilterExitButton"),
+  entrySearchControl: document.querySelector("#entrySearchControl"),
+  entrySearchConfigButton: document.querySelector("#entrySearchConfigButton"),
+  entrySearchConfigMenu: document.querySelector("#entrySearchConfigMenu"),
+  entrySearchConfigFields: document.querySelector("#entrySearchConfigFields"),
+  entrySearchDefaultButton: document.querySelector("#entrySearchDefaultButton"),
   partFilter: document.querySelector("#partFilter"),
   sortSelect: document.querySelector("#sortSelect"),
   newEntryButton: document.querySelector("#newEntryButton"),
@@ -2005,18 +2032,99 @@ function normalizeDictionarySettings(settings = {}) {
   };
 }
 
-let entrySearchRuntimeCache = { dictionary: null, search: null, options: null };
+function defaultEntrySearchProfile(dictionary = activeDictionary()) {
+  const search = entrySearchModel.normalizeEntrySearchSettings(dictionary?.settings?.search);
+  return {
+    fields: Object.fromEntries(ENTRY_SEARCH_FIELD_KEYS.map((field) => [
+      field,
+      {
+        enabled: search.fields[field].enabled,
+        fuzzy: search.fields[field].fuzzy,
+      },
+    ])),
+  };
+}
+
+function normalizeRuntimeEntrySearchProfile(profile, dictionary = activeDictionary()) {
+  const defaults = defaultEntrySearchProfile(dictionary);
+  const normalized = entrySearchModel.normalizeEntrySearchSettings({
+    fields: profile?.fields || defaults.fields,
+  });
+  if (!entrySearchModel.searchSettingsHaveEnabledField(normalized)) {
+    return defaults;
+  }
+  return {
+    fields: Object.fromEntries(ENTRY_SEARCH_FIELD_KEYS.map((field) => [
+      field,
+      {
+        enabled: normalized.fields[field].enabled,
+        fuzzy: normalized.fields[field].fuzzy,
+      },
+    ])),
+  };
+}
+
+function runtimeEntrySearchProfile(dictionary = activeDictionary()) {
+  if (!dictionary?.id) {
+    return defaultEntrySearchProfile(dictionary);
+  }
+  if (!runtimeEntrySearchProfiles.has(dictionary.id)) {
+    runtimeEntrySearchProfiles.set(dictionary.id, defaultEntrySearchProfile(dictionary));
+  }
+  return runtimeEntrySearchProfiles.get(dictionary.id);
+}
+
+function setRuntimeEntrySearchProfile(profile, dictionary = activeDictionary()) {
+  if (!dictionary?.id) {
+    return;
+  }
+  runtimeEntrySearchProfiles.set(
+    dictionary.id,
+    normalizeRuntimeEntrySearchProfile(profile, dictionary),
+  );
+  entrySearchRuntimeCache = {
+    dictionary: null,
+    search: null,
+    profile: null,
+    options: null,
+  };
+}
+
+function runtimeEntrySearchProfileIsDefault(dictionary = activeDictionary()) {
+  if (!dictionary) {
+    return true;
+  }
+  return stableJson(runtimeEntrySearchProfile(dictionary))
+    === stableJson(defaultEntrySearchProfile(dictionary));
+}
+
+let entrySearchRuntimeCache = {
+  dictionary: null,
+  search: null,
+  profile: null,
+  options: null,
+};
 
 function entrySearchQueryOptions(dictionary = activeDictionary()) {
   const search = dictionary?.settings?.search;
+  const profile = runtimeEntrySearchProfile(dictionary);
   if (entrySearchRuntimeCache.dictionary === dictionary
     && entrySearchRuntimeCache.search === search
+    && entrySearchRuntimeCache.profile === profile
     && entrySearchRuntimeCache.options) {
     return entrySearchRuntimeCache.options;
   }
-  const normalizedSearch = entrySearchModel.normalizeEntrySearchSettings(search);
+  const normalizedSearch = entrySearchModel.normalizeEntrySearchSettings({
+    ...search,
+    fields: profile.fields,
+  });
   const options = entrySearchModel.searchSettingsQueryOptions(normalizedSearch);
-  entrySearchRuntimeCache = { dictionary, search, options };
+  entrySearchRuntimeCache = {
+    dictionary,
+    search,
+    profile,
+    options,
+  };
   return options;
 }
 
@@ -2729,6 +2837,9 @@ function splitSourceText(value) {
 function render() {
   closeEntryContextMenu();
   ensureValidSelection();
+  if (state.activeView !== "editor") {
+    setEntrySearchConfigOpen(false);
+  }
   applyLocale();
   applyTheme();
   renderShellNav();
@@ -3564,6 +3675,100 @@ function firstLemmaEntry(dictionary) {
   return [...(dictionary?.entries || [])].sort((a, b) => a.lemma.localeCompare(b.lemma, "zh-CN"))[0] || null;
 }
 
+function entrySearchFieldLabel(field) {
+  const labels = {
+    lemma: "searchFieldLemma",
+    pronunciation: "searchFieldPronunciation",
+    tags: "searchFieldTags",
+    definitions: "searchFieldDefinitions",
+    examples: "searchFieldExamples",
+    notes: "searchFieldNotes",
+    etymology: "searchFieldEtymology",
+    morphology: "searchFieldMorphology",
+  };
+  return t(labels[field] || field);
+}
+
+function entrySearchProfileSummary(profile) {
+  const enabledFields = ENTRY_SEARCH_FIELD_KEYS.filter((field) => profile.fields[field]?.enabled);
+  const fuzzyCount = enabledFields.filter((field) => profile.fields[field]?.fuzzy).length;
+  const fields = enabledFields.length === ENTRY_SEARCH_FIELD_KEYS.length
+    ? t("searchSettingsAllFields")
+    : (enabledFields.length === 1
+      ? entrySearchFieldLabel(enabledFields[0])
+      : formatText("searchSettingsFieldCount", { count: enabledFields.length }));
+  const matching = fuzzyCount === 0
+    ? t("searchSettingsStrictMatching")
+    : (fuzzyCount === enabledFields.length
+      ? t("searchSettingsFuzzyMatching")
+      : t("searchSettingsMixedMatching"));
+  return formatText("searchSettingsSummary", { fields, matching });
+}
+
+function setEntrySearchConfigOpen(open) {
+  entrySearchConfigOpen = Boolean(open);
+  if (!elements.entrySearchConfigButton || !elements.entrySearchConfigMenu) {
+    return;
+  }
+  elements.entrySearchConfigButton.setAttribute("aria-expanded", String(entrySearchConfigOpen));
+  elements.entrySearchConfigMenu.hidden = !entrySearchConfigOpen;
+}
+
+function renderEntrySearchConfig() {
+  const dictionary = activeDictionary();
+  const unavailable = !dictionary || Boolean(advancedFilter && !advancedFilterUsesEntryQuery());
+  if (!dictionary) {
+    setEntrySearchConfigOpen(false);
+    elements.entrySearchConfigButton.disabled = true;
+    elements.entrySearchConfigFields.innerHTML = "";
+    return;
+  }
+
+  const profile = runtimeEntrySearchProfile(dictionary);
+  const focusedControl = document.activeElement?.dataset.runtimeSearchEnabled
+    ? { type: "enabled", field: document.activeElement.dataset.runtimeSearchEnabled }
+    : (document.activeElement?.dataset.runtimeSearchFuzzy
+      ? { type: "fuzzy", field: document.activeElement.dataset.runtimeSearchFuzzy }
+      : null);
+  elements.entrySearchConfigFields.innerHTML = ENTRY_SEARCH_FIELD_KEYS.map((field) => {
+    const config = profile.fields[field];
+    const label = entrySearchFieldLabel(field);
+    return `
+      <div class="entry-search-config-field${config.enabled ? "" : " is-search-disabled"}" data-runtime-search-field="${escapeHtml(field)}">
+        <span>${escapeHtml(label)}</span>
+        <label>
+          <span class="visually-hidden">${escapeHtml(`${label}: ${t("searchFieldEnabled")}`)}</span>
+          <input type="checkbox" data-runtime-search-enabled="${escapeHtml(field)}"${config.enabled ? " checked" : ""}>
+        </label>
+        <label>
+          <span class="visually-hidden">${escapeHtml(`${label}: ${t("searchFieldFuzzy")}`)}</span>
+          <input type="checkbox" data-runtime-search-fuzzy="${escapeHtml(field)}"${config.fuzzy ? " checked" : ""}${config.enabled ? "" : " disabled"}>
+        </label>
+      </div>
+    `;
+  }).join("");
+
+  const isDefault = runtimeEntrySearchProfileIsDefault(dictionary);
+  const summary = entrySearchProfileSummary(profile);
+  elements.entrySearchConfigButton.disabled = unavailable;
+  elements.entrySearchConfigButton.classList.toggle("active", !isDefault);
+  elements.entrySearchConfigButton.setAttribute("aria-label", summary);
+  elements.entrySearchDefaultButton.disabled = isDefault;
+  if (focusedControl) {
+    const attribute = focusedControl.type === "enabled"
+      ? "data-runtime-search-enabled"
+      : "data-runtime-search-fuzzy";
+    elements.entrySearchConfigFields
+      .querySelector(`[${attribute}="${focusedControl.field}"]:not(:disabled)`)
+      ?.focus();
+  }
+  if (unavailable) {
+    setEntrySearchConfigOpen(false);
+  } else {
+    setEntrySearchConfigOpen(entrySearchConfigOpen);
+  }
+}
+
 function renderPartFilter() {
   const dictionary = activeDictionary();
   if (advancedFilter) {
@@ -3576,6 +3781,9 @@ function renderPartFilter() {
   } else if (rootMode) {
     activePart = "";
     elements.partFilter.value = "";
+  }
+  if (advancedFilterUsesEntryQuery()) {
+    refreshAdvancedFilterFacts(dictionary);
   }
   startEntryFacetsApiCheck(dictionary);
   const usedParts = entryFacetsPartsForRender(dictionary) || localPartTags(dictionary);
@@ -3594,6 +3802,7 @@ function renderPartFilter() {
   elements.partFilter.value = options.includes(current) ? current : "";
   elements.partFilter.disabled = rootMode || Boolean(advancedFilter);
   elements.searchInput.disabled = Boolean(advancedFilter && !advancedFilterUsesEntryQuery());
+  renderEntrySearchConfig();
   activePart = elements.partFilter.value;
   elements.rootModeToggleButton.textContent = rootMode ? t("normalMode") : t("rootMode");
   elements.rootModeToggleButton.classList.toggle("active", rootMode);
@@ -5209,7 +5418,7 @@ function entryQueryApiKey(dictionary = activeDictionary()) {
     normalizeEntrySearchText(searchQuery, dictionary),
     activePart,
     stableJson(advancedFilterUsesEntryQuery() ? advancedFilter.filter : null),
-    stableJson(advancedFilterUsesEntryQuery() ? advancedFilter.search : null),
+    stableJson(advancedFilterUsesEntryQuery() ? advancedFilter.searchScope : null),
     entrySort,
     stableJson(settings.tagDisplayMap),
     settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
@@ -5303,11 +5512,11 @@ function resetEntryQueryState() {
 function entryQuerySearchDescriptor(dictionary, descriptor = advancedFilterUsesEntryQuery() ? advancedFilter : null) {
   const usesStructuredFilter = advancedFilterVariantUsesEntryQuery(descriptor);
   const configuredSearch = entrySearchQueryOptions(dictionary);
-  const fields = usesStructuredFilter && descriptor.search?.fields?.length
-    ? new Set(descriptor.search.fields)
+  const fields = usesStructuredFilter && descriptor.searchScope?.fields?.length
+    ? new Set(descriptor.searchScope.fields)
     : configuredSearch.fields;
-  const fuzzyFields = usesStructuredFilter && Array.isArray(descriptor.search?.fuzzyFields)
-    ? new Set(descriptor.search.fuzzyFields)
+  const fuzzyFields = usesStructuredFilter && Array.isArray(descriptor.searchScope?.fuzzyFields)
+    ? new Set(descriptor.searchScope.fuzzyFields)
     : configuredSearch.fuzzyFields;
   return {
     text: searchQuery.trim(),
@@ -5336,14 +5545,6 @@ function entryQueryParams(dictionary, descriptor = advancedFilterUsesEntryQuery(
     params.set("fuzzyFields", search.fuzzyFields.join(","));
   }
   return params;
-}
-
-function advancedFilterVariantProbeQuery(dictionary, variant, index) {
-  return {
-    id: `variant-${index}`,
-    filter: variant.filter,
-    search: entryQuerySearchDescriptor(dictionary, variant),
-  };
 }
 
 function entryQueryUrl(dictionary, options = {}) {
@@ -5406,6 +5607,14 @@ function loadEntryQueryWindowPage(dictionary, page) {
   const key = entryQueryState.key;
   const requestId = entryQueryState.requestId;
   const updateToken = entryQueryState.updateToken;
+  const filterFactContext = page.index === 0 && advancedFilterUsesEntryQuery()
+    ? {
+        dictionaryId: dictionary.id,
+        dictionaryUpdatedAt: dictionary.updatedAt,
+        filter: entryQueryModel.normalizeEntryFilter(advancedFilter.filter),
+        hasSearch: Boolean(entryQuerySearchDescriptor(dictionary).text),
+      }
+    : null;
   page.status = "loading";
   page.error = null;
   page.lastAccessAt = performance.now();
@@ -5420,6 +5629,7 @@ function loadEntryQueryWindowPage(dictionary, page) {
     transform: compactEntryQueryResult,
   })
     .then((result) => {
+      recordEntryQueryFilterFact(filterFactContext, result);
       if (
         entryQueryState.requestId !== requestId
         || entryQueryState.key !== key
@@ -5451,10 +5661,6 @@ function loadEntryQueryWindowPage(dictionary, page) {
       entryQueryState.error = null;
       if (page.index === 0) {
         if (advancedFilterUsesEntryQuery()) {
-          const activeVariant = advancedFilter.variants[advancedFilter.variantIndex];
-          if (activeVariant) {
-            activeVariant.available = Number(result.pageInfo?.total || 0) > 0;
-          }
           if (advancedFilter.selectFirstOnLoad) {
             advancedFilter.selectFirstOnLoad = false;
             const firstEntry = result.items[0];
@@ -6530,12 +6736,181 @@ function advancedFilterUsesEntryQuery() {
   return advancedFilterVariantUsesEntryQuery(advancedFilter);
 }
 
+function entryFilterIdentity(filter) {
+  return stableJson(entryQueryModel.normalizeEntryFilter(filter));
+}
+
+function entryFilterFactsVersionKey(dictionary) {
+  return `${dictionary?.id || ""}\u0000${dictionary?.updatedAt || ""}`;
+}
+
+function entryFilterFactsForDictionary(dictionary, create = false) {
+  const versionKey = entryFilterFactsVersionKey(dictionary);
+  if (!versionKey || versionKey === "\u0000") {
+    return null;
+  }
+  if (!entryFilterFactsByDictionaryVersion.has(versionKey) && create) {
+    entryFilterFactsByDictionaryVersion.set(versionKey, new Map());
+  }
+  return entryFilterFactsByDictionaryVersion.get(versionKey) || null;
+}
+
+function entryFilterFact(dictionary, filter) {
+  return entryFilterFactsForDictionary(dictionary)?.get(entryFilterIdentity(filter)) || null;
+}
+
+function setEntryFilterFact(dictionary, filter, fact = {}) {
+  const facts = entryFilterFactsForDictionary(dictionary, true);
+  if (!facts) {
+    return null;
+  }
+  const identity = entryFilterIdentity(filter);
+  const existing = facts.get(identity);
+  const total = Number.isSafeInteger(fact.total) && fact.total >= 0
+    ? fact.total
+    : existing?.total ?? null;
+  const available = fact.available === true || total > 0;
+  const empty = fact.available === false || total === 0;
+  const normalized = {
+    status: available ? "available" : empty ? "empty" : "unknown",
+    total,
+    generation: Number.isSafeInteger(fact.generation) ? fact.generation : existing?.generation ?? null,
+  };
+  facts.set(identity, normalized);
+  return normalized;
+}
+
+function invalidateEntryFilterFacts(dictionaryId) {
+  const prefix = `${String(dictionaryId || "")}\u0000`;
+  [...entryFilterFactsByDictionaryVersion.keys()].forEach((key) => {
+    if (key.startsWith(prefix)) {
+      entryFilterFactsByDictionaryVersion.delete(key);
+    }
+  });
+  [...entryFilterFactsInFlight.keys()].forEach((key) => {
+    if (key.startsWith(prefix)) {
+      entryFilterFactsInFlight.delete(key);
+    }
+  });
+}
+
+function seedAdvancedFilterFacts(dictionary, variants = []) {
+  variants.forEach((variant) => {
+    if (advancedFilterVariantUsesEntryQuery(variant) && variant.initialFilterFact) {
+      setEntryFilterFact(dictionary, variant.filter, variant.initialFilterFact);
+    }
+  });
+}
+
+function advancedFilterVariantFactStatus(variant, dictionary = activeDictionary()) {
+  if (!advancedFilterVariantUsesEntryQuery(variant)) {
+    return variant?.entryIds?.length ? "available" : "empty";
+  }
+  return entryFilterFact(dictionary, variant.filter)?.status || "unknown";
+}
+
+function storeEntryFilterFactsResponse(dictionary, targets, result) {
+  const currentDictionary = state.dictionaries.find((item) => item.id === dictionary.id);
+  if (!currentDictionary || currentDictionary.updatedAt !== dictionary.updatedAt) {
+    return false;
+  }
+  targets.forEach((target) => {
+    const fact = result?.facts?.[target.id];
+    if (fact?.available === true || fact?.available === false) {
+      setEntryFilterFact(currentDictionary, target.filter, {
+        available: fact.available,
+        generation: result.generation,
+      });
+    }
+  });
+  if (activeDictionary()?.id === dictionary.id && advancedFilterUsesEntryQuery()) {
+    renderPartFilter();
+  }
+  return true;
+}
+
+async function loadEntryFilterFacts(dictionary, targets) {
+  const requestKey = [
+    entryFilterFactsVersionKey(dictionary),
+    ...targets.map((target) => entryFilterIdentity(target.filter)).sort(),
+  ].join("|");
+  if (entryFilterFactsInFlight.has(requestKey)) {
+    return entryFilterFactsInFlight.get(requestKey);
+  }
+  const request = api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/filter-facts`, {
+    method: "POST",
+    body: JSON.stringify({
+      filters: targets.map((target) => ({ id: target.id, filter: target.filter })),
+    }),
+  })
+    .then((result) => {
+      storeEntryFilterFactsResponse(dictionary, targets, result);
+      return result;
+    })
+    .finally(() => {
+      entryFilterFactsInFlight.delete(requestKey);
+    });
+  entryFilterFactsInFlight.set(requestKey, request);
+  return request;
+}
+
+async function refreshAdvancedFilterFacts(dictionary = activeDictionary(), options = {}) {
+  if (!backendAvailable || !dictionary || !advancedFilterUsesEntryQuery()) {
+    return;
+  }
+  const byIdentity = new Map();
+  advancedFilter.variants.forEach((variant) => {
+    if (!advancedFilterVariantUsesEntryQuery(variant)) {
+      return;
+    }
+    const identity = entryFilterIdentity(variant.filter);
+    if (!options.force && entryFilterFact(dictionary, variant.filter)?.status !== undefined) {
+      return;
+    }
+    if (!byIdentity.has(identity)) {
+      byIdentity.set(identity, variant.filter);
+    }
+  });
+  const filters = [...byIdentity.values()];
+  const batches = [];
+  for (let offset = 0; offset < filters.length; offset += 16) {
+    batches.push(filters.slice(offset, offset + 16).map((filter, index) => ({
+      id: `filter-${offset + index}`,
+      filter,
+    })));
+  }
+  try {
+    await Promise.all(batches.map((targets) => loadEntryFilterFacts(dictionary, targets)));
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+function recordEntryQueryFilterFact(context, result) {
+  if (!context || !Number.isSafeInteger(result?.pageInfo?.total)) {
+    return;
+  }
+  const dictionary = state.dictionaries.find((item) => item.id === context.dictionaryId);
+  if (!dictionary || dictionary.updatedAt !== context.dictionaryUpdatedAt) {
+    return;
+  }
+  const total = result.pageInfo.total;
+  if (total > 0) {
+    setEntryFilterFact(dictionary, context.filter, {
+      available: true,
+      ...(context.hasSearch ? {} : { total }),
+    });
+  } else if (!context.hasSearch) {
+    setEntryFilterFact(dictionary, context.filter, { available: false, total: 0 });
+  }
+}
+
 function advancedFilterStateForVariant(base, variant, variantIndex) {
   return {
     ...base,
     title: variant.title,
     filter: variant.filter,
-    search: variant.search,
+    searchScope: variant.searchScope,
     entryIds: variant.entryIds,
     issueMap: variant.issueMap,
     variantIndex,
@@ -6582,7 +6957,10 @@ async function enterAdvancedFilter(action) {
 
   const previous = advancedFilter?.previous || entryViewSnapshot();
   const variants = normalizeAdvancedFilterVariants(action);
-  const activeVariant = variants.find((variant) => variant.available !== false) || variants[0];
+  seedAdvancedFilterFacts(dictionary, variants);
+  const activeVariant = variants.find((variant) => (
+    advancedFilterVariantFactStatus(variant, dictionary) !== "empty"
+  )) || variants[0];
   if (!activeVariant) {
     return;
   }
@@ -6594,7 +6972,7 @@ async function enterAdvancedFilter(action) {
   }, activeVariant, variants.indexOf(activeVariant));
   rootMode = false;
   activePart = "";
-  searchQuery = activeVariant.search?.text || "";
+  searchQuery = activeVariant.initialSearchText || "";
   elements.searchInput.value = searchQuery;
   state.activeView = "editor";
   revealEntryBrowserForResults();
@@ -6618,6 +6996,9 @@ async function enterAdvancedFilter(action) {
     }
   }
   render();
+  if (advancedFilterUsesEntryQuery()) {
+    refreshAdvancedFilterFacts(dictionary);
+  }
   if (state.selectedEntryId) {
     scheduleEntryCardScroll(state.selectedEntryId);
   }
@@ -6673,17 +7054,22 @@ function normalizeAdvancedFilterVariants(action, options = {}) {
       const usesEntryQuery = advancedFilterVariantUsesEntryQuery(variant);
       const entryIds = usesEntryQuery ? [] : entryIdsFrom(variant.entryIds);
       const filter = usesEntryQuery ? entryQueryModel.normalizeEntryFilter(variant.filter) : null;
-      const search = usesEntryQuery && variant.search
-        ? entryQueryModel.normalizeEntrySearch(variant.search)
+      const search = usesEntryQuery && (variant.searchScope || variant.search)
+        ? entryQueryModel.normalizeEntrySearch(variant.searchScope || variant.search)
         : null;
       return {
         key: variant.key || "",
         title: variant.title || t("advancedFilterMode"),
         filter,
-        search,
+        searchScope: search ? { fields: search.fields, fuzzyFields: search.fuzzyFields } : null,
+        initialSearchText: usesEntryQuery
+          ? String(variant.initialSearchText ?? variant.search?.text ?? "").trim()
+          : "",
+        initialFilterFact: usesEntryQuery && variant.initialFilterFact
+          ? { ...variant.initialFilterFact }
+          : null,
         entryIds,
         issueMap: usesEntryQuery ? {} : advancedFilterIssueMapFromIssues(variant.issues, entryIds),
-        available: usesEntryQuery ? variant.available !== false : entryIds.length > 0,
       };
     })
     .filter((variant, index) => (
@@ -6949,43 +7335,12 @@ async function refreshAdvancedFilter() {
   if (!refreshAdvancedFilterState()) {
     return;
   }
-  const refreshTarget = advancedFilter;
   const dictionary = activeDictionary();
-  const dictionaryVersion = `${dictionary?.id || ""}\u0000${dictionary?.updatedAt || ""}`;
   revealEntryBrowserForResults();
   render();
   if (advancedFilterUsesEntryQuery()) {
     scheduleEntryCardScroll(state.selectedEntryId);
-    const probeQueries = advancedFilter.variants
-      .map((variant, index) => ({ variant, index }))
-      .filter(({ variant, index }) => index !== advancedFilter.variantIndex && advancedFilterVariantUsesEntryQuery(variant))
-      .map(({ variant, index }) => advancedFilterVariantProbeQuery(dictionary, variant, index));
-    if (!probeQueries.length) {
-      return;
-    }
-    let result;
-    try {
-      result = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/probe`, {
-        method: "POST",
-        body: JSON.stringify({ queries: probeQueries }),
-      });
-    } catch (error) {
-      console.error(error);
-      return;
-    }
-    if (
-      advancedFilter !== refreshTarget
-      || `${activeDictionary()?.id || ""}\u0000${activeDictionary()?.updatedAt || ""}` !== dictionaryVersion
-    ) {
-      return;
-    }
-    probeQueries.forEach((query) => {
-      const index = Number.parseInt(query.id.slice("variant-".length), 10);
-      if (advancedFilter.variants[index]) {
-        advancedFilter.variants[index].available = result?.results?.[query.id]?.available === true;
-      }
-    });
-    renderPartFilter();
+    await refreshAdvancedFilterFacts(dictionary, { force: true });
   } else if (advancedFilter?.entryIds?.length && advancedFilter.entryIds.includes(state.selectedEntryId)) {
     scheduleEntryCardScroll(state.selectedEntryId);
   }
@@ -7000,7 +7355,7 @@ function nextAdvancedFilterVariantIndex() {
   for (let step = 1; step < variants.length; step += 1) {
     const index = (currentIndex + step) % variants.length;
     const variant = variants[index];
-    if (advancedFilterVariantUsesEntryQuery(variant) ? variant.available !== false : variant?.entryIds?.length) {
+    if (advancedFilterVariantFactStatus(variant) !== "empty") {
       return index;
     }
   }
@@ -8447,6 +8802,7 @@ function analysisSliceCacheKey(context, dep) {
     base: context.cacheBaseKey,
     dep,
     searchQuery: dep === "search" ? normalizeEntrySearchText(searchQuery, context.dictionary) : "",
+    searchOptions: dep === "search" ? entrySearchQuerySignature(context.dictionary) : "",
     entrySort: dep === "relation" || dep === "rootFamilies" ? entrySort : "",
     rootFamilyLimit: dep === "rootFamilies" ? analysisRootFamilyLimit() : "",
   });
@@ -9456,15 +9812,11 @@ function analyzeSearchFields(entries, dictionary) {
     .map(([field, item]) => [
       item.label,
       item.count,
-      entryFilterAction(analysisFilterTitle(aText("搜索字段", "Search Field"), item.label), {}, {
-        count: item.count,
-        search: {
-          text: query,
-          fields: [field],
-          fuzzyFields: fuzzyFields.has(field) ? [field] : [],
-        },
-        meta: { type: "search-field", field },
-      }),
+      {
+        type: "search-scope",
+        fields: [field],
+        fuzzyFields: fuzzyFields.has(field) ? [field] : [],
+      },
     ]);
 }
 
@@ -9592,13 +9944,21 @@ function entryFilterAction(title, filter, options = {}) {
   if (!available && !options.allowEmptyActive) {
     return null;
   }
-  const createVariant = (variantTitle, variantFilter, variant = {}) => ({
-    key: variant.key || "",
-    title: variantTitle,
-    filter: entryQueryModel.normalizeEntryFilter(variantFilter),
-    search: variant.search ? entryQueryModel.normalizeEntrySearch(variant.search) : null,
-    available: variant.available ?? (variant.count === undefined ? true : Number(variant.count) > 0),
-  });
+  const createVariant = (variantTitle, variantFilter, variant = {}) => {
+    const search = variant.search ? entryQueryModel.normalizeEntrySearch(variant.search) : null;
+    const hasCount = variant.count !== undefined && Number.isFinite(Number(variant.count));
+    const count = hasCount ? Math.max(0, Number(variant.count)) : null;
+    return {
+      key: variant.key || "",
+      title: variantTitle,
+      filter: entryQueryModel.normalizeEntryFilter(variantFilter),
+      searchScope: search ? { fields: search.fields, fuzzyFields: search.fuzzyFields } : null,
+      initialSearchText: search?.text || "",
+      initialFilterFact: hasCount
+        ? { available: count > 0, total: count }
+        : null,
+    };
+  };
   const variants = [
     createVariant(title, filter, {
       key: options.key,
@@ -9692,12 +10052,44 @@ function analysisActionAttributes(action) {
   if (normalized.type === "part-filter") {
     return ` data-part-filter-value="${escapeHtml(normalized.part || NO_PART_FILTER_VALUE)}"`;
   }
+  if (normalized.type === "search-scope" && normalized.fields?.length) {
+    const id = `search-scope-${analysisFilterCounter += 1}`;
+    analysisFilterRegistry.set(id, normalized);
+    return ` data-search-scope-id="${escapeHtml(id)}"`;
+  }
   if (normalized.type === "advanced-filter" && (normalized.entryIds?.length || normalized.variants?.length)) {
     const id = `filter-${analysisFilterCounter += 1}`;
     analysisFilterRegistry.set(id, normalized);
     return ` data-advanced-filter-id="${escapeHtml(id)}"`;
   }
   return "";
+}
+
+function applyAnalysisSearchScope(action) {
+  const dictionary = activeDictionary();
+  const fields = (action?.fields || []).filter((field) => ENTRY_SEARCH_FIELD_KEYS.includes(field));
+  if (!dictionary || !fields.length) {
+    return;
+  }
+  const enabled = new Set(fields);
+  const fuzzy = new Set((action.fuzzyFields || [])
+    .filter((field) => enabled.has(field)));
+  const current = runtimeEntrySearchProfile(dictionary);
+  const nextFields = Object.fromEntries(ENTRY_SEARCH_FIELD_KEYS.map((field) => [
+    field,
+    {
+      enabled: enabled.has(field),
+      fuzzy: enabled.has(field) ? fuzzy.has(field) : current.fields[field].fuzzy,
+    },
+  ]));
+  setRuntimeEntrySearchProfile({ fields: nextFields }, dictionary);
+  advancedFilter = null;
+  rootMode = false;
+  activePart = "";
+  state.activeView = "editor";
+  resetEntryQueryState();
+  revealEntryBrowserForResults();
+  render();
 }
 
 function increment(map, key, amount = 1) {
@@ -13419,6 +13811,7 @@ async function saveDictionary(event) {
 function invalidateDictionaryQueryCache(dictionaryId) {
   queryPageCache.invalidateDictionary(dictionaryId);
   entryDetailCache.invalidateDictionary(dictionaryId);
+  invalidateEntryFilterFacts(dictionaryId);
   if (selectedEntryDetailState.dictionaryId === dictionaryId) {
     resetSelectedEntryDetailState();
   }
@@ -13576,6 +13969,9 @@ function resetEntryReadStateAfterSave() {
   resetRootGroupsQueryState();
   entryRelationsCache.clear();
   rootGroupDerivedStates.clear();
+  if (advancedFilterUsesEntryQuery()) {
+    refreshAdvancedFilterFacts(activeDictionary());
+  }
 }
 
 async function activateDictionary(dictionaryId) {
@@ -13619,6 +14015,7 @@ async function deleteSelectedDictionary() {
     forgetAnalysisViewState(dictionary.id);
     forgetQualityViewState(dictionary.id);
     corpusViewStates.delete(dictionary.id);
+    runtimeEntrySearchProfiles.delete(dictionary.id);
     if (corpusDraftState?.dictionaryId === dictionary.id) {
       corpusDraftState = null;
     }
@@ -13730,6 +14127,7 @@ function importData(event) {
         corpusViewStates.delete(dictionary.id);
         forgetAnalysisViewState(dictionary.id);
         forgetQualityViewState(dictionary.id);
+        runtimeEntrySearchProfiles.delete(dictionary.id);
         if (corpusDraftState?.dictionaryId === dictionary.id) {
           corpusDraftState = null;
         }
@@ -13921,6 +14319,74 @@ elements.searchInput.addEventListener("input", (event) => {
     entrySearchDebounceTimer = 0;
     renderEntries();
   }, ENTRY_SEARCH_DEBOUNCE_MS);
+});
+
+elements.entrySearchConfigButton.addEventListener("click", () => {
+  if (elements.entrySearchConfigButton.disabled) {
+    return;
+  }
+  setEntrySearchConfigOpen(!entrySearchConfigOpen);
+  if (entrySearchConfigOpen) {
+    elements.entrySearchConfigMenu.querySelector("input:not(:disabled)")?.focus();
+  }
+});
+
+elements.entrySearchConfigFields.addEventListener("change", (event) => {
+  const dictionary = activeDictionary();
+  const enabledField = event.target.dataset.runtimeSearchEnabled;
+  const fuzzyField = event.target.dataset.runtimeSearchFuzzy;
+  const field = enabledField || fuzzyField;
+  if (!dictionary || !field || !ENTRY_SEARCH_FIELD_KEYS.includes(field)) {
+    return;
+  }
+  const current = runtimeEntrySearchProfile(dictionary);
+  if (enabledField
+    && !event.target.checked
+    && ENTRY_SEARCH_FIELD_KEYS.filter((key) => current.fields[key].enabled).length === 1) {
+    event.target.checked = true;
+    showToast(t("searchFieldRequired"));
+    return;
+  }
+  const fields = Object.fromEntries(ENTRY_SEARCH_FIELD_KEYS.map((key) => [
+    key,
+    { ...current.fields[key] },
+  ]));
+  if (enabledField) {
+    fields[field].enabled = event.target.checked;
+  } else {
+    fields[field].fuzzy = event.target.checked;
+  }
+  setRuntimeEntrySearchProfile({ fields }, dictionary);
+  window.clearTimeout(entrySearchDebounceTimer);
+  entrySearchDebounceTimer = 0;
+  renderPartFilter();
+  renderEntries();
+});
+
+elements.entrySearchDefaultButton.addEventListener("click", () => {
+  const dictionary = activeDictionary();
+  if (!dictionary) {
+    return;
+  }
+  setRuntimeEntrySearchProfile(defaultEntrySearchProfile(dictionary), dictionary);
+  window.clearTimeout(entrySearchDebounceTimer);
+  entrySearchDebounceTimer = 0;
+  renderPartFilter();
+  renderEntries();
+});
+
+document.addEventListener("pointerdown", (event) => {
+  if (entrySearchConfigOpen && !elements.entrySearchControl.contains(event.target)) {
+    setEntrySearchConfigOpen(false);
+  }
+}, true);
+
+document.addEventListener("keydown", (event) => {
+  if (entrySearchConfigOpen && event.key === "Escape") {
+    event.preventDefault();
+    setEntrySearchConfigOpen(false);
+    elements.entrySearchConfigButton.focus();
+  }
 });
 
 elements.rootModeToggleButton.addEventListener("click", () => {
@@ -14295,6 +14761,12 @@ elements.analysisPanel.addEventListener("click", (event) => {
     }
     render();
     scheduleEntryCardScroll(state.selectedEntryId);
+    return;
+  }
+  const searchScopeTarget = event.target.closest("[data-search-scope-id]");
+  if (searchScopeTarget) {
+    const action = analysisFilterRegistry.get(searchScopeTarget.dataset.searchScopeId);
+    applyAnalysisSearchScope(action);
     return;
   }
   const filterTarget = event.target.closest("[data-advanced-filter-id]");

@@ -69,7 +69,7 @@
 | 方法 | 路径 | 用途 | 响应 | 校验范围 |
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | `{ items, pageInfo }`，其中 `items` 固定为词条摘要 DTO | 支持结构化 JSON `filter`，以及现有 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`sort`、`cursor`、`windowOffset`、`limit`。结构化 `filter` 不得与平铺筛选参数混用。无参数请求也使用默认排序和窗口大小，不返回完整词条数组。 |
-| `POST` | `/api/dictionaries/:id/entries/probe` | 批量探测 EntryQuery 是否存在匹配 | `{ dictionaryId, generation, results }` | 最多接受 16 个 filter/search descriptor；只返回按请求 ID 对应的 `available` 布尔值，不计算总数、排序、分页或构建词条 DTO。 |
+| `POST` | `/api/dictionaries/:id/entries/filter-facts` | 批量读取结构筛选是否存在候选 | `{ dictionaryId, generation, facts }` | 最多接受 16 个 filter descriptor；只返回按请求 ID 对应的 `available` 布尔值，不接受搜索、排序或分页语义。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId/location` | 定位词条在当前查询中的窗口 | `{ items, pageInfo, location }` | 接受与 `/entries` 相同的查询 descriptor 和 `limit`，但不接受客户端 cursor；目标存在但被查询排除时返回 `location.found: false`。 |
 | `POST` | `/api/dictionaries/:id/entries` | 新建词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
@@ -112,17 +112,16 @@
 - 基础搜索逐个独立字段值匹配：一条释义、一个标签、一个来源或一段备注必须自行包含查询文本，查询不会跨多个值拼接命中；`notes` 中的词条备注、释义备注和每个词条形态组备注也分别作为独立值。多标签组合等条件应使用高级筛选。自由文本按当前词典的 `settings.search.normalization` 处理。SQLite 的严格及 fuzzy 查询均直接读取静态 `entry_search_values` 和按需读取形态 `entry_morphology_search_values`；fuzzy 通过连接级确定性函数复用共享搜索模型的评分语义。该路径支持 NFC、Unicode case folding 和自定义等价规则。结构键和词源关系键不套用该自由文本配置。
 - 词源自动补全目前仍在前端当前词典快照上运行，并由独立的 `settings.search.etymologyAutocomplete.fuzzy` 控制；它复用搜索 normalizer 和原有 JS fuzzy 排序，但尚未接入 `/entries` projection 与普通列表查询路径。
 
-#### `POST /api/dictionaries/:id/entries/probe`
+#### `POST /api/dictionaries/:id/entries/filter-facts`
 
-请求体为 `{ queries }`；`queries` 必须包含 1–16 项，每项形如 `{ id, filter, search }`。`id` 在请求内唯一，只允许字母、数字、点、下划线和连字符，最长 80 字符；`filter` 和 `search` 复用普通 EntryQuery 的规范化语义。probe 不接受 `sort`、`page`、`limit`、`cursor`、`windowOffset` 或 `offset`。
+请求体为 `{ filters }`；`filters` 必须包含 1–16 项，每项形如 `{ id, filter }`。`id` 在请求内唯一，只允许字母、数字、点、下划线和连字符，最长 80 字符；`filter` 复用普通 EntryFilter 的规范化语义。端点拒绝 `search`、`sort`、`page`、`limit`、`cursor`、`windowOffset` 或 `offset`，避免把结构可用性重新解释为某次交互搜索的命中状态。
 
 ```js
 {
-  queries: [
+  filters: [
     {
       id: "missing-ipa",
-      filter: { presence: [{ field: "ipa", present: false }] },
-      search: { text: "", fields: [], fuzzyFields: [] }
+      filter: { presence: [{ field: "ipa", present: false }] }
     }
   ]
 }
@@ -134,13 +133,13 @@
 {
   dictionaryId: "dict-1",
   generation: 7,
-  results: {
+  facts: {
     "missing-ipa": { available: true }
   }
 }
 ```
 
-结构条件使用 SQL `EXISTS`；严格和 fuzzy 文本条件直接探测搜索 projection，不建立排序结果、命中详情或摘要 DTO。规范化后相同的 descriptor 在同一请求中只执行一次。验证错误使用 `invalid_entry_probe_payload`、`invalid_entry_probe_queries`、`invalid_entry_probe_query`、`invalid_entry_probe_query_id` 或 `duplicate_entry_probe_query_id`。
+结构条件使用 SQL `EXISTS`，不建立排序结果、搜索会话、命中详情或摘要 DTO。规范化后相同的 filter 在请求内及当前 dictionary generation 的轻量事实缓存中只执行一次；任何成功写入都会随查询 generation 一并失效。验证错误使用 `invalid_entry_filter_facts_payload`、`invalid_entry_filter_facts`、`invalid_entry_filter_fact`、`invalid_entry_filter_fact_id` 或 `duplicate_entry_filter_fact_id`。
 
 ## 实体 ID 校验约定
 

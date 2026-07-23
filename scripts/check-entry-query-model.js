@@ -4,6 +4,7 @@ const {
   EntryQueryValidationError,
   entryQueryIdentity,
   normalizeEntryFilter,
+  normalizeEntryFilterFactsRequest,
   normalizeEntryQuery,
   serializeEntryFilter,
 } = require("../lib/entry-query-model");
@@ -138,11 +139,50 @@ function checkValidation() {
   );
 }
 
+function checkFilterFactsNormalization() {
+  assert.deepEqual(
+    normalizeEntryFilterFactsRequest({
+      filters: [{
+        id: "missing-ipa",
+        filter: { presence: { ipa: false } },
+      }],
+    }),
+    {
+      filters: [{
+        id: "missing-ipa",
+        filter: {
+          part: "",
+          tags: { values: [], mode: "any" },
+          presence: [{ field: "ipa", present: false }],
+          sourceCount: null,
+          activityDays: [],
+        },
+      }],
+    },
+  );
+  assert.throws(
+    () => normalizeEntryFilterFactsRequest({
+      filters: [{ id: "searched", filter: {}, search: { text: "root" } }],
+    }),
+    (error) => error instanceof EntryQueryValidationError && error.code === "invalid_entry_filter_fact",
+  );
+  assert.throws(
+    () => normalizeEntryFilterFactsRequest({
+      filters: [
+        { id: "duplicate", filter: {} },
+        { id: "duplicate", filter: { part: "n" } },
+      ],
+    }),
+    (error) => error instanceof EntryQueryValidationError && error.code === "duplicate_entry_filter_fact_id",
+  );
+}
+
 function main() {
   checkLegacyTransportNormalization();
   checkCanonicalFilterNormalization();
   checkStableIdentity();
   checkValidation();
+  checkFilterFactsNormalization();
   console.log("Entry query model checks passed.");
 }
 

@@ -310,34 +310,34 @@ async function checkAnalysisQueryContract(repository) {
   }
 }
 
-async function checkEntryProbeContract(repository) {
+async function checkEntryFilterFactsContract(repository) {
   const dictionary = await repository.createDictionary(normalizeDictionary({
-    id: "dict-entry-probe-contract",
-    name: "Entry Probe Contract",
+    id: "dict-entry-filter-facts-contract",
+    name: "Entry Filter Facts Contract",
     settings: {
       manualPartOfSpeechTags: true,
       partOfSpeechTags: ["n", "v"],
     },
     entries: [
       {
-        id: "entry-probe-alpha",
+        id: "entry-filter-facts-alpha",
         lemma: "alpha",
         pronunciation: "/a/",
         tags: ["n"],
-        definitions: [{ id: "def-probe-alpha", meaning: "mirror meaning" }],
+        definitions: [{ id: "def-filter-facts-alpha", meaning: "mirror meaning" }],
       },
       {
-        id: "entry-probe-beta",
+        id: "entry-filter-facts-beta",
         lemma: "beta",
         tags: ["v"],
-        definitions: [{ id: "def-probe-beta", meaning: "second meaning" }],
+        definitions: [{ id: "def-filter-facts-beta", meaning: "second meaning" }],
       },
     ],
   }));
-  let compiledProbeQueries = 0;
+  let compiledFilterFacts = 0;
   const compileEntryFilter = repository.entryQueryWhereClauses.bind(repository);
   repository.entryQueryWhereClauses = (...args) => {
-    compiledProbeQueries += 1;
+    compiledFilterFacts += 1;
     return compileEntryFilter(...args);
   };
 
@@ -345,22 +345,12 @@ async function checkEntryProbeContract(repository) {
     const result = await callApi(
       repository,
       "POST",
-      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/probe`,
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/filter-facts`,
       {
-        queries: [
+        filters: [
           { id: "has-ipa", filter: { presence: [{ field: "ipa", present: true }] } },
           { id: "no-sources", filter: { presence: [{ field: "source", present: false }] } },
           { id: "missing-tag", filter: { tags: { values: ["missing"], mode: "any" } } },
-          {
-            id: "strict-search",
-            filter: { part: "v" },
-            search: { text: "second", fields: ["definitions"], fuzzyFields: [] },
-          },
-          {
-            id: "fuzzy-search",
-            filter: { part: "n" },
-            search: { text: "mrmeaning", fields: ["definitions"], fuzzyFields: ["definitions"] },
-          },
           { id: "duplicate-a", filter: { presence: [{ field: "ipa", present: true }] } },
           { id: "duplicate-b", filter: { presence: [{ field: "ipa", present: true }] } },
         ],
@@ -369,44 +359,57 @@ async function checkEntryProbeContract(repository) {
     assert.equal(result.statusCode, 200);
     assert.equal(result.body.dictionaryId, dictionary.id);
     assert.equal(Number.isSafeInteger(result.body.generation), true);
-    assert.deepEqual(result.body.results, {
+    assert.deepEqual(result.body.facts, {
       "has-ipa": { available: true },
       "no-sources": { available: true },
       "missing-tag": { available: false },
-      "strict-search": { available: true },
-      "fuzzy-search": { available: true },
       "duplicate-a": { available: true },
       "duplicate-b": { available: true },
     });
-    assert.equal(compiledProbeQueries, 5, "normalized duplicate probes should compile and execute once");
+    assert.equal(compiledFilterFacts, 3, "normalized duplicate filter facts should compile and execute once");
+    await callApi(
+      repository,
+      "POST",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/filter-facts`,
+      { filters: [{ id: "cached", filter: { presence: [{ field: "ipa", present: true }] } }] },
+    );
+    assert.equal(compiledFilterFacts, 3, "filter facts should be reused within the current generation");
 
-    const alpha = await repository.getEntry(dictionary.id, "entry-probe-alpha");
+    const alpha = await repository.getEntry(dictionary.id, "entry-filter-facts-alpha");
     await repository.saveEntry(dictionary.id, { ...alpha, notes: "updated" });
     const refreshed = await callApi(
       repository,
       "POST",
-      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/probe`,
-      { queries: [{ id: "has-ipa", filter: { presence: [{ field: "ipa", present: true }] } }] },
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/filter-facts`,
+      { filters: [{ id: "has-ipa", filter: { presence: [{ field: "ipa", present: true }] } }] },
     );
     assert.equal(refreshed.body.generation, result.body.generation + 1);
-    assert.equal(refreshed.body.results["has-ipa"].available, true);
+    assert.equal(refreshed.body.facts["has-ipa"].available, true);
+    assert.equal(compiledFilterFacts, 4, "filter facts should be rebuilt after a successful write");
 
     await assertRejectStatus(
-      callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/probe`, {
-        queries: [
+      callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/filter-facts`, {
+        filters: [
           { id: "duplicate", filter: {} },
           { id: "duplicate", filter: { part: "n" } },
         ],
       }),
       400,
-      "duplicate entry probe query id",
+      "duplicate entry filter fact id",
     );
     await assertRejectStatus(
-      callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/probe`, {
-        queries: [{ id: "paged", filter: {}, limit: 1 }],
+      callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/filter-facts`, {
+        filters: [{ id: "paged", filter: {}, limit: 1 }],
       }),
       400,
-      "entry probe paging rejection",
+      "entry filter facts paging rejection",
+    );
+    await assertRejectStatus(
+      callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/filter-facts`, {
+        filters: [{ id: "searched", filter: {}, search: { text: "alpha" } }],
+      }),
+      400,
+      "entry filter facts search rejection",
     );
   } finally {
     repository.entryQueryWhereClauses = compileEntryFilter;
@@ -1872,7 +1875,7 @@ async function runRepositoryContractTests(options = {}) {
     );
 
     await checkCorpusIdCollisionInvariants(repository);
-    await checkEntryProbeContract(repository);
+    await checkEntryFilterFactsContract(repository);
     await checkAnalysisQueryContract(repository);
 
     const preferences = await repository.updatePreferences({ uiLanguage: "en", uiTheme: "dark" });
