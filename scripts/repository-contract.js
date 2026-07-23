@@ -159,6 +159,261 @@ async function checkCorpusIdCollisionInvariants(repository) {
   }
 }
 
+async function checkAnalysisQueryContract(repository) {
+  const dictionary = await repository.createDictionary(normalizeDictionary({
+    id: "dict-analysis-query-contract",
+    name: "Analysis Query Contract",
+    settings: {
+      tagDisplayMap: { n: "Noun", v: "Verb" },
+    },
+    entries: [
+      {
+        id: "entry-analysis-alpha",
+        lemma: "alpha",
+        pronunciation: "a",
+        tags: ["n", "root"],
+        definitions: [{ id: "def-analysis-alpha", meaning: "first", example: "alpha example" }],
+        notes: "note",
+        etymology: { sources: ["origin"] },
+        createdAt: "2026-07-01T08:00:00.000Z",
+        updatedAt: "2026-07-01T09:00:00.000Z",
+      },
+      {
+        id: "entry-analysis-beta",
+        lemma: "beta",
+        tags: ["v"],
+        definitions: [{ id: "def-analysis-beta", meaning: "second" }],
+        createdAt: "2026-07-02T08:00:00.000Z",
+        updatedAt: "2026-07-02T09:00:00.000Z",
+      },
+      {
+        id: "entry-analysis-gamma",
+        lemma: "gamma",
+        tags: [],
+        createdAt: "2026-07-02T10:00:00.000Z",
+        updatedAt: "2026-07-03T09:00:00.000Z",
+      },
+      {
+        id: "entry-analysis-delta",
+        lemma: "delta",
+        tags: ["n"],
+        createdAt: "2026-07-03T08:00:00.000Z",
+        updatedAt: "2026-07-04T09:00:00.000Z",
+      },
+    ],
+  }));
+  try {
+    const request = {
+      widgets: [
+        { id: "entries", type: "entryCount" },
+        { id: "coverage", type: "coverageBreakdown" },
+        { id: "parts", type: "partDistribution", limit: 8 },
+        { id: "activity", type: "activityPreview", limit: 2 },
+      ],
+    };
+    const result = await callApi(
+      repository,
+      "POST",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`,
+      request,
+    );
+    assert.equal(result.statusCode, 200);
+    assert.equal(result.body.dictionaryId, dictionary.id);
+    assert.deepEqual(result.body.diagnostics.computedTasks, ["entryStats", "partStats", "activityStats"]);
+    assert.equal(result.body.widgets.entries.value, 4);
+
+    const coverage = Object.fromEntries(result.body.widgets.coverage.rows.map((row) => [row.field, row]));
+    assert.equal(coverage.definition.count, 2);
+    assert.equal(coverage.definition.itemCount, 2);
+    assert.equal(coverage.example.count, 1);
+    assert.equal(coverage.entryNote.count, 1);
+    assert.equal(coverage.source.count, 1);
+    assert.equal(coverage.ipa.count, 1);
+    assert.deepEqual(coverage.ipa.missingAction.filter, { presence: [{ field: "ipa", present: false }] });
+
+    const parts = Object.fromEntries(result.body.widgets.parts.rows.map((row) => [row.part, row]));
+    assert.equal(parts.n.count, 2);
+    assert.equal(parts.n.displayLabel, "Noun");
+    assert.equal(parts.v.count, 1);
+    assert.equal(parts[NO_PART_FILTER_VALUE].count, 1);
+    assert.deepEqual(parts.n.action.filter, { part: "n" });
+
+    assert.deepEqual(result.body.widgets.activity.created.map((row) => row.day), ["2026-07-02", "2026-07-03"]);
+    assert.deepEqual(result.body.widgets.activity.latest.map((row) => row.entryId), ["entry-analysis-delta", "entry-analysis-gamma"]);
+    assert.deepEqual(result.body.widgets.activity.updated[0].action.filter, {
+      activityDays: [{ field: "updated", day: "2026-07-03" }],
+    });
+
+    const withoutActions = await callApi(
+      repository,
+      "POST",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`,
+      {
+        widgets: [
+          { id: "coverage", type: "coverageBreakdown" },
+          { id: "activity", type: "activityPreview" },
+        ],
+        options: { includeActions: false },
+      },
+    );
+    assert.equal(withoutActions.statusCode, 200);
+    assert.deepEqual(withoutActions.body.diagnostics.computedTasks, ["entryStats", "activityStats"]);
+    assert.equal(withoutActions.body.widgets.coverage.rows[0].action, undefined);
+    assert.equal(withoutActions.body.widgets.activity.latest[0].action, undefined);
+    assert.equal(withoutActions.body.widgets.activity.latest.length, 4);
+
+    const firstGeneration = result.body.generation;
+    const firstCacheKey = result.body.cacheKey;
+    await repository.saveEntry(dictionary.id, {
+      ...(await repository.getEntry(dictionary.id, "entry-analysis-beta")),
+      notes: "updated note",
+    });
+    const refreshed = await callApi(
+      repository,
+      "POST",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`,
+      request,
+    );
+    assert.equal(refreshed.body.generation, firstGeneration + 1);
+    assert.notEqual(refreshed.body.cacheKey, firstCacheKey);
+    assert.equal(
+      refreshed.body.widgets.coverage.rows.find((row) => row.field === "entryNote").count,
+      2,
+    );
+
+    await assertRejectStatus(
+      callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`, {
+        widgets: [{ id: "unsupported", type: "notAWidget" }],
+      }),
+      400,
+      "unsupported analysis widget",
+    );
+    await assertRejectStatus(
+      callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`, {
+        widgets: [
+          { id: "duplicate", type: "entryCount" },
+          { id: "duplicate", type: "coverageBreakdown" },
+        ],
+      }),
+      400,
+      "duplicate analysis widget id",
+    );
+    await assertRejectStatus(
+      callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`, {
+        widgets: [{ id: "activity", type: "activityPreview", limit: 51 }],
+      }),
+      400,
+      "invalid analysis widget limit",
+    );
+  } finally {
+    await repository.deleteDictionary(dictionary.id);
+  }
+}
+
+async function checkEntryProbeContract(repository) {
+  const dictionary = await repository.createDictionary(normalizeDictionary({
+    id: "dict-entry-probe-contract",
+    name: "Entry Probe Contract",
+    settings: {
+      manualPartOfSpeechTags: true,
+      partOfSpeechTags: ["n", "v"],
+    },
+    entries: [
+      {
+        id: "entry-probe-alpha",
+        lemma: "alpha",
+        pronunciation: "/a/",
+        tags: ["n"],
+        definitions: [{ id: "def-probe-alpha", meaning: "mirror meaning" }],
+      },
+      {
+        id: "entry-probe-beta",
+        lemma: "beta",
+        tags: ["v"],
+        definitions: [{ id: "def-probe-beta", meaning: "second meaning" }],
+      },
+    ],
+  }));
+  let compiledProbeQueries = 0;
+  const compileEntryFilter = repository.entryQueryWhereClauses.bind(repository);
+  repository.entryQueryWhereClauses = (...args) => {
+    compiledProbeQueries += 1;
+    return compileEntryFilter(...args);
+  };
+
+  try {
+    const result = await callApi(
+      repository,
+      "POST",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/probe`,
+      {
+        queries: [
+          { id: "has-ipa", filter: { presence: [{ field: "ipa", present: true }] } },
+          { id: "no-sources", filter: { presence: [{ field: "source", present: false }] } },
+          { id: "missing-tag", filter: { tags: { values: ["missing"], mode: "any" } } },
+          {
+            id: "strict-search",
+            filter: { part: "v" },
+            search: { text: "second", fields: ["definitions"], fuzzyFields: [] },
+          },
+          {
+            id: "fuzzy-search",
+            filter: { part: "n" },
+            search: { text: "mrmeaning", fields: ["definitions"], fuzzyFields: ["definitions"] },
+          },
+          { id: "duplicate-a", filter: { presence: [{ field: "ipa", present: true }] } },
+          { id: "duplicate-b", filter: { presence: [{ field: "ipa", present: true }] } },
+        ],
+      },
+    );
+    assert.equal(result.statusCode, 200);
+    assert.equal(result.body.dictionaryId, dictionary.id);
+    assert.equal(Number.isSafeInteger(result.body.generation), true);
+    assert.deepEqual(result.body.results, {
+      "has-ipa": { available: true },
+      "no-sources": { available: true },
+      "missing-tag": { available: false },
+      "strict-search": { available: true },
+      "fuzzy-search": { available: true },
+      "duplicate-a": { available: true },
+      "duplicate-b": { available: true },
+    });
+    assert.equal(compiledProbeQueries, 5, "normalized duplicate probes should compile and execute once");
+
+    const alpha = await repository.getEntry(dictionary.id, "entry-probe-alpha");
+    await repository.saveEntry(dictionary.id, { ...alpha, notes: "updated" });
+    const refreshed = await callApi(
+      repository,
+      "POST",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/probe`,
+      { queries: [{ id: "has-ipa", filter: { presence: [{ field: "ipa", present: true }] } }] },
+    );
+    assert.equal(refreshed.body.generation, result.body.generation + 1);
+    assert.equal(refreshed.body.results["has-ipa"].available, true);
+
+    await assertRejectStatus(
+      callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/probe`, {
+        queries: [
+          { id: "duplicate", filter: {} },
+          { id: "duplicate", filter: { part: "n" } },
+        ],
+      }),
+      400,
+      "duplicate entry probe query id",
+    );
+    await assertRejectStatus(
+      callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/probe`, {
+        queries: [{ id: "paged", filter: {}, limit: 1 }],
+      }),
+      400,
+      "entry probe paging rejection",
+    );
+  } finally {
+    repository.entryQueryWhereClauses = compileEntryFilter;
+    await repository.deleteDictionary(dictionary.id);
+  }
+}
+
 function testNormalize(value) {
   return String(value || "").trim().toLocaleLowerCase("zh-CN");
 }
@@ -1617,6 +1872,8 @@ async function runRepositoryContractTests(options = {}) {
     );
 
     await checkCorpusIdCollisionInvariants(repository);
+    await checkEntryProbeContract(repository);
+    await checkAnalysisQueryContract(repository);
 
     const preferences = await repository.updatePreferences({ uiLanguage: "en", uiTheme: "dark" });
     assert.deepEqual(preferences, { uiLanguage: "en", uiTheme: "dark" });

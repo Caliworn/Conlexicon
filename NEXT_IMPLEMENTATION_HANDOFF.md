@@ -31,7 +31,7 @@
 
 ### 阶段 B：数据访问层与索引（核心已完成）
 
-前端已通过 HTTP API 与具体文件读写解耦，SQLite 已是默认主存储。静态字段和动态形态的严格/fuzzy 搜索 projection、查询会话、纯滚动数据窗口、列表 summary DTO、按需词条详情、词根模式和词汇关系 API 均已接入。阶段 B 的剩余重点是将已建立的高级筛选 EntryFilter 接入 SQL 与前端状态、建立 feature result session、推进数据分析与质量检查按需 API，以及之后独立处理语料查询边界。所有后续语料功能继续只依赖稳定 API，不直接依赖 JSON 或 SQLite。
+前端已通过 HTTP API 与具体文件读写解耦，SQLite 已是默认主存储。静态字段和动态形态的严格/fuzzy 搜索 projection、查询会话、纯滚动数据窗口、列表 summary DTO、按需词条详情、词根模式、词汇关系 API、高级筛选 F0–F3，以及 F4a 轻量分析查询均已接入。阶段 B 的下一步是 F4b feature result session，随后以 F5 质量 API 迁移剩余重型消费者，再独立处理语料查询边界。所有后续语料功能继续只依赖稳定 API，不直接依赖 JSON 或 SQLite。
 
 ### 阶段 C：例句链接迁移
 
@@ -532,10 +532,12 @@ lib/
 4. 若继续阶段 B，优先处理默认 SQLite 后的清债项：
    - 查询缓存 Q1–Q4 已完成前端查询 LRU、后端严格/fuzzy entries 与 root-groups 运行时会话、in-flight 合并、词典级 generation 失效、summary DTO、按需详情、词根组子项懒加载、版本化 cursor 和纯滚动数据窗口。`/entries/:entryId/location` 与 `/root-groups/location` 已接入自动滚动：普通目标直接装入返回窗口，词根衍生词先定位父级、保留多来源根语境，再读取整组子项。前端不再通过完整活动词典 snapshot 猜测未加载页号；SWR 保留的旧列表也不能提前完成新查询的滚动请求。
    - 两段式 stale-while-revalidate 已接入查询首窗和按需词条详情：200ms 内保持原内容，但旧详情从请求开始即进入 `inert`；超过后以统一覆盖视觉显示详情遮罩和变淡列表的“正在更新”。首次无旧内容仍直接显示加载状态，失败直接进入现有错误状态，不重试或把旧内容当作成功结果。词条切换和词汇网络返回已改为局部提交，只同步已渲染卡片选中态、详情和必要滚动，不再调用全局 `render()` 或重建查询窗口。详情来源、详情/完整编辑衍生词和词汇网络已共用 `/entry-relations/:entryId` 与前端关系缓存，不再重建完整词典关系索引。
-   - 高级筛选查询化 F0–F3 已完成：共享 `EntryQuery/EntryFilter` 已统一现有 `/entries` 参数、查询 descriptor、cursor digest 与缓存身份；字段存在性、来源数量和 UTC 日期已接入同一 SQLite 编译器及定位 API。可稳定查询的高级筛选前端状态已经从完整 `entryIds` 数组迁为结构 descriptor，并复用普通查询窗口、定位、排序、SWR 与搜索。与词条详情/词汇网络重复的来源文本、指定来源词条筛选已删除；总览“衍生词”入口复用“有来源”条件。下一步进入 F4/F5：IPA、Gloss、形态和质量问题必须走各自 feature result session，不能伪装成 repository 普通 predicate。
+   - 高级筛选查询化 F0–F3 已完成：共享 `EntryQuery/EntryFilter` 已统一现有 `/entries` 参数、查询 descriptor、cursor digest 与缓存身份；字段存在性、来源数量和 UTC 日期已接入同一 SQLite 编译器及定位 API。可稳定查询的高级筛选前端状态已经从完整 `entryIds` 数组迁为结构 descriptor，并复用普通查询窗口、定位、排序、SWR 与搜索。刷新时当前变体复用首窗总数，其他变体通过单次批量 `/entries/probe` 的 SQL `EXISTS` 判断可用性，且只失效当前 entries/定位缓存。与词条详情/词汇网络重复的来源文本、指定来源词条筛选已删除；总览“衍生词”入口复用“有来源”条件。
+   - F4a 已实装同步、按需的 `POST /api/dictionaries/:id/analysis/query`：`entryCount`、`coverageBreakdown`、`partDistribution` 和 `activityPreview` 由最小 widget planner 合并为三个 SQLite 聚合任务。前端总览异步消费 widget DTO，已迁移统计不再读取完整活动词典；F4a 没有建设通用后台任务框架。
+   - 下一步 F4b 为重型 IPA、Gloss、完整形态统计、完整词根家族排名和质量问题建立 feature result session；先允许同步构建并缓存，只有真实基准证明请求内计算不可接受时才加入进程内后台状态，近期不增加持久化 job 表。F5 建立 `/quality/query` 并删除剩余前端 ID 数组桥接。
    - 普通词条和词根模式的搜索、窗口、定位与关系读取已完成查询化；候选索引是否采用 FTS/ngram 由真实基准决定，不再把这些已完成路径列为待接线项。
    - 形态学结构化存储已完成；DSL v2、表格结构编辑与 layout 设计暂缓，除明确 bug 外不要继续扩展其 schema。数据分析升级时删除 `app.js` 的旧形态单表适配，改为直接调用共享 morphology model。
-   - 将数据分析、质量检查推进为按需 API + query planner。
+   - F4a 已完成；按 F4b → F5 顺序将剩余数据分析和质量检查推进为功能结果会话与按需 API，不得把 feature result 伪装成 repository 普通 predicate。
    - 评估语料库是否先拆为块/单元级 changeset，再决定何时 SQL 分表。
 5. 旧 JSON 词典当前通过词典管理界面的 JSON 导入功能手动迁入 SQLite；不要在未设计备份、报告和回滚前加入启动时自动迁移。
 6. 增量保存稳定后，再基于目标对象的 `updatedAt` 做轻量冲突检查；短期不引入词典级 revision。

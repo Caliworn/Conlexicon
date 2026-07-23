@@ -167,6 +167,13 @@ let selectedEntryDetailLoadPromise = null;
 const entryRelationsCache = new Map();
 const ENTRY_RELATIONS_CACHE_MAX = 24;
 let qualityReportCache = null;
+let analysisOverviewQueryState = {
+  key: "",
+  status: "idle",
+  response: null,
+  error: null,
+  requestId: 0,
+};
 let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
 let draggedToolNavView = "";
@@ -191,6 +198,12 @@ const VIRTUAL_LIST_HEIGHT_CACHE_WIDTH_BUCKET = 24;
 const VIRTUAL_LIST_HEIGHT_CACHE_LIMIT = 50000;
 const STALE_CONTENT_UPDATE_DELAY_MS = 200;
 const DEFAULT_ANALYSIS_ROOT_FAMILY_LIMIT = 12;
+const ANALYSIS_OVERVIEW_QUERY_WIDGETS = [
+  { id: "entry-count", type: "entryCount" },
+  { id: "coverage", type: "coverageBreakdown" },
+  { id: "parts", type: "partDistribution", limit: 12 },
+  { id: "activity", type: "activityPreview", limit: 10 },
+];
 let staleContentUpdateSequence = 0;
 let entryListHasSettledContent = false;
 let entryDetailHasSettledContent = false;
@@ -5287,10 +5300,27 @@ function resetEntryQueryState() {
   };
 }
 
+function entryQuerySearchDescriptor(dictionary, descriptor = advancedFilterUsesEntryQuery() ? advancedFilter : null) {
+  const usesStructuredFilter = advancedFilterVariantUsesEntryQuery(descriptor);
+  const configuredSearch = entrySearchQueryOptions(dictionary);
+  const fields = usesStructuredFilter && descriptor.search?.fields?.length
+    ? new Set(descriptor.search.fields)
+    : configuredSearch.fields;
+  const fuzzyFields = usesStructuredFilter && Array.isArray(descriptor.search?.fuzzyFields)
+    ? new Set(descriptor.search.fuzzyFields)
+    : configuredSearch.fuzzyFields;
+  return {
+    text: searchQuery.trim(),
+    fields: [...fields],
+    fuzzyFields: [...fuzzyFields],
+  };
+}
+
 function entryQueryParams(dictionary, descriptor = advancedFilterUsesEntryQuery() ? advancedFilter : null) {
   const params = new URLSearchParams();
-  if (searchQuery.trim()) {
-    params.set("q", searchQuery.trim());
+  const search = entryQuerySearchDescriptor(dictionary, descriptor);
+  if (search.text) {
+    params.set("q", search.text);
   }
   const usesStructuredFilter = advancedFilterVariantUsesEntryQuery(descriptor);
   if (usesStructuredFilter) {
@@ -5301,24 +5331,19 @@ function entryQueryParams(dictionary, descriptor = advancedFilterUsesEntryQuery(
   if (entrySort) {
     params.set("sort", entrySort);
   }
-  const configuredSearch = entrySearchQueryOptions(dictionary);
-  const fields = usesStructuredFilter && descriptor.search?.fields?.length
-    ? new Set(descriptor.search.fields)
-    : configuredSearch.fields;
-  const fuzzyFields = usesStructuredFilter && Array.isArray(descriptor.search?.fuzzyFields)
-    ? new Set(descriptor.search.fuzzyFields)
-    : configuredSearch.fuzzyFields;
-  params.set("fields", [...fields].join(","));
-  if (fuzzyFields.size) {
-    params.set("fuzzyFields", [...fuzzyFields].join(","));
+  params.set("fields", search.fields.join(","));
+  if (search.fuzzyFields.length) {
+    params.set("fuzzyFields", search.fuzzyFields.join(","));
   }
   return params;
 }
 
-function advancedFilterVariantProbeUrl(dictionary, variant) {
-  const params = entryQueryParams(dictionary, variant);
-  params.set("limit", "1");
-  return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries?${params}`;
+function advancedFilterVariantProbeQuery(dictionary, variant, index) {
+  return {
+    id: `variant-${index}`,
+    filter: variant.filter,
+    search: entryQuerySearchDescriptor(dictionary, variant),
+  };
 }
 
 function entryQueryUrl(dictionary, options = {}) {
@@ -5353,6 +5378,19 @@ function syncEntryQueryWindowState() {
 
 function entryQueryPageCacheKey(key, cursor = "") {
   return queryPageCacheKey("entries", `${key}\u0000${cursor}`);
+}
+
+function invalidateCurrentEntryQueryCache(dictionary) {
+  if (!dictionary) {
+    return;
+  }
+  const key = entryQueryApiKey(dictionary);
+  queryPageCache.invalidatePrefix(queryPageCacheKey("entries", `${key}\u0000`), {
+    dictionaryId: dictionary.id,
+  });
+  queryPageCache.invalidatePrefix(queryPageCacheKey("entry-location", `${key}\u0000`), {
+    dictionaryId: dictionary.id,
+  });
 }
 
 function restartEntryQueryWindowAfterStale(dictionary) {
@@ -6881,7 +6919,7 @@ function refreshAdvancedFilterState() {
     if (!dictionary) {
       return false;
     }
-    queryPageCache.invalidateDictionary(dictionary.id);
+    invalidateCurrentEntryQueryCache(dictionary);
     resetEntryQueryState();
     return true;
   }
@@ -6913,21 +6951,38 @@ async function refreshAdvancedFilter() {
   }
   const refreshTarget = advancedFilter;
   const dictionary = activeDictionary();
+  const dictionaryVersion = `${dictionary?.id || ""}\u0000${dictionary?.updatedAt || ""}`;
   revealEntryBrowserForResults();
   render();
   if (advancedFilterUsesEntryQuery()) {
     scheduleEntryCardScroll(state.selectedEntryId);
-    const results = await Promise.allSettled(
-      advancedFilter.variants.map((variant) => api(advancedFilterVariantProbeUrl(dictionary, variant))),
-    );
-    if (advancedFilter !== refreshTarget) {
+    const probeQueries = advancedFilter.variants
+      .map((variant, index) => ({ variant, index }))
+      .filter(({ variant, index }) => index !== advancedFilter.variantIndex && advancedFilterVariantUsesEntryQuery(variant))
+      .map(({ variant, index }) => advancedFilterVariantProbeQuery(dictionary, variant, index));
+    if (!probeQueries.length) {
       return;
     }
-    results.forEach((result, index) => {
-      if (result.status === "fulfilled") {
-        advancedFilter.variants[index].available = Number(result.value?.pageInfo?.total || 0) > 0;
-      } else {
-        console.error(result.reason);
+    let result;
+    try {
+      result = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/probe`, {
+        method: "POST",
+        body: JSON.stringify({ queries: probeQueries }),
+      });
+    } catch (error) {
+      console.error(error);
+      return;
+    }
+    if (
+      advancedFilter !== refreshTarget
+      || `${activeDictionary()?.id || ""}\u0000${activeDictionary()?.updatedAt || ""}` !== dictionaryVersion
+    ) {
+      return;
+    }
+    probeQueries.forEach((query) => {
+      const index = Number.parseInt(query.id.slice("variant-".length), 10);
+      if (advancedFilter.variants[index]) {
+        advancedFilter.variants[index].available = result?.results?.[query.id]?.available === true;
       }
     });
     renderPartFilter();
@@ -8237,9 +8292,111 @@ function renderAnalysis(dictionary = activeDictionary()) {
   analysisFilterCounter = 0;
   const page = activeAnalysisPage();
   const subpage = activeAnalysisSubpage(page);
+  if (page === "overview") {
+    const queryState = analysisOverviewStateFor(dictionary);
+    elements.analysisPanel.innerHTML = renderAnalysisOverviewQueryPage(queryState);
+    setupAnalysisMasonryLayouts();
+    if (queryState.status === "idle") {
+      void loadAnalysisOverview(dictionary);
+    }
+    return;
+  }
   const report = getAnalysisReport(dictionary, { page, subpage });
   elements.analysisPanel.innerHTML = renderAnalysisPage(report, page, subpage);
   setupAnalysisMasonryLayouts();
+}
+
+function analysisOverviewQueryKey(dictionary) {
+  return stableJson({
+    dictionaryId: dictionary?.id || "",
+    updatedAt: dictionary?.updatedAt || "",
+  });
+}
+
+function analysisOverviewStateFor(dictionary) {
+  const key = analysisOverviewQueryKey(dictionary);
+  if (analysisOverviewQueryState.key !== key) {
+    return {
+      key,
+      status: "idle",
+      response: null,
+      error: null,
+      requestId: analysisOverviewQueryState.requestId,
+    };
+  }
+  return analysisOverviewQueryState;
+}
+
+async function loadAnalysisOverview(dictionary, { force = false } = {}) {
+  if (!dictionary?.id) {
+    return;
+  }
+  const key = analysisOverviewQueryKey(dictionary);
+  if (!force && analysisOverviewQueryState.key === key && ["loading", "ready"].includes(analysisOverviewQueryState.status)) {
+    return;
+  }
+  const requestId = analysisOverviewQueryState.requestId + 1;
+  analysisOverviewQueryState = {
+    key,
+    status: "loading",
+    response: null,
+    error: null,
+    requestId,
+  };
+  try {
+    const response = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`, {
+      method: "POST",
+      body: JSON.stringify({ widgets: ANALYSIS_OVERVIEW_QUERY_WIDGETS }),
+    });
+    if (analysisOverviewQueryState.requestId !== requestId || analysisOverviewQueryState.key !== key) {
+      return;
+    }
+    analysisOverviewQueryState = {
+      key,
+      status: "ready",
+      response,
+      error: null,
+      requestId,
+    };
+  } catch (error) {
+    if (analysisOverviewQueryState.requestId !== requestId || analysisOverviewQueryState.key !== key) {
+      return;
+    }
+    analysisOverviewQueryState = {
+      key,
+      status: "error",
+      response: null,
+      error,
+      requestId,
+    };
+    console.error(error);
+  }
+  if (
+    state.activeView === "analysis"
+    && activeAnalysisPage() === "overview"
+    && activeDictionary()?.id === dictionary.id
+  ) {
+    renderAnalysis(activeDictionary());
+  }
+}
+
+function renderAnalysisOverviewQueryPage(queryState) {
+  let body = "";
+  if (queryState.status === "ready") {
+    body = renderAnalysisOverviewQuery(queryState.response);
+  } else if (queryState.status === "error") {
+    body = `<div class="empty-state">
+      <strong>${escapeHtml(aText("无法加载数据分析", "Could not load analysis"))}</strong>
+      <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
+      <button type="button" class="secondary-button" data-analysis-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+    </div>`;
+  } else {
+    body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载数据分析", "Loading analysis"))}</strong></div>`;
+  }
+  return `
+    ${analysisPageNav("overview")}
+    <section class="analysis-page-body">${body}</section>
+  `;
 }
 
 function activeAnalysisPage() {
@@ -8487,26 +8644,117 @@ function analysisPageBody(report, page, subpage) {
   if (page === "activity") {
     return renderAnalysisActivityPage(report, subpage);
   }
-  return renderAnalysisOverview(report);
+  return "";
 }
 
-function renderAnalysisOverview(report) {
+function analysisQueryFilterAction(action, title, options = {}) {
+  if (action?.type !== "entryFilter") {
+    return null;
+  }
+  return entryFilterAction(title, action.filter, {
+    count: action.count,
+    variants: options.variants || [],
+  });
+}
+
+function analysisCoverageFieldMeta(field) {
+  const fields = {
+    definition: {
+      label: aText("有释义", "Definitions"),
+      presentTitle: aText("有释义", "Has definitions"),
+      missingTitle: aText("无释义", "No definitions"),
+    },
+    example: {
+      label: aText("有例句", "Examples"),
+      presentTitle: aText("有例句", "Has examples"),
+      missingTitle: aText("无例句", "No examples"),
+    },
+    entryNote: {
+      label: aText("有备注", "Notes"),
+      presentTitle: aText("有备注", "Has notes"),
+      missingTitle: aText("无备注", "No notes"),
+    },
+    source: {
+      label: aText("有来源", "Sources"),
+      presentTitle: aText("有来源", "Has sources"),
+      missingTitle: aText("无来源", "No sources"),
+    },
+    ipa: {
+      label: "IPA",
+      presentTitle: aText("有 IPA", "Has IPA"),
+      missingTitle: aText("无 IPA", "No IPA"),
+    },
+  };
+  return fields[field] || {
+    label: field,
+    presentTitle: field,
+    missingTitle: field,
+  };
+}
+
+function analysisCoverageRowAction(row) {
+  const meta = analysisCoverageFieldMeta(row?.field || "");
+  return analysisQueryFilterAction(row?.action, meta.presentTitle, {
+    variants: row?.missingAction ? [{
+      title: meta.missingTitle,
+      filter: row.missingAction.filter,
+      count: row.missingAction.count,
+    }] : [],
+  });
+}
+
+function renderAnalysisOverviewQuery(response) {
+  const widgets = response?.widgets || {};
+  const entryCount = Number(widgets["entry-count"]?.value || 0);
+  const coverageRows = widgets.coverage?.rows || [];
+  const coverageByField = new Map(coverageRows.map((row) => [row.field, row]));
+  const definition = coverageByField.get("definition") || {};
+  const ipa = coverageByField.get("ipa") || {};
+  const source = coverageByField.get("source") || {};
+  const parts = (widgets.parts?.rows || []).map((row) => {
+    const label = row.part === NO_PART_FILTER_VALUE
+      ? t("noPart")
+      : row.displayLabel || row.part;
+    return [
+      label,
+      row.count,
+      analysisQueryFilterAction(row.action, analysisFilterTitle(aText("词性", "Part of Speech"), label)),
+    ];
+  });
+  const coverage = coverageRows.map((row) => [
+    analysisCoverageFieldMeta(row.field).label,
+    row.ratio,
+    analysisCoverageRowAction(row),
+  ]);
+  const activityWidget = widgets.activity || {};
+  const activity = {
+    created: (activityWidget.created || []).map((row) => [
+      row.day,
+      row.count,
+      analysisQueryFilterAction(row.action, analysisFilterTitle(aText("新增日期", "Created Date"), row.day)),
+    ]),
+    updated: (activityWidget.updated || []).map((row) => [
+      row.day,
+      row.count,
+      analysisQueryFilterAction(row.action, analysisFilterTitle(aText("编辑日期", "Updated Date"), row.day)),
+    ]),
+    latest: (activityWidget.latest || []).map((row) => [
+      row.lemma || aText("无词形", "No lemma"),
+      row.day,
+      row.action?.type === "entry" ? directEntryAction(row.action.entryId) : null,
+    ]),
+  };
   return `
     <section class="analysis-grid analysis-summary-grid">
-      ${analysisMetricCard(aText("词条", "Entries"), report.entries.length, `${report.rootCount} ${aText("个词根", "roots")}`, viewAction("editor"))}
-      ${analysisMetricCard(aText("衍生词", "Derived"), report.derivedCount, `${report.isolatedRootCount} ${aText("个孤立词根", "isolated roots")}`, entryFilterAction(aText("有来源", "Has sources"), { presence: [{ field: "source", present: true }] }, { count: report.sourceEntryCount }))}
-      ${analysisMetricCard(aText("释义覆盖", "Definition Coverage"), percentText(report.coverage.definitions), `${report.definitionCount} ${aText("条释义", "definitions")}`, binaryPresenceFilterAction(aText("有释义", "Has definitions"), "definition", report.definitionEntryCount, aText("无释义", "No definitions"), report.noDefinitionEntryCount))}
-      ${analysisMetricCard("IPA", percentText(report.coverage.ipa), `${report.ipa.syllableAverage} ${aText("平均音节", "avg syllables")}`, binaryPresenceFilterAction(aText("有 IPA", "Has IPA"), "ipa", report.ipaEntryCount, aText("无 IPA", "No IPA"), report.noIpaEntryCount))}
-      ${analysisMetricCard(aText("形态学", "Morphology"), percentText(report.coverage.morphology), `${report.morphology.generatedForms} ${aText("个生成形式", "generated forms")}`, advancedFilterAction(aText("有形态表格", "Has morphology table"), report.morphologyEntryIds, { variants: [{ title: aText("无形态表格", "No morphology table"), entryIds: report.noMorphologyEntryIds }] }))}
+      ${analysisMetricCard(aText("词条", "Entries"), entryCount, "", widgets["entry-count"]?.action?.type === "view" ? viewAction("editor") : null)}
+      ${analysisMetricCard(aText("释义覆盖", "Definition Coverage"), percentText(definition.ratio), `${Number(definition.itemCount || 0)} ${aText("条释义", "definitions")}`, analysisCoverageRowAction(definition))}
+      ${analysisMetricCard("IPA", percentText(ipa.ratio), `${Number(ipa.count || 0)} ${t("entries")}`, analysisCoverageRowAction(ipa))}
+      ${analysisMetricCard(aText("来源覆盖", "Source Coverage"), percentText(source.ratio), `${Number(source.count || 0)} ${t("entries")}`, analysisCoverageRowAction(source))}
     </section>
     <section class="analysis-grid">
-      ${analysisCard(aText("词性分布", "Part of Speech"), analysisBarList(report.parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") }))}
-      ${analysisCard(aText("覆盖率", "Coverage"), analysisCoverageList(report.coverageRows))}
-      ${analysisCard(aText("编辑进度", "Editing Progress"), analysisActivityList({
-        created: report.activity.created.slice(-10),
-        updated: report.activity.updated.slice(-10),
-        latest: report.activity.latest.slice(0, 6),
-      }))}
+      ${analysisCard(aText("词性分布", "Part of Speech"), analysisBarList(parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") }))}
+      ${analysisCard(aText("覆盖率", "Coverage"), analysisCoverageList(coverage))}
+      ${analysisCard(aText("编辑进度", "Editing Progress"), analysisActivityList(activity))}
     </section>
   `;
 }
@@ -13985,6 +14233,12 @@ elements.entryListNewEntryButton.addEventListener("click", async () => {
 });
 elements.editEntryButton.addEventListener("click", beginEditEntry);
 elements.analysisPanel.addEventListener("click", (event) => {
+  const retryButton = event.target.closest("[data-analysis-retry]");
+  if (retryButton) {
+    void loadAnalysisOverview(activeDictionary(), { force: true });
+    renderAnalysis(activeDictionary());
+    return;
+  }
   const pageButton = event.target.closest("[data-analysis-page]");
   if (pageButton) {
     rememberProcessScroll();

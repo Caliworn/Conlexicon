@@ -23,7 +23,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - Auto morphology with template groups, multiple subtables per group, automatic or manual per-entry group selection, rule syntax, function objects, overrides, generated forms, and searchable morphology output.
 - Markdown language documentation with split edit/preview, edit-only, and preview-only modes.
 - Per-dictionary corpus management with ordered blocks, speaker/modality layers, standalone units, inherited attributes, unique entity ID validation, single-parent link validation, and configurable gloss-based unit names with optional render objects.
-- Tabbed data analysis for overview, entries/tags, IPA, morphology, and editing activity, plus a dedicated quality-check page for priority/module issue review.
+- Tabbed data analysis with an on-demand SQLite widget overview for entry count, coverage, part-of-speech distribution, and recent activity, plus entries/tags, IPA, morphology, activity, and a dedicated quality-check page.
 - Gloss rendering for `\gla`, `\glb`, `\glc`, and `\ft`, with independent render-object and alignment settings for corpus unit cards, unit content headings, and entry examples, plus per-object font, size, bold, italic, and `\glb` small-caps styles.
 - Per-dictionary UI/settings options, including per-field search/fuzzy controls, optional NFC and Unicode case folding, custom search equivalence rules, etymology autocomplete matching, label display replacement, highlighted tags, gloss rendering, polysemy display, save/discard/prompt handling for edits during navigation, corpus/docs auto-save, IPA keyboard symbols, and left navigation order.
 - SQLite-backed per-value search projections for static entry fields and generated morphology, with configurable strict/fuzzy matching and localized hit summaries. Large entry and root-mode results use versioned query windows while retaining one continuous native scrollbar.
@@ -42,7 +42,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - 自动形态学：支持模板组及组内多个形态表格、词条级自动匹配或手动选择形态组、规则语法、函数识别对象、词条覆盖项、生成形式和搜索生成结果。
 - Markdown 语言文档：支持左右分栏编辑预览、纯编辑和纯查看模式。
 - 词典级语料库：支持有序语料块、发言人/模态语料层、独立语料单元、属性继承、实体 ID 唯一性检查、单父级链接检查，以及带可选渲染对象的 Gloss 单元名渲染。
-- 分标签页数据分析：包括总览、词条与标签、IPA、形态学和编辑进度；质量检查拥有独立页面，支持按优先度和检查模块查看问题。
+- 分标签页数据分析：总览按需异步读取 SQLite 轻量 widget，提供词条数、覆盖率、词性分布和近期活动；其余标签页包括词条与标签、IPA、形态学和编辑进度。质量检查拥有独立页面，支持按优先度和检查模块查看问题。
 - Gloss 渲染：语料单元卡片、单元内容名称和词条例句可分别配置渲染对象与对齐，并支持 `\gla`、`\glb`、`\glc`、`\ft` 独立配置字体、字号、粗体和斜体，以及 `\glb` small caps。
 - 词典级界面设置：包括逐字段搜索/模糊匹配、可选 NFC 与 Unicode 大小写折叠、自定义搜索等价规则、词源自动补全、标签显示替换、红色高亮标签、gloss 渲染、多义项显示、导航时保存/放弃/提示编辑、语料库/文档自动保存、IPA 虚拟键盘符号和左侧导航栏排序。
 - SQLite 逐值搜索投射：静态词条字段和自动生成形态均支持可配置的严格/模糊搜索及本地化命中摘要；词根模式和词汇网络复用仅在关系变化时失效、带双向定位索引的稳定拓扑。大型词条列表与词根模式结果通过版本化查询窗口加载，同时保持一条连续的原生滚动条。切换查询或词条详情时会先保留当前内容，旧详情会立即停止响应交互；读取超过 200ms 后再以统一遮罩标明正在更新，避免快速本地读取产生闪烁。

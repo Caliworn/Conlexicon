@@ -69,6 +69,7 @@
 | 方法 | 路径 | 用途 | 响应 | 校验范围 |
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | `{ items, pageInfo }`，其中 `items` 固定为词条摘要 DTO | 支持结构化 JSON `filter`，以及现有 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`sort`、`cursor`、`windowOffset`、`limit`。结构化 `filter` 不得与平铺筛选参数混用。无参数请求也使用默认排序和窗口大小，不返回完整词条数组。 |
+| `POST` | `/api/dictionaries/:id/entries/probe` | 批量探测 EntryQuery 是否存在匹配 | `{ dictionaryId, generation, results }` | 最多接受 16 个 filter/search descriptor；只返回按请求 ID 对应的 `available` 布尔值，不计算总数、排序、分页或构建词条 DTO。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId/location` | 定位词条在当前查询中的窗口 | `{ items, pageInfo, location }` | 接受与 `/entries` 相同的查询 descriptor 和 `limit`，但不接受客户端 cursor；目标存在但被查询排除时返回 `location.found: false`。 |
 | `POST` | `/api/dictionaries/:id/entries` | 新建词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
@@ -85,6 +86,7 @@
 | `GET` | `/api/dictionaries/:id/root-groups` | 读取词根模式分组 | `{ items, pageInfo }` | 支持 `q`、`fields`、`fuzzyFields`、`sort`、`cursor`、`windowOffset`、`limit`。前端词根模式正常路径以该 API 为准，并按窗口加载。 |
 | `GET` | `/api/dictionaries/:id/root-groups/location` | 定位词条所属的父级词根窗口 | `{ items, pageInfo, location }` | 必须传 `entryId`；可传 `preferredRootId` 消除多来源词条的父级歧义，其余参数沿用 `/root-groups` descriptor。 |
 | `GET` | `/api/dictionaries/:id/root-groups/:rootId/entries` | 按需读取单个词根组的全部衍生词 | `{ items }`，其中 `items` 固定为词条摘要 DTO | 支持与词根组查询相同的搜索、排序和字段参数，但不分页；折叠组不预载衍生词，展开后一次读取整组。 |
+| `POST` | `/api/dictionaries/:id/analysis/query` | 按需读取轻量分析 widgets | `{ dictionaryId, generation, cacheKey, widgets, diagnostics }` | F4a 同步聚合端点；多个 widget 由 planner 合并为共享 SQLite 任务，不读取或返回完整词典 snapshot。 |
 
 #### `GET /api/dictionaries/:id/entries` 查询参数补充
 
@@ -109,6 +111,36 @@
 - `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；仅对同时出现在 `fields` 中的字段生效。
 - 基础搜索逐个独立字段值匹配：一条释义、一个标签、一个来源或一段备注必须自行包含查询文本，查询不会跨多个值拼接命中；`notes` 中的词条备注、释义备注和每个词条形态组备注也分别作为独立值。多标签组合等条件应使用高级筛选。自由文本按当前词典的 `settings.search.normalization` 处理。SQLite 的严格及 fuzzy 查询均直接读取静态 `entry_search_values` 和按需读取形态 `entry_morphology_search_values`；fuzzy 通过连接级确定性函数复用共享搜索模型的评分语义。该路径支持 NFC、Unicode case folding 和自定义等价规则。结构键和词源关系键不套用该自由文本配置。
 - 词源自动补全目前仍在前端当前词典快照上运行，并由独立的 `settings.search.etymologyAutocomplete.fuzzy` 控制；它复用搜索 normalizer 和原有 JS fuzzy 排序，但尚未接入 `/entries` projection 与普通列表查询路径。
+
+#### `POST /api/dictionaries/:id/entries/probe`
+
+请求体为 `{ queries }`；`queries` 必须包含 1–16 项，每项形如 `{ id, filter, search }`。`id` 在请求内唯一，只允许字母、数字、点、下划线和连字符，最长 80 字符；`filter` 和 `search` 复用普通 EntryQuery 的规范化语义。probe 不接受 `sort`、`page`、`limit`、`cursor`、`windowOffset` 或 `offset`。
+
+```js
+{
+  queries: [
+    {
+      id: "missing-ipa",
+      filter: { presence: [{ field: "ipa", present: false }] },
+      search: { text: "", fields: [], fuzzyFields: [] }
+    }
+  ]
+}
+```
+
+响应不包含 `items`、`total` 或 cursor：
+
+```js
+{
+  dictionaryId: "dict-1",
+  generation: 7,
+  results: {
+    "missing-ipa": { available: true }
+  }
+}
+```
+
+结构条件使用 SQL `EXISTS`；严格和 fuzzy 文本条件直接探测搜索 projection，不建立排序结果、命中详情或摘要 DTO。规范化后相同的 descriptor 在同一请求中只执行一次。验证错误使用 `invalid_entry_probe_payload`、`invalid_entry_probe_queries`、`invalid_entry_probe_query`、`invalid_entry_probe_query_id` 或 `duplicate_entry_probe_query_id`。
 
 ## 实体 ID 校验约定
 
@@ -562,15 +594,13 @@ directDerivedEntries
 
 `sourceResolution` 可被质量检查使用，但“未解析来源”和“来源循环”仍属于质量检查/词源网络问题，不归入诊断修复。
 
-#### Analysis widget query
+#### Analysis widget query（F4a 已实装）
 
-总览后续应作为可配置 dashboard，而不是固定页面报告。前端提交 widget 声明，后端 planner 合并 widget 依赖，避免多个卡片重复遍历词典。
+数据分析总览通过 widget 声明请求所需切片；后端 planner 合并 widget 依赖，避免多个卡片重复统计。当前端点为：
 
-建议端点：
+`POST /api/dictionaries/:id/analysis/query`
 
-```text
-POST /api/dictionaries/:id/analysis/query
-```
+F4a 支持 `entryCount`、`coverageBreakdown`、`partDistribution` 和 `activityPreview`。这些 light widgets 在一次同步 HTTP 请求内完成；前端异步加载并显示独立的 loading/error/retry 状态。数据分析页未打开时不发起请求。
 
 请求：
 
@@ -580,66 +610,79 @@ POST /api/dictionaries/:id/analysis/query
     { id: "entry-count", type: "entryCount" },
     { id: "parts", type: "partDistribution", limit: 8 },
     { id: "coverage", type: "coverageBreakdown" },
-    { id: "roots", type: "topRootFamilies", limit: 12 },
     { id: "activity", type: "activityPreview", limit: 6 }
   ],
   options: {
-    language: "zh",
     includeActions: true
   }
 }
 ```
 
+- `widgets` 必须为非空数组，最多 16 项；`id` 在一次请求中必须唯一，只允许字母、数字、点、下划线和连字符，最长 80 字符。
+- `partDistribution` 和 `activityPreview` 接受 `limit`，默认分别为 12 和 6，范围为 1–50；其他 widget 不接受 `limit`。
+- `options.includeActions` 默认为 `true`。设为 `false` 时省略 action descriptor。
+
 响应返回结构化 widget data，不返回 HTML：
 
 ```js
 {
-  dictionaryId,
-  cacheKey,
+  dictionaryId: "dict-1",
+  generation: 4,
+  cacheKey: "...",
   widgets: {
     "entry-count": {
-      type: "metric",
-      title: "词条",
+      type: "entryCount",
       value: 10000,
-      note: "8147 个词根",
       action: { type: "view", target: "editor" }
     },
     "coverage": {
-      type: "barList",
-      title: "覆盖率",
+      type: "coverageBreakdown",
+      total: 10000,
       rows: [
-        { label: "IPA", value: 0.94, action: { type: "filter", filter: { kind: "coverage", field: "ipa", value: "present" } } }
+        {
+          field: "ipa",
+          count: 9400,
+          missingCount: 600,
+          ratio: 0.94,
+          action: {
+            type: "entryFilter",
+            count: 9400,
+            filter: { presence: [{ field: "ipa", present: true }] }
+          },
+          missingAction: {
+            type: "entryFilter",
+            count: 600,
+            filter: { presence: [{ field: "ipa", present: false }] }
+          }
+        }
       ]
     }
   },
   diagnostics: {
-    computedTasks: ["relationSummary", "coverageStats", "tagStats", "activityPreview"],
+    computedTasks: ["entryStats", "partStats", "activityStats"],
     elapsedMs: 0
   }
 }
 ```
 
-Widget 不应直接绑定前端旧 report 字段；应通过任务依赖生成：
+`generation` 在成功写入后递增；`cacheKey` 绑定词典 ID、generation 和规范化请求，因此写入后同一声明会得到新的身份。当前 response 不承诺服务端结果缓存，`cacheKey` 用于稳定标识和后续缓存扩展。
 
-| Widget | 典型任务 |
+Widget 通过以下任务依赖生成：
+
+| Widget | F4a 任务 |
 | --- | --- |
-| `entryCount` | `entrySummary`, `relationSummary` |
-| `derivedCount` | `relationSummary` |
-| `coverageBreakdown` | `coverageStats` |
-| `partDistribution` | `tagStats` |
-| `tagFrequency` | `tagStats` |
-| `topRootFamilies` | `rootFamilies` |
+| `entryCount` | `entryStats` |
+| `coverageBreakdown` | `entryStats` |
+| `partDistribution` | `partStats` |
 | `activityPreview` | `activityStats` |
-| `ipaAverageSyllables` | `ipaLightStats` |
-| `ipaUnitFrequency` | `ipaFullStats` |
-| `morphologyCoverage` | `coverageStats` |
-| `morphologyGeneratedForms` | `morphologyFullStats` |
 
-Planner 应把多个 widgets 合并为尽量少的任务。例如 `entryCount`、`coverageBreakdown` 和 `partDistribution` 可以共享一次基础 entry scan；`topRootFamilies` 和 `/root-groups` 可共享 relation index。
+同一任务在一次请求中只执行一次；多个 `activityPreview` 使用请求中的最大 limit 读取，再分别裁剪。`coverageBreakdown.rows[].field` 支持 `definition`、`example`、`entryNote`、`source`、`ipa`；释义和例句行另带 `itemCount`。词性分布 action 使用 `{ part }` descriptor，无词性行使用保留值 `__conlexicon_no_part__`。最近编辑行使用 `{ type: "entry", entryId }` action。
+
+请求验证失败使用 `invalid_analysis_query_payload`、`invalid_analysis_widgets`、`invalid_analysis_widget`、`invalid_analysis_widget_id`、`unsupported_analysis_widget`、`invalid_analysis_widget_limit` 或 `duplicate_analysis_widget_id`。
 
 #### Light / full 任务边界
 
-为避免总览卡片触发重型计算，任务应区分 light/full：
+为避免总览卡片触发重型计算，F4a 只实现上述三个轻量任务。以下仍是 F4b 的设计边界：
 
 ```text
 ipaLightStats
@@ -661,25 +704,25 @@ activityFull
   完整最近修改列表和完整日期分布
 ```
 
-用户将重型 widget 放入总览时，API 可以返回 `status: "deferred"` 或要求点击后计算；不要默认让总览触发所有 full 任务。
+F4a 的 light widgets 不返回后台任务状态。F4b 接入重型 widget 后，可以先同步构建并缓存结果；只有真实基准证明计算不适合停留在请求生命周期内时，API 才增加 `status: "deferred" | "running" | "failed"` 或要求点击后计算。不要默认让总览触发所有 full 任务，也不要近期引入持久化 job 表。
 
 #### Filter descriptor
 
-分析卡片和质量卡片不应长期传递大量 `entryIds`。建议逐步改成 filter descriptor：
+分析卡片和质量卡片不应长期传递大量 `entryIds`。F4a 分析 widget 已使用 filter descriptor：
 
 ```js
 {
-  type: "filter",
+  type: "entryFilter",
   count: 608,
   filter: {
-    kind: "coverage",
-    field: "ipa",
-    value: "missing"
+    presence: [
+      { field: "ipa", present: false }
+    ]
   }
 }
 ```
 
-点击“在词条列表查看”时，词条列表使用 descriptor 调用 `/entries` 或后续 query endpoint 获取匹配项。这样总览 API 只返回 `count` 和可复用 filter spec，避免大词典下把大量 ID 塞进 dashboard 响应。
+点击分析行时，词条列表使用 descriptor 调用 `/entries` 获取匹配项。这样总览 API 只返回 `count` 和可复用 filter spec，避免大词典下把大量 ID 塞进 dashboard 响应。F4b/F5 的功能结果仍需按各自会话边界迁移。
 
 #### 诊断修复边界
 
@@ -703,8 +746,9 @@ activityFull
 
 #### 最小落地顺序
 
-1. 已完成的基础继续保持：`listDictionaries()`/词典标题 root count、词根模式和词汇网络复用 SQLite 稳定词根拓扑；前端数据分析暂时仍使用独立内存 query model。
-2. 先按 [Advanced Filter Query Plan](ADVANCED_FILTER_QUERY_PLAN.md) 的 F1 建立统一 EntryQuery/EntryFilter，让稳定筛选条件复用 `/entries` 的窗口、cursor、缓存与定位。
-3. 再实装 `POST /analysis/query` 的 light widgets：`entryCount`、`coverageBreakdown`、`partDistribution`、`activityPreview`，并让总览改用 widget query。
-4. 为质量检查建立独立 `/quality/query` 与 result session，再让质量高级筛选消费该会话；repository 不反向调用质量算法。
-5. 重型 IPA、morphology、root family widgets 和语料查询在对应服务边界稳定后按需接入，不恢复前端 materialized ID 或完整快照兜底。
+1. 已完成的基础继续保持：`listDictionaries()`/词典标题 root count、词根模式和词汇网络复用 SQLite 稳定词根拓扑。
+2. F1–F3 已完成统一 EntryQuery/EntryFilter、SQLite 条件编译和前端 descriptor 迁移；稳定筛选继续复用 `/entries` 的窗口、cursor、缓存与定位。
+3. F4a 已完成 `POST /analysis/query` 的四类 light widgets、最小 planner 和总览异步加载；总览不再为这些统计读取完整 snapshot。
+4. F4b 为重型 IPA、Gloss、morphology、完整 root family 排名和质量问题建立独立 feature result session；先同步构建并缓存，异步后台状态由真实基准决定。
+5. F5 建立独立 `/quality/query`，再让质量高级筛选消费该会话；repository 不反向调用质量算法。
+6. 语料查询在独立服务边界稳定后按需接入，不恢复前端 materialized ID 或完整快照兜底。

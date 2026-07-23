@@ -287,7 +287,7 @@ query kind
 - 普通列表直接保存并渲染 API summary DTO，不再先压缩成 ID、再通过完整 `dictionary.entries` 映射回词条。summary 的 `definitionPreviews` 保留全部义项的轻量文本与原位置，因此列表的多义项显示和搜索命中序号不需要完整词条。
 - 当前词条详情统一通过 `/entries/:entryId` 按需读取；前端使用最多 12 项、约 12 MiB 的小型 LRU，并合并同一词条的并发请求。保存响应会立即更新当前详情缓存，查询 DTO 则局部更新后按 `updatedAt` 失效并重查。
 - `/root-groups` 的折叠组只返回 root summary、衍生词数量和匹配数量，不再携带全部衍生词。展开时通过 `/root-groups/:rootId/entries` 一次读取组内全部 summary；该子端点与父端点复用同一关系会话，但不提供分页。
-- 普通编辑器列表与详情已切到上述边界；F3 又将稳定 SQL 高级筛选接入同一窗口与查询会话。数据分析、质量检查以及 IPA/Gloss/形态 feature result 仍会使用完整活动词典 snapshot，等待 F4/F5 迁移。详情来源、完整编辑衍生词和词汇网络等关系消费者已经迁移到共享关系 API，不再列入剩余本地消费者。这是尚未迁移模块的当前实现，不是 summary/detail 的运行时兜底。
+- 普通编辑器列表与详情已切到上述边界；F3 又将稳定 SQL 高级筛选接入同一窗口与查询会话。F4a 已让数据分析总览的轻量统计改用 `/analysis/query` widget DTO；其他分析子页、质量检查以及 IPA/Gloss/形态 feature result 仍会使用完整活动词典 snapshot，等待 F4b/F5 迁移。详情来源、完整编辑衍生词和词汇网络等关系消费者已经迁移到共享关系 API，不再列入剩余本地消费者。这是尚未迁移模块的当前实现，不是 summary/detail 的运行时兜底。
 
 ### Q4：可重建 cursor 与纯滚动窗口化（已完成）
 
@@ -298,6 +298,7 @@ query kind
 - 定位层已完成并接入自动滚动：`/entries/:entryId/location` 返回当前普通查询下的目标窗口，`/root-groups/location` 通过稳定拓扑候选根和会话组下标返回父级窗口；严格及 fuzzy 搜索共同复用 `entryId -> resultIndex`，词根会话复用 `rootId -> resultIndex`。无搜索的结构筛选仍在 SQL 内计算位置。目标存在但被查询排除时返回明确的 `found: false`，而不是伪造首窗。词根衍生词定位先加载父级窗口，再按需读取整组子项；前端不再调用 `filteredEntries()` / `rootModeGroups()` 猜测未加载窗口。
 - 产品前端不再请求临时 `limit=10000`，窗口大小固定为上述小批次；repository 保留原有大页硬上限，供显式基准和诊断工具使用，不进入正常 UI 路径。
 - `/root-groups/:rootId/entries` 不复用父级分页协议：后端通过查询会话的 `rootId → group` 索引直接定位并返回整组，不处理 cursor、`windowOffset` 或 `limit`，也不设置单组 2000 条硬上限。`/entry-relations/:entryId` 同时通过稳定拓扑的 `entryId → rootIds` 和 `rootId → group` 索引定位同根组，不再逐请求递归扫描祖先与后代。
+- 查询型高级筛选刷新只按当前 EntryQuery key 前缀失效 entries 页面和对应定位缓存，不再清空同词典的词根、facets 或其他查询页面。循环变体可用性由批量 `/entries/probe` 布尔结果更新，前端以当前筛选对象和词典版本拒绝过期响应；当前变体复用正常首窗总数。
 - 全局展开状态使用 `manual/all` 两种模式；`all` 下单组收起记录为例外。父级窗口淘汰只释放衍生词 DTO，不清除展开意图；“全部展开”和“全部收起”都会清空上一轮手动展开/收起例外。“全部收起”同时释放已加载的组内数据。
 
 ### Q4 后：stale-while-revalidate 与词条切换局部渲染（已完成）
@@ -316,5 +317,5 @@ query kind
 ### Q5：剩余查询消费者（部分完成）
 
 - 高级筛选 F1–F3 已完成共享 filter descriptor、统一 EntryQuery 身份、稳定条件 SQL 编译和前端状态迁移；查询型筛选复用 `/entries` 窗口、缓存、定位、排序与搜索，不再保存匹配 ID 数组。
-- 数据分析和质量检查目前仍读取完整活动词典并使用各自的前端 slice/report cache；它们不复用词条列表页面缓存对象，但尚未拥有按需 API。F4/F5 应为功能结果建立独立服务端会话，并让分析与质量查询只返回各自需要的统计、窗口 DTO 和问题详情。
+- 数据分析总览的 `entryCount`、`coverageBreakdown`、`partDistribution` 和 `activityPreview` 已通过同步 `/analysis/query` 与最小 planner 按需读取；前端异步加载并按 generation/cacheKey 识别结果。其他分析子页和质量检查仍使用各自的前端 slice/report cache。下一步 F4b 为重型功能结果建立独立服务端会话，F5 接入质量 API；只有真实基准证明单次重型计算不适合请求内完成时，才增加后台状态。
 - 语料库在独立升级阶段建立块/单元读取与 changeset；不把 corpus blob 扫描塞进 entries 会话。
