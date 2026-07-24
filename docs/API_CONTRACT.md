@@ -38,7 +38,7 @@
 
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/state` | 读取轻量应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme }` | `dictionaries` 只包含 metadata 和 summary；所有词典都返回 `entryCount`，只有当前词典返回 `rootCount`。前端把它当轻量索引，并按需读取当前词典快照；未加载词典不会因此建立词根拓扑。 |
+| `GET` | `/api/state` | 读取轻量应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme }` | `dictionaries` 只包含 metadata 和 summary；所有词典都通过轻量 SQL 返回 `entryCount` 和严格的 `rootCount`。前端把它当轻量索引，并按需读取当前词典快照；未加载词典不会因此建立词根拓扑。 |
 | `PUT` | `/api/preferences` | 保存全局界面偏好 | `{ uiLanguage, uiTheme }` | 目前支持 `uiLanguage` 和 `uiTheme`。 |
 
 ### 导入、导出与词典生命周期
@@ -232,7 +232,9 @@ GET /api/dictionaries/:id/summary
 GET /api/dictionaries/:id/settings
 ```
 
-SQLite repository 的 `readState()` / `listDictionaries()` 已只返回词典 metadata 和 summary；前端启动流程始终将 `/api/state` 的 `dictionaries` 当作 metadata，再按需加载 active dictionary。`entryCount` 对每本词典使用轻量 SQL count；`rootCount` 只为当前词典返回并复用稳定词根拓扑。未加载词典不会在启动或打开词典管理页时建立拓扑，切换为当前词典后才会建立。
+SQLite repository 的 `readState()` / `listDictionaries()` 已只返回词典 metadata 和 summary；前端启动流程始终将 `/api/state` 的 `dictionaries` 当作 metadata，再按需加载 active dictionary。每本词典都通过轻量 SQL 返回 `entryCount` 和 `rootCount`，不会在启动、词典切换或打开词典管理页时建立词根拓扑。
+
+基础关系统计按来源记录是否存在严格分类：没有任何 `entry_sources` 行的词条计入 `rootCount`，至少有一行的词条计入 `derivedCount`，两类互斥。来源无法解析或形成循环时，词根模式可以为可见性建立回退分组；这类分组不改变基础分类，因此 `/root-groups` 的分组总数不保证等于 `rootCount`。
 
 示例：
 
@@ -257,7 +259,7 @@ GET /api/dictionaries
       updatedAt,
       summary: {
         entryCount,
-        rootCount // 仅当前词典存在
+        rootCount
       }
     }
   ]
@@ -452,7 +454,7 @@ GET /api/dictionaries/:id/entry-relations/:entryId
 
 `matchedEntry` 是已匹配来源的 summary DTO；未解析来源时为 `null`。词条详情和词汇网络应直接消费该 DTO，不应回到完整活动词典扫描 `matchedEntryId`。`matchedEntryId` 应由 repository 明确解析；如果同名 lemma 存在多条，当前阶段可选择排序后的第一条并在后续诊断模块中报告歧义。
 
-词汇网络详情视图和词根模式均已接入后端关系/词根读取端点。词根模式、词汇网络同根组和词典摘要的词根数量复用 SQLite repository 的稳定词根拓扑；来源匹配与直接衍生词仍由相同 repository 关系边界返回，不再由前端扫描完整活动词典。
+词汇网络详情视图和词根模式均已接入后端关系/词根读取端点。词根模式和词汇网络同根组复用 SQLite repository 的稳定词根拓扑；词典摘要的严格 `rootCount` 独立按无来源词条轻量计算。来源匹配与直接衍生词仍由相同 repository 关系边界返回，不再由前端扫描完整活动词典。
 
 词根模式读取端点：
 
@@ -515,7 +517,7 @@ GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&so
 
 性能优化方向：
 
-- repository 已以独立 relation generation 缓存与搜索条件无关的 `rootId -> derivedIds` 稳定拓扑，并同时维护 `entryId -> rootIds`、`rootId -> group` 反向索引；词根查询会话进一步维护 `rootId -> resultIndex`。词典摘要计数、`/root-groups`、组内子项和 `/entry-relations/:entryId` 复用该拓扑。拓扑组和查询结果位置的定位均为 O(1)，关系响应仍需按实际返回条目数读取并构建 DTO。词条增删、lemma/来源变化、整库替换和词典删除会使其失效；普通词条保存/patch 仅同步轻量排序记录，其他模块保存不触碰拓扑。查询 session/cursor 的 cache generation 仍按查询一致性要求独立失效。
+- repository 已以独立 relation generation 缓存与搜索条件无关的 `rootId -> derivedIds` 稳定拓扑，并同时维护 `entryId -> rootIds`、`rootId -> group` 反向索引；词根查询会话进一步维护 `rootId -> resultIndex`。`/root-groups`、组内子项和 `/entry-relations/:entryId` 复用该拓扑，词典摘要计数不依赖它。拓扑组和查询结果位置的定位均为 O(1)，关系响应仍需按实际返回条目数读取并构建 DTO。词条增删、lemma/来源变化、整库替换和词典删除会使其失效；普通词条保存/patch 仅同步轻量排序记录，其他模块保存不触碰拓扑。查询 session/cursor 的 cache generation 仍按查询一致性要求独立失效。
 - `/root-groups` 搜索直接从 `entry_search_values` / `entry_morphology_search_values` 获取命中 ID，再筛选稳定拓扑，不导出完整词典 snapshot。`entry-relations/:entryId` 已复用同一拓扑的反向索引；后续质量检查中的词源问题仍应继续收敛到该关系查询层。
 - SQLite 后端继续用 `entry_sources(source_key, entry_id)` 或等价表/索引支持词根分组和词汇网络查询；旧 JSON conversion 与 migration 不参与运行期查询。
 - 前端词根模式正常路径以 `/root-groups` 为准；请求失败时显示失败状态，不回退前端本地完整分组。父级未加载窗口以 `pageInfo.total` 和 `windowMetrics` 建立占位，因此滚动条可在折叠、搜索自动展开及全局展开状态下代表完整词根组集合。全局展开采用状态意图：父级页进入可见范围后才加载各组衍生词；单组收起作为例外保留到重新展开或“全部收起/全部展开”重置。组内衍生词不建立第二层分页窗口。
@@ -562,9 +564,9 @@ SQLite 路径应逐步用 SQL、持久索引、视图或临时表实现相同接
 
 #### 共享 relation/query 能力
 
-以下能力应共享同一套 relation/index 语义：
+以下能力共享关系数据，但基础计数与拓扑显示分组具有明确边界：
 
-- 词典标题的 `rootCount`。
+- 词典标题和词典管理的 `rootCount` 按“没有来源记录”计算，不依赖来源解析或拓扑回退组。
 - 数据分析 relation summary 与 root family widgets。
 - `/root-groups` 词根模式。
 - `/entry-relations/:entryId` 词汇网络详情。

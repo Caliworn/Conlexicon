@@ -27,11 +27,28 @@ async function runSqliteLifecycleCheck() {
       id: "dict-sqlite-first",
       name: "First",
       language: "one",
+      entries: [
+        { id: "entry-first-root", lemma: "first-root" },
+        {
+          id: "entry-first-unresolved",
+          lemma: "first-unresolved",
+          etymology: { sources: ["missing-root"] },
+        },
+      ],
     }));
     const second = await repository.createDictionary(normalizeDictionary({
       id: "dict-sqlite-second",
       name: "Second",
       language: "two",
+      entries: [
+        { id: "entry-second-root-a", lemma: "second-root-a" },
+        { id: "entry-second-root-b", lemma: "second-root-b" },
+        {
+          id: "entry-second-derived",
+          lemma: "second-derived",
+          etymology: { sources: ["entry-second-root-a"] },
+        },
+      ],
     }));
 
     let topologyBuilds = 0;
@@ -41,26 +58,33 @@ async function runSqliteLifecycleCheck() {
       return buildRootTopology(...args);
     };
     let state = await repository.readState();
-    assert.equal(topologyBuilds, 1, "readState should build a topology only for the active dictionary");
+    assert.equal(topologyBuilds, 0, "readState should not build root topologies for dictionary summaries");
     assert.equal(state.activeDictionaryId, second.id);
     assert.deepEqual(state.dictionaries.map((dictionary) => dictionary.id), [first.id, second.id]);
     assert.equal(state.dictionaries.every((dictionary) => dictionary.entries === undefined), true);
     assert.deepEqual(state.dictionaries.map((dictionary) => dictionary.summary), [
-      { entryCount: 0 },
-      { entryCount: 0, rootCount: 0 },
+      { entryCount: 2, rootCount: 1 },
+      { entryCount: 3, rootCount: 2 },
     ]);
 
     await repository.activateDictionary(first.id);
     state = await repository.readState();
-    assert.equal(topologyBuilds, 2, "activating another dictionary should build its topology on demand");
+    assert.equal(topologyBuilds, 0, "activating another dictionary should not build its topology for summaries");
     assert.equal(state.activeDictionaryId, first.id);
     assert.deepEqual(state.dictionaries.map((dictionary) => dictionary.summary), [
-      { entryCount: 0, rootCount: 0 },
-      { entryCount: 0 },
+      { entryCount: 2, rootCount: 1 },
+      { entryCount: 3, rootCount: 2 },
     ]);
     assert.equal((await repository.exportDictionary()).id, first.id);
+    const firstRootGroups = await repository.queryRootGroups(first.id, { limit: 10 });
+    assert.equal(firstRootGroups.pageInfo.total, 2);
+    assert.equal(
+      state.dictionaries[0].summary.rootCount,
+      1,
+      "an unresolved derived fallback group must not count as a semantic root",
+    );
     assert.deepEqual(await repository.listDictionaries(), state.dictionaries);
-    assert.equal(topologyBuilds, 2, "listing dictionaries should not build topologies for inactive dictionaries");
+    assert.equal(topologyBuilds, 1, "listing dictionaries should not build additional root topologies");
     assert.equal((await repository.getDictionarySnapshot(second.id)).name, "Second");
 
     const preferences = await repository.updatePreferences({ uiLanguage: "en", uiTheme: "dark" });

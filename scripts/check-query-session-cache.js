@@ -455,8 +455,8 @@ async function checkRepositoryIntegration() {
     );
     const stateWithRootCount = await repository.readState();
     const activeMetadata = stateWithRootCount.dictionaries.find(({ id }) => id === dictionary.id);
-    assert.equal(activeMetadata.summary.rootCount, rootFirst.pageInfo.total);
-    assert.equal(topologyBuilds, 1, "dictionary summary root counts should reuse the stable topology");
+    assert.equal(activeMetadata.summary.rootCount, 2);
+    assert.equal(topologyBuilds, 1, "dictionary summary root counts should not read the stable topology");
     assert.deepEqual(
       rootFirst.items.map((group) => group.root.id),
       rootSecond.items.slice(0, rootFirst.items.length).map((group) => group.root.id),

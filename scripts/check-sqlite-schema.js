@@ -155,6 +155,7 @@ async function runSqliteSchemaCheck() {
     assert.deepEqual(Object.keys(dictionaryMetadata).sort(), ["createdAt", "description", "id", "language", "name", "summary", "updatedAt"]);
     assert.equal(Object.hasOwn(dictionaryMetadata, "entries"), false);
     assert.equal(dictionaryMetadata.summary.entryCount, sourceDictionary.entries.length);
+    assert.equal(dictionaryMetadata.summary.rootCount, 1);
 
     const savedSettings = await repository.updateSettings(sourceDictionary.id, { entryListTagDisplayLimit: 4 });
     assert.deepEqual(Object.keys(savedSettings).sort(), ["id", "settings", "updatedAt"]);

@@ -18,6 +18,7 @@ const ipaModel = require("../lib/ipa-model");
 const tagModel = require("../lib/tag-model");
 const entrySearchModel = require("../lib/entry-search-model");
 const entryRelationsModel = require("../lib/entry-relations-model");
+const dictionaryQueryModel = require("../lib/dictionary-query-model");
 const qualityModel = require("../lib/quality-model");
 
 const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
@@ -665,6 +666,7 @@ function checkModelNormalization() {
       { id: "entry-root", lemma: "root" },
       { id: "entry-derived-lemma", lemma: "derived lemma", etymology: { sources: ["root", "root"] } },
       { id: "entry-derived-id", lemma: "derived id", etymology: { sources: ["entry-root"] } },
+      { id: "entry-derived-unresolved", lemma: "derived unresolved", etymology: { sources: ["missing-root"] } },
     ],
   };
   const relationIndex = entryRelationsModel.buildEntryRelationIndex(relationDictionary, { normalizeText: testNormalize });
@@ -672,6 +674,16 @@ function checkModelNormalization() {
   assert.deepEqual(
     entryRelationsModel.findDerivedEntries(relationDictionary.entries[0], relationDictionary, { index: relationIndex }).map((entry) => entry.id),
     ["entry-derived-id", "entry-derived-lemma"],
+  );
+  assert.equal(entryRelationsModel.rootCount(relationDictionary, { index: relationIndex }), 1);
+  assert.deepEqual(
+    dictionaryQueryModel.createDictionaryQueryContext(relationDictionary, { normalizeText: testNormalize }).relationSummary(),
+    {
+      rootCount: 1,
+      derivedCount: 3,
+      isolatedRootCount: 0,
+      multiSourceCount: 1,
+    },
   );
   assert.equal(
     entrySearchModel.entryMatchesSearchText(

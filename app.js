@@ -7525,7 +7525,7 @@ function dictionaryStatsText(dictionary) {
 }
 
 function dictionaryManagerStatsText(dictionary) {
-  return `${dictionaryEntryCount(dictionary)} ${t("entries")}`;
+  return dictionaryStatsText(dictionary);
 }
 
 function dictionaryEntryCount(dictionary) {
