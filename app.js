@@ -178,6 +178,13 @@ let analysisOverviewQueryState = {
   error: null,
   requestId: 0,
 };
+let analysisIpaCompareQueryState = {
+  key: "",
+  status: "idle",
+  response: null,
+  error: null,
+  requestId: 0,
+};
 let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
 let draggedToolNavView = "";
@@ -3127,7 +3134,7 @@ function entryBrowserCanScrollNow() {
 
 function entryCardScrollQueryIsReady() {
   const dictionary = activeDictionary();
-  if (!dictionary || (advancedFilter && !advancedFilterUsesEntryQuery())) {
+  if (!dictionary || (advancedFilter && !advancedFilterUsesRemoteQuery())) {
     return true;
   }
   if (rootMode && rootGroupsQueryCanUseApi(dictionary)) {
@@ -3200,7 +3207,7 @@ function focusCurrentEntryInBrowser() {
   }
   if (
     advancedFilter
-    && !advancedFilterUsesEntryQuery()
+    && !advancedFilterUsesRemoteQuery()
     && !(advancedFilter.entryIds || []).includes(entryId)
   ) {
     showToast(t("currentEntryNotInList"));
@@ -3716,7 +3723,7 @@ function setEntrySearchConfigOpen(open) {
 
 function renderEntrySearchConfig() {
   const dictionary = activeDictionary();
-  const unavailable = !dictionary || Boolean(advancedFilter && !advancedFilterUsesEntryQuery());
+  const unavailable = !dictionary || Boolean(advancedFilter && !advancedFilterUsesRemoteQuery());
   if (!dictionary) {
     setEntrySearchConfigOpen(false);
     elements.entrySearchConfigButton.disabled = true;
@@ -3774,7 +3781,7 @@ function renderPartFilter() {
   if (advancedFilter) {
     rootMode = false;
     activePart = "";
-    if (!advancedFilterUsesEntryQuery()) {
+    if (!advancedFilterUsesRemoteQuery()) {
       searchQuery = "";
       elements.searchInput.value = "";
     }
@@ -3801,7 +3808,7 @@ function renderPartFilter() {
 
   elements.partFilter.value = options.includes(current) ? current : "";
   elements.partFilter.disabled = rootMode || Boolean(advancedFilter);
-  elements.searchInput.disabled = Boolean(advancedFilter && !advancedFilterUsesEntryQuery());
+  elements.searchInput.disabled = Boolean(advancedFilter && !advancedFilterUsesRemoteQuery());
   renderEntrySearchConfig();
   activePart = elements.partFilter.value;
   elements.rootModeToggleButton.textContent = rootMode ? t("normalMode") : t("rootMode");
@@ -5402,7 +5409,7 @@ function entryQueryCanUseApi(dictionary = activeDictionary()) {
   return Boolean(
     backendAvailable
     && dictionary
-    && (!advancedFilter || advancedFilterUsesEntryQuery())
+    && (!advancedFilter || advancedFilterUsesRemoteQuery())
     && !rootMode
   );
 }
@@ -5419,6 +5426,8 @@ function entryQueryApiKey(dictionary = activeDictionary()) {
     activePart,
     stableJson(advancedFilterUsesEntryQuery() ? advancedFilter.filter : null),
     stableJson(advancedFilterUsesEntryQuery() ? advancedFilter.searchScope : null),
+    stableJson(advancedFilterUsesFeatureQuery() ? advancedFilter.resultSource : null),
+    advancedFilterUsesFeatureQuery() ? advancedFilter.category : "",
     entrySort,
     stableJson(settings.tagDisplayMap),
     settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
@@ -5429,9 +5438,28 @@ function entryQueryApiKey(dictionary = activeDictionary()) {
 
 function compactEntryQueryResult(result) {
   return {
-    items: Array.isArray(result?.items) ? result.items.filter((entry) => entry?.id) : [],
+    items: Array.isArray(result?.items)
+      ? result.items
+          .map((item) => item?.entry?.id ? { ...item.entry, feature: item.feature } : item)
+          .filter((entry) => entry?.id)
+      : [],
     pageInfo: result?.pageInfo || null,
+    summary: result?.summary || null,
+    source: result?.source || null,
   };
+}
+
+function recordFeatureResultSummary(result) {
+  if (!advancedFilterUsesFeatureQuery() || !result?.summary?.views) {
+    return;
+  }
+  const counts = new Map(result.summary.views.map((row) => [row.key, Math.max(0, Number(row.count) || 0)]));
+  advancedFilter.variants = advancedFilter.variants.map((variant) => (
+    advancedFilterVariantUsesFeatureQuery(variant)
+      ? { ...variant, resultCount: counts.get(variant.category) || 0 }
+      : variant
+  ));
+  advancedFilter.resultCount = counts.get(advancedFilter.category) || 0;
 }
 
 function entrySummaryDto(entry, dictionary = activeDictionary()) {
@@ -5469,7 +5497,7 @@ function updateEntrySummaryDtoAfterSave(dictionary, entry) {
       }
     });
     syncEntryQueryWindowState();
-    if (!rootMode && (!advancedFilter || advancedFilterUsesEntryQuery())) {
+    if (!rootMode && (!advancedFilter || advancedFilterUsesRemoteQuery())) {
       renderEntryRows(entryQueryState.items, {
         pageInfo: entryQueryState.pageInfo,
         windowPages: entryQueryState.pages,
@@ -5564,6 +5592,46 @@ function entryQueryLocationUrl(dictionary, entryId) {
   return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entryId)}/location?${params}`;
 }
 
+function featureResultQueryBody(dictionary, options = {}) {
+  const search = entryQuerySearchDescriptor(dictionary);
+  return {
+    source: advancedFilter.resultSource,
+    view: {
+      category: advancedFilter.category,
+      search,
+      sort: entrySort,
+    },
+    page: {
+      limit: ENTRY_QUERY_WINDOW_PAGE_SIZE,
+      cursor: options.cursor || "",
+      windowOffset: options.windowOffset === "" ? null : options.windowOffset ?? null,
+    },
+  };
+}
+
+function loadEntryQueryApiPage(dictionary, options = {}) {
+  if (!advancedFilterUsesFeatureQuery()) {
+    return api(entryQueryUrl(dictionary, options));
+  }
+  return api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/features/query`, {
+    method: "POST",
+    body: JSON.stringify(featureResultQueryBody(dictionary, options)),
+  });
+}
+
+function loadEntryQueryApiLocation(dictionary, entryId) {
+  if (!advancedFilterUsesFeatureQuery()) {
+    return api(entryQueryLocationUrl(dictionary, entryId));
+  }
+  return api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/features/location`, {
+    method: "POST",
+    body: JSON.stringify({
+      ...featureResultQueryBody(dictionary),
+      entryId,
+    }),
+  });
+}
+
 function entryQueryWindowForRender(dictionary) {
   const key = entryQueryApiKey(dictionary);
   if (entryQueryState.status !== "success" || entryQueryState.key !== key) {
@@ -5621,11 +5689,11 @@ function loadEntryQueryWindowPage(dictionary, page) {
   return queryPageCache.load({
     key: entryQueryPageCacheKey(key, `${entryQueryState.windowCursor || page.cursor}\u0000${page.offset}`),
     dictionaryId: dictionary.id,
-    load: () => api(entryQueryUrl(dictionary, {
+    load: () => loadEntryQueryApiPage(dictionary, {
       cursor: entryQueryState.windowCursor || page.cursor,
       windowOffset: entryQueryState.windowCursor ? page.offset : "",
       limit: ENTRY_QUERY_WINDOW_PAGE_SIZE,
-    })),
+    }),
     transform: compactEntryQueryResult,
   })
     .then((result) => {
@@ -5638,6 +5706,7 @@ function loadEntryQueryWindowPage(dictionary, page) {
       ) {
         return;
       }
+      recordFeatureResultSummary(result);
       page.estimatedHeight = queryWindowPageHeight(entryVirtualList, page.index, page.estimatedHeight);
       page.status = "success";
       page.items = result.items;
@@ -5660,11 +5729,11 @@ function loadEntryQueryWindowPage(dictionary, page) {
       entryQueryState.status = "success";
       entryQueryState.error = null;
       if (page.index === 0) {
-        if (advancedFilterUsesEntryQuery()) {
+        if (advancedFilterUsesRemoteQuery()) {
           if (advancedFilter.selectFirstOnLoad) {
-            advancedFilter.selectFirstOnLoad = false;
             const firstEntry = result.items[0];
             if (firstEntry) {
+              advancedFilter.selectFirstOnLoad = false;
               state.selectedEntryId = firstEntry.id;
               editorMode = "display";
               entryDraft = null;
@@ -6429,7 +6498,7 @@ function startEntryQueryLocation(dictionary, entryId) {
   queryPageCache.load({
     key: queryPageCacheKey("entry-location", `${key}\u0000${entryId}`),
     dictionaryId: dictionary.id,
-    load: () => api(entryQueryLocationUrl(dictionary, entryId)),
+    load: () => loadEntryQueryApiLocation(dictionary, entryId),
     transform: (result) => ({
       ...compactEntryQueryResult(result),
       location: result?.location || null,
@@ -6444,6 +6513,7 @@ function startEntryQueryLocation(dictionary, entryId) {
       ) {
         return;
       }
+      recordFeatureResultSummary(result);
       if (!result.location?.found) {
         if (pendingEntryCardScroll?.options?.reportMissing) {
           showToast(t("currentEntryNotInList"));
@@ -6598,7 +6668,7 @@ function startRootGroupQueryLocation(dictionary, entryId, options = {}) {
 
 function ensureQueryWindowForEntryScroll(entryId, options = {}) {
   const dictionary = activeDictionary();
-  if (!dictionary || (advancedFilter && !advancedFilterUsesEntryQuery())) {
+  if (!dictionary || (advancedFilter && !advancedFilterUsesRemoteQuery())) {
     return;
   }
   if (!rootMode && entryQueryState.status === "success") {
@@ -6711,12 +6781,12 @@ function filteredEntries() {
     return [];
   }
 
-  if (advancedFilter && !advancedFilterUsesEntryQuery()) {
+  if (advancedFilter && !advancedFilterUsesRemoteQuery()) {
     const ids = new Set(advancedFilter.entryIds || []);
     return [...dictionary.entries].filter((entry) => ids.has(entry.id)).sort(compareEntries);
   }
 
-  if (advancedFilterUsesEntryQuery()) {
+  if (advancedFilterUsesRemoteQuery()) {
     return [];
   }
 
@@ -6734,6 +6804,22 @@ function advancedFilterVariantUsesEntryQuery(variant) {
 
 function advancedFilterUsesEntryQuery() {
   return advancedFilterVariantUsesEntryQuery(advancedFilter);
+}
+
+function advancedFilterVariantUsesFeatureQuery(variant) {
+  return Boolean(
+    variant?.resultSource?.type === "ipaAutoCompare"
+    && Number(variant.resultSource.version) === 1
+    && ["match", "looseMismatch", "strictMismatch"].includes(variant.category)
+  );
+}
+
+function advancedFilterUsesFeatureQuery() {
+  return advancedFilterVariantUsesFeatureQuery(advancedFilter);
+}
+
+function advancedFilterUsesRemoteQuery() {
+  return advancedFilterUsesEntryQuery() || advancedFilterUsesFeatureQuery();
 }
 
 function entryFilterIdentity(filter) {
@@ -6803,6 +6889,9 @@ function seedAdvancedFilterFacts(dictionary, variants = []) {
 }
 
 function advancedFilterVariantFactStatus(variant, dictionary = activeDictionary()) {
+  if (advancedFilterVariantUsesFeatureQuery(variant)) {
+    return Number(variant.resultCount) > 0 ? "available" : "empty";
+  }
   if (!advancedFilterVariantUsesEntryQuery(variant)) {
     return variant?.entryIds?.length ? "available" : "empty";
   }
@@ -6911,6 +7000,9 @@ function advancedFilterStateForVariant(base, variant, variantIndex) {
     title: variant.title,
     filter: variant.filter,
     searchScope: variant.searchScope,
+    resultSource: variant.resultSource,
+    category: variant.category,
+    resultCount: variant.resultCount,
     entryIds: variant.entryIds,
     issueMap: variant.issueMap,
     variantIndex,
@@ -6976,7 +7068,7 @@ async function enterAdvancedFilter(action) {
   elements.searchInput.value = searchQuery;
   state.activeView = "editor";
   revealEntryBrowserForResults();
-  if (advancedFilterUsesEntryQuery()) {
+  if (advancedFilterUsesRemoteQuery()) {
     advancedFilter.selectFirstOnLoad = !action.preferredEntryId;
     if (action.preferredEntryId) {
       state.selectedEntryId = action.preferredEntryId;
@@ -7052,7 +7144,8 @@ function normalizeAdvancedFilterVariants(action, options = {}) {
   return variants
     .map((variant) => {
       const usesEntryQuery = advancedFilterVariantUsesEntryQuery(variant);
-      const entryIds = usesEntryQuery ? [] : entryIdsFrom(variant.entryIds);
+      const usesFeatureQuery = advancedFilterVariantUsesFeatureQuery(variant);
+      const entryIds = usesEntryQuery || usesFeatureQuery ? [] : entryIdsFrom(variant.entryIds);
       const filter = usesEntryQuery ? entryQueryModel.normalizeEntryFilter(variant.filter) : null;
       const search = usesEntryQuery && (variant.searchScope || variant.search)
         ? entryQueryModel.normalizeEntrySearch(variant.searchScope || variant.search)
@@ -7069,11 +7162,19 @@ function normalizeAdvancedFilterVariants(action, options = {}) {
           ? { ...variant.initialFilterFact }
           : null,
         entryIds,
-        issueMap: usesEntryQuery ? {} : advancedFilterIssueMapFromIssues(variant.issues, entryIds),
+        resultSource: usesFeatureQuery ? {
+          type: "ipaAutoCompare",
+          version: 1,
+          options: {},
+        } : null,
+        category: usesFeatureQuery ? variant.category : "",
+        resultCount: usesFeatureQuery ? Math.max(0, Number(variant.resultCount) || 0) : 0,
+        issueMap: usesEntryQuery || usesFeatureQuery ? {} : advancedFilterIssueMapFromIssues(variant.issues, entryIds),
       };
     })
     .filter((variant, index) => (
       advancedFilterVariantUsesEntryQuery(variant)
+      || advancedFilterVariantUsesFeatureQuery(variant)
       || variant.entryIds.length
       || (options.keepFirstEmpty && index === 0)
     ));
@@ -7254,7 +7355,7 @@ function rebuildAdvancedFilterAction(options = {}) {
     return null;
   }
   const allowEmptyActive = Boolean(options.allowEmptyActive);
-  if (advancedFilterUsesEntryQuery()) {
+  if (advancedFilterUsesRemoteQuery()) {
     return null;
   }
   if (advancedFilter.meta?.type === "quality") {
@@ -7282,7 +7383,7 @@ function applyAdvancedFilterAction(action, options = {}) {
     meta: activeVariant.key && action.meta ? { ...action.meta, activeKey: activeVariant.key } : action.meta,
     variants,
   }, activeVariant, 0);
-  if (advancedFilterUsesEntryQuery()) {
+  if (advancedFilterUsesRemoteQuery()) {
     resetEntryQueryState();
     return true;
   }
@@ -7300,7 +7401,7 @@ function refreshAdvancedFilterState() {
   if (!advancedFilter) {
     return false;
   }
-  if (advancedFilterUsesEntryQuery()) {
+  if (advancedFilterUsesRemoteQuery()) {
     const dictionary = activeDictionary();
     if (!dictionary) {
       return false;
@@ -7338,9 +7439,11 @@ async function refreshAdvancedFilter() {
   const dictionary = activeDictionary();
   revealEntryBrowserForResults();
   render();
-  if (advancedFilterUsesEntryQuery()) {
+  if (advancedFilterUsesRemoteQuery()) {
     scheduleEntryCardScroll(state.selectedEntryId);
-    await refreshAdvancedFilterFacts(dictionary, { force: true });
+    if (advancedFilterUsesEntryQuery()) {
+      await refreshAdvancedFilterFacts(dictionary, { force: true });
+    }
   } else if (advancedFilter?.entryIds?.length && advancedFilter.entryIds.includes(state.selectedEntryId)) {
     scheduleEntryCardScroll(state.selectedEntryId);
   }
@@ -7379,9 +7482,9 @@ function cycleAdvancedFilterVariant() {
   advancedFilter = advancedFilterStateForVariant({
     ...advancedFilter,
     meta: next.key && advancedFilter.meta ? { ...advancedFilter.meta, activeKey: next.key } : advancedFilter.meta,
-    selectFirstOnLoad: advancedFilterVariantUsesEntryQuery(next),
+    selectFirstOnLoad: advancedFilterVariantUsesEntryQuery(next) || advancedFilterVariantUsesFeatureQuery(next),
   }, next, nextIndex);
-  if (advancedFilterUsesEntryQuery()) {
+  if (advancedFilterUsesRemoteQuery()) {
     resetEntryQueryState();
     revealEntryBrowserForResults();
     render();
@@ -8656,6 +8759,15 @@ function renderAnalysis(dictionary = activeDictionary()) {
     }
     return;
   }
+  if (page === "ipa" && subpage === "mismatches") {
+    const queryState = analysisIpaCompareStateFor(dictionary);
+    elements.analysisPanel.innerHTML = renderAnalysisIpaCompareQueryPage(queryState);
+    setupAnalysisMasonryLayouts();
+    if (queryState.status === "idle") {
+      void loadAnalysisIpaCompare(dictionary);
+    }
+    return;
+  }
   const report = getAnalysisReport(dictionary, { page, subpage });
   elements.analysisPanel.innerHTML = renderAnalysisPage(report, page, subpage);
   setupAnalysisMasonryLayouts();
@@ -8666,6 +8778,113 @@ function analysisOverviewQueryKey(dictionary) {
     dictionaryId: dictionary?.id || "",
     updatedAt: dictionary?.updatedAt || "",
   });
+}
+
+function analysisIpaCompareQueryKey(dictionary) {
+  return stableJson({
+    dictionaryId: dictionary?.id || "",
+    updatedAt: dictionary?.updatedAt || "",
+    ipaSettings: dictionary?.settings?.ipa || {},
+  });
+}
+
+function analysisIpaCompareStateFor(dictionary) {
+  const key = analysisIpaCompareQueryKey(dictionary);
+  if (analysisIpaCompareQueryState.key !== key) {
+    return {
+      key,
+      status: "idle",
+      response: null,
+      error: null,
+      requestId: analysisIpaCompareQueryState.requestId,
+    };
+  }
+  return analysisIpaCompareQueryState;
+}
+
+async function loadAnalysisIpaCompare(dictionary, { force = false } = {}) {
+  if (!dictionary?.id) {
+    return;
+  }
+  const key = analysisIpaCompareQueryKey(dictionary);
+  if (!force && analysisIpaCompareQueryState.key === key && ["loading", "ready"].includes(analysisIpaCompareQueryState.status)) {
+    return;
+  }
+  const requestId = analysisIpaCompareQueryState.requestId + 1;
+  analysisIpaCompareQueryState = {
+    key,
+    status: "loading",
+    response: null,
+    error: null,
+    requestId,
+  };
+  try {
+    const response = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/features/query`, {
+      method: "POST",
+      body: JSON.stringify({
+        source: { type: "ipaAutoCompare", version: 1, options: {} },
+        view: {
+          category: "match",
+          search: { text: "", fields: ["lemma"], fuzzyFields: [] },
+          sort: "lemmaAsc",
+        },
+        page: { limit: 1 },
+      }),
+    });
+    if (analysisIpaCompareQueryState.requestId !== requestId || analysisIpaCompareQueryState.key !== key) {
+      return;
+    }
+    analysisIpaCompareQueryState = {
+      key,
+      status: "ready",
+      response,
+      error: null,
+      requestId,
+    };
+  } catch (error) {
+    if (analysisIpaCompareQueryState.requestId !== requestId || analysisIpaCompareQueryState.key !== key) {
+      return;
+    }
+    analysisIpaCompareQueryState = {
+      key,
+      status: "error",
+      response: null,
+      error,
+      requestId,
+    };
+    console.error(error);
+  }
+  if (
+    state.activeView === "analysis"
+    && activeAnalysisPage() === "ipa"
+    && activeAnalysisSubpage("ipa") === "mismatches"
+    && activeDictionary()?.id === dictionary.id
+  ) {
+    renderAnalysis(activeDictionary());
+  }
+}
+
+function renderAnalysisIpaCompareQueryPage(queryState) {
+  let body = "";
+  if (queryState.status === "ready") {
+    body = `<section class="analysis-detail-grid">${analysisCard(
+      aText("自动生成检查", "Auto Checks"),
+      analysisFactList(analysisIpaCompareRows(queryState.response)),
+    )}</section>`;
+  } else if (queryState.status === "error") {
+    body = `<div class="empty-state">
+      <strong>${escapeHtml(aText("无法完成 IPA 自动生成检查", "Could not complete IPA auto checks"))}</strong>
+      <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
+      <button type="button" class="secondary-button" data-analysis-ipa-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+    </div>`;
+  } else {
+    body = `<div class="empty-state"><strong>${escapeHtml(aText("正在检查 IPA 自动生成结果", "Checking generated IPA"))}</strong></div>`;
+  }
+  return `
+    ${analysisPageNav("ipa")}
+    ${analysisSubpageNav("ipa", "mismatches")}
+    <section class="analysis-page-body">${body}</section>
+  `;
 }
 
 function analysisOverviewStateFor(dictionary) {
@@ -8919,7 +9138,6 @@ function analysisSubpages(page) {
     activity: [
       ["updated", aText("编辑日期", "Updated")],
       ["created", aText("新增日期", "Created")],
-      ["latest", aText("最近修改", "Recent")],
     ],
   };
   return subpages[page] || [];
@@ -9094,11 +9312,6 @@ function renderAnalysisOverviewQuery(response) {
       row.count,
       analysisQueryFilterAction(row.action, analysisFilterTitle(aText("编辑日期", "Updated Date"), row.day)),
     ]),
-    latest: (activityWidget.latest || []).map((row) => [
-      row.lemma || aText("无词形", "No lemma"),
-      row.day,
-      row.action?.type === "entry" ? directEntryAction(row.action.entryId) : null,
-    ]),
   };
   return `
     <section class="analysis-grid analysis-summary-grid">
@@ -9150,7 +9363,10 @@ function renderAnalysisIpaPage(report, subpage) {
     </section>`;
   }
   if (subpage === "mismatches") {
-    return `<section class="analysis-detail-grid">${analysisCard(aText("自动生成检查", "Auto Checks"), analysisFactList(analysisIpaMismatchRows(report)))}</section>`;
+    const queryState = analysisIpaCompareStateFor(activeDictionary());
+    return queryState.status === "ready"
+      ? `<section class="analysis-detail-grid">${analysisCard(aText("自动生成检查", "Auto Checks"), analysisFactList(analysisIpaCompareRows(queryState.response)))}</section>`
+      : `<div class="empty-state"><strong>${escapeHtml(aText("正在检查 IPA 自动生成结果", "Checking generated IPA"))}</strong></div>`;
   }
   return `<section class="analysis-detail-grid">
     ${analysisCard(aText("音节数分布", "Syllable Counts"), analysisBarList(report.ipa.allSyllableCounts, { empty: aText("暂无 IPA", "No IPA yet") }))}
@@ -9177,9 +9393,6 @@ function renderAnalysisMorphologyPage(report, subpage) {
 function renderAnalysisActivityPage(report, subpage) {
   if (subpage === "created") {
     return `<section class="analysis-detail-grid">${analysisCard(aText("新增日期", "Created Date"), analysisBarList(report.activity.created, { empty: aText("暂无创建记录", "No creation records") }))}</section>`;
-  }
-  if (subpage === "latest") {
-    return `<section class="analysis-detail-grid">${analysisCard(aText("最近修改", "Recently Edited"), analysisLatestList(report.activity.latest))}</section>`;
   }
   return `<section class="analysis-detail-grid">${analysisCard(aText("编辑日期", "Updated Date"), analysisBarList(report.activity.updated, { empty: aText("暂无编辑记录", "No edit records") }))}</section>`;
 }
@@ -9358,22 +9571,28 @@ function analysisFactRows(report) {
   ];
 }
 
-function analysisIpaMismatchRows(report) {
+function analysisIpaCompareRows(response) {
   const matchTitle = aText("IPA 自动生成一致", "Auto IPA matches");
   const looseTitle = aText("IPA 自动生成不一致（宽松）", "Auto IPA mismatches (loose)");
   const strictTitle = aText("IPA 自动生成不一致（严格）", "Auto IPA mismatches (strict)");
+  const viewCounts = new Map((response?.summary?.views || []).map((row) => [row.key, Number(row.count) || 0]));
+  const outcomeCounts = new Map((response?.summary?.outcomes || []).map((row) => [row.key, Number(row.count) || 0]));
   const variants = [
-    { title: matchTitle, entryIds: report.ipa.generatedMatchEntryIds },
-    { title: looseTitle, entryIds: report.ipa.generatedMismatchEntryIds },
-    { title: strictTitle, entryIds: report.ipa.generatedMismatchStrictEntryIds },
+    { key: "match", title: matchTitle, resultCount: viewCounts.get("match") || 0 },
+    { key: "looseMismatch", title: looseTitle, resultCount: viewCounts.get("looseMismatch") || 0 },
+    { key: "strictMismatch", title: strictTitle, resultCount: viewCounts.get("strictMismatch") || 0 },
   ];
-  const ipaFilterAction = (title, entryIds) => entryIds.length
-    ? advancedFilterAction(title, entryIds, { variants: variants.filter((variant) => variant.title !== title) })
-    : null;
+  const ipaFilterAction = (category) => featureResultAdvancedFilterAction(
+    response?.source,
+    variants,
+    category,
+  );
   return [
-    [matchTitle, report.ipa.generatedMatch, ipaFilterAction(matchTitle, report.ipa.generatedMatchEntryIds)],
-    [looseTitle, report.ipa.generatedMismatch, ipaFilterAction(looseTitle, report.ipa.generatedMismatchEntryIds)],
-    [strictTitle, report.ipa.generatedMismatchStrict, ipaFilterAction(strictTitle, report.ipa.generatedMismatchStrictEntryIds)],
+    [matchTitle, viewCounts.get("match") || 0, ipaFilterAction("match")],
+    [looseTitle, viewCounts.get("looseMismatch") || 0, ipaFilterAction("looseMismatch")],
+    [strictTitle, viewCounts.get("strictMismatch") || 0, ipaFilterAction("strictMismatch")],
+    [aText("无法生成", "Unavailable"), outcomeCounts.get("unavailable") || 0],
+    [aText("生成失败", "Failed"), outcomeCounts.get("failed") || 0],
   ];
 }
 
@@ -9646,12 +9865,6 @@ function analyzeIpa(entries, dictionary) {
   const syllableCounts = new Map();
   let syllableTotal = 0;
   let syllableEntries = 0;
-  let generatedMatch = 0;
-  let generatedMismatch = 0;
-  let generatedMismatchStrict = 0;
-  const generatedMatchEntryIds = new Set();
-  const generatedMismatchEntryIds = new Set();
-  const generatedMismatchStrictEntryIds = new Set();
   const complex = normalizeIpaSettings(dictionary.settings?.ipa).syllable.complexPhonemes;
   entries.forEach((entry) => {
     if (!entry.pronunciation) {
@@ -9672,19 +9885,6 @@ function analyzeIpa(entries, dictionary) {
       syllableTotal += syllables.length;
       incrementEntry(syllableCounts, String(syllables.length), entry);
     }
-    const generated = generateIpaFromLemma(entry.lemma, dictionary.settings?.ipa);
-    if (generated && generated === String(entry.pronunciation ?? "")) {
-      generatedMatch += 1;
-      generatedMatchEntryIds.add(entry.id);
-    }
-    if (generated && normalizeIpaCompare(generated) !== normalizeIpaCompare(entry.pronunciation)) {
-      generatedMismatch += 1;
-      generatedMismatchEntryIds.add(entry.id);
-    }
-    if (generated && generated !== String(entry.pronunciation ?? "")) {
-      generatedMismatchStrict += 1;
-      generatedMismatchStrictEntryIds.add(entry.id);
-    }
   });
   return {
     units: topEntryMapItems(units, 16, aText("IPA 音位", "IPA Unit")),
@@ -9696,12 +9896,6 @@ function analyzeIpa(entries, dictionary) {
     syllableCounts: numericEntryMapItems(syllableCounts, aText("音节数", "Syllable Count")),
     allSyllableCounts: numericEntryMapItems(syllableCounts, aText("音节数", "Syllable Count")),
     syllableAverage: syllableEntries ? (syllableTotal / syllableEntries).toFixed(2) : "0",
-    generatedMatch,
-    generatedMatchEntryIds: [...generatedMatchEntryIds],
-    generatedMismatch,
-    generatedMismatchEntryIds: [...generatedMismatchEntryIds],
-    generatedMismatchStrict,
-    generatedMismatchStrictEntryIds: [...generatedMismatchStrictEntryIds],
   };
 }
 
@@ -9769,9 +9963,6 @@ function analyzeActivity(entries) {
   return {
     created: numericDateEntryItems(created, aText("新增日期", "Created Date"), "created"),
     updated: numericDateEntryItems(updated, aText("编辑日期", "Updated Date"), "updated"),
-    latest: [...entries]
-      .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
-      .map((entry) => [entry.lemma || aText("无词形", "No lemma"), dateBucket(entry.updatedAt) || "", directEntryAction(entry.id)]),
   };
 }
 
@@ -9866,17 +10057,7 @@ function analysisCoverageList(rows) {
 function analysisActivityList(activity) {
   const created = analysisBarList(activity.created, { empty: aText("暂无创建记录", "No creation records") });
   const updated = analysisBarList(activity.updated, { empty: aText("暂无编辑记录", "No edit records") });
-  const latest = activity.latest.length
-    ? `<ul class="analysis-issue-list">${activity.latest.map(([lemma, date, action]) => `<li${analysisActionAttributes(action)}><button type="button">${escapeHtml(lemma)}</button><span>${escapeHtml(date)}</span></li>`).join("")}</ul>`
-    : `<p class="muted-text">${escapeHtml(aText("暂无最近活动", "No recent activity"))}</p>`;
-  return `<h4>${escapeHtml(aText("新增", "Created"))}</h4>${created}<h4>${escapeHtml(aText("编辑", "Updated"))}</h4>${updated}<h4>${escapeHtml(aText("最近修改", "Recently Edited"))}</h4>${latest}`;
-}
-
-function analysisLatestList(items) {
-  if (!items.length) {
-    return `<p class="muted-text">${escapeHtml(aText("暂无最近活动", "No recent activity"))}</p>`;
-  }
-  return `<ul class="analysis-issue-list">${items.map(([lemma, date, action]) => `<li${analysisActionAttributes(action)}><button type="button">${escapeHtml(lemma)}</button><span>${escapeHtml(date)}</span></li>`).join("")}</ul>`;
+  return `<h4>${escapeHtml(aText("新增", "Created"))}</h4>${created}<h4>${escapeHtml(aText("编辑", "Updated"))}</h4>${updated}`;
 }
 
 function analysisFactList(rows) {
@@ -10017,6 +10198,32 @@ function advancedFilterAction(title, items, options = {}) {
     entryIds,
     variants,
     meta: options.meta || null,
+  };
+}
+
+function featureResultAdvancedFilterAction(source, variants, activeCategory) {
+  const normalizedVariants = (variants || []).map((variant) => ({
+    key: variant.key,
+    title: variant.title,
+    resultSource: source,
+    category: variant.key,
+    resultCount: Math.max(0, Number(variant.resultCount) || 0),
+  }));
+  const active = normalizedVariants.find((variant) => variant.category === activeCategory);
+  if (!active || active.resultCount <= 0) {
+    return null;
+  }
+  return {
+    type: "advanced-filter",
+    title: active.title,
+    variants: [
+      active,
+      ...normalizedVariants.filter((variant) => variant.category !== activeCategory),
+    ],
+    meta: {
+      type: "feature-result",
+      sourceType: source?.type || "",
+    },
   };
 }
 
@@ -14308,7 +14515,7 @@ function escapeHtml(value) {
 }
 
 elements.searchInput.addEventListener("input", (event) => {
-  if (advancedFilter && !advancedFilterUsesEntryQuery()) {
+  if (advancedFilter && !advancedFilterUsesRemoteQuery()) {
     event.target.value = "";
     return;
   }
@@ -14699,6 +14906,12 @@ elements.entryListNewEntryButton.addEventListener("click", async () => {
 });
 elements.editEntryButton.addEventListener("click", beginEditEntry);
 elements.analysisPanel.addEventListener("click", (event) => {
+  const ipaRetryButton = event.target.closest("[data-analysis-ipa-retry]");
+  if (ipaRetryButton) {
+    void loadAnalysisIpaCompare(activeDictionary(), { force: true });
+    renderAnalysis(activeDictionary());
+    return;
+  }
   const retryButton = event.target.closest("[data-analysis-retry]");
   if (retryButton) {
     void loadAnalysisOverview(activeDictionary(), { force: true });

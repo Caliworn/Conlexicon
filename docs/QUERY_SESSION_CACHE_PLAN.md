@@ -287,7 +287,7 @@ query kind
 - 普通列表直接保存并渲染 API summary DTO，不再先压缩成 ID、再通过完整 `dictionary.entries` 映射回词条。summary 的 `definitionPreviews` 保留全部义项的轻量文本与原位置，因此列表的多义项显示和搜索命中序号不需要完整词条。
 - 当前词条详情统一通过 `/entries/:entryId` 按需读取；前端使用最多 12 项、约 12 MiB 的小型 LRU，并合并同一词条的并发请求。保存响应会立即更新当前详情缓存，查询 DTO 则局部更新后按 `updatedAt` 失效并重查。
 - `/root-groups` 的折叠组只返回 root summary、衍生词数量和匹配数量，不再携带全部衍生词。展开时通过 `/root-groups/:rootId/entries` 一次读取组内全部 summary；该子端点与父端点复用同一关系会话，但不提供分页。
-- 普通编辑器列表与详情已切到上述边界；F3 又将稳定 SQL 高级筛选接入同一窗口与查询会话。F4a 已让数据分析总览的轻量统计改用 `/analysis/query` widget DTO；其他分析子页、质量检查以及 IPA/Gloss/形态 feature result 仍会使用完整活动词典 snapshot，等待 F4b/F5 迁移。详情来源、完整编辑衍生词和词汇网络等关系消费者已经迁移到共享关系 API，不再列入剩余本地消费者。这是尚未迁移模块的当前实现，不是 summary/detail 的运行时兜底。
+- 普通编辑器列表与详情已切到上述边界；F3 又将稳定 SQL 高级筛选接入同一窗口与查询会话。F4a 已让数据分析总览的轻量统计改用 `/analysis/query` widget DTO；F4b-1 已让 IPA 自动生成比较消费 feature query/location 和同一列表窗口。其他分析子页、质量检查以及 Gloss/形态 feature result 仍会使用完整活动词典 snapshot，等待 F4b-2/F4b-3/F5 迁移。详情来源、完整编辑衍生词和词汇网络等关系消费者已经迁移到共享关系 API，不再列入剩余本地消费者。这是尚未迁移模块的当前实现，不是 summary/detail 的运行时兜底。
 
 ### Q4：可重建 cursor 与纯滚动窗口化（已完成）
 
@@ -318,5 +318,5 @@ query kind
 ### Q5：剩余查询消费者（部分完成）
 
 - 高级筛选 F1–F3 已完成共享 filter descriptor、统一 EntryQuery 身份、稳定条件 SQL 编译和前端状态迁移；查询型筛选复用 `/entries` 窗口、缓存、定位、排序与搜索，不再保存匹配 ID 数组。
-- 数据分析总览的 `entryCount`、`coverageBreakdown`、`partDistribution` 和 `activityPreview` 已通过同步 `/analysis/query` 与最小 planner 按需读取；前端异步加载并按 generation/cacheKey 识别结果。其他分析子页和质量检查仍使用各自的前端 slice/report cache。下一步 F4b 为重型功能结果建立独立服务端会话，F5 接入质量 API；只有真实基准证明单次重型计算不适合请求内完成时，才增加后台状态。
+- 数据分析总览的 `entryCount`、`coverageBreakdown`、`partDistribution` 和 `activityPreview` 已通过同步 `/analysis/query` 与最小 planner 按需读取；前端异步加载并按 generation/cacheKey 识别结果。F4b-1 已完成 IPA 自动生成比较的可重建会话、异步分析页和高级筛选窗口；10k/30k 基准暂不要求后台状态。其他分析子页和质量检查仍使用各自的前端 slice/report cache；下一步迁移 IPA 分布、正式形态分析，再由 F5 接入独立质量 API。词根排行和确定性统计分别走 topology 与 summary/facet，不进入 feature session。
 - 语料库在独立升级阶段建立块/单元读取与 changeset；不把 corpus blob 扫描塞进 entries 会话。

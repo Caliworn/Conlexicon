@@ -239,7 +239,7 @@ async function checkAnalysisQueryContract(repository) {
     assert.deepEqual(parts.n.action.filter, { part: "n" });
 
     assert.deepEqual(result.body.widgets.activity.created.map((row) => row.day), ["2026-07-02", "2026-07-03"]);
-    assert.deepEqual(result.body.widgets.activity.latest.map((row) => row.entryId), ["entry-analysis-delta", "entry-analysis-gamma"]);
+    assert.deepEqual(Object.keys(result.body.widgets.activity).sort(), ["created", "type", "updated"]);
     assert.deepEqual(result.body.widgets.activity.updated[0].action.filter, {
       activityDays: [{ field: "updated", day: "2026-07-03" }],
     });
@@ -259,8 +259,8 @@ async function checkAnalysisQueryContract(repository) {
     assert.equal(withoutActions.statusCode, 200);
     assert.deepEqual(withoutActions.body.diagnostics.computedTasks, ["entryStats", "activityStats"]);
     assert.equal(withoutActions.body.widgets.coverage.rows[0].action, undefined);
-    assert.equal(withoutActions.body.widgets.activity.latest[0].action, undefined);
-    assert.equal(withoutActions.body.widgets.activity.latest.length, 4);
+    assert.equal(withoutActions.body.widgets.activity.created[0].action, undefined);
+    assert.equal(withoutActions.body.widgets.activity.updated[0].action, undefined);
 
     const firstGeneration = result.body.generation;
     const firstCacheKey = result.body.cacheKey;

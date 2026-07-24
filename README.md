@@ -16,14 +16,14 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - Configurable part-of-speech logic: by default the first tag is treated as the part of speech; an optional explicit tag list supports multiple parts of speech per entry for display and filtering.
 - Display mode and edit mode: saved entries open in a clean reading view, with full editing and inline section editing available.
 - Responsive application shell with collapsible tool navigation, a collapsible entry list, and mobile drawer controls for navigation, entry browsing, and creating entries.
-- Advanced filtering from analytics and quality checks: click analytic rows or quality categories to filter the entry browser, with reversible filter variants for coverage, IPA, morphology, and quality issues.
+- Advanced filtering from analytics and quality checks: click analytic rows or quality categories to filter the entry browser, with reversible filter variants for coverage, IPA, morphology, and quality issues. IPA auto-check variants use a rebuildable server result session and retain the normal list search, sort, window, and location behavior.
 - Root mode entry browsing: derived entries can be nested under their roots, with expand/collapse controls and quick derived-entry creation.
 - Layered SVG lexical network for source and derived relationships, with keyed node refocusing, animated edges, hover details, and responsive horizontal/vertical layouts.
 - Auto IPA rules with mapping, syllabification, onset/coda clusters, complex phonemes, stress settings, sandbox testing, and batch generation.
 - Auto morphology with template groups, multiple subtables per group, automatic or manual per-entry group selection, rule syntax, function objects, overrides, generated forms, and searchable morphology output.
 - Markdown language documentation with split edit/preview, edit-only, and preview-only modes.
 - Per-dictionary corpus management with ordered blocks, speaker/modality layers, standalone units, inherited attributes, unique entity ID validation, single-parent link validation, and configurable gloss-based unit names with optional render objects.
-- Tabbed data analysis with an on-demand SQLite widget overview for entry count, coverage, part-of-speech distribution, and recent activity, plus entries/tags, IPA, morphology, activity, and a dedicated quality-check page.
+- Tabbed data analysis with an on-demand SQLite widget overview for entry count, coverage, part-of-speech distribution, and creation/edit date activity; IPA auto-generation checks are also loaded on demand and reuse one cached outcome summary across match variants.
 - Gloss rendering for `\gla`, `\glb`, `\glc`, and `\ft`, with independent render-object and alignment settings for corpus unit cards, unit content headings, and entry examples, plus per-object font, size, bold, italic, and `\glb` small-caps styles.
 - Per-dictionary UI/settings options, including per-field search/fuzzy controls, optional NFC and Unicode case folding, custom search equivalence rules, etymology autocomplete matching, label display replacement, highlighted tags, gloss rendering, polysemy display, save/discard/prompt handling for edits during navigation, corpus/docs auto-save, IPA keyboard symbols, and left navigation order.
 - SQLite-backed per-value search projections for static entry fields and generated morphology, with configurable strict/fuzzy matching and localized hit summaries. Large entry and root-mode results use versioned query windows while retaining one continuous native scrollbar.
@@ -35,14 +35,14 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - 可配置词性逻辑：默认将第一个标签视为词性；也可显式指定词性标签列表，使一个词条拥有多个词性并用于显示和筛选。
 - 查看模式与编辑模式：保存后的词条会进入整洁的阅读界面，也支持完整编辑和栏目局部编辑。
 - 响应式应用外壳：支持可收起工具导航、可收起词条列表，以及移动端用于导航、浏览词条和新建词条的抽屉控件。
-- 数据分析与质量检查高级筛选：点击统计行或质量类别可以筛选词条列表，并支持释义覆盖、IPA、形态学、质量问题等项目的筛选条件切换；标签、字段有无、来源数量和日期等稳定条件可继续叠加自由文本搜索，并复用普通词条列表的窗口加载与定位。循环条件按结构候选自动更新，不会因当前搜索暂时无命中而错误隐藏；“当前搜索命中字段”会直接切换列表的运行期搜索范围，不额外进入高级筛选。
+- 数据分析与质量检查高级筛选：点击统计行或质量类别可以筛选词条列表，并支持释义覆盖、IPA、形态学、质量问题等项目的筛选条件切换；标签、字段有无、来源数量和日期等稳定条件可继续叠加自由文本搜索，并复用普通词条列表的窗口加载与定位。IPA 自动检查变体使用可重建的服务端结果会话，同样保留列表搜索、排序、窗口与定位行为。循环条件按候选摘要自动更新，不会因当前搜索暂时无命中而错误隐藏；“当前搜索命中字段”会直接切换列表的运行期搜索范围，不额外进入高级筛选。
 - 词根模式浏览：衍生词可以嵌套显示在词根下方，支持单组展开/收起、全局展开、全局模式下的单组收起例外，以及快速创建衍生词；父级窗口淘汰只释放数据，不丢失展开意图。
 - 词汇网络：以分层 SVG 展示来源、当前焦点与衍生关系；关联节点会在切换焦点时连续移动并更新连线，同时支持悬浮信息、键盘操作和窄屏纵向布局。
 - 自动 IPA：支持映射、音节划分、音节首/尾辅音簇、复杂音位、重音设置、沙盒测试和批量生成。
 - 自动形态学：支持模板组及组内多个形态表格、词条级自动匹配或手动选择形态组、规则语法、函数识别对象、词条覆盖项、生成形式和搜索生成结果。
 - Markdown 语言文档：支持左右分栏编辑预览、纯编辑和纯查看模式。
 - 词典级语料库：支持有序语料块、发言人/模态语料层、独立语料单元、属性继承、实体 ID 唯一性检查、单父级链接检查，以及带可选渲染对象的 Gloss 单元名渲染。
-- 分标签页数据分析：总览按需异步读取 SQLite 轻量 widget，提供词条数、覆盖率、词性分布和近期活动；其余标签页包括词条与标签、IPA、形态学和编辑进度。质量检查拥有独立页面，支持按优先度和检查模块查看问题。
+- 分标签页数据分析：总览按需异步读取 SQLite 轻量 widget，提供词条数、覆盖率、词性分布和创建/编辑日期活动；按修改时间浏览词条复用列表排序。IPA 自动生成检查也按需异步加载，并由一份互斥 outcome 摘要提供一致、宽松不一致和严格不一致三类视图。质量检查拥有独立页面，支持按优先度和检查模块查看问题。
 - Gloss 渲染：语料单元卡片、单元内容名称和词条例句可分别配置渲染对象与对齐，并支持 `\gla`、`\glb`、`\glc`、`\ft` 独立配置字体、字号、粗体和斜体，以及 `\glb` small caps。
 - 词典级界面设置：包括新会话默认使用的逐字段搜索/模糊匹配、可选 NFC 与 Unicode 大小写折叠、自定义搜索等价规则、词源自动补全、标签显示替换、红色高亮标签、gloss 渲染、多义项显示、导航时保存/放弃/提示编辑、语料库/文档自动保存、IPA 虚拟键盘符号和左侧导航栏排序。词条列表搜索框旁可在不改写默认值的情况下，按当前运行期临时调整搜索字段和每个字段的 fuzzy 状态。
 - SQLite 逐值搜索投射：静态词条字段和自动生成形态均支持可配置的严格/模糊搜索及本地化命中摘要；词根模式和词汇网络复用仅在关系变化时失效、带双向定位索引的稳定拓扑。大型词条列表与词根模式结果通过版本化查询窗口加载，同时保持一条连续的原生滚动条。切换查询或词条详情时会先保留当前内容，旧详情会立即停止响应交互；读取超过 200ms 后再以统一遮罩标明正在更新，避免快速本地读取产生闪烁。

@@ -31,7 +31,7 @@
 
 ### 阶段 B：数据访问层与索引（核心已完成）
 
-前端已通过 HTTP API 与具体文件读写解耦，SQLite 已是默认主存储。静态字段和动态形态的严格/fuzzy 搜索 projection、查询会话、纯滚动数据窗口、列表 summary DTO、按需词条详情、词根模式、词汇关系 API、高级筛选 F0–F3，以及 F4a 轻量分析查询均已接入。阶段 B 的下一步是 F4b feature result session，随后以 F5 质量 API 迁移剩余重型消费者，再独立处理语料查询边界。所有后续语料功能继续只依赖稳定 API，不直接依赖 JSON 或 SQLite。
+前端已通过 HTTP API 与具体文件读写解耦，SQLite 已是默认主存储。静态字段和动态形态的严格/fuzzy 搜索 projection、查询会话、纯滚动数据窗口、列表 summary DTO、按需词条详情、词根模式、词汇关系 API、高级筛选 F0–F3、F4a 轻量分析查询，以及 F4b-1 IPA 自动生成比较结果会话均已接入。阶段 B 的下一步是 F4b-2 IPA 分布迁移，随后以共享 morphology model 完成 F4b-3 正式形态分析，再由 F5 质量 API 接管质量检查。词根家族排行直接消费稳定后端拓扑，不进入 feature session。所有后续语料功能继续只依赖稳定 API，不直接依赖 JSON 或 SQLite。
 
 ### 阶段 C：例句链接迁移
 
@@ -534,10 +534,12 @@ lib/
    - 两段式 stale-while-revalidate 已接入查询首窗和按需词条详情：200ms 内保持原内容，但旧详情从请求开始即进入 `inert`；超过后以统一覆盖视觉显示详情遮罩和变淡列表的“正在更新”。首次无旧内容仍直接显示加载状态，失败直接进入现有错误状态，不重试或把旧内容当作成功结果。词条切换和词汇网络返回已改为局部提交，只同步已渲染卡片选中态、详情和必要滚动，不再调用全局 `render()` 或重建查询窗口。详情来源、详情/完整编辑衍生词和词汇网络已共用 `/entry-relations/:entryId` 与前端关系缓存，不再重建完整词典关系索引。
    - 高级筛选查询化 F0–F3 已完成：共享 `EntryQuery/EntryFilter` 已统一现有 `/entries` 参数、查询 descriptor、cursor digest 与缓存身份；字段存在性、来源数量和 UTC 日期已接入同一 SQLite 编译器及定位 API。可稳定查询的高级筛选前端状态已经从完整 `entryIds` 数组迁为结构 descriptor，并复用普通查询窗口、定位、排序、SWR 与搜索。循环变体已拆分结构 facts 与当前搜索结果：`/entries/filter-facts` 只批量判断 filter 候选是否存在，并按 generation 复用；搜索只重查当前变体，进入筛选和写入后自动补齐未知 facts，有效的非当前响应继续进入前端缓存。手动刷新只失效当前 entries/定位缓存并强制重新验证 facts。与词条详情/词汇网络重复的来源文本、指定来源词条筛选已删除；总览“衍生词”入口复用“有来源”条件。
    - F4a 已实装同步、按需的 `POST /api/dictionaries/:id/analysis/query`：`entryCount`、`coverageBreakdown`、`partDistribution` 和 `activityPreview` 由最小 widget planner 合并为三个 SQLite 聚合任务。前端总览异步消费 widget DTO，已迁移统计不再读取完整活动词典；F4a 没有建设通用后台任务框架。
-   - 下一步 F4b 为重型 IPA、Gloss、完整形态统计、完整词根家族排名和质量问题建立 feature result session；先允许同步构建并缓存，只有真实基准证明请求内计算不可接受时才加入进程内后台状态，近期不增加持久化 job 表。F5 建立 `/quality/query` 并删除剩余前端 ID 数组桥接。
+   - F4b-0 与 F4b-1 已完成，契约见 `docs/FEATURE_RESULT_SESSION_PLAN.md`：客户端携带可重建 result source descriptor，服务端内部会话复用基础算法结果，分类、搜索、排序和窗口不触发算法重算。当前 `ipaAutoCompare` 以可替换 adapter 包装简易模型，query/location API 返回 summary、EntrySummary 窗口和轻量 feature detail；分析页及高级筛选不再持有三类完整 ID 数组，也未新增自动 IPA 持久化列。
+   - F4b-2 再迁移 IPA 音位/首尾音/音节分布，F4b-3 以共享 morphology model 重做形态分析并删除旧单表适配。词根家族排行改用稳定 topology summary，正写法统计另走轻量 summary/facet，Gloss 等待阶段 C 的例句链接边界。F5 建立独立 `/quality/query`，只复用内部会话原语并删除剩余质量 ID/issue bridge。
+   - F4b 首版同步构建并使用有界运行时缓存；只有 10k/30k 基准或可观察交互证明请求内计算不可接受时才加入进程内后台状态，近期不增加持久化 job 表。
    - 普通词条和词根模式的搜索、窗口、定位与关系读取已完成查询化；候选索引是否采用 FTS/ngram 由真实基准决定，不再把这些已完成路径列为待接线项。
    - 形态学结构化存储已完成；DSL v2、表格结构编辑与 layout 设计暂缓，除明确 bug 外不要继续扩展其 schema。数据分析升级时删除 `app.js` 的旧形态单表适配，改为直接调用共享 morphology model。
-   - F4a 已完成；按 F4b → F5 顺序将剩余数据分析和质量检查推进为功能结果会话与按需 API，不得把 feature result 伪装成 repository 普通 predicate。
+   - F4a、F4b-0 与 F4b-1 已完成；下一步按 F4b-2 → F4b-3 → F5 顺序迁移 IPA 分布、正式形态分析与质量检查，不得把 feature result 伪装成 repository 普通 predicate，也不得为已有 topology/summary 能力重复建会话。
    - 评估语料库是否先拆为块/单元级 changeset，再决定何时 SQL 分表。
 5. 旧 JSON 词典当前通过词典管理界面的 JSON 导入功能手动迁入 SQLite；不要在未设计备份、报告和回滚前加入启动时自动迁移。
 6. 增量保存稳定后，再基于目标对象的 `updatedAt` 做轻量冲突检查；短期不引入词典级 revision。
