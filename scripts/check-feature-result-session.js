@@ -46,8 +46,23 @@ function summaryCounts(response, key) {
 async function checkQueryModel() {
   const normalized = normalizeFeatureResultQuery(featureRequest("strictMismatch"));
   assert.equal(normalized.source.type, "ipaAutoCompare");
+  assert.equal(normalized.responseMode, "items");
   assert.equal(normalized.view.category, "strictMismatch");
   assert.equal(normalized.page.limit, 2);
+  assert.deepEqual(
+    normalizeFeatureResultQuery({ source: SOURCE, responseMode: "summary" }),
+    { source: SOURCE, responseMode: "summary" },
+  );
+  assert.throws(
+    () => normalizeFeatureResultQuery({ source: SOURCE, responseMode: "summary", page: { limit: 1 } }),
+    (error) => error instanceof FeatureResultQueryValidationError
+      && error.code === "invalid_feature_result_summary_request",
+  );
+  assert.throws(
+    () => normalizeFeatureResultQuery({ source: SOURCE, responseMode: "unknown" }),
+    (error) => error instanceof FeatureResultQueryValidationError
+      && error.code === "invalid_feature_result_response_mode",
+  );
   assert.throws(
     () => normalizeFeatureResultQuery({ ...featureRequest("match"), source: { ...SOURCE, version: 2 } }),
     (error) => error instanceof FeatureResultQueryValidationError
@@ -138,6 +153,34 @@ async function checkRepositoryIntegration() {
       },
     };
     const service = new AnalysisFeatureService({ repository, engine });
+    let orderedViewCalls = 0;
+    let entrySummaryCalls = 0;
+    const orderedAnalysisFeatureEntryIds = repository.orderedAnalysisFeatureEntryIds.bind(repository);
+    const analysisFeatureEntrySummaries = repository.analysisFeatureEntrySummaries.bind(repository);
+    repository.orderedAnalysisFeatureEntryIds = (...args) => {
+      orderedViewCalls += 1;
+      return orderedAnalysisFeatureEntryIds(...args);
+    };
+    repository.analysisFeatureEntrySummaries = (...args) => {
+      entrySummaryCalls += 1;
+      return analysisFeatureEntrySummaries(...args);
+    };
+
+    const summary = await service.query(dictionary.id, {
+      source: SOURCE,
+      responseMode: "summary",
+    });
+    assert.equal(Object.hasOwn(summary, "items"), false);
+    assert.equal(Object.hasOwn(summary, "pageInfo"), false);
+    assert.equal(Object.hasOwn(summary.diagnostics, "viewCache"), false);
+    assert.equal(orderedViewCalls, 0, "summary mode must not build an ordered result view");
+    assert.equal(entrySummaryCalls, 0, "summary mode must not read entry summaries");
+    assert.equal(generateCalls, 5);
+    assert.deepEqual(summaryCounts(summary, "views"), {
+      match: 1,
+      looseMismatch: 1,
+      strictMismatch: 2,
+    });
 
     const strict = await service.query(dictionary.id, featureRequest("strictMismatch", { limit: 1 }));
     assert.equal(strict.items.length, 1);
@@ -158,7 +201,9 @@ async function checkRepositoryIntegration() {
       looseMismatch: 1,
       strictMismatch: 2,
     });
-    assert.equal(generateCalls, 5);
+    assert.equal(generateCalls, 5, "item query must reuse the summary request's base feature session");
+    assert.equal(orderedViewCalls, 1);
+    assert.equal(entrySummaryCalls, 1);
 
     const strictNext = await service.query(dictionary.id, featureRequest("strictMismatch", {
       limit: 1,

@@ -87,7 +87,7 @@
 | `GET` | `/api/dictionaries/:id/root-groups/location` | 定位词条所属的父级词根窗口 | `{ items, pageInfo, location }` | 必须传 `entryId`；可传 `preferredRootId` 消除多来源词条的父级歧义，其余参数沿用 `/root-groups` descriptor。 |
 | `GET` | `/api/dictionaries/:id/root-groups/:rootId/entries` | 按需读取单个词根组的全部衍生词 | `{ items }`，其中 `items` 固定为词条摘要 DTO | 支持与词根组查询相同的搜索、排序和字段参数，但不分页；折叠组不预载衍生词，展开后一次读取整组。 |
 | `POST` | `/api/dictionaries/:id/analysis/query` | 按需读取轻量分析 widgets | `{ dictionaryId, generation, cacheKey, widgets, diagnostics }` | F4a 同步聚合端点；多个 widget 由 planner 合并为共享 SQLite 任务，不读取或返回完整词典 snapshot。 |
-| `POST` | `/api/dictionaries/:id/analysis/features/query` | 读取派生功能结果窗口 | `{ dictionaryId, generation, resultKey, source, summary, items, pageInfo, diagnostics }` | F4b-1 当前只支持 `ipaAutoCompare` v1；基础算法结果保存在有界进程缓存中，分类、搜索、排序和窗口不触发 IPA 重算。 |
+| `POST` | `/api/dictionaries/:id/analysis/features/query` | 读取派生功能结果摘要或窗口 | summary 模式返回 `{ dictionaryId, generation, resultKey, source, summary, diagnostics }`；items 模式另带 `{ items, pageInfo }` | F4b-1 当前只支持 `ipaAutoCompare` v1；基础算法结果保存在有界进程缓存中，分类、搜索、排序和窗口不触发 IPA 重算。 |
 | `POST` | `/api/dictionaries/:id/analysis/features/location` | 定位词条在派生结果视图中的窗口 | feature query 响应加 `{ location }` | 请求额外携带 `entryId`；目标不属于当前分类或搜索结果时返回 `location.found: false`。 |
 
 #### `GET /api/dictionaries/:id/entries` 查询参数补充
@@ -690,11 +690,12 @@ POST /api/dictionaries/:id/analysis/features/query
 POST /api/dictionaries/:id/analysis/features/location
 ```
 
-请求分成可重建的 `source`、可变的 `view` 和 `page`。当前规范形状为：
+请求默认使用 `responseMode: "items"`，并分成可重建的 `source`、可变的 `view` 和 `page`。当前窗口查询规范形状为：
 
 ```js
 {
   source: { type: "ipaAutoCompare", version: 1, options: {} },
+  responseMode: "items",
   view: {
     category: "match" | "looseMismatch" | "strictMismatch",
     search: {
@@ -712,7 +713,18 @@ POST /api/dictionaries/:id/analysis/features/location
 }
 ```
 
-`source` 绑定功能类型、契约版本和算法 options；`view` 选择 category、EntrySearch 与 sort；`page` 使用普通列表相同的窗口语义。服务端按词典 generation、source、算法版本和 IPA 设置摘要复用内部会话。搜索复用词典的运行期规范化配置和现有 SQLite search projection；只回读当前页 EntrySummary 与 search hits。
+只读取整个 result source 摘要时使用：
+
+```js
+{
+  source: { type: "ipaAutoCompare", version: 1, options: {} },
+  responseMode: "summary"
+}
+```
+
+summary 模式不接受 `view` 或 `page`，其统计不受 category、搜索、排序或窗口影响。服务端建立或复用基础会话后直接返回 `summary`，不建立有序结果视图、不读取 EntrySummary，也不生成 `items`、`pageInfo` 或 cursor。IPA 自动检查页首次加载使用该模式。
+
+`source` 绑定功能类型、契约版本和算法 options；items 模式的 `view` 选择 category、EntrySearch 与 sort，`page` 使用普通列表相同的窗口语义。服务端按词典 generation、source、算法版本和 IPA 设置摘要复用内部会话。搜索复用词典的运行期规范化配置和现有 SQLite search projection；只回读当前页 EntrySummary 与 search hits。
 
 基础 outcome 为互斥的 `exactMatch`、`normalizedOnlyMatch`、`mismatch`、`unavailable`、`failed`。三个 UI category 分别映射为 `exactMatch`、`mismatch`、`normalizedOnlyMatch + mismatch`。响应中的 `summary.outcomes` 和 `summary.views` 一次返回全部计数，因此循环按钮不执行额外存在性探针。
 
@@ -720,7 +732,7 @@ POST /api/dictionaries/:id/analysis/features/location
 
 会话使用每词典最多 4 份、全局估算 32 MiB、空闲 2 分钟的有界进程缓存，并合并相同 descriptor 的并发构建。写入、IPA 设置变化、引擎 ID/版本或 source 变化会产生新会话；淘汰或进程重启后由 descriptor 透明重建。cursor 绑定进程 epoch、generation、result key 和视图 identity，陈旧 cursor 返回 `query_cursor_stale`。当前简易 IPA 模型由 adapter 包装；自动生成值仍是可重建的运行时结果，不新增持久化列。
 
-source、version、options、category、page 与搜索字段验证失败分别使用 `invalid_feature_result_source`、`unsupported_feature_result_source`、`invalid_feature_result_source_version`、`invalid_feature_result_source_options`、`invalid_feature_result_category` 或既有 EntryQuery 校验码。location 缺少目标 ID 时返回 `invalid_feature_result_location_entry_id`。
+source、version、options、response mode、category、page 与搜索字段验证失败分别使用 `invalid_feature_result_source`、`unsupported_feature_result_source`、`invalid_feature_result_source_version`、`invalid_feature_result_source_options`、`invalid_feature_result_response_mode`、`invalid_feature_result_category` 或既有 EntryQuery 校验码。summary 模式携带 `view` 或 `page` 时返回 `invalid_feature_result_summary_request`；location 缺少目标 ID 时返回 `invalid_feature_result_location_entry_id`。
 
 #### Light / full 任务边界
 

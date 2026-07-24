@@ -8823,12 +8823,7 @@ async function loadAnalysisIpaCompare(dictionary, { force = false } = {}) {
       method: "POST",
       body: JSON.stringify({
         source: { type: "ipaAutoCompare", version: 1, options: {} },
-        view: {
-          category: "match",
-          search: { text: "", fields: ["lemma"], fuzzyFields: [] },
-          sort: "lemmaAsc",
-        },
-        page: { limit: 1 },
+        responseMode: "summary",
       }),
     });
     if (analysisIpaCompareQueryState.requestId !== requestId || analysisIpaCompareQueryState.key !== key) {
