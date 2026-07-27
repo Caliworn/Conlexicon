@@ -561,8 +561,8 @@ CREATE TABLE entry_morphology_search_values (
 
 按当前依赖关系建议依次处理：
 
-1. 高级筛选 F1–F3、分析 F4a 与 F4b-0/F4b-1 已完成：统一 EntryQuery/EntryFilter、稳定条件 SQL 编译和前端 descriptor 状态已接入 `/entries` 会话、窗口、定位、排序与搜索；轻量 `/analysis/query` 已以最小 widget planner 聚合 SQLite 任务并异步供前端总览消费；IPA 自动生成比较已接入可重建 feature result session 与 query/location。10k/30k 基准暂不要求增加后台状态。
-2. F4b/F5 把真正的功能算法结果和质量检查推进为按需 API。数据分析词根家族 slice 则直接消费 `currentRootTopology()`：只返回 `{ rootId, lemma, derivedCount }` 和必要的窗口信息，不返回全部 `derivedIds`；可配置 Top N 通过 `limit` 表达。全局衍生词数量不得累加各家族数量，以免多来源词条重复计数。迁移后删除前端重复的关系索引/词根分组，以及未被 UI 消费的 `rootFamilies[].derivedEntryIds`。质量检查中的词源查询也应复用同一稳定拓扑。
+1. 高级筛选 F1–F3、分析 F4a、F4b-0/F4b-1 与 F4b-2 后端 source 已完成：统一 EntryQuery/EntryFilter、稳定条件 SQL 编译和前端 descriptor 状态已接入 `/entries` 会话、窗口、定位、排序与搜索；轻量 `/analysis/query` 已以最小 widget planner 聚合 SQLite 任务并异步供前端总览消费；IPA 自动生成比较已接入可重建 feature result session 与 query/location，IPA 分布也已具备不调用生成引擎的独立 summary/items/location 契约。10k/30k 基准暂不要求增加后台状态。
+2. 先完成 F4b-2 IPA 分布分析页和高级筛选接线，再由 F4b/F5 把其余真正的功能算法结果和质量检查推进为按需 API。数据分析词根家族 slice 则直接消费 `currentRootTopology()`：只返回 `{ rootId, lemma, derivedCount }` 和必要的窗口信息，不返回全部 `derivedIds`；可配置 Top N 通过 `limit` 表达。全局衍生词数量不得累加各家族数量，以免多来源词条重复计数。迁移后删除前端重复的关系索引/词根分组，以及未被 UI 消费的 `rootFamilies[].derivedEntryIds`。质量检查中的词源查询也应复用同一稳定拓扑。
 3. F4b 数据分析升级时直接消费当前 morphology model，删除前端临时旧单表视图；不要在 repository 恢复旧形态输出。
 4. 仅在基准表明确认线性扫描成为主要瓶颈后，再选择 FTS、ngram 或其他候选索引。
 5. 语料库进入独立升级阶段后，再把 `module_blobs.corpus` 拆成正式 SQL 表及块/单元级 API。

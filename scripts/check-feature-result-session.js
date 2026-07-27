@@ -6,6 +6,7 @@ const {
   normalizeFeatureResultQuery,
 } = require("../lib/feature-result-query-model");
 const { FeatureResultSessionCache } = require("../lib/feature-result-session-cache");
+const { buildIpaDistributionResult } = require("../lib/ipa-distribution-feature");
 const { createSimpleIpaEngine } = require("../lib/phonology-engine");
 const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
 const {
@@ -15,6 +16,11 @@ const {
 
 const SOURCE = {
   type: "ipaAutoCompare",
+  version: 1,
+  options: {},
+};
+const DISTRIBUTION_SOURCE = {
+  type: "ipaDistribution",
   version: 1,
   options: {},
 };
@@ -39,8 +45,36 @@ function featureRequest(category, options = {}) {
   };
 }
 
+function distributionRequest(category, value, options = {}) {
+  return {
+    source: DISTRIBUTION_SOURCE,
+    view: {
+      category,
+      value,
+      search: options.search || {
+        text: "",
+        fields: ["lemma", "pronunciation"],
+        fuzzyFields: [],
+      },
+      sort: options.sort || "lemmaAsc",
+    },
+    page: {
+      limit: options.limit || 2,
+      cursor: options.cursor || "",
+      ...(options.windowOffset === undefined ? {} : { windowOffset: options.windowOffset }),
+    },
+  };
+}
+
 function summaryCounts(response, key) {
   return Object.fromEntries((response.summary?.[key] || []).map((row) => [row.key, row.count]));
+}
+
+function distributionCounts(response, facet, countField = "count") {
+  return Object.fromEntries(
+    (response.summary?.distributions?.[facet] || [])
+      .map((row) => [row.value, row[countField]]),
+  );
 }
 
 async function checkQueryModel() {
@@ -49,9 +83,17 @@ async function checkQueryModel() {
   assert.equal(normalized.responseMode, "items");
   assert.equal(normalized.view.category, "strictMismatch");
   assert.equal(normalized.page.limit, 2);
+  const distribution = normalizeFeatureResultQuery(distributionRequest("syllableCount", "02"));
+  assert.equal(distribution.source.type, "ipaDistribution");
+  assert.equal(distribution.view.category, "syllableCount");
+  assert.equal(distribution.view.value, "2");
   assert.deepEqual(
     normalizeFeatureResultQuery({ source: SOURCE, responseMode: "summary" }),
     { source: SOURCE, responseMode: "summary" },
+  );
+  assert.deepEqual(
+    normalizeFeatureResultQuery({ source: DISTRIBUTION_SOURCE, responseMode: "summary" }),
+    { source: DISTRIBUTION_SOURCE, responseMode: "summary" },
   );
   assert.throws(
     () => normalizeFeatureResultQuery({ source: SOURCE, responseMode: "summary", page: { limit: 1 } }),
@@ -73,6 +115,48 @@ async function checkQueryModel() {
     (error) => error instanceof FeatureResultQueryValidationError
       && error.code === "invalid_feature_result_category",
   );
+  assert.throws(
+    () => normalizeFeatureResultQuery(distributionRequest("unit", "")),
+    (error) => error instanceof FeatureResultQueryValidationError
+      && error.code === "invalid_feature_result_value",
+  );
+  assert.throws(
+    () => normalizeFeatureResultQuery(distributionRequest("syllableCount", "1.5")),
+    (error) => error instanceof FeatureResultQueryValidationError
+      && error.code === "invalid_feature_result_value",
+  );
+}
+
+async function checkIpaDistributionModel() {
+  const result = await buildIpaDistributionResult([
+    { id: "complex", pronunciation: "/ˈt͡sa-na/" },
+    { id: "legacy-dot", pronunciation: "[a.ta]" },
+  ], {
+    syllable: {
+      complexPhonemes: ["t͡s"],
+      separator: "-",
+    },
+  });
+  assert.equal(result.summary.inputTotal, 2);
+  assert.equal(result.summary.unitTotal, 7);
+  assert.equal(result.summary.syllableEntryCount, 2);
+  assert.equal(result.summary.syllableTotal, 4);
+  assert.equal(result.summary.syllableAverage, 2);
+  assert.deepEqual(distributionCounts({ summary: result.summary }, "units"), {
+    a: 4,
+    t: 1,
+    "t͡s": 1,
+    n: 1,
+  });
+  assert.deepEqual(distributionCounts({ summary: result.summary }, "units", "entryCount"), {
+    a: 2,
+    t: 1,
+    "t͡s": 1,
+    n: 1,
+  });
+  assert.equal(result.recordsById.get("complex").initial, "t͡s");
+  assert.equal(result.recordsById.get("complex").final, "a");
+  assert.equal(result.recordsById.get("legacy-dot").syllableCount, 2);
 }
 
 async function checkCache() {
@@ -153,6 +237,40 @@ async function checkRepositoryIntegration() {
       },
     };
     const service = new AnalysisFeatureService({ repository, engine });
+    const generation = repository.querySessionGeneration(dictionary.id);
+    const distributionDescriptor = service.sessionDescriptor(
+      dictionary,
+      generation,
+      DISTRIBUTION_SOURCE,
+    );
+    const autoCompareDescriptor = service.sessionDescriptor(dictionary, generation, SOURCE);
+    assert.equal(Object.hasOwn(distributionDescriptor, "engine"), false);
+    assert.equal(Object.hasOwn(autoCompareDescriptor, "engine"), true);
+    const mappingOnlyDescriptor = service.sessionDescriptor({
+      ...dictionary,
+      settings: {
+        ...dictionary.settings,
+        ipa: {
+          ...dictionary.settings.ipa,
+          mappings: [{ from: "x", to: "y" }],
+        },
+      },
+    }, generation, DISTRIBUTION_SOURCE);
+    assert.equal(mappingOnlyDescriptor.settingsDigest, distributionDescriptor.settingsDigest);
+    const separatorDescriptor = service.sessionDescriptor({
+      ...dictionary,
+      settings: {
+        ...dictionary.settings,
+        ipa: {
+          ...dictionary.settings.ipa,
+          syllable: {
+            ...dictionary.settings.ipa.syllable,
+            separator: "-",
+          },
+        },
+      },
+    }, generation, DISTRIBUTION_SOURCE);
+    assert.notEqual(separatorDescriptor.settingsDigest, distributionDescriptor.settingsDigest);
     let orderedViewCalls = 0;
     let entrySummaryCalls = 0;
     const orderedAnalysisFeatureEntryIds = repository.orderedAnalysisFeatureEntryIds.bind(repository);
@@ -239,11 +357,81 @@ async function checkRepositoryIntegration() {
       (error) => error.code === "query_cursor_stale",
     );
 
+    const orderedCallsBeforeDistributionSummary = orderedViewCalls;
+    const summaryCallsBeforeDistributionSummary = entrySummaryCalls;
+    const distributionSummary = await service.query(dictionary.id, {
+      source: DISTRIBUTION_SOURCE,
+      responseMode: "summary",
+    });
+    assert.equal(generateCalls, 5, "IPA distribution must not invoke the phonology engine");
+    assert.equal(orderedViewCalls, orderedCallsBeforeDistributionSummary);
+    assert.equal(entrySummaryCalls, summaryCallsBeforeDistributionSummary);
+    assert.equal(distributionSummary.summary.inputTotal, 5);
+    assert.equal(distributionSummary.summary.unitTotal, 11);
+    assert.equal(distributionSummary.summary.syllableEntryCount, 5);
+    assert.equal(distributionSummary.summary.syllableTotal, 8);
+    assert.equal(distributionSummary.summary.syllableAverage, 1.6);
+    assert.deepEqual(distributionCounts(distributionSummary, "units"), {
+      a: 6,
+      d: 1,
+      f: 1,
+      t: 2,
+      x: 1,
+    });
+    assert.deepEqual(distributionCounts(distributionSummary, "units", "entryCount"), {
+      a: 3,
+      d: 1,
+      f: 1,
+      t: 2,
+      x: 1,
+    });
+    assert.deepEqual(distributionCounts(distributionSummary, "syllableCounts"), {
+      1: 2,
+      2: 3,
+    });
+    const warmDistributionSummary = await service.query(dictionary.id, {
+      source: DISTRIBUTION_SOURCE,
+      responseMode: "summary",
+    });
+    assert.equal(warmDistributionSummary.diagnostics.cache, "hit");
+    assert.equal(generateCalls, 5);
+
+    const unitA = await service.query(dictionary.id, distributionRequest("unit", "a"));
+    assert.equal(unitA.pageInfo.total, 3);
+    assert.equal(unitA.items.length, 2);
+    assert.ok(unitA.items.every((item) => item.feature.occurrenceCount === 2));
+    assert.ok(unitA.items.every((item) => item.feature.category === "unit"));
+    const unitANext = await service.query(dictionary.id, distributionRequest("unit", "a", {
+      cursor: unitA.pageInfo.nextCursor,
+    }));
+    assert.equal(unitANext.items.length, 1);
+    assert.equal(unitANext.items[0].feature.value, "a");
+
+    const searchedSyllables = await service.query(dictionary.id, distributionRequest("syllableCount", "2", {
+      search: { text: "a.da", fields: ["pronunciation"], fuzzyFields: [] },
+    }));
+    assert.deepEqual(searchedSyllables.items.map((item) => item.entry.id), ["entry-mismatch"]);
+    const locatedUnit = await service.location(dictionary.id, {
+      ...distributionRequest("unit", "a", { limit: 1 }),
+      entryId: "entry-mismatch",
+    });
+    assert.equal(locatedUnit.location.found, true);
+    assert.equal(locatedUnit.items[0].entry.id, "entry-mismatch");
+    assert.equal(generateCalls, 5, "IPA distribution views must reuse their own session without engine work");
+
     const saved = await repository.getEntry(dictionary.id, "entry-exact");
     await repository.saveEntry(dictionary.id, { ...saved, pronunciation: "/a.da/" });
     const afterSave = await service.query(dictionary.id, featureRequest("match"));
     assert.equal(generateCalls, 10, "dictionary writes must invalidate the base feature session");
     assert.equal(summaryCounts(afterSave, "views").match, 0);
+    const distributionAfterSave = await service.query(dictionary.id, {
+      source: DISTRIBUTION_SOURCE,
+      responseMode: "summary",
+    });
+    assert.equal(distributionAfterSave.diagnostics.cache, "miss");
+    assert.equal(distributionCounts(distributionAfterSave, "units").t, 1);
+    assert.equal(distributionCounts(distributionAfterSave, "units").d, 2);
+    assert.equal(generateCalls, 10, "distribution rebuilds after writes must remain engine-independent");
   } finally {
     repository.close();
     await cleanup();
@@ -252,6 +440,7 @@ async function checkRepositoryIntegration() {
 
 async function main() {
   await checkQueryModel();
+  await checkIpaDistributionModel();
   await checkCache();
   await checkRepositoryIntegration();
   console.log("Feature result session checks passed.");

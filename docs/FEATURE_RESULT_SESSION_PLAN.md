@@ -1,6 +1,6 @@
 # Feature Result Session Plan
 
-本文记录 F4b 的功能结果源与运行时会话设计。F4b-0 已完成现状清点、独立复评和契约冻结；F4b-1 已实装 IPA 自动生成比较的 API、运行时缓存和前端窗口消费，后续阶段继续沿此边界迁移 IPA 分布与正式形态分析。
+本文记录 F4b 的功能结果源与运行时会话设计。F4b-0 已完成现状清点、独立复评和契约冻结；F4b-1 已实装 IPA 自动生成比较的 API、运行时缓存和前端窗口消费；F4b-2 第一部分已实装 IPA 分布后端 source，下一部分接入分析页与高级筛选，之后继续迁移正式形态分析。
 
 ## 1. F4b-0 结论
 
@@ -310,10 +310,14 @@ F4b-1 默认在请求内同步构建，记录冷/热耗时、扫描词条数、�
 - 已迁移三类自动生成比较及循环变体，删除对应前端 ID 数组。
 - 已建立定向契约检查；10k/30k 冷热基准由 `scripts/benchmark-feature-result-session.js` 执行。
 
-### F4b-2：IPA 分布
+### F4b-2：IPA 分布（后端 source 已完成）
 
-- 独立 `ipaDistribution` source，避免只看音位分布时顺带执行自动生成。
-- 迁移音位、首音、尾音和音节数桶；设置摘要覆盖 complex phoneme 和分隔规则。
+- 第一部分已实装独立 `ipaDistribution` source，避免只看音位分布时顺带执行自动生成；完整支持 summary、桶查询、搜索交集、窗口、定位和 cursor。
+- view 使用 `unit / initial / final / syllableCount + value`。summary 一次返回音素单元、首音、尾音和音节数全部桶，不返回固定 ID 数组。
+- 音素单元桶同时返回总出现次数 `count` 和唯一词条数 `entryCount`；首音、尾音和音节数每个词条只贡献一次。首尾音从完整 token 顺序读取，不能从去重集合推导。
+- 清洗复用 `ipa-model`：移除包裹符和重音，空白、传统点号及当前配置分隔符均作为音节边界，复杂音素继续按最长优先切分。descriptor 只摘要 complex phoneme 和分隔符，不包含音系引擎、映射或重音设置。
+- 构建每 128 项让出事件循环。10k/30k 临时 SQLite 基准中冷构建约 50/130 ms，热桶约 2 ms，仍不需要后台 job 状态。
+- 第二部分负责把 IPA 分布与音节分析页改为异步消费该 source，并将相应高级筛选从固定 `entryIds` 迁入 feature query；完成前保留旧前端本地 slice。
 
 ### F4b-3：形态分析
 
@@ -348,6 +352,7 @@ F4b-1 默认在请求内同步构建，记录冷/热耗时、扫描词条数、�
 - `lib/feature-result-query-model.js`：source/view/page 与 location 规范化。
 - `lib/feature-result-session-cache.js`：有界 TTL/LRU 和 in-flight 合并。
 - `lib/analysis-feature-service.js`：互斥 outcome、summary、视图窗口和 cursor。
+- `lib/ipa-distribution-feature.js`：IPA 分隔、复杂音素统计、桶摘要和成员语义。
 - `scripts/check-feature-result-session.js`：规范化、缓存、失效、分类、搜索、窗口、定位与 cursor 契约。
 
 2026-07-24 临时 SQLite 基准中，10k 词条冷构建约 79 ms、热视图约 2 ms；30k 冷构建约 246 ms、热视图约 2 ms，分类切换约 28 ms，带搜索的新视图约 33 ms。当前实现每 128 项让出事件循环，暂不增加 `deferred/running` 轮询状态；更复杂的外部音系引擎接入后须重新测量。

@@ -13,6 +13,11 @@ const SOURCE = {
   version: 1,
   options: {},
 };
+const DISTRIBUTION_SOURCE = {
+  type: "ipaDistribution",
+  version: 1,
+  options: {},
+};
 
 function benchmarkSizes() {
   const source = process.env.CONLEXICON_FEATURE_BENCHMARK_SIZES || "10000,30000";
@@ -26,6 +31,23 @@ function request(category, searchText = "") {
     source: SOURCE,
     view: {
       category,
+      search: {
+        text: searchText,
+        fields: ["lemma", "pronunciation"],
+        fuzzyFields: [],
+      },
+      sort: "lemmaAsc",
+    },
+    page: { limit: 200 },
+  };
+}
+
+function distributionRequest(category, value, searchText = "") {
+  return {
+    source: DISTRIBUTION_SOURCE,
+    view: {
+      category,
+      value,
       search: {
         text: searchText,
         fields: ["lemma", "pronunciation"],
@@ -79,6 +101,18 @@ async function benchmarkSize(size) {
       await measure("warm strict", () => service.query(dictionary.id, request("strictMismatch"))),
       await measure("category switch", () => service.query(dictionary.id, request("looseMismatch"))),
       await measure("search view", () => service.query(dictionary.id, request("strictMismatch", "999"))),
+      await measure("distribution cold unit", () => service.query(
+        dictionary.id,
+        distributionRequest("unit", "t"),
+      )),
+      await measure("distribution warm unit", () => service.query(
+        dictionary.id,
+        distributionRequest("unit", "t"),
+      )),
+      await measure("distribution bucket switch", () => service.query(
+        dictionary.id,
+        distributionRequest("syllableCount", "2"),
+      )),
     ];
     console.log(JSON.stringify({
       size,

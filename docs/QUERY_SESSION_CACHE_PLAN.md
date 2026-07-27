@@ -318,5 +318,5 @@ query kind
 ### Q5：剩余查询消费者（部分完成）
 
 - 高级筛选 F1–F3 已完成共享 filter descriptor、统一 EntryQuery 身份、稳定条件 SQL 编译和前端状态迁移；查询型筛选复用 `/entries` 窗口、缓存、定位、排序与搜索，不再保存匹配 ID 数组。
-- 数据分析总览的 `entryCount`、`coverageBreakdown`、`partDistribution` 和 `activityPreview` 已通过同步 `/analysis/query` 与最小 planner 按需读取；前端异步加载并按 generation/cacheKey 识别结果。F4b-1 已完成 IPA 自动生成比较的可重建会话、异步分析页和高级筛选窗口；10k/30k 基准暂不要求后台状态。其他分析子页和质量检查仍使用各自的前端 slice/report cache；下一步迁移 IPA 分布、正式形态分析，再由 F5 接入独立质量 API。词根排行和确定性统计分别走 topology 与 summary/facet，不进入 feature session。
+- 数据分析总览的 `entryCount`、`coverageBreakdown`、`partDistribution` 和 `activityPreview` 已通过同步 `/analysis/query` 与最小 planner 按需读取；前端异步加载并按 generation/cacheKey 识别结果。F4b-1 已完成 IPA 自动生成比较的可重建会话、异步分析页和高级筛选窗口；F4b-2 第一部分已完成独立 IPA 分布后端会话及 summary/items/location，10k/30k 基准仍不要求后台状态。IPA 分布分析页和高级筛选尚待接线，其他分析子页和质量检查仍使用各自的前端 slice/report cache；之后迁移正式形态分析，再由 F5 接入独立质量 API。词根排行和确定性统计分别走 topology 与 summary/facet，不进入 feature session。
 - 语料库在独立升级阶段建立块/单元读取与 changeset；不把 corpus blob 扫描塞进 entries 会话。
