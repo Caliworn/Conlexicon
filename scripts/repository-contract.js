@@ -175,7 +175,7 @@ async function checkAnalysisQueryContract(repository) {
         tags: ["n", "root"],
         definitions: [{ id: "def-analysis-alpha", meaning: "first", example: "alpha example" }],
         notes: "note",
-        etymology: { sources: ["origin"] },
+        etymology: { sources: ["origin", "proto"] },
         createdAt: "2026-07-01T08:00:00.000Z",
         updatedAt: "2026-07-01T09:00:00.000Z",
       },
@@ -207,6 +207,7 @@ async function checkAnalysisQueryContract(repository) {
     const request = {
       widgets: [
         { id: "entries", type: "entryCount" },
+        { id: "lexicon", type: "lexiconSummary" },
         { id: "coverage", type: "coverageBreakdown" },
         { id: "parts", type: "partDistribution", limit: 8 },
         { id: "activity", type: "activityPreview", limit: 2 },
@@ -222,6 +223,14 @@ async function checkAnalysisQueryContract(repository) {
     assert.equal(result.body.dictionaryId, dictionary.id);
     assert.deepEqual(result.body.diagnostics.computedTasks, ["entryStats", "partStats", "activityStats"]);
     assert.equal(result.body.widgets.entries.value, 4);
+    assert.equal(result.body.widgets.lexicon.entryCount, 4);
+    assert.equal(result.body.widgets.lexicon.rootCount, 3);
+    assert.equal(result.body.widgets.lexicon.derivedCount, 1);
+    assert.equal(result.body.widgets.lexicon.multiSourceCount, 1);
+    assert.deepEqual(result.body.widgets.lexicon.rootAction.filter, {
+      presence: [{ field: "source", present: false }],
+    });
+    assert.deepEqual(result.body.widgets.lexicon.multiSourceAction.filter, { sourceCount: { min: 2 } });
 
     const coverage = Object.fromEntries(result.body.widgets.coverage.rows.map((row) => [row.field, row]));
     assert.equal(coverage.definition.count, 2);
@@ -238,6 +247,9 @@ async function checkAnalysisQueryContract(repository) {
     assert.equal(parts.v.count, 1);
     assert.equal(parts[NO_PART_FILTER_VALUE].count, 1);
     assert.deepEqual(parts.n.action.filter, { part: "n" });
+    assert.equal(result.body.widgets.parts.partTypeCount, 2);
+    assert.equal(result.body.widgets.parts.noPartOfSpeechCount, 1);
+    assert.deepEqual(result.body.widgets.parts.noPartAction.filter, { part: NO_PART_FILTER_VALUE });
 
     assert.deepEqual(result.body.widgets.activity.created.map((row) => row.day), ["2026-07-02", "2026-07-03"]);
     assert.deepEqual(Object.keys(result.body.widgets.activity).sort(), ["created", "type", "updated"]);
@@ -251,6 +263,7 @@ async function checkAnalysisQueryContract(repository) {
       `/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`,
       {
         widgets: [
+          { id: "lexicon", type: "lexiconSummary" },
           { id: "coverage", type: "coverageBreakdown" },
           { id: "activity", type: "activityPreview" },
         ],
@@ -259,6 +272,7 @@ async function checkAnalysisQueryContract(repository) {
     );
     assert.equal(withoutActions.statusCode, 200);
     assert.deepEqual(withoutActions.body.diagnostics.computedTasks, ["entryStats", "activityStats"]);
+    assert.equal(withoutActions.body.widgets.lexicon.rootAction, undefined);
     assert.equal(withoutActions.body.widgets.coverage.rows[0].action, undefined);
     assert.equal(withoutActions.body.widgets.activity.created[0].action, undefined);
     assert.equal(withoutActions.body.widgets.activity.updated[0].action, undefined);

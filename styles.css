@@ -3225,6 +3225,11 @@ dialog {
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
+.analysis-overview-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
 .analysis-wide-grid {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.3fr);
@@ -3291,16 +3296,219 @@ dialog {
   padding: 16px;
 }
 
+.analysis-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
 .analysis-card h3 {
   margin: 0;
   color: var(--ink);
   font-size: 1rem;
 }
 
+.analysis-card-navigation {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 6px 4px 9px;
+  background: var(--surface-2);
+  color: var(--accent-strong);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.analysis-card-navigation svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.analysis-card-navigation:hover,
+.analysis-card-navigation:focus-visible {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .analysis-card h4 {
   margin: 8px 0 0;
   color: var(--muted);
   font-size: 0.82rem;
+}
+
+.analysis-overview-primary {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 4px 0 12px;
+}
+
+.analysis-overview-primary strong {
+  min-width: 0;
+  color: var(--ink);
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.analysis-overview-primary span {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.analysis-composition-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.analysis-composition-stat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 10px;
+  min-width: 0;
+  border: 0;
+  padding: 2px 12px 2px 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.analysis-composition-stat + .analysis-composition-stat {
+  border-left: 1px solid var(--line);
+  padding-right: 0;
+  padding-left: 12px;
+}
+
+button.analysis-composition-stat,
+button.analysis-composition-subset {
+  cursor: pointer;
+}
+
+.analysis-composition-stat-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
+.analysis-composition-stat-label > span {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+}
+
+.analysis-composition-stat.root .analysis-composition-stat-label > span {
+  background: var(--accent);
+}
+
+.analysis-composition-stat.derived .analysis-composition-stat-label > span {
+  background: var(--focus);
+}
+
+.analysis-composition-stat strong {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: var(--ink);
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.analysis-composition-stat small {
+  grid-column: 1;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+button.analysis-composition-stat:hover .analysis-composition-stat-label,
+button.analysis-composition-subset:hover strong {
+  color: var(--accent-strong);
+}
+
+.analysis-composition {
+  display: flex;
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.analysis-composition span {
+  display: block;
+  height: 100%;
+}
+
+.analysis-composition .root {
+  background: var(--accent);
+}
+
+.analysis-composition .derived {
+  background: var(--focus);
+}
+
+.analysis-composition-subset {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--line);
+  padding: 10px 0 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.analysis-composition-subset > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.analysis-composition-subset strong {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.analysis-composition-subset small {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.analysis-composition-subset b {
+  color: var(--ink);
+  font-size: 1rem;
 }
 
 .analysis-bars {
@@ -3345,6 +3553,7 @@ button.analysis-bar-label,
 .analysis-fact-list div[data-part-filter-value],
 .analysis-fact-list div[data-entry-id],
 .analysis-fact-list div[data-view-target],
+.analysis-overview-primary[data-view-target],
 .analysis-issue-list li[data-entry-id] {
   cursor: pointer;
 }
@@ -3363,6 +3572,7 @@ button.analysis-bar-label:hover,
 .analysis-fact-list div[data-part-filter-value]:hover dt,
 .analysis-fact-list div[data-entry-id]:hover dt,
 .analysis-fact-list div[data-view-target]:hover dt,
+.analysis-overview-primary[data-view-target]:hover span,
 .analysis-issue-list li[data-entry-id]:hover button {
   color: var(--accent-strong);
 }
@@ -3385,6 +3595,23 @@ button.analysis-bar-label:hover,
   color: var(--muted);
   font-size: 0.78rem;
   text-align: right;
+}
+
+.analysis-coverage-row {
+  grid-template-columns: minmax(76px, 0.72fr) minmax(80px, 1fr) minmax(82px, auto);
+}
+
+.analysis-coverage-row strong {
+  display: grid;
+  gap: 2px;
+}
+
+.analysis-coverage-row strong small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 750;
+  line-height: 1.2;
+  white-space: normal;
 }
 
 .analysis-issue-list {

@@ -48,6 +48,8 @@ const DEFAULT_ENTRY_LIST_TAG_DISPLAY_LIMIT = 3;
 const MIN_ENTRY_LIST_TAG_DISPLAY_LIMIT = 2;
 const MAX_ENTRY_LIST_TAG_DISPLAY_LIMIT = 10;
 const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
+const NO_MORPHOLOGY_TABLE_FILTER_VALUE = "__conlexicon_no_morphology_table__";
+const UNTITLED_MORPHOLOGY_TABLE_FILTER_VALUE = "__conlexicon_untitled_morphology_table__";
 const tagModel = window.ConlexiconTags;
 const morphologyModel = window.ConlexiconMorphology;
 const entrySearchModel = window.ConlexiconEntrySearch;
@@ -210,10 +212,10 @@ const VIRTUAL_LIST_HEIGHT_CACHE_LIMIT = 50000;
 const STALE_CONTENT_UPDATE_DELAY_MS = 200;
 const DEFAULT_ANALYSIS_ROOT_FAMILY_LIMIT = 12;
 const ANALYSIS_OVERVIEW_QUERY_WIDGETS = [
-  { id: "entry-count", type: "entryCount" },
+  { id: "lexicon", type: "lexiconSummary" },
   { id: "coverage", type: "coverageBreakdown" },
-  { id: "parts", type: "partDistribution", limit: 12 },
-  { id: "activity", type: "activityPreview", limit: 10 },
+  { id: "parts", type: "partDistribution", limit: 7 },
+  { id: "activity", type: "activityPreview", limit: 5 },
 ];
 let staleContentUpdateSequence = 0;
 let entryListHasSettledContent = false;
@@ -340,8 +342,54 @@ const i18n = {
     expandAll: "全部展开",
     collapseAll: "全部收起",
     advancedFilterMode: "高级筛选",
+    advancedFilterFieldValue: "{label}: {value}",
+    advancedFilterRoots: "词根",
+    advancedFilterDerivedEntries: "衍生词",
+    advancedFilterQualityIssues: "质量问题",
+    advancedFilterHighQualityIssues: "高优先级质量问题",
+    advancedFilterMediumQualityIssues: "中优先级质量问题",
+    advancedFilterLowQualityIssues: "低优先级质量问题",
+    advancedFilterHasDefinitions: "有释义",
+    advancedFilterNoDefinitions: "无释义",
+    advancedFilterHasIpa: "有 IPA",
+    advancedFilterNoIpa: "无 IPA",
+    advancedFilterHasMorphologyTable: "有形态表格",
+    advancedFilterNoMorphologyTable: "无形态表格",
+    advancedFilterEmptyMorphologyCells: "形态空单元",
+    advancedFilterGlossedExamples: "Glossed 例句",
+    advancedFilterMultiSourceEntries: "多来源词条",
+    advancedFilterHasExamples: "有例句",
+    advancedFilterNoExamples: "无例句",
+    advancedFilterHasNotes: "有备注",
+    advancedFilterNoNotes: "无备注",
+    advancedFilterHasSources: "有来源",
+    advancedFilterNoSources: "无来源",
+    advancedFilterAutoIpaMatches: "IPA 自动生成一致",
+    advancedFilterAutoIpaLooseMismatches: "IPA 自动生成不一致（宽松）",
+    advancedFilterAutoIpaStrictMismatches: "IPA 自动生成不一致（严格）",
+    advancedFilterWordFormIssues: "词形问题",
+    advancedFilterTagIssues: "标签问题",
+    advancedFilterIpaIssues: "IPA 问题",
+    advancedFilterEtymologyIssues: "词源网络问题",
+    advancedFilterGlossedExampleIssues: "Glossed 例句问题",
+    advancedFilterOtherIssues: "其他问题",
+    advancedFilterPartOfSpeech: "词性",
+    advancedFilterTagCombination: "标签组合",
+    advancedFilterInitialLetter: "首字母",
+    advancedFilterWordLength: "词长",
+    advancedFilterOrthographicCharacter: "正写法字符",
+    advancedFilterOrthographicBigram: "正写法双字符组合",
+    advancedFilterIpaUnit: "IPA 音位",
+    advancedFilterIpaInitial: "IPA 首音",
+    advancedFilterIpaFinal: "IPA 尾音",
+    advancedFilterSyllableCount: "音节数",
+    advancedFilterCreatedDate: "新增日期",
+    advancedFilterUpdatedDate: "编辑日期",
+    advancedFilterNoTable: "无表格",
+    advancedFilterUntitledTable: "未命名表格",
     exitAdvancedFilter: "退出",
     refreshAdvancedFilter: "刷新高级筛选",
+    retryAdvancedFilter: "重试高级筛选",
     cycleAdvancedFilter: "切换筛选条件",
     qualityFilterInfo: "查看质量筛选说明",
     qualityFilterInfoTitle: "质量筛选说明",
@@ -515,7 +563,7 @@ const i18n = {
     confirmTitle: "确认操作",
     clear: "清空",
     saveEntry: "保存词条",
-    dictionaryManagerEyebrow: "多词典管理",
+    dictionaryManagerEyebrow: "多个词典",
     dictionaryManager: "词典管理",
     backToEditor: "返回编辑器",
     newDictionary: "新建词典",
@@ -855,8 +903,54 @@ const i18n = {
     expandAll: "Expand All",
     collapseAll: "Collapse All",
     advancedFilterMode: "Advanced Filter",
+    advancedFilterFieldValue: "{label}: {value}",
+    advancedFilterRoots: "Roots",
+    advancedFilterDerivedEntries: "Derived entries",
+    advancedFilterQualityIssues: "Quality issues",
+    advancedFilterHighQualityIssues: "High-priority quality issues",
+    advancedFilterMediumQualityIssues: "Medium-priority quality issues",
+    advancedFilterLowQualityIssues: "Low-priority quality issues",
+    advancedFilterHasDefinitions: "Has definitions",
+    advancedFilterNoDefinitions: "No definitions",
+    advancedFilterHasIpa: "Has IPA",
+    advancedFilterNoIpa: "No IPA",
+    advancedFilterHasMorphologyTable: "Has morphology table",
+    advancedFilterNoMorphologyTable: "No morphology table",
+    advancedFilterEmptyMorphologyCells: "Empty morphology cells",
+    advancedFilterGlossedExamples: "Glossed examples",
+    advancedFilterMultiSourceEntries: "Multi-source entries",
+    advancedFilterHasExamples: "Has examples",
+    advancedFilterNoExamples: "No examples",
+    advancedFilterHasNotes: "Has notes",
+    advancedFilterNoNotes: "No notes",
+    advancedFilterHasSources: "Has sources",
+    advancedFilterNoSources: "No sources",
+    advancedFilterAutoIpaMatches: "Auto IPA matches",
+    advancedFilterAutoIpaLooseMismatches: "Auto IPA mismatches (loose)",
+    advancedFilterAutoIpaStrictMismatches: "Auto IPA mismatches (strict)",
+    advancedFilterWordFormIssues: "Word-form issues",
+    advancedFilterTagIssues: "Tag issues",
+    advancedFilterIpaIssues: "IPA issues",
+    advancedFilterEtymologyIssues: "Etymology network issues",
+    advancedFilterGlossedExampleIssues: "Glossed example issues",
+    advancedFilterOtherIssues: "Other issues",
+    advancedFilterPartOfSpeech: "Part of Speech",
+    advancedFilterTagCombination: "Tag Combination",
+    advancedFilterInitialLetter: "Initial Letter",
+    advancedFilterWordLength: "Word Length",
+    advancedFilterOrthographicCharacter: "Orthographic Character",
+    advancedFilterOrthographicBigram: "Orthographic Bigram",
+    advancedFilterIpaUnit: "IPA Unit",
+    advancedFilterIpaInitial: "IPA Initial",
+    advancedFilterIpaFinal: "IPA Final",
+    advancedFilterSyllableCount: "Syllable Count",
+    advancedFilterCreatedDate: "Created Date",
+    advancedFilterUpdatedDate: "Updated Date",
+    advancedFilterNoTable: "No table",
+    advancedFilterUntitledTable: "Untitled table",
     exitAdvancedFilter: "Exit",
     refreshAdvancedFilter: "Refresh Advanced Filter",
+    retryAdvancedFilter: "Retry Advanced Filter",
     cycleAdvancedFilter: "Cycle Filter Condition",
     qualityFilterInfo: "Show quality filter help",
     qualityFilterInfoTitle: "Quality filter help",
@@ -3817,6 +3911,7 @@ function renderPartFilter() {
   elements.expandAllRootsButton.hidden = !rootMode || Boolean(advancedFilter);
   elements.collapseAllRootsButton.hidden = !rootMode || Boolean(advancedFilter);
   elements.advancedFilterToolbar.hidden = !advancedFilter;
+  renderAdvancedFilterRefreshAvailability();
   elements.advancedFilterCycleButton.hidden = !canCycleAdvancedFilter();
   const advancedFilterTitle = advancedFilter ? advancedFilterDisplayTitle() : "";
   elements.advancedFilterLabel.innerHTML = advancedFilterTitle
@@ -3833,6 +3928,16 @@ function renderPartFilter() {
     && (hasRootSearch || !rootGroupsReady || (rootExpansionMode === "all" && !collapsedRootEntries.size));
   elements.collapseAllRootsButton.disabled = rootMode
     && (hasRootSearch || !rootGroupsReady || (rootExpansionMode === "manual" && !expandedRootEntries.size));
+}
+
+function renderAdvancedFilterRefreshAvailability() {
+  const remoteQueryFailed = advancedFilterUsesRemoteQuery() && entryQueryState.status === "error";
+  elements.advancedFilterRefreshButton.hidden = !advancedFilter
+    || (advancedFilterUsesRemoteQuery() && !remoteQueryFailed);
+  elements.advancedFilterRefreshButton.setAttribute(
+    "aria-label",
+    t(remoteQueryFailed ? "retryAdvancedFilter" : "refreshAdvancedFilter"),
+  );
 }
 
 function createVirtualListState(estimatedItemHeight) {
@@ -4514,7 +4619,7 @@ function disconnectMasonryLayoutsWithin(root) {
 
 function setupAnalysisMasonryLayouts() {
   elements.analysisPanel.querySelectorAll(
-    ".analysis-grid:not(.analysis-summary-grid), .analysis-detail-grid, .analysis-wide-grid",
+    ".analysis-grid:not(.analysis-summary-grid):not(.analysis-overview-grid), .analysis-detail-grid, .analysis-wide-grid",
   ).forEach((container) => setupMasonryLayout(container, ".analysis-card", 14));
 }
 
@@ -5783,6 +5888,7 @@ function loadEntryQueryWindowPage(dictionary, page) {
         finishStaleContentUpdate("list", updateToken);
       }
       console.error(error);
+      renderAdvancedFilterRefreshAvailability();
       renderEntries();
     });
 }
@@ -6943,7 +7049,7 @@ async function loadEntryFilterFacts(dictionary, targets) {
   return request;
 }
 
-async function refreshAdvancedFilterFacts(dictionary = activeDictionary(), options = {}) {
+async function refreshAdvancedFilterFacts(dictionary = activeDictionary()) {
   if (!backendAvailable || !dictionary || !advancedFilterUsesEntryQuery()) {
     return;
   }
@@ -6953,7 +7059,7 @@ async function refreshAdvancedFilterFacts(dictionary = activeDictionary(), optio
       return;
     }
     const identity = entryFilterIdentity(variant.filter);
-    if (!options.force && entryFilterFact(dictionary, variant.filter)?.status !== undefined) {
+    if (entryFilterFact(dictionary, variant.filter)?.status !== undefined) {
       return;
     }
     if (!byIdentity.has(identity)) {
@@ -6997,7 +7103,7 @@ function recordEntryQueryFilterFact(context, result) {
 function advancedFilterStateForVariant(base, variant, variantIndex) {
   return {
     ...base,
-    title: variant.title,
+    titleDescriptor: variant.titleDescriptor,
     filter: variant.filter,
     searchScope: variant.searchScope,
     resultSource: variant.resultSource,
@@ -7152,7 +7258,7 @@ function normalizeAdvancedFilterVariants(action, options = {}) {
         : null;
       return {
         key: variant.key || "",
-        title: variant.title || t("advancedFilterMode"),
+        titleDescriptor: normalizeAdvancedFilterTitleDescriptor(variant.titleDescriptor),
         filter,
         searchScope: search ? { fields: search.fields, fuzzyFields: search.fuzzyFields } : null,
         initialSearchText: usesEntryQuery
@@ -7210,124 +7316,49 @@ function advancedFilterDisplayTitle() {
   if (!advancedFilter) {
     return "";
   }
-  const dictionary = activeDictionary();
-  if (advancedFilter.meta?.type === "tag" && advancedFilter.meta.tag) {
-    return analysisFilterTitle(t("tags"), displayTag(advancedFilter.meta.tag, dictionary));
-  }
-  if (advancedFilter.meta?.type === "quality" && dictionary) {
-    const action = qualityIssueFilterAction(
-      getQualityViewReport(dictionary),
-      advancedFilter.meta.group,
-      advancedFilter.meta.activeKey,
-      { allowEmptyActive: true },
-    );
-    return action?.title || advancedFilter.title;
-  }
-  return localizeAdvancedFilterTitle(advancedFilter.title || t("advancedFilterMode"));
+  return advancedFilterTitleText(advancedFilter.titleDescriptor);
 }
 
-function localizeAdvancedFilterTitle(title) {
-  const text = String(title || "");
-  const pairMatch = text.match(/^(.+?)\s*[:：]\s*(.+)$/);
-  if (pairMatch) {
-    const label = localizeAdvancedFilterSegment(pairMatch[1]);
-    const value = localizeAdvancedFilterValue(pairMatch[1], pairMatch[2]);
-    return analysisFilterTitle(label, value);
-  }
-  const exactTitles = new Map([
-    ["Quality issues", aText("质量问题", "Quality issues")],
-    ["质量问题", aText("质量问题", "Quality issues")],
-    ["High-priority quality issues", aText("高优先级质量问题", "High-priority quality issues")],
-    ["高优先级质量问题", aText("高优先级质量问题", "High-priority quality issues")],
-    ["Medium-priority quality issues", aText("中优先级质量问题", "Medium-priority quality issues")],
-    ["中优先级质量问题", aText("中优先级质量问题", "Medium-priority quality issues")],
-    ["Low-priority quality issues", aText("低优先级质量问题", "Low-priority quality issues")],
-    ["低优先级质量问题", aText("低优先级质量问题", "Low-priority quality issues")],
-    ["Has definitions", aText("有释义", "Has definitions")],
-    ["有释义", aText("有释义", "Has definitions")],
-    ["No definitions", aText("无释义", "No definitions")],
-    ["无释义", aText("无释义", "No definitions")],
-    ["Has IPA", aText("有 IPA", "Has IPA")],
-    ["有 IPA", aText("有 IPA", "Has IPA")],
-    ["No IPA", aText("无 IPA", "No IPA")],
-    ["无 IPA", aText("无 IPA", "No IPA")],
-    ["Has morphology table", aText("有形态表格", "Has morphology table")],
-    ["有形态表格", aText("有形态表格", "Has morphology table")],
-    ["No morphology table", aText("无形态表格", "No morphology table")],
-    ["无形态表格", aText("无形态表格", "No morphology table")],
-    ["Empty morphology cells", aText("形态空单元", "Empty morphology cells")],
-    ["形态空单元", aText("形态空单元", "Empty morphology cells")],
-    ["Glossed examples", aText("Glossed 例句", "Glossed examples")],
-    ["Glossed 例句", aText("Glossed 例句", "Glossed examples")],
-    ["Multi-source entries", aText("多来源词条", "Multi-source entries")],
-    ["多来源词条", aText("多来源词条", "Multi-source entries")],
-    ["Has examples", aText("有例句", "Has examples")],
-    ["有例句", aText("有例句", "Has examples")],
-    ["No examples", aText("无例句", "No examples")],
-    ["无例句", aText("无例句", "No examples")],
-    ["Has notes", aText("有备注", "Has notes")],
-    ["有备注", aText("有备注", "Has notes")],
-    ["No notes", aText("无备注", "No notes")],
-    ["无备注", aText("无备注", "No notes")],
-    ["Has sources", aText("有来源", "Has sources")],
-    ["有来源", aText("有来源", "Has sources")],
-    ["No sources", aText("无来源", "No sources")],
-    ["无来源", aText("无来源", "No sources")],
-    ["Auto IPA matches", aText("IPA 自动生成一致", "Auto IPA matches")],
-    ["IPA 自动生成一致", aText("IPA 自动生成一致", "Auto IPA matches")],
-    ["Auto IPA mismatches (loose)", aText("IPA 自动生成不一致（宽松）", "Auto IPA mismatches (loose)")],
-    ["IPA 自动生成不一致（宽松）", aText("IPA 自动生成不一致（宽松）", "Auto IPA mismatches (loose)")],
-    ["Auto IPA mismatches (strict)", aText("IPA 自动生成不一致（严格）", "Auto IPA mismatches (strict)")],
-    ["IPA 自动生成不一致（严格）", aText("IPA 自动生成不一致（严格）", "Auto IPA mismatches (strict)")],
-    ["Word Forms", aText("词形问题", "Word Forms")],
-    ["词形问题", aText("词形问题", "Word Forms")],
-    ["Etymology", aText("词源网络", "Etymology")],
-    ["词源网络", aText("词源网络", "Etymology")],
-    ["Glossed Examples", aText("Glossed 例句", "Glossed Examples")],
-    ["Other", aText("其他问题", "Other")],
-    ["其他问题", aText("其他问题", "Other")],
-  ]);
-  return exactTitles.get(text) || localizeAdvancedFilterSegment(text);
+function advancedFilterTitleDescriptor(key, options = {}) {
+  return {
+    key,
+    ...(options.labelKey ? { labelKey: options.labelKey } : {}),
+    ...(Object.hasOwn(options, "value") ? { value: String(options.value ?? "") } : {}),
+    ...(options.valueKey ? { valueKey: options.valueKey } : {}),
+    ...(options.valueType ? { valueType: options.valueType } : {}),
+  };
 }
 
-function localizeAdvancedFilterSegment(segment) {
-  const text = String(segment || "").trim();
-  const labelPairs = [
-    ["词性", "Part of Speech"],
-    ["标签", "Tag", ["Tags"]],
-    ["标签组合", "Tag Combination", ["Tag Combinations"]],
-    ["首字母", "Initial Letter", ["Initial Letters"]],
-    ["词长", "Word Length", ["Word Lengths"]],
-    ["正写法字符", "Orthographic Character", ["Orthographic Characters"]],
-    ["正写法双字符组合", "Orthographic Bigram", ["Orthographic Bigrams"]],
-    ["词形", "Lemma"],
-    ["释义", "Definitions", ["Definition"]],
-    ["例句", "Examples", ["Example"]],
-    ["词源", "Etymology"],
-    ["形态形式", "Morphology forms", ["Morphology Forms"]],
-    ["IPA 音位", "IPA Unit", ["IPA Units"]],
-    ["IPA 首音", "IPA Initial", ["IPA Initials"]],
-    ["IPA 尾音", "IPA Final", ["IPA Finals"]],
-    ["音节数", "Syllable Count", ["Syllable Counts"]],
-    ["形态表格", "Morphology Table", ["Morphology Tables", "Morphology table"]],
-    ["搜索字段", "Search Field", ["Current Search Fields"]],
-    ["新增日期", "Created Date"],
-    ["编辑日期", "Updated Date"],
-  ];
-  const normalizedText = normalize(text);
-  const match = labelPairs.find(([zh, en, aliases = []]) =>
-    [zh, en, ...aliases].some((candidate) => normalize(candidate) === normalizedText)
-  );
-  return match ? aText(match[0], match[1]) : text;
+function advancedFilterValueTitleDescriptor(labelKey, value, options = {}) {
+  return advancedFilterTitleDescriptor("advancedFilterFieldValue", {
+    labelKey,
+    value,
+    valueKey: options.valueKey,
+    valueType: options.valueType,
+  });
 }
 
-function localizeAdvancedFilterValue(label, value) {
-  const normalizedLabel = normalize(String(label || ""));
-  const searchFieldLabels = ["搜索字段", "Search Field", "Current Search Fields"].map(normalize);
-  if (searchFieldLabels.includes(normalizedLabel)) {
-    return localizeAdvancedFilterSegment(value);
+function normalizeAdvancedFilterTitleDescriptor(descriptor) {
+  if (!descriptor || typeof descriptor !== "object" || typeof descriptor.key !== "string") {
+    return advancedFilterTitleDescriptor("advancedFilterMode");
   }
-  return String(value || "").trim();
+  return advancedFilterTitleDescriptor(descriptor.key, descriptor);
+}
+
+function advancedFilterTitleText(descriptor, dictionary = activeDictionary()) {
+  const normalized = normalizeAdvancedFilterTitleDescriptor(descriptor);
+  if (normalized.key !== "advancedFilterFieldValue") {
+    return t(normalized.key);
+  }
+  const value = normalized.valueKey
+    ? t(normalized.valueKey)
+    : normalized.valueType === "tag"
+      ? displayTag(normalized.value, dictionary)
+      : normalized.value;
+  return formatText(normalized.key, {
+    label: t(normalized.labelKey || "advancedFilterMode"),
+    value,
+  });
 }
 
 function tagAdvancedFilterAction(tag, options = {}) {
@@ -7335,7 +7366,7 @@ function tagAdvancedFilterAction(tag, options = {}) {
   if (!dictionary || !tag) {
     return null;
   }
-  return entryFilterAction(analysisFilterTitle(t("tags"), displayTag(tag, dictionary)), {
+  return entryFilterAction(advancedFilterValueTitleDescriptor("tags", tag, { valueType: "tag" }), {
     tags: { values: [tag], mode: "any" },
   }, {
     allowEmptyActive: Boolean(options.allowEmptyActive),
@@ -7432,18 +7463,14 @@ function refreshAdvancedFilterState() {
   return true;
 }
 
-async function refreshAdvancedFilter() {
+function refreshAdvancedFilter() {
   if (!refreshAdvancedFilterState()) {
     return;
   }
-  const dictionary = activeDictionary();
   revealEntryBrowserForResults();
   render();
   if (advancedFilterUsesRemoteQuery()) {
     scheduleEntryCardScroll(state.selectedEntryId);
-    if (advancedFilterUsesEntryQuery()) {
-      await refreshAdvancedFilterFacts(dictionary, { force: true });
-    }
   } else if (advancedFilter?.entryIds?.length && advancedFilter.entryIds.includes(state.selectedEntryId)) {
     scheduleEntryCardScroll(state.selectedEntryId);
   }
@@ -9216,11 +9243,11 @@ function analysisPageBody(report, page, subpage) {
   return "";
 }
 
-function analysisQueryFilterAction(action, title, options = {}) {
+function analysisQueryFilterAction(action, titleDescriptor, options = {}) {
   if (action?.type !== "entryFilter") {
     return null;
   }
-  return entryFilterAction(title, action.filter, {
+  return entryFilterAction(titleDescriptor, action.filter, {
     count: action.count,
     variants: options.variants || [],
   });
@@ -9229,43 +9256,43 @@ function analysisQueryFilterAction(action, title, options = {}) {
 function analysisCoverageFieldMeta(field) {
   const fields = {
     definition: {
-      label: aText("有释义", "Definitions"),
-      presentTitle: aText("有释义", "Has definitions"),
-      missingTitle: aText("无释义", "No definitions"),
+      label: aText("释义", "Definitions"),
+      presentTitleDescriptor: advancedFilterTitleDescriptor("advancedFilterHasDefinitions"),
+      missingTitleDescriptor: advancedFilterTitleDescriptor("advancedFilterNoDefinitions"),
     },
     example: {
-      label: aText("有例句", "Examples"),
-      presentTitle: aText("有例句", "Has examples"),
-      missingTitle: aText("无例句", "No examples"),
+      label: aText("例句", "Examples"),
+      presentTitleDescriptor: advancedFilterTitleDescriptor("advancedFilterHasExamples"),
+      missingTitleDescriptor: advancedFilterTitleDescriptor("advancedFilterNoExamples"),
     },
     entryNote: {
-      label: aText("有备注", "Notes"),
-      presentTitle: aText("有备注", "Has notes"),
-      missingTitle: aText("无备注", "No notes"),
+      label: aText("备注", "Notes"),
+      presentTitleDescriptor: advancedFilterTitleDescriptor("advancedFilterHasNotes"),
+      missingTitleDescriptor: advancedFilterTitleDescriptor("advancedFilterNoNotes"),
     },
     source: {
-      label: aText("有来源", "Sources"),
-      presentTitle: aText("有来源", "Has sources"),
-      missingTitle: aText("无来源", "No sources"),
+      label: aText("来源", "Sources"),
+      presentTitleDescriptor: advancedFilterTitleDescriptor("advancedFilterHasSources"),
+      missingTitleDescriptor: advancedFilterTitleDescriptor("advancedFilterNoSources"),
     },
     ipa: {
       label: "IPA",
-      presentTitle: aText("有 IPA", "Has IPA"),
-      missingTitle: aText("无 IPA", "No IPA"),
+      presentTitleDescriptor: advancedFilterTitleDescriptor("advancedFilterHasIpa"),
+      missingTitleDescriptor: advancedFilterTitleDescriptor("advancedFilterNoIpa"),
     },
   };
   return fields[field] || {
     label: field,
-    presentTitle: field,
-    missingTitle: field,
+    presentTitleDescriptor: advancedFilterTitleDescriptor("advancedFilterMode"),
+    missingTitleDescriptor: advancedFilterTitleDescriptor("advancedFilterMode"),
   };
 }
 
 function analysisCoverageRowAction(row) {
   const meta = analysisCoverageFieldMeta(row?.field || "");
-  return analysisQueryFilterAction(row?.action, meta.presentTitle, {
+  return analysisQueryFilterAction(row?.action, meta.presentTitleDescriptor, {
     variants: row?.missingAction ? [{
-      title: meta.missingTitle,
+      titleDescriptor: meta.missingTitleDescriptor,
       filter: row.missingAction.filter,
       count: row.missingAction.count,
     }] : [],
@@ -9274,51 +9301,131 @@ function analysisCoverageRowAction(row) {
 
 function renderAnalysisOverviewQuery(response) {
   const widgets = response?.widgets || {};
-  const entryCount = Number(widgets["entry-count"]?.value || 0);
+  const lexicon = widgets.lexicon || {};
+  const entryCount = Number(lexicon.entryCount || 0);
+  const rootCount = Number(lexicon.rootCount || 0);
+  const derivedCount = Number(lexicon.derivedCount || 0);
+  const multiSourceCount = Number(lexicon.multiSourceCount || 0);
+  const rootAction = analysisQueryFilterAction(
+    lexicon.rootAction,
+    advancedFilterTitleDescriptor("advancedFilterRoots"),
+    {
+      variants: lexicon.derivedAction ? [{
+        titleDescriptor: advancedFilterTitleDescriptor("advancedFilterDerivedEntries"),
+        filter: lexicon.derivedAction.filter,
+        count: lexicon.derivedAction.count,
+      }] : [],
+    },
+  );
+  const derivedAction = analysisQueryFilterAction(
+    lexicon.derivedAction,
+    advancedFilterTitleDescriptor("advancedFilterDerivedEntries"),
+    {
+      variants: lexicon.rootAction ? [{
+        titleDescriptor: advancedFilterTitleDescriptor("advancedFilterRoots"),
+        filter: lexicon.rootAction.filter,
+        count: lexicon.rootAction.count,
+      }] : [],
+    },
+  );
+  const multiSourceAction = analysisQueryFilterAction(
+    lexicon.multiSourceAction,
+    advancedFilterTitleDescriptor("advancedFilterMultiSourceEntries"),
+  );
   const coverageRows = widgets.coverage?.rows || [];
+  const coverageOrder = ["definition", "example", "ipa", "entryNote"];
   const coverageByField = new Map(coverageRows.map((row) => [row.field, row]));
-  const definition = coverageByField.get("definition") || {};
-  const ipa = coverageByField.get("ipa") || {};
-  const source = coverageByField.get("source") || {};
-  const parts = (widgets.parts?.rows || []).map((row) => {
-    const label = row.part === NO_PART_FILTER_VALUE
-      ? t("noPart")
-      : row.displayLabel || row.part;
+  const coverage = coverageOrder.map((field) => coverageByField.get(field)).filter(Boolean).map((row) => {
+    const itemNote = Number.isFinite(Number(row.itemCount))
+      ? aText(`，共 ${Number(row.itemCount)} 项`, `, ${Number(row.itemCount)} items`)
+      : "";
     return [
-      label,
-      row.count,
-      analysisQueryFilterAction(row.action, analysisFilterTitle(aText("词性", "Part of Speech"), label)),
+      analysisCoverageFieldMeta(row.field).label,
+      row.ratio,
+      analysisCoverageRowAction(row),
+      `${Number(row.count || 0)}/${Number(widgets.coverage?.total || 0)}${itemNote}`,
     ];
   });
-  const coverage = coverageRows.map((row) => [
-    analysisCoverageFieldMeta(row.field).label,
-    row.ratio,
-    analysisCoverageRowAction(row),
-  ]);
+  const partWidget = widgets.parts || {};
+  const parts = (partWidget.rows || [])
+    .filter((row) => row.part !== NO_PART_FILTER_VALUE)
+    .slice(0, 6)
+    .map((row) => {
+      const label = row.displayLabel || row.part;
+      return [
+        label,
+        row.count,
+        analysisQueryFilterAction(
+          row.action,
+          advancedFilterValueTitleDescriptor("advancedFilterPartOfSpeech", label),
+        ),
+      ];
+    });
+  const noPartAction = analysisQueryFilterAction(
+    partWidget.noPartAction,
+    advancedFilterValueTitleDescriptor("advancedFilterPartOfSpeech", "", { valueKey: "noPart" }),
+  );
   const activityWidget = widgets.activity || {};
   const activity = {
     created: (activityWidget.created || []).map((row) => [
       row.day,
       row.count,
-      analysisQueryFilterAction(row.action, analysisFilterTitle(aText("新增日期", "Created Date"), row.day)),
+      analysisQueryFilterAction(
+        row.action,
+        advancedFilterValueTitleDescriptor("advancedFilterCreatedDate", row.day),
+      ),
     ]),
     updated: (activityWidget.updated || []).map((row) => [
       row.day,
       row.count,
-      analysisQueryFilterAction(row.action, analysisFilterTitle(aText("编辑日期", "Updated Date"), row.day)),
+      analysisQueryFilterAction(
+        row.action,
+        advancedFilterValueTitleDescriptor("advancedFilterUpdatedDate", row.day),
+      ),
     ]),
   };
+  const rootRatio = entryCount ? rootCount / entryCount : 0;
+  const derivedRatio = entryCount ? derivedCount / entryCount : 0;
+  const multiSourceRatio = derivedCount ? multiSourceCount / derivedCount : 0;
   return `
-    <section class="analysis-grid analysis-summary-grid">
-      ${analysisMetricCard(aText("词条", "Entries"), entryCount, "", widgets["entry-count"]?.action?.type === "view" ? viewAction("editor") : null)}
-      ${analysisMetricCard(aText("释义覆盖", "Definition Coverage"), percentText(definition.ratio), `${Number(definition.itemCount || 0)} ${aText("条释义", "definitions")}`, analysisCoverageRowAction(definition))}
-      ${analysisMetricCard("IPA", percentText(ipa.ratio), `${Number(ipa.count || 0)} ${t("entries")}`, analysisCoverageRowAction(ipa))}
-      ${analysisMetricCard(aText("来源覆盖", "Source Coverage"), percentText(source.ratio), `${Number(source.count || 0)} ${t("entries")}`, analysisCoverageRowAction(source))}
-    </section>
-    <section class="analysis-grid">
-      ${analysisCard(aText("词性分布", "Part of Speech"), analysisBarList(parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") }))}
-      ${analysisCard(aText("覆盖率", "Coverage"), analysisCoverageList(coverage))}
-      ${analysisCard(aText("编辑进度", "Editing Progress"), analysisActivityList(activity))}
+    <section class="analysis-grid analysis-overview-grid">
+      ${analysisCard(aText("词汇构成", "Lexicon Composition"), `
+        ${analysisOverviewPrimaryStat(entryCount, aText("个词条", "entries"))}
+        <div class="analysis-composition-stats">
+          ${analysisCompositionStat(aText("词根", "Roots"), rootCount, rootRatio, rootAction, "root")}
+          ${analysisCompositionStat(aText("衍生词", "Derived entries"), derivedCount, derivedRatio, derivedAction, "derived")}
+        </div>
+        <div class="analysis-composition" aria-label="${escapeHtml(aText(
+          `词根 ${rootCount}，衍生词 ${derivedCount}`,
+          `${rootCount} roots, ${derivedCount} derived entries`,
+        ))}">
+          <span class="root" style="width: ${(rootRatio * 100).toFixed(2)}%"></span>
+          <span class="derived" style="width: ${(derivedRatio * 100).toFixed(2)}%"></span>
+        </div>
+        ${analysisCompositionSubset(
+          aText("其中多来源词条", "Multi-source entries"),
+          multiSourceCount,
+          aText(
+            `占衍生词 ${percentText(multiSourceRatio)}`,
+            `${percentText(multiSourceRatio)} of derived entries`,
+          ),
+          multiSourceAction,
+        )}
+      `)}
+      ${analysisCard(aText("资料覆盖", "Data Coverage"), analysisCoverageList(coverage), {
+        destinationPage: "entries",
+        destinationSubpage: "coverage",
+      })}
+      ${analysisCard(aText("词性分布", "Part of Speech"), `
+        ${analysisBarList(parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") })}
+        ${analysisFactList([
+          [aText("词性种类", "Part types"), Number(partWidget.partTypeCount || 0)],
+          [t("noPart"), Number(partWidget.noPartOfSpeechCount || 0), noPartAction],
+        ])}
+      `, { destinationPage: "entries", destinationSubpage: "tags" })}
+      ${analysisCard(aText("编辑活动", "Editing Activity"), `
+        ${analysisActivityList(activity)}
+      `, { destinationPage: "activity", destinationSubpage: "updated" })}
     </section>
   `;
 }
@@ -9365,7 +9472,7 @@ function renderAnalysisIpaPage(report, subpage) {
   }
   return `<section class="analysis-detail-grid">
     ${analysisCard(aText("音节数分布", "Syllable Counts"), analysisBarList(report.ipa.allSyllableCounts, { empty: aText("暂无 IPA", "No IPA yet") }))}
-    ${analysisCard(aText("IPA 覆盖", "IPA Coverage"), analysisCoverageList([["IPA", report.coverage.ipa, binaryPresenceFilterAction(aText("有 IPA", "Has IPA"), "ipa", report.ipaEntryCount, aText("无 IPA", "No IPA"), report.noIpaEntryCount)]]))}
+    ${analysisCard(aText("IPA 覆盖", "IPA Coverage"), analysisCoverageList([["IPA", report.coverage.ipa, binaryPresenceFilterAction(advancedFilterTitleDescriptor("advancedFilterHasIpa"), "ipa", report.ipaEntryCount, advancedFilterTitleDescriptor("advancedFilterNoIpa"), report.noIpaEntryCount)]]))}
   </section>`;
 }
 
@@ -9376,12 +9483,12 @@ function renderAnalysisMorphologyPage(report, subpage) {
   if (subpage === "generated") {
     return `<section class="analysis-detail-grid">${analysisCard(aText("生成检查", "Generated Checks"), analysisFactList([
       [aText("生成形式", "Generated forms"), report.morphology.generatedForms],
-      [aText("形态空单元", "Empty morphology cells"), report.morphology.emptyCells, advancedFilterAction(aText("形态空单元", "Empty morphology cells"), report.morphology.emptyCellEntryIds)],
+      [aText("形态空单元", "Empty morphology cells"), report.morphology.emptyCells, advancedFilterAction(advancedFilterTitleDescriptor("advancedFilterEmptyMorphologyCells"), report.morphology.emptyCellEntryIds)],
     ]))}</section>`;
   }
   return `<section class="analysis-detail-grid">
     ${analysisCard(aText("形态表格使用", "Morphology Tables"), analysisBarList(report.morphology.allTables, { empty: aText("暂无形态表格", "No morphology tables yet") }))}
-    ${analysisCard(aText("形态学覆盖", "Morphology Coverage"), analysisCoverageList([[aText("形态表格", "Morphology table"), report.coverage.morphology, advancedFilterAction(aText("有形态表格", "Has morphology table"), report.morphologyEntryIds, { variants: [{ title: aText("无形态表格", "No morphology table"), entryIds: report.noMorphologyEntryIds }] })]]))}
+    ${analysisCard(aText("形态学覆盖", "Morphology Coverage"), analysisCoverageList([[aText("形态表格", "Morphology table"), report.coverage.morphology, advancedFilterAction(advancedFilterTitleDescriptor("advancedFilterHasMorphologyTable"), report.morphologyEntryIds, { variants: [{ titleDescriptor: advancedFilterTitleDescriptor("advancedFilterNoMorphologyTable"), entryIds: report.noMorphologyEntryIds }] })]]))}
   </section>`;
 }
 
@@ -9468,15 +9575,15 @@ function qualityIssueFilterDefinitions(report, group) {
   if (group === "module") {
     return ["lemma", "tags", "ipa", "network", "gloss", "other"].map((module) => ({
       key: module,
-      title: qualityIssueModuleFilterTitle(module),
+      titleDescriptor: qualityIssueModuleFilterTitleDescriptor(module),
       issues: qualityIssuesWithEntries(qualityIssuesByModule(report, module)),
     }));
   }
   return [
-    { key: "all", title: aText("质量问题", "Quality issues"), issues: issueEntries },
-    { key: "high", title: aText("高优先级质量问题", "High-priority quality issues"), issues: issueEntries.filter((issue) => issue.severity === "high") },
-    { key: "medium", title: aText("中优先级质量问题", "Medium-priority quality issues"), issues: issueEntries.filter((issue) => issue.severity === "medium") },
-    { key: "low", title: aText("低优先级质量问题", "Low-priority quality issues"), issues: issueEntries.filter((issue) => issue.severity === "low") },
+    { key: "all", titleDescriptor: advancedFilterTitleDescriptor("advancedFilterQualityIssues"), issues: issueEntries },
+    { key: "high", titleDescriptor: advancedFilterTitleDescriptor("advancedFilterHighQualityIssues"), issues: issueEntries.filter((issue) => issue.severity === "high") },
+    { key: "medium", titleDescriptor: advancedFilterTitleDescriptor("advancedFilterMediumQualityIssues"), issues: issueEntries.filter((issue) => issue.severity === "medium") },
+    { key: "low", titleDescriptor: advancedFilterTitleDescriptor("advancedFilterLowQualityIssues"), issues: issueEntries.filter((issue) => issue.severity === "low") },
   ];
 }
 
@@ -9487,7 +9594,7 @@ function qualityIssueFilterAction(report, group, activeKey, options = {}) {
     return null;
   }
   return qualityIssueAdvancedFilterAction(
-    active.title,
+    active.titleDescriptor,
     active.issues,
     definitions.filter((item) => item.key !== active.key),
     {
@@ -9499,21 +9606,31 @@ function qualityIssueFilterAction(report, group, activeKey, options = {}) {
 }
 
 function refreshAdvancedFilterLocalization() {
-  refreshAdvancedFilterState();
+  if (
+    !advancedFilter
+    || advancedFilterUsesRemoteQuery()
+    || advancedFilter.meta?.type !== "quality"
+  ) {
+    return;
+  }
+  const action = rebuildAdvancedFilterAction({ allowEmptyActive: true });
+  if (action) {
+    applyAdvancedFilterAction(action, { keepFirstEmpty: true });
+  }
 }
 
-function qualityIssueAdvancedFilterAction(title, issues = [], variants = [], options = {}) {
+function qualityIssueAdvancedFilterAction(titleDescriptor, issues = [], variants = [], options = {}) {
   const activeIssues = qualityIssuesWithEntries(issues);
   const entryIds = entryIdsFrom(activeIssues.map((issue) => issue.entryId));
   return entryIds.length || options.allowEmptyActive
-    ? advancedFilterAction(title, entryIds, {
+    ? advancedFilterAction(titleDescriptor, entryIds, {
       key: options.key || "",
       issues: activeIssues,
       variants: variants.map((variant) => {
         const variantIssues = qualityIssuesWithEntries(variant.issues);
         return {
           key: variant.key || "",
-          title: variant.title,
+          titleDescriptor: variant.titleDescriptor,
           entryIds: entryIdsFrom(variantIssues.map((issue) => issue.entryId)),
           issues: variantIssues,
         };
@@ -9553,29 +9670,40 @@ function qualityIssueSeverityLabel(severity) {
   return labels[severity] || labels.low;
 }
 
-function qualityIssueModuleFilterTitle(module) {
-  return qualityIssueModuleLabel(module);
+function qualityIssueModuleFilterTitleDescriptor(module) {
+  const keys = {
+    lemma: "advancedFilterWordFormIssues",
+    tags: "advancedFilterTagIssues",
+    ipa: "advancedFilterIpaIssues",
+    network: "advancedFilterEtymologyIssues",
+    gloss: "advancedFilterGlossedExampleIssues",
+    other: "advancedFilterOtherIssues",
+  };
+  return advancedFilterTitleDescriptor(keys[module] || keys.other);
 }
 
 function analysisFactRows(report) {
   return [
-    [aText("例句数量", "Examples"), report.examples, binaryPresenceFilterAction(aText("有例句", "Has examples"), "example", report.exampleEntryCount, aText("无例句", "No examples"), report.noExampleEntryCount)],
-    [aText("Glossed 例句", "Glossed examples"), report.glossExamples, advancedFilterAction(aText("Glossed 例句", "Glossed examples"), report.glossEntryIds)],
-    [aText("多来源词条", "Multi-source entries"), report.multiSourceCount, entryFilterAction(aText("多来源词条", "Multi-source entries"), { sourceCount: { min: 2 } }, { count: report.multiSourceCount })],
+    [aText("例句数量", "Examples"), report.examples, binaryPresenceFilterAction(advancedFilterTitleDescriptor("advancedFilterHasExamples"), "example", report.exampleEntryCount, advancedFilterTitleDescriptor("advancedFilterNoExamples"), report.noExampleEntryCount)],
+    [aText("Glossed 例句", "Glossed examples"), report.glossExamples, advancedFilterAction(advancedFilterTitleDescriptor("advancedFilterGlossedExamples"), report.glossEntryIds)],
+    [aText("多来源词条", "Multi-source entries"), report.multiSourceCount, entryFilterAction(advancedFilterTitleDescriptor("advancedFilterMultiSourceEntries"), { sourceCount: { min: 2 } }, { count: report.multiSourceCount })],
     [aText("当前搜索命中", "Current search matches"), report.searchMatches, viewAction("editor")],
   ];
 }
 
 function analysisIpaCompareRows(response) {
-  const matchTitle = aText("IPA 自动生成一致", "Auto IPA matches");
-  const looseTitle = aText("IPA 自动生成不一致（宽松）", "Auto IPA mismatches (loose)");
-  const strictTitle = aText("IPA 自动生成不一致（严格）", "Auto IPA mismatches (strict)");
+  const matchTitleDescriptor = advancedFilterTitleDescriptor("advancedFilterAutoIpaMatches");
+  const looseTitleDescriptor = advancedFilterTitleDescriptor("advancedFilterAutoIpaLooseMismatches");
+  const strictTitleDescriptor = advancedFilterTitleDescriptor("advancedFilterAutoIpaStrictMismatches");
+  const matchTitle = advancedFilterTitleText(matchTitleDescriptor);
+  const looseTitle = advancedFilterTitleText(looseTitleDescriptor);
+  const strictTitle = advancedFilterTitleText(strictTitleDescriptor);
   const viewCounts = new Map((response?.summary?.views || []).map((row) => [row.key, Number(row.count) || 0]));
   const outcomeCounts = new Map((response?.summary?.outcomes || []).map((row) => [row.key, Number(row.count) || 0]));
   const variants = [
-    { key: "match", title: matchTitle, resultCount: viewCounts.get("match") || 0 },
-    { key: "looseMismatch", title: looseTitle, resultCount: viewCounts.get("looseMismatch") || 0 },
-    { key: "strictMismatch", title: strictTitle, resultCount: viewCounts.get("strictMismatch") || 0 },
+    { key: "match", titleDescriptor: matchTitleDescriptor, resultCount: viewCounts.get("match") || 0 },
+    { key: "looseMismatch", titleDescriptor: looseTitleDescriptor, resultCount: viewCounts.get("looseMismatch") || 0 },
+    { key: "strictMismatch", titleDescriptor: strictTitleDescriptor, resultCount: viewCounts.get("strictMismatch") || 0 },
   ];
   const ipaFilterAction = (category) => featureResultAdvancedFilterAction(
     response?.source,
@@ -9735,12 +9863,12 @@ function buildAnalysisCoverageSlice(context) {
     morphology: morphologyEntryIds.size / total,
   };
   const coverageRows = [
-    [aText("有释义", "Definitions"), coverage.definitions, binaryPresenceFilterAction(aText("有释义", "Has definitions"), "definition", definitionEntryCount, aText("无释义", "No definitions"), noDefinitionEntryCount)],
-    [aText("有例句", "Examples"), coverage.examples, binaryPresenceFilterAction(aText("有例句", "Has examples"), "example", exampleEntryCount, aText("无例句", "No examples"), noExampleEntryCount)],
-    [aText("有备注", "Notes"), coverage.notes, binaryPresenceFilterAction(aText("有备注", "Has notes"), "entryNote", noteEntryCount, aText("无备注", "No notes"), noNoteEntryCount)],
-    [aText("有来源", "Sources"), coverage.sources, binaryPresenceFilterAction(aText("有来源", "Has sources"), "source", sourceEntryCount, aText("无来源", "No sources"), noSourceEntryCount)],
-    ["IPA", coverage.ipa, binaryPresenceFilterAction(aText("有 IPA", "Has IPA"), "ipa", ipaEntryCount, aText("无 IPA", "No IPA"), noIpaEntryCount)],
-    [aText("形态表格", "Morphology table"), coverage.morphology, binaryFeatureFilterAction(aText("有形态表格", "Has morphology table"), [...morphologyEntryIds], aText("无形态表格", "No morphology table"), noMorphologyEntryIds)],
+    [aText("有释义", "Definitions"), coverage.definitions, binaryPresenceFilterAction(advancedFilterTitleDescriptor("advancedFilterHasDefinitions"), "definition", definitionEntryCount, advancedFilterTitleDescriptor("advancedFilterNoDefinitions"), noDefinitionEntryCount)],
+    [aText("有例句", "Examples"), coverage.examples, binaryPresenceFilterAction(advancedFilterTitleDescriptor("advancedFilterHasExamples"), "example", exampleEntryCount, advancedFilterTitleDescriptor("advancedFilterNoExamples"), noExampleEntryCount)],
+    [aText("有备注", "Notes"), coverage.notes, binaryPresenceFilterAction(advancedFilterTitleDescriptor("advancedFilterHasNotes"), "entryNote", noteEntryCount, advancedFilterTitleDescriptor("advancedFilterNoNotes"), noNoteEntryCount)],
+    [aText("有来源", "Sources"), coverage.sources, binaryPresenceFilterAction(advancedFilterTitleDescriptor("advancedFilterHasSources"), "source", sourceEntryCount, advancedFilterTitleDescriptor("advancedFilterNoSources"), noSourceEntryCount)],
+    ["IPA", coverage.ipa, binaryPresenceFilterAction(advancedFilterTitleDescriptor("advancedFilterHasIpa"), "ipa", ipaEntryCount, advancedFilterTitleDescriptor("advancedFilterNoIpa"), noIpaEntryCount)],
+    [aText("形态表格", "Morphology table"), coverage.morphology, binaryFeatureFilterAction(advancedFilterTitleDescriptor("advancedFilterHasMorphologyTable"), [...morphologyEntryIds], advancedFilterTitleDescriptor("advancedFilterNoMorphologyTable"), noMorphologyEntryIds)],
   ];
 
   return {
@@ -9791,8 +9919,8 @@ function buildAnalysisTagSlice(context) {
     allParts: partEntryMapItems(parts, Number.MAX_SAFE_INTEGER, dictionary),
     tags: tagEntryMapItems(tags, 16, dictionary),
     allTags: tagEntryMapItems(tags, Number.MAX_SAFE_INTEGER, dictionary),
-    tagCombos: topEntryMapItems(tagCombos, 10, aText("标签组合", "Tag Combination")),
-    allTagCombos: topEntryMapItems(tagCombos, Number.MAX_SAFE_INTEGER, aText("标签组合", "Tag Combination")),
+    tagCombos: topEntryMapItems(tagCombos, 10, "advancedFilterTagCombination"),
+    allTagCombos: topEntryMapItems(tagCombos, Number.MAX_SAFE_INTEGER, "advancedFilterTagCombination"),
   };
 }
 
@@ -9819,14 +9947,14 @@ function buildAnalysisFormSlice(context) {
   });
 
   return {
-    initialLetters: topEntryMapItems(initialLetters, 14, aText("首字母", "Initial Letter")),
-    allInitialLetters: topEntryMapItems(initialLetters, Number.MAX_SAFE_INTEGER, aText("首字母", "Initial Letter")),
-    wordLengths: numericEntryMapItems(wordLengths, aText("词长", "Word Length")),
-    allWordLengths: numericEntryMapItems(wordLengths, aText("词长", "Word Length")),
-    characters: topEntryMapItems(characters, 16, aText("正写法字符", "Orthographic Character")),
-    allCharacters: topEntryMapItems(characters, Number.MAX_SAFE_INTEGER, aText("正写法字符", "Orthographic Character")),
-    bigrams: topEntryMapItems(bigrams, 16, aText("正写法双字符组合", "Orthographic Bigram")),
-    allBigrams: topEntryMapItems(bigrams, Number.MAX_SAFE_INTEGER, aText("正写法双字符组合", "Orthographic Bigram")),
+    initialLetters: topEntryMapItems(initialLetters, 14, "advancedFilterInitialLetter"),
+    allInitialLetters: topEntryMapItems(initialLetters, Number.MAX_SAFE_INTEGER, "advancedFilterInitialLetter"),
+    wordLengths: numericEntryMapItems(wordLengths, "advancedFilterWordLength"),
+    allWordLengths: numericEntryMapItems(wordLengths, "advancedFilterWordLength"),
+    characters: topEntryMapItems(characters, 16, "advancedFilterOrthographicCharacter"),
+    allCharacters: topEntryMapItems(characters, Number.MAX_SAFE_INTEGER, "advancedFilterOrthographicCharacter"),
+    bigrams: topEntryMapItems(bigrams, 16, "advancedFilterOrthographicBigram"),
+    allBigrams: topEntryMapItems(bigrams, Number.MAX_SAFE_INTEGER, "advancedFilterOrthographicBigram"),
   };
 }
 
@@ -9882,14 +10010,14 @@ function analyzeIpa(entries, dictionary) {
     }
   });
   return {
-    units: topEntryMapItems(units, 16, aText("IPA 音位", "IPA Unit")),
-    allUnits: topEntryMapItems(units, Number.MAX_SAFE_INTEGER, aText("IPA 音位", "IPA Unit")),
-    initials: topEntryMapItems(initials, 12, aText("IPA 首音", "IPA Initial")),
-    allInitials: topEntryMapItems(initials, Number.MAX_SAFE_INTEGER, aText("IPA 首音", "IPA Initial")),
-    finals: topEntryMapItems(finals, 12, aText("IPA 尾音", "IPA Final")),
-    allFinals: topEntryMapItems(finals, Number.MAX_SAFE_INTEGER, aText("IPA 尾音", "IPA Final")),
-    syllableCounts: numericEntryMapItems(syllableCounts, aText("音节数", "Syllable Count")),
-    allSyllableCounts: numericEntryMapItems(syllableCounts, aText("音节数", "Syllable Count")),
+    units: topEntryMapItems(units, 16, "advancedFilterIpaUnit"),
+    allUnits: topEntryMapItems(units, Number.MAX_SAFE_INTEGER, "advancedFilterIpaUnit"),
+    initials: topEntryMapItems(initials, 12, "advancedFilterIpaInitial"),
+    allInitials: topEntryMapItems(initials, Number.MAX_SAFE_INTEGER, "advancedFilterIpaInitial"),
+    finals: topEntryMapItems(finals, 12, "advancedFilterIpaFinal"),
+    allFinals: topEntryMapItems(finals, Number.MAX_SAFE_INTEGER, "advancedFilterIpaFinal"),
+    syllableCounts: numericEntryMapItems(syllableCounts, "advancedFilterSyllableCount"),
+    allSyllableCounts: numericEntryMapItems(syllableCounts, "advancedFilterSyllableCount"),
     syllableAverage: syllableEntries ? (syllableTotal / syllableEntries).toFixed(2) : "0",
   };
 }
@@ -9903,10 +10031,10 @@ function analyzeMorphology(entries, dictionary) {
   entries.forEach((entry) => {
     const table = resolveEntryMorphologyTable(entry, dictionary);
     if (!table) {
-      incrementEntry(tableUse, aText("无表格", "No table"), entry);
+      incrementEntry(tableUse, NO_MORPHOLOGY_TABLE_FILTER_VALUE, entry);
       return;
     }
-    incrementEntry(tableUse, table.name || aText("未命名表格", "Untitled table"), entry);
+    incrementEntry(tableUse, table.name || UNTITLED_MORPHOLOGY_TABLE_FILTER_VALUE, entry);
     const overrides = Object.keys(entry.morphology?.overrides || {});
     if (overrides.length) {
       overrideRows.push([entry.lemma || aText("无词形", "No lemma"), overrides.length, directEntryAction(entry.id)]);
@@ -9929,8 +10057,8 @@ function analyzeMorphology(entries, dictionary) {
     }
   });
   return {
-    tables: topEntryMapItems(tableUse, 12, aText("形态表格", "Morphology Table")),
-    allTables: topEntryMapItems(tableUse, Number.MAX_SAFE_INTEGER, aText("形态表格", "Morphology Table")),
+    tables: topEntryMapItems(tableUse, 12, "morphologyTable"),
+    allTables: topEntryMapItems(tableUse, Number.MAX_SAFE_INTEGER, "morphologyTable"),
     overrides: overrideRows
       .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), "zh-CN"))
       .slice(0, 12),
@@ -9956,8 +10084,8 @@ function analyzeActivity(entries) {
     }
   });
   return {
-    created: numericDateEntryItems(created, aText("新增日期", "Created Date"), "created"),
-    updated: numericDateEntryItems(updated, aText("编辑日期", "Updated Date"), "updated"),
+    created: numericDateEntryItems(created, "advancedFilterCreatedDate", "created"),
+    updated: numericDateEntryItems(updated, "advancedFilterUpdatedDate", "updated"),
   };
 }
 
@@ -10011,8 +10139,40 @@ function analysisMetricCard(label, value, note = "", action = null) {
   return `<article class="analysis-metric"${attrs}><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></article>`;
 }
 
-function analysisCard(title, body) {
-  return `<article class="analysis-card"><h3>${escapeHtml(title)}</h3>${body}</article>`;
+function analysisCard(title, body, options = {}) {
+  const destination = options.destinationPage
+    ? `<button type="button" class="analysis-card-navigation" data-analysis-destination-page="${escapeHtml(options.destinationPage)}"${options.destinationSubpage ? ` data-analysis-destination-subpage="${escapeHtml(options.destinationSubpage)}"` : ""}><span>${escapeHtml(aText("详情", "Details"))}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button>`
+    : "";
+  return `<article class="analysis-card"><header class="analysis-card-header"><h3>${escapeHtml(title)}</h3>${destination}</header>${body}</article>`;
+}
+
+function analysisOverviewPrimaryStat(value, unit) {
+  return `<div class="analysis-overview-primary"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(unit)}</span></div>`;
+}
+
+function analysisCompositionStat(label, value, ratio, action, tone) {
+  const attrs = analysisActionAttributes(action);
+  const tag = attrs ? "button" : "div";
+  const type = attrs ? ` type="button"` : "";
+  return `
+    <${tag} class="analysis-composition-stat ${escapeHtml(tone)}"${type}${attrs}>
+      <span class="analysis-composition-stat-label"><span aria-hidden="true"></span>${escapeHtml(label)}</span>
+      <strong>${escapeHtml(value)}</strong>
+      <small>${escapeHtml(percentText(ratio))}</small>
+    </${tag}>
+  `;
+}
+
+function analysisCompositionSubset(label, value, note, action) {
+  const attrs = analysisActionAttributes(action);
+  const tag = attrs ? "button" : "div";
+  const type = attrs ? ` type="button"` : "";
+  return `
+    <${tag} class="analysis-composition-subset"${type}${attrs}>
+      <span><strong>${escapeHtml(label)}</strong><small>${escapeHtml(note)}</small></span>
+      <b>${escapeHtml(value)}</b>
+    </${tag}>
+  `;
 }
 
 function analysisBarList(items, options = {}) {
@@ -10035,15 +10195,15 @@ function analysisBarList(items, options = {}) {
 }
 
 function analysisCoverageList(rows) {
-  return `<div class="analysis-bars">${rows.map(([label, ratio, action]) => {
+  return `<div class="analysis-bars">${rows.map(([label, ratio, action, note = ""]) => {
     const attrs = analysisActionAttributes(action);
     const labelTag = attrs ? "button" : "span";
     const labelAttrs = attrs ? ` type="button"` : "";
     return `
-    <div class="analysis-bar-row"${attrs}>
+    <div class="analysis-bar-row analysis-coverage-row"${attrs}>
       <${labelTag} class="analysis-bar-label"${labelAttrs}>${escapeHtml(label)}</${labelTag}>
       <div class="analysis-bar-track"><span style="width: ${(ratio * 100).toFixed(2)}%"></span></div>
-      <strong>${percentText(ratio)}</strong>
+      <strong><span>${percentText(ratio)}</span>${note ? `<small>${escapeHtml(note)}</small>` : ""}</strong>
     </div>
   `;
   }).join("")}</div>`;
@@ -10111,22 +10271,18 @@ function entryIdsFrom(items) {
     .filter(Boolean))];
 }
 
-function analysisFilterTitle(label, value = "") {
-  return value ? `${label}: ${value}` : label;
-}
-
-function entryFilterAction(title, filter, options = {}) {
+function entryFilterAction(titleDescriptor, filter, options = {}) {
   const available = options.available ?? (options.count === undefined ? true : Number(options.count) > 0);
   if (!available && !options.allowEmptyActive) {
     return null;
   }
-  const createVariant = (variantTitle, variantFilter, variant = {}) => {
+  const createVariant = (variantTitleDescriptor, variantFilter, variant = {}) => {
     const search = variant.search ? entryQueryModel.normalizeEntrySearch(variant.search) : null;
     const hasCount = variant.count !== undefined && Number.isFinite(Number(variant.count));
     const count = hasCount ? Math.max(0, Number(variant.count)) : null;
     return {
       key: variant.key || "",
-      title: variantTitle,
+      titleDescriptor: normalizeAdvancedFilterTitleDescriptor(variantTitleDescriptor),
       filter: entryQueryModel.normalizeEntryFilter(variantFilter),
       searchScope: search ? { fields: search.fields, fuzzyFields: search.fuzzyFields } : null,
       initialSearchText: search?.text || "",
@@ -10136,60 +10292,63 @@ function entryFilterAction(title, filter, options = {}) {
     };
   };
   const variants = [
-    createVariant(title, filter, {
+    createVariant(titleDescriptor, filter, {
       key: options.key,
       search: options.search,
       available,
     }),
     ...(options.variants || []).map((variant) => createVariant(
-      variant.title,
+      variant.titleDescriptor,
       variant.filter,
       variant,
     )),
   ];
   return {
     type: "advanced-filter",
-    title,
     variants,
     meta: options.meta || null,
   };
 }
 
-function binaryPresenceFilterAction(activeTitle, field, activeCount, alternateTitle, alternateCount) {
-  return entryFilterAction(activeTitle, {
+function binaryPresenceFilterAction(activeTitleDescriptor, field, activeCount, alternateTitleDescriptor, alternateCount) {
+  return entryFilterAction(activeTitleDescriptor, {
     presence: [{ field, present: true }],
   }, {
     count: activeCount,
     variants: [{
-      title: alternateTitle,
+      titleDescriptor: alternateTitleDescriptor,
       filter: { presence: [{ field, present: false }] },
       count: alternateCount,
     }],
   });
 }
 
-function binaryFeatureFilterAction(activeTitle, activeEntryIds, alternateTitle, alternateEntryIds) {
+function binaryFeatureFilterAction(activeTitleDescriptor, activeEntryIds, alternateTitleDescriptor, alternateEntryIds) {
   const activeIds = entryIdsFrom(activeEntryIds);
   const alternateIds = entryIdsFrom(alternateEntryIds);
   return activeIds.length
-    ? advancedFilterAction(activeTitle, activeIds, { variants: [{ title: alternateTitle, entryIds: alternateIds }] })
+    ? advancedFilterAction(activeTitleDescriptor, activeIds, { variants: [{ titleDescriptor: alternateTitleDescriptor, entryIds: alternateIds }] })
     : null;
 }
 
-function advancedFilterAction(title, items, options = {}) {
+function advancedFilterAction(titleDescriptor, items, options = {}) {
   const entryIds = entryIdsFrom(items);
   const variants = [
-    { key: options.key || "", title, entryIds, issues: options.issues || [] },
+    {
+      key: options.key || "",
+      titleDescriptor: normalizeAdvancedFilterTitleDescriptor(titleDescriptor),
+      entryIds,
+      issues: options.issues || [],
+    },
     ...(options.variants || []).map((variant) => ({
       key: variant.key || "",
-      title: variant.title,
+      titleDescriptor: normalizeAdvancedFilterTitleDescriptor(variant.titleDescriptor),
       entryIds: entryIdsFrom(variant.entryIds),
       issues: variant.issues || [],
     })),
   ].filter((variant, index) => variant.entryIds.length || (index === 0 && options.allowEmptyActive));
   return {
     type: "advanced-filter",
-    title,
     entryIds,
     variants,
     meta: options.meta || null,
@@ -10199,7 +10358,7 @@ function advancedFilterAction(title, items, options = {}) {
 function featureResultAdvancedFilterAction(source, variants, activeCategory) {
   const normalizedVariants = (variants || []).map((variant) => ({
     key: variant.key,
-    title: variant.title,
+    titleDescriptor: normalizeAdvancedFilterTitleDescriptor(variant.titleDescriptor),
     resultSource: source,
     category: variant.key,
     resultCount: Math.max(0, Number(variant.resultCount) || 0),
@@ -10210,7 +10369,6 @@ function featureResultAdvancedFilterAction(source, variants, activeCategory) {
   }
   return {
     type: "advanced-filter",
-    title: active.title,
     variants: [
       active,
       ...normalizedVariants.filter((variant) => variant.category !== activeCategory),
@@ -10324,11 +10482,34 @@ function topMapItems(map, limit = 12) {
     .slice(0, limit);
 }
 
-function topEntryMapItems(map, limit = 12, title = "") {
+function advancedFilterMapValue(label) {
+  if (label === NO_MORPHOLOGY_TABLE_FILTER_VALUE) {
+    return { label: t("advancedFilterNoTable"), valueKey: "advancedFilterNoTable" };
+  }
+  if (label === UNTITLED_MORPHOLOGY_TABLE_FILTER_VALUE) {
+    return { label: t("advancedFilterUntitledTable"), valueKey: "advancedFilterUntitledTable" };
+  }
+  return { label: String(label), valueKey: "" };
+}
+
+function topEntryMapItems(map, limit = 12, labelKey = "") {
   return [...map.entries()]
-    .sort((a, b) => b[1].count - a[1].count || String(a[0]).localeCompare(String(b[0]), "zh-CN"))
+    .sort((a, b) => (
+      b[1].count - a[1].count
+      || advancedFilterMapValue(a[0]).label.localeCompare(advancedFilterMapValue(b[0]).label, "zh-CN")
+    ))
     .slice(0, limit)
-    .map(([label, item]) => [label, item.count, advancedFilterAction(analysisFilterTitle(title, label), [...item.entryIds])]);
+    .map(([rawLabel, item]) => {
+      const { label, valueKey } = advancedFilterMapValue(rawLabel);
+      return [
+        label,
+        item.count,
+        advancedFilterAction(
+          advancedFilterValueTitleDescriptor(labelKey, label, { valueKey }),
+          [...item.entryIds],
+        ),
+      ];
+    });
 }
 
 function partEntryMapItems(map, limit = 12, dictionary = activeDictionary()) {
@@ -10364,23 +10545,30 @@ function numericMapItems(map) {
   return [...map.entries()].sort((a, b) => Number(a[0]) - Number(b[0]));
 }
 
-function numericEntryMapItems(map, title = "") {
+function numericEntryMapItems(map, labelKey = "") {
   return [...map.entries()]
     .sort((a, b) => Number(a[0]) - Number(b[0]))
-    .map(([label, item]) => [label, item.count, advancedFilterAction(analysisFilterTitle(title, label), [...item.entryIds])]);
+    .map(([label, item]) => [
+      label,
+      item.count,
+      advancedFilterAction(
+        advancedFilterValueTitleDescriptor(labelKey, label),
+        [...item.entryIds],
+      ),
+    ]);
 }
 
 function numericDateItems(map) {
   return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
 
-function numericDateEntryItems(map, title = "", field = "updated") {
+function numericDateEntryItems(map, labelKey = "", field = "updated") {
   return [...map.entries()]
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([label, count]) => [
       label,
       Number(count),
-      entryFilterAction(analysisFilterTitle(title, label), {
+      entryFilterAction(advancedFilterValueTitleDescriptor(labelKey, label), {
         activityDays: [{ field, day: label }],
       }, { count }),
     ]);
@@ -14911,6 +15099,20 @@ elements.analysisPanel.addEventListener("click", (event) => {
   if (retryButton) {
     void loadAnalysisOverview(activeDictionary(), { force: true });
     renderAnalysis(activeDictionary());
+    return;
+  }
+  const destinationButton = event.target.closest("[data-analysis-destination-page]");
+  if (destinationButton) {
+    rememberProcessScroll();
+    const analysisViewState = activeAnalysisViewState();
+    const page = destinationButton.dataset.analysisDestinationPage || "overview";
+    const requestedSubpage = destinationButton.dataset.analysisDestinationSubpage || "";
+    analysisViewState.page = page;
+    if (requestedSubpage && analysisSubpages(page).some(([subpage]) => subpage === requestedSubpage)) {
+      analysisViewState.subpageByPage[page] = requestedSubpage;
+    }
+    renderAnalysis(activeDictionary());
+    restoreProcessScroll();
     return;
   }
   const pageButton = event.target.closest("[data-analysis-page]");

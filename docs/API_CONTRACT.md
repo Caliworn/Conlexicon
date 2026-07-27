@@ -603,17 +603,17 @@ directDerivedEntries
 
 `POST /api/dictionaries/:id/analysis/query`
 
-F4a 支持 `entryCount`、`coverageBreakdown`、`partDistribution` 和 `activityPreview`。这些 light widgets 在一次同步 HTTP 请求内完成；前端异步加载并显示独立的 loading/error/retry 状态。数据分析页未打开时不发起请求。
+F4a 支持 `entryCount`、`lexiconSummary`、`coverageBreakdown`、`partDistribution` 和 `activityPreview`。这些 light widgets 在一次同步 HTTP 请求内完成；前端异步加载并显示独立的 loading/error/retry 状态。数据分析页未打开时不发起请求。
 
 请求：
 
 ```js
 {
   widgets: [
-    { id: "entry-count", type: "entryCount" },
-    { id: "parts", type: "partDistribution", limit: 8 },
+    { id: "lexicon", type: "lexiconSummary" },
     { id: "coverage", type: "coverageBreakdown" },
-    { id: "activity", type: "activityPreview", limit: 6 }
+    { id: "parts", type: "partDistribution", limit: 7 },
+    { id: "activity", type: "activityPreview", limit: 5 }
   ],
   options: {
     includeActions: true
@@ -633,10 +633,28 @@ F4a 支持 `entryCount`、`coverageBreakdown`、`partDistribution` 和 `activity
   generation: 4,
   cacheKey: "...",
   widgets: {
-    "entry-count": {
-      type: "entryCount",
-      value: 10000,
-      action: { type: "view", target: "editor" }
+    "lexicon": {
+      type: "lexiconSummary",
+      entryCount: 10000,
+      rootCount: 6400,
+      derivedCount: 3600,
+      multiSourceCount: 180,
+      action: { type: "view", target: "editor" },
+      rootAction: {
+        type: "entryFilter",
+        count: 6400,
+        filter: { presence: [{ field: "source", present: false }] }
+      },
+      derivedAction: {
+        type: "entryFilter",
+        count: 3600,
+        filter: { presence: [{ field: "source", present: true }] }
+      },
+      multiSourceAction: {
+        type: "entryFilter",
+        count: 180,
+        filter: { sourceCount: { min: 2 } }
+      }
     },
     "coverage": {
       type: "coverageBreakdown",
@@ -675,11 +693,14 @@ Widget 通过以下任务依赖生成：
 | Widget | F4a 任务 |
 | --- | --- |
 | `entryCount` | `entryStats` |
+| `lexiconSummary` | `entryStats` |
 | `coverageBreakdown` | `entryStats` |
 | `partDistribution` | `partStats` |
 | `activityPreview` | `activityStats` |
 
-同一任务在一次请求中只执行一次；多个 `activityPreview` 使用请求中的最大 limit 读取日期桶，再分别裁剪。`activityPreview` 只返回 `created` 和 `updated` 日期聚合；按修改时间浏览词条由词条列表的编辑时间排序负责。`coverageBreakdown.rows[].field` 支持 `definition`、`example`、`entryNote`、`source`、`ipa`；释义和例句行另带 `itemCount`。词性分布 action 使用 `{ part }` descriptor，无词性行使用保留值 `__conlexicon_no_part__`。
+同一任务在一次请求中只执行一次；多个 `activityPreview` 使用请求中的最大 limit 读取日期桶，再分别裁剪。`lexiconSummary.rootCount` 严格表示没有任何来源记录的词条数，`derivedCount` 表示至少有一条来源记录的词条数；这两个计数不建立词根拓扑，也不表达孤立词根。`partDistribution` 除排行 `rows` 外返回 `partTypeCount`、`noPartOfSpeechCount` 和对应的 `noPartAction`。`activityPreview` 只返回 `created`、`updated` 日期聚合；按修改时间浏览词条由词条列表的编辑时间排序负责。`coverageBreakdown.rows[].field` 支持 `definition`、`example`、`entryNote`、`source`、`ipa`；释义和例句行另带 `itemCount`。词性分布 action 使用 `{ part }` descriptor，无词性行使用保留值 `__conlexicon_no_part__`。
+
+当前总览固定消费四个 widget，分别渲染词汇规模、资料覆盖、词性分布和编辑活动。资料覆盖卡只展示释义、例句、IPA 与备注，避免“来源覆盖”与衍生词比例重复；`coverageBreakdown` 仍保留 `source` 行供其他消费者使用。词根家族和孤立词根需要稳定词根拓扑，不属于首屏轻量总览，只有进入词根关系详情时才按需读取。
 
 请求验证失败使用 `invalid_analysis_query_payload`、`invalid_analysis_widgets`、`invalid_analysis_widget`、`invalid_analysis_widget_id`、`unsupported_analysis_widget`、`invalid_analysis_widget_limit` 或 `duplicate_analysis_widget_id`。
 

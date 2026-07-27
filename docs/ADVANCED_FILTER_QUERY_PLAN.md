@@ -121,9 +121,9 @@ Feature result source 应由对应 service 产生可重建的查询身份，并�
 
 - F3 已让稳定条件保存 filter descriptor，并复用普通 `/entries` 的窗口、查询会话、cursor、定位、排序、SWR 和搜索；这些条件不再经过 `filteredEntries()` 或保存匹配 ID 数组。
 - 查询型循环变体保存结构 `filter`、可选 `searchScope` 和初始搜索文本，不再用同一个 `available` 同时表达结构候选与当前搜索命中。前端按词典版本和规范化 filter 缓存 `unknown / available / empty` 结构事实；循环按钮只消费该事实。
-- 进入高级筛选、结构事实失效或词条写入后，前端通过批量 `/entries/filter-facts` 自动补齐未知事实。搜索输入只重查当前 `Filter ∩ Search`，不会为其他变体重复 strict/fuzzy 探测；手动刷新继续强制重新读取当前窗口并重新验证结构事实。
+- 进入高级筛选、结构事实失效或词条写入后，前端通过批量 `/entries/filter-facts` 自动补齐未知事实。搜索输入只重查当前 `Filter ∩ Search`，不会为其他变体重复 strict/fuzzy 探测。稳定结构筛选和 IPA feature 筛选正常时不显示刷新按钮；当前远程查询失败时才将该按钮作为重试入口，并且不强制重验已有结构事实。
 - IPA 自动生成比较已消费 feature result query/location，不再保存前端结果 ID；Gloss、形态和质量问题仍保存前端功能结果 ID 与可选问题详情。这是 F4b-2/F4b-3/F5 尚未迁移的明确边界，不是普通 filter 的兜底。
-- 筛选标题只负责当前语言显示；查询身份来自规范化 descriptor。标签 descriptor 保存原始标签，并使用结构键精确语义。
+- 筛选标题使用独立于查询身份的语义化 `titleDescriptor`：固定标题保存主 i18n key，字段值标题保存 label key 及原始值或 value key，循环变体不保存已翻译字符串。语言切换只通过主 i18n 重新渲染标题，不失效列表或 facts 缓存；尚未迁移的本地质量筛选只为带本地化文本的 issue map 定向重建。标签 descriptor 保存原始标签，并使用结构键精确语义。
 - 当前形态覆盖率、表格使用和空单元统计依赖临时旧形态视图。相关入口在形态分析升级前继续属于 feature result source，不能据此固化错误 descriptor。
 - “词根/孤立词根”需要与共享词根拓扑保持重复 lemma、未解析来源和递归来源语义一致；在来源 ID 化或关系结果会话落地前，不新增一套仅供高级筛选使用的直接 SQL 判断。
 
@@ -145,7 +145,7 @@ Feature result source 应由对应 service 产生可重建的查询身份，并�
 
 ### F3：前端状态收敛（已完成）
 
-- 高级筛选状态保存结构 descriptor、搜索字段范围、视图级搜索文本、当前循环变体和显示元数据，不保存完整匹配 ID。
+- 高级筛选状态保存结构 descriptor、搜索字段范围、视图级搜索文本、当前循环变体和语义化标题 descriptor，不保存已翻译标题或完整匹配 ID。
 - 普通筛选复用现有查询 SWR、窗口化、自动展开和目标定位。
 - 移除已迁移筛选的本地完整快照扫描。
 - 查询型高级筛选允许继续输入自由文本；数据分析的当前搜索字段入口已经脱离高级筛选，改为更新列表运行期字段/fuzzy profile。
