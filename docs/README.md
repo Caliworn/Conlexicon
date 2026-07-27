@@ -11,7 +11,7 @@
 | [SQLite Migration Plan](SQLITE_MIGRATION_PLAN.md) | 当前架构 / 后续计划 | 旧 JSON 导入、SQLite 迁移、导出 profile、备份与回滚边界。 |
 | [Query Session Cache Plan](QUERY_SESSION_CACHE_PLAN.md) | 已实装设计参考 | 查询会话、cursor、缓存失效、窗口化和结果定位语义。 |
 | [Advanced Filter Query Plan](ADVANCED_FILTER_QUERY_PLAN.md) | 部分完成 / 活跃计划 | 高级筛选 F0–F3、IPA feature result 迁移，以及 Gloss/形态/质量结果的后续阶段。 |
-| [Feature Result Session Plan](FEATURE_RESULT_SESSION_PLAN.md) | F4b-0/F4b-1、F4b-2 后端已完成 | 重型分析结果源、运行时会话、音系引擎边界、IPA 试点与后续分阶段验收。 |
+| [Feature Result Session Plan](FEATURE_RESULT_SESSION_PLAN.md) | F4b-0–F4b-2 已完成 | 重型分析结果源、运行时会话、音系引擎边界、IPA 试点与后续分阶段验收。 |
 
 ## 推荐阅读顺序
 

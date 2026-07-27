@@ -122,7 +122,7 @@ Feature result source 应由对应 service 产生可重建的查询身份，并�
 - F3 已让稳定条件保存 filter descriptor，并复用普通 `/entries` 的窗口、查询会话、cursor、定位、排序、SWR 和搜索；这些条件不再经过 `filteredEntries()` 或保存匹配 ID 数组。
 - 查询型循环变体保存结构 `filter`、可选 `searchScope` 和初始搜索文本，不再用同一个 `available` 同时表达结构候选与当前搜索命中。前端按词典版本和规范化 filter 缓存 `unknown / available / empty` 结构事实；循环按钮只消费该事实。
 - 进入高级筛选、结构事实失效或词条写入后，前端通过批量 `/entries/filter-facts` 自动补齐未知事实。搜索输入只重查当前 `Filter ∩ Search`，不会为其他变体重复 strict/fuzzy 探测。稳定结构筛选和 IPA feature 筛选正常时不显示刷新按钮；当前远程查询失败时才将该按钮作为重试入口，并且不强制重验已有结构事实。
-- IPA 自动生成比较已消费 feature result query/location，不再保存前端结果 ID；IPA 分布的独立后端 source 也已完成，但分析页和高级筛选仍待接线。Gloss、形态和质量问题仍保存前端功能结果 ID 与可选问题详情。这是 F4b-2 前端部分、F4b-3 与 F5 尚未迁移的明确边界，不是普通 filter 的兜底。
+- IPA 自动生成比较以及音素单元、首音、尾音、音节数分布均已消费 feature result query/location，不再保存前端结果 ID；分布统计桶以 `{ category, value }` action 进入词条列表，并继续叠加运行期搜索、排序、窗口与定位。Gloss、形态和质量问题仍保存前端功能结果 ID 与可选问题详情。这是 F4b-3 与 F5 尚未迁移的明确边界，不是普通 filter 的兜底。
 - 筛选标题使用独立于查询身份的语义化 `titleDescriptor`：固定标题保存主 i18n key，字段值标题保存 label key 及原始值或 value key，循环变体不保存已翻译字符串。语言切换只通过主 i18n 重新渲染标题，不失效列表或 facts 缓存；尚未迁移的本地质量筛选只为带本地化文本的 issue map 定向重建。标签 descriptor 保存原始标签，并使用结构键精确语义。
 - 当前形态覆盖率、表格使用和空单元统计依赖临时旧形态视图。相关入口在形态分析升级前继续属于 feature result source，不能据此固化错误 descriptor。
 - “词根/孤立词根”需要与共享词根拓扑保持重复 lemma、未解析来源和递归来源语义一致；在来源 ID 化或关系结果会话落地前，不新增一套仅供高级筛选使用的直接 SQL 判断。
@@ -167,6 +167,7 @@ Feature result source 应由对应 service 产生可重建的查询身份，并�
 - feature service 接受可重建的 result source descriptor，并返回摘要、窗口 DTO 和可选轻量 detail，而不是完整 ID 数组或只能依赖进程内状态解释的裸 `sessionId`。
 - 基础会话绑定词典 generation、算法版本、功能相关设置和引擎摘要；分类、搜索、排序和窗口只生成查询视图，不重复运行功能算法。
 - F4b-1 已以 IPA 自动生成比较完成试点，经可替换音系引擎 adapter 包装当前简易模型；自动生成 IPA 不持久化。
+- F4b-2 已让 IPA 分布/音位分析页异步共享 `ipaDistribution` summary，并把音素、首尾音和音节数高级筛选迁入 feature query/location；旧本地 IPA slice 与固定 ID action 已删除。
 - 先同步构建并复用运行时会话。只有 10k/30k 基准或可观察交互证明单次计算需要脱离请求生命周期时，才增加进程内后台状态；近期不增加持久化任务队列。
 
 ### F5：质量 API 与剩余迁移

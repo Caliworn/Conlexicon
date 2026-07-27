@@ -214,7 +214,7 @@
 - 普通保存优先增加细粒度端点，不再回退到完整词典 PUT。
 - `GET /api/state` 是轻量启动状态入口；普通启动只应读取词典 metadata/summary，再通过 `GET /api/dictionaries/:id` 或专用读取端点按需加载当前词典内容。
 - 语料库下一步可从整份 corpus 模块保存拆成块、层、单元级 changeset。
-- 搜索、词根模式、词汇关系读取、稳定 SQL 高级筛选、轻量分析总览、IPA 自动生成比较及 IPA 分布后端 source 已依赖 repository 查询/索引或 feature service；IPA 分布前端消费、其余分析、质量检查及 Gloss/形态功能结果仍应继续迁移，不能长期让前端扫描大型完整快照。
+- 搜索、词根模式、词汇关系读取、稳定 SQL 高级筛选、轻量分析总览、IPA 自动生成比较及 IPA 分布分析/筛选已依赖 repository 查询/索引或 feature service；其余分析、质量检查及 Gloss/形态功能结果仍应继续迁移，不能长期让前端扫描大型完整快照。
 - 短期不引入词典级 revision。等对象级增量端点稳定后，再基于目标对象 `updatedAt` 做轻量乐观锁。
 
 ## 读取 API 现状与后续草案
@@ -704,9 +704,9 @@ Widget 通过以下任务依赖生成：
 
 请求验证失败使用 `invalid_analysis_query_payload`、`invalid_analysis_widgets`、`invalid_analysis_widget`、`invalid_analysis_widget_id`、`unsupported_analysis_widget`、`invalid_analysis_widget_limit` 或 `duplicate_analysis_widget_id`。
 
-#### Feature result query（F4b-1 与 F4b-2 后端已实装）
+#### Feature result query（F4b-1 与 F4b-2 已实装）
 
-F4b-1 已按 [Feature Result Session Plan](FEATURE_RESULT_SESSION_PLAN.md) 实装 IPA 自动比较试点；F4b-2 第一部分新增独立的 IPA 分布后端 source：
+F4b-1 已按 [Feature Result Session Plan](FEATURE_RESULT_SESSION_PLAN.md) 实装 IPA 自动比较试点；F4b-2 新增独立的 IPA 分布 source，并已由分析页与高级筛选消费：
 
 ```text
 POST /api/dictionaries/:id/analysis/features/query
@@ -745,7 +745,7 @@ POST /api/dictionaries/:id/analysis/features/location
 }
 ```
 
-summary 模式不接受 `view` 或 `page`，其统计不受 category、搜索、排序或窗口影响。服务端建立或复用基础会话后直接返回 `summary`，不建立有序结果视图、不读取 EntrySummary，也不生成 `items`、`pageInfo` 或 cursor。IPA 自动检查页首次加载使用该模式。
+summary 模式不接受 `view` 或 `page`，其统计不受 category、搜索、排序或窗口影响。服务端建立或复用基础会话后直接返回 `summary`，不建立有序结果视图、不读取 EntrySummary，也不生成 `items`、`pageInfo` 或 cursor。IPA 自动检查页以及 IPA 分布/音位分析页首次加载使用该模式；分布与音位子页共享同一份 `ipaDistribution` summary。
 
 `source` 绑定功能类型、契约版本和算法 options；items 模式的 `view` 选择 category、EntrySearch 与 sort，`page` 使用普通列表相同的窗口语义。服务端按词典 generation、source、算法版本和 IPA 设置摘要复用内部会话。搜索复用词典的运行期规范化配置和现有 SQLite search projection；只回读当前页 EntrySummary 与 search hits。
 
@@ -775,7 +775,7 @@ summary 模式同样只传 `source` 与 `responseMode: "summary"`。`summary.dis
 
 基础 outcome 为互斥的 `exactMatch`、`normalizedOnlyMatch`、`mismatch`、`unavailable`、`failed`。三个 UI category 分别映射为 `exactMatch`、`mismatch`、`normalizedOnlyMatch + mismatch`。响应中的 `summary.outcomes` 和 `summary.views` 一次返回全部计数，因此循环按钮不执行额外存在性探针。
 
-`items` 形如 `{ entry: EntrySummary, feature: { outcome, generated, diagnostics } }`；HTTP 响应和前端高级筛选 action 都不携带完整匹配 ID。`pageInfo` 返回 `total/limit/windowOffset/nextCursor/windowCursor/hasMore`。location 请求沿用同一 source/view/page，并增加 `entryId`；响应增加 `{ found, index, windowIndex, windowOffset }`。
+`ipaAutoCompare` items 形如 `{ entry: EntrySummary, feature: { outcome, generated, diagnostics } }`；`ipaDistribution` items 的 feature 形如 `{ category, value, occurrenceCount }`。HTTP 响应和前端高级筛选 action 都不携带完整匹配 ID。`pageInfo` 返回 `total/limit/windowOffset/nextCursor/windowCursor/hasMore`。location 请求沿用同一 source/view/page，并增加 `entryId`；响应增加 `{ found, index, windowIndex, windowOffset }`。
 
 会话使用每词典最多 4 份、全局估算 32 MiB、空闲 2 分钟的有界进程缓存，并合并相同 descriptor 的并发构建。写入或 source 变化会产生新会话；`ipaAutoCompare` 另受完整 IPA 设置与引擎 ID/版本影响，`ipaDistribution` 只受复杂音素和音节分隔符影响，不调用音系引擎，也不因映射、重音或其他生成设置变化而产生不同 descriptor。淘汰或进程重启后由 descriptor 透明重建。cursor 绑定进程 epoch、generation、result key 和视图 identity，陈旧 cursor 返回 `query_cursor_stale`。当前简易 IPA 模型由 adapter 包装；自动生成值仍是可重建的运行时结果，不新增持久化列。
 
@@ -850,6 +850,6 @@ F4a 的 light widgets 不返回后台任务状态。F4b 接入重型 widget 后�
 1. 已完成的基础继续保持：`listDictionaries()`/词典标题 root count、词根模式和词汇网络复用 SQLite 稳定词根拓扑。
 2. F1–F3 已完成统一 EntryQuery/EntryFilter、SQLite 条件编译和前端 descriptor 迁移；稳定筛选继续复用 `/entries` 的窗口、cursor、缓存与定位。
 3. F4a 已完成 `POST /analysis/query` 的四类 light widgets、最小 planner 和总览异步加载；总览不再为这些统计读取完整 snapshot。
-4. F4b-0/F4b-1 已完成可重建 result source、运行时会话、失效、音系引擎 adapter 与 IPA 自动生成比较迁移；F4b-2 第一部分已完成 IPA 分布后端 source，下一步接入分析页和高级筛选，再迁移正式形态分析。root family 排名直接消费稳定 topology，不进入 feature session。
+4. F4b-0/F4b-1 已完成可重建 result source、运行时会话、失效、音系引擎 adapter 与 IPA 自动生成比较迁移；F4b-2 已完成 IPA 分布 source、异步分析页及高级筛选迁移。下一步迁移正式形态分析。root family 排名直接消费稳定 topology，不进入 feature session。
 5. F5 建立独立 `/quality/query`，再让质量高级筛选消费共享的内部会话原语；repository 不反向调用质量算法。
 6. 语料查询在独立服务边界稳定后按需接入，不恢复前端 materialized ID 或完整快照兜底。

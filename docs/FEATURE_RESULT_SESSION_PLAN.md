@@ -1,6 +1,6 @@
 # Feature Result Session Plan
 
-本文记录 F4b 的功能结果源与运行时会话设计。F4b-0 已完成现状清点、独立复评和契约冻结；F4b-1 已实装 IPA 自动生成比较的 API、运行时缓存和前端窗口消费；F4b-2 第一部分已实装 IPA 分布后端 source，下一部分接入分析页与高级筛选，之后继续迁移正式形态分析。
+本文记录 F4b 的功能结果源与运行时会话设计。F4b-0 已完成现状清点、独立复评和契约冻结；F4b-1 已实装 IPA 自动生成比较的 API、运行时缓存和前端窗口消费；F4b-2 已完成 IPA 分布后端 source、异步分析页和高级筛选接线，下一阶段继续迁移正式形态分析。
 
 ## 1. F4b-0 结论
 
@@ -22,7 +22,7 @@ F4b 不建设通用分析任务平台，不把功能结果伪装成普通 `Entry
 | 页面/入口 | 当前数据来源 | 当前结果动作 | F4b-0 归类 | 目标边界 |
 | --- | --- | --- | --- | --- |
 | IPA 自动生成一致/宽松不一致/严格不一致 | F4b-1 `ipaAutoCompare` adapter 与运行时会话 | summary 驱动的 feature query 变体 | Feature result（已迁移） | 保持当前 query/location 契约，外部引擎接入后重跑基准 |
-| IPA 音位、首音、尾音、音节数 | 当前 IPA 清理、complex phoneme tokenization 与分隔规则 | 每个桶保存固定 `entryIds` | Feature result | F4b-2 `ipaDistribution`，与比较结果分开按需构建 |
+| IPA 音位、首音、尾音、音节数 | F4b-2 `ipaDistribution` 与共享 IPA 清理/tokenization 规则 | `category + value` 功能结果查询 | Feature result（已迁移） | 与自动比较分开按需构建，分析页共享一次 summary |
 | Glossed 例句 | 解析 `definition.example` 中的 `\gla/\glb/\glc/\ft` | 固定 `entryIds` | Feature result，但模型即将变化 | 暂缓到例句/语料链接边界明确后迁移 |
 | 形态覆盖与表格使用 | 前端临时旧单表适配 `resolveEntryMorphologyTable()` | 固定有/无 ID 与桶 ID | 错误模型上的临时结果 | F4b-3 改用共享 morphology model 后重新定义 |
 | 形态生成数与空单元 | 临时旧表格逐单元求值 | 固定问题 ID | Feature result | F4b-3 使用真实多组、多子表、nested override |
@@ -310,14 +310,16 @@ F4b-1 默认在请求内同步构建，记录冷/热耗时、扫描词条数、�
 - 已迁移三类自动生成比较及循环变体，删除对应前端 ID 数组。
 - 已建立定向契约检查；10k/30k 冷热基准由 `scripts/benchmark-feature-result-session.js` 执行。
 
-### F4b-2：IPA 分布（后端 source 已完成）
+### F4b-2：IPA 分布（已完成）
 
-- 第一部分已实装独立 `ipaDistribution` source，避免只看音位分布时顺带执行自动生成；完整支持 summary、桶查询、搜索交集、窗口、定位和 cursor。
+- 已实装独立 `ipaDistribution` source，避免只看音位分布时顺带执行自动生成；完整支持 summary、桶查询、搜索交集、窗口、定位和 cursor。
 - view 使用 `unit / initial / final / syllableCount + value`。summary 一次返回音素单元、首音、尾音和音节数全部桶，不返回固定 ID 数组。
 - 音素单元桶同时返回总出现次数 `count` 和唯一词条数 `entryCount`；首音、尾音和音节数每个词条只贡献一次。首尾音从完整 token 顺序读取，不能从去重集合推导。
 - 清洗复用 `ipa-model`：移除包裹符和重音，空白、传统点号及当前配置分隔符均作为音节边界，复杂音素继续按最长优先切分。descriptor 只摘要 complex phoneme 和分隔符，不包含音系引擎、映射或重音设置。
 - 构建每 128 项让出事件循环。10k/30k 临时 SQLite 基准中冷构建约 50/130 ms，热桶约 2 ms，仍不需要后台 job 状态。
-- 第二部分负责把 IPA 分布与音节分析页改为异步消费该 source，并将相应高级筛选从固定 `entryIds` 迁入 feature query；完成前保留旧前端本地 slice。
+- IPA 分布与音位分析页已改为按需异步消费同一份 summary，具有加载、失败和重试状态；切换分布/音位子页复用按词典版本与 IPA 解析配置识别的前端请求状态。
+- 音素单元、首音、尾音和音节数统计桶已使用 `{ category, value }` action 进入 feature query/location；词条列表继续叠加当前运行期搜索字段/fuzzy、排序和窗口，不保存完整匹配 ID。
+- `analysis-model` 不再声明本地 IPA slice，前端旧 `analyzeIpa()`、固定 ID action 和相关本地分析计算已经删除。
 
 ### F4b-3：形态分析
 
