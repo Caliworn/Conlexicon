@@ -671,8 +671,26 @@ function checkModelNormalization() {
     "notes",
     "etymology",
   ]);
-  assert.equal(entrySearchModel.textMatches("mirror meaning", "mrmeaning", { fuzzy: true }), true);
-  assert.equal(entrySearchModel.textMatches("mirror meaning", "mrmeaning", { fuzzy: false }), false);
+  assert.throws(
+    () => entrySearchModel.textMatches("mirror meaning", "mrmeaning", { fuzzy: true }),
+    /Search normalizeText option is required/,
+  );
+  assert.throws(
+    () => entrySearchModel.fuzzyScore("mirror meaning", "mrmeaning"),
+    /Search normalizeText option is required/,
+  );
+  assert.throws(
+    () => entrySearchModel.entryMatchesSearchText({ lemma: "mirror" }, {}, "mirror"),
+    /Search normalizeText option is required/,
+  );
+  assert.equal(entrySearchModel.textMatches("mirror meaning", "mrmeaning", {
+    fuzzy: true,
+    normalizeText: testNormalize,
+  }), true);
+  assert.equal(entrySearchModel.textMatches("mirror meaning", "mrmeaning", {
+    fuzzy: false,
+    normalizeText: testNormalize,
+  }), false);
   assert.equal(entrySearchModel.fieldFuzzyEnabled("tags", { fuzzyFields: "tags" }), true);
   assert.equal(entrySearchModel.fieldFuzzyEnabled("tags", { fuzzyFields: "definitions" }), false);
   const relationDictionary = {
@@ -704,7 +722,7 @@ function checkModelNormalization() {
       { lemma: "acar", definitions: [{ meaning: "root" }] },
       {},
       "root",
-      { fields: "definitions" },
+      { fields: "definitions", normalizeText: testNormalize },
     ),
     true,
   );
@@ -713,7 +731,7 @@ function checkModelNormalization() {
       { lemma: "acar", tags: ["n"], definitions: [{ meaning: "mirror meaning" }] },
       { settings: { tagDisplayMap: { n: "Noun Display" } } },
       "mrmeaning",
-      { fuzzyFields: "definitions" },
+      { fuzzyFields: "definitions", normalizeText: testNormalize },
     ),
     true,
   );
@@ -722,7 +740,7 @@ function checkModelNormalization() {
       { lemma: "acar", tags: ["n"], definitions: [{ meaning: "mirror meaning" }] },
       { settings: { tagDisplayMap: { n: "Noun Display" } } },
       "nd",
-      { fuzzyFields: "definitions" },
+      { fuzzyFields: "definitions", normalizeText: testNormalize },
     ),
     false,
   );
