@@ -3173,6 +3173,9 @@ dialog {
 .analysis-page-body {
   display: grid;
   gap: 18px;
+  min-width: 0;
+  container-name: analysis-page;
+  container-type: inline-size;
 }
 
 .analysis-filter-group {
@@ -3236,6 +3239,12 @@ dialog {
 .analysis-overview-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
+}
+
+@container analysis-page (max-width: 860px) {
+  .analysis-grid.analysis-overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .analysis-wide-grid {
@@ -3605,8 +3614,13 @@ button.analysis-bar-label:hover,
   text-align: right;
 }
 
+.analysis-coverage-list {
+  grid-template-columns: minmax(76px, max-content) minmax(80px, 1fr) minmax(82px, max-content);
+}
+
 .analysis-coverage-row {
-  grid-template-columns: minmax(76px, 0.72fr) minmax(80px, 1fr) minmax(82px, auto);
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
 }
 
 .analysis-coverage-row strong {
@@ -4955,11 +4969,19 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   .inline-field-action,
   .analysis-grid,
   .analysis-summary-grid,
-    .analysis-detail-grid,
-    .analysis-bar-row,
-    .corpus-attribute-row,
-    .corpus-effective-table > div {
+  .analysis-detail-grid,
+  .analysis-bar-row,
+  .corpus-attribute-row,
+  .corpus-effective-table > div {
     grid-template-columns: 1fr;
+  }
+
+  .analysis-coverage-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .analysis-coverage-row {
+    grid-column: 1;
   }
 
   .ipa-rule-header {

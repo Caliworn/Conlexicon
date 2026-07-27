@@ -10318,7 +10318,7 @@ function analysisBarList(items, options = {}) {
 }
 
 function analysisCoverageList(rows) {
-  return `<div class="analysis-bars">${rows.map(([label, ratio, action, note = ""]) => {
+  return `<div class="analysis-bars analysis-coverage-list">${rows.map(([label, ratio, action, note = ""]) => {
     const attrs = analysisActionAttributes(action);
     const labelTag = attrs ? "button" : "span";
     const labelAttrs = attrs ? ` type="button"` : "";
