@@ -146,7 +146,8 @@
           </section>
 
           <section class="content-grid" id="editorContentGrid" data-browser-state="expanded">
-            <section class="entry-browser view-browser" id="entryBrowser" data-i18n-aria-label="entryBrowser" aria-label="词条列表">
+            <div class="entry-browser-slot" id="entryBrowserSlot">
+              <section class="entry-browser view-browser" id="entryBrowser" data-i18n-aria-label="entryBrowser" aria-label="词条列表">
               <div class="filter-row">
                 <div class="entry-search-control" id="entrySearchControl">
                   <input id="searchInput" type="search" data-i18n-placeholder="searchPlaceholder" placeholder="搜索词形、释义、标签">
@@ -210,7 +211,8 @@
                   <span class="content-update-indicator" data-i18n="contentUpdating">正在更新</span>
                 </div>
               </div>
-            </section>
+              </section>
+            </div>
 
             <section class="entry-detail-panel" id="entryDetailPanel" data-i18n-aria-label="entryDetail" aria-label="词条详情">
               <article class="entry-display" id="entryDisplay" hidden>

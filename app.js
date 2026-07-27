@@ -1359,6 +1359,7 @@ i18n.zh.createSourceEntry = "新建来源词条：{source}";
 
 const elements = {
   appShell: document.querySelector("#appShell"),
+  workspace: document.querySelector(".workspace"),
   mobileAppBar: document.querySelector("#mobileAppBar"),
   mobileNavButton: document.querySelector("#mobileNavButton"),
   mobileCurrentViewLabel: document.querySelector("#mobileCurrentViewLabel"),
@@ -1371,6 +1372,7 @@ const elements = {
   editorView: document.querySelector("#editorView"),
   editorTopBar: document.querySelector("#editorTopBar"),
   entryBrowserToggleButton: document.querySelector("#entryBrowserToggleButton"),
+  entryBrowserSlot: document.querySelector("#entryBrowserSlot"),
   entryBrowser: document.querySelector("#entryBrowser"),
   dictionaryManagerView: document.querySelector("#dictionaryManagerView"),
   analysisView: document.querySelector("#analysisView"),
@@ -3554,50 +3556,42 @@ function renderShellEntryBrowser() {
 function updateEntryBrowserHeight() {
   entryBrowserHeightFrame = 0;
   const browser = elements.entryBrowser;
-  if (!browser || browser.hidden || state.activeView !== "editor" || !desktopNavMediaQuery.matches) {
+  const slot = elements.entryBrowserSlot;
+  if (!browser || !slot || browser.hidden || state.activeView !== "editor" || !desktopNavMediaQuery.matches) {
     clearEntryBrowserLayoutVariables();
     return;
   }
   const gridRect = elements.contentGrid.getBoundingClientRect();
-  const bottomGap = 20;
+  const workspaceBottomPadding = Number.parseFloat(getComputedStyle(elements.workspace).paddingBottom) || 0;
+  const bottomGap = Math.max(20, workspaceBottomPadding);
   const stickyTop = 20;
   const top = Math.max(stickyTop, gridRect.top);
-  const columns = getComputedStyle(elements.contentGrid).gridTemplateColumns.split(/\s+/);
-  const firstColumnWidth = Number.parseFloat(columns[0]) || browser.getBoundingClientRect().width || 340;
   const availableHeight = Math.max(220, window.innerHeight - top - bottomGap);
-  const nextLeft = `${Math.round(gridRect.left)}px`;
-  const nextTop = `${Math.round(top)}px`;
-  const nextWidth = `${Math.round(firstColumnWidth)}px`;
+  const gridDocumentTop = gridRect.top + window.scrollY;
+  const restingTop = Math.max(stickyTop, gridDocumentTop);
+  const restingHeight = Math.max(220, window.innerHeight - restingTop - bottomGap);
   const nextHeight = `${Math.round(availableHeight)}px`;
-  const widthChanged = browser.style.getPropertyValue("--entry-browser-fixed-width") !== nextWidth;
+  const nextSlotMinHeight = `${Math.round(restingHeight)}px`;
   if (
-    browser.style.getPropertyValue("--entry-browser-fixed-left") === nextLeft
-    && browser.style.getPropertyValue("--entry-browser-fixed-top") === nextTop
-    && browser.style.getPropertyValue("--entry-browser-fixed-width") === nextWidth
-    && browser.style.getPropertyValue("--entry-browser-height") === nextHeight
+    browser.style.getPropertyValue("--entry-browser-height") === nextHeight
+    && slot.style.getPropertyValue("--entry-browser-slot-min-height") === nextSlotMinHeight
   ) {
-    elements.contentGrid.dataset.browserLayout = "ready";
     return;
   }
   const scrollPin = entryVirtualListScrollPin();
-  browser.style.setProperty("--entry-browser-fixed-left", nextLeft);
-  browser.style.setProperty("--entry-browser-fixed-top", nextTop);
-  browser.style.setProperty("--entry-browser-fixed-width", nextWidth);
   browser.style.setProperty("--entry-browser-height", nextHeight);
-  elements.contentGrid.dataset.browserLayout = "ready";
-  syncEntryVirtualListAfterBrowserLayoutChange({ widthChanged, scrollPin });
+  slot.style.setProperty("--entry-browser-slot-min-height", nextSlotMinHeight);
+  syncEntryVirtualListAfterBrowserLayoutChange({ scrollPin });
 }
 
 function clearEntryBrowserLayoutVariables() {
   const browser = elements.entryBrowser;
-  if (!browser) {
+  const slot = elements.entryBrowserSlot;
+  if (!browser || !slot) {
     return;
   }
-  browser.style.removeProperty("--entry-browser-fixed-left");
-  browser.style.removeProperty("--entry-browser-fixed-top");
-  browser.style.removeProperty("--entry-browser-fixed-width");
   browser.style.removeProperty("--entry-browser-height");
-  elements.contentGrid.dataset.browserLayout = "pending";
+  slot.style.removeProperty("--entry-browser-slot-min-height");
 }
 
 function scheduleEntryBrowserHeightUpdate() {

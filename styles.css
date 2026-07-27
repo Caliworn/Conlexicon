@@ -28,6 +28,11 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  overscroll-behavior: none;
+}
+
 body {
   margin: 0;
   min-width: 0;
@@ -392,10 +397,17 @@ fieldset {
   margin-top: 8px;
 }
 
+.entry-browser-slot,
 .entry-browser,
 .editor-panel,
 .entry-detail-panel {
   min-width: 0;
+}
+
+.entry-browser-slot {
+  align-self: stretch;
+  min-height: var(--entry-browser-slot-min-height, calc(100vh - 172px));
+  contain: size;
 }
 
 .entry-browser {
@@ -512,12 +524,8 @@ fieldset {
 }
 
 @media (min-width: 800px) {
-  .content-grid[data-browser-state="expanded"][data-browser-layout="ready"] .entry-browser {
-    position: fixed;
-    left: var(--entry-browser-fixed-left);
-    top: var(--entry-browser-fixed-top);
-    z-index: 4;
-    width: var(--entry-browser-fixed-width);
+  .content-grid[data-browser-state="collapsed"] .entry-browser-slot {
+    display: none;
   }
 
   .content-grid[data-browser-state="expanded"] .entry-detail-panel {
@@ -4723,7 +4731,7 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   }
 }
 
-@media (max-width: 799px) {
+@media (max-width: 799.98px) {
   body {
     min-width: 0;
   }
@@ -4772,12 +4780,19 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
     grid-row: 2;
     min-height: 0;
     overflow-y: auto;
+    overscroll-behavior: none;
     padding: 14px 14px 24px;
   }
 
   .content-grid,
   .content-grid[data-browser-state="collapsed"] {
     grid-template-columns: 1fr;
+  }
+
+  .entry-browser-slot {
+    display: contents;
+    min-height: 0;
+    contain: none;
   }
 
   .dictionary-panel,
