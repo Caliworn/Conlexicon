@@ -12,6 +12,7 @@
 
 - 完成 F4b-3 形态分析迁移：冻结并实装 `morphologyAnalysis` 的 summary、items、location 和高级筛选 category/value/scope，统计真实模板组分配、自动/手动模式及 nested override 的 active/inactive 覆写。数据分析形态页改为按需异步加载“使用情况/覆写”，统计项直接进入可搜索、排序、定位和循环的功能结果窗口；删除旧前端单表适配、固定 ID slice、生成数、空单元、子表使用排行和形态质量判断。Feature service/query model 使用显式 source registry，SQLite 只提供不含释义、来源、IPA、模板单元格或完整词典快照的最小形态输入。
 - 词条列表的运行期搜索字段面板新增逐字段命中词条数：普通查询、结构筛选、词根模式和 feature result 均按当前启用字段及各自 strict/fuzzy 配置返回一致的唯一词条计数；词根模式统计直接搜索命中的词条，而非可见词根组或随组展示的衍生词。移除数据分析中重复且依赖完整活动词典的“当前搜索命中字段/当前搜索命中”统计。
+- 移除与总览“资料覆盖”重复的数据分析覆盖率子页、详情跳转和前端全词典 coverage slice；释义、例句、IPA 与备注覆盖仍由总览 SQLite widget 展示并可直接进入有/无字段筛选，Gloss 问题继续归入质量检查。
 
 ### 性能
 

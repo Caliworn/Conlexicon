@@ -381,7 +381,6 @@ const i18n = {
     advancedFilterMorphologyOverrideTable: "形态覆写表格",
     advancedFilterMorphologyActiveOverrideTable: "活跃覆写表格",
     advancedFilterMorphologyInactiveOverrideTable: "休眠覆写表格",
-    advancedFilterGlossedExamples: "Glossed 例句",
     advancedFilterMultiSourceEntries: "多来源词条",
     advancedFilterHasExamples: "有例句",
     advancedFilterNoExamples: "无例句",
@@ -956,7 +955,6 @@ const i18n = {
     advancedFilterMorphologyOverrideTable: "Morphology override table",
     advancedFilterMorphologyActiveOverrideTable: "Active override table",
     advancedFilterMorphologyInactiveOverrideTable: "Dormant override table",
-    advancedFilterGlossedExamples: "Glossed examples",
     advancedFilterMultiSourceEntries: "Multi-source entries",
     advancedFilterHasExamples: "Has examples",
     advancedFilterNoExamples: "No examples",
@@ -9396,14 +9394,7 @@ function analysisBaseCacheKey(dictionary) {
     entries: (dictionary?.entries || []).map((entry) => ({
       id: entry.id || "",
       lemma: entry.lemma || "",
-      pronunciation: entry.pronunciation || "",
       tags: entry.tags || [],
-      definitions: (entry.definitions || []).map((definition) => ({
-        id: definition.id || "",
-        meaning: definition.meaning || "",
-        example: definition.example || "",
-      })),
-      notes: entry.notes || "",
       etymology: {
         sources: entry.etymology?.sources || [],
       },
@@ -9417,8 +9408,6 @@ function analysisSliceCacheKey(context, dep) {
   return stableJson({
     base: context.cacheBaseKey,
     dep,
-    searchQuery: dep === "search" ? normalizeEntrySearchText(searchQuery, context.dictionary) : "",
-    searchOptions: dep === "search" ? entrySearchQuerySignature(context.dictionary) : "",
     entrySort: dep === "relation" || dep === "rootFamilies" ? entrySort : "",
     rootFamilyLimit: dep === "rootFamilies" ? analysisRootFamilyLimit() : "",
   });
@@ -9520,7 +9509,6 @@ function analysisSubpages(page) {
       ["tags", aText("标签", "Tags")],
       ["forms", aText("词形结构", "Word Forms")],
       ["roots", aText("词根关系", "Roots")],
-      ["coverage", aText("覆盖率", "Coverage")],
     ],
     ipa: [
       ["distribution", aText("分布", "Distribution")],
@@ -9780,10 +9768,7 @@ function renderAnalysisOverviewQuery(response) {
           multiSourceAction,
         )}
       `)}
-      ${analysisCard(aText("资料覆盖", "Data Coverage"), analysisCoverageList(coverage), {
-        destinationPage: "entries",
-        destinationSubpage: "coverage",
-      })}
+      ${analysisCard(aText("资料覆盖", "Data Coverage"), analysisCoverageList(coverage))}
       ${analysisCard(aText("词性分布", "Part of Speech"), `
         ${analysisBarList(parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") })}
         ${analysisFactList([
@@ -9809,12 +9794,6 @@ function renderAnalysisEntriesPage(report, subpage) {
   }
   if (subpage === "roots") {
     return `<section class="analysis-detail-grid">${analysisCard(aText("词根家族排行", "Root Families"), analysisBarList(report.allRootFamilies, { empty: aText("暂无衍生关系", "No derivation links yet") }))}</section>`;
-  }
-  if (subpage === "coverage") {
-    return `<section class="analysis-detail-grid">
-      ${analysisCard(aText("覆盖率", "Coverage"), analysisCoverageList(report.coverageRows))}
-      ${analysisCard(aText("规则与资料", "Rules and Data"), analysisFactList(analysisFactRows(report)))}
-    </section>`;
   }
   return `<section class="analysis-detail-grid">
     ${analysisCard(aText("词性分布", "Part of Speech"), analysisBarList(report.allParts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") }))}
@@ -10217,14 +10196,6 @@ function qualityIssueModuleFilterTitleDescriptor(module) {
   return advancedFilterTitleDescriptor(keys[module] || keys.other);
 }
 
-function analysisFactRows(report) {
-  return [
-    [aText("例句数量", "Examples"), report.examples, binaryPresenceFilterAction(advancedFilterTitleDescriptor("advancedFilterHasExamples"), "example", report.exampleEntryCount, advancedFilterTitleDescriptor("advancedFilterNoExamples"), report.noExampleEntryCount)],
-    [aText("Glossed 例句", "Glossed examples"), report.glossExamples, advancedFilterAction(advancedFilterTitleDescriptor("advancedFilterGlossedExamples"), report.glossEntryIds)],
-    [aText("多来源词条", "Multi-source entries"), report.multiSourceCount, entryFilterAction(advancedFilterTitleDescriptor("advancedFilterMultiSourceEntries"), { sourceCount: { min: 2 } }, { count: report.multiSourceCount })],
-  ];
-}
-
 function analysisIpaCompareRows(response) {
   const matchTitleDescriptor = advancedFilterTitleDescriptor("advancedFilterAutoIpaMatches");
   const looseTitleDescriptor = advancedFilterTitleDescriptor("advancedFilterAutoIpaLooseMismatches");
@@ -10275,7 +10246,6 @@ function buildAnalysisContext(dictionary) {
   return {
     dictionary,
     entries,
-    total: entries.length || 1,
     query: dictionaryQueryModel.createDictionaryQueryContext(dictionary, {
       normalizeText: normalize,
       compareEntries,
@@ -10290,7 +10260,6 @@ function composeLegacyAnalysisReport(context, slices) {
     entries: context.entries,
     ...slices.relation,
     ...slices.rootFamilies,
-    ...slices.coverage,
     ...slices.tags,
     ...slices.forms,
     activity: slices.activity,
@@ -10301,7 +10270,6 @@ function analysisSliceBuilders() {
   return {
     relation: buildAnalysisRelationSlice,
     rootFamilies: buildAnalysisRootFamiliesSlice,
-    coverage: buildAnalysisCoverageSlice,
     tags: buildAnalysisTagSlice,
     forms: buildAnalysisFormSlice,
     activity: buildAnalysisActivitySlice,
@@ -10321,88 +10289,6 @@ function buildAnalysisRootFamiliesSlice(context) {
   return {
     rootFamilies: rootFamilyGroups.rows.map(familyRow),
     allRootFamilies: rootFamilyGroups.allRows.map(familyRow),
-  };
-}
-
-function buildAnalysisCoverageSlice(context) {
-  const { entries, total } = context;
-  const glossEntryIds = new Set();
-  let definitionEntryCount = 0;
-  let exampleEntryCount = 0;
-  let noteEntryCount = 0;
-  let sourceEntryCount = 0;
-  let ipaEntryCount = 0;
-  let definitionCount = 0;
-  let examples = 0;
-  let glossExamples = 0;
-
-  entries.forEach((entry) => {
-    const definitions = entry.definitions || [];
-    const meaningfulDefinitions = definitions.filter((definition) => definition.meaning);
-    definitionCount += meaningfulDefinitions.length;
-    if (meaningfulDefinitions.length) {
-      definitionEntryCount += 1;
-    }
-    if (definitions.some((definition) => definition.example)) {
-      exampleEntryCount += 1;
-    }
-    examples += definitions.filter((definition) => definition.example).length;
-    definitions.forEach((definition) => {
-      const gloss = parseGloss(definition.example);
-      if (gloss) {
-        glossExamples += 1;
-        glossEntryIds.add(entry.id);
-      }
-    });
-    if (entry.notes) {
-      noteEntryCount += 1;
-    }
-    if (entryHasSources(entry)) {
-      sourceEntryCount += 1;
-    }
-    if (entry.pronunciation) {
-      ipaEntryCount += 1;
-    }
-  });
-
-  const entryTotal = entries.length;
-  const noDefinitionEntryCount = entryTotal - definitionEntryCount;
-  const noExampleEntryCount = entryTotal - exampleEntryCount;
-  const noNoteEntryCount = entryTotal - noteEntryCount;
-  const noSourceEntryCount = entryTotal - sourceEntryCount;
-  const noIpaEntryCount = entryTotal - ipaEntryCount;
-  const coverage = {
-    definitions: definitionEntryCount / total,
-    examples: exampleEntryCount / total,
-    notes: noteEntryCount / total,
-    sources: sourceEntryCount / total,
-    ipa: ipaEntryCount / total,
-  };
-  const coverageRows = [
-    [aText("有释义", "Definitions"), coverage.definitions, binaryPresenceFilterAction(advancedFilterTitleDescriptor("advancedFilterHasDefinitions"), "definition", definitionEntryCount, advancedFilterTitleDescriptor("advancedFilterNoDefinitions"), noDefinitionEntryCount)],
-    [aText("有例句", "Examples"), coverage.examples, binaryPresenceFilterAction(advancedFilterTitleDescriptor("advancedFilterHasExamples"), "example", exampleEntryCount, advancedFilterTitleDescriptor("advancedFilterNoExamples"), noExampleEntryCount)],
-    [aText("有备注", "Notes"), coverage.notes, binaryPresenceFilterAction(advancedFilterTitleDescriptor("advancedFilterHasNotes"), "entryNote", noteEntryCount, advancedFilterTitleDescriptor("advancedFilterNoNotes"), noNoteEntryCount)],
-    [aText("有来源", "Sources"), coverage.sources, binaryPresenceFilterAction(advancedFilterTitleDescriptor("advancedFilterHasSources"), "source", sourceEntryCount, advancedFilterTitleDescriptor("advancedFilterNoSources"), noSourceEntryCount)],
-    ["IPA", coverage.ipa, binaryPresenceFilterAction(advancedFilterTitleDescriptor("advancedFilterHasIpa"), "ipa", ipaEntryCount, advancedFilterTitleDescriptor("advancedFilterNoIpa"), noIpaEntryCount)],
-  ];
-
-  return {
-    definitionCount,
-    examples,
-    glossExamples,
-    definitionEntryCount,
-    exampleEntryCount,
-    glossEntryIds: [...glossEntryIds],
-    noteEntryCount,
-    sourceEntryCount,
-    ipaEntryCount,
-    noDefinitionEntryCount,
-    noExampleEntryCount,
-    noNoteEntryCount,
-    noSourceEntryCount,
-    noIpaEntryCount,
-    coverage,
-    coverageRows,
   };
 }
 
