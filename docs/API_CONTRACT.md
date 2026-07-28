@@ -704,9 +704,9 @@ Widget 通过以下任务依赖生成：
 
 请求验证失败使用 `invalid_analysis_query_payload`、`invalid_analysis_widgets`、`invalid_analysis_widget`、`invalid_analysis_widget_id`、`unsupported_analysis_widget`、`invalid_analysis_widget_limit` 或 `duplicate_analysis_widget_id`。
 
-#### Feature result query（F4b-1 与 F4b-2 已实装）
+#### Feature result query（F4b-1/F4b-2/F4b-3 后端已实装）
 
-F4b-1 已按 [Feature Result Session Plan](FEATURE_RESULT_SESSION_PLAN.md) 实装 IPA 自动比较试点；F4b-2 新增独立的 IPA 分布 source，并已由分析页与高级筛选消费：
+F4b-1 已按 [Feature Result Session Plan](FEATURE_RESULT_SESSION_PLAN.md) 实装 IPA 自动比较试点；F4b-2 新增独立的 IPA 分布 source，并已由分析页与高级筛选消费；F4b-3 已实装 `morphologyAnalysis` 后端 source、最小 repository 输入及 query/location/session 接线，前端形态分析页仍待迁移：
 
 ```text
 POST /api/dictionaries/:id/analysis/features/query
@@ -773,11 +773,71 @@ summary 模式同样只传 `source` 与 `responseMode: "summary"`。`summary.dis
 
 分布解析先移除 IPA 包裹符和重音符，再按空白、传统 `.` 及当前 IPA 设置中的音节分隔符切分；音素单元切分复用 `ipa-model` 的 `complexPhonemes` 最长优先规则。桶查询的搜索语义为 `Distribution(category, value) ∩ EntrySearch`，不会重跑分布计算。items 中的 source-specific feature 为 `{ category, value, occurrenceCount }`；其中 unit 的 `occurrenceCount` 是该词条内出现次数，其余类别为 1。
 
+形态分析使用以下 source 和 view（后端已实现，前端待接线）：
+
+```js
+{
+  source: { type: "morphologyAnalysis", version: 1, options: {} },
+  responseMode: "items",
+  view: {
+    category: "assignment" | "mode" | "group" | "override" | "overrideGroup" | "overrideTable",
+    value: "assigned",
+    scope: "any" | "active" | "inactive", // 仅 overrideGroup/overrideTable；默认 any
+    search: {
+      text: "",
+      fields: ["lemma", "morphology"],
+      fuzzyFields: []
+    },
+    sort: "lemmaAsc"
+  },
+  page: { limit: 200, cursor: "", windowOffset: null }
+}
+```
+
+category/value 组合固定为：`assignment + assigned|unassigned`、`mode + auto|manual`、`group + templateGroupId`、`override + any|active|inactive`、`overrideGroup + templateGroupId + scope`、`overrideTable + templateTableId + scope`。`scope` 在后两类中省略时规范化为 `any`，其他 category 不接受 scope。不存在于当前 result source 的模板组或子表 ID、缺少 value、非法枚举和非法 scope 返回 `invalid_feature_result_value`。
+
+`morphologyAnalysis` summary 固定形状为：
+
+```js
+{
+  inputTotal,
+  assignment: { assignedEntryCount, unassignedEntryCount },
+  modes: [
+    { mode: "auto", entryCount, assignedEntryCount, unassignedEntryCount },
+    { mode: "manual", entryCount, assignedEntryCount, unassignedEntryCount }
+  ],
+  groups: [
+    { groupId, name, assignedEntryCount, tableCount }
+  ],
+  overrides: {
+    entryCount,
+    storedCellCount,
+    activeEntryCount,
+    activeCellCount,
+    inactiveEntryCount,
+    inactiveCellCount,
+    topEntries: [
+      { entryId, lemma, storedCellCount, activeCellCount, inactiveCellCount }
+    ]
+  },
+  overrideGroups: [
+    { groupId, name, entryCount, activeEntryCount, activeCellCount, inactiveEntryCount, inactiveCellCount }
+  ],
+  overrideTables: [
+    { groupId, tableId, groupName, title, entryCount, activeEntryCount, activeCellCount, inactiveEntryCount, inactiveCellCount }
+  ]
+}
+```
+
+assignment 的两个计数互斥且和为 `inputTotal`；每个 mode 行的 assigned/unassigned 之和等于该行 `entryCount`。手动词条可以属于多个模板组，所以 `groups[].assignedEntryCount` 不可相加推导总数。override 的 active/inactive 词条集合允许重叠，`entryCount` 表示至少保存一个非空 override 单元格的唯一词条数；单元格计数满足 `storedCellCount = activeCellCount + inactiveCellCount`。`topEntries` 最多 12 项，按 `storedCellCount` 降序并以现有稳定 `lemmaAsc + entryId` 顺序打破平局；模板组和子表数组按当前配置顺序返回，不携带成员 ID 集合。空 override 值以及只保存标题或备注的 dormant overlay 不增加这些单元格计数。
+
+`morphologyAnalysis` items 的 feature 固定为 `{ mode, assignedGroupIds, activeOverrideCellCount, inactiveOverrideCellCount }`。形态覆盖只表示至少解析到一个模板组；该 source 不执行单元格生成，不统计生成形式、空单元、失败或必需形式缺失，也不把未分配或 inactive override 解释为质量问题。
+
 基础 outcome 为互斥的 `exactMatch`、`normalizedOnlyMatch`、`mismatch`、`unavailable`、`failed`。三个 UI category 分别映射为 `exactMatch`、`mismatch`、`normalizedOnlyMatch + mismatch`。响应中的 `summary.outcomes` 和 `summary.views` 一次返回全部计数，因此循环按钮不执行额外存在性探针。
 
-`ipaAutoCompare` items 形如 `{ entry: EntrySummary, feature: { outcome, generated, diagnostics } }`；`ipaDistribution` items 的 feature 形如 `{ category, value, occurrenceCount }`。HTTP 响应和前端高级筛选 action 都不携带完整匹配 ID。`pageInfo` 返回 `total/limit/windowOffset/nextCursor/windowCursor/hasMore`。location 请求沿用同一 source/view/page，并增加 `entryId`；响应增加 `{ found, index, windowIndex, windowOffset }`。
+`ipaAutoCompare` items 形如 `{ entry: EntrySummary, feature: { outcome, generated, diagnostics } }`；`ipaDistribution` items 的 feature 形如 `{ category, value, occurrenceCount }`；`morphologyAnalysis` items 的 feature 形状见上。HTTP 响应和前端高级筛选 action 都不携带完整匹配 ID。`pageInfo` 返回 `total/limit/windowOffset/nextCursor/windowCursor/hasMore`。location 请求沿用同一 source/view/page，并增加 `entryId`；响应增加 `{ found, index, windowIndex, windowOffset }`。
 
-会话使用每词典最多 4 份、全局估算 32 MiB、空闲 2 分钟的有界进程缓存，并合并相同 descriptor 的并发构建。写入或 source 变化会产生新会话；`ipaAutoCompare` 另受完整 IPA 设置与引擎 ID/版本影响，`ipaDistribution` 只受复杂音素和音节分隔符影响，不调用音系引擎，也不因映射、重音或其他生成设置变化而产生不同 descriptor。淘汰或进程重启后由 descriptor 透明重建。cursor 绑定进程 epoch、generation、result key 和视图 identity，陈旧 cursor 返回 `query_cursor_stale`。当前简易 IPA 模型由 adapter 包装；自动生成值仍是可重建的运行时结果，不新增持久化列。
+会话使用每词典最多 4 份、全局估算 32 MiB、空闲 2 分钟的有界进程缓存，并合并相同 descriptor 的并发构建。写入或 source 变化会产生新会话；`ipaAutoCompare` 另受完整 IPA 设置与引擎 ID/版本影响，`ipaDistribution` 只受复杂音素和音节分隔符影响，不调用音系引擎，也不因映射、重音或其他生成设置变化而产生不同 descriptor。`morphologyAnalysis` 只消费当前 generation 下的模板组元数据和词条形态分配/覆写事实，不依赖音系引擎、搜索 projection 或单元格生成配置摘要。淘汰或进程重启后由 descriptor 透明重建。cursor 绑定进程 epoch、generation、result key 和视图 identity，陈旧 cursor 返回 `query_cursor_stale`。当前简易 IPA 模型由 adapter 包装；自动生成值仍是可重建的运行时结果，不新增持久化列。
 
 source、version、options、response mode、category、分布 value、page 与搜索字段验证失败分别使用 `invalid_feature_result_source`、`unsupported_feature_result_source`、`invalid_feature_result_source_version`、`invalid_feature_result_source_options`、`invalid_feature_result_response_mode`、`invalid_feature_result_category`、`invalid_feature_result_value` 或既有 EntryQuery 校验码。summary 模式携带 `view` 或 `page` 时返回 `invalid_feature_result_summary_request`；location 缺少目标 ID 时返回 `invalid_feature_result_location_entry_id`。
 
@@ -792,11 +852,8 @@ ipaLightStats
 ipaFullStats
   音位频率、首音/尾音、自动生成一致性等完整统计
 
-morphologyLightStats
-  是否有形态表格、表格覆盖等轻量信息
-
-morphologyFullStats
-  生成形式数量、空单元、override 排行等重型统计
+morphologyAnalysis
+  模板组分配覆盖、模式/模板组使用量，以及 active/inactive nested override 分布；不执行单元格生成
 
 activityPreview
   少量创建/编辑日期桶
@@ -850,6 +907,6 @@ F4a 的 light widgets 不返回后台任务状态。F4b 接入重型 widget 后�
 1. 已完成的基础继续保持：`listDictionaries()`/词典标题 root count、词根模式和词汇网络复用 SQLite 稳定词根拓扑。
 2. F1–F3 已完成统一 EntryQuery/EntryFilter、SQLite 条件编译和前端 descriptor 迁移；稳定筛选继续复用 `/entries` 的窗口、cursor、缓存与定位。
 3. F4a 已完成 `POST /analysis/query` 的四类 light widgets、最小 planner 和总览异步加载；总览不再为这些统计读取完整 snapshot。
-4. F4b-0/F4b-1 已完成可重建 result source、运行时会话、失效、音系引擎 adapter 与 IPA 自动生成比较迁移；F4b-2 已完成 IPA 分布 source、异步分析页及高级筛选迁移。下一步迁移正式形态分析。root family 排名直接消费稳定 topology，不进入 feature session。
+4. F4b-0/F4b-1 已完成可重建 result source、运行时会话、失效、音系引擎 adapter 与 IPA 自动生成比较迁移；F4b-2 已完成 IPA 分布 source、异步分析页及高级筛选迁移。F4b-3 已完成形态统计、feature query、repository 最小读取、纯 builder 与 source adapter，下一步迁移前端形态分析页和高级筛选 action。root family 排名直接消费稳定 topology，不进入 feature session。
 5. F5 建立独立 `/quality/query`，再让质量高级筛选消费共享的内部会话原语；repository 不反向调用质量算法。
 6. 语料查询在独立服务边界稳定后按需接入，不恢复前端 materialized ID 或完整快照兜底。

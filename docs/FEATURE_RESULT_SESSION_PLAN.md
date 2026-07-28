@@ -1,6 +1,6 @@
 # Feature Result Session Plan
 
-本文记录 F4b 的功能结果源与运行时会话设计。F4b-0 已完成现状清点、独立复评和契约冻结；F4b-1 已实装 IPA 自动生成比较的 API、运行时缓存和前端窗口消费；F4b-2 已完成 IPA 分布后端 source、异步分析页和高级筛选接线，下一阶段继续迁移正式形态分析。
+本文记录 F4b 的功能结果源与运行时会话设计。F4b-0 已完成现状清点、独立复评和契约冻结；F4b-1 已实装 IPA 自动生成比较的 API、运行时缓存和前端窗口消费；F4b-2 已完成 IPA 分布后端 source、异步分析页和高级筛选接线；F4b-3 已完成形态分配与覆写 source、异步分析页和高级筛选接线。
 
 ## 1. F4b-0 结论
 
@@ -24,9 +24,9 @@ F4b 不建设通用分析任务平台，不把功能结果伪装成普通 `Entry
 | IPA 自动生成一致/宽松不一致/严格不一致 | F4b-1 `ipaAutoCompare` adapter 与运行时会话 | summary 驱动的 feature query 变体 | Feature result（已迁移） | 保持当前 query/location 契约，外部引擎接入后重跑基准 |
 | IPA 音位、首音、尾音、音节数 | F4b-2 `ipaDistribution` 与共享 IPA 清理/tokenization 规则 | `category + value` 功能结果查询 | Feature result（已迁移） | 与自动比较分开按需构建，分析页共享一次 summary |
 | Glossed 例句 | 解析 `definition.example` 中的 `\gla/\glb/\glc/\ft` | 固定 `entryIds` | Feature result，但模型即将变化 | 暂缓到例句/语料链接边界明确后迁移 |
-| 形态覆盖与表格使用 | 前端临时旧单表适配 `resolveEntryMorphologyTable()` | 固定有/无 ID 与桶 ID | 错误模型上的临时结果 | F4b-3 改用共享 morphology model 后重新定义 |
-| 形态生成数与空单元 | 临时旧表格逐单元求值 | 固定问题 ID | Feature result | F4b-3 使用真实多组、多子表、nested override |
-| Override 排行 | 前端扫描词条并计数 | 定位单条词条 | Navigation summary | 与形态 summary 一并迁移，不建立结果筛选 |
+| 形态分配覆盖与模板组使用 | F4b-3 `morphologyAnalysis` 与共享 morphology model | source/view descriptor | Feature result（已迁移） | 保持真实多组分配、summary 与 feature query 边界 |
+| 形态生成数与空单元 | 已删除 | 无 | 语义不足，删除 | 当前模型不能区分未定义、不适用与失败；F4b-3 不执行单元格生成 |
+| Override 使用与排行 | F4b-3 nested override summary | source/view descriptor 与单词条定位 | Feature result + bounded summary（已迁移） | 按当前生效与 dormant overlay 中未应用的单元格分别统计 |
 | 词根家族排行 | 前端 `dictionary-query-model` 重建 relation index | 定位词根 | Topology summary | 直接查询 `RootTopologyCache` 的 `{ rootId, lemma, derivedCount }` |
 | 词长、首字母、字符、双字符组合 | 前端按 JS code point 和 `\s` 规则统计 | 每桶固定 `entryIds` | Deterministic summary/facet | 先固定 Unicode/空白语义，再选择 SQL 函数或轻量 projection |
 | 标签组合 | 显示替换后的标签按原顺序拼接 | 每组合固定 `entryIds` | 语义未定 | 明确 raw tag、顺序和重复语义前不迁移 |
@@ -45,7 +45,7 @@ F4b 不建设通用分析任务平台，不把功能结果伪装成普通 `Entry
 
 ### 3.2 不采用通用 predicate 或分析 DSL
 
-`ipaAutoCompare`、形态空单元和 Gloss 解析具有不同输入、分类与详情。把它们压成 repository predicate 会让 repository 反向依赖功能算法，也无法表达算法 provenance。
+`ipaAutoCompare`、形态分配/覆写和 Gloss 解析具有不同输入、分类与详情。把它们压成 repository predicate 会让 repository 反向依赖功能算法，也无法表达算法 provenance。
 
 替代方案是 feature service 调用 repository 的读取和窗口能力；repository 只理解通用的内部候选关系，不理解 IPA、形态或质量类型。
 
@@ -321,11 +321,57 @@ F4b-1 默认在请求内同步构建，记录冷/热耗时、扫描词条数、�
 - 音素单元、首音、尾音和音节数统计桶已使用 `{ category, value }` action 进入 feature query/location；词条列表继续叠加当前运行期搜索字段/fuzzy、排序和窗口，不保存完整匹配 ID。
 - `analysis-model` 不再声明本地 IPA slice，前端旧 `analyzeIpa()`、固定 ID action 和相关本地分析计算已经删除。
 
-### F4b-3：形态分析
+### F4b-3：形态分配与覆写分析（已完成）
 
-- 使用 `morphology-model.resolveEntryMorphologyGroups()` 与 `morphologyCellValue()`。
-- 按真实多组、多子表和 nested override 定义覆盖、表格使用、生成数与空单元。
-- 删除 `app.js` 的 `resolveEntryMorphologyTable()`、旧 `entry.morphology` 和旧 `morphology.tables` 分析适配。
+#### 统计语义
+
+- “已分配”严格表示 `morphology-model.resolveEntryMorphologyGroups(entry, dictionary).length > 0`；“未分配”表示结果为空。覆盖率只由这两个互斥计数计算。
+- 自动/手动模式按词条当前 `morphologyMode` 计数；每种模式另返回已分配与未分配数量。手动词条可以分配多个模板组，因此模板组计数之和不要求等于词条总数。
+- 模板组使用量按当前实际分配到该组的唯一词条数计算；组内所有子表随组一起应用，不再提供语义重复的“子表使用排行”。使用量为零的组仍进入 summary，供前端跳转形态设置。
+- nested override 按实际非空单元格计数。override 所属组存在于当前 `assignedGroupIds` 时计为 active，否则计为 inactive；inactive override 位于 dormant overlay 中，但 dormant overlay 还可能只包含标题或备注，两者不能混用计数。
+- override 的 any/active/inactive 词条数均按唯一词条计算；active 与 inactive 词条集合可以重叠，单元格计数满足 `storedCellCount = activeCellCount + inactiveCellCount`。
+- F4b-3 不调用 `morphologyCellValue()`，不统计生成形式、唯一形式、空单元、失败或必需形式缺失，也不把未分配、inactive override 或模式选择解释为质量问题。
+
+#### Source 与视图
+
+source 固定为 `{ type: "morphologyAnalysis", version: 1, options: {} }`。summary 请求仍只携带 source 与 `responseMode: "summary"`；items/location 的 source-specific view 固定为：
+
+- `assignment + assigned|unassigned`
+- `mode + auto|manual`
+- `group + <templateGroupId>`，只匹配当前实际分配到该组的词条
+- `override + any|active|inactive`
+- `overrideGroup + <templateGroupId> + scope`
+- `overrideTable + <templateTableId> + scope`
+
+`scope` 只允许用于 `overrideGroup` 和 `overrideTable`，取值为 `any / active / inactive`，省略时规范化为 `any`。其他 category 携带 scope、缺少 value、非法枚举或不存在于当前 source 的组/子表 ID 均使用 `invalid_feature_result_value`。
+
+#### Summary 与 items
+
+summary 固定返回 `inputTotal`、互斥 assignment 计数、auto/manual 模式及其 assignment 分解、全部模板组的唯一词条使用量、override 总计、按组/子表的 active/inactive 分布，以及最多 12 条按 stored override 单元格数降序排列的词条排行。summary 不返回完整匹配 ID 数组。
+
+items 中的 feature 只返回当前词条的 `{ mode, assignedGroupIds, activeOverrideCellCount, inactiveOverrideCellCount }`。分析卡片和高级筛选 action 保存 source/view descriptor，不保存 materialized ID。搜索、fuzzy、排序、窗口、location 和 cursor 继续复用现有 feature result 契约。
+
+模板组及子表统计按当前模板配置顺序返回。override 词条排行按 `storedCellCount` 降序；计数相同时沿用当前稳定 `lemmaAsc + entryId` 顺序，确保同一 generation 内 summary 顺序可复现。
+
+#### 实现边界
+
+- repository 已通过 `morphologyAnalysisFeatureInput()` 只提供 ID、lemma、tags、morphology mode、canonical groups/overrides 以及模板组/子表元数据，不读取 definitions、sources、IPA、corpus、模板单元格或完整词典 snapshot。
+- 纯 builder 位于 `lib/morphology-analysis-feature.js`；F5 真正冻结形态质量规则后，再决定是否把中性 entry fact builder 提取为共享模块，不提前建立事实服务。
+- query model 和 analysis feature service 已改为显式 source registry；所有被查询模型接受的 source 都有对应 adapter，不再存在“非分布 source 默认落入 IPA 自动比较”的分支。
+- 首版已复用现有有界 session cache、generation、in-flight 合并和每 128 词条让出事件循环；没有新增 schema、搜索 projection 依赖、后台任务或持久化缓存。
+- 前端只保留“使用情况”和“覆写”两个形态分析子页，按词典版本复用同一份异步 summary，并已删除 `resolveEntryMorphologyTable()`、临时 `entry.morphology`、本地 `analyzeMorphology()`、生成检查、空单元筛选及固定 ID 结果。分配、模式、模板组和覆写统计均保存 source/view descriptor；`overrideGroup` / `overrideTable` 的 active/inactive scope 可直接进入普通词条窗口。
+
+#### 验收门槛
+
+- query model、service adapter 和 repository 最小读取必须在同一批实现中接入；任何已通过规范化的 source 都必须有明确 adapter，不能落入其他 source 的默认分支。
+- 页面未打开时不构建 morphology feature session；首次请求不读取完整词典 snapshot。
+- 同一 source 的 summary、不同分类、搜索、排序、窗口和 location 复用一次基础形态事实构建。
+- assignment 计数互斥且和为 `inputTotal`；每种 mode 的 assigned/unassigned 之和等于该 mode 的 `entryCount`。
+- `storedCellCount = activeCellCount + inactiveCellCount`；同一词条同时含 active 与 inactive override 时只在各自词条集合中各计一次。
+- 空模板组、仅标题/备注的 dormant overlay 和空 override 值不会增加 override 单元格计数；未使用模板组仍按配置顺序出现在 summary。
+- HTTP 响应、前端 state 和 action 不携带完整匹配 ID；非法组/子表 ID 与非法 category/value/scope 使用稳定错误码。
+- 定向 fixture 覆盖 auto/manual、零/多组分配、同词条多组、active/inactive 混合 override、空模板组、搜索交集、窗口、定位和 cursor 失效。
+- 基准达到后台升级阈值前保持请求内同步构建；不增加 job 状态、SQLite 派生缓存或形态单元格生成。
 
 ### 并行但不属于 feature session
 
@@ -355,7 +401,8 @@ F4b-1 默认在请求内同步构建，记录冷/热耗时、扫描词条数、�
 - `lib/feature-result-session-cache.js`：有界 TTL/LRU 和 in-flight 合并。
 - `lib/analysis-feature-service.js`：互斥 outcome、summary、视图窗口和 cursor。
 - `lib/ipa-distribution-feature.js`：IPA 分隔、复杂音素统计、桶摘要和成员语义。
-- `scripts/check-feature-result-session.js`：规范化、缓存、失效、分类、搜索、窗口、定位与 cursor 契约。
+- `lib/morphology-analysis-feature.js`：形态分配、模式、模板组使用及 active/inactive override 事实与摘要。
+- `scripts/check-feature-result-session.js`：规范化、缓存、失效、分类、搜索、窗口、定位、cursor 及三类 source registry 契约。
 
 2026-07-24 临时 SQLite 基准中，10k 词条冷构建约 79 ms、热视图约 2 ms；30k 冷构建约 246 ms、热视图约 2 ms，分类切换约 28 ms，带搜索的新视图约 33 ms。当前实现每 128 项让出事件循环，暂不增加 `deferred/running` 轮询状态；更复杂的外部音系引擎接入后须重新测量。
 

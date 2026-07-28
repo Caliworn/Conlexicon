@@ -48,8 +48,6 @@ const DEFAULT_ENTRY_LIST_TAG_DISPLAY_LIMIT = 3;
 const MIN_ENTRY_LIST_TAG_DISPLAY_LIMIT = 2;
 const MAX_ENTRY_LIST_TAG_DISPLAY_LIMIT = 10;
 const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
-const NO_MORPHOLOGY_TABLE_FILTER_VALUE = "__conlexicon_no_morphology_table__";
-const UNTITLED_MORPHOLOGY_TABLE_FILTER_VALUE = "__conlexicon_untitled_morphology_table__";
 const tagModel = window.ConlexiconTags;
 const morphologyModel = window.ConlexiconMorphology;
 const entrySearchModel = window.ConlexiconEntrySearch;
@@ -111,7 +109,7 @@ const defaultAnalysisViewState = {
   subpageByPage: {
     entries: "tags",
     ipa: "distribution",
-    morphology: "tables",
+    morphology: "usage",
     activity: "updated",
   },
   scrollByRoute: {},
@@ -188,6 +186,13 @@ let analysisIpaCompareQueryState = {
   requestId: 0,
 };
 let analysisIpaDistributionQueryState = {
+  key: "",
+  status: "idle",
+  response: null,
+  error: null,
+  requestId: 0,
+};
+let analysisMorphologyQueryState = {
   key: "",
   status: "idle",
   response: null,
@@ -360,9 +365,20 @@ const i18n = {
     advancedFilterNoDefinitions: "无释义",
     advancedFilterHasIpa: "有 IPA",
     advancedFilterNoIpa: "无 IPA",
-    advancedFilterHasMorphologyTable: "有形态表格",
-    advancedFilterNoMorphologyTable: "无形态表格",
-    advancedFilterEmptyMorphologyCells: "形态空单元",
+    advancedFilterMorphologyAssigned: "已分配形态模板",
+    advancedFilterMorphologyUnassigned: "未分配形态模板",
+    advancedFilterMorphologyAuto: "自动形态模式",
+    advancedFilterMorphologyManual: "手动形态模式",
+    advancedFilterMorphologyGroup: "形态模板组",
+    advancedFilterMorphologyOverrides: "有形态覆写",
+    advancedFilterMorphologyActiveOverrides: "有活跃形态覆写",
+    advancedFilterMorphologyInactiveOverrides: "有休眠形态覆写",
+    advancedFilterMorphologyOverrideGroup: "形态覆写模板组",
+    advancedFilterMorphologyActiveOverrideGroup: "活跃覆写模板组",
+    advancedFilterMorphologyInactiveOverrideGroup: "休眠覆写模板组",
+    advancedFilterMorphologyOverrideTable: "形态覆写表格",
+    advancedFilterMorphologyActiveOverrideTable: "活跃覆写表格",
+    advancedFilterMorphologyInactiveOverrideTable: "休眠覆写表格",
     advancedFilterGlossedExamples: "Glossed 例句",
     advancedFilterMultiSourceEntries: "多来源词条",
     advancedFilterHasExamples: "有例句",
@@ -921,9 +937,20 @@ const i18n = {
     advancedFilterNoDefinitions: "No definitions",
     advancedFilterHasIpa: "Has IPA",
     advancedFilterNoIpa: "No IPA",
-    advancedFilterHasMorphologyTable: "Has morphology table",
-    advancedFilterNoMorphologyTable: "No morphology table",
-    advancedFilterEmptyMorphologyCells: "Empty morphology cells",
+    advancedFilterMorphologyAssigned: "Morphology template assigned",
+    advancedFilterMorphologyUnassigned: "No morphology template assigned",
+    advancedFilterMorphologyAuto: "Automatic morphology mode",
+    advancedFilterMorphologyManual: "Manual morphology mode",
+    advancedFilterMorphologyGroup: "Morphology template group",
+    advancedFilterMorphologyOverrides: "Has morphology overrides",
+    advancedFilterMorphologyActiveOverrides: "Has active morphology overrides",
+    advancedFilterMorphologyInactiveOverrides: "Has dormant morphology overrides",
+    advancedFilterMorphologyOverrideGroup: "Morphology override group",
+    advancedFilterMorphologyActiveOverrideGroup: "Active override group",
+    advancedFilterMorphologyInactiveOverrideGroup: "Dormant override group",
+    advancedFilterMorphologyOverrideTable: "Morphology override table",
+    advancedFilterMorphologyActiveOverrideTable: "Active override table",
+    advancedFilterMorphologyInactiveOverrideTable: "Dormant override table",
     advancedFilterGlossedExamples: "Glossed examples",
     advancedFilterMultiSourceEntries: "Multi-source entries",
     advancedFilterHasExamples: "Has examples",
@@ -5535,6 +5562,7 @@ function entryQueryApiKey(dictionary = activeDictionary()) {
     stableJson(advancedFilterUsesFeatureQuery() ? advancedFilter.resultSource : null),
     advancedFilterUsesFeatureQuery() ? advancedFilter.category : "",
     advancedFilterUsesFeatureQuery() ? advancedFilter.value : "",
+    advancedFilterUsesFeatureQuery() ? advancedFilter.scope : "",
     entrySort,
     stableJson(settings.tagDisplayMap),
     settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
@@ -5575,6 +5603,41 @@ function recordFeatureResultSummary(result) {
       const row = (result.summary.distributions?.[facets[variant.category]] || [])
         .find((item) => String(item.value) === String(variant.value));
       return Math.max(0, Number(row?.entryCount) || 0);
+    }
+    if (variant.resultSource?.type === "morphologyAnalysis") {
+      const summary = result.summary;
+      if (variant.category === "assignment") {
+        return Math.max(0, Number(summary.assignment?.[
+          variant.value === "assigned" ? "assignedEntryCount" : "unassignedEntryCount"
+        ]) || 0);
+      }
+      if (variant.category === "mode") {
+        const row = (summary.modes || []).find((item) => item.mode === variant.value);
+        return Math.max(0, Number(row?.entryCount) || 0);
+      }
+      if (variant.category === "group") {
+        const row = (summary.groups || []).find((item) => item.groupId === variant.value);
+        return Math.max(0, Number(row?.assignedEntryCount) || 0);
+      }
+      if (variant.category === "override") {
+        const fields = {
+          any: "entryCount",
+          active: "activeEntryCount",
+          inactive: "inactiveEntryCount",
+        };
+        return Math.max(0, Number(summary.overrides?.[fields[variant.value]]) || 0);
+      }
+      const rows = variant.category === "overrideGroup"
+        ? summary.overrideGroups
+        : summary.overrideTables;
+      const idField = variant.category === "overrideGroup" ? "groupId" : "tableId";
+      const row = (rows || []).find((item) => item[idField] === variant.value);
+      const fields = {
+        any: "entryCount",
+        active: "activeEntryCount",
+        inactive: "inactiveEntryCount",
+      };
+      return Math.max(0, Number(row?.[fields[variant.scope || "any"]]) || 0);
     }
     return 0;
   };
@@ -5723,6 +5786,7 @@ function featureResultQueryBody(dictionary, options = {}) {
     view: {
       category: advancedFilter.category,
       ...(advancedFilter.value ? { value: advancedFilter.value } : {}),
+      ...(advancedFilter.scope ? { scope: advancedFilter.scope } : {}),
       search,
       sort: entrySort,
     },
@@ -6943,6 +7007,26 @@ function advancedFilterVariantUsesFeatureQuery(variant) {
     return ["unit", "initial", "final", "syllableCount"].includes(variant.category)
       && String(variant.value ?? "").trim() !== "";
   }
+  if (variant.resultSource.type === "morphologyAnalysis") {
+    const category = String(variant.category || "");
+    const value = String(variant.value ?? "").trim();
+    const scope = String(variant.scope ?? "").trim();
+    if (category === "assignment") {
+      return ["assigned", "unassigned"].includes(value) && !scope;
+    }
+    if (category === "mode") {
+      return ["auto", "manual"].includes(value) && !scope;
+    }
+    if (category === "group") {
+      return Boolean(value) && !scope;
+    }
+    if (category === "override") {
+      return ["any", "active", "inactive"].includes(value) && !scope;
+    }
+    if (category === "overrideGroup" || category === "overrideTable") {
+      return Boolean(value) && ["", "any", "active", "inactive"].includes(scope);
+    }
+  }
   return false;
 }
 
@@ -7135,6 +7219,7 @@ function advancedFilterStateForVariant(base, variant, variantIndex) {
     resultSource: variant.resultSource,
     category: variant.category,
     value: variant.value,
+    scope: variant.scope,
     resultCount: variant.resultCount,
     entryIds: variant.entryIds,
     issueMap: variant.issueMap,
@@ -7302,6 +7387,11 @@ function normalizeAdvancedFilterVariants(action, options = {}) {
         } : null,
         category: usesFeatureQuery ? variant.category : "",
         value: usesFeatureQuery ? String(variant.value ?? "").trim() : "",
+        scope: usesFeatureQuery
+          ? String(variant.scope ?? (
+            ["overrideGroup", "overrideTable"].includes(variant.category) ? "any" : ""
+          )).trim()
+          : "",
         resultCount: usesFeatureQuery ? Math.max(0, Number(variant.resultCount) || 0) : 0,
         issueMap: usesEntryQuery || usesFeatureQuery ? {} : advancedFilterIssueMapFromIssues(variant.issues, entryIds),
       };
@@ -8747,38 +8837,6 @@ function renderTagTooltipRow(label, value, chipClasses) {
   `;
 }
 
-function morphologyTables(dictionary = activeDictionary()) {
-  return normalizeMorphology(dictionary?.morphology).tables;
-}
-
-function resolveEntryMorphologyTable(entry, dictionary = activeDictionary()) {
-  const selected = entry?.morphology?.tableId || "auto";
-  if (selected === "none") {
-    return null;
-  }
-  const tables = morphologyTables(dictionary);
-  if (selected !== "auto") {
-    return tables.find((table) => table.id === selected) || null;
-  }
-  const entryTags = new Set((entry?.tags || []).map(searchNormalizationModel.normalizeStructuralKey));
-  return tables.find((table) => table.matchTags.some((tag) => entryTags.has(searchNormalizationModel.normalizeStructuralKey(tag)))) || null;
-}
-
-function morphologyCellValue(entry, table, row, col, dictionary = activeDictionary()) {
-  const key = morphologyCellKey(row, col);
-  const override = entry?.morphology?.overrides?.[key];
-  return override || morphologyCellDefaultValue(entry, table, row, col, dictionary);
-}
-
-function morphologyCellDefaultValue(entry, table, row, col, dictionary = activeDictionary()) {
-  const key = morphologyCellKey(row, col);
-  const rule = String(table?.cells?.[key]?.value || "").trim();
-  if (!rule) {
-    return "";
-  }
-  return applyMorphologyRuleSyntax(entry?.lemma || "", rule, morphologyFunctionConfig(dictionary));
-}
-
 function morphologyFunctionConfig(dictionary = activeDictionary()) {
   return normalizeMorphology(dictionary?.morphology).functions;
 }
@@ -8832,6 +8890,15 @@ function renderAnalysis(dictionary = activeDictionary()) {
     }
     return;
   }
+  if (page === "morphology") {
+    const queryState = analysisMorphologyStateFor(dictionary);
+    elements.analysisPanel.innerHTML = renderAnalysisMorphologyQueryPage(queryState, subpage);
+    setupAnalysisMasonryLayouts();
+    if (queryState.status === "idle") {
+      void loadAnalysisMorphology(dictionary);
+    }
+    return;
+  }
   const report = getAnalysisReport(dictionary, { page, subpage });
   elements.analysisPanel.innerHTML = renderAnalysisPage(report, page, subpage);
   setupAnalysisMasonryLayouts();
@@ -8860,6 +8927,93 @@ function analysisIpaDistributionQueryKey(dictionary) {
     complexPhonemes: ipa.syllable.complexPhonemes,
     separator: ipa.syllable.separator,
   });
+}
+
+function analysisMorphologyQueryKey(dictionary) {
+  return stableJson({
+    dictionaryId: dictionary?.id || "",
+    updatedAt: dictionary?.updatedAt || "",
+  });
+}
+
+function analysisMorphologyStateFor(dictionary) {
+  const key = analysisMorphologyQueryKey(dictionary);
+  if (analysisMorphologyQueryState.key !== key) {
+    return {
+      key,
+      status: "idle",
+      response: null,
+      error: null,
+      requestId: analysisMorphologyQueryState.requestId,
+    };
+  }
+  return analysisMorphologyQueryState;
+}
+
+async function loadAnalysisMorphology(dictionary, { force = false } = {}) {
+  if (!dictionary?.id) {
+    return;
+  }
+  const key = analysisMorphologyQueryKey(dictionary);
+  if (
+    !force
+    && analysisMorphologyQueryState.key === key
+    && ["loading", "ready"].includes(analysisMorphologyQueryState.status)
+  ) {
+    return;
+  }
+  const requestId = analysisMorphologyQueryState.requestId + 1;
+  analysisMorphologyQueryState = {
+    key,
+    status: "loading",
+    response: null,
+    error: null,
+    requestId,
+  };
+  try {
+    const response = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/features/query`, {
+      method: "POST",
+      body: JSON.stringify({
+        source: { type: "morphologyAnalysis", version: 1, options: {} },
+        responseMode: "summary",
+      }),
+    });
+    if (
+      analysisMorphologyQueryState.requestId !== requestId
+      || analysisMorphologyQueryState.key !== key
+    ) {
+      return;
+    }
+    analysisMorphologyQueryState = {
+      key,
+      status: "ready",
+      response,
+      error: null,
+      requestId,
+    };
+  } catch (error) {
+    if (
+      analysisMorphologyQueryState.requestId !== requestId
+      || analysisMorphologyQueryState.key !== key
+    ) {
+      return;
+    }
+    analysisMorphologyQueryState = {
+      key,
+      status: "error",
+      response: null,
+      error,
+      requestId,
+    };
+    console.error(error);
+  }
+  if (
+    state.activeView === "analysis"
+    && activeAnalysisPage() === "morphology"
+    && activeDictionary()?.id === dictionary.id
+  ) {
+    renderAnalysis(activeDictionary());
+  }
 }
 
 function analysisIpaDistributionStateFor(dictionary) {
@@ -9057,6 +9211,26 @@ function renderAnalysisIpaDistributionQueryPage(queryState, subpage, dictionary)
   `;
 }
 
+function renderAnalysisMorphologyQueryPage(queryState, subpage) {
+  let body = "";
+  if (queryState.status === "ready") {
+    body = renderAnalysisMorphologyQuery(queryState.response, subpage);
+  } else if (queryState.status === "error") {
+    body = `<div class="empty-state">
+      <strong>${escapeHtml(aText("无法加载形态分析", "Could not load morphology analysis"))}</strong>
+      <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
+      <button type="button" class="secondary-button" data-analysis-morphology-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+    </div>`;
+  } else {
+    body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载形态分析", "Loading morphology analysis"))}</strong></div>`;
+  }
+  return `
+    ${analysisPageNav("morphology")}
+    ${analysisSubpageNav("morphology", subpage)}
+    <section class="analysis-page-body">${body}</section>
+  `;
+}
+
 function analysisOverviewStateFor(dictionary) {
   const key = analysisOverviewQueryKey(dictionary);
   if (analysisOverviewQueryState.key !== key) {
@@ -9164,7 +9338,6 @@ function analysisBaseCacheKey(dictionary) {
     dictionaryUpdatedAt: dictionary?.updatedAt || "",
     language: currentLanguage,
     settings: dictionary?.settings || {},
-    morphology: dictionary?.morphology || {},
     entries: (dictionary?.entries || []).map((entry) => ({
       id: entry.id || "",
       lemma: entry.lemma || "",
@@ -9179,7 +9352,6 @@ function analysisBaseCacheKey(dictionary) {
       etymology: {
         sources: entry.etymology?.sources || [],
       },
-      morphologyGroups: entry.morphologyGroups || [],
       createdAt: entry.createdAt || "",
       updatedAt: entry.updatedAt || "",
     })),
@@ -9301,9 +9473,8 @@ function analysisSubpages(page) {
       ["mismatches", aText("自动生成检查", "Auto Checks")],
     ],
     morphology: [
-      ["tables", aText("表格使用", "Tables")],
-      ["overrides", "Override"],
-      ["generated", aText("生成检查", "Generated")],
+      ["usage", aText("使用情况", "Usage")],
+      ["overrides", aText("覆写", "Overrides")],
     ],
     activity: [
       ["updated", aText("编辑日期", "Updated")],
@@ -9378,9 +9549,6 @@ function qualitySubpageGroups() {
 function analysisPageBody(report, page, subpage) {
   if (page === "entries") {
     return renderAnalysisEntriesPage(report, subpage);
-  }
-  if (page === "morphology") {
-    return renderAnalysisMorphologyPage(report, subpage);
   }
   if (page === "activity") {
     return renderAnalysisActivityPage(report, subpage);
@@ -9650,19 +9818,158 @@ function renderAnalysisIpaDistributionQuery(response, subpage, dictionary) {
   </section>`;
 }
 
-function renderAnalysisMorphologyPage(report, subpage) {
+function morphologyFeatureVariant(category, value, titleDescriptor, resultCount, scope = "") {
+  return {
+    key: `${category}:${value}:${scope}`,
+    category,
+    value,
+    scope,
+    titleDescriptor,
+    resultCount: Math.max(0, Number(resultCount) || 0),
+  };
+}
+
+function morphologyScopeTitleDescriptor(kind, scope, value) {
+  const labelKeys = {
+    overrideGroup: {
+      any: "advancedFilterMorphologyOverrideGroup",
+      active: "advancedFilterMorphologyActiveOverrideGroup",
+      inactive: "advancedFilterMorphologyInactiveOverrideGroup",
+    },
+    overrideTable: {
+      any: "advancedFilterMorphologyOverrideTable",
+      active: "advancedFilterMorphologyActiveOverrideTable",
+      inactive: "advancedFilterMorphologyInactiveOverrideTable",
+    },
+  };
+  return advancedFilterValueTitleDescriptor(labelKeys[kind][scope], value);
+}
+
+function morphologyOverrideBreakdownRows(response, rows, category) {
+  const isGroup = category === "overrideGroup";
+  return (rows || []).flatMap((row) => {
+    const id = String(row[isGroup ? "groupId" : "tableId"] || "");
+    const baseLabel = isGroup
+      ? (row.name || aText("未命名模板组", "Untitled template group"))
+      : [
+          row.groupName || aText("未命名模板组", "Untitled template group"),
+          row.title || aText("未命名表格", "Untitled table"),
+        ].join(" / ");
+    return [
+      ["any", aText("全部", "All"), row.entryCount],
+      ["active", aText("活跃", "Active"), row.activeEntryCount],
+      ["inactive", aText("休眠", "Dormant"), row.inactiveEntryCount],
+    ].filter(([, , resultCount]) => Number(resultCount) > 0).map(([scope, scopeLabel, resultCount]) => {
+      const variant = morphologyFeatureVariant(
+        category,
+        id,
+        morphologyScopeTitleDescriptor(category, scope, baseLabel),
+        resultCount,
+        scope,
+      );
+      return [
+        `${baseLabel} · ${scopeLabel}`,
+        Math.max(0, Number(resultCount) || 0),
+        featureResultAdvancedFilterAction(response?.source, [variant], category, id, scope),
+      ];
+    });
+  });
+}
+
+function renderAnalysisMorphologyQuery(response, subpage) {
+  const summary = response?.summary || {};
   if (subpage === "overrides") {
-    return `<section class="analysis-detail-grid">${analysisCard(aText("Override 排行", "Override Ranking"), analysisBarList(report.morphology.allOverrides, { empty: aText("暂无 override", "No overrides yet") }))}</section>`;
+    const overrides = summary.overrides || {};
+    const overrideVariants = [
+      morphologyFeatureVariant("override", "any", advancedFilterTitleDescriptor("advancedFilterMorphologyOverrides"), overrides.entryCount),
+      morphologyFeatureVariant("override", "active", advancedFilterTitleDescriptor("advancedFilterMorphologyActiveOverrides"), overrides.activeEntryCount),
+      morphologyFeatureVariant("override", "inactive", advancedFilterTitleDescriptor("advancedFilterMorphologyInactiveOverrides"), overrides.inactiveEntryCount),
+    ];
+    const overrideAction = (value) => featureResultAdvancedFilterAction(
+      response?.source,
+      overrideVariants,
+      "override",
+      value,
+    );
+    const topEntries = (overrides.topEntries || []).map((row) => [
+      row.lemma || aText("无词形", "No lemma"),
+      Math.max(0, Number(row.storedCellCount) || 0),
+      directEntryAction(row.entryId),
+    ]);
+    return `<section class="analysis-detail-grid">
+      ${analysisCard(aText("覆写总览", "Override Overview"), analysisFactList([
+        [aText("有覆写的词条", "Entries with overrides"), overrides.entryCount || 0, overrideAction("any")],
+        [aText("已保存单元格", "Stored cells"), overrides.storedCellCount || 0],
+        [aText("有活跃覆写的词条", "Entries with active overrides"), overrides.activeEntryCount || 0, overrideAction("active")],
+        [aText("活跃覆写单元格", "Active override cells"), overrides.activeCellCount || 0],
+        [aText("有休眠覆写的词条", "Entries with dormant overrides"), overrides.inactiveEntryCount || 0, overrideAction("inactive")],
+        [aText("休眠覆写单元格", "Dormant override cells"), overrides.inactiveCellCount || 0],
+      ]))}
+      ${analysisCard(aText("覆写词条排行", "Override Entries"), analysisBarList(topEntries, { empty: aText("暂无已保存覆写", "No stored overrides") }))}
+      ${analysisCard(aText("按模板组", "By Template Group"), analysisBarList(
+        morphologyOverrideBreakdownRows(response, summary.overrideGroups, "overrideGroup"),
+        { empty: aText("暂无模板组覆写", "No template-group overrides") },
+      ))}
+      ${analysisCard(aText("按表格", "By Table"), analysisBarList(
+        morphologyOverrideBreakdownRows(response, summary.overrideTables, "overrideTable"),
+        { empty: aText("暂无表格覆写", "No table overrides") },
+      ))}
+    </section>`;
   }
-  if (subpage === "generated") {
-    return `<section class="analysis-detail-grid">${analysisCard(aText("生成检查", "Generated Checks"), analysisFactList([
-      [aText("生成形式", "Generated forms"), report.morphology.generatedForms],
-      [aText("形态空单元", "Empty morphology cells"), report.morphology.emptyCells, advancedFilterAction(advancedFilterTitleDescriptor("advancedFilterEmptyMorphologyCells"), report.morphology.emptyCellEntryIds)],
-    ]))}</section>`;
-  }
+
+  const total = Math.max(0, Number(summary.inputTotal) || 0);
+  const assigned = Math.max(0, Number(summary.assignment?.assignedEntryCount) || 0);
+  const unassigned = Math.max(0, Number(summary.assignment?.unassignedEntryCount) || 0);
+  const assignmentVariants = [
+    morphologyFeatureVariant("assignment", "assigned", advancedFilterTitleDescriptor("advancedFilterMorphologyAssigned"), assigned),
+    morphologyFeatureVariant("assignment", "unassigned", advancedFilterTitleDescriptor("advancedFilterMorphologyUnassigned"), unassigned),
+  ];
+  const modeDescriptors = {
+    auto: advancedFilterTitleDescriptor("advancedFilterMorphologyAuto"),
+    manual: advancedFilterTitleDescriptor("advancedFilterMorphologyManual"),
+  };
+  const modeVariants = (summary.modes || []).map((row) => morphologyFeatureVariant(
+    "mode",
+    row.mode,
+    modeDescriptors[row.mode],
+    row.entryCount,
+  ));
+  const groupRows = (summary.groups || []).map((row) => {
+    const label = row.name || aText("未命名模板组", "Untitled template group");
+    const variant = morphologyFeatureVariant(
+      "group",
+      row.groupId,
+      advancedFilterValueTitleDescriptor("advancedFilterMorphologyGroup", label),
+      row.assignedEntryCount,
+    );
+    return [
+      label,
+      Math.max(0, Number(row.assignedEntryCount) || 0),
+      featureResultAdvancedFilterAction(response?.source, [variant], "group", row.groupId)
+        || viewAction("morphology-tables"),
+    ];
+  });
   return `<section class="analysis-detail-grid">
-    ${analysisCard(aText("形态表格使用", "Morphology Tables"), analysisBarList(report.morphology.allTables, { empty: aText("暂无形态表格", "No morphology tables yet") }))}
-    ${analysisCard(aText("形态学覆盖", "Morphology Coverage"), analysisCoverageList([[aText("形态表格", "Morphology table"), report.coverage.morphology, advancedFilterAction(advancedFilterTitleDescriptor("advancedFilterHasMorphologyTable"), report.morphologyEntryIds, { variants: [{ titleDescriptor: advancedFilterTitleDescriptor("advancedFilterNoMorphologyTable"), entryIds: report.noMorphologyEntryIds }] })]]))}
+    ${analysisCard(aText("模板分配", "Template Assignment"), analysisCoverageList([
+      [
+        aText("已分配模板组", "Assigned to template groups"),
+        total ? assigned / total : 0,
+        featureResultAdvancedFilterAction(response?.source, assignmentVariants, "assignment", "assigned"),
+        `${assigned}/${total}`,
+      ],
+      [
+        aText("未分配模板组", "Not assigned to a template group"),
+        total ? unassigned / total : 0,
+        featureResultAdvancedFilterAction(response?.source, assignmentVariants, "assignment", "unassigned"),
+        `${unassigned}/${total}`,
+      ],
+    ]))}
+    ${analysisCard(aText("分配模式", "Assignment Mode"), analysisFactList((summary.modes || []).map((row) => [
+      row.mode === "manual" ? aText("手动", "Manual") : aText("自动", "Automatic"),
+      Math.max(0, Number(row.entryCount) || 0),
+      featureResultAdvancedFilterAction(response?.source, modeVariants, "mode", row.mode),
+    ])))}
+    ${analysisCard(aText("模板组使用", "Template Group Usage"), analysisBarList(groupRows, { empty: aText("暂无形态模板组", "No morphology template groups") }))}
   </section>`;
 }
 
@@ -9933,7 +10240,6 @@ function composeLegacyAnalysisReport(context, slices) {
     ...slices.coverage,
     ...slices.tags,
     ...slices.forms,
-    morphology: slices.morphology,
     ...slices.search,
     activity: slices.activity,
   };
@@ -9946,7 +10252,6 @@ function analysisSliceBuilders() {
     coverage: buildAnalysisCoverageSlice,
     tags: buildAnalysisTagSlice,
     forms: buildAnalysisFormSlice,
-    morphology: buildAnalysisMorphologySlice,
     search: buildAnalysisSearchSlice,
     activity: buildAnalysisActivitySlice,
   };
@@ -9969,9 +10274,8 @@ function buildAnalysisRootFamiliesSlice(context) {
 }
 
 function buildAnalysisCoverageSlice(context) {
-  const { dictionary, entries, total } = context;
+  const { entries, total } = context;
   const glossEntryIds = new Set();
-  const morphologyEntryIds = new Set();
   let definitionEntryCount = 0;
   let exampleEntryCount = 0;
   let noteEntryCount = 0;
@@ -10008,14 +10312,8 @@ function buildAnalysisCoverageSlice(context) {
     if (entry.pronunciation) {
       ipaEntryCount += 1;
     }
-    if (resolveEntryMorphologyTable(entry, dictionary)) {
-      morphologyEntryIds.add(entry.id);
-    }
   });
 
-  const noMorphologyEntryIds = entries
-    .filter((entry) => !resolveEntryMorphologyTable(entry, dictionary))
-    .map((entry) => entry.id);
   const entryTotal = entries.length;
   const noDefinitionEntryCount = entryTotal - definitionEntryCount;
   const noExampleEntryCount = entryTotal - exampleEntryCount;
@@ -10028,7 +10326,6 @@ function buildAnalysisCoverageSlice(context) {
     notes: noteEntryCount / total,
     sources: sourceEntryCount / total,
     ipa: ipaEntryCount / total,
-    morphology: morphologyEntryIds.size / total,
   };
   const coverageRows = [
     [aText("有释义", "Definitions"), coverage.definitions, binaryPresenceFilterAction(advancedFilterTitleDescriptor("advancedFilterHasDefinitions"), "definition", definitionEntryCount, advancedFilterTitleDescriptor("advancedFilterNoDefinitions"), noDefinitionEntryCount)],
@@ -10036,7 +10333,6 @@ function buildAnalysisCoverageSlice(context) {
     [aText("有备注", "Notes"), coverage.notes, binaryPresenceFilterAction(advancedFilterTitleDescriptor("advancedFilterHasNotes"), "entryNote", noteEntryCount, advancedFilterTitleDescriptor("advancedFilterNoNotes"), noNoteEntryCount)],
     [aText("有来源", "Sources"), coverage.sources, binaryPresenceFilterAction(advancedFilterTitleDescriptor("advancedFilterHasSources"), "source", sourceEntryCount, advancedFilterTitleDescriptor("advancedFilterNoSources"), noSourceEntryCount)],
     ["IPA", coverage.ipa, binaryPresenceFilterAction(advancedFilterTitleDescriptor("advancedFilterHasIpa"), "ipa", ipaEntryCount, advancedFilterTitleDescriptor("advancedFilterNoIpa"), noIpaEntryCount)],
-    [aText("形态表格", "Morphology table"), coverage.morphology, binaryFeatureFilterAction(advancedFilterTitleDescriptor("advancedFilterHasMorphologyTable"), [...morphologyEntryIds], advancedFilterTitleDescriptor("advancedFilterNoMorphologyTable"), noMorphologyEntryIds)],
   ];
 
   return {
@@ -10049,13 +10345,11 @@ function buildAnalysisCoverageSlice(context) {
     noteEntryCount,
     sourceEntryCount,
     ipaEntryCount,
-    morphologyEntryIds: [...morphologyEntryIds],
     noDefinitionEntryCount,
     noExampleEntryCount,
     noNoteEntryCount,
     noSourceEntryCount,
     noIpaEntryCount,
-    noMorphologyEntryIds,
     coverage,
     coverageRows,
   };
@@ -10126,10 +10420,6 @@ function buildAnalysisFormSlice(context) {
   };
 }
 
-function buildAnalysisMorphologySlice(context) {
-  return analyzeMorphology(context.entries, context.dictionary);
-}
-
 function buildAnalysisSearchSlice(context) {
   const { dictionary, entries } = context;
   const searchMatchEntries = normalizeEntrySearchText(searchQuery, dictionary)
@@ -10143,54 +10433,6 @@ function buildAnalysisSearchSlice(context) {
 
 function buildAnalysisActivitySlice(context) {
   return analyzeActivity(context.entries);
-}
-
-function analyzeMorphology(entries, dictionary) {
-  const tableUse = new Map();
-  const overrideRows = [];
-  let generatedForms = 0;
-  let emptyCells = 0;
-  const emptyCellEntryIds = new Set();
-  entries.forEach((entry) => {
-    const table = resolveEntryMorphologyTable(entry, dictionary);
-    if (!table) {
-      incrementEntry(tableUse, NO_MORPHOLOGY_TABLE_FILTER_VALUE, entry);
-      return;
-    }
-    incrementEntry(tableUse, table.name || UNTITLED_MORPHOLOGY_TABLE_FILTER_VALUE, entry);
-    const overrides = Object.keys(entry.morphology?.overrides || {});
-    if (overrides.length) {
-      overrideRows.push([entry.lemma || aText("无词形", "No lemma"), overrides.length, directEntryAction(entry.id)]);
-    }
-    for (let row = 0; row < table.rows; row += 1) {
-      for (let col = 0; col < table.cols; col += 1) {
-        let value = "";
-        try {
-          value = morphologyCellValue(entry, table, row, col, dictionary);
-        } catch {
-          value = "";
-        }
-        if (value) {
-          generatedForms += 1;
-        } else {
-          emptyCells += 1;
-          emptyCellEntryIds.add(entry.id);
-        }
-      }
-    }
-  });
-  return {
-    tables: topEntryMapItems(tableUse, 12, "morphologyTable"),
-    allTables: topEntryMapItems(tableUse, Number.MAX_SAFE_INTEGER, "morphologyTable"),
-    overrides: overrideRows
-      .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), "zh-CN"))
-      .slice(0, 12),
-    allOverrides: overrideRows
-      .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), "zh-CN")),
-    generatedForms,
-    emptyCells,
-    emptyCellEntryIds: [...emptyCellEntryIds],
-  };
 }
 
 function analyzeActivity(entries) {
@@ -10446,14 +10688,6 @@ function binaryPresenceFilterAction(activeTitleDescriptor, field, activeCount, a
   });
 }
 
-function binaryFeatureFilterAction(activeTitleDescriptor, activeEntryIds, alternateTitleDescriptor, alternateEntryIds) {
-  const activeIds = entryIdsFrom(activeEntryIds);
-  const alternateIds = entryIdsFrom(alternateEntryIds);
-  return activeIds.length
-    ? advancedFilterAction(activeTitleDescriptor, activeIds, { variants: [{ titleDescriptor: alternateTitleDescriptor, entryIds: alternateIds }] })
-    : null;
-}
-
 function advancedFilterAction(titleDescriptor, items, options = {}) {
   const entryIds = entryIdsFrom(items);
   const variants = [
@@ -10478,18 +10712,20 @@ function advancedFilterAction(titleDescriptor, items, options = {}) {
   };
 }
 
-function featureResultAdvancedFilterAction(source, variants, activeCategory, activeValue = "") {
+function featureResultAdvancedFilterAction(source, variants, activeCategory, activeValue = "", activeScope = "") {
   const normalizedVariants = (variants || []).map((variant) => ({
     key: variant.key,
     titleDescriptor: normalizeAdvancedFilterTitleDescriptor(variant.titleDescriptor),
     resultSource: source,
     category: variant.category || variant.key,
     value: String(variant.value ?? ""),
+    scope: String(variant.scope ?? ""),
     resultCount: Math.max(0, Number(variant.resultCount) || 0),
   }));
   const active = normalizedVariants.find((variant) => (
     variant.category === activeCategory
     && variant.value === String(activeValue ?? "")
+    && variant.scope === String(activeScope ?? "")
   ));
   if (!active || active.resultCount <= 0) {
     return null;
@@ -10498,7 +10734,11 @@ function featureResultAdvancedFilterAction(source, variants, activeCategory, act
     type: "advanced-filter",
     variants: [
       active,
-      ...normalizedVariants.filter((variant) => variant.category !== activeCategory),
+      ...normalizedVariants.filter((variant) => (
+        variant.category !== active.category
+        || variant.value !== active.value
+        || variant.scope !== active.scope
+      )),
     ],
     meta: {
       type: "feature-result",
@@ -10610,12 +10850,6 @@ function topMapItems(map, limit = 12) {
 }
 
 function advancedFilterMapValue(label) {
-  if (label === NO_MORPHOLOGY_TABLE_FILTER_VALUE) {
-    return { label: t("advancedFilterNoTable"), valueKey: "advancedFilterNoTable" };
-  }
-  if (label === UNTITLED_MORPHOLOGY_TABLE_FILTER_VALUE) {
-    return { label: t("advancedFilterUntitledTable"), valueKey: "advancedFilterUntitledTable" };
-  }
   return { label: String(label), valueKey: "" };
 }
 
@@ -15216,6 +15450,12 @@ elements.entryListNewEntryButton.addEventListener("click", async () => {
 });
 elements.editEntryButton.addEventListener("click", beginEditEntry);
 elements.analysisPanel.addEventListener("click", (event) => {
+  const morphologyRetryButton = event.target.closest("[data-analysis-morphology-retry]");
+  if (morphologyRetryButton) {
+    void loadAnalysisMorphology(activeDictionary(), { force: true });
+    renderAnalysis(activeDictionary());
+    return;
+  }
   const ipaDistributionRetryButton = event.target.closest("[data-analysis-ipa-distribution-retry]");
   if (ipaDistributionRetryButton) {
     void loadAnalysisIpaDistribution(activeDictionary(), { force: true });

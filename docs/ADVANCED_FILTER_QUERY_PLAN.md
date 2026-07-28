@@ -97,9 +97,9 @@ F0 清点确认，现有入口必须分成三类：
 | --- | --- | --- |
 | IPA 自动生成一致、宽松不一致、严格不一致 | IPA analysis/service | 依赖当前 IPA 规则生成和两种比较语义。 |
 | Glossed 例句 | Gloss/语料 analysis | 需要解析 Gloss 结构；未来还会迁移到语料链接。 |
-| 有/无形态表格 | Morphology analysis/service | 自动模式需要标签匹配，手动模式需要实例组；当前分析仍依赖临时旧单表视图。 |
-| 形态表格使用 | Morphology analysis/service | 多组、多子表语义尚未接入当前分析。 |
-| 形态空单元 | Morphology analysis/service | 必须解析实际形态组、override 并运行单元格生成。 |
+| 已/未分配形态组 | `morphologyAnalysis` feature result | 按共享 morphology model 解析出的实际模板组判断；F4b-3 后端已实现，前端待迁移。 |
+| 指定形态模板组、自动/手动模式 | `morphologyAnalysis` feature result | 使用模式或模板组 ID descriptor，不保存成员 ID。 |
+| 有/无当前生效或未应用的覆写 | `morphologyAnalysis` feature result | 按 nested override 单元格及其所属组是否当前已分配判断；inactive 不表达质量问题。 |
 | 质量问题：全部、高、中、低 | QualityService | 需要完整规则报告及问题详情。 |
 | 质量模块：词形、标签、IPA、词源、Gloss、其他 | QualityService | 同一词条还需携带一个或多个 issue badge/detail，不能只返回布尔条件。 |
 
@@ -124,7 +124,7 @@ Feature result source 应由对应 service 产生可重建的查询身份，并�
 - 进入高级筛选、结构事实失效或词条写入后，前端通过批量 `/entries/filter-facts` 自动补齐未知事实。搜索输入只重查当前 `Filter ∩ Search`，不会为其他变体重复 strict/fuzzy 探测。稳定结构筛选和 IPA feature 筛选正常时不显示刷新按钮；当前远程查询失败时才将该按钮作为重试入口，并且不强制重验已有结构事实。
 - IPA 自动生成比较以及音素单元、首音、尾音、音节数分布均已消费 feature result query/location，不再保存前端结果 ID；分布统计桶以 `{ category, value }` action 进入词条列表，并继续叠加运行期搜索、排序、窗口与定位。Gloss、形态和质量问题仍保存前端功能结果 ID 与可选问题详情。这是 F4b-3 与 F5 尚未迁移的明确边界，不是普通 filter 的兜底。
 - 筛选标题使用独立于查询身份的语义化 `titleDescriptor`：固定标题保存主 i18n key，字段值标题保存 label key 及原始值或 value key，循环变体不保存已翻译字符串。语言切换只通过主 i18n 重新渲染标题，不失效列表或 facts 缓存；尚未迁移的本地质量筛选只为带本地化文本的 issue map 定向重建。标签 descriptor 保存原始标签，并使用结构键精确语义。
-- 当前形态覆盖率、表格使用和空单元统计依赖临时旧形态视图。相关入口在形态分析升级前继续属于 feature result source，不能据此固化错误 descriptor。
+- 当前形态覆盖率、表格使用、override 排行和空单元统计仍依赖临时旧形态视图。F4b-3 已冻结为 `morphologyAnalysis` 的分配、模式、模板组及 active/inactive override descriptor；生成数、空单元和子表使用排行不会迁入新契约。
 - “词根/孤立词根”需要与共享词根拓扑保持重复 lemma、未解析来源和递归来源语义一致；在来源 ID 化或关系结果会话落地前，不新增一套仅供高级筛选使用的直接 SQL 判断。
 
 ## 8. 后续阶段
@@ -168,6 +168,7 @@ Feature result source 应由对应 service 产生可重建的查询身份，并�
 - 基础会话绑定词典 generation、算法版本、功能相关设置和引擎摘要；分类、搜索、排序和窗口只生成查询视图，不重复运行功能算法。
 - F4b-1 已以 IPA 自动生成比较完成试点，经可替换音系引擎 adapter 包装当前简易模型；自动生成 IPA 不持久化。
 - F4b-2 已让 IPA 分布/音位分析页异步共享 `ipaDistribution` summary，并把音素、首尾音和音节数高级筛选迁入 feature query/location；旧本地 IPA slice 与固定 ID action 已删除。
+- F4b-3 已实现 `morphologyAnalysis` 的统计、feature query、source adapter 和 repository 最小读取；前端仍保存旧形态功能结果 ID，下一批迁移到 source/view descriptor。
 - 先同步构建并复用运行时会话。只有 10k/30k 基准或可观察交互证明单次计算需要脱离请求生命周期时，才增加进程内后台状态；近期不增加持久化任务队列。
 
 ### F5：质量 API 与剩余迁移

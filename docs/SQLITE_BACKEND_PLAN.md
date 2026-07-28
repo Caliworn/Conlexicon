@@ -390,7 +390,7 @@ POST /api/dictionaries/:id/analysis/query
 - 总览页只是若干 widgets 的组合，不是固定完整分析报告。
 - planner 将 widgets 合并为 `entryStats`、`partStats` 和 `activityStats` 三个 SQL 聚合任务；同一任务在一次请求内只执行一次。
 - F4a 支持 entry count、coverage、part distribution 和 activity preview 单独请求，并返回可复用的筛选/跳转 action descriptor。
-- IPA 音节、Gloss 和完整形态分析属于 F4b feature result，不得悄悄塞入轻量总览任务；root family 排行直接消费稳定 topology summary，不建立 feature session。
+- IPA 音节、Gloss 和形态分配/覆写分析属于 F4b feature result，不得悄悄塞入轻量总览任务；F4b-3 不执行形态单元格生成。root family 排行直接消费稳定 topology summary，不建立 feature session。
 
 ### 7.6 质量检查 query
 
@@ -561,9 +561,9 @@ CREATE TABLE entry_morphology_search_values (
 
 按当前依赖关系建议依次处理：
 
-1. 高级筛选 F1–F3、分析 F4a 以及 F4b-0–F4b-2 已完成：统一 EntryQuery/EntryFilter、稳定条件 SQL 编译和前端 descriptor 状态已接入 `/entries` 会话、窗口、定位、排序与搜索；轻量 `/analysis/query` 已以最小 widget planner 聚合 SQLite 任务并异步供前端总览消费；IPA 自动生成比较和 IPA 分布统计均已接入可重建 feature result session、异步 summary 与 query/location。10k/30k 基准暂不要求增加后台状态。
-2. 下一步由 F4b-3/F5 把正式形态算法结果和质量检查推进为按需 API。数据分析词根家族 slice 则直接消费 `currentRootTopology()`：只返回 `{ rootId, lemma, derivedCount }` 和必要的窗口信息，不返回全部 `derivedIds`；可配置 Top N 通过 `limit` 表达。全局衍生词数量不得累加各家族数量，以免多来源词条重复计数。迁移后删除前端重复的关系索引/词根分组，以及未被 UI 消费的 `rootFamilies[].derivedEntryIds`。质量检查中的词源查询也应复用同一稳定拓扑。
-3. F4b 数据分析升级时直接消费当前 morphology model，删除前端临时旧单表视图；不要在 repository 恢复旧形态输出。
+1. 高级筛选 F1–F3、分析 F4a 以及 F4b-0–F4b-3 后端已完成：统一 EntryQuery/EntryFilter、稳定条件 SQL 编译和前端 descriptor 状态已接入 `/entries` 会话、窗口、定位、排序与搜索；轻量 `/analysis/query` 已以最小 widget planner 聚合 SQLite 任务并异步供前端总览消费；IPA 自动生成比较、IPA 分布和形态分配/覆写统计均已接入可重建 feature result session 与 query/location。10k/30k 基准暂不要求增加后台状态。
+2. 下一步让前端形态分析页与高级筛选 action 消费 `morphologyAnalysis`，再由 F5 把质量检查推进为独立按需 API。数据分析词根家族 slice 则直接消费 `currentRootTopology()`：只返回 `{ rootId, lemma, derivedCount }` 和必要的窗口信息，不返回全部 `derivedIds`；可配置 Top N 通过 `limit` 表达。全局衍生词数量不得累加各家族数量，以免多来源词条重复计数。迁移后删除前端重复的关系索引/词根分组，以及未被 UI 消费的 `rootFamilies[].derivedEntryIds`。质量检查中的词源查询也应复用同一稳定拓扑。
+3. F4b-3 直接消费当前 morphology model 的真实多组分配与 nested override，删除前端临时旧单表视图；不恢复旧形态输出，不复用丢弃空值的形态搜索 projection，也不统计生成数或空单元。
 4. 仅在基准表明确认线性扫描成为主要瓶颈后，再选择 FTS、ngram 或其他候选索引。
 5. 语料库进入独立升级阶段后，再把 `module_blobs.corpus` 拆成正式 SQL 表及块/单元级 API。
 

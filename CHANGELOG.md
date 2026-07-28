@@ -8,6 +8,10 @@
 
 - 完成 F4b-2 IPA 分布迁移：新增独立 `ipaDistribution` 功能结果源及完整 summary/items/location 契约，按需统计音素频次与唯一词条数、首音、尾音和音节数；数据分析的分布与音位页改为异步共享同一份 summary，提供加载、失败与重试状态，点击统计桶后由 `category + value` 功能结果查询接入普通词条窗口、搜索、排序、定位和 cursor，不再保存前端固定 ID slice。分布计算不会调用自动 IPA 引擎，其缓存身份只纳入复杂音素与音节分隔规则。
 
+### 改进
+
+- 完成 F4b-3 形态分析迁移：冻结并实装 `morphologyAnalysis` 的 summary、items、location 和高级筛选 category/value/scope，统计真实模板组分配、自动/手动模式及 nested override 的 active/inactive 覆写。数据分析形态页改为按需异步加载“使用情况/覆写”，统计项直接进入可搜索、排序、定位和循环的功能结果窗口；删除旧前端单表适配、固定 ID slice、生成数、空单元、子表使用排行和形态质量判断。Feature service/query model 使用显式 source registry，SQLite 只提供不含释义、来源、IPA、模板单元格或完整词典快照的最小形态输入。
+
 ### 性能
 
 - IPA 分布构建每 128 项让出事件循环；临时 SQLite 基准中，10k/30k 词条冷构建约 50/130 毫秒，热桶查询约 2 毫秒，暂不需要引入后台任务状态。
