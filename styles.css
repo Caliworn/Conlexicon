@@ -640,6 +640,26 @@ fieldset {
   font-size: 0.82rem;
 }
 
+.entry-search-config-field-name {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.entry-search-config-field-name > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.entry-search-config-field-name small {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .entry-search-config-field:hover {
   background: var(--accent-soft);
 }

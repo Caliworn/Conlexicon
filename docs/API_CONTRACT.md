@@ -57,7 +57,7 @@
 | 方法 | 路径 | 用途 | 响应 | 校验范围 |
 | --- | --- | --- | --- | --- |
 | `PUT` | `/api/dictionaries/:id/meta` | 保存词典名称、语言、描述 | 词典 metadata payload | 不做实体 ID 检查；响应包含 `id/name/language/description/createdAt/updatedAt`。 |
-| `PUT` | `/api/dictionaries/:id/settings` | 保存其他设置 | `{ id, updatedAt, settings }` | 不做实体 ID 检查；会保留既有 IPA 设置。`settings.search` 含字段级 `enabled/fuzzy`、`etymologyAutocomplete.fuzzy`，以及 `normalization: { unicodeNormalization: "none" | "nfc", caseFolding: boolean, customRules: { canonical, variants[] }[] }`。规范化默认严格关闭；自定义规则按最长变体优先且单次应用。前端据此生成读取 API 参数，并同步用于本地筛选、词根模式、搜索摘要/高亮、搜索字段分析和词源自动补全。 |
+| `PUT` | `/api/dictionaries/:id/settings` | 保存其他设置 | `{ id, updatedAt, settings }` | 不做实体 ID 检查；会保留既有 IPA 设置。`settings.search` 含字段级 `enabled/fuzzy`、`etymologyAutocomplete.fuzzy`，以及 `normalization: { unicodeNormalization: "none" | "nfc", caseFolding: boolean, customRules: { canonical, variants[] }[] }`。规范化默认严格关闭；自定义规则按最长变体优先且单次应用。前端据此生成读取 API 参数，并同步用于词根模式、搜索摘要/高亮、字段命中计数和词源自动补全。 |
 | `PUT` | `/api/dictionaries/:id/docs` | 保存语言文档 | `{ id, updatedAt, docs }` | 不做实体 ID 检查。 |
 | `PUT` | `/api/dictionaries/:id/corpus` | 保存语料库模块 | `{ id, updatedAt, corpus }` | 检查语料范围内实体 ID 冲突。 |
 | `PUT` | `/api/dictionaries/:id/morphology` | 保存自动形态学模块 | `{ id, updatedAt, morphology }` | 检查形态表实体 ID 冲突，并使用共享形态模块校验规则引用语法和函数对象配置；SQLite 事务提交后只重建并返回形态模块，不重建完整词典 snapshot。 |
@@ -68,9 +68,9 @@
 
 | 方法 | 路径 | 用途 | 响应 | 校验范围 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | `{ items, pageInfo }`，其中 `items` 固定为词条摘要 DTO | 支持结构化 JSON `filter`，以及现有 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`sort`、`cursor`、`windowOffset`、`limit`。结构化 `filter` 不得与平铺筛选参数混用。无参数请求也使用默认排序和窗口大小，不返回完整词条数组。 |
+| `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | `{ items, pageInfo, searchSummary }`，其中 `items` 固定为词条摘要 DTO | 支持结构化 JSON `filter`，以及现有 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`sort`、`cursor`、`windowOffset`、`limit`。结构化 `filter` 不得与平铺筛选参数混用。无参数请求也使用默认排序和窗口大小，不返回完整词条数组。 |
 | `POST` | `/api/dictionaries/:id/entries/filter-facts` | 批量读取结构筛选是否存在候选 | `{ dictionaryId, generation, facts }` | 最多接受 16 个 filter descriptor；只返回按请求 ID 对应的 `available` 布尔值，不接受搜索、排序或分页语义。 |
-| `GET` | `/api/dictionaries/:id/entries/:entryId/location` | 定位词条在当前查询中的窗口 | `{ items, pageInfo, location }` | 接受与 `/entries` 相同的查询 descriptor 和 `limit`，但不接受客户端 cursor；目标存在但被查询排除时返回 `location.found: false`。 |
+| `GET` | `/api/dictionaries/:id/entries/:entryId/location` | 定位词条在当前查询中的窗口 | `{ items, pageInfo, searchSummary, location }` | 接受与 `/entries` 相同的查询 descriptor 和 `limit`，但不接受客户端 cursor；目标存在但被查询排除时返回 `location.found: false`。 |
 | `POST` | `/api/dictionaries/:id/entries` | 新建词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
 | `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存单个词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
@@ -83,11 +83,11 @@
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/dictionaries/:id/facets` | 读取词性和标签统计 | `{ parts, tags, noPartOfSpeechCount }` | 尊重当前词典的词性标签设置和标签显示替换。前端词性筛选选项正常路径以该 API 为准，不再每次本地统计完整词性集合做一致性校验。 |
 | `GET` | `/api/dictionaries/:id/entry-relations/:entryId` | 读取词源/衍生/同根关系 | `{ entryId, sources, derivedEntries, rootGroup }` | SQLite 路径复用稳定词根拓扑的反向索引，并按需读取关系 DTO；同名 lemma 暂按排序后的第一条匹配，后续可由诊断模块报告歧义。 |
-| `GET` | `/api/dictionaries/:id/root-groups` | 读取词根模式分组 | `{ items, pageInfo }` | 支持 `q`、`fields`、`fuzzyFields`、`sort`、`cursor`、`windowOffset`、`limit`。前端词根模式正常路径以该 API 为准，并按窗口加载。 |
-| `GET` | `/api/dictionaries/:id/root-groups/location` | 定位词条所属的父级词根窗口 | `{ items, pageInfo, location }` | 必须传 `entryId`；可传 `preferredRootId` 消除多来源词条的父级歧义，其余参数沿用 `/root-groups` descriptor。 |
+| `GET` | `/api/dictionaries/:id/root-groups` | 读取词根模式分组 | `{ items, pageInfo, searchSummary }` | 支持 `q`、`fields`、`fuzzyFields`、`sort`、`cursor`、`windowOffset`、`limit`。前端词根模式正常路径以该 API 为准，并按窗口加载。 |
+| `GET` | `/api/dictionaries/:id/root-groups/location` | 定位词条所属的父级词根窗口 | `{ items, pageInfo, searchSummary, location }` | 必须传 `entryId`；可传 `preferredRootId` 消除多来源词条的父级歧义，其余参数沿用 `/root-groups` descriptor。 |
 | `GET` | `/api/dictionaries/:id/root-groups/:rootId/entries` | 按需读取单个词根组的全部衍生词 | `{ items }`，其中 `items` 固定为词条摘要 DTO | 支持与词根组查询相同的搜索、排序和字段参数，但不分页；折叠组不预载衍生词，展开后一次读取整组。 |
 | `POST` | `/api/dictionaries/:id/analysis/query` | 按需读取轻量分析 widgets | `{ dictionaryId, generation, cacheKey, widgets, diagnostics }` | F4a 同步聚合端点；多个 widget 由 planner 合并为共享 SQLite 任务，不读取或返回完整词典 snapshot。 |
-| `POST` | `/api/dictionaries/:id/analysis/features/query` | 读取派生功能结果摘要或窗口 | summary 模式返回 `{ dictionaryId, generation, resultKey, source, summary, diagnostics }`；items 模式另带 `{ items, pageInfo }` | F4b-1 当前只支持 `ipaAutoCompare` v1；基础算法结果保存在有界进程缓存中，分类、搜索、排序和窗口不触发 IPA 重算。 |
+| `POST` | `/api/dictionaries/:id/analysis/features/query` | 读取派生功能结果摘要或窗口 | summary 模式返回 `{ dictionaryId, generation, resultKey, source, summary, diagnostics }`；items 模式另带 `{ items, pageInfo, searchSummary }` | 当前支持 `ipaAutoCompare`、`ipaDistribution` 和 `morphologyAnalysis` v1；基础算法结果保存在有界进程缓存中，分类、搜索、排序和窗口不触发功能算法重算。 |
 | `POST` | `/api/dictionaries/:id/analysis/features/location` | 定位词条在派生结果视图中的窗口 | feature query 响应加 `{ location }` | 请求额外携带 `entryId`；目标不属于当前分类或搜索结果时返回 `location.found: false`。 |
 
 #### `GET /api/dictionaries/:id/entries` 查询参数补充
@@ -345,6 +345,13 @@ GET /api/dictionaries/:id/entries/:entryId/location?filter=&q=&fields=&fuzzyFiel
       parts
     }
   ],
+  searchSummary: {
+    matchedEntryCount: 27,
+    fields: [
+      { field: "lemma", matching: "strict", entryCount: 12 },
+      { field: "definitions", matching: "fuzzy", entryCount: 19 }
+    ]
+  },
   pageInfo: {
     nextCursor,
     windowCursor,
@@ -353,6 +360,10 @@ GET /api/dictionaries/:id/entries/:entryId/location?filter=&q=&fields=&fuzzyFiel
   }
 }
 ```
+
+带 `q` 的普通词条、词根组及 feature items/location 响应在顶层返回同一 `searchSummary`；无 `q` 时为 `null`。`fields` 只包含本次查询实际启用的字段，`matching` 固定为 `strict` 或 `fuzzy`，`entryCount` 按“该字段至少有一个独立值命中”的唯一词条数计算。同一词条在同一字段命中多个值仍只计一次，但可以同时计入多个字段，因此字段计数之和可以大于 `matchedEntryCount`。统计复用生成当前结果集合的同一轮 projection 匹配，不按字段追加查询，也不因打开前端字段面板重新请求。
+
+普通列表和 feature result 的 `matchedEntryCount` 等于搜索及候选条件相交后的唯一词条总数。词根模式仍统计直接命中搜索的唯一词条，不统计可见词根组数，也不把“词根命中后随组展示但自身未命中”的衍生词计入；因此它可以与 `pageInfo.total` 不同。location 响应复用相同查询会话中的摘要，即使目标不在结果内也不重新计算。
 
 #### S3 逐值检索与命中定位契约
 
@@ -474,6 +485,7 @@ GET /api/dictionaries/:id/root-groups?q=&fields=&fuzzyFields=&sort=&cursor=&wind
       rootMatches: true
     }
   ],
+  searchSummary,
   pageInfo: {
     nextCursor,
     windowCursor,

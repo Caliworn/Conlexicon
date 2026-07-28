@@ -33,7 +33,7 @@ F4b 不建设通用分析任务平台，不把功能结果伪装成普通 `Entry
 | 完整活动日期分布 | 前端扫描日期 | 日期行已是 EntryFilter | Summary/navigation | 扩展 F4a activity query，不建立 feature session；按修改时间浏览复用词条列表排序 |
 | 质量优先级与模块 | `quality-model` 完整扫描，问题带 entry、severity、module、detail | 固定 ID、问题详情和循环变体 | Quality result | F5 `/quality/query` |
 
-已完成的覆盖率、词性、标签、来源数量、日期和运行期搜索字段范围继续使用 F4a/EntryFilter/EntrySearch，不得回退到 feature result。
+已完成的覆盖率、词性、标签、来源数量和日期继续使用 F4a/EntryFilter，不得回退到 feature result。运行期搜索字段命中量由普通 EntrySearch projection 在同一轮匹配中聚合，并显示在列表字段管理面板；旧分析 slice 已删除。
 
 ## 3. 独立复评
 
@@ -136,6 +136,13 @@ items 请求分为不变的结果源、可变化的视图和窗口：
       { key: "strictMismatch", count: 1200 }
     ]
   },
+  searchSummary: {
+    matchedEntryCount: 27,
+    fields: [
+      { field: "lemma", matching: "strict", entryCount: 12 },
+      { field: "pronunciation", matching: "fuzzy", entryCount: 18 }
+    ]
+  },
   items: [
     {
       entry: {
@@ -164,6 +171,8 @@ items 请求分为不变的结果源、可变化的视图和窗口：
 ```
 
 具体 EntrySummary 字段复用普通词条列表 DTO，不在 feature API 内定义第二种卡片模型。`feature` 只携带当前页面需要的稳定 code 和轻量详情；大量诊断文本或多问题详情以后通过按词条 detail query 读取。
+
+items/location 视图的 `searchSummary` 在 feature 候选集合与当前搜索相交后按唯一词条聚合，只列出启用字段；同一 feature view 的翻窗和定位复用 view cache 中的 `{ orderedIds, searchSummary }`，不重跑 feature adapter 或搜索 projection。无搜索时为 `null`；summary-only 响应不建立搜索视图，也不返回该字段。
 
 分析卡片进入词条列表时使用：
 

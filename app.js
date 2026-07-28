@@ -131,6 +131,7 @@ let entryQueryState = {
   status: "idle",
   items: [],
   pageInfo: null,
+  searchSummary: null,
   error: null,
   requestId: 0,
   pages: [],
@@ -150,6 +151,7 @@ let rootGroupsQueryState = {
   status: "idle",
   groups: [],
   pageInfo: null,
+  searchSummary: null,
   error: null,
   requestId: 0,
   pages: [],
@@ -476,6 +478,9 @@ const i18n = {
     defaultSearchFields: "默认搜索字段",
     searchDefaultsHelp: "设置当前词典在新会话中使用的默认搜索字段和匹配方式。列表控制栏中的调整仅在本次运行期间生效。",
     currentSearchSettings: "当前搜索设置",
+    searchFieldMatchCount: "{count} 个命中词条",
+    searchFieldMatchLoading: "正在统计命中词条",
+    searchFieldMatchUnavailable: "暂无当前搜索统计",
     restoreSearchDefaults: "恢复词典默认值",
     searchSettingsSummary: "搜索范围：{fields}；{matching}",
     searchSettingsAllFields: "全部字段",
@@ -1048,6 +1053,9 @@ const i18n = {
     defaultSearchFields: "Default Search Fields",
     searchDefaultsHelp: "Set the default search fields and matching behavior for this dictionary in new sessions. Changes in the entry-list toolbar last only for the current run.",
     currentSearchSettings: "Current Search Settings",
+    searchFieldMatchCount: "{count} matching entries",
+    searchFieldMatchLoading: "Counting matching entries",
+    searchFieldMatchUnavailable: "No current search count",
     restoreSearchDefaults: "Restore Dictionary Defaults",
     searchSettingsSummary: "Search scope: {fields}; {matching}",
     searchSettingsAllFields: "All fields",
@@ -3843,6 +3851,23 @@ function setEntrySearchConfigOpen(open) {
   elements.entrySearchConfigMenu.hidden = !entrySearchConfigOpen;
 }
 
+function currentEntrySearchSummary(dictionary) {
+  if (!normalizeEntrySearchText(searchQuery, dictionary)) {
+    return { status: "empty", summary: null };
+  }
+  const queryState = rootMode ? rootGroupsQueryState : entryQueryState;
+  const expectedKey = rootMode
+    ? rootGroupsQueryApiKey(dictionary)
+    : entryQueryApiKey(dictionary);
+  if (queryState.key !== expectedKey || queryState.status === "loading") {
+    return { status: "loading", summary: null };
+  }
+  if (queryState.status !== "success" || !queryState.searchSummary) {
+    return { status: "unavailable", summary: null };
+  }
+  return { status: "success", summary: queryState.searchSummary };
+}
+
 function renderEntrySearchConfig() {
   const dictionary = activeDictionary();
   const unavailable = !dictionary || Boolean(advancedFilter && !advancedFilterUsesRemoteQuery());
@@ -3854,6 +3879,10 @@ function renderEntrySearchConfig() {
   }
 
   const profile = runtimeEntrySearchProfile(dictionary);
+  const matchState = currentEntrySearchSummary(dictionary);
+  const countByField = new Map(
+    (matchState.summary?.fields || []).map((item) => [item.field, Math.max(0, Number(item.entryCount) || 0)]),
+  );
   const focusedControl = document.activeElement?.dataset.runtimeSearchEnabled
     ? { type: "enabled", field: document.activeElement.dataset.runtimeSearchEnabled }
     : (document.activeElement?.dataset.runtimeSearchFuzzy
@@ -3862,9 +3891,19 @@ function renderEntrySearchConfig() {
   elements.entrySearchConfigFields.innerHTML = ENTRY_SEARCH_FIELD_KEYS.map((field) => {
     const config = profile.fields[field];
     const label = entrySearchFieldLabel(field);
+    const hasCount = config.enabled && countByField.has(field);
+    const countText = hasCount ? String(countByField.get(field)) : "–";
+    const countLabel = hasCount
+      ? formatText("searchFieldMatchCount", { count: countText })
+      : (matchState.status === "loading" && config.enabled
+        ? t("searchFieldMatchLoading")
+        : t("searchFieldMatchUnavailable"));
     return `
       <div class="entry-search-config-field${config.enabled ? "" : " is-search-disabled"}" data-runtime-search-field="${escapeHtml(field)}">
-        <span>${escapeHtml(label)}</span>
+        <span class="entry-search-config-field-name">
+          <span>${escapeHtml(label)}</span>
+          <small aria-label="${escapeHtml(countLabel)}" title="${escapeHtml(countLabel)}">${matchState.status === "loading" && config.enabled ? "…" : escapeHtml(countText)}</small>
+        </span>
         <label>
           <span class="visually-hidden">${escapeHtml(`${label}: ${t("searchFieldEnabled")}`)}</span>
           <input type="checkbox" data-runtime-search-enabled="${escapeHtml(field)}"${config.enabled ? " checked" : ""}>
@@ -5206,6 +5245,7 @@ function compactRootGroupsQueryResult(result) {
     : [];
   return {
     groups,
+    searchSummary: result?.searchSummary || null,
     pageInfo: result?.pageInfo ? {
       ...result.pageInfo,
       windowMetrics: Array.isArray(result.pageInfo.windowMetrics)
@@ -5224,6 +5264,7 @@ function resetRootGroupsQueryState() {
     status: "idle",
     groups: [],
     pageInfo: null,
+    searchSummary: null,
     error: null,
     requestId: rootGroupsQueryState.requestId + 1,
     pages: [],
@@ -5403,6 +5444,7 @@ function loadRootGroupsWindowPage(dictionary, page) {
       page.status = "success";
       page.items = result.groups;
       page.pageInfo = result.pageInfo;
+      rootGroupsQueryState.searchSummary = result.searchSummary;
       page.error = null;
       page.lastAccessAt = performance.now();
       populateQueryWindowPages(
@@ -5441,6 +5483,7 @@ function loadRootGroupsWindowPage(dictionary, page) {
       );
       syncRootGroupsQueryWindowState();
       renderPartFilter();
+      renderEntrySearchConfig();
       renderEntries();
       flushPendingEntryCardScroll();
     })
@@ -5458,6 +5501,7 @@ function loadRootGroupsWindowPage(dictionary, page) {
         status: "error",
         groups: [],
         pageInfo: null,
+        searchSummary: null,
         error,
         requestId,
         pages: [],
@@ -5528,6 +5572,7 @@ function startRootGroupsQueryApiCheck(dictionary) {
     status: "loading",
     groups: [],
     pageInfo: null,
+    searchSummary: null,
     error: null,
     requestId,
     pages: [firstPage],
@@ -5579,6 +5624,7 @@ function compactEntryQueryResult(result) {
           .filter((entry) => entry?.id)
       : [],
     pageInfo: result?.pageInfo || null,
+    searchSummary: result?.searchSummary || null,
     summary: result?.summary || null,
     source: result?.source || null,
   };
@@ -5715,6 +5761,7 @@ function resetEntryQueryState() {
     status: "idle",
     items: [],
     pageInfo: null,
+    searchSummary: null,
     error: null,
     requestId: entryQueryState.requestId + 1,
     pages: [],
@@ -5900,6 +5947,7 @@ function loadEntryQueryWindowPage(dictionary, page) {
       page.status = "success";
       page.items = result.items;
       page.pageInfo = result.pageInfo;
+      entryQueryState.searchSummary = result.searchSummary;
       page.error = null;
       page.lastAccessAt = performance.now();
       preserveQueryWindowPageHeight(
@@ -5937,6 +5985,7 @@ function loadEntryQueryWindowPage(dictionary, page) {
         finishStaleContentUpdate("list", updateToken);
       }
       syncEntryQueryWindowState();
+      renderEntrySearchConfig();
       evictDistantQueryWindowPages(
         entryQueryState.pages,
         entryVirtualList,
@@ -5961,6 +6010,7 @@ function loadEntryQueryWindowPage(dictionary, page) {
         status: "error",
         items: [],
         pageInfo: null,
+        searchSummary: null,
         error,
         requestId,
         pages: [],
@@ -6028,6 +6078,7 @@ function startEntryQueryApiCheck(dictionary) {
     status: "loading",
     items: [],
     pageInfo: null,
+    searchSummary: null,
     error: null,
     requestId,
     pages: [firstPage],
@@ -6704,6 +6755,8 @@ function startEntryQueryLocation(dictionary, entryId) {
         return;
       }
       recordFeatureResultSummary(result);
+      entryQueryState.searchSummary = result.searchSummary;
+      renderEntrySearchConfig();
       if (!result.location?.found) {
         if (pendingEntryCardScroll?.options?.reportMissing) {
           showToast(t("currentEntryNotInList"));
@@ -6782,6 +6835,8 @@ function startRootGroupQueryLocation(dictionary, entryId, options = {}) {
       ) {
         return;
       }
+      rootGroupsQueryState.searchSummary = result.searchSummary;
+      renderEntrySearchConfig();
       if (!result.location?.found) {
         if (pendingEntryCardScroll?.options?.reportMissing) {
           showToast(t("currentEntryNotInList"));
@@ -9759,7 +9814,6 @@ function renderAnalysisEntriesPage(report, subpage) {
     return `<section class="analysis-detail-grid">
       ${analysisCard(aText("覆盖率", "Coverage"), analysisCoverageList(report.coverageRows))}
       ${analysisCard(aText("规则与资料", "Rules and Data"), analysisFactList(analysisFactRows(report)))}
-      ${analysisCard(aText("当前搜索命中字段", "Current Search Fields"), analysisBarList(report.searchFields, { empty: aText("暂无搜索", "No active search") }))}
     </section>`;
   }
   return `<section class="analysis-detail-grid">
@@ -10168,7 +10222,6 @@ function analysisFactRows(report) {
     [aText("例句数量", "Examples"), report.examples, binaryPresenceFilterAction(advancedFilterTitleDescriptor("advancedFilterHasExamples"), "example", report.exampleEntryCount, advancedFilterTitleDescriptor("advancedFilterNoExamples"), report.noExampleEntryCount)],
     [aText("Glossed 例句", "Glossed examples"), report.glossExamples, advancedFilterAction(advancedFilterTitleDescriptor("advancedFilterGlossedExamples"), report.glossEntryIds)],
     [aText("多来源词条", "Multi-source entries"), report.multiSourceCount, entryFilterAction(advancedFilterTitleDescriptor("advancedFilterMultiSourceEntries"), { sourceCount: { min: 2 } }, { count: report.multiSourceCount })],
-    [aText("当前搜索命中", "Current search matches"), report.searchMatches, viewAction("editor")],
   ];
 }
 
@@ -10240,7 +10293,6 @@ function composeLegacyAnalysisReport(context, slices) {
     ...slices.coverage,
     ...slices.tags,
     ...slices.forms,
-    ...slices.search,
     activity: slices.activity,
   };
 }
@@ -10252,7 +10304,6 @@ function analysisSliceBuilders() {
     coverage: buildAnalysisCoverageSlice,
     tags: buildAnalysisTagSlice,
     forms: buildAnalysisFormSlice,
-    search: buildAnalysisSearchSlice,
     activity: buildAnalysisActivitySlice,
   };
 }
@@ -10420,17 +10471,6 @@ function buildAnalysisFormSlice(context) {
   };
 }
 
-function buildAnalysisSearchSlice(context) {
-  const { dictionary, entries } = context;
-  const searchMatchEntries = normalizeEntrySearchText(searchQuery, dictionary)
-    ? entries.filter((entry) => entryMatchesSearch(entry, dictionary))
-    : entries;
-  return {
-    searchMatches: searchMatchEntries.length,
-    searchFields: analyzeSearchFields(entries, dictionary),
-  };
-}
-
 function buildAnalysisActivitySlice(context) {
   return analyzeActivity(context.entries);
 }
@@ -10452,51 +10492,6 @@ function analyzeActivity(entries) {
     created: numericDateEntryItems(created, "advancedFilterCreatedDate", "created"),
     updated: numericDateEntryItems(updated, "advancedFilterUpdatedDate", "updated"),
   };
-}
-
-function analyzeSearchFields(entries, dictionary) {
-  const searchOptions = entrySearchQueryOptions(dictionary);
-  const query = searchQuery;
-  if (!searchOptions.normalizeText(query)) {
-    return [];
-  }
-  const { fields: searchFields, fuzzyFields } = searchOptions;
-  const counts = new Map();
-  entries.forEach((entry) => {
-    const fieldValues = entrySearchModel.entrySearchFieldValues(entry, dictionary, {
-      fields: searchFields,
-      normalizeText: searchOptions.normalizeText,
-    });
-    const fieldGroups = [
-      ["lemma", aText("词形", "Lemma"), fieldValues.lemma],
-      ["tags", aText("标签", "Tags"), fieldValues.tags],
-      ["definitions", aText("释义", "Definitions"), fieldValues.definitions],
-      ["examples", aText("例句", "Examples"), fieldValues.examples],
-      ["etymology", aText("词源", "Etymology"), fieldValues.etymology],
-      ["pronunciation", "IPA", fieldValues.pronunciation],
-      ["morphology", aText("形态形式", "Morphology forms"), fieldValues.morphology],
-      ["notes", aText("备注", "Notes"), fieldValues.notes],
-    ];
-    fieldGroups.forEach(([field, label, values]) => {
-      if (values.some((value) => textMatches(value, query, fuzzyFields.has(field)))) {
-        const current = counts.get(field) || { label, count: 0 };
-        current.count += 1;
-        counts.set(field, current);
-      }
-    });
-  });
-  return [...counts.entries()]
-    .sort((left, right) => right[1].count - left[1].count || left[1].label.localeCompare(right[1].label, "zh-CN"))
-    .slice(0, 10)
-    .map(([field, item]) => [
-      item.label,
-      item.count,
-      {
-        type: "search-scope",
-        fields: [field],
-        fuzzyFields: fuzzyFields.has(field) ? [field] : [],
-      },
-    ]);
 }
 
 function analysisMetricCard(label, value, note = "", action = null) {
@@ -10779,44 +10774,12 @@ function analysisActionAttributes(action) {
   if (normalized.type === "part-filter") {
     return ` data-part-filter-value="${escapeHtml(normalized.part || NO_PART_FILTER_VALUE)}"`;
   }
-  if (normalized.type === "search-scope" && normalized.fields?.length) {
-    const id = `search-scope-${analysisFilterCounter += 1}`;
-    analysisFilterRegistry.set(id, normalized);
-    return ` data-search-scope-id="${escapeHtml(id)}"`;
-  }
   if (normalized.type === "advanced-filter" && (normalized.entryIds?.length || normalized.variants?.length)) {
     const id = `filter-${analysisFilterCounter += 1}`;
     analysisFilterRegistry.set(id, normalized);
     return ` data-advanced-filter-id="${escapeHtml(id)}"`;
   }
   return "";
-}
-
-function applyAnalysisSearchScope(action) {
-  const dictionary = activeDictionary();
-  const fields = (action?.fields || []).filter((field) => ENTRY_SEARCH_FIELD_KEYS.includes(field));
-  if (!dictionary || !fields.length) {
-    return;
-  }
-  const enabled = new Set(fields);
-  const fuzzy = new Set((action.fuzzyFields || [])
-    .filter((field) => enabled.has(field)));
-  const current = runtimeEntrySearchProfile(dictionary);
-  const nextFields = Object.fromEntries(ENTRY_SEARCH_FIELD_KEYS.map((field) => [
-    field,
-    {
-      enabled: enabled.has(field),
-      fuzzy: enabled.has(field) ? fuzzy.has(field) : current.fields[field].fuzzy,
-    },
-  ]));
-  setRuntimeEntrySearchProfile({ fields: nextFields }, dictionary);
-  advancedFilter = null;
-  rootMode = false;
-  activePart = "";
-  state.activeView = "editor";
-  resetEntryQueryState();
-  revealEntryBrowserForResults();
-  render();
 }
 
 function increment(map, key, amount = 1) {
@@ -15544,12 +15507,6 @@ elements.analysisPanel.addEventListener("click", (event) => {
     }
     render();
     scheduleEntryCardScroll(state.selectedEntryId);
-    return;
-  }
-  const searchScopeTarget = event.target.closest("[data-search-scope-id]");
-  if (searchScopeTarget) {
-    const action = analysisFilterRegistry.get(searchScopeTarget.dataset.searchScopeId);
-    applyAnalysisSearchScope(action);
     return;
   }
   const filterTarget = event.target.closest("[data-advanced-filter-id]");

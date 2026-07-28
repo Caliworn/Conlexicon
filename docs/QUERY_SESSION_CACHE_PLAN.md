@@ -63,6 +63,7 @@ SQLite repository
 {
   items,       // 当前窗口的 summary DTO
   pageInfo,
+  searchSummary, // 当前查询已启用字段的唯一命中词条数；无搜索时为 null
   // root groups 首窗可附带 windowMetrics
 }
 ```
@@ -103,6 +104,7 @@ limit
   descriptorKey,
   orderedIds,           // entries 查询
   entryIndexById,       // 已物化有序 ID 的 entryId -> resultIndex
+  searchSummary,        // 同一轮 projection 匹配聚合出的字段命中摘要
   groups,               // rootId + derivedIds + matchedDerivedIds + rootMatches
   groupIndexByRootId,   // rootId -> resultIndex
   total,
@@ -112,7 +114,7 @@ limit
 }
 ```
 
-词条严格及 fuzzy 搜索会话都保存排序后的命中词条 ID，并同步维护 `entryIndexById`；词根会话保存组身份、匹配标记和 `groupIndexByRootId`。两种索引都只复用已经物化的结果数组，不额外扫描 SQLite，供后续定位 API 直接取得结果下标。`searchHits` 和页面 DTO 仍按当前窗口的 ID 从 projection/主表读取，避免把所有命中详情长期留在内存。session 必须保留完整规范化 descriptor；只有 digest 无法在后续页面中恢复字段、fuzzy 配置和命中定位语义。
+词条严格及 fuzzy 搜索会话都保存排序后的命中词条 ID，并同步维护 `entryIndexById`；词根会话保存组身份、匹配标记和 `groupIndexByRootId`。projection 查询先形成去重的 `(entryId, field)`，再在 SQL 内按词条聚合为固定字段位掩码，因此返回 Node 的仍是一词条一行；repository 读取同一批结果时同时生成有序 ID 与 `searchSummary`，不会为各字段追加查询。两种索引和摘要都只复用已经物化的结果，不额外扫描 SQLite，供后续窗口和定位响应直接读取。`searchHits` 和页面 DTO 仍按当前窗口的 ID 从 projection/主表读取，避免把所有命中详情长期留在内存。session 必须保留完整规范化 descriptor；只有 digest 无法在后续页面中恢复字段、fuzzy 配置和命中定位语义。
 
 ### 3.3 SQLite repository
 

@@ -229,8 +229,8 @@ async function main() {
     const repository = context.repository;
     let orderedProjectionSearchCalls = 0;
     let unorderedProjectionSearchCalls = 0;
-    const originalProjectionSearch = repository.entrySearchMatchedIdsFromProjectionQuery.bind(repository);
-    repository.entrySearchMatchedIdsFromProjectionQuery = (...args) => {
+    const originalProjectionSearch = repository.entrySearchProjectionMatches.bind(repository);
+    repository.entrySearchProjectionMatches = (...args) => {
       if (args[2]?.ordered === false) {
         unorderedProjectionSearchCalls += 1;
       } else {
@@ -299,6 +299,10 @@ async function main() {
     await assertDirectQuery(repository, dictionary, { q: "RawTagToken", fields: "tags" });
     await assertDirectQuery(repository, dictionary, { q: "DisplayTagToken", fields: "tags" });
     const definitionHitResult = await assertDirectQuery(repository, dictionary, { q: "DefinitionToken", fields: "definitions" });
+    assert.deepEqual(definitionHitResult.searchSummary, {
+      matchedEntryCount: 1,
+      fields: [{ field: "definitions", matching: "strict", entryCount: 1 }],
+    });
     assert.deepEqual(definitionHitResult.items[0].searchHits, [{
       field: "definitions",
       value: "CommonToken DefinitionToken",
@@ -333,6 +337,18 @@ async function main() {
       { q: "DefinitionToken", fields: "definitions,morphology" },
       ["entry-alpha-root"],
     );
+    const mixedFieldSummary = await assertDirectQuery(repository, dictionary, {
+      q: "CommonToken",
+      fields: "lemma,definitions",
+      fuzzyFields: "lemma",
+    });
+    assert.deepEqual(mixedFieldSummary.searchSummary, {
+      matchedEntryCount: 3,
+      fields: [
+        { field: "definitions", matching: "strict", entryCount: 3 },
+        { field: "lemma", matching: "fuzzy", entryCount: 0 },
+      ],
+    }, "search summaries should include enabled zero-count fields and omit disabled fields");
     await assertDirectQuery(repository, dictionary, { q: "ExampleToken", fields: "examples" });
     await assertDirectQuery(repository, dictionary, { q: "EntryNoteToken", fields: "notes" });
     await assertDirectQuery(repository, dictionary, { q: "DefinitionNoteToken", fields: "notes" });
@@ -383,6 +399,10 @@ async function main() {
     assert.deepEqual(derivedRootSearch.items.map((group) => group.root.id), ["entry-alpha-root"]);
     assert.equal(derivedRootSearch.items[0].rootMatches, false);
     assert.equal(derivedRootSearch.items[0].matchedDerivedCount, 1);
+    assert.deepEqual(derivedRootSearch.searchSummary, {
+      matchedEntryCount: 1,
+      fields: [{ field: "definitions", matching: "strict", entryCount: 1 }],
+    }, "root mode should count direct matching entries rather than visible root groups");
     const fuzzyMorphologyRootSearch = await repository.queryRootGroups(dictionary.id, {
       q: "MorphTkn",
       fields: "morphology",

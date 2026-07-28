@@ -682,6 +682,10 @@ async function checkRepositoryIntegration() {
     }));
     assert.deepEqual(searched.items.map((item) => item.entry.id), ["entry-mismatch"]);
     assert.equal(searched.items[0].entry.searchHits[0].field, "pronunciation");
+    assert.deepEqual(searched.searchSummary, {
+      matchedEntryCount: 1,
+      fields: [{ field: "pronunciation", matching: "strict", entryCount: 1 }],
+    }, "feature search counts must be intersected with the feature candidate set");
     assert.equal(generateCalls, 5, "search changes must not rerun the engine");
 
     const located = await service.location(dictionary.id, {
@@ -865,6 +869,10 @@ async function checkRepositoryIntegration() {
       searchedVerbGroup.items.map((item) => item.entry.id),
       ["entry-manual-multi"],
     );
+    assert.deepEqual(searchedVerbGroup.searchSummary, {
+      matchedEntryCount: 1,
+      fields: [{ field: "tags", matching: "strict", entryCount: 1 }],
+    });
     const locatedMorphology = await service.location(morphologyDictionary.id, {
       ...morphologyRequest("group", "morph-noun", { limit: 2 }),
       entryId: "entry-auto-noun-two",
