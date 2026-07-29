@@ -201,6 +201,13 @@ let analysisMorphologyQueryState = {
   error: null,
   requestId: 0,
 };
+let analysisActivityQueryState = {
+  key: "",
+  status: "idle",
+  response: null,
+  error: null,
+  requestId: 0,
+};
 let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
 let draggedToolNavView = "";
@@ -8952,6 +8959,15 @@ function renderAnalysis(dictionary = activeDictionary()) {
     }
     return;
   }
+  if (page === "activity") {
+    const queryState = analysisActivityStateFor(dictionary);
+    elements.analysisPanel.innerHTML = renderAnalysisActivityQueryPage(queryState, subpage);
+    setupAnalysisMasonryLayouts();
+    if (queryState.status === "idle") {
+      void loadAnalysisActivity(dictionary);
+    }
+    return;
+  }
   const report = getAnalysisReport(dictionary, { page, subpage });
   elements.analysisPanel.innerHTML = renderAnalysisPage(report, page, subpage);
   setupAnalysisMasonryLayouts();
@@ -8987,6 +9003,92 @@ function analysisMorphologyQueryKey(dictionary) {
     dictionaryId: dictionary?.id || "",
     updatedAt: dictionary?.updatedAt || "",
   });
+}
+
+function analysisActivityQueryKey(dictionary) {
+  return stableJson({
+    dictionaryId: dictionary?.id || "",
+    updatedAt: dictionary?.updatedAt || "",
+  });
+}
+
+function analysisActivityStateFor(dictionary) {
+  const key = analysisActivityQueryKey(dictionary);
+  if (analysisActivityQueryState.key !== key) {
+    return {
+      key,
+      status: "idle",
+      response: null,
+      error: null,
+      requestId: analysisActivityQueryState.requestId,
+    };
+  }
+  return analysisActivityQueryState;
+}
+
+async function loadAnalysisActivity(dictionary, { force = false } = {}) {
+  if (!dictionary?.id) {
+    return;
+  }
+  const key = analysisActivityQueryKey(dictionary);
+  if (
+    !force
+    && analysisActivityQueryState.key === key
+    && ["loading", "ready"].includes(analysisActivityQueryState.status)
+  ) {
+    return;
+  }
+  const requestId = analysisActivityQueryState.requestId + 1;
+  analysisActivityQueryState = {
+    key,
+    status: "loading",
+    response: null,
+    error: null,
+    requestId,
+  };
+  try {
+    const response = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`, {
+      method: "POST",
+      body: JSON.stringify({
+        widgets: [{ id: "activity", type: "activityDistribution" }],
+      }),
+    });
+    if (
+      analysisActivityQueryState.requestId !== requestId
+      || analysisActivityQueryState.key !== key
+    ) {
+      return;
+    }
+    analysisActivityQueryState = {
+      key,
+      status: "ready",
+      response,
+      error: null,
+      requestId,
+    };
+  } catch (error) {
+    if (
+      analysisActivityQueryState.requestId !== requestId
+      || analysisActivityQueryState.key !== key
+    ) {
+      return;
+    }
+    analysisActivityQueryState = {
+      key,
+      status: "error",
+      response: null,
+      error,
+      requestId,
+    };
+    console.error(error);
+  }
+  if (
+    state.activeView === "analysis"
+    && activeAnalysisPage() === "activity"
+    && activeDictionary()?.id === dictionary.id
+  ) {
+    renderAnalysis(activeDictionary());
+  }
 }
 
 function analysisMorphologyStateFor(dictionary) {
@@ -9280,6 +9382,26 @@ function renderAnalysisMorphologyQueryPage(queryState, subpage) {
   return `
     ${analysisPageNav("morphology")}
     ${analysisSubpageNav("morphology", subpage)}
+    <section class="analysis-page-body">${body}</section>
+  `;
+}
+
+function renderAnalysisActivityQueryPage(queryState, subpage) {
+  let body = "";
+  if (queryState.status === "ready") {
+    body = renderAnalysisActivityQuery(queryState.response, subpage);
+  } else if (queryState.status === "error") {
+    body = `<div class="empty-state">
+      <strong>${escapeHtml(aText("无法加载编辑日期", "Could not load editing dates"))}</strong>
+      <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
+      <button type="button" class="secondary-button" data-analysis-activity-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+    </div>`;
+  } else {
+    body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载编辑日期", "Loading editing dates"))}</strong></div>`;
+  }
+  return `
+    ${analysisPageNav("activity")}
+    ${analysisSubpageNav("activity", subpage)}
     <section class="analysis-page-body">${body}</section>
   `;
 }
@@ -9592,9 +9714,6 @@ function qualitySubpageGroups() {
 function analysisPageBody(report, page, subpage) {
   if (page === "entries") {
     return renderAnalysisEntriesPage(report, subpage);
-  }
-  if (page === "activity") {
-    return renderAnalysisActivityPage(report, subpage);
   }
   return "";
 }
@@ -10006,11 +10125,23 @@ function renderAnalysisMorphologyQuery(response, subpage) {
   </section>`;
 }
 
-function renderAnalysisActivityPage(report, subpage) {
+function renderAnalysisActivityQuery(response, subpage) {
+  const activity = response?.widgets?.activity || {};
+  const rowsForField = (rows, field) => (rows || []).map((row) => [
+    row.day,
+    Number(row.count || 0),
+    analysisQueryFilterAction(
+      row.action,
+      advancedFilterValueTitleDescriptor(
+        field === "created" ? "advancedFilterCreatedDate" : "advancedFilterUpdatedDate",
+        row.day,
+      ),
+    ),
+  ]);
   if (subpage === "created") {
-    return `<section class="analysis-detail-grid">${analysisCard(aText("新增日期", "Created Date"), analysisBarList(report.activity.created, { empty: aText("暂无创建记录", "No creation records") }))}</section>`;
+    return `<section class="analysis-detail-grid">${analysisCard(aText("新增日期", "Created Date"), analysisBarList(rowsForField(activity.created, "created"), { empty: aText("暂无创建记录", "No creation records") }))}</section>`;
   }
-  return `<section class="analysis-detail-grid">${analysisCard(aText("编辑日期", "Updated Date"), analysisBarList(report.activity.updated, { empty: aText("暂无编辑记录", "No edit records") }))}</section>`;
+  return `<section class="analysis-detail-grid">${analysisCard(aText("编辑日期", "Updated Date"), analysisBarList(rowsForField(activity.updated, "updated"), { empty: aText("暂无编辑记录", "No edit records") }))}</section>`;
 }
 
 function qualityPageBody(report, subpage) {
@@ -10262,7 +10393,6 @@ function composeLegacyAnalysisReport(context, slices) {
     ...slices.rootFamilies,
     ...slices.tags,
     ...slices.forms,
-    activity: slices.activity,
   };
 }
 
@@ -10272,7 +10402,6 @@ function analysisSliceBuilders() {
     rootFamilies: buildAnalysisRootFamiliesSlice,
     tags: buildAnalysisTagSlice,
     forms: buildAnalysisFormSlice,
-    activity: buildAnalysisActivitySlice,
   };
 }
 
@@ -10354,29 +10483,6 @@ function buildAnalysisFormSlice(context) {
     allCharacters: topEntryMapItems(characters, Number.MAX_SAFE_INTEGER, "advancedFilterOrthographicCharacter"),
     bigrams: topEntryMapItems(bigrams, 16, "advancedFilterOrthographicBigram"),
     allBigrams: topEntryMapItems(bigrams, Number.MAX_SAFE_INTEGER, "advancedFilterOrthographicBigram"),
-  };
-}
-
-function buildAnalysisActivitySlice(context) {
-  return analyzeActivity(context.entries);
-}
-
-function analyzeActivity(entries) {
-  const created = new Map();
-  const updated = new Map();
-  entries.forEach((entry) => {
-    const createdDay = dateBucket(entry.createdAt);
-    const updatedDay = dateBucket(entry.updatedAt);
-    if (createdDay) {
-      increment(created, createdDay);
-    }
-    if (updatedDay) {
-      increment(updated, updatedDay);
-    }
-  });
-  return {
-    created: numericDateEntryItems(created, "advancedFilterCreatedDate", "created"),
-    updated: numericDateEntryItems(updated, "advancedFilterUpdatedDate", "updated"),
   };
 }
 
@@ -10493,14 +10599,6 @@ function cleanIpaText(value) {
 
 function normalizeIpaCompare(value) {
   return ipaModel.normalizeIpaCompare(value);
-}
-
-function dateBucket(value) {
-  const date = new Date(value || 0);
-  if (Number.isNaN(date.getTime()) || date.getTime() <= 0) {
-    return "";
-  }
-  return date.toISOString().slice(0, 10);
 }
 
 function percentText(value) {
@@ -10770,18 +10868,6 @@ function numericEntryMapItems(map, labelKey = "") {
 
 function numericDateItems(map) {
   return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-}
-
-function numericDateEntryItems(map, labelKey = "", field = "updated") {
-  return [...map.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([label, count]) => [
-      label,
-      Number(count),
-      entryFilterAction(advancedFilterValueTitleDescriptor(labelKey, label), {
-        activityDays: [{ field, day: label }],
-      }, { count }),
-    ]);
 }
 
 function renderMorphologyDisplay(entry, showEmptySections = false) {
@@ -15299,6 +15385,12 @@ elements.entryListNewEntryButton.addEventListener("click", async () => {
 });
 elements.editEntryButton.addEventListener("click", beginEditEntry);
 elements.analysisPanel.addEventListener("click", (event) => {
+  const activityRetryButton = event.target.closest("[data-analysis-activity-retry]");
+  if (activityRetryButton) {
+    void loadAnalysisActivity(activeDictionary(), { force: true });
+    renderAnalysis(activeDictionary());
+    return;
+  }
   const morphologyRetryButton = event.target.closest("[data-analysis-morphology-retry]");
   if (morphologyRetryButton) {
     void loadAnalysisMorphology(activeDictionary(), { force: true });

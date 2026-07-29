@@ -6,8 +6,10 @@ const entrySearchModel = require("../lib/entry-search-model");
 const morphologyModel = require("../lib/morphology-model");
 const searchNormalizationModel = require("../lib/search-normalization-model");
 const tagModel = require("../lib/tag-model");
-const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
-const { createTempSqliteRepository } = require("./sqlite-check-utils");
+const {
+  createTempSqliteRepository,
+  requireSqliteRuntime,
+} = require("./sqlite-check-utils");
 
 const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
 
@@ -217,10 +219,7 @@ function searchConsistencyDictionary() {
 }
 
 async function main() {
-  if (!SqliteDictionaryRepository.isRuntimeAvailable()) {
-    console.log("SQLite runtime unavailable; entry-search consistency check skipped.");
-    return;
-  }
+  requireSqliteRuntime("entry-search consistency check");
   const context = await createTempSqliteRepository("conlexicon-entry-search-consistency-");
   try {
     const source = searchConsistencyDictionary();

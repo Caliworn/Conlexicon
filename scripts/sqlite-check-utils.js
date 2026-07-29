@@ -35,8 +35,10 @@ async function createTempSqliteRepository(prefix = "conlexicon-sqlite-check-") {
   };
 }
 
-function sqliteRuntimeUnavailableMessage(scope) {
-  return `SQLite runtime unavailable; ${scope} skipped.`;
+function requireSqliteRuntime(scope = "SQLite check") {
+  if (!SqliteDictionaryRepository.isRuntimeAvailable()) {
+    throw new Error(`SQLite runtime unavailable; ${scope} cannot run.`);
+  }
 }
 
 function sampleSqliteDictionary() {
@@ -94,7 +96,7 @@ function sampleSqliteDictionary() {
 
 module.exports = {
   createTempSqliteRepository,
+  requireSqliteRuntime,
   sampleSqliteDictionary,
   sqliteRepositoryOptions,
-  sqliteRuntimeUnavailableMessage,
 };

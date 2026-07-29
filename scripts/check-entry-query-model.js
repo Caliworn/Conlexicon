@@ -94,7 +94,7 @@ function checkStableIdentity() {
       fields: ["lemma", "tags"],
       fuzzyFields: ["lemma"],
     },
-    page: { limit: 500, offset: 100 },
+    page: { limit: 200, offset: 100 },
   });
   assert.deepEqual(entryQueryIdentity(first), entryQueryIdentity(second));
 
@@ -124,6 +124,14 @@ function checkValidation() {
   assert.throws(
     () => normalizeEntryQuery({ windowOffset: "not-a-number" }),
     (error) => error instanceof EntryQueryValidationError && error.code === "invalid_query_window_offset",
+  );
+  assert.throws(
+    () => normalizeEntryQuery({ limit: 201 }),
+    (error) => (
+      error instanceof EntryQueryValidationError
+      && error.code === "invalid_entry_query_limit"
+      && error.details?.maxLimit === 200
+    ),
   );
   assert.throws(
     () => normalizeEntryFilter({ activityDay: { field: "created", day: "2026-02-31" } }),

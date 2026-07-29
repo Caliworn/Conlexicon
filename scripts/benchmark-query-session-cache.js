@@ -7,28 +7,39 @@ const { ENTRY_SEARCH_FIELD_KEYS } = require("../lib/entry-search-model");
 const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
 const { sqliteRepositoryOptions } = require("./sqlite-check-utils");
 
+const ENTRY_PAGE_SIZE = 200;
+const ROOT_GROUP_PAGE_SIZE = 100;
+const STATIC_SEARCH_FIELDS = ENTRY_SEARCH_FIELD_KEYS.filter((field) => field !== "morphology");
+
 function usage() {
   return [
-    "Usage: node scripts/benchmark-query-session-cache.js --data <sqlite-data-dir> [--id <dictionary-id>] [--query <text>] [--runs <count>]",
+    "Usage: node scripts/benchmark-query-session-cache.js --data <sqlite-data-dir> [--id <dictionary-id>] [--query <text>] [--strict-query <text>] [--morphology-query <text>] [--lemma-query <text>] [--runs <count>]",
     "",
-    "Measures cold and repeated hot fuzzy-entry/root-group queries without modifying dictionary data.",
+    "Measures cold session builds and repeated product-sized entry/root-group windows without modifying dictionary data.",
   ].join("\n");
 }
 
 function parseArgs(argv) {
-  const options = { query: "bdy", runs: 5 };
+  const options = {
+    query: "bdy",
+    strictQuery: "body",
+    morphologyQuery: "qna",
+    lemmaQuery: "ta",
+    runs: 5,
+  };
   for (let index = 2; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--help" || token === "-h") {
       options.help = true;
       continue;
     }
-    if (["--data", "--id", "--query", "--runs"].includes(token)) {
+    if (["--data", "--id", "--query", "--strict-query", "--morphology-query", "--lemma-query", "--runs"].includes(token)) {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) {
         throw new Error(`${token} requires a value`);
       }
-      options[token.slice(2)] = value;
+      const optionKey = token.slice(2).replace(/-([a-z])/g, (_match, letter) => letter.toUpperCase());
+      options[optionKey] = value;
       index += 1;
       continue;
     }
@@ -67,6 +78,11 @@ async function measureScenario(repository, dictionaryId, scenario, runs) {
   const after = repository.querySessionCacheStats();
   return {
     key: scenario.key,
+    ...(scenario.fields ? {
+      query: scenario.query,
+      fields: scenario.fields,
+      fuzzyFields: scenario.fuzzyFields,
+    } : {}),
     coldMs: rounded(coldMs),
     hotMinMs: rounded(Math.min(...hotSamples)),
     hotMedianMs: rounded(percentile(hotSamples, 0.5)),
@@ -103,39 +119,37 @@ async function main() {
   }
   const repository = new SqliteDictionaryRepository(sqliteRepositoryOptions(dataDir));
   try {
-    const allFields = ENTRY_SEARCH_FIELD_KEYS.join(",");
+    const entryScenario = (key, query, fields, fuzzyFields) => ({
+      key,
+      query,
+      fields,
+      fuzzyFields,
+      run: () => repository.queryEntries(dictionaryId, {
+        q: query,
+        fields: fields.join(","),
+        fuzzyFields: fuzzyFields.join(","),
+        limit: ENTRY_PAGE_SIZE,
+      }),
+    });
     const scenarios = [
-      {
-        key: "entries-fuzzy-limit-10000",
-        run: () => repository.queryEntries(dictionaryId, {
-          q: options.query,
-          fields: allFields,
-          fuzzyFields: allFields,
-          limit: 10000,
-        }),
-      },
-      {
-        key: "entries-fuzzy-limit-100",
-        run: () => repository.queryEntries(dictionaryId, {
-          q: options.query,
-          fields: allFields,
-          fuzzyFields: allFields,
-          limit: 100,
-        }),
-      },
+      entryScenario("entries-all-fields-fuzzy", options.query, ENTRY_SEARCH_FIELD_KEYS, ENTRY_SEARCH_FIELD_KEYS),
+      entryScenario("entries-static-fields-fuzzy", options.query, STATIC_SEARCH_FIELDS, STATIC_SEARCH_FIELDS),
+      entryScenario("entries-morphology-fuzzy", options.morphologyQuery, ["morphology"], ["morphology"]),
+      entryScenario("entries-static-fields-strict", options.strictQuery, STATIC_SEARCH_FIELDS, []),
+      entryScenario("entries-lemma-strict", options.lemmaQuery, ["lemma"], []),
       {
         key: "root-groups-no-search",
         run: () => repository.queryRootGroups(dictionaryId, {
-          limit: 2000,
+          limit: ROOT_GROUP_PAGE_SIZE,
         }),
       },
       {
         key: "root-groups-fuzzy-search",
         run: () => repository.queryRootGroups(dictionaryId, {
           q: options.query,
-          fields: allFields,
-          fuzzyFields: allFields,
-          limit: 2000,
+          fields: ENTRY_SEARCH_FIELD_KEYS.join(","),
+          fuzzyFields: ENTRY_SEARCH_FIELD_KEYS.join(","),
+          limit: ROOT_GROUP_PAGE_SIZE,
         }),
       },
     ];
@@ -146,8 +160,17 @@ async function main() {
     console.log(JSON.stringify({
       dictionaryId,
       entryCount: (await repository.getDictionaryMeta(dictionaryId)).summary.entryCount,
-      query: options.query,
+      queries: {
+        fuzzy: options.query,
+        strict: options.strictQuery,
+        morphology: options.morphologyQuery,
+        lemma: options.lemmaQuery,
+      },
       hotRuns: options.runs,
+      windows: {
+        entries: ENTRY_PAGE_SIZE,
+        rootGroups: ROOT_GROUP_PAGE_SIZE,
+      },
       results,
     }, null, 2));
   } finally {

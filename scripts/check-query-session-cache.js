@@ -10,9 +10,9 @@ const {
 const { RootTopologyCache } = require("../lib/root-topology-cache");
 const {
   createTempSqliteRepository,
+  requireSqliteRuntime,
   sampleSqliteDictionary,
   sqliteRepositoryOptions,
-  sqliteRuntimeUnavailableMessage,
 } = require("./sqlite-check-utils");
 
 function checkDescriptorIdentity() {
@@ -46,7 +46,7 @@ function checkDescriptorIdentity() {
       sort: "lemmaAsc",
       searchFields: new Set(["lemma", "tags"]),
       fuzzyFields: new Set(["lemma"]),
-      limit: 500,
+      limit: 200,
       offset: 100,
     },
   });
@@ -255,10 +255,7 @@ async function checkCacheLifecycle() {
 }
 
 async function checkRepositoryIntegration() {
-  if (!SqliteDictionaryRepository.isRuntimeAvailable()) {
-    console.log(sqliteRuntimeUnavailableMessage("query-session cache integration check"));
-    return;
-  }
+  requireSqliteRuntime("query-session cache integration check");
   const { repository, cleanup } = await createTempSqliteRepository("conlexicon-query-session-");
   try {
     const dictionary = normalizeDictionary({
@@ -282,6 +279,11 @@ async function checkRepositoryIntegration() {
       ],
     });
     await repository.importDictionarySnapshot(dictionary);
+    await assert.rejects(
+      () => repository.queryRootGroups(dictionary.id, { limit: 101 }),
+      (error) => error?.code === "invalid_root_group_query_limit"
+        && error?.details?.maxLimit === 100,
+    );
 
     let fuzzyBuilds = 0;
     let strictBuilds = 0;

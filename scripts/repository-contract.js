@@ -211,6 +211,7 @@ async function checkAnalysisQueryContract(repository) {
         { id: "coverage", type: "coverageBreakdown" },
         { id: "parts", type: "partDistribution", limit: 8 },
         { id: "activity", type: "activityPreview", limit: 2 },
+        { id: "activityAll", type: "activityDistribution" },
       ],
     };
     const result = await callApi(
@@ -256,6 +257,15 @@ async function checkAnalysisQueryContract(repository) {
     assert.deepEqual(result.body.widgets.activity.updated[0].action.filter, {
       activityDays: [{ field: "updated", day: "2026-07-03" }],
     });
+    assert.deepEqual(
+      result.body.widgets.activityAll.created.map((row) => row.day),
+      ["2026-07-01", "2026-07-02", "2026-07-03"],
+    );
+    assert.deepEqual(
+      result.body.widgets.activityAll.updated.map((row) => row.day),
+      ["2026-07-01", "2026-07-02", "2026-07-03", "2026-07-04"],
+    );
+    assert.equal(result.body.widgets.activityAll.type, "activityDistribution");
 
     const withoutActions = await callApi(
       repository,
@@ -316,6 +326,13 @@ async function checkAnalysisQueryContract(repository) {
     await assertRejectStatus(
       callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`, {
         widgets: [{ id: "activity", type: "activityPreview", limit: 51 }],
+      }),
+      400,
+      "invalid analysis widget limit",
+    );
+    await assertRejectStatus(
+      callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`, {
+        widgets: [{ id: "activity", type: "activityDistribution", limit: 5 }],
       }),
       400,
       "invalid analysis widget limit",

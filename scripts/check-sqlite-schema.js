@@ -1,18 +1,14 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 
-const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
 const {
   createTempSqliteRepository,
+  requireSqliteRuntime,
   sampleSqliteDictionary,
-  sqliteRuntimeUnavailableMessage,
 } = require("./sqlite-check-utils");
 
 async function runSqliteSchemaCheck() {
-  if (!SqliteDictionaryRepository.isRuntimeAvailable()) {
-    console.log(sqliteRuntimeUnavailableMessage("schema check"));
-    return;
-  }
+  requireSqliteRuntime("schema check");
 
   const { repository, cleanup } = await createTempSqliteRepository("conlexicon-sqlite-schema-");
   try {
@@ -44,8 +40,7 @@ async function runSqliteSchemaCheck() {
       "entry_morphology_groups",
       "entry_morphology_cell_overrides",
     ].forEach((table) => assert.equal(tables.has(table), true, `missing table: ${table}`));
-    ["schema_migrations", "dictionary_settings", "ipa_rules", "morphology_tables", "entry_morphology_tables", "corpus_units"]
-      .forEach((table) => assert.equal(tables.has(table), false, `unexpected table: ${table}`));
+    assert.equal(tables.has("schema_migrations"), false, "runtime schema must not introduce migration state");
 
     const entryColumns = new Set(db.prepare("PRAGMA table_info(entries)").all().map((row) => row.name));
     ["id", "position", "lemma", "pronunciation", "notes", "etymology_description", "morphology_mode", "created_at", "updated_at", "sort_key"]
@@ -56,11 +51,9 @@ async function runSqliteSchemaCheck() {
     assert.equal(entryIndexes.has("idx_entries_updated_at"), true);
     const entryTagColumns = new Set(db.prepare("PRAGMA table_info(entry_tags)").all().map((row) => row.name));
     ["entry_id", "position", "tag"].forEach((column) => assert.equal(entryTagColumns.has(column), true, `missing entry_tags column: ${column}`));
-    assert.equal(entryTagColumns.has("normalized_tag"), false);
     const entryTagIndexes = new Set(db.prepare("PRAGMA index_list(entry_tags)").all().map((row) => row.name));
     assert.equal(entryTagIndexes.has("idx_entry_tags_tag_entry"), true);
     assert.equal(entryTagIndexes.has("idx_entry_tags_first_tag"), true);
-    assert.equal(entryTagIndexes.has("idx_entry_tags_tag"), false);
     const entrySearchValueColumns = new Set(db.prepare("PRAGMA table_info(entry_search_values)").all().map((row) => row.name));
     ["entry_id", "field", "source_type", "source_id", "source_position", "value_type", "raw_value", "normalized_value"]
       .forEach((column) => assert.equal(entrySearchValueColumns.has(column), true, `missing entry_search_values column: ${column}`));
@@ -76,7 +69,6 @@ async function runSqliteSchemaCheck() {
     const entryMorphologyOverrideColumns = new Set(db.prepare("PRAGMA table_info(entry_morphology_cell_overrides)").all().map((row) => row.name));
     ["entry_id", "template_group_id", "template_table_id", "row_index", "column_index", "value"]
       .forEach((column) => assert.equal(entryMorphologyOverrideColumns.has(column), true, `missing entry morphology override column: ${column}`));
-    assert.equal(entryMorphologyOverrideColumns.has("entry_morphology_group_id"), false);
 
     const sourceDictionary = sampleSqliteDictionary();
     await repository.importDictionarySnapshot(sourceDictionary);

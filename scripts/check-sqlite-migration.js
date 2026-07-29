@@ -12,6 +12,7 @@ const {
 } = require("../lib/dictionary-model");
 const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
 const { migrateJsonDataDirectoryToSqlite } = require("./migrate-json-data-to-sqlite");
+const { requireSqliteRuntime } = require("./sqlite-check-utils");
 
 function repositoryOptions(dataDir) {
   return {
@@ -41,10 +42,7 @@ async function writeJson(filePath, value) {
 }
 
 async function main() {
-  if (!SqliteDictionaryRepository.isRuntimeAvailable()) {
-    console.log("SQLite runtime unavailable; migration check skipped.");
-    return;
-  }
+  requireSqliteRuntime("JSON directory conversion check");
 
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "conlexicon-migration-check-"));
   const sourceDataDir = path.join(tempRoot, "source-data");

@@ -1,21 +1,21 @@
-const fs = require("fs");
-const path = require("path");
+#!/usr/bin/env node
+const fs = require("node:fs/promises");
+const path = require("node:path");
+
+const {
+  DEFAULT_INDEX,
+  assertUniqueDictionaryEntityIds,
+  normalizeDictionary,
+  normalizeUiLanguage,
+  normalizeUiTheme,
+} = require("../lib/dictionary-model");
+const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
 
 const ROOT = path.resolve(__dirname, "..");
-const DATA_DIR = process.env.CONLEXICON_DATA_DIR
-  ? path.resolve(process.env.CONLEXICON_DATA_DIR)
-  : path.join(ROOT, "data");
-const DICTIONARY_DIR = path.join(DATA_DIR, "dictionaries");
-const INDEX_PATH = path.join(DATA_DIR, "index.json");
-
-const DICTIONARY_ID = process.env.CONLEXICON_STRESS_DICTIONARY_ID || "dict-7a4f7f2b-71dd-4c9f-8d3f-7bb391000000";
-const LEGACY_DICTIONARY_IDS = ["stress-test-10k"];
-const ENTRY_COUNT = Math.max(
-  1,
-  Number.parseInt(process.env.CONLEXICON_STRESS_ENTRY_COUNT, 10) || 10000,
-);
+const REAL_DATA_DIR = path.join(ROOT, "data");
+const DICTIONARY_ID = "dict-7a4f7f2b-71dd-4c9f-8d3f-7bb391000000";
+const DEFAULT_ENTRY_COUNT = 10000;
 const CREATED_AT = "2026-07-01T00:00:00.000Z";
-const MORPHOLOGY_STRESS = process.env.CONLEXICON_STRESS_MORPHOLOGY === "1";
 
 function mulberry32(seed) {
   return function random() {
@@ -26,7 +26,7 @@ function mulberry32(seed) {
   };
 }
 
-const random = mulberry32(0xC0DEC0DE);
+let random = mulberry32(0xC0DEC0DE);
 
 function pick(items) {
   return items[Math.floor(random() * items.length)];
@@ -144,9 +144,6 @@ function makeTags(partOfSpeech) {
 }
 
 function stressMorphologyTemplateGroups() {
-  if (!MORPHOLOGY_STRESS) {
-    return [];
-  }
   return partsOfSpeech.map((partOfSpeech, index) => {
     const groupId = deterministicId("morph", 8, index + 1);
     const tableId = deterministicId("mtable", 8, index + 1);
@@ -182,7 +179,7 @@ function stressMorphologyTemplateGroups() {
 }
 
 function stressMorphologyGroups(index, partOfSpeech) {
-  if (!MORPHOLOGY_STRESS || index % 29 !== 0) {
+  if (index % 29 !== 0) {
     return [];
   }
   const partIndex = partsOfSpeech.indexOf(partOfSpeech) + 1;
@@ -214,12 +211,18 @@ function makeSources(index, lemmas) {
   return Array.from(new Set(sources.filter(Boolean)));
 }
 
-function buildDictionary() {
+function formatEntryCount(entryCount) {
+  return entryCount.toLocaleString("en-US");
+}
+
+function buildDictionary(entryCount = DEFAULT_ENTRY_COUNT) {
+  entryCount = parseEntryCount(entryCount);
+  random = mulberry32(0xC0DEC0DE);
   const usedLemmas = new Set();
   const lemmas = [];
   const entries = [];
 
-  for (let index = 1; index <= ENTRY_COUNT; index += 1) {
+  for (let index = 1; index <= entryCount; index += 1) {
     const lemma = makeLemma(index, usedLemmas);
     lemmas.push(lemma);
     const partOfSpeech = pick(partsOfSpeech);
@@ -244,11 +247,9 @@ function buildDictionary() {
 
   return {
     id: DICTIONARY_ID,
-    name: MORPHOLOGY_STRESS
-      ? `Morphology Stress Test ${ENTRY_COUNT}`
-      : `Stress Test ${ENTRY_COUNT}`,
+    name: `Morphology Stress Test ${formatEntryCount(entryCount)}`,
     language: "Synthetic",
-    description: `Deterministic ${ENTRY_COUNT}-entry dictionary for UI stress testing.`,
+    description: `Deterministic ${formatEntryCount(entryCount)}-entry dictionary with morphology data for UI stress testing.`,
     settings: {
       manualPartOfSpeechTags: true,
       partOfSpeechTags: partsOfSpeech,
@@ -291,11 +292,11 @@ function buildDictionary() {
       ipaKeyboard: ["ˈ", "ˌ", "ə", "ʃ", "t͡ʃ", "ʔ"],
     },
     docs: {
-      content: "",
-      updatedAt: CREATED_AT,
+      markdown: "",
     },
     corpus: {
-      texts: [],
+      blocks: [],
+      units: [],
     },
     morphology: {
       functions: {},
@@ -307,55 +308,155 @@ function buildDictionary() {
   };
 }
 
-function readJson(filePath, fallback) {
-  try {
-    return JSON.parse(fs.readFileSync(filePath, "utf8"));
-  } catch (error) {
-    if (error.code === "ENOENT") return fallback;
-    throw error;
-  }
+function usage() {
+  return [
+    "Usage: node scripts/generate-stress-dictionary.js --data <empty-temp-dir> [--entries <count>]",
+    "",
+    `Generates a deterministic SQLite stress dictionary with morphology data (${DEFAULT_ENTRY_COUNT} entries by default).`,
+    "The explicit target must be empty, initialized without dictionaries, or not exist.",
+    "The project's real data directory is never accepted.",
+  ].join("\n");
 }
 
-function writeJson(filePath, value) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  fs.writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+function parseEntryCount(value) {
+  if (!/^[1-9]\d*$/.test(String(value || ""))) {
+    throw new Error("--entries must be a positive integer");
+  }
+  const entryCount = Number(value);
+  if (!Number.isSafeInteger(entryCount)) {
+    throw new Error("--entries must be a safe integer");
+  }
+  return entryCount;
 }
 
-function updateIndex() {
-  const index = readJson(INDEX_PATH, { activeDictionaryId: DICTIONARY_ID, dictionaryIds: [] });
-  const dictionaryIds = Array.isArray(index.dictionaryIds)
-    ? index.dictionaryIds.filter((id) => !LEGACY_DICTIONARY_IDS.includes(id))
-    : [];
-  if (!dictionaryIds.includes(DICTIONARY_ID)) {
-    dictionaryIds.push(DICTIONARY_ID);
-  }
-  if (!index.activeDictionaryId || LEGACY_DICTIONARY_IDS.includes(index.activeDictionaryId)) {
-    index.activeDictionaryId = DICTIONARY_ID;
-  }
-  index.dictionaryIds = dictionaryIds;
-  writeJson(INDEX_PATH, index);
-  return index;
-}
-
-function removeLegacyGeneratedFiles() {
-  LEGACY_DICTIONARY_IDS.forEach((id) => {
-    const filePath = path.join(DICTIONARY_DIR, `${id}.json`);
-    if (fs.existsSync(filePath)) {
-      fs.rmSync(filePath);
+function parseArgs(argv) {
+  const options = { entries: DEFAULT_ENTRY_COUNT };
+  for (let index = 2; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (token === "--help" || token === "-h") {
+      options.help = true;
+      continue;
     }
+    if (token === "--data" || token === "--entries") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--")) {
+        throw new Error(`${token} requires a value`);
+      }
+      if (token === "--data") {
+        options.data = value;
+      } else {
+        options.entries = parseEntryCount(value);
+      }
+      index += 1;
+      continue;
+    }
+    throw new Error(`Unknown argument: ${token}`);
+  }
+  return options;
+}
+
+function isWithinDirectory(parentDirectory, candidatePath) {
+  const relative = path.relative(parentDirectory, candidatePath);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+async function assertSafeTargetDirectory(dataDir) {
+  const target = path.resolve(dataDir);
+  if (isWithinDirectory(REAL_DATA_DIR, target)) {
+    throw new Error("Target data directory cannot be the project's real data directory");
+  }
+  try {
+    const entries = await fs.readdir(target, { withFileTypes: true });
+    const unexpected = entries.filter((entry) => !["index.json", "dictionaries"].includes(entry.name));
+    if (unexpected.length) {
+      throw new Error("Target data directory must not contain files other than an empty data index");
+    }
+    const indexEntry = entries.find((entry) => entry.name === "index.json");
+    if (indexEntry) {
+      if (!indexEntry.isFile()) {
+        throw new Error("Target data index must be a regular file");
+      }
+      const index = JSON.parse(await fs.readFile(path.join(target, "index.json"), "utf8"));
+      if (index.activeDictionaryId || (Array.isArray(index.dictionaryIds) && index.dictionaryIds.length)) {
+        throw new Error("Target data directory already contains registered dictionaries");
+      }
+    }
+    const dictionariesEntry = entries.find((entry) => entry.name === "dictionaries");
+    if (dictionariesEntry) {
+      if (!dictionariesEntry.isDirectory()) {
+        throw new Error("Target dictionaries path must be a directory");
+      }
+      if ((await fs.readdir(path.join(target, "dictionaries"))).length) {
+        throw new Error("Target data directory already contains dictionary files");
+      }
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") {
+      throw error;
+    }
+  }
+  return target;
+}
+
+function repositoryOptions(dataDir) {
+  return {
+    dataDir,
+    defaultIndex: DEFAULT_INDEX,
+    normalizeDictionary,
+    normalizeUiLanguage,
+    normalizeUiTheme,
+    validateDictionary: assertUniqueDictionaryEntityIds,
+  };
+}
+
+async function generateStressDictionary({ dataDir, entryCount = DEFAULT_ENTRY_COUNT }) {
+  if (!SqliteDictionaryRepository.isRuntimeAvailable()) {
+    throw new Error("SQLite runtime is unavailable");
+  }
+  const target = await assertSafeTargetDirectory(dataDir);
+  const dictionary = buildDictionary(entryCount);
+  const repository = new SqliteDictionaryRepository(repositoryOptions(target));
+  try {
+    await repository.importDictionary(dictionary);
+    return {
+      dataDir: target,
+      dictionary,
+      databasePath: path.join(target, "dictionaries", `${DICTIONARY_ID}.sqlite`),
+    };
+  } finally {
+    repository.close();
+  }
+}
+
+async function main() {
+  const options = parseArgs(process.argv);
+  if (options.help) {
+    console.log(usage());
+    return;
+  }
+  if (!options.data) {
+    throw new Error(`${usage()}\n\nMissing --data`);
+  }
+  const result = await generateStressDictionary({
+    dataDir: options.data,
+    entryCount: options.entries,
+  });
+  console.log(
+    `Created "${result.dictionary.name}" with ${formatEntryCount(result.dictionary.entries.length)} entries in ${result.databasePath}`,
+  );
+}
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error.message || error);
+    process.exitCode = 1;
   });
 }
 
-function main() {
-  const dictionary = buildDictionary();
-  const dictionaryPath = path.join(DICTIONARY_DIR, `${DICTIONARY_ID}.json`);
-  removeLegacyGeneratedFiles();
-  writeJson(dictionaryPath, dictionary);
-  const index = updateIndex();
-
-  console.log(`Created ${dictionary.entries.length} entries in ${path.relative(ROOT, dictionaryPath)}`);
-  console.log(`Registered dictionary id "${DICTIONARY_ID}" in ${path.relative(ROOT, INDEX_PATH)}`);
-  console.log(`Active dictionary remains "${index.activeDictionaryId}"`);
-}
-
-main();
+module.exports = {
+  DEFAULT_ENTRY_COUNT,
+  DICTIONARY_ID,
+  buildDictionary,
+  generateStressDictionary,
+  parseArgs,
+};

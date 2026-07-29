@@ -185,7 +185,8 @@
 | `invalid_corpus_payload` | 语料请求体格式无效。 |
 | `invalid_autosave_payload` | autosave 请求未携带有效 docs 或 corpus 对象。 |
 | `invalid_query_window_offset` | 查询窗口 offset 不是非负安全整数。 |
-| `invalid_entry_query_limit` | 词条查询 limit 不是大于零的安全整数。 |
+| `invalid_entry_query_limit` | 词条或 feature-result 查询 limit 不在 1–200 范围内。 |
+| `invalid_root_group_query_limit` | 父级词根组查询 limit 不在 1–100 范围内。 |
 | `invalid_entry_filter_json` | 结构化 `filter` 参数不是合法 JSON。 |
 | `invalid_entry_filter_payload` | 结构化 `filter` 的顶层不是对象。 |
 | `conflicting_entry_filter_transport` | 同一请求同时使用结构化 `filter` 与旧平铺筛选参数。 |
@@ -294,9 +295,9 @@ GET /api/dictionaries/:id/entries?filter=&q=&fields=&fuzzyFields=&part=&tags=&ta
 - `sort`：`lemmaAsc`、`lemmaDesc`、`updatedAsc`、`updatedDesc`、`createdAsc`、`createdDesc`。
 - `cursor`：不透明查询游标，前端不得解析。顺序分页使用响应的 `pageInfo.nextCursor`；随机窗口读取使用 `pageInfo.windowCursor`。
 - `windowOffset`：可选的结果窗口起点。非零值必须与同一查询返回的有效 `windowCursor` 一起发送；省略时沿用 cursor 自身的位置。该参数用于纯滚动列表直接读取远端窗口，不是 UI 页码。
-- `limit`：分页大小，后端可设置上限。
+- `limit`：分页大小，必须为 1–200；超限返回 `invalid_entry_query_limit`。
 
-前端普通列表以每窗 200 条读取，最多保留 5 个已加载窗口；未加载和已淘汰窗口使用等高占位，从而让原生滚动条始终代表完整结果集。请求失败时显示失败状态，不回退到前端完整词典快照。repository 仍允许显式诊断和基准工具请求至多 10000 条，但产品 UI 不使用该大页路径。
+前端普通列表以每窗 200 条读取，最多保留 5 个已加载窗口；未加载和已淘汰窗口使用等高占位，从而让原生滚动条始终代表完整结果集。请求失败时显示失败状态，不回退到前端完整词典快照。基准和诊断使用同一产品窗口，通过会话 `buildMs`、缓存统计和 cursor 窗口分别测量匹配构建与响应开销，不开放大页旁路。
 
 当前搜索输入采用 250ms debounce，连续输入会重置计时；前端用递增请求 ID 忽略迟到的旧响应。后端所有排序以词条 ID 作为最终稳定键，避免同词形或同时间记录跨窗口边界漂移。`nextCursor` 表示顺序下一页，最后一页为空；`windowCursor` 始终绑定同一结果集合的起点，即使当前响应来自最后一页也可继续用于任意 `windowOffset`。两类 cursor 都绑定当前服务进程 epoch、词典查询缓存 generation 和规范化查询 descriptor；会话被 TTL/LRU 淘汰时后端可重建查询并继续读取，服务重启、成功写入或查询条件变化则返回 `query_cursor_stale`。前端收到 stale cursor 后从首窗重建查询。
 
@@ -498,6 +499,8 @@ GET /api/dictionaries/:id/root-groups?q=&fields=&fuzzyFields=&sort=&cursor=&wind
 
 `windowMetrics` 通常只在 offset 为 0 的父级响应中提供，按本次 `limit` 划分全部父级窗口；词根定位响应即使位于后续窗口也会携带它，以便前端直接重建完整父级占位。它只包含每窗词根组数和衍生词总数，不携带词条内容。前端用它在“全部展开”和搜索自动展开状态下估算尚未加载窗口的完整高度。普通后续窗口响应可以省略该数组。
 
+父级词根组 `limit` 必须为 1–100；超限返回 `invalid_root_group_query_limit`。普通查询与定位端点使用相同上限。
+
 目标词条所在父级窗口由以下端点定位：
 
 ```text
@@ -615,7 +618,7 @@ directDerivedEntries
 
 `POST /api/dictionaries/:id/analysis/query`
 
-F4a 支持 `entryCount`、`lexiconSummary`、`coverageBreakdown`、`partDistribution` 和 `activityPreview`。这些 light widgets 在一次同步 HTTP 请求内完成；前端异步加载并显示独立的 loading/error/retry 状态。数据分析页未打开时不发起请求。
+F4a 支持 `entryCount`、`lexiconSummary`、`coverageBreakdown`、`partDistribution`、`activityPreview` 和 `activityDistribution`。这些 widgets 在一次同步 HTTP 请求内完成；前端异步加载并显示独立的 loading/error/retry 状态。数据分析页未打开时不发起请求。
 
 请求：
 
@@ -634,7 +637,7 @@ F4a 支持 `entryCount`、`lexiconSummary`、`coverageBreakdown`、`partDistribu
 ```
 
 - `widgets` 必须为非空数组，最多 16 项；`id` 在一次请求中必须唯一，只允许字母、数字、点、下划线和连字符，最长 80 字符。
-- `partDistribution` 和 `activityPreview` 接受 `limit`，默认分别为 12 和 6，范围为 1–50；其他 widget 不接受 `limit`。
+- `partDistribution` 和 `activityPreview` 接受 `limit`，默认分别为 12 和 6，范围为 1–50。`activityDistribution` 返回完整日期桶且不接受 `limit`；其他 widget 同样不接受 `limit`。
 - `options.includeActions` 默认为 `true`。设为 `false` 时省略 action descriptor。
 
 响应返回结构化 widget data，不返回 HTML：
@@ -709,10 +712,11 @@ Widget 通过以下任务依赖生成：
 | `coverageBreakdown` | `entryStats` |
 | `partDistribution` | `partStats` |
 | `activityPreview` | `activityStats` |
+| `activityDistribution` | `activityStats` |
 
-同一任务在一次请求中只执行一次；多个 `activityPreview` 使用请求中的最大 limit 读取日期桶，再分别裁剪。`lexiconSummary.rootCount` 严格表示没有任何来源记录的词条数，`derivedCount` 表示至少有一条来源记录的词条数；这两个计数不建立词根拓扑，也不表达孤立词根。`partDistribution` 除排行 `rows` 外返回 `partTypeCount`、`noPartOfSpeechCount` 和对应的 `noPartAction`。`activityPreview` 只返回 `created`、`updated` 日期聚合；按修改时间浏览词条由词条列表的编辑时间排序负责。`coverageBreakdown.rows[].field` 支持 `definition`、`example`、`entryNote`、`source`、`ipa`；释义和例句行另带 `itemCount`。词性分布 action 使用 `{ part }` descriptor，无词性行使用保留值 `__conlexicon_no_part__`。
+同一任务在一次请求中只执行一次；只有 `activityPreview` 时使用请求中的最大 limit 读取日期桶，再分别裁剪；请求包含 `activityDistribution` 时读取完整日期桶，并继续按各自 limit 裁剪预览 widget。`lexiconSummary.rootCount` 严格表示没有任何来源记录的词条数，`derivedCount` 表示至少有一条来源记录的词条数；这两个计数不建立词根拓扑，也不表达孤立词根。`partDistribution` 除排行 `rows` 外返回 `partTypeCount`、`noPartOfSpeechCount` 和对应的 `noPartAction`。两类活动 widget 都返回 `created`、`updated` 日期聚合及结构化日期筛选 action；按修改时间浏览词条由词条列表的编辑时间排序负责。`coverageBreakdown.rows[].field` 支持 `definition`、`example`、`entryNote`、`source`、`ipa`；释义和例句行另带 `itemCount`。词性分布 action 使用 `{ part }` descriptor，无词性行使用保留值 `__conlexicon_no_part__`。
 
-当前总览固定消费四个 widget，分别渲染词汇规模、资料覆盖、词性分布和编辑活动。资料覆盖卡只展示释义、例句、IPA 与备注，避免“来源覆盖”与衍生词比例重复；`coverageBreakdown` 仍保留 `source` 行供其他消费者使用。词根家族和孤立词根需要稳定词根拓扑，不属于首屏轻量总览，只有进入词根关系详情时才按需读取。
+当前总览固定消费四个 widget，分别渲染词汇规模、资料覆盖、词性分布和编辑活动；编辑活动使用 `activityPreview`。进入“编辑进度”详情后另行请求 `activityDistribution`，不读取完整活动词典或在前端扫描词条。资料覆盖卡只展示释义、例句、IPA 与备注，避免“来源覆盖”与衍生词比例重复；`coverageBreakdown` 仍保留 `source` 行供其他消费者使用。词根家族和孤立词根需要稳定词根拓扑，不属于首屏轻量总览，只有进入词根关系详情时才按需读取。
 
 请求验证失败使用 `invalid_analysis_query_payload`、`invalid_analysis_widgets`、`invalid_analysis_widget`、`invalid_analysis_widget_id`、`unsupported_analysis_widget`、`invalid_analysis_widget_limit` 或 `duplicate_analysis_widget_id`。
 
@@ -759,7 +763,7 @@ POST /api/dictionaries/:id/analysis/features/location
 
 summary 模式不接受 `view` 或 `page`，其统计不受 category、搜索、排序或窗口影响。服务端建立或复用基础会话后直接返回 `summary`，不建立有序结果视图、不读取 EntrySummary，也不生成 `items`、`pageInfo` 或 cursor。IPA 自动检查页以及 IPA 分布/音位分析页首次加载使用该模式；分布与音位子页共享同一份 `ipaDistribution` summary。
 
-`source` 绑定功能类型、契约版本和算法 options；items 模式的 `view` 选择 category、EntrySearch 与 sort，`page` 使用普通列表相同的窗口语义。服务端按词典 generation、source、算法版本和 IPA 设置摘要复用内部会话。搜索复用词典的运行期规范化配置和现有 SQLite search projection；只回读当前页 EntrySummary 与 search hits。
+`source` 绑定功能类型、契约版本和算法 options；items 模式的 `view` 选择 category、EntrySearch 与 sort，`page` 使用普通列表相同的窗口语义和 1–200 硬上限。服务端按词典 generation、source、算法版本和 IPA 设置摘要复用内部会话。搜索复用词典的运行期规范化配置和现有 SQLite search projection；只回读当前页 EntrySummary 与 search hits。
 
 IPA 分布使用以下 source 和 view：
 

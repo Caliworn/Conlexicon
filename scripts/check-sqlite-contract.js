@@ -4,7 +4,10 @@ const path = require("node:path");
 
 const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
 const { runRepositoryContractTests } = require("./repository-contract");
-const { sqliteRepositoryOptions } = require("./sqlite-check-utils");
+const {
+  requireSqliteRuntime,
+  sqliteRepositoryOptions,
+} = require("./sqlite-check-utils");
 
 async function createSqliteRepositoryContractContext() {
   const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "conlexicon-sqlite-contract-"));
@@ -19,10 +22,7 @@ async function createSqliteRepositoryContractContext() {
 }
 
 async function main() {
-  if (!SqliteDictionaryRepository.isRuntimeAvailable()) {
-    console.log("SQLite runtime unavailable; contract check skipped.");
-    return;
-  }
+  requireSqliteRuntime("repository contract check");
 
   const result = await runRepositoryContractTests({
     name: "sqlite",

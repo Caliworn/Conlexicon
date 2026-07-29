@@ -14,10 +14,9 @@ const {
   morphologyAnalysisRecordMatches,
 } = require("../lib/morphology-analysis-feature");
 const { createSimpleIpaEngine } = require("../lib/phonology-engine");
-const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
 const {
   createTempSqliteRepository,
-  sqliteRuntimeUnavailableMessage,
+  requireSqliteRuntime,
 } = require("./sqlite-check-utils");
 
 const SOURCE = {
@@ -539,10 +538,7 @@ async function checkCache() {
 }
 
 async function checkRepositoryIntegration() {
-  if (!SqliteDictionaryRepository.isRuntimeAvailable()) {
-    console.log(sqliteRuntimeUnavailableMessage("feature result session integration check"));
-    return;
-  }
+  requireSqliteRuntime("feature result session integration check");
   const { repository, cleanup } = await createTempSqliteRepository("conlexicon-feature-result-");
   try {
     const dictionary = normalizeDictionary({

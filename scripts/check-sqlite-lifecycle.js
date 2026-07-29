@@ -1,17 +1,13 @@
 const assert = require("node:assert/strict");
 
 const { normalizeDictionary } = require("../lib/dictionary-model");
-const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
 const {
   createTempSqliteRepository,
-  sqliteRuntimeUnavailableMessage,
+  requireSqliteRuntime,
 } = require("./sqlite-check-utils");
 
 async function runSqliteLifecycleCheck() {
-  if (!SqliteDictionaryRepository.isRuntimeAvailable()) {
-    console.log(sqliteRuntimeUnavailableMessage("lifecycle check"));
-    return;
-  }
+  requireSqliteRuntime("lifecycle check");
 
   const { repository, cleanup } = await createTempSqliteRepository("conlexicon-sqlite-lifecycle-");
   try {

@@ -1,5 +1,5 @@
 data/
-morphology-stress-10k-data/
+stress-test-data/
 node_modules/
 electron-shell/
 .DS_Store

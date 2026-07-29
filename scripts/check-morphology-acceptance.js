@@ -6,7 +6,10 @@ const path = require("node:path");
 const morphologyModel = require("../lib/morphology-model");
 const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
 const { migrateJsonDataDirectoryToSqlite } = require("./migrate-json-data-to-sqlite");
-const { sqliteRepositoryOptions } = require("./sqlite-check-utils");
+const {
+  requireSqliteRuntime,
+  sqliteRepositoryOptions,
+} = require("./sqlite-check-utils");
 const {
   DICTIONARY_ID,
   writeMorphologyTestData,
@@ -25,10 +28,7 @@ function templateGroupByName(dictionary, name) {
 }
 
 async function runMorphologyAcceptanceCheck() {
-  if (!SqliteDictionaryRepository.isRuntimeAvailable()) {
-    console.log("SQLite runtime unavailable; morphology acceptance check skipped.");
-    return;
-  }
+  requireSqliteRuntime("morphology acceptance check");
 
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "conlexicon-morphology-acceptance-"));
   const sourceDataDir = path.join(tempRoot, "legacy-json");
