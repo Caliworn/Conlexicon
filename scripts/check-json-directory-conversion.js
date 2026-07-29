@@ -44,7 +44,7 @@ async function writeJson(filePath, value) {
 async function main() {
   requireSqliteRuntime("JSON directory conversion check");
 
-  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "conlexicon-migration-check-"));
+  const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "conlexicon-json-directory-conversion-"));
   const sourceDataDir = path.join(tempRoot, "source-data");
   const targetDataDir = path.join(tempRoot, "target-data");
   const targetRepository = new SqliteDictionaryRepository(repositoryOptions(targetDataDir));
@@ -76,7 +76,7 @@ async function main() {
     const report = await migrateJsonDataDirectoryToSqlite({ sourceDataDir, targetDataDir });
     const after = await readSourceSnapshot(sourceDataDir, [first.id, second.id]);
 
-    assert.deepEqual(after, before, "migration must not modify source JSON data");
+    assert.deepEqual(after, before, "directory conversion must not modify source JSON data");
     assert.equal(report.migratedCount, 2);
     assert.equal(report.failedCount, 0);
     assert.equal(report.targetActiveDictionaryId, first.id);
@@ -96,7 +96,7 @@ async function main() {
     assert.equal(secondSnapshot.name, "Migration Second");
     assert.deepEqual(secondSnapshot.entries[0].etymology.sources, ["root"]);
 
-    console.log("SQLite migration check passed.");
+    console.log("JSON directory conversion check passed.");
   } finally {
     targetRepository.close?.();
     await fs.rm(tempRoot, { recursive: true, force: true });

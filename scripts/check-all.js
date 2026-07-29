@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const fs = require("node:fs");
 const path = require("node:path");
 const { spawn } = require("node:child_process");
 
@@ -21,17 +22,36 @@ const CHECK_GROUPS = [
   {
     name: "sqlite-and-api",
     scripts: [
-      "check-sqlite-repository.js",
+      "check-sqlite-schema.js",
+      "check-sqlite-lifecycle.js",
       "check-sqlite-contract.js",
       "check-query-session-cache.js",
       "check-feature-result-session.js",
       "check-entry-search-consistency.js",
-      "check-sqlite-migration.js",
+      "check-json-directory-conversion.js",
       "check-morphology-acceptance.js",
       "check-default-repository.js",
     ],
   },
 ];
+
+function assertCompleteCheckManifest() {
+  const configured = CHECK_GROUPS.flatMap((group) => group.scripts);
+  const duplicates = configured.filter((scriptName, index) => configured.indexOf(scriptName) !== index);
+  const discovered = fs.readdirSync(__dirname)
+    .filter((scriptName) => /^check-.*\.js$/.test(scriptName) && scriptName !== "check-all.js")
+    .sort();
+  const missing = discovered.filter((scriptName) => !configured.includes(scriptName));
+  const stale = configured.filter((scriptName) => !discovered.includes(scriptName));
+  if (duplicates.length || missing.length || stale.length) {
+    throw new Error([
+      "check-all manifest is incomplete.",
+      duplicates.length ? `Duplicate entries: ${[...new Set(duplicates)].join(", ")}` : "",
+      missing.length ? `Unregistered checks: ${missing.join(", ")}` : "",
+      stale.length ? `Missing scripts: ${stale.join(", ")}` : "",
+    ].filter(Boolean).join("\n"));
+  }
+}
 
 function runCheck(groupName, scriptName) {
   return new Promise((resolve, reject) => {
@@ -74,6 +94,7 @@ function runCheck(groupName, scriptName) {
 }
 
 async function main() {
+  assertCompleteCheckManifest();
   for (const group of CHECK_GROUPS) {
     for (const scriptName of group.scripts) {
       await runCheck(group.name, scriptName);

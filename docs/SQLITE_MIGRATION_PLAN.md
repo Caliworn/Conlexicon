@@ -108,7 +108,7 @@ node scripts/migrate-json-data-to-sqlite.js --from <json-data-dir> --to <sqlite-
 
 脚本默认只允许写入不存在或为空的目标目录，不直接覆盖源目录，也不允许源目录和目标目录互相嵌套。正式接入产品时再加入 UI 或启动向导。
 
-当前脚本会输出 JSON migration report，并已有 `scripts/check-sqlite-migration.js` 使用临时目录验证源目录不被修改、目标 SQLite 可读、active dictionary 和 UI 偏好被保留。
+当前脚本会输出 JSON conversion report，并已有 `scripts/check-json-directory-conversion.js` 使用临时目录验证源目录不被修改、目标 SQLite 可读、active dictionary 和 UI 偏好被保留。
 
 ### 6.1 迁移步骤
 
@@ -222,13 +222,9 @@ GET /api/export?dictionaryId=...&format=xlsx
   - `node --check app.js`
   - `node --check server.js`
   - `node --check lib/sqlite-dictionary-repository.js`
-  - `node scripts/check-sqlite-schema.js`
-  - `node scripts/check-sqlite-lifecycle.js`
-  - `node scripts/check-sqlite-repository.js`
-  - `node scripts/check-sqlite-contract.js`
-  - `node scripts/check-sqlite-migration.js`
-  - `node scripts/check-default-repository.js`
+  - `node scripts/check-all.js`
   - `git diff --check`
+- 定向排查时可单独运行对应的 `scripts/check-*.js`；完整回归仍以 `check-all.js` 为准，其 manifest 会拒绝遗漏、重复或不存在的检查脚本。
 - SQLite 模式下完成一次 API smoke，至少覆盖：
   - 轻量 `/api/state`
   - 当前词典完整 snapshot

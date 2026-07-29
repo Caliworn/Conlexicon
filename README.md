@@ -82,6 +82,14 @@ Then open:
 http://localhost:4173/
 ```
 
+Run the complete model, SQLite, API, and integration regression suite with:
+
+完整的模型、SQLite、API 与集成回归统一通过以下命令运行：
+
+```bash
+node scripts/check-all.js
+```
+
 For the focused frontend query-cache contract check, run:
 
 前端查询缓存的定向契约检查可通过以下命令运行：
