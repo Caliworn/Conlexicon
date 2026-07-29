@@ -10,6 +10,7 @@
 
 ### 改进
 
+- 删除 repository contract 查询矩阵中一条参数与断言完全相同的 definitions fuzzy 重复查询，不改变现有搜索覆盖范围。
 - 完成测试脚本收尾：统一入口现在会校验所有 `check-*` 脚本均已登记且没有重复或失效项；移除重复的 SQLite schema/lifecycle 聚合脚本，将误称 migration 的旧 JSON 目录检查改为 conversion，并同步标准验证命令和测试夹具词性断言边界。
 - 修订项目协作规则：区分只读与修改型 Git 操作、任务内旧实现清理与破坏性删除，按实际改动文件执行 JavaScript 语法检查，并明确当前 SQLite schema 不使用运行时迁移链；同时修正 Windows shell、Changelog 条目归属、SQLite 存储措辞和 UI 验收边界。
 - 统一测试入口为 `node scripts/check-all.js`，按纯模型与 SQLite/API 两组顺序运行现有回归并为单脚本设置超时；SQLite 已是必需运行时，相关检查不再静默跳过。清理仅记录已删除 analysis slice 和历史 schema 名称的墓碑断言，同时在项目协作规则中限定负向断言必须对应当前公开契约或明确架构不变量。

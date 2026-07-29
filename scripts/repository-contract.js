@@ -1406,7 +1406,6 @@ async function checkReadApiConsistency(repository) {
     await assertEntryQueryConsistency(repository, dictionary, { q: "olpha" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "mrmeaning", fuzzyFields: "definitions" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "nd", fuzzyFields: "tags" });
-    await assertEntryQueryConsistency(repository, dictionary, { q: "mrmeaning", fuzzyFields: "definitions" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "mrmeaning", fuzzyFields: "tags" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "alpha-generated", fields: "morphology" });
     await assertEntryQueryConsistency(repository, dictionary, { q: "alpha-generated", fields: "definitions" });
