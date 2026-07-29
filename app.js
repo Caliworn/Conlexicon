@@ -208,6 +208,13 @@ let analysisActivityQueryState = {
   error: null,
   requestId: 0,
 };
+let analysisRootFamiliesQueryState = {
+  key: "",
+  status: "idle",
+  response: null,
+  error: null,
+  requestId: 0,
+};
 let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
 let draggedToolNavView = "";
@@ -231,7 +238,6 @@ const VIRTUAL_LIST_RESIZE_IDLE_FLUSH_MS = 180;
 const VIRTUAL_LIST_HEIGHT_CACHE_WIDTH_BUCKET = 24;
 const VIRTUAL_LIST_HEIGHT_CACHE_LIMIT = 50000;
 const STALE_CONTENT_UPDATE_DELAY_MS = 200;
-const DEFAULT_ANALYSIS_ROOT_FAMILY_LIMIT = 12;
 const ANALYSIS_OVERVIEW_QUERY_WIDGETS = [
   { id: "lexicon", type: "lexiconSummary" },
   { id: "coverage", type: "coverageBreakdown" },
@@ -445,7 +451,7 @@ const i18n = {
     lemma: "词形",
     pronunciation: "发音",
     autoIpa: "自动 IPA",
-    tagsLabel: "属性标签（第一个标签会作为词性）",
+    tagsLabel: "属性标签（自动模式使用第一个标签作为词性，手动模式使用已配置的词性标签）",
     definitionList: "多条释义",
     addDefinition: "添加释义",
     etymologyInfo: "来源与说明",
@@ -1019,7 +1025,7 @@ const i18n = {
     lemma: "Lemma",
     pronunciation: "Pronunciation",
     autoIpa: "Auto IPA",
-    tagsLabel: "Attribute Tags (first tag is part of speech)",
+    tagsLabel: "Attribute Tags (automatic mode uses the first tag as the part of speech; manual mode uses configured part-of-speech tags)",
     definitionList: "Definition List",
     addDefinition: "Add Definition",
     etymologyInfo: "Source and Notes",
@@ -8932,6 +8938,15 @@ function renderAnalysis(dictionary = activeDictionary()) {
     }
     return;
   }
+  if (page === "entries" && subpage === "roots") {
+    const queryState = analysisRootFamiliesStateFor(dictionary);
+    elements.analysisPanel.innerHTML = renderAnalysisRootFamiliesQueryPage(queryState);
+    setupAnalysisMasonryLayouts();
+    if (queryState.status === "idle") {
+      void loadAnalysisRootFamilies(dictionary);
+    }
+    return;
+  }
   if (page === "ipa" && subpage === "mismatches") {
     const queryState = analysisIpaCompareStateFor(dictionary);
     elements.analysisPanel.innerHTML = renderAnalysisIpaCompareQueryPage(queryState);
@@ -8943,7 +8958,7 @@ function renderAnalysis(dictionary = activeDictionary()) {
   }
   if (page === "ipa") {
     const queryState = analysisIpaDistributionStateFor(dictionary);
-    elements.analysisPanel.innerHTML = renderAnalysisIpaDistributionQueryPage(queryState, subpage, dictionary);
+    elements.analysisPanel.innerHTML = renderAnalysisIpaDistributionQueryPage(queryState, subpage);
     setupAnalysisMasonryLayouts();
     if (queryState.status === "idle") {
       void loadAnalysisIpaDistribution(dictionary);
@@ -9010,6 +9025,96 @@ function analysisActivityQueryKey(dictionary) {
     dictionaryId: dictionary?.id || "",
     updatedAt: dictionary?.updatedAt || "",
   });
+}
+
+function analysisRootFamiliesQueryKey(dictionary) {
+  return stableJson({
+    dictionaryId: dictionary?.id || "",
+    updatedAt: dictionary?.updatedAt || "",
+  });
+}
+
+function analysisRootFamiliesStateFor(dictionary) {
+  const key = analysisRootFamiliesQueryKey(dictionary);
+  if (analysisRootFamiliesQueryState.key !== key) {
+    return {
+      key,
+      status: "idle",
+      response: null,
+      error: null,
+      requestId: analysisRootFamiliesQueryState.requestId,
+    };
+  }
+  return analysisRootFamiliesQueryState;
+}
+
+async function loadAnalysisRootFamilies(dictionary, { force = false } = {}) {
+  if (!dictionary?.id) {
+    return;
+  }
+  const key = analysisRootFamiliesQueryKey(dictionary);
+  if (
+    !force
+    && analysisRootFamiliesQueryState.key === key
+    && ["loading", "ready"].includes(analysisRootFamiliesQueryState.status)
+  ) {
+    return;
+  }
+  const requestId = analysisRootFamiliesQueryState.requestId + 1;
+  analysisRootFamiliesQueryState = {
+    key,
+    status: "loading",
+    response: null,
+    error: null,
+    requestId,
+  };
+  try {
+    const response = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`, {
+      method: "POST",
+      body: JSON.stringify({
+        widgets: [{
+          id: "families",
+          type: "rootFamilyRanking",
+        }],
+      }),
+    });
+    if (
+      analysisRootFamiliesQueryState.requestId !== requestId
+      || analysisRootFamiliesQueryState.key !== key
+    ) {
+      return;
+    }
+    analysisRootFamiliesQueryState = {
+      key,
+      status: "ready",
+      response,
+      error: null,
+      requestId,
+    };
+  } catch (error) {
+    if (
+      analysisRootFamiliesQueryState.requestId !== requestId
+      || analysisRootFamiliesQueryState.key !== key
+    ) {
+      return;
+    }
+    analysisRootFamiliesQueryState = {
+      key,
+      status: "error",
+      response: null,
+      error,
+      requestId,
+    };
+    console.error(error);
+  }
+  if (
+    state.activeView === "analysis"
+    && activeAnalysisPage() === "entries"
+    && activeAnalysisSubpage("entries") === "roots"
+    && activeDictionary()?.id === dictionary.id
+  ) {
+    renderAnalysis(activeDictionary());
+  }
 }
 
 function analysisActivityStateFor(dictionary) {
@@ -9346,10 +9451,10 @@ function renderAnalysisIpaCompareQueryPage(queryState) {
   `;
 }
 
-function renderAnalysisIpaDistributionQueryPage(queryState, subpage, dictionary) {
+function renderAnalysisIpaDistributionQueryPage(queryState, subpage) {
   let body = "";
   if (queryState.status === "ready") {
-    body = renderAnalysisIpaDistributionQuery(queryState.response, subpage, dictionary);
+    body = renderAnalysisIpaDistributionQuery(queryState.response, subpage);
   } else if (queryState.status === "error") {
     body = `<div class="empty-state">
       <strong>${escapeHtml(aText("无法加载 IPA 分布", "Could not load IPA distribution"))}</strong>
@@ -9402,6 +9507,35 @@ function renderAnalysisActivityQueryPage(queryState, subpage) {
   return `
     ${analysisPageNav("activity")}
     ${analysisSubpageNav("activity", subpage)}
+    <section class="analysis-page-body">${body}</section>
+  `;
+}
+
+function renderAnalysisRootFamiliesQueryPage(queryState) {
+  let body = "";
+  if (queryState.status === "ready") {
+    const widget = queryState.response?.widgets?.families || {};
+    const rows = (widget.rows || []).map((row) => [
+      row.lemma || aText("无词形", "No lemma"),
+      Math.max(0, Number(row.derivedCount) || 0),
+      row.action || directEntryAction(row.rootId),
+    ]);
+    body = `<section class="analysis-detail-grid">${analysisCard(
+      aText("词根家族排行", "Root Families"),
+      analysisBarList(rows, { empty: aText("暂无衍生关系", "No derivation links yet") }),
+    )}</section>`;
+  } else if (queryState.status === "error") {
+    body = `<div class="empty-state">
+      <strong>${escapeHtml(aText("无法加载词根家族", "Could not load root families"))}</strong>
+      <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
+      <button type="button" class="secondary-button" data-analysis-root-families-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+    </div>`;
+  } else {
+    body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载词根家族", "Loading root families"))}</strong></div>`;
+  }
+  return `
+    ${analysisPageNav("entries")}
+    ${analysisSubpageNav("entries", "roots")}
     <section class="analysis-page-body">${body}</section>
   `;
 }
@@ -9530,13 +9664,8 @@ function analysisSliceCacheKey(context, dep) {
   return stableJson({
     base: context.cacheBaseKey,
     dep,
-    entrySort: dep === "relation" || dep === "rootFamilies" ? entrySort : "",
-    rootFamilyLimit: dep === "rootFamilies" ? analysisRootFamilyLimit() : "",
+    entrySort: dep === "relation" ? entrySort : "",
   });
-}
-
-function analysisRootFamilyLimit() {
-  return DEFAULT_ANALYSIS_ROOT_FAMILY_LIMIT;
 }
 
 function renderQuality(dictionary = activeDictionary()) {
@@ -9605,7 +9734,7 @@ function renderAnalysisPage(report, page = activeAnalysisPage(), subpage = activ
 function analysisPageNav(activePage) {
   const pages = [
     ["overview", aText("总览", "Overview")],
-    ["entries", aText("词条与标签", "Entries & Tags")],
+    ["entries", aText("词汇", "Lexicon")],
     ["ipa", "IPA"],
     ["morphology", aText("形态学", "Morphology")],
     ["activity", aText("编辑进度", "Activity")],
@@ -9629,8 +9758,8 @@ function analysisSubpages(page) {
   const subpages = {
     entries: [
       ["tags", aText("标签", "Tags")],
-      ["forms", aText("词形结构", "Word Forms")],
-      ["roots", aText("词根关系", "Roots")],
+      ["forms", aText("正写法", "Orthography")],
+      ["roots", aText("词根家族", "Root Families")],
     ],
     ipa: [
       ["distribution", aText("分布", "Distribution")],
@@ -9911,9 +10040,6 @@ function renderAnalysisEntriesPage(report, subpage) {
       ${analysisCard(aText("正写法双字符组合", "Orthographic Bigrams"), analysisBarList(report.allBigrams, { empty: aText("暂无组合", "No bigrams yet") }))}
     </section>`;
   }
-  if (subpage === "roots") {
-    return `<section class="analysis-detail-grid">${analysisCard(aText("词根家族排行", "Root Families"), analysisBarList(report.allRootFamilies, { empty: aText("暂无衍生关系", "No derivation links yet") }))}</section>`;
-  }
   return `<section class="analysis-detail-grid">
     ${analysisCard(aText("词性分布", "Part of Speech"), analysisBarList(report.allParts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") }))}
     ${analysisCard(aText("标签频率", "Tag Frequency"), analysisBarList(report.allTags, { empty: aText("暂无标签", "No tags yet") }))}
@@ -9940,7 +10066,7 @@ function ipaDistributionRows(response, facet, category, labelKey) {
   });
 }
 
-function renderAnalysisIpaDistributionQuery(response, subpage, dictionary) {
+function renderAnalysisIpaDistributionQuery(response, subpage) {
   if (subpage === "units") {
     return `<section class="analysis-detail-grid">
       ${analysisCard(aText("IPA 音位频率", "IPA Unit Frequency"), analysisBarList(ipaDistributionRows(response, "units", "unit", "advancedFilterIpaUnit"), { empty: aText("暂无 IPA", "No IPA yet") }))}
@@ -9949,7 +10075,7 @@ function renderAnalysisIpaDistributionQuery(response, subpage, dictionary) {
     </section>`;
   }
   const summary = response?.summary || {};
-  const entryTotal = dictionary?.entries?.length || 0;
+  const entryTotal = Math.max(0, Number(summary.entryTotal) || 0);
   const ipaEntryCount = Math.max(0, Number(summary.inputTotal) || 0);
   const noIpaEntryCount = Math.max(0, entryTotal - ipaEntryCount);
   const ipaCoverage = entryTotal ? ipaEntryCount / entryTotal : 0;
@@ -10390,7 +10516,6 @@ function composeLegacyAnalysisReport(context, slices) {
   return {
     entries: context.entries,
     ...slices.relation,
-    ...slices.rootFamilies,
     ...slices.tags,
     ...slices.forms,
   };
@@ -10399,7 +10524,6 @@ function composeLegacyAnalysisReport(context, slices) {
 function analysisSliceBuilders() {
   return {
     relation: buildAnalysisRelationSlice,
-    rootFamilies: buildAnalysisRootFamiliesSlice,
     tags: buildAnalysisTagSlice,
     forms: buildAnalysisFormSlice,
   };
@@ -10407,18 +10531,6 @@ function analysisSliceBuilders() {
 
 function buildAnalysisRelationSlice(context) {
   return context.query.relationSummary();
-}
-
-function buildAnalysisRootFamiliesSlice(context) {
-  const rootFamilyGroups = context.query.rootFamilies({
-    limit: analysisRootFamilyLimit(),
-    includeAll: true,
-  });
-  const familyRow = (group) => [group.lemma, group.derivedCount, directEntryAction(group.rootId)];
-  return {
-    rootFamilies: rootFamilyGroups.rows.map(familyRow),
-    allRootFamilies: rootFamilyGroups.allRows.map(familyRow),
-  };
 }
 
 function buildAnalysisTagSlice(context) {
@@ -15406,6 +15518,12 @@ elements.analysisPanel.addEventListener("click", (event) => {
   const ipaRetryButton = event.target.closest("[data-analysis-ipa-retry]");
   if (ipaRetryButton) {
     void loadAnalysisIpaCompare(activeDictionary(), { force: true });
+    renderAnalysis(activeDictionary());
+    return;
+  }
+  const rootFamiliesRetryButton = event.target.closest("[data-analysis-root-families-retry]");
+  if (rootFamiliesRetryButton) {
+    void loadAnalysisRootFamilies(activeDictionary(), { force: true });
     renderAnalysis(activeDictionary());
     return;
   }

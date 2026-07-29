@@ -480,7 +480,7 @@ SQLite repository 的核心读写、schema、迁移脚本和 smoke 已经落地�
 | `getEntryFacets()` | 已改为 SQL 聚合，覆盖词性、标签频率和无词性计数 | 否 | 后续如增加筛选上下文 facets，再扩展 SQL |
 | `getEntryRelations()` | 已使用 `entry_sources`/`entries` 查询来源和直接衍生，并复用稳定词根拓扑的 `entryId → rootIds`、`rootId → group` 反向索引组装同根组 | 否；前端词条详情和词汇网络均消费该 API | 质量检查中的词源问题后续接入同一关系层；不再把词汇网络列为待接线项 |
 | `queryRootGroups()` | 词根与衍生词 ID 拓扑按独立 relation generation 稳定缓存；无搜索和带搜索查询只生成排序/匹配视图，搜索命中直接读取静态与形态 projection | 否；不再导出完整 snapshot 或重复构建关系；无关保存只刷新轻量排序记录 | fuzzy projection 仍是线性扫描，可继续结合真实基准评估候选索引；质量检查后续复用同一拓扑 |
-| 质量检查 / 数据分析 | 还没有直接接 SQLite repository 查询层；数据分析已有 24 项 slice cache，质量检查已有独立的单 report cache。数据分析“词根家族”仍在前端 `dictionary-query-model` 中从完整词典重新建立关系索引和词根分组，没有消费后端 `RootTopologyCache` | 仍依赖完整活动词典；两类缓存 key 都会序列化 O(N) 的相关词条字段，miss 时运行完整前端/共享 JS 算法；词根家族与后端词根模式重复计算关系拓扑；数据分析形态统计另有临时旧单表视图 | 后续做按需 API + SQL/query planner；词根家族排行直接消费稳定后端拓扑，形态统计直接复用共享 morphology model，并删除旧视图 |
+| 质量检查 / 数据分析 | 数据分析总览、活动、IPA、形态和词根家族排行均已按需接入后端；`rootFamilyRanking` 直接消费 `RootTopologyCache`，不返回家族成员 ID。质量检查仍使用前端完整 report cache | 已迁移分析页不再读取完整活动词典；质量检查仍会序列化并扫描相关词条字段 | F5 将质量检查推进为独立按需 API，并让词源检查复用同一稳定拓扑 |
 | 契约测试 | SQLite repository 已跑通当前完整 repository contract | 否 | 主路径语义变化验证 SQLite contract；模型、旧 JSON 转换和目录迁移分别运行定向检查 |
 | 主服务接入 | 运行期只使用 SQLite repository，旧 JSON runtime repository 和后端 feature flag 已移除；SQLite 路径已完成 API/UI smoke；`scripts/check-default-repository.js` 覆盖 SQLite 服务启动 | 否；旧 JSON 词典通过单文件导入或只读目录迁移工具迁入 SQLite | 继续做真实词典实测；后续再设计产品内自动迁移向导 |
 
@@ -562,8 +562,8 @@ CREATE TABLE entry_morphology_search_values (
 按当前依赖关系建议依次处理：
 
 1. 高级筛选 F1–F3、分析 F4a 以及 F4b-0–F4b-3 后端已完成：统一 EntryQuery/EntryFilter、稳定条件 SQL 编译和前端 descriptor 状态已接入 `/entries` 会话、窗口、定位、排序与搜索；轻量 `/analysis/query` 已以最小 widget planner 聚合 SQLite 任务并异步供前端总览消费；IPA 自动生成比较、IPA 分布和形态分配/覆写统计均已接入可重建 feature result session 与 query/location。10k/30k 基准暂不要求增加后台状态。
-2. 下一步让前端形态分析页与高级筛选 action 消费 `morphologyAnalysis`，再由 F5 把质量检查推进为独立按需 API。数据分析词根家族 slice 则直接消费 `currentRootTopology()`：只返回 `{ rootId, lemma, derivedCount }` 和必要的窗口信息，不返回全部 `derivedIds`；可配置 Top N 通过 `limit` 表达。全局衍生词数量不得累加各家族数量，以免多来源词条重复计数。迁移后删除前端重复的关系索引/词根分组，以及未被 UI 消费的 `rootFamilies[].derivedEntryIds`。质量检查中的词源查询也应复用同一稳定拓扑。
-3. F4b-3 直接消费当前 morphology model 的真实多组分配与 nested override，删除前端临时旧单表视图；不恢复旧形态输出，不复用丢弃空值的形态搜索 projection，也不统计生成数或空单元。
+2. 形态分析前端与词根家族排行均已完成接线：`rootFamilyRanking` 返回全部非空家族的 `{ rootId, lemma, derivedCount }` 和 `familyCount`，前端重复关系分组和家族成员 ID 已删除。下一步由 F5 把质量检查推进为独立按需 API，并让词源检查复用同一稳定拓扑。全局衍生词数量仍不得累加各家族数量，以免多来源词条重复计数。
+3. 正写法统计在 Unicode 与空白语义冻结后迁入轻量 summary/facet；不要为确定性桶建立 feature result session。
 4. 仅在基准表明确认线性扫描成为主要瓶颈后，再选择 FTS、ngram 或其他候选索引。
 5. 语料库进入独立升级阶段后，再把 `module_blobs.corpus` 拆成正式 SQL 表及块/单元级 API。
 

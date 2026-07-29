@@ -175,7 +175,7 @@ async function checkAnalysisQueryContract(repository) {
         tags: ["n", "root"],
         definitions: [{ id: "def-analysis-alpha", meaning: "first", example: "alpha example" }],
         notes: "note",
-        etymology: { sources: ["origin", "proto"] },
+        etymology: { sources: ["beta", "gamma"] },
         createdAt: "2026-07-01T08:00:00.000Z",
         updatedAt: "2026-07-01T09:00:00.000Z",
       },
@@ -204,6 +204,7 @@ async function checkAnalysisQueryContract(repository) {
     ],
   }));
   try {
+    const topologyBuildsBefore = repository.rootTopologyCache.stats().builds;
     const request = {
       widgets: [
         { id: "entries", type: "entryCount" },
@@ -212,6 +213,7 @@ async function checkAnalysisQueryContract(repository) {
         { id: "parts", type: "partDistribution", limit: 8 },
         { id: "activity", type: "activityPreview", limit: 2 },
         { id: "activityAll", type: "activityDistribution" },
+        { id: "families", type: "rootFamilyRanking" },
       ],
     };
     const result = await callApi(
@@ -222,7 +224,12 @@ async function checkAnalysisQueryContract(repository) {
     );
     assert.equal(result.statusCode, 200);
     assert.equal(result.body.dictionaryId, dictionary.id);
-    assert.deepEqual(result.body.diagnostics.computedTasks, ["entryStats", "partStats", "activityStats"]);
+    assert.deepEqual(result.body.diagnostics.computedTasks, [
+      "entryStats",
+      "partStats",
+      "activityStats",
+      "rootTopology",
+    ]);
     assert.equal(result.body.widgets.entries.value, 4);
     assert.equal(result.body.widgets.lexicon.entryCount, 4);
     assert.equal(result.body.widgets.lexicon.rootCount, 3);
@@ -266,6 +273,29 @@ async function checkAnalysisQueryContract(repository) {
       ["2026-07-01", "2026-07-02", "2026-07-03", "2026-07-04"],
     );
     assert.equal(result.body.widgets.activityAll.type, "activityDistribution");
+    assert.equal(result.body.widgets.families.familyCount, 2);
+    assert.deepEqual(result.body.widgets.families.rows, [
+      {
+        rootId: "entry-analysis-beta",
+        lemma: "beta",
+        derivedCount: 1,
+        action: { type: "entry", entryId: "entry-analysis-beta" },
+      },
+      {
+        rootId: "entry-analysis-gamma",
+        lemma: "gamma",
+        derivedCount: 1,
+        action: { type: "entry", entryId: "entry-analysis-gamma" },
+      },
+    ]);
+    assert.equal(Object.hasOwn(result.body.widgets.families.rows[0], "derivedIds"), false);
+    assert.equal(repository.rootTopologyCache.stats().builds, topologyBuildsBefore + 1);
+    await repository.queryRootGroups(dictionary.id, { limit: 10 });
+    assert.equal(
+      repository.rootTopologyCache.stats().builds,
+      topologyBuildsBefore + 1,
+      "analysis and root-group queries should share one stable topology",
+    );
 
     const withoutActions = await callApi(
       repository,
@@ -276,16 +306,18 @@ async function checkAnalysisQueryContract(repository) {
           { id: "lexicon", type: "lexiconSummary" },
           { id: "coverage", type: "coverageBreakdown" },
           { id: "activity", type: "activityPreview" },
+          { id: "families", type: "rootFamilyRanking" },
         ],
         options: { includeActions: false },
       },
     );
     assert.equal(withoutActions.statusCode, 200);
-    assert.deepEqual(withoutActions.body.diagnostics.computedTasks, ["entryStats", "activityStats"]);
+    assert.deepEqual(withoutActions.body.diagnostics.computedTasks, ["entryStats", "activityStats", "rootTopology"]);
     assert.equal(withoutActions.body.widgets.lexicon.rootAction, undefined);
     assert.equal(withoutActions.body.widgets.coverage.rows[0].action, undefined);
     assert.equal(withoutActions.body.widgets.activity.created[0].action, undefined);
     assert.equal(withoutActions.body.widgets.activity.updated[0].action, undefined);
+    assert.equal(withoutActions.body.widgets.families.rows[0].action, undefined);
 
     const firstGeneration = result.body.generation;
     const firstCacheKey = result.body.cacheKey;
@@ -304,6 +336,11 @@ async function checkAnalysisQueryContract(repository) {
     assert.equal(
       refreshed.body.widgets.coverage.rows.find((row) => row.field === "entryNote").count,
       2,
+    );
+    assert.equal(
+      repository.rootTopologyCache.stats().builds,
+      topologyBuildsBefore + 1,
+      "non-relation edits should preserve the root-family topology",
     );
 
     await assertRejectStatus(
@@ -336,6 +373,13 @@ async function checkAnalysisQueryContract(repository) {
       }),
       400,
       "invalid analysis widget limit",
+    );
+    await assertRejectStatus(
+      callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`, {
+        widgets: [{ id: "families", type: "rootFamilyRanking", limit: 12 }],
+      }),
+      400,
+      "root-family ranking does not accept a limit",
     );
   } finally {
     await repository.deleteDictionary(dictionary.id);

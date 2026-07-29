@@ -8,7 +8,7 @@
 - 调用 FastCtx 时传入绝对路径。每次结果末尾会标明 `Complete` 或 `Partial`；只有出现 `Partial` 时，才按其给出的精确参数继续读取下一页。
 - 机械式查找替换优先使用 `mcp__fastctx__replace`；批量修改前先用 `dry_run` 预览，并用 `max_replacements` 限制影响范围。
 - 生成内容、语义性重写和小范围手工编辑使用 `apply_patch`。
-- FastCtx 不可用或任务确实依赖 shell 管道时，文件搜索退回 `rg` / `rg --files`。复杂文本处理可使用 Git Bash、`rg`、Node 脚本或专用工具，尽量避免 PowerShell 复杂管道。
+- FastCtx 不可用或任务确实依赖 shell 管道时，文件搜索退回 `rg` / `rg --files`。复杂文本处理可使用 Git Bash、`rg`、Node 脚本或专用工具；不要编写 PowerShell 或 cmd 文本处理命令。
 
 ## 工作流
 
@@ -25,7 +25,12 @@
 - 对现有功能、显示条件、数据流、交互状态或性能路径作事实判断前，必须先检查对应代码、测试或可观察运行结果；不得根据界面印象、命名或常见做法补全实际逻辑。回答中应明确区分“已由当前实现确认的事实”“基于证据的推断”和“建议的新设计”，无法确认时直接说明尚未确认。
 - 架构、数据模型、schema、API、性能方案或较大的 UI/交互方案在实装前，应对初步设计再做一次独立评估：把原方案视为外部提案，重新检查必要性、边界、替代方案、耦合、迁移成本和验收方式；不得为了维护第一次结论而附和原方案，复评发现问题时应明确收窄、修正或推翻。微小且局部、低风险的常规改动不要求重复进行形式化复评。
 - 默认不要回滚、覆盖或删除用户已有改动。除非用户明确要求，不要执行破坏性 Git 操作。
-- 命令默认使用当前执行工具提供的 shell，不要构造工具并不支持的 shell 选择参数。Windows 下确实依赖 Bash 语义时，显式调用 PATH 中的 `bash`；PATH 不可用时才使用 `C:\Program Files\Git\bin\bash.exe`。
+- 当前 Windows Codex 的 `shell_command` 没有 shell 选择参数，宿主固定为 PowerShell；不要在命令载荷中编写或依赖 PowerShell、cmd 语法及其管道。需要执行 shell 命令时，统一显式进入 PATH 中的 Git Bash：
+  ```bash
+  bash -lc '<command>'
+  ```
+- 如果 PATH 中的 `bash` 不可用，停止并说明环境问题，不要静默退回 PowerShell。工作目录由工具的 `workdir` 参数设置，不要在 Bash 命令内重复 `cd`；包含空格的路径按 Bash 规则引用。
+- 不要用 `Start-Process`、`node:child_process`、`nohup`、`&` 或其他 detached/background 技巧从一次性 shell 调用启动开发服务。常驻进程只能使用工具明确提供的可等待、可回收会话；没有这种能力时，跳过非必要浏览器 smoke 并说明限制。
 - 不要把测试数据写入真实 `data/`。需要测试数据时，使用临时目录并通过 `CONLEXICON_DATA_DIR` 指向它。
 - `data/` 是用户私有数据，禁止提交、覆盖或作为测试夹具使用。
 

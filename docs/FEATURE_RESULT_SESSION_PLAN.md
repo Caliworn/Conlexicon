@@ -384,7 +384,7 @@ items 中的 feature 只返回当前词条的 `{ mode, assignedGroupIds, activeO
 
 ### 并行但不属于 feature session
 
-- 词根家族排行改用稳定 RootTopologyCache 的 summary/window query。
+- 词根家族排行已通过 `rootFamilyRanking` widget 复用稳定 `RootTopologyCache`，返回全部非空家族的轻量摘要，不建立 feature session。
 - 正写法统计先冻结 Unicode 语义，再选择轻量 projection 或 summary query。
 - Gloss 结果等待阶段 C 的例句/语料链接读取边界，避免为即将删除的 `definition.example` 建长期契约。
 - F5 建立独立质量 API，复用内部会话原语并删除剩余质量 ID/issue bridge。

@@ -330,7 +330,8 @@ async function checkIpaDistributionModel() {
       complexPhonemes: ["t͡s"],
       separator: "-",
     },
-  });
+  }, { entryTotal: 3 });
+  assert.equal(result.summary.entryTotal, 3);
   assert.equal(result.summary.inputTotal, 2);
   assert.equal(result.summary.unitTotal, 7);
   assert.equal(result.summary.syllableEntryCount, 2);
@@ -559,6 +560,7 @@ async function checkRepositoryIntegration() {
         { id: "entry-mismatch", lemma: "ata", pronunciation: "/a.da/" },
         { id: "entry-unavailable", lemma: "", pronunciation: "/x/" },
         { id: "entry-failed", lemma: "fail", pronunciation: "/f/" },
+        { id: "entry-no-ipa", lemma: "silent", pronunciation: "" },
       ],
     });
     await repository.importDictionarySnapshot(dictionary);
@@ -709,6 +711,7 @@ async function checkRepositoryIntegration() {
     assert.equal(generateCalls, 5, "IPA distribution must not invoke the phonology engine");
     assert.equal(orderedViewCalls, orderedCallsBeforeDistributionSummary);
     assert.equal(entrySummaryCalls, summaryCallsBeforeDistributionSummary);
+    assert.equal(distributionSummary.summary.entryTotal, 6);
     assert.equal(distributionSummary.summary.inputTotal, 5);
     assert.equal(distributionSummary.summary.unitTotal, 11);
     assert.equal(distributionSummary.summary.syllableEntryCount, 5);
