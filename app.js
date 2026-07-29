@@ -180,6 +180,13 @@ let analysisOverviewQueryState = {
   error: null,
   requestId: 0,
 };
+let analysisTagsQueryState = {
+  key: "",
+  status: "idle",
+  response: null,
+  error: null,
+  requestId: 0,
+};
 let analysisIpaCompareQueryState = {
   key: "",
   status: "idle",
@@ -243,6 +250,10 @@ const ANALYSIS_OVERVIEW_QUERY_WIDGETS = [
   { id: "coverage", type: "coverageBreakdown" },
   { id: "parts", type: "partDistribution", limit: 7 },
   { id: "activity", type: "activityPreview", limit: 5 },
+];
+const ANALYSIS_TAG_QUERY_WIDGETS = [
+  { id: "parts", type: "partDistribution" },
+  { id: "tags", type: "tagFrequency" },
 ];
 let staleContentUpdateSequence = 0;
 let entryListHasSettledContent = false;
@@ -8931,6 +8942,16 @@ function renderAnalysis(dictionary = activeDictionary()) {
     }
     return;
   }
+  if (page === "entries" && subpage === "tags") {
+    const queryState = analysisTagsStateFor(dictionary);
+    const report = getAnalysisReport(dictionary, { page, subpage });
+    elements.analysisPanel.innerHTML = renderAnalysisTagsQueryPage(queryState, report);
+    setupAnalysisMasonryLayouts();
+    if (queryState.status === "idle") {
+      void loadAnalysisTags(dictionary);
+    }
+    return;
+  }
   if (page === "entries" && subpage === "roots") {
     const queryState = analysisRootFamiliesStateFor(dictionary);
     elements.analysisPanel.innerHTML = renderAnalysisRootFamiliesQueryPage(queryState);
@@ -9025,6 +9046,74 @@ function analysisRootFamiliesQueryKey(dictionary) {
     dictionaryId: dictionary?.id || "",
     updatedAt: dictionary?.updatedAt || "",
   });
+}
+
+function analysisTagsStateFor(dictionary) {
+  const key = analysisOverviewQueryKey(dictionary);
+  if (analysisTagsQueryState.key !== key) {
+    return {
+      key,
+      status: "idle",
+      response: null,
+      error: null,
+      requestId: analysisTagsQueryState.requestId,
+    };
+  }
+  return analysisTagsQueryState;
+}
+
+async function loadAnalysisTags(dictionary, { force = false } = {}) {
+  if (!dictionary?.id) {
+    return;
+  }
+  const key = analysisOverviewQueryKey(dictionary);
+  if (!force && analysisTagsQueryState.key === key && ["loading", "ready"].includes(analysisTagsQueryState.status)) {
+    return;
+  }
+  const requestId = analysisTagsQueryState.requestId + 1;
+  analysisTagsQueryState = {
+    key,
+    status: "loading",
+    response: null,
+    error: null,
+    requestId,
+  };
+  try {
+    const response = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`, {
+      method: "POST",
+      body: JSON.stringify({ widgets: ANALYSIS_TAG_QUERY_WIDGETS }),
+    });
+    if (analysisTagsQueryState.requestId !== requestId || analysisTagsQueryState.key !== key) {
+      return;
+    }
+    analysisTagsQueryState = {
+      key,
+      status: "ready",
+      response,
+      error: null,
+      requestId,
+    };
+  } catch (error) {
+    if (analysisTagsQueryState.requestId !== requestId || analysisTagsQueryState.key !== key) {
+      return;
+    }
+    analysisTagsQueryState = {
+      key,
+      status: "error",
+      response: null,
+      error,
+      requestId,
+    };
+    console.error(error);
+  }
+  if (
+    state.activeView === "analysis"
+    && activeAnalysisPage() === "entries"
+    && activeAnalysisSubpage("entries") === "tags"
+    && activeDictionary()?.id === dictionary.id
+  ) {
+    renderAnalysis(activeDictionary());
+  }
 }
 
 function analysisRootFamiliesStateFor(dictionary) {
@@ -10024,6 +10113,60 @@ function renderAnalysisOverviewQuery(response) {
   `;
 }
 
+function analysisTagPageRows(response) {
+  const widgets = response?.widgets || {};
+  const parts = (widgets.parts?.rows || []).map((row) => {
+    const noPart = row.part === NO_PART_FILTER_VALUE;
+    const label = noPart ? t("noPart") : (row.displayLabel || row.part);
+    return [
+      label,
+      Number(row.count || 0),
+      analysisQueryFilterAction(
+        row.action,
+        advancedFilterValueTitleDescriptor(
+          "advancedFilterPartOfSpeech",
+          noPart ? "" : label,
+          noPart ? { valueKey: "noPart" } : {},
+        ),
+      ),
+    ];
+  });
+  const tags = (widgets.tags?.rows || []).map((row) => [
+    row.displayLabel || row.tag,
+    Number(row.count || 0),
+    analysisQueryFilterAction(
+      row.action,
+      advancedFilterValueTitleDescriptor("tags", row.tag, { valueType: "tag" }),
+    ),
+  ]);
+  return { parts, tags };
+}
+
+function renderAnalysisTagsQueryPage(queryState, report) {
+  let body = "";
+  if (queryState.status === "ready") {
+    const rows = analysisTagPageRows(queryState.response);
+    body = `<section class="analysis-detail-grid">
+      ${analysisCard(aText("词性分布", "Part of Speech"), analysisBarList(rows.parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") }))}
+      ${analysisCard(aText("其他标签频率", "Other Tag Frequency"), analysisBarList(rows.tags, { empty: aText("暂无其他标签", "No other tags yet") }))}
+      ${analysisCard(aText("标签组合", "Tag Combinations"), analysisBarList(report.allTagCombos, { empty: aText("暂无组合", "No combinations yet") }))}
+    </section>`;
+  } else if (queryState.status === "error") {
+    body = `<div class="empty-state">
+      <strong>${escapeHtml(aText("无法加载标签统计", "Could not load tag statistics"))}</strong>
+      <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
+      <button type="button" class="secondary-button" data-analysis-tags-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+    </div>`;
+  } else {
+    body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载标签统计", "Loading tag statistics"))}</strong></div>`;
+  }
+  return `
+    ${analysisPageNav("entries")}
+    ${analysisSubpageNav("entries", "tags", report)}
+    <section class="analysis-page-body">${body}</section>
+  `;
+}
+
 function renderAnalysisEntriesPage(report, subpage) {
   if (subpage === "forms") {
     return `<section class="analysis-detail-grid">
@@ -10034,8 +10177,6 @@ function renderAnalysisEntriesPage(report, subpage) {
     </section>`;
   }
   return `<section class="analysis-detail-grid">
-    ${analysisCard(aText("词性分布", "Part of Speech"), analysisBarList(report.allParts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") }))}
-    ${analysisCard(aText("标签频率", "Tag Frequency"), analysisBarList(report.allTags, { empty: aText("暂无标签", "No tags yet") }))}
     ${analysisCard(aText("标签组合", "Tag Combinations"), analysisBarList(report.allTagCombos, { empty: aText("暂无组合", "No combinations yet") }))}
   </section>`;
 }
@@ -10528,30 +10669,15 @@ function buildAnalysisRelationSlice(context) {
 
 function buildAnalysisTagSlice(context) {
   const { dictionary, entries } = context;
-  const parts = new Map();
-  const tags = new Map();
   const tagCombos = new Map();
 
   entries.forEach((entry) => {
-    const entryPartTags = entryParts(entry, dictionary);
-    if (entryPartTags.length) {
-      entryPartTags.forEach((part) => increment(parts, part));
-    } else {
-      increment(parts, NO_PART_FILTER_VALUE);
-    }
-    (entry.tags || []).forEach((tag) => {
-      increment(tags, tag);
-    });
     if ((entry.tags || []).length > 1) {
       incrementEntry(tagCombos, entry.tags.map((tag) => displayTag(tag, dictionary)).join(" + "), entry);
     }
   });
 
   return {
-    parts: partEntryMapItems(parts, 12, dictionary),
-    allParts: partEntryMapItems(parts, Number.MAX_SAFE_INTEGER, dictionary),
-    tags: tagEntryMapItems(tags, 16, dictionary),
-    allTags: tagEntryMapItems(tags, Number.MAX_SAFE_INTEGER, dictionary),
     tagCombos: topEntryMapItems(tagCombos, 10, "advancedFilterTagCombination"),
     allTagCombos: topEntryMapItems(tagCombos, Number.MAX_SAFE_INTEGER, "advancedFilterTagCombination"),
   };
@@ -10923,35 +11049,6 @@ function topEntryMapItems(map, limit = 12, labelKey = "") {
         ),
       ];
     });
-}
-
-function partEntryMapItems(map, limit = 12, dictionary = activeDictionary()) {
-  return [...map.entries()]
-    .sort((a, b) => Number(b[1]) - Number(a[1]) || String(partDisplayLabel(a[0], dictionary)).localeCompare(String(partDisplayLabel(b[0], dictionary)), "zh-CN"))
-    .slice(0, limit)
-    .map(([part, count]) => [partDisplayLabel(part, dictionary), Number(count), partFilterAction(part)]);
-}
-
-function tagEntryMapItems(map, limit = 12, dictionary = activeDictionary()) {
-  return [...map.entries()]
-    .sort((a, b) => Number(b[1]) - Number(a[1]) || String(displayTag(a[0], dictionary)).localeCompare(String(displayTag(b[0], dictionary)), "zh-CN"))
-    .slice(0, limit)
-    .map(([tag, count]) => [
-      displayTag(tag, dictionary),
-      Number(count),
-      tagIsPartFilterCandidate(tag, dictionary) ? partFilterAction(tag) : tagAdvancedFilterAction(tag),
-    ]);
-}
-
-function partDisplayLabel(part, dictionary = activeDictionary()) {
-  return part === NO_PART_FILTER_VALUE ? t("noPart") : displayTag(part, dictionary);
-}
-
-function tagIsPartFilterCandidate(tag, dictionary = activeDictionary()) {
-  const structuralTag = searchNormalizationModel.normalizeStructuralKey(tag);
-  return Boolean(structuralTag)
-    && (dictionary?.entries || []).some((entry) => entryParts(entry, dictionary)
-      .some((part) => searchNormalizationModel.normalizeStructuralKey(part) === structuralTag));
 }
 
 function numericMapItems(map) {
@@ -15505,6 +15602,12 @@ elements.analysisPanel.addEventListener("click", (event) => {
   const rootFamiliesRetryButton = event.target.closest("[data-analysis-root-families-retry]");
   if (rootFamiliesRetryButton) {
     void loadAnalysisRootFamilies(activeDictionary(), { force: true });
+    renderAnalysis(activeDictionary());
+    return;
+  }
+  const tagsRetryButton = event.target.closest("[data-analysis-tags-retry]");
+  if (tagsRetryButton) {
+    void loadAnalysisTags(activeDictionary(), { force: true });
     renderAnalysis(activeDictionary());
     return;
   }

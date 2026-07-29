@@ -212,6 +212,7 @@ async function checkAnalysisQueryContract(repository) {
         { id: "lexicon", type: "lexiconSummary" },
         { id: "coverage", type: "coverageBreakdown" },
         { id: "parts", type: "partDistribution", limit: 8 },
+        { id: "tags", type: "tagFrequency" },
         { id: "activity", type: "activityPreview", limit: 2 },
         { id: "activityAll", type: "activityDistribution" },
         { id: "families", type: "rootFamilyRanking" },
@@ -228,6 +229,7 @@ async function checkAnalysisQueryContract(repository) {
     assert.deepEqual(result.body.diagnostics.computedTasks, [
       "entryStats",
       "partStats",
+      "tagStats",
       "activityStats",
       "rootTopology",
     ]);
@@ -259,6 +261,13 @@ async function checkAnalysisQueryContract(repository) {
     assert.equal(result.body.widgets.parts.partTypeCount, 2);
     assert.equal(result.body.widgets.parts.noPartOfSpeechCount, 1);
     assert.deepEqual(result.body.widgets.parts.noPartAction.filter, { part: NO_PART_FILTER_VALUE });
+
+    assert.deepEqual(result.body.widgets.tags.rows.map((row) => row.tag), ["root"]);
+    assert.equal(result.body.widgets.tags.rows[0].count, 1);
+    assert.deepEqual(result.body.widgets.tags.rows[0].action.filter, {
+      tags: { values: ["root"], mode: "any" },
+    });
+    assert.equal(result.body.widgets.tags.tagTypeCount, 1);
 
     assert.deepEqual(result.body.widgets.activity.created.map((row) => row.day), ["2026-07-02", "2026-07-03"]);
     assert.deepEqual(Object.keys(result.body.widgets.activity).sort(), ["created", "type", "updated"]);

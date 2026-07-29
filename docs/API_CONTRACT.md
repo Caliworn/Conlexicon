@@ -618,7 +618,7 @@ directDerivedEntries
 
 `POST /api/dictionaries/:id/analysis/query`
 
-F4a 支持 `entryCount`、`lexiconSummary`、`coverageBreakdown`、`partDistribution`、`activityPreview`、`activityDistribution` 和 `rootFamilyRanking`。这些 widgets 在一次同步 HTTP 请求内完成；前端异步加载并显示独立的 loading/error/retry 状态。数据分析页未打开时不发起请求。
+F4a 支持 `entryCount`、`lexiconSummary`、`coverageBreakdown`、`partDistribution`、`tagFrequency`、`activityPreview`、`activityDistribution` 和 `rootFamilyRanking`。这些 widgets 在一次同步 HTTP 请求内完成；前端异步加载并显示独立的 loading/error/retry 状态。数据分析页未打开时不发起请求。
 
 请求：
 
@@ -638,7 +638,7 @@ F4a 支持 `entryCount`、`lexiconSummary`、`coverageBreakdown`、`partDistribu
 ```
 
 - `widgets` 必须为非空数组，最多 16 项；`id` 在一次请求中必须唯一，只允许字母、数字、点、下划线和连字符，最长 80 字符。
-- `partDistribution` 和 `activityPreview` 接受 `limit`，默认分别为 12 和 6，范围为 1–50。`activityDistribution` 返回完整日期桶且不接受 `limit`；包括 `rootFamilyRanking` 在内的其他 widget 同样不接受 `limit`。
+- `partDistribution` 和 `tagFrequency` 接受可选 `limit`，范围为 1–50；省略时返回完整排行。`activityPreview` 的 `limit` 默认为 6，范围同样为 1–50。`activityDistribution` 返回完整日期桶且不接受 `limit`；包括 `rootFamilyRanking` 在内的其他 widget 同样不接受 `limit`。
 - `options.includeActions` 默认为 `true`。设为 `false` 时省略 action descriptor。
 
 响应返回结构化 widget data，不返回 HTML：
@@ -712,15 +712,16 @@ Widget 通过以下任务依赖生成：
 | `lexiconSummary` | `entryStats` |
 | `coverageBreakdown` | `entryStats` |
 | `partDistribution` | `partStats` |
+| `tagFrequency` | `tagStats` |
 | `activityPreview` | `activityStats` |
 | `activityDistribution` | `activityStats` |
 | `rootFamilyRanking` | `rootTopology` |
 
-同一任务在一次请求中只执行一次；只有 `activityPreview` 时使用请求中的最大 limit 读取日期桶，再分别裁剪；请求包含 `activityDistribution` 时读取完整日期桶，并继续按各自 limit 裁剪预览 widget。`lexiconSummary.rootCount` 严格表示没有任何来源记录的词条数，`derivedCount` 表示至少有一条来源记录的词条数；这两个计数不建立词根拓扑，也不表达孤立词根。`partDistribution` 除排行 `rows` 外返回 `partTypeCount`、`noPartOfSpeechCount` 和对应的 `noPartAction`。两类活动 widget 都返回 `created`、`updated` 日期聚合及结构化日期筛选 action；按修改时间浏览词条由词条列表的编辑时间排序负责。`coverageBreakdown.rows[].field` 支持 `definition`、`example`、`entryNote`、`source`、`ipa`；释义和例句行另带 `itemCount`。词性分布 action 使用 `{ part }` descriptor，无词性行使用保留值 `__conlexicon_no_part__`。
+同一任务在一次请求中只执行一次；只有 `activityPreview` 时使用请求中的最大 limit 读取日期桶，再分别裁剪；请求包含 `activityDistribution` 时读取完整日期桶，并继续按各自 limit 裁剪预览 widget。`lexiconSummary.rootCount` 严格表示没有任何来源记录的词条数，`derivedCount` 表示至少有一条来源记录的词条数；这两个计数不建立词根拓扑，也不表达孤立词根。`partDistribution` 除排行 `rows` 外返回 `partTypeCount`、`noPartOfSpeechCount` 和对应的 `noPartAction`。`tagFrequency` 从 SQLite 标签聚合阶段排除当前 `partOfSpeechTags` 中的所有标签，返回 `tagTypeCount`、完整或限额后的 `rows` 以及 `{ tags: { values, mode: "any" } }` 筛选 action。两类活动 widget 都返回 `created`、`updated` 日期聚合及结构化日期筛选 action；按修改时间浏览词条由词条列表的编辑时间排序负责。`coverageBreakdown.rows[].field` 支持 `definition`、`example`、`entryNote`、`source`、`ipa`；释义和例句行另带 `itemCount`。词性分布 action 使用 `{ part }` descriptor，无词性行使用保留值 `__conlexicon_no_part__`。
 
 `rootFamilyRanking` 按衍生词数量降序、词根词形升序返回全部非空词根家族，同时返回家族总数 `familyCount`。每行固定为 `{ rootId, lemma, derivedCount, action? }`，其中 action 定位词根词条；不会返回家族成员或 `derivedIds`。该任务直接消费与 `/root-groups`、词汇网络共享的稳定 `RootTopologyCache`，同一词典的拓扑已存在时不重新解析来源关系；多来源词条可以分别计入其所属家族，因此不能累加排行得到全局衍生词数量。
 
-当前总览固定消费四个 widget，分别渲染词汇规模、资料覆盖、词性分布和编辑活动；编辑活动使用 `activityPreview`。进入“编辑进度”详情后另行请求 `activityDistribution`，进入“词根家族”详情后另行请求 `rootFamilyRanking`，均不读取完整活动词典或在前端扫描词条。资料覆盖卡只展示释义、例句、IPA 与备注，避免“来源覆盖”与衍生词比例重复；`coverageBreakdown` 仍保留 `source` 行供其他消费者使用。词根家族不属于首屏轻量总览；孤立词根尚未作为分析 widget 接线。
+当前总览固定消费四个 widget，分别渲染词汇规模、资料覆盖、词性分布和编辑活动；编辑活动使用 `activityPreview`。进入“词汇 > 标签”后同一次请求完整的 `partDistribution` 与 `tagFrequency`，前端只继续计算标签组合；进入“编辑进度”详情后另行请求 `activityDistribution`，进入“词根家族”详情后另行请求 `rootFamilyRanking`。资料覆盖卡只展示释义、例句、IPA 与备注，避免“来源覆盖”与衍生词比例重复；`coverageBreakdown` 仍保留 `source` 行供其他消费者使用。词根家族不属于首屏轻量总览；孤立词根尚未作为分析 widget 接线。
 
 请求验证失败使用 `invalid_analysis_query_payload`、`invalid_analysis_widgets`、`invalid_analysis_widget`、`invalid_analysis_widget_id`、`unsupported_analysis_widget`、`invalid_analysis_widget_limit` 或 `duplicate_analysis_widget_id`。
 

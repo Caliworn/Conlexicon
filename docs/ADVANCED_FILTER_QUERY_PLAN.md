@@ -154,10 +154,10 @@ Feature result source 应由对应 service 产生可重建的查询身份，并�
 
 ### F4a：轻量分析查询（已完成）
 
-- `POST /api/dictionaries/:id/analysis/query` 已实现 `entryCount`、`coverageBreakdown`、`partDistribution` 和 `activityPreview`，请求规范化限制 widget 数量、ID、类型和 limit。
-- 最小 widget planner 将四类 widget 合并为 `entryStats`、`partStats`、`activityStats` 三个 SQLite 聚合任务；同一任务只执行一次，action 继续返回 EntryFilter descriptor，不返回完整 ID 数组。
+- `POST /api/dictionaries/:id/analysis/query` 已实现 `entryCount`、`coverageBreakdown`、`partDistribution`、`tagFrequency` 和 `activityPreview` 等轻量 widgets，请求规范化限制 widget 数量、ID、类型和 limit。
+- 最小 widget planner 将这些 widgets 合并为 `entryStats`、`partStats`、`tagStats`、`activityStats` 等 SQLite 聚合任务；同一任务只执行一次，action 继续返回 EntryFilter descriptor，不返回完整 ID 数组。`tagFrequency` 在聚合层排除显式词性标签。
 - F4a 使用同步、按需 API；前端以异步状态加载总览，并提供 loading/error/retry。数据分析页未打开时不请求该端点，也没有引入通用后台任务、进度轮询或持久化 job 表。
-- 前端总览已迁移到结构化 widget DTO；已迁移轻量统计不再依赖完整活动词典 snapshot 和本地 report slice。IPA 音节、Gloss 和完整形态统计留给 F4b feature service；词根家族排行改走稳定 topology summary。
+- 前端总览以及“词汇 > 标签”的词性分布、其他标签频率已迁移到结构化 widget DTO；已迁移轻量统计不再依赖完整活动词典 snapshot 和本地 report slice。标签组合暂保留前端计算；IPA 音节、Gloss 和完整形态统计留给 F4b feature service；词根家族排行改走稳定 topology summary。
 - repository contract 已覆盖请求规范化、planner 任务合并、widget DTO、筛选 action 和词典写入后的 generation/cacheKey 失效；实现路径直接查询 SQLite 聚合表，不导出完整 snapshot。10k 临时 SQLite 词典中，四个总览 widget 的 5 次定向请求约 56–60 毫秒，响应约 5 KiB。
 
 ### F4b：Feature result session
