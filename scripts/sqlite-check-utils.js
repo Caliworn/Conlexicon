@@ -48,7 +48,6 @@ function sampleSqliteDictionary() {
     language: "test-lang",
     description: "roundtrip check",
     settings: {
-      manualPartOfSpeechTags: true,
       partOfSpeechTags: ["n", "v"],
       tagDisplayMap: { n: "noun" },
     },

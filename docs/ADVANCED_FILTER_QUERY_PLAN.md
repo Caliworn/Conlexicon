@@ -58,7 +58,7 @@ F0 清点确认，现有入口必须分成三类：
 | 当前入口 | 当前语义 | 目标 | 备注 |
 | --- | --- | --- | --- |
 | 自由文本搜索 | `q + fields + fuzzyFields` | 保留为 `search` | 已接 `/entries`、projection、查询会话和定位 API，不属于高级 filter。 |
-| 词性、无词性 | 当前词典设置决定第一个标签或手动配置的词性标签 | `part` filter | 已有 SQLite 查询；应从独立 `activePart` 状态并入统一 EntryQuery。 |
+| 词性、无词性 | 只有当前词典显式配置的词性标签会被识别；配置为空时全部词条均为无词性 | `part` filter | 已有 SQLite 查询；应从独立 `activePart` 状态并入统一 EntryQuery。 |
 | 单标签 | 词条包含指定原始标签 | `tag` filter | 已有 SQLite `entry_tags` 查询；descriptor 必须保存原始标签，不能保存显示替换，也不应沿用自由文本模糊规范化。 |
 | 有/无释义 | 至少一条非空 `definition.meaning` | `presence(definition)` | 可直接查询 `definitions`。 |
 | 有/无例句 | 至少一条非空 `definition.example` | `presence(example)` | 当前例句仍存于 definition；未来语料链接升级时由 query 层保持语义。 |

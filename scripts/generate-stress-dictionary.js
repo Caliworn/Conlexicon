@@ -251,7 +251,6 @@ function buildDictionary(entryCount = DEFAULT_ENTRY_COUNT) {
     language: "Synthetic",
     description: `Deterministic ${formatEntryCount(entryCount)}-entry dictionary with morphology data for UI stress testing.`,
     settings: {
-      manualPartOfSpeechTags: true,
       partOfSpeechTags: partsOfSpeech,
       tagSortOrder: [...partsOfSpeech, ...lexicalTags, ...semanticDomains],
       tagDisplayMap: {

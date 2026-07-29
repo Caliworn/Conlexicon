@@ -475,7 +475,7 @@ SQLite repository 的核心读写、schema、迁移脚本和 smoke 已经落地�
 | `deleteEntry()` | 已改为 SQL 增量删除目标 entry 及其 definitions/tags/sources/entry morphology groups/overrides projection | 否；repository 返回 `{ id, updatedAt }`，API 返回 `{ updatedAt }` | 写入侧和普通 API 响应已达当前目标 |
 | `patchEntries()` | 已改为 SQL 增量更新目标词条 projection；携带 settings 时直接更新 settings blob，并只返回 `{ id, updatedAt, entries, settings? }` | 否 | 写入与 repository/API 响应均已收窄 |
 | `getEntry()` | 已按 `entries.id` 读取 SQL 表并组装完整 entry | 否 | 可继续保留 |
-| `queryEntries()` | 无参数和带参数请求都返回摘要 DTO 分页对象；无全文搜索时已下推到 SQL，覆盖词性、标签、字段存在性、来源数量、活动日期、排序和窗口读取。P0 已将正向词性及标签 `any/all` 从逐词条相关 `EXISTS` 改为标签索引驱动的候选 ID 集合；手动词性/普通标签使用 `(tag, entry_id)`，自动首标签词性使用 `WHERE position = 0` 的部分索引。F3 已将活动日期改为索引可用的 UTC 半开范围，并让来源数量上下界共享一次计数 | 否 | 完整词条只通过 `getEntry()` 按需读取；无词性反向查询继续复用 `(entry_id, position)` 主键或标签候选集；后续只按真实基准继续优化查询形状 |
+| `queryEntries()` | 无参数和带参数请求都返回摘要 DTO 分页对象；无全文搜索时已下推到 SQL，覆盖词性、标签、字段存在性、来源数量、活动日期、排序和窗口读取。P0 已将正向词性及标签 `any/all` 从逐词条相关 `EXISTS` 改为 `(tag, entry_id)` 索引驱动的候选 ID 集合；词性只由词典显式配置的词性标签集合决定，不再读取标签位置。F3 已将活动日期改为索引可用的 UTC 半开范围，并让来源数量上下界共享一次计数 | 否 | 完整词条只通过 `getEntry()` 按需读取；无词性反向查询复用标签候选集；后续只按真实基准继续优化查询形状 |
 | 全文 / fuzzy / 动态形态搜索 | 严格及 fuzzy 查询均按字段读取 `entry_search_values` 与 `entry_morphology_search_values`，首次查询建立有序命中 ID 会话，后续窗口、总数和定位复用同一结果；形态单字段和静态+形态混合查询均返回统一 `searchHits`；fuzzy 通过连接级确定性函数复用共享评分 | 不再依赖完整 snapshot、逐词条动态形态生成或重复的严格 `COUNT`/页面/排名；fuzzy 仍需线性扫描所选 projection records | 继续以真实基准评估查询形状和候选索引 |
 | `getEntryFacets()` | 已改为 SQL 聚合，覆盖词性、标签频率和无词性计数 | 否 | 后续如增加筛选上下文 facets，再扩展 SQL |
 | `getEntryRelations()` | 已使用 `entry_sources`/`entries` 查询来源和直接衍生，并复用稳定词根拓扑的 `entryId → rootIds`、`rootId → group` 反向索引组装同根组 | 否；前端词条详情和词汇网络均消费该 API | 质量检查中的词源问题后续接入同一关系层；不再把词汇网络列为待接线项 |

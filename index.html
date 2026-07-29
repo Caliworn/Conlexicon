@@ -298,7 +298,7 @@
                 <div class="ipa-keyboard" id="ipaKeyboard" data-i18n-aria-label="ipaKeyboardSettings" aria-label="IPA 虚拟键盘"></div>
 
                 <label>
-                  <span data-i18n="tagsLabel">属性标签（自动模式使用第一个标签作为词性，手动模式使用已配置的词性标签）</span>
+                  <span data-i18n="tagsLabel">属性标签（词性由“其他设置”中的词性标签配置决定）</span>
                   <input id="tagsInput" name="tags" maxlength="180">
                 </label>
 
@@ -598,8 +598,15 @@
                 <div class="form-heading compact-heading">
                   <div>
                     <p class="eyebrow" data-i18n="entryTagSettings">词条标签</p>
-                    <h3 data-i18n="tagDisplayReplacement">标签显示替换</h3>
+                    <h3 data-i18n="partOfSpeechTagSettings">词性标签</h3>
                   </div>
+                </div>
+                <label>
+                  <span data-i18n="partOfSpeechTagsHelp">只有这里列出的标签会被识别为词性；多个标签用逗号分隔。留空表示此词典不使用词性。</span>
+                  <input id="partOfSpeechTagsInput" type="text" placeholder="n, v, adj">
+                </label>
+                <div class="subsection-title">
+                  <h3 data-i18n="tagDisplayReplacement">标签显示替换</h3>
                 </div>
                 <label>
                   <span data-i18n="tagDisplayReplacementHelp">每行一条，格式为 原标签 = 显示文本。仅影响查看模式中的显示，不改变词条数据。</span>
@@ -623,17 +630,6 @@
                     <option value="chips" data-i18n="entryListPartDisplayChips">标签区</option>
                     <option value="both" data-i18n="entryListPartDisplayBoth">两者均显示</option>
                   </select>
-                </label>
-                <div class="subsection-title">
-                  <h3 data-i18n="partOfSpeechTagSettings">词性标签</h3>
-                </div>
-                <label class="toggle-row">
-                  <span data-i18n="manualPartOfSpeechTags">手动配置词性标签</span>
-                  <input id="manualPartOfSpeechTagsInput" type="checkbox">
-                </label>
-                <label>
-                  <span data-i18n="partOfSpeechTagsHelp">开启后，仅这里列出的标签会被识别为词性；多个标签用逗号分隔。关闭时仍保留内容，但使用第一个词条标签作为词性。</span>
-                  <input id="partOfSpeechTagsInput" type="text" placeholder="n, v, adj">
                 </label>
                 <div class="subsection-title tag-order-heading">
                   <h3 data-i18n="tagOrderSettings">自动整理标签顺序</h3>

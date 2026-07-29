@@ -33,7 +33,6 @@ function buildMorphologyTestDictionary() {
     language: "Synthetic",
     description: "Small current-schema dictionary for manually and automatically testing morphology groups, subtables, overrides, and empty cells.",
     settings: {
-      manualPartOfSpeechTags: true,
       partOfSpeechTags: ["n", "v", "adj"],
       showEmptyEntrySections: false,
       allowEmptyPronunciation: true,

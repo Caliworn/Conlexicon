@@ -13,7 +13,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - Multi-dictionary management: create, switch, import, export, configure, and delete dictionaries, with explicit confirmation before an imported dictionary ID overwrites an existing dictionary.
 - Per-dictionary SQLite persistence: entries and their structured subobjects, morphology template groups/tables/overrides, corpus data, settings, docs, and IPA rules are stored locally with each dictionary. Legacy JSON remains an explicit import/export and migration format.
 - Lexical entry editing with lemma, pronunciation, tags, multiple definitions, examples, notes, etymology, sources, and derived-entry backlinks.
-- Configurable part-of-speech logic: by default the first tag is treated as the part of speech; an optional explicit tag list supports multiple parts of speech per entry for display and filtering.
+- Explicit part-of-speech tags: only tags listed in the dictionary settings are treated as parts of speech for display and filtering; an empty list means the dictionary does not use parts of speech.
 - Display mode and edit mode: saved entries open in a clean reading view, with full editing and inline section editing available.
 - Responsive application shell with collapsible tool navigation, a collapsible entry list, and mobile drawer controls for navigation, entry browsing, and creating entries.
 - Advanced filtering from analytics and quality checks: click analytic rows or quality categories to filter the entry browser, with reversible filter variants for coverage, IPA, morphology, and quality issues. IPA auto-check and distribution filters use rebuildable server result sessions and retain the normal list search, sort, window, and location behavior. The runtime search-field panel shows exact unique matching-entry counts for each enabled field without issuing a separate statistics request.
@@ -25,14 +25,14 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - Per-dictionary corpus management with ordered blocks, speaker/modality layers, standalone units, inherited attributes, unique entity ID validation, single-parent link validation, and configurable gloss-based unit names with optional render objects.
 - Tabbed data analysis with a four-card, on-demand SQLite overview for lexicon size, data coverage, part-of-speech distribution, and editing activity; root-family details load on demand from the same stable topology used by root mode. IPA auto-generation checks reuse one cached outcome summary across match variants, while IPA unit, initial/final, and syllable distributions asynchronously share a separate cached summary.
 - Gloss rendering for `\gla`, `\glb`, `\glc`, and `\ft`, with independent render-object and alignment settings for corpus unit cards, unit content headings, and entry examples, plus per-object font, size, bold, italic, and `\glb` small-caps styles.
-- Per-dictionary UI/settings options, including per-field search/fuzzy controls, optional NFC and Unicode case folding, custom search equivalence rules, etymology autocomplete matching, label display replacement, highlighted tags, gloss rendering, polysemy display, save/discard/prompt handling for edits during navigation, corpus/docs auto-save, IPA keyboard symbols, and left navigation order.
+- Per-dictionary UI/settings options, including explicitly configured part-of-speech tags, per-field search/fuzzy controls, optional NFC and Unicode case folding, custom search equivalence rules, etymology autocomplete matching, label display replacement, highlighted tags, gloss rendering, polysemy display, save/discard/prompt handling for edits during navigation, corpus/docs auto-save, IPA keyboard symbols, and left navigation order.
 - SQLite-backed per-value search projections for static entry fields and generated morphology, with configurable strict/fuzzy matching and localized hit summaries. Large entry and root-mode results use versioned query windows while retaining one continuous native scrollbar.
 - Dark mode and Chinese/English UI switching, with the global interface theme and language remembered in `data/index.json`.
 
 - 多词典管理：新建、切换、导入、导出、配置和删除词典；导入相同词典 ID 的词典前会明确确认是否覆盖。
 - 词典级 SQLite 保存：词条及其结构化子对象、形态模板组/子表/覆盖项、语料库、设置、语言文档和 IPA 规则都会随当前词典保存在本地。旧 JSON 仅作为显式导入、导出和迁移格式保留。
 - 词条编辑：支持词形、发音、标签、多条释义、例句、备注、词源、来源以及反向衍生链接。
-- 可配置词性逻辑：默认将第一个标签视为词性；也可显式指定词性标签列表，使一个词条拥有多个词性并用于显示和筛选。
+- 显式词性标签：只有词典设置中列出的标签会被识别为词性，使一个词条可以拥有多个词性并用于显示和筛选；列表留空表示该词典不使用词性。
 - 查看模式与编辑模式：保存后的词条会进入整洁的阅读界面，也支持完整编辑和栏目局部编辑。
 - 响应式应用外壳：支持可收起工具导航、可收起词条列表，以及移动端用于导航、浏览词条和新建词条的抽屉控件。
 - 数据分析与质量检查高级筛选：点击统计行或质量类别可以筛选词条列表，并支持释义覆盖、IPA、形态学、质量问题等项目的筛选条件切换；标签、字段有无、来源数量和日期等稳定条件可继续叠加自由文本搜索，并复用普通词条列表的窗口加载与定位。IPA 自动检查以及音位、首尾音、音节数分布使用可重建的服务端结果会话，同样保留列表搜索、排序、窗口与定位行为。循环条件按候选摘要自动更新，不会因当前搜索暂时无命中而错误隐藏；列表的运行期搜索字段面板会显示每个已启用字段的准确唯一命中词条数，不另发统计请求。

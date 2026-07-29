@@ -165,6 +165,7 @@ async function checkAnalysisQueryContract(repository) {
     id: "dict-analysis-query-contract",
     name: "Analysis Query Contract",
     settings: {
+      partOfSpeechTags: ["n", "v"],
       tagDisplayMap: { n: "Noun", v: "Verb" },
     },
     entries: [
@@ -391,7 +392,6 @@ async function checkEntryFilterFactsContract(repository) {
     id: "dict-entry-filter-facts-contract",
     name: "Entry Filter Facts Contract",
     settings: {
-      manualPartOfSpeechTags: true,
       partOfSpeechTags: ["n", "v"],
     },
     entries: [
@@ -508,9 +508,6 @@ function testEntryParts(entry = {}, dictionary = {}) {
     return [];
   }
   const settings = dictionary.settings || {};
-  if (!settings.manualPartOfSpeechTags) {
-    return tags[0] ? [tags[0]] : [];
-  }
   const configuredParts = new Set((settings.partOfSpeechTags || []).map(testNormalize));
   if (!configuredParts.size) {
     return [];
@@ -675,11 +672,11 @@ function checkModelNormalization() {
   assert.deepEqual(
     tagModel.entryParts(
       { tags: ["topic", "n", "v"] },
-      { manualPartOfSpeechTags: true, partOfSpeechTags: ["n", "v"] },
+      { partOfSpeechTags: ["n", "v"] },
     ),
     ["n", "v"],
   );
-  assert.deepEqual(tagModel.entryParts({ tags: ["topic", "n"] }, { manualPartOfSpeechTags: false }), ["topic"]);
+  assert.deepEqual(tagModel.entryParts({ tags: ["topic", "n"] }, { partOfSpeechTags: [] }), []);
   assert.equal(tagModel.displayTag("n", { tagDisplayMap: { n: "noun" } }), "noun");
   assert.deepEqual([...entrySearchModel.normalizeSearchFields("lemma,unknown,tags")], ["lemma", "tags"]);
   assert.deepEqual([...entrySearchModel.normalizeFuzzyFields("")], []);
@@ -1339,7 +1336,6 @@ async function checkReadApiConsistency(repository) {
     id: "dict-read-api-consistency",
     name: "Read API Consistency",
     settings: {
-      manualPartOfSpeechTags: true,
       partOfSpeechTags: ["n", "v", "adj"],
       tagDisplayMap: {
         n: "Noun Display",
@@ -1676,11 +1672,10 @@ async function checkReadApiConsistency(repository) {
     }
   }
 
-  const defaultPartDictionary = await repository.createDictionary(normalizeDictionary({
-    id: "dict-read-api-default-part",
-    name: "Read API Default Part",
+  const noConfiguredPartDictionary = await repository.createDictionary(normalizeDictionary({
+    id: "dict-read-api-no-configured-part",
+    name: "Read API No Configured Part",
     settings: {
-      manualPartOfSpeechTags: false,
       tagDisplayMap: { topic: "Topic Display" },
     },
     entries: [
@@ -1690,13 +1685,13 @@ async function checkReadApiConsistency(repository) {
   }));
 
   try {
-    await assertEntryQueryConsistency(repository, defaultPartDictionary, { part: "topic" });
-    let apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(defaultPartDictionary.id)}/facets`);
+    await assertEntryQueryConsistency(repository, noConfiguredPartDictionary, { part: "topic" });
+    let apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(noConfiguredPartDictionary.id)}/facets`);
     assert.equal(apiResult.statusCode, 200);
-    assert.deepEqual(apiResult.body.parts.map((part) => part.tag), expectedParts(defaultPartDictionary));
-    assert.equal(apiResult.body.parts.find((part) => part.tag === "topic")?.displayLabel, "Topic Display");
+    assert.deepEqual(apiResult.body.parts, []);
+    assert.equal(apiResult.body.noPartOfSpeechCount, 2);
   } finally {
-    await repository.deleteDictionary(defaultPartDictionary.id);
+    await repository.deleteDictionary(noConfiguredPartDictionary.id);
     if (previousState.activeDictionaryId) {
       await repository.activateDictionary(previousState.activeDictionaryId);
     }
@@ -1729,7 +1724,11 @@ async function runRepositoryContractTests(options = {}) {
     assert.equal(state.uiLanguage, "zh");
     assert.equal(state.uiTheme, "light");
 
-    const first = await repository.createDictionary(normalizeDictionary({ name: "First", language: "one" }));
+    const first = await repository.createDictionary(normalizeDictionary({
+      name: "First",
+      language: "one",
+      settings: { partOfSpeechTags: ["n", "v"] },
+    }));
     const second = await repository.createDictionary(normalizeDictionary({ name: "Second", language: "two" }));
 
     state = await repository.readState();

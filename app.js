@@ -451,7 +451,7 @@ const i18n = {
     lemma: "词形",
     pronunciation: "发音",
     autoIpa: "自动 IPA",
-    tagsLabel: "属性标签（自动模式使用第一个标签作为词性，手动模式使用已配置的词性标签）",
+    tagsLabel: "属性标签（词性由“其他设置”中的词性标签配置决定）",
     definitionList: "多条释义",
     addDefinition: "添加释义",
     etymologyInfo: "来源与说明",
@@ -568,8 +568,7 @@ const i18n = {
     tagTooltipRawTag: "原始标签",
     tagTooltipDisplayReplacement: "显示替换",
     partOfSpeechTagSettings: "词性标签",
-    manualPartOfSpeechTags: "手动配置词性标签",
-    partOfSpeechTagsHelp: "开启后，仅这里列出的标签会被识别为词性；多个标签用逗号分隔。关闭时仍保留内容，但使用第一个词条标签作为词性。",
+    partOfSpeechTagsHelp: "只有这里列出的标签会被识别为词性；多个标签用逗号分隔。留空表示此词典不使用词性。",
     tagOrderSettings: "自动整理标签顺序",
     tagOrderHelp: "输入统一标签顺序，多个标签用逗号分隔。填写原始标签，不填写显示替换后的文本。",
     tagOrderInfo: "查看标签排序逻辑",
@@ -1025,7 +1024,7 @@ const i18n = {
     lemma: "Lemma",
     pronunciation: "Pronunciation",
     autoIpa: "Auto IPA",
-    tagsLabel: "Attribute Tags (automatic mode uses the first tag as the part of speech; manual mode uses configured part-of-speech tags)",
+    tagsLabel: "Attribute Tags (parts of speech are determined by the configured tags in Settings)",
     definitionList: "Definition List",
     addDefinition: "Add Definition",
     etymologyInfo: "Source and Notes",
@@ -1142,8 +1141,7 @@ const i18n = {
     tagTooltipRawTag: "Raw tag",
     tagTooltipDisplayReplacement: "Display",
     partOfSpeechTagSettings: "Part-of-Speech Tags",
-    manualPartOfSpeechTags: "Manually configure part-of-speech tags",
-    partOfSpeechTagsHelp: "When enabled, only tags listed here are recognized as parts of speech. Separate tags with commas. When disabled, the value is kept but the first entry tag is used as the part of speech.",
+    partOfSpeechTagsHelp: "Only tags listed here are recognized as parts of speech. Separate tags with commas. Leave this empty if the dictionary does not use parts of speech.",
     tagOrderSettings: "Auto Arrange Tag Order",
     tagOrderHelp: "Enter a unified tag order separated by commas. Use raw tags, not display replacements.",
     tagOrderInfo: "Show tag ordering logic",
@@ -1558,7 +1556,6 @@ const elements = {
   entryListRawTagDisplayInput: document.querySelector("#entryListRawTagDisplayInput"),
   entryListTagDisplayLimitInput: document.querySelector("#entryListTagDisplayLimitInput"),
   entryListPartDisplayInput: document.querySelector("#entryListPartDisplayInput"),
-  manualPartOfSpeechTagsInput: document.querySelector("#manualPartOfSpeechTagsInput"),
   partOfSpeechTagsInput: document.querySelector("#partOfSpeechTagsInput"),
   tagSortOrderInput: document.querySelector("#tagSortOrderInput"),
   applyTagSortOrderButton: document.querySelector("#applyTagSortOrderButton"),
@@ -2166,7 +2163,6 @@ function normalizeDictionarySettings(settings = {}) {
     entryListRawTagDisplay: Boolean(settings.entryListRawTagDisplay),
     entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(settings.entryListTagDisplayLimit),
     entryListPartDisplay: normalizeEntryListPartDisplay(settings.entryListPartDisplay),
-    manualPartOfSpeechTags: Boolean(settings.manualPartOfSpeechTags),
     partOfSpeechTags: normalizeTagList(settings.partOfSpeechTags),
     tagSortOrder: normalizeTagList(settings.tagSortOrder),
     redHighlightTags: normalizeRedHighlightTags(settings.redHighlightTags),
@@ -2939,8 +2935,8 @@ function entryPartText(entry, dictionary = activeDictionary()) {
   return entryPartLabels(entry, dictionary).join(", ");
 }
 
-function entryTagIsPart(entry, tagIndex, tag, dictionary = activeDictionary()) {
-  return tagModel.entryTagIsPart(entry, tagIndex, tag, normalizeDictionarySettings(dictionary?.settings), {
+function entryTagIsPart(entry, tag, dictionary = activeDictionary()) {
+  return tagModel.entryTagIsPart(entry, tag, normalizeDictionarySettings(dictionary?.settings), {
     normalizeText: searchNormalizationModel.normalizeStructuralKey,
   });
 }
@@ -4988,7 +4984,6 @@ function entryCardSettingsSizeSignature() {
     settings.entryListRawTagDisplay ? "raw-tags" : "display-tags",
     settings.entryListTagFiltering ? "tag-filtering" : "no-tag-filtering",
     entrySearchQuerySignature(),
-    settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
     settings.partOfSpeechTags.join(","),
     stableJson(settings.tagDisplayMap),
     stableJson(settings.redHighlightTags),
@@ -5621,7 +5616,6 @@ function entryQueryApiKey(dictionary = activeDictionary()) {
     advancedFilterUsesFeatureQuery() ? advancedFilter.scope : "",
     entrySort,
     stableJson(settings.tagDisplayMap),
-    settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
     settings.partOfSpeechTags.join(","),
     entrySearchQuerySignature(dictionary),
   ].join("|");
@@ -6120,7 +6114,6 @@ function entryFacetsApiKey(dictionary = activeDictionary()) {
     dictionary.id,
     dictionary.updatedAt || "",
     stableJson(settings.tagDisplayMap),
-    settings.manualPartOfSpeechTags ? "manual-parts" : "first-tag-part",
     settings.partOfSpeechTags.join(","),
   ].join("|");
 }
@@ -6357,7 +6350,7 @@ function createEntryCard(entry, options = {}) {
     if (tagTarget && button.contains(tagTarget)) {
       event.preventDefault();
       event.stopPropagation();
-      applyTagFilter(entry, Number(tagTarget.dataset.entryTagIndex), tagTarget.dataset.entryTagValue || "");
+      applyTagFilter(entry, tagTarget.dataset.entryTagValue || "");
       return;
     }
     switchToEntry(entry.id, { rootId: options.rootId || "" });
@@ -7380,7 +7373,7 @@ async function enterAdvancedFilter(action) {
   }
 }
 
-async function applyTagFilter(entry, tagIndex, tag) {
+async function applyTagFilter(entry, tag) {
   const dictionary = activeDictionary();
   if (!dictionary || !tag) {
     return;
@@ -7391,7 +7384,7 @@ async function applyTagFilter(entry, tagIndex, tag) {
     return;
   }
 
-  if (entryTagIsPart(entry, tagIndex, tag, dictionary)) {
+  if (entryTagIsPart(entry, tag, dictionary)) {
     advancedFilter = null;
     rootMode = false;
     activePart = tag;
@@ -8063,10 +8056,10 @@ function renderEntryDisplay(entry) {
   const showEmptySections = normalizeDictionarySettings(activeDictionary()?.settings).showEmptyEntrySections;
   const partTags = (entry.tags || [])
     .map((tag, index) => ({ tag, index }))
-    .filter(({ tag, index }) => entryTagIsPart(entry, index, tag));
+    .filter(({ tag }) => entryTagIsPart(entry, tag));
   const otherTags = (entry.tags || [])
     .map((tag, index) => ({ tag, index }))
-    .filter(({ tag, index }) => !entryTagIsPart(entry, index, tag));
+    .filter(({ tag }) => !entryTagIsPart(entry, tag));
   elements.editEntryButton.hidden = false;
   elements.focusEntryListButton.hidden = false;
   elements.openLexicalNetworkButton.hidden = false;
@@ -8845,7 +8838,7 @@ function renderSmallCaps(value) {
 function entryListTagItems(entry, { includePartTags = true, dictionary = activeDictionary() } = {}) {
   return (entry.tags || [])
     .map((tag, index) => ({ tag, index }))
-    .filter(({ tag, index }) => includePartTags || !entryTagIsPart(entry, index, tag, dictionary));
+    .filter(({ tag }) => includePartTags || !entryTagIsPart(entry, tag, dictionary));
 }
 
 function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = false, clickable = false, { includePartTags = true } = {}) {
@@ -8857,7 +8850,7 @@ function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = false, 
     .slice(0, visibleLimit)
     .map(({ tag, index }) => {
       const text = entryListDisplayTag(tag, settings);
-      const classes = ["chip", entryTagIsPart(entry, index, tag) ? "part-chip" : "", tagIsRedHighlighted(tag) ? "highlight-tag" : ""].filter(Boolean).join(" ");
+      const classes = ["chip", entryTagIsPart(entry, tag) ? "part-chip" : "", tagIsRedHighlighted(tag) ? "highlight-tag" : ""].filter(Boolean).join(" ");
       const tagAttributes = clickable
         ? ` data-entry-tag-index="${index}" data-entry-tag-value="${escapeHtml(tag)}"`
         : "";
@@ -8871,8 +8864,8 @@ function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = false, 
     ? tags.slice(visibleLimit).map(({ tag }) => entryListDisplayTag(tag, settings)).join(", ")
     : "";
   const hiddenTagTooltipHtml = hasHiddenTags
-    ? `<span class="app-tooltip-chip-list">${tags.slice(visibleLimit).map(({ tag, index }) => {
-      const classes = ["chip", entryTagIsPart(entry, index, tag) ? "part-chip" : "", tagIsRedHighlighted(tag) ? "highlight-tag" : ""].filter(Boolean).join(" ");
+    ? `<span class="app-tooltip-chip-list">${tags.slice(visibleLimit).map(({ tag }) => {
+      const classes = ["chip", entryTagIsPart(entry, tag) ? "part-chip" : "", tagIsRedHighlighted(tag) ? "highlight-tag" : ""].filter(Boolean).join(" ");
       return `<span class="${classes}">${escapeHtml(entryListDisplayTag(tag, settings))}</span>`;
     }).join("")}</span>`
     : "";
@@ -11830,9 +11823,7 @@ function fillSettingsForm(dictionary) {
   elements.entryListRawTagDisplayInput.checked = settings.entryListRawTagDisplay;
   elements.entryListTagDisplayLimitInput.value = settings.entryListTagDisplayLimit;
   elements.entryListPartDisplayInput.value = settings.entryListPartDisplay;
-  elements.manualPartOfSpeechTagsInput.checked = settings.manualPartOfSpeechTags;
   elements.partOfSpeechTagsInput.value = settings.partOfSpeechTags.join(", ");
-  syncPartOfSpeechTagSettingsControls();
   elements.tagSortOrderInput.value = settings.tagSortOrder.join(", ");
   elements.tagRedHighlightInput.value = settings.redHighlightTags.join("\n");
   elements.entryListTagFilteringInput.checked = settings.entryListTagFiltering;
@@ -11852,13 +11843,6 @@ function fillSettingsForm(dictionary) {
   renderEntrySectionOrderEditor(settings.entrySectionOrder);
   renderToolNavOrderEditor(settings.toolNavOrder);
   setupMasonryLayout(elements.settingsForm, ".settings-section, .form-actions", 18);
-}
-
-function syncPartOfSpeechTagSettingsControls() {
-  const enabled = Boolean(elements.manualPartOfSpeechTagsInput?.checked);
-  if (elements.partOfSpeechTagsInput) {
-    elements.partOfSpeechTagsInput.disabled = !enabled;
-  }
 }
 
 function renderToolNavOrderEditor(order = DEFAULT_TOOL_NAV_ORDER) {
@@ -12090,7 +12074,6 @@ function settingsFormSnapshot() {
     entryListRawTagDisplay: elements.entryListRawTagDisplayInput.checked,
     entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(elements.entryListTagDisplayLimitInput.value),
     entryListPartDisplay: normalizeEntryListPartDisplay(elements.entryListPartDisplayInput.value),
-    manualPartOfSpeechTags: elements.manualPartOfSpeechTagsInput.checked,
     partOfSpeechTags: normalizeTagList(elements.partOfSpeechTagsInput.value),
     tagSortOrder: normalizeTagList(elements.tagSortOrderInput.value),
     redHighlightTags: normalizeRedHighlightTags(elements.tagRedHighlightInput.value),
@@ -12127,7 +12110,6 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     entryListRawTagDisplay: settings.entryListRawTagDisplay,
     entryListTagDisplayLimit: settings.entryListTagDisplayLimit,
     entryListPartDisplay: settings.entryListPartDisplay,
-    manualPartOfSpeechTags: settings.manualPartOfSpeechTags,
     partOfSpeechTags: settings.partOfSpeechTags,
     tagSortOrder: settings.tagSortOrder,
     redHighlightTags: settings.redHighlightTags,
@@ -12282,7 +12264,6 @@ function collectDictionarySettingsFromForm(existing = {}) {
     entryListRawTagDisplay: elements.entryListRawTagDisplayInput.checked,
     entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(elements.entryListTagDisplayLimitInput.value),
     entryListPartDisplay: normalizeEntryListPartDisplay(elements.entryListPartDisplayInput.value),
-    manualPartOfSpeechTags: elements.manualPartOfSpeechTagsInput.checked,
     partOfSpeechTags: normalizeTagList(elements.partOfSpeechTagsInput.value),
     tagSortOrder: normalizeTagList(elements.tagSortOrderInput.value),
     redHighlightTags: normalizeRedHighlightTags(elements.tagRedHighlightInput.value),
@@ -15288,7 +15269,7 @@ elements.entryDisplay.addEventListener("click", async (event) => {
     if (entry) {
       event.preventDefault();
       event.stopPropagation();
-      applyTagFilter(entry, Number(tagTarget.dataset.entryTagIndex), tagTarget.dataset.entryTagValue || "");
+      applyTagFilter(entry, tagTarget.dataset.entryTagValue || "");
     }
     return;
   }
@@ -15749,7 +15730,6 @@ elements.entryMorphologyControls.addEventListener("click", async (event) => {
   renderMorphologyEntryControls(elements.entryMorphologyControls, { ...baseEntry, ...current }, { full: true });
 });
 elements.settingsForm.addEventListener("submit", saveSettings);
-elements.manualPartOfSpeechTagsInput.addEventListener("change", syncPartOfSpeechTagSettingsControls);
 elements.searchFieldEnabledInputs.forEach((input) => {
   input.addEventListener("change", syncEntrySearchSettingsControls);
 });

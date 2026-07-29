@@ -127,7 +127,6 @@ function searchConsistencyDictionary() {
     id: "dict-entry-search-consistency",
     name: "Entry Search Consistency",
     settings: {
-      manualPartOfSpeechTags: true,
       partOfSpeechTags: ["n", "v"],
       tagDisplayMap: { "internal-tag": "DisplayTagToken" },
     },
