@@ -317,7 +317,8 @@ const i18n = {
     columnCount: "列数",
     rowLabels: "行标签",
     columnLabels: "列标签",
-    autoMatchTags: "自动匹配标签",
+    autoMatchTags: "自动匹配词条标签",
+    autoMatchTagsHelp: "词条包含其中任一标签时，将匹配此表格组；若多个表格组同时匹配，只使用排序最前的组。多个标签可用半角逗号、全角逗号或顿号分隔。",
     referenceMode: "引用",
     replacementMode: "替换",
     applySize: "应用尺寸",
@@ -462,7 +463,8 @@ const i18n = {
     lemma: "词形",
     pronunciation: "发音",
     autoIpa: "自动 IPA",
-    tagsLabel: "属性标签（词性由“其他设置”中的词性标签配置决定）",
+    tagsLabel: "标签",
+    tagsHelp: "填写词条标签；词性也作为标签在这里输入。多个标签可用半角逗号、全角逗号或顿号分隔。已配置为词性的标签会按词性显示。",
     definitionList: "多条释义",
     addDefinition: "添加释义",
     etymologyInfo: "来源与说明",
@@ -567,7 +569,7 @@ const i18n = {
     tags: "标签",
     entryTagSettings: "词条标签",
     tagDisplayReplacement: "标签显示替换",
-    tagDisplayReplacementHelp: "每行一条，格式为 原标签 = 显示文本。仅影响查看模式中的显示，不改变词条数据。",
+    tagDisplayReplacementHelp: "每行一条，格式为“标签 = 显示文本”。只改变界面显示，不修改标签本身。",
     entryListRawTagDisplay: "词条列表中显示原始标签",
     entryListTagDisplayLimit: "词条列表中标签显示上限",
     entryListTagDisplayLimitHelp: "设为 n 时，超过 n 个标签会显示前 n-1 个和省略号。默认为 3。",
@@ -579,11 +581,16 @@ const i18n = {
     tagTooltipRawTag: "原始标签",
     tagTooltipDisplayReplacement: "显示替换",
     partOfSpeechTagSettings: "词性标签",
-    partOfSpeechTagsHelp: "只有这里列出的标签会被识别为词性；多个标签用逗号分隔。留空表示此词典不使用词性。",
+    partOfSpeechTagsHelp: "只有这里列出的标签会被识别为词性；留空表示此词典不使用词性。多个标签可用半角逗号、全角逗号或顿号分隔。",
+    tagListSeparator: "标签列表分隔符",
+    tagListSeparatorHelp: "选择各标签输入框显示多个标签时使用的分隔符。无论选择哪项，输入时均可使用半角逗号、全角逗号或顿号。",
+    tagListSeparatorCommaSpace: "半角逗号和空格（n, v）",
+    tagListSeparatorFullwidthComma: "全角逗号（n，v）",
+    tagListSeparatorIdeographicComma: "顿号（n、v）",
     tagOrderSettings: "自动整理标签顺序",
-    tagOrderHelp: "输入统一标签顺序，多个标签用逗号分隔。填写原始标签，不填写显示替换后的文本。",
+    tagOrderHelp: "按此顺序整理每个词条的标签；未列出的标签保留在末尾。请填写标签本身，不要填写显示替换文本。",
     tagOrderInfo: "查看标签排序逻辑",
-    tagOrderInfoBody: "点击刷新后，系统会按输入框中的统一顺序重排每个词条的标签。统一顺序里有而某个词条没有的标签会被跳过；某个词条里有但统一顺序里没有的标签会保留在末尾，多个额外标签保持原始相对顺序。这里应填写原始标签；显示替换只影响界面显示，不参与匹配。",
+    tagOrderInfoBody: "点击“应用”后，系统会按输入框中的统一顺序重排每个词条的标签。统一顺序里有而某个词条没有的标签会被跳过；某个词条里有但统一顺序里没有的标签会保留在末尾，多个额外标签保持原始相对顺序。这里应填写标签本身；显示替换只影响界面显示，不参与匹配。",
     tagOrderConfirm: "将按照当前输入的统一顺序重排当前词典中所有词条的标签，并立即保存。继续吗？",
     tagOrderUnsavedSettingsConfirm: "当前其他设置有未保存更改。请先保存设置后再自动整理标签顺序。",
     tagOrderApplied: "标签顺序已整理",
@@ -591,7 +598,7 @@ const i18n = {
     saveAndApply: "保存并应用",
     applyTags: "应用",
     tagDisplaySettings: "标签突出显示",
-    tagRedHighlightHelp: "配置后，这些标签会在词条浏览栏和查看界面中以红色显示。多个标签用逗号、空格或换行分隔。",
+    tagRedHighlightHelp: "这里列出的标签会在词条列表和词条详情中以红色显示。请填写标签本身，不要填写显示替换文本。",
     tagFilterSettings: "标签筛选",
     entryListTagFilteringHelp: "在词条列表中点击标签时启用筛选",
     displaySettings: "显示",
@@ -777,7 +784,7 @@ const i18n = {
     corpusBlockTitle: "块标题",
     corpusUnitContent: "单元内容",
     corpusTags: "标签",
-    corpusTagsHelp: "使用逗号或换行分隔。",
+    corpusTagsHelp: "为当前语料项目添加标签。多个标签可用半角逗号、全角逗号或顿号分隔。",
     corpusNotes: "备注",
     corpusAttributes: "属性",
     addAttribute: "添加属性",
@@ -890,7 +897,8 @@ const i18n = {
     columnCount: "Columns",
     rowLabels: "Row Labels",
     columnLabels: "Column Labels",
-    autoMatchTags: "Auto Match Tags",
+    autoMatchTags: "Automatic Entry Tag Matching",
+    autoMatchTagsHelp: "An entry matches this table group when it contains any listed tag. If multiple groups match, only the first group in the current order is used. Separate multiple tags with halfwidth commas, fullwidth commas, or ideographic commas.",
     referenceMode: "Reference",
     replacementMode: "Replacement",
     applySize: "Apply Size",
@@ -1035,7 +1043,8 @@ const i18n = {
     lemma: "Lemma",
     pronunciation: "Pronunciation",
     autoIpa: "Auto IPA",
-    tagsLabel: "Attribute Tags (parts of speech are determined by the configured tags in Settings)",
+    tagsLabel: "Tags",
+    tagsHelp: "Enter entry tags here; parts of speech are tags too. Separate multiple tags with halfwidth commas, fullwidth commas, or ideographic commas. Configured part-of-speech tags are displayed as parts of speech.",
     definitionList: "Definition List",
     addDefinition: "Add Definition",
     etymologyInfo: "Source and Notes",
@@ -1140,7 +1149,7 @@ const i18n = {
     tags: "Tags",
     entryTagSettings: "Entry Tags",
     tagDisplayReplacement: "Tag Display Replacement",
-    tagDisplayReplacementHelp: "One per line, in the format Original Tag = Display Text. Only affects display mode; entry data is unchanged.",
+    tagDisplayReplacementHelp: "Enter one per line in the format “Tag = Display Text”. This changes only the interface display and does not modify the tag itself.",
     entryListRawTagDisplay: "Show raw tags in the entry list",
     entryListTagDisplayLimit: "Entry list tag display limit",
     entryListTagDisplayLimitHelp: "Set to n: entries with more than n tags show the first n-1 tags and an ellipsis. Default: 3.",
@@ -1152,11 +1161,16 @@ const i18n = {
     tagTooltipRawTag: "Raw tag",
     tagTooltipDisplayReplacement: "Display",
     partOfSpeechTagSettings: "Part-of-Speech Tags",
-    partOfSpeechTagsHelp: "Only tags listed here are recognized as parts of speech. Separate tags with commas. Leave this empty if the dictionary does not use parts of speech.",
+    partOfSpeechTagsHelp: "Only tags listed here are recognized as parts of speech; leave this empty if the dictionary does not use parts of speech. Separate multiple tags with halfwidth commas, fullwidth commas, or ideographic commas.",
+    tagListSeparator: "Tag List Separator",
+    tagListSeparatorHelp: "Choose the separator used to display multiple tags in tag input fields. Regardless of this choice, input accepts halfwidth commas, fullwidth commas, or ideographic commas.",
+    tagListSeparatorCommaSpace: "Comma and space (n, v)",
+    tagListSeparatorFullwidthComma: "Fullwidth comma (n，v)",
+    tagListSeparatorIdeographicComma: "Ideographic comma (n、v)",
     tagOrderSettings: "Auto Arrange Tag Order",
-    tagOrderHelp: "Enter a unified tag order separated by commas. Use raw tags, not display replacements.",
+    tagOrderHelp: "Arrange each entry's tags in this order; unlisted tags remain at the end. Enter tag values, not display replacements.",
     tagOrderInfo: "Show tag ordering logic",
-    tagOrderInfoBody: "After you click Refresh, each entry's tags are reordered by the unified order in this field. Tags in the unified order that an entry does not have are skipped. Tags on an entry that are not in the unified order are kept at the end, and multiple extra tags keep their original relative order. Use raw tags here; display replacements only affect how tags are shown.",
+    tagOrderInfoBody: "After you click Apply, each entry's tags are reordered by the unified order in this field. Tags in the unified order that an entry does not have are skipped. Tags on an entry that are not in the unified order are kept at the end, and multiple extra tags keep their original relative order. Enter tag values here; display replacements only affect how tags are shown.",
     tagOrderConfirm: "This will reorder tags for every entry in the current dictionary using the current unified order and save immediately. Continue?",
     tagOrderUnsavedSettingsConfirm: "Other Settings have unsaved changes. Save the settings before arranging tag order.",
     tagOrderApplied: "Tag order arranged",
@@ -1164,7 +1178,7 @@ const i18n = {
     saveAndApply: "Save and Apply",
     applyTags: "Apply",
     tagDisplaySettings: "Tag Highlighting",
-    tagRedHighlightHelp: "Configured tags are shown in red in the entry browser and display mode. Separate tags with commas, spaces, or line breaks.",
+    tagRedHighlightHelp: "Tags listed here are shown in red in the entry list and entry details. Enter tag values, not display replacements.",
     tagFilterSettings: "Tag Filtering",
     entryListTagFilteringHelp: "Enable filtering when clicking tags in the entry list",
     displaySettings: "Display",
@@ -1353,7 +1367,7 @@ const i18n = {
     corpusBlockTitle: "Block Title",
     corpusUnitContent: "Unit Content",
     corpusTags: "Tags",
-    corpusTagsHelp: "Separate with commas or line breaks.",
+    corpusTagsHelp: "Add tags to this corpus item. Separate multiple tags with halfwidth commas, fullwidth commas, or ideographic commas.",
     corpusNotes: "Notes",
     corpusAttributes: "Attributes",
     addAttribute: "Add Attribute",
@@ -1568,6 +1582,7 @@ const elements = {
   entryListTagDisplayLimitInput: document.querySelector("#entryListTagDisplayLimitInput"),
   entryListPartDisplayInput: document.querySelector("#entryListPartDisplayInput"),
   partOfSpeechTagsInput: document.querySelector("#partOfSpeechTagsInput"),
+  tagListSeparatorStyleInput: document.querySelector("#tagListSeparatorStyleInput"),
   tagSortOrderInput: document.querySelector("#tagSortOrderInput"),
   applyTagSortOrderButton: document.querySelector("#applyTagSortOrderButton"),
   tagOrderInfoButton: document.querySelector("#tagOrderInfoButton"),
@@ -2116,7 +2131,7 @@ function normalizeDictionary(dictionary) {
 }
 
 function normalizeEntry(entry, usedIds = new Set()) {
-  const tags = Array.isArray(entry.tags) ? entry.tags.filter(Boolean) : [];
+  const tags = normalizeTagList(entry.tags);
 
   const definitions = Array.isArray(entry.definitions)
     ? entry.definitions.map((definition) => normalizeDefinition(definition, usedIds))
@@ -2176,7 +2191,8 @@ function normalizeDictionarySettings(settings = {}) {
     entryListPartDisplay: normalizeEntryListPartDisplay(settings.entryListPartDisplay),
     partOfSpeechTags: normalizeTagList(settings.partOfSpeechTags),
     tagSortOrder: normalizeTagList(settings.tagSortOrder),
-    redHighlightTags: normalizeRedHighlightTags(settings.redHighlightTags),
+    redHighlightTags: normalizeTagList(settings.redHighlightTags),
+    tagListSeparatorStyle: normalizeTagListSeparatorStyle(settings.tagListSeparatorStyle),
     entryListTagFiltering: Boolean(settings.entryListTagFiltering ?? true),
     entryListPolysemyDisplay: Boolean(settings.entryListPolysemyDisplay),
     networkPolysemyDisplay: Boolean(settings.networkPolysemyDisplay),
@@ -2401,12 +2417,33 @@ function normalizeTagDisplayMap(map = {}) {
   return tagModel.normalizeTagDisplayMap(map);
 }
 
-function normalizeRedHighlightTags(value) {
-  return tagModel.normalizeRedHighlightTags(value);
-}
-
 function normalizeTagList(value) {
   return tagModel.normalizeTagList(value);
+}
+
+function parseTagListText(value) {
+  return tagModel.parseTagListText(value);
+}
+
+function normalizeTagListSeparatorStyle(value) {
+  return tagModel.normalizeTagListSeparatorStyle(value);
+}
+
+function serializeTagList(value, dictionaryOrSettings = activeDictionary()) {
+  const settings = dictionaryOrSettings?.settings || dictionaryOrSettings || {};
+  return tagModel.serializeTagList(value, settings.tagListSeparatorStyle);
+}
+
+function updateTagListPlaceholders(style = elements.tagListSeparatorStyleInput.value) {
+  const separatorStyle = normalizeTagListSeparatorStyle(style);
+  elements.partOfSpeechTagsInput.placeholder = tagModel.serializeTagList(
+    ["n", "v", "adj"],
+    separatorStyle,
+  );
+  elements.tagSortOrderInput.placeholder = tagModel.serializeTagList(
+    ["n", "v", "adj", "root"],
+    separatorStyle,
+  );
 }
 
 function normalizeEntryListTagDisplayLimit(value) {
@@ -2500,7 +2537,7 @@ function normalizeCorpusBlock(block = {}, usedIds = new Set()) {
     id: reserveEntityId(block.id, "corpus-block", usedIds),
     title: String(block.title || ""),
     attributes: normalizeCorpusAttributes(block.attributes),
-    tags: uniqueList(block.tags),
+    tags: normalizeTagList(block.tags),
     notes: String(block.notes || ""),
     unitIds: normalizeCorpusUnitIds(block.unitIds),
     layers: Array.isArray(block.layers) ? block.layers.map((layer) => normalizeCorpusLayer(layer, usedIds)) : [],
@@ -2517,7 +2554,7 @@ function normalizeCorpusLayer(layer = {}, usedIds = new Set()) {
     speaker: String(layer.speaker || ""),
     modality: String(layer.modality || ""),
     attributes: normalizeCorpusAttributes(layer.attributes),
-    tags: uniqueList(layer.tags),
+    tags: normalizeTagList(layer.tags),
     notes: String(layer.notes || ""),
     unitIds: normalizeCorpusUnitIds(layer.unitIds),
   };
@@ -2530,7 +2567,7 @@ function normalizeCorpusUnit(unit = {}, usedIds = new Set()) {
     id: reserveEntityId(unit.id, "corpus-unit", usedIds),
     content: String(unit.content || ""),
     attributes: normalizeCorpusAttributes(unit.attributes),
-    tags: uniqueList(unit.tags),
+    tags: normalizeTagList(unit.tags),
     notes: String(unit.notes || ""),
     createdAt: unit.createdAt || now,
     updatedAt: unit.updatedAt || now,
@@ -2970,24 +3007,6 @@ function normalize(value) {
   return searchNormalizationModel.normalizeSearchText(value, {
     locale: currentLanguage === "zh" ? "zh-CN" : "en-US",
   });
-}
-
-function splitList(value) {
-  return String(value || "")
-    .split(/[,\n，、]/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function uniqueList(value) {
-  const unique = [];
-  splitList(Array.isArray(value) ? value.join("，") : value)
-    .forEach((item) => {
-      if (!unique.includes(item)) {
-        unique.push(item);
-      }
-    });
-  return unique;
 }
 
 function splitSourceText(value) {
@@ -11184,7 +11203,7 @@ function fillEntryForm(entry) {
   elements.entryId.value = formEntry.id || "";
   elements.lemmaInput.value = formEntry.lemma || "";
   elements.pronunciationInput.value = formEntry.pronunciation || "";
-  elements.tagsInput.value = (formEntry.tags || []).join("，");
+  elements.tagsInput.value = serializeTagList(formEntry.tags);
   elements.notesInput.value = formEntry.notes || "";
   elements.sourceEntryInput.value = (formEntry.etymology?.sources || []).join("，");
   elements.etymologyDescriptionInput.value = formEntry.etymology?.description || "";
@@ -11216,7 +11235,7 @@ function morphologyFormPreviewEntry(entry = {}, full = false) {
   return {
     ...entry,
     lemma: full ? elements.lemmaInput.value.trim() : entry.lemma || "",
-    tags: full ? splitList(elements.tagsInput.value) : entry.tags || [],
+    tags: full ? parseTagListText(elements.tagsInput.value) : entry.tags || [],
   };
 }
 
@@ -11482,9 +11501,7 @@ function entrySemanticSnapshot(entry = {}) {
   return {
     lemma: String(entry.lemma || "").trim(),
     pronunciation: String(entry.pronunciation || "").trim(),
-    tags: Array.isArray(entry.tags)
-      ? entry.tags.map((tag) => String(tag || "").trim()).filter(Boolean)
-      : [],
+    tags: normalizeTagList(entry.tags),
     definitions: (entry.definitions || [])
       .map((definition) => ({
         id: String(definition?.id || ""),
@@ -11516,7 +11533,7 @@ function entriesHaveSameSemantics(left, right) {
 
 function fullEntryFormCandidate(existing = selectedEntry()) {
   const lemma = elements.lemmaInput.value.trim();
-  const tags = splitList(elements.tagsInput.value);
+  const tags = parseTagListText(elements.tagsInput.value);
   const morphologyState = collectMorphologyEntryState(elements.entryMorphologyControls, {
     ...(existing || {}),
     lemma,
@@ -11920,9 +11937,11 @@ function fillSettingsForm(dictionary) {
   elements.entryListRawTagDisplayInput.checked = settings.entryListRawTagDisplay;
   elements.entryListTagDisplayLimitInput.value = settings.entryListTagDisplayLimit;
   elements.entryListPartDisplayInput.value = settings.entryListPartDisplay;
-  elements.partOfSpeechTagsInput.value = settings.partOfSpeechTags.join(", ");
-  elements.tagSortOrderInput.value = settings.tagSortOrder.join(", ");
-  elements.tagRedHighlightInput.value = settings.redHighlightTags.join("\n");
+  elements.tagListSeparatorStyleInput.value = settings.tagListSeparatorStyle;
+  updateTagListPlaceholders(settings.tagListSeparatorStyle);
+  elements.partOfSpeechTagsInput.value = serializeTagList(settings.partOfSpeechTags, settings);
+  elements.tagSortOrderInput.value = serializeTagList(settings.tagSortOrder, settings);
+  elements.tagRedHighlightInput.value = serializeTagList(settings.redHighlightTags, settings);
   elements.entryListTagFilteringInput.checked = settings.entryListTagFiltering;
   elements.entryListPolysemyInput.checked = settings.entryListPolysemyDisplay;
   elements.networkPolysemyInput.checked = settings.networkPolysemyDisplay;
@@ -12171,9 +12190,10 @@ function settingsFormSnapshot() {
     entryListRawTagDisplay: elements.entryListRawTagDisplayInput.checked,
     entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(elements.entryListTagDisplayLimitInput.value),
     entryListPartDisplay: normalizeEntryListPartDisplay(elements.entryListPartDisplayInput.value),
-    partOfSpeechTags: normalizeTagList(elements.partOfSpeechTagsInput.value),
-    tagSortOrder: normalizeTagList(elements.tagSortOrderInput.value),
-    redHighlightTags: normalizeRedHighlightTags(elements.tagRedHighlightInput.value),
+    partOfSpeechTags: parseTagListText(elements.partOfSpeechTagsInput.value),
+    tagSortOrder: parseTagListText(elements.tagSortOrderInput.value),
+    redHighlightTags: parseTagListText(elements.tagRedHighlightInput.value),
+    tagListSeparatorStyle: normalizeTagListSeparatorStyle(elements.tagListSeparatorStyleInput.value),
     entryListTagFiltering: elements.entryListTagFilteringInput.checked,
     entryListPolysemyDisplay: elements.entryListPolysemyInput.checked,
     networkPolysemyDisplay: elements.networkPolysemyInput.checked,
@@ -12210,6 +12230,7 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     partOfSpeechTags: settings.partOfSpeechTags,
     tagSortOrder: settings.tagSortOrder,
     redHighlightTags: settings.redHighlightTags,
+    tagListSeparatorStyle: settings.tagListSeparatorStyle,
     entryListTagFiltering: settings.entryListTagFiltering,
     entryListPolysemyDisplay: settings.entryListPolysemyDisplay,
     networkPolysemyDisplay: settings.networkPolysemyDisplay,
@@ -12361,9 +12382,10 @@ function collectDictionarySettingsFromForm(existing = {}) {
     entryListRawTagDisplay: elements.entryListRawTagDisplayInput.checked,
     entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(elements.entryListTagDisplayLimitInput.value),
     entryListPartDisplay: normalizeEntryListPartDisplay(elements.entryListPartDisplayInput.value),
-    partOfSpeechTags: normalizeTagList(elements.partOfSpeechTagsInput.value),
-    tagSortOrder: normalizeTagList(elements.tagSortOrderInput.value),
-    redHighlightTags: normalizeRedHighlightTags(elements.tagRedHighlightInput.value),
+    partOfSpeechTags: parseTagListText(elements.partOfSpeechTagsInput.value),
+    tagSortOrder: parseTagListText(elements.tagSortOrderInput.value),
+    redHighlightTags: parseTagListText(elements.tagRedHighlightInput.value),
+    tagListSeparatorStyle: normalizeTagListSeparatorStyle(elements.tagListSeparatorStyleInput.value),
     entryListTagFiltering: elements.entryListTagFilteringInput.checked,
     entryListPolysemyDisplay: elements.entryListPolysemyInput.checked,
     networkPolysemyDisplay: elements.networkPolysemyInput.checked,
@@ -12454,7 +12476,7 @@ async function applyTagSortOrder() {
     return;
   }
 
-  let order = normalizeTagList(elements.tagSortOrderInput.value);
+  let order = parseTagListText(elements.tagSortOrderInput.value);
   if (!order.length) {
     await appConfirm(t("tagOrderEmpty"), {
       title: t("tagOrderSettings"),
@@ -13194,7 +13216,7 @@ function renderCorpusBlockEditor(block, corpus) {
         <button class="danger-ghost" type="button" data-action="delete-corpus-block">${escapeHtml(t("deleteCorpusBlock"))}</button>
       </div>
       <label><span>${escapeHtml(t("corpusBlockTitle"))}</span><input data-field="title" maxlength="160" value="${escapeHtml(block.title)}"></label>
-      <label><span>${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(block.tags.join("，"))}"><small class="field-help">${escapeHtml(t("corpusTagsHelp"))}</small></label>
+      <label><span>${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(serializeTagList(block.tags))}"><small class="field-help">${escapeHtml(t("corpusTagsHelp"))}</small></label>
       <label><span>${escapeHtml(t("corpusNotes"))}</span><textarea data-field="notes" rows="4">${escapeHtml(block.notes)}</textarea></label>
       <section class="corpus-subsection">
         <div class="subsection-title"><h3>${escapeHtml(t("corpusAttributes"))}</h3></div>
@@ -13232,7 +13254,7 @@ function renderCorpusLayerEditor(block, layer, index, corpus) {
         <label><span>${escapeHtml(t("layerName"))}</span><input data-field="name" value="${escapeHtml(layer.name)}"></label>
         <label><span>${escapeHtml(t("speaker"))}</span><input data-field="speaker" value="${escapeHtml(layer.speaker)}"></label>
         <label><span>${escapeHtml(t("modality"))}</span><input data-field="modality" value="${escapeHtml(layer.modality)}"></label>
-        <label><span>${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(layer.tags.join("，"))}"></label>
+        <label><span>${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(serializeTagList(layer.tags))}"><small class="field-help">${escapeHtml(t("corpusTagsHelp"))}</small></label>
       </div>
       <label><span>${escapeHtml(t("corpusNotes"))}</span><textarea data-field="notes" rows="3">${escapeHtml(layer.notes)}</textarea></label>
       <div class="subsection-title"><h3>${escapeHtml(t("corpusAttributes"))}</h3></div>
@@ -13290,7 +13312,7 @@ function renderCorpusUnitEditor(unit, corpus) {
           ${corpusParentRefs(corpus).map((ref) => `<option value="${escapeHtml(ref.key)}"${parent?.key === ref.key ? " selected" : ""}>${escapeHtml(corpusParentLabel(ref))}</option>`).join("")}
         </select>
       </label>
-      <label><span>${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(unit.tags.join("，"))}"><small class="field-help">${escapeHtml(t("corpusTagsHelp"))}</small></label>
+      <label><span>${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(serializeTagList(unit.tags))}"><small class="field-help">${escapeHtml(t("corpusTagsHelp"))}</small></label>
       <label><span>${escapeHtml(t("corpusNotes"))}</span><textarea data-field="notes" rows="4">${escapeHtml(unit.notes)}</textarea></label>
       <section class="corpus-subsection">
         <div class="subsection-title"><h3>${escapeHtml(t("corpusAttributes"))}</h3></div>
@@ -13353,7 +13375,7 @@ function syncCorpusEditorToDraft() {
     }
     updateCorpusRecord(block, {
       title: form.querySelector('[data-field="title"]').value.trim(),
-      tags: uniqueList(form.querySelector(':scope > label [data-field="tags"]').value),
+      tags: parseTagListText(form.querySelector(':scope > label [data-field="tags"]').value),
       notes: form.querySelector(':scope > label [data-field="notes"]').value,
       attributes: collectCorpusAttributes(form.querySelector(':scope > .corpus-subsection [data-corpus-attributes]')),
     });
@@ -13366,7 +13388,7 @@ function syncCorpusEditorToDraft() {
         name: card.querySelector('[data-field="name"]').value.trim(),
         speaker: card.querySelector('[data-field="speaker"]').value.trim(),
         modality: card.querySelector('[data-field="modality"]').value.trim(),
-        tags: uniqueList(card.querySelector('[data-field="tags"]').value),
+        tags: parseTagListText(card.querySelector('[data-field="tags"]').value),
         notes: card.querySelector('[data-field="notes"]').value,
         attributes: collectCorpusAttributes(card.querySelector('[data-corpus-attributes]')),
       });
@@ -13379,7 +13401,7 @@ function syncCorpusEditorToDraft() {
   }
   updateCorpusRecord(unit, {
     content: form.querySelector('[data-field="content"]').value,
-    tags: uniqueList(form.querySelector('[data-field="tags"]').value),
+    tags: parseTagListText(form.querySelector('[data-field="tags"]').value),
     notes: form.querySelector('[data-field="notes"]').value,
     attributes: collectCorpusAttributes(form.querySelector('[data-corpus-attributes]')),
   });
@@ -13562,7 +13584,8 @@ function createMorphologyGroupEditor(group, index) {
         <div class="morphology-group-fields">
           <label>
             <span>${escapeHtml(t("autoMatchTags"))}</span>
-            <input data-field="matchTags" value="${escapeHtml(group.matchTags.join("，"))}">
+            <input data-field="matchTags" value="${escapeHtml(serializeTagList(group.matchTags))}">
+            <small class="field-help">${escapeHtml(t("autoMatchTagsHelp"))}</small>
           </label>
         </div>
       </div>
@@ -13663,7 +13686,7 @@ function collectMorphologyTemplateGroups() {
   const groups = [...elements.morphologyTableList.querySelectorAll(".morphology-group-card")].map((groupCard) => ({
     id: groupCard.dataset.templateGroupId,
     name: groupCard.querySelector('[data-field="name"]')?.value.trim() || groupCard.dataset.groupName || t("morphologyTableGroup"),
-    matchTags: splitList(groupCard.querySelector('[data-field="matchTags"]')?.value),
+    matchTags: parseTagListText(groupCard.querySelector('[data-field="matchTags"]')?.value),
     notes: groupCard.querySelector('[data-field="notes"]')?.value || groupCard.dataset.groupNotes || "",
     createdAt: groupCard.dataset.groupCreatedAt || "",
     updatedAt: groupCard.dataset.groupUpdatedAt || "",
@@ -14180,7 +14203,8 @@ async function openPartialEdit(section) {
       <div class="ipa-keyboard partial-ipa-keyboard"></div>
       <label>
         <span>${escapeHtml(t("tagsLabel"))}</span>
-        <input data-field="tags" maxlength="180" value="${escapeHtml((entry.tags || []).join("，"))}">
+        <input data-field="tags" maxlength="180" value="${escapeHtml(serializeTagList(entry.tags))}">
+        <small class="field-help">${escapeHtml(t("tagsHelp"))}</small>
       </label>
     `;
     renderPartialIpaKeyboard();
@@ -14329,7 +14353,7 @@ function partialEntryFormCandidate(entry = selectedEntry(), body = partialEditBo
       ...entry,
       lemma: body.querySelector('[data-field="lemma"]').value.trim(),
       pronunciation: body.querySelector('[data-field="pronunciation"]').value.trim(),
-      tags: splitList(body.querySelector('[data-field="tags"]').value),
+      tags: parseTagListText(body.querySelector('[data-field="tags"]').value),
     };
   }
   if (partialEditSection === "definitions") {
@@ -15794,7 +15818,7 @@ elements.tagsInput.addEventListener("input", () => {
     renderMorphologyEntryControls(elements.entryMorphologyControls, {
       ...baseEntry,
       ...current,
-      tags: splitList(elements.tagsInput.value),
+      tags: parseTagListText(elements.tagsInput.value),
     }, { full: true });
   }
 });
@@ -15833,6 +15857,9 @@ elements.entryMorphologyControls.addEventListener("click", async (event) => {
   renderMorphologyEntryControls(elements.entryMorphologyControls, { ...baseEntry, ...current }, { full: true });
 });
 elements.settingsForm.addEventListener("submit", saveSettings);
+elements.tagListSeparatorStyleInput.addEventListener("change", () => {
+  updateTagListPlaceholders(elements.tagListSeparatorStyleInput.value);
+});
 elements.searchFieldEnabledInputs.forEach((input) => {
   input.addEventListener("change", syncEntrySearchSettingsControls);
 });

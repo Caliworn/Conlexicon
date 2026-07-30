@@ -298,8 +298,9 @@
                 <div class="ipa-keyboard" id="ipaKeyboard" data-i18n-aria-label="ipaKeyboardSettings" aria-label="IPA 虚拟键盘"></div>
 
                 <label>
-                  <span data-i18n="tagsLabel">属性标签（词性由“其他设置”中的词性标签配置决定）</span>
+                  <span data-i18n="tagsLabel">标签</span>
                   <input id="tagsInput" name="tags" maxlength="180">
+                  <small class="field-help" data-i18n="tagsHelp">填写词条标签；词性也作为标签在这里输入。多个标签可用半角逗号、全角逗号或顿号分隔。已配置为词性的标签会按词性显示。</small>
                 </label>
 
                 <section class="definition-editor" data-entry-form-section="definitions">
@@ -602,14 +603,25 @@
                   </div>
                 </div>
                 <label>
-                  <span data-i18n="partOfSpeechTagsHelp">只有这里列出的标签会被识别为词性；多个标签用逗号分隔。留空表示此词典不使用词性。</span>
-                  <input id="partOfSpeechTagsInput" type="text" placeholder="n, v, adj">
+                  <span data-i18n="partOfSpeechTagsHelp">只有这里列出的标签会被识别为词性；留空表示此词典不使用词性。多个标签可用半角逗号、全角逗号或顿号分隔。</span>
+                  <input id="partOfSpeechTagsInput" type="text">
+                </label>
+                <div class="subsection-title">
+                  <h3 data-i18n="tagListSeparator">标签列表分隔符</h3>
+                </div>
+                <label>
+                  <span data-i18n="tagListSeparatorHelp">选择各标签输入框显示多个标签时使用的分隔符。无论选择哪项，输入时均可使用半角逗号、全角逗号或顿号。</span>
+                  <select id="tagListSeparatorStyleInput">
+                    <option value="commaSpace" data-i18n="tagListSeparatorCommaSpace">半角逗号和空格（n, v）</option>
+                    <option value="fullwidthComma" data-i18n="tagListSeparatorFullwidthComma">全角逗号（n，v）</option>
+                    <option value="ideographicComma" data-i18n="tagListSeparatorIdeographicComma">顿号（n、v）</option>
+                  </select>
                 </label>
                 <div class="subsection-title">
                   <h3 data-i18n="tagDisplayReplacement">标签显示替换</h3>
                 </div>
                 <label>
-                  <span data-i18n="tagDisplayReplacementHelp">每行一条，格式为 原标签 = 显示文本。仅影响查看模式中的显示，不改变词条数据。</span>
+                  <span data-i18n="tagDisplayReplacementHelp">每行一条，格式为“标签 = 显示文本”。只改变界面显示，不修改标签本身。</span>
                   <textarea id="tagDisplayMapInput" rows="6"></textarea>
                 </label>
                 <label class="toggle-row">
@@ -638,9 +650,9 @@
                   <button class="info-button" id="tagOrderInfoButton" type="button" data-app-tooltip="always" data-i18n-aria-label="tagOrderInfo" aria-label="标签排序逻辑">i</button>
                 </div>
                 <label>
-                  <span data-i18n="tagOrderHelp">输入统一标签顺序，多个标签用逗号分隔。填写原始标签，不填写显示替换后的文本。</span>
+                  <span data-i18n="tagOrderHelp">按此顺序整理每个词条的标签；未列出的标签保留在末尾。请填写标签本身，不要填写显示替换文本。</span>
                   <div class="inline-field-action tag-order-control">
-                    <input id="tagSortOrderInput" type="text" placeholder="n, v, adj, root">
+                    <input id="tagSortOrderInput" type="text">
                     <button class="secondary-button" id="applyTagSortOrderButton" type="button" data-i18n="applyTags">应用</button>
                   </div>
                 </label>
@@ -648,8 +660,8 @@
                   <h3 data-i18n="tagDisplaySettings">标签突出显示</h3>
                 </div>
                 <label>
-                  <span data-i18n="tagRedHighlightHelp">配置后，这些标签会在词条浏览栏和查看界面中以红色显示。多个标签用逗号、空格或换行分隔。</span>
-                  <textarea id="tagRedHighlightInput" rows="3"></textarea>
+                  <span data-i18n="tagRedHighlightHelp">这里列出的标签会在词条列表和词条详情中以红色显示。请填写标签本身，不要填写显示替换文本。</span>
+                  <input id="tagRedHighlightInput" type="text">
                 </label>
                 <div class="subsection-title">
                   <h3 data-i18n="tagFilterSettings">标签筛选</h3>

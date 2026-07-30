@@ -675,9 +675,34 @@ async function assertRootGroupQueryConsistency(repository, dictionary, params = 
 }
 
 function checkModelNormalization() {
-  assert.deepEqual(tagModel.normalizeTagList("n，v,n\nadj"), ["n", "v", "adj"]);
-  assert.deepEqual(tagModel.normalizeRedHighlightTags("rare, archaic rare"), ["rare", "archaic"]);
+  assert.deepEqual(tagModel.parseTagListText("n，v、n,adj"), ["n", "v", "adj"]);
+  assert.deepEqual(tagModel.normalizeTagList([null, undefined, "", "  ", "null", " proper noun ", "null"]), ["null", "proper noun"]);
+  assert.deepEqual(tagModel.normalizeTagList("n,v"), []);
+  assert.equal(tagModel.serializeTagList(["n", "v"], "commaSpace"), "n, v");
+  assert.equal(tagModel.serializeTagList(["n", "v"], "fullwidthComma"), "n，v");
+  assert.equal(tagModel.serializeTagList(["n", "v"], "ideographicComma"), "n、v");
+  assert.equal(tagModel.normalizeTagListSeparatorStyle("unknown"), "commaSpace");
   assert.equal(tagModel.normalizeEntryListTagDisplayLimit(99), 10);
+  const normalizedTagLists = normalizeDictionary({
+    entries: [{ lemma: "entry", tags: [" n ", null, "n", "null"] }],
+    settings: {
+      partOfSpeechTags: [" n ", "n"],
+      redHighlightTags: ["proper noun", "proper noun"],
+      tagListSeparatorStyle: "ideographicComma",
+    },
+    corpus: {
+      blocks: [{ title: "block", tags: [" corpus ", "corpus"] }],
+    },
+    morphology: {
+      templateGroups: [{ name: "group", matchTags: [" n ", "n"], tables: [] }],
+    },
+  });
+  assert.deepEqual(normalizedTagLists.entries[0].tags, ["n", "null"]);
+  assert.deepEqual(normalizedTagLists.settings.partOfSpeechTags, ["n"]);
+  assert.deepEqual(normalizedTagLists.settings.redHighlightTags, ["proper noun"]);
+  assert.equal(normalizedTagLists.settings.tagListSeparatorStyle, "ideographicComma");
+  assert.deepEqual(normalizedTagLists.corpus.blocks[0].tags, ["corpus"]);
+  assert.deepEqual(normalizedTagLists.morphology.templateGroups[0].matchTags, ["n"]);
   assert.deepEqual(
     tagModel.entryParts(
       { tags: ["topic", "n", "v"] },
@@ -1783,9 +1808,14 @@ async function runRepositoryContractTests(options = {}) {
     assert.equal(savedRoot.entry.definitions[0].meaning, "root meaning");
     const rootEntryId = savedRoot.entry.id;
 
-    const savedWithNewEntry = await repository.saveEntry(first.id, { lemma: "new entry", definitions: [{ meaning: "new" }] });
+    const savedWithNewEntry = await repository.saveEntry(first.id, {
+      lemma: "new entry",
+      tags: [" tag ", null, "tag", "null"],
+      definitions: [{ meaning: "new" }],
+    });
     assert.equal(savedWithNewEntry.id, first.id);
     assert.equal(savedWithNewEntry.entry.lemma, "new entry");
+    assert.deepEqual(savedWithNewEntry.entry.tags, ["tag", "null"]);
     const repositoryEntryId = savedWithNewEntry.entry.id;
     assert.equal((await repository.getEntry(first.id, repositoryEntryId)).lemma, "new entry");
 
