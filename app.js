@@ -5788,7 +5788,7 @@ function recordFeatureResultSummary(result) {
   const resultCountForVariant = (variant) => {
     if (variant.resultSource?.type === "ipaAutoCompare") {
       const row = (result.summary.views || []).find((item) => item.key === variant.category);
-      return Math.max(0, Number(row?.count) || 0);
+      return Math.max(0, Number(row?.entryCount) || 0);
     }
     if (variant.resultSource?.type === "ipaDistribution") {
       const facets = {
@@ -9748,11 +9748,11 @@ function renderAnalysisRootFamiliesQueryPage(queryState) {
     const widget = queryState.response?.widgets?.families || {};
     const rows = (widget.rows || []).map((row) => [
       row.lemma || aText("无词形", "No lemma"),
-      Math.max(0, Number(row.derivedCount) || 0),
+      Math.max(0, Number(row.derivedEntryCount) || 0),
       row.action || directEntryAction(row.rootId),
     ]);
     body = `<section class="analysis-detail-grid">${analysisCard(
-      aText("词根家族排行", "Root Families"),
+      aText("词根家族（按衍生词数）", "Root Families by Derived Entries"),
       analysisBarList(rows, { empty: aText("暂无衍生关系", "No derivation links yet") }),
     )}</section>`;
   } else if (queryState.status === "error") {
@@ -10083,7 +10083,7 @@ function analysisQueryFilterAction(action, titleDescriptor, options = {}) {
     return null;
   }
   return entryFilterAction(titleDescriptor, action.filter, {
-    count: action.count,
+    resultCount: action.resultCount,
     variants: options.variants || [],
   });
 }
@@ -10129,7 +10129,7 @@ function analysisCoverageRowAction(row) {
     variants: row?.missingAction ? [{
       titleDescriptor: meta.missingTitleDescriptor,
       filter: row.missingAction.filter,
-      count: row.missingAction.count,
+      resultCount: row.missingAction.resultCount,
     }] : [],
   });
 }
@@ -10138,9 +10138,9 @@ function renderAnalysisOverviewQuery(response) {
   const widgets = response?.widgets || {};
   const lexicon = widgets.lexicon || {};
   const entryCount = Number(lexicon.entryCount || 0);
-  const rootCount = Number(lexicon.rootCount || 0);
-  const derivedCount = Number(lexicon.derivedCount || 0);
-  const multiSourceCount = Number(lexicon.multiSourceCount || 0);
+  const rootEntryCount = Number(lexicon.rootEntryCount || 0);
+  const derivedEntryCount = Number(lexicon.derivedEntryCount || 0);
+  const multiSourceEntryCount = Number(lexicon.multiSourceEntryCount || 0);
   const rootAction = analysisQueryFilterAction(
     lexicon.rootAction,
     advancedFilterTitleDescriptor("advancedFilterRoots"),
@@ -10148,7 +10148,7 @@ function renderAnalysisOverviewQuery(response) {
       variants: lexicon.derivedAction ? [{
         titleDescriptor: advancedFilterTitleDescriptor("advancedFilterDerivedEntries"),
         filter: lexicon.derivedAction.filter,
-        count: lexicon.derivedAction.count,
+        resultCount: lexicon.derivedAction.resultCount,
       }] : [],
     },
   );
@@ -10159,7 +10159,7 @@ function renderAnalysisOverviewQuery(response) {
       variants: lexicon.rootAction ? [{
         titleDescriptor: advancedFilterTitleDescriptor("advancedFilterRoots"),
         filter: lexicon.rootAction.filter,
-        count: lexicon.rootAction.count,
+        resultCount: lexicon.rootAction.resultCount,
       }] : [],
     },
   );
@@ -10178,7 +10178,7 @@ function renderAnalysisOverviewQuery(response) {
       analysisCoverageFieldMeta(row.field).label,
       row.ratio,
       analysisCoverageRowAction(row),
-      `${Number(row.count || 0)}/${Number(widgets.coverage?.total || 0)}${itemNote}`,
+      `${Number(row.coveredEntryCount || 0)}/${Number(widgets.coverage?.entryTotal || 0)}${itemNote}`,
     ];
   });
   const partWidget = widgets.parts || {};
@@ -10189,7 +10189,7 @@ function renderAnalysisOverviewQuery(response) {
       const label = row.displayLabel || row.part;
       return [
         label,
-        row.count,
+        row.entryCount,
         analysisQueryFilterAction(
           row.action,
           advancedFilterValueTitleDescriptor("advancedFilterPartOfSpeech", label),
@@ -10204,7 +10204,7 @@ function renderAnalysisOverviewQuery(response) {
   const activity = {
     created: (activityWidget.created || []).map((row) => [
       row.day,
-      row.count,
+      row.entryCount,
       analysisQueryFilterAction(
         row.action,
         advancedFilterValueTitleDescriptor("advancedFilterCreatedDate", row.day),
@@ -10212,34 +10212,34 @@ function renderAnalysisOverviewQuery(response) {
     ]),
     updated: (activityWidget.updated || []).map((row) => [
       row.day,
-      row.count,
+      row.entryCount,
       analysisQueryFilterAction(
         row.action,
         advancedFilterValueTitleDescriptor("advancedFilterUpdatedDate", row.day),
       ),
     ]),
   };
-  const rootRatio = entryCount ? rootCount / entryCount : 0;
-  const derivedRatio = entryCount ? derivedCount / entryCount : 0;
-  const multiSourceRatio = derivedCount ? multiSourceCount / derivedCount : 0;
+  const rootRatio = entryCount ? rootEntryCount / entryCount : 0;
+  const derivedRatio = entryCount ? derivedEntryCount / entryCount : 0;
+  const multiSourceRatio = derivedEntryCount ? multiSourceEntryCount / derivedEntryCount : 0;
   return `
     <section class="analysis-grid analysis-overview-grid">
       ${analysisCard(aText("词汇构成", "Lexicon Composition"), `
         ${analysisOverviewPrimaryStat(entryCount, aText("个词条", "entries"))}
         <div class="analysis-composition-stats">
-          ${analysisCompositionStat(aText("词根", "Roots"), rootCount, rootRatio, rootAction, "root")}
-          ${analysisCompositionStat(aText("衍生词", "Derived entries"), derivedCount, derivedRatio, derivedAction, "derived")}
+          ${analysisCompositionStat(aText("词根", "Roots"), rootEntryCount, rootRatio, rootAction, "root")}
+          ${analysisCompositionStat(aText("衍生词", "Derived entries"), derivedEntryCount, derivedRatio, derivedAction, "derived")}
         </div>
         <div class="analysis-composition" aria-label="${escapeHtml(aText(
-          `词根 ${rootCount}，衍生词 ${derivedCount}`,
-          `${rootCount} roots, ${derivedCount} derived entries`,
+          `词根 ${rootEntryCount}，衍生词 ${derivedEntryCount}`,
+          `${rootEntryCount} roots, ${derivedEntryCount} derived entries`,
         ))}">
           <span class="root" style="width: ${(rootRatio * 100).toFixed(2)}%"></span>
           <span class="derived" style="width: ${(derivedRatio * 100).toFixed(2)}%"></span>
         </div>
         ${analysisCompositionSubset(
           aText("其中多来源词条", "Multi-source entries"),
-          multiSourceCount,
+          multiSourceEntryCount,
           aText(
             `占衍生词 ${percentText(multiSourceRatio)}`,
             `${percentText(multiSourceRatio)} of derived entries`,
@@ -10248,7 +10248,7 @@ function renderAnalysisOverviewQuery(response) {
         )}
       `)}
       ${analysisCard(aText("资料覆盖", "Data Coverage"), analysisCoverageList(coverage))}
-      ${analysisCard(aText("词性分布", "Part of Speech"), `
+      ${analysisCard(aText("词性分布", "Part-of-Speech Distribution"), `
         ${analysisBarList(parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") })}
         ${analysisFactList([
           [aText("词性种类", "Part types"), Number(partWidget.partTypeCount || 0)],
@@ -10269,7 +10269,7 @@ function analysisTagPageRows(response) {
     const label = noPart ? t("noPart") : (row.displayLabel || row.part);
     return [
       label,
-      Number(row.count || 0),
+      Number(row.entryCount || 0),
       analysisQueryFilterAction(
         row.action,
         advancedFilterValueTitleDescriptor(
@@ -10282,7 +10282,7 @@ function analysisTagPageRows(response) {
   });
   const tags = (widgets.tags?.rows || []).map((row) => [
     row.displayLabel || row.tag,
-    Number(row.count || 0),
+    Number(row.entryCount || 0),
     analysisQueryFilterAction(
       row.action,
       advancedFilterValueTitleDescriptor("tags", row.tag, { valueType: "tag" }),
@@ -10296,8 +10296,8 @@ function renderAnalysisTagsQueryPage(queryState, report) {
   if (queryState.status === "ready") {
     const rows = analysisTagPageRows(queryState.response);
     body = `<section class="analysis-detail-grid">
-      ${analysisCard(aText("词性分布", "Part of Speech"), analysisBarList(rows.parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") }))}
-      ${analysisCard(aText("其他标签频率", "Other Tag Frequency"), analysisBarList(rows.tags, { empty: aText("暂无其他标签", "No other tags yet") }))}
+      ${analysisCard(aText("词性分布", "Part-of-Speech Distribution"), analysisBarList(rows.parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") }))}
+      ${analysisCard(aText("其他标签分布", "Other Tag Distribution"), analysisBarList(rows.tags, { empty: aText("暂无其他标签", "No other tags yet") }))}
       ${analysisCard(aText("标签组合", "Tag Combinations"), analysisBarList(report.allTagCombos, { empty: aText("暂无组合", "No combinations yet") }))}
     </section>`;
   } else if (queryState.status === "error") {
@@ -10319,10 +10319,10 @@ function renderAnalysisTagsQueryPage(queryState, report) {
 function renderAnalysisEntriesPage(report, subpage) {
   if (subpage === "forms") {
     return `<section class="analysis-detail-grid">
-      ${analysisCard(aText("词长分布", "Word Lengths"), analysisBarList(report.allWordLengths, { empty: aText("暂无词形", "No lemmas yet") }))}
-      ${analysisCard(aText("首字母分布", "Initial Letters"), analysisBarList(report.allInitialLetters, { empty: aText("暂无词形", "No lemmas yet") }))}
-      ${analysisCard(aText("正写法字符", "Orthographic Characters"), analysisBarList(report.allCharacters, { empty: aText("暂无词形", "No lemmas yet") }))}
-      ${analysisCard(aText("正写法双字符组合", "Orthographic Bigrams"), analysisBarList(report.allBigrams, { empty: aText("暂无组合", "No bigrams yet") }))}
+      ${analysisCard(aText("词长分布", "Word Length Distribution"), analysisBarList(report.allWordLengths, { empty: aText("暂无词形", "No lemmas yet") }))}
+      ${analysisCard(aText("首字母分布", "Initial Letter Distribution"), analysisBarList(report.allInitialLetters, { empty: aText("暂无词形", "No lemmas yet") }))}
+      ${analysisCard(aText("正写法字符频率（次数 / 词条）", "Orthographic Character Frequency (Occurrences / Entries)"), analysisBarList(report.allCharacters, { empty: aText("暂无词形", "No lemmas yet") }))}
+      ${analysisCard(aText("正写法双字符频率（次数 / 词条）", "Orthographic Bigram Frequency (Occurrences / Entries)"), analysisBarList(report.allBigrams, { empty: aText("暂无组合", "No bigrams yet") }))}
     </section>`;
   }
   return `<section class="analysis-detail-grid">
@@ -10334,36 +10334,41 @@ function ipaDistributionRows(response, facet, category, labelKey) {
   return (response?.summary?.distributions?.[facet] || []).map((row) => {
     const value = String(row.value ?? "");
     const resultCount = Math.max(0, Number(row.entryCount) || 0);
+    const occurrenceCount = Math.max(0, Number(row.occurrenceCount) || 0);
     const titleDescriptor = advancedFilterValueTitleDescriptor(labelKey, value);
-    return [
+    const action = featureResultAdvancedFilterAction(response?.source, [{
+      key: `${category}:${value}`,
+      category,
       value,
-      Math.max(0, Number(row.count) || 0),
-      featureResultAdvancedFilterAction(response?.source, [{
-        key: `${category}:${value}`,
-        category,
-        value,
-        titleDescriptor,
-        resultCount,
-      }], category, value),
-    ];
+      titleDescriptor,
+      resultCount,
+    }], category, value);
+    return category === "unit"
+      ? {
+        label: value,
+        value: occurrenceCount,
+        valueText: `${occurrenceCount} / ${resultCount}`,
+        action,
+      }
+      : [value, resultCount, action];
   });
 }
 
 function renderAnalysisIpaDistributionQuery(response, subpage) {
   if (subpage === "units") {
     return `<section class="analysis-detail-grid">
-      ${analysisCard(aText("IPA 音位频率", "IPA Unit Frequency"), analysisBarList(ipaDistributionRows(response, "units", "unit", "advancedFilterIpaUnit"), { empty: aText("暂无 IPA", "No IPA yet") }))}
-      ${analysisCard(aText("IPA 首音", "IPA Initials"), analysisBarList(ipaDistributionRows(response, "initials", "initial", "advancedFilterIpaInitial"), { empty: aText("暂无 IPA", "No IPA yet") }))}
-      ${analysisCard(aText("IPA 尾音", "IPA Finals"), analysisBarList(ipaDistributionRows(response, "finals", "final", "advancedFilterIpaFinal"), { empty: aText("暂无 IPA", "No IPA yet") }))}
+      ${analysisCard(aText("IPA 音位频率（次数 / 词条）", "IPA Unit Frequency (Occurrences / Entries)"), analysisBarList(ipaDistributionRows(response, "units", "unit", "advancedFilterIpaUnit"), { empty: aText("暂无 IPA", "No IPA yet") }))}
+      ${analysisCard(aText("IPA 首音分布", "IPA Initial Distribution"), analysisBarList(ipaDistributionRows(response, "initials", "initial", "advancedFilterIpaInitial"), { empty: aText("暂无 IPA", "No IPA yet") }))}
+      ${analysisCard(aText("IPA 尾音分布", "IPA Final Distribution"), analysisBarList(ipaDistributionRows(response, "finals", "final", "advancedFilterIpaFinal"), { empty: aText("暂无 IPA", "No IPA yet") }))}
     </section>`;
   }
   const summary = response?.summary || {};
-  const entryTotal = Math.max(0, Number(summary.entryTotal) || 0);
-  const ipaEntryCount = Math.max(0, Number(summary.inputTotal) || 0);
-  const noIpaEntryCount = Math.max(0, entryTotal - ipaEntryCount);
-  const ipaCoverage = entryTotal ? ipaEntryCount / entryTotal : 0;
+  const dictionaryEntryCount = Math.max(0, Number(summary.dictionaryEntryCount) || 0);
+  const ipaEntryCount = Math.max(0, Number(summary.ipaEntryCount) || 0);
+  const noIpaEntryCount = Math.max(0, dictionaryEntryCount - ipaEntryCount);
+  const ipaCoverage = dictionaryEntryCount ? ipaEntryCount / dictionaryEntryCount : 0;
   return `<section class="analysis-detail-grid">
-    ${analysisCard(aText("音节数分布", "Syllable Counts"), analysisBarList(ipaDistributionRows(response, "syllableCounts", "syllableCount", "advancedFilterSyllableCount"), { empty: aText("暂无 IPA", "No IPA yet") }))}
+    ${analysisCard(aText("音节数分布", "Syllable Count Distribution"), analysisBarList(ipaDistributionRows(response, "syllableCounts", "syllableCount", "advancedFilterSyllableCount"), { empty: aText("暂无 IPA", "No IPA yet") }))}
     ${analysisCard(aText("IPA 覆盖", "IPA Coverage"), analysisCoverageList([[
       "IPA",
       ipaCoverage,
@@ -10374,7 +10379,7 @@ function renderAnalysisIpaDistributionQuery(response, subpage) {
         advancedFilterTitleDescriptor("advancedFilterNoIpa"),
         noIpaEntryCount,
       ),
-      `${ipaEntryCount}/${entryTotal}`,
+      `${ipaEntryCount}/${dictionaryEntryCount}`,
     ]]))}
   </section>`;
 }
@@ -10466,19 +10471,19 @@ function renderAnalysisMorphologyQuery(response, subpage) {
         [aText("有休眠覆写的词条", "Entries with dormant overrides"), overrides.inactiveEntryCount || 0, overrideAction("inactive")],
         [aText("休眠覆写单元格", "Dormant override cells"), overrides.inactiveCellCount || 0],
       ]))}
-      ${analysisCard(aText("覆写词条排行", "Override Entries"), analysisBarList(topEntries, { empty: aText("暂无已保存覆写", "No stored overrides") }))}
-      ${analysisCard(aText("按模板组", "By Template Group"), analysisBarList(
+      ${analysisCard(aText("覆写词条（按单元格数）", "Override Entries by Stored Cells"), analysisBarList(topEntries, { empty: aText("暂无已保存覆写", "No stored overrides") }))}
+      ${analysisCard(aText("覆写词条（按模板组）", "Override Entries by Template Group"), analysisBarList(
         morphologyOverrideBreakdownRows(response, summary.overrideGroups, "overrideGroup"),
         { empty: aText("暂无模板组覆写", "No template-group overrides") },
       ))}
-      ${analysisCard(aText("按表格", "By Table"), analysisBarList(
+      ${analysisCard(aText("覆写词条（按表格）", "Override Entries by Table"), analysisBarList(
         morphologyOverrideBreakdownRows(response, summary.overrideTables, "overrideTable"),
         { empty: aText("暂无表格覆写", "No table overrides") },
       ))}
     </section>`;
   }
 
-  const total = Math.max(0, Number(summary.inputTotal) || 0);
+  const total = Math.max(0, Number(summary.inputEntryCount) || 0);
   const assigned = Math.max(0, Number(summary.assignment?.assignedEntryCount) || 0);
   const unassigned = Math.max(0, Number(summary.assignment?.unassignedEntryCount) || 0);
   const assignmentVariants = [
@@ -10538,7 +10543,7 @@ function renderAnalysisActivityQuery(response, subpage) {
   const activity = response?.widgets?.activity || {};
   const rowsForField = (rows, field) => (rows || []).map((row) => [
     row.day,
-    Number(row.count || 0),
+    Number(row.entryCount || 0),
     analysisQueryFilterAction(
       row.action,
       advancedFilterValueTitleDescriptor(
@@ -10548,9 +10553,9 @@ function renderAnalysisActivityQuery(response, subpage) {
     ),
   ]);
   if (subpage === "created") {
-    return `<section class="analysis-detail-grid">${analysisCard(aText("新增日期", "Created Date"), analysisBarList(rowsForField(activity.created, "created"), { empty: aText("暂无创建记录", "No creation records") }))}</section>`;
+    return `<section class="analysis-detail-grid">${analysisCard(aText("新增词条（按日期）", "Entries by Creation Date"), analysisBarList(rowsForField(activity.created, "created"), { empty: aText("暂无创建记录", "No creation records") }))}</section>`;
   }
-  return `<section class="analysis-detail-grid">${analysisCard(aText("编辑日期", "Updated Date"), analysisBarList(rowsForField(activity.updated, "updated"), { empty: aText("暂无编辑记录", "No edit records") }))}</section>`;
+  return `<section class="analysis-detail-grid">${analysisCard(aText("编辑词条（按日期）", "Entries by Update Date"), analysisBarList(rowsForField(activity.updated, "updated"), { empty: aText("暂无编辑记录", "No edit records") }))}</section>`;
 }
 
 function qualityPageBody(report, subpage) {
@@ -10765,8 +10770,8 @@ function analysisIpaCompareRows(response) {
   const matchTitle = advancedFilterTitleText(matchTitleDescriptor);
   const looseTitle = advancedFilterTitleText(looseTitleDescriptor);
   const strictTitle = advancedFilterTitleText(strictTitleDescriptor);
-  const viewCounts = new Map((response?.summary?.views || []).map((row) => [row.key, Number(row.count) || 0]));
-  const outcomeCounts = new Map((response?.summary?.outcomes || []).map((row) => [row.key, Number(row.count) || 0]));
+  const viewCounts = new Map((response?.summary?.views || []).map((row) => [row.key, Number(row.entryCount) || 0]));
+  const outcomeCounts = new Map((response?.summary?.outcomes || []).map((row) => [row.key, Number(row.entryCount) || 0]));
   const variants = [
     { key: "match", titleDescriptor: matchTitleDescriptor, resultCount: viewCounts.get("match") || 0 },
     { key: "looseMismatch", titleDescriptor: looseTitleDescriptor, resultCount: viewCounts.get("looseMismatch") || 0 },
@@ -10881,10 +10886,10 @@ function buildAnalysisFormSlice(context) {
     allInitialLetters: topEntryMapItems(initialLetters, Number.MAX_SAFE_INTEGER, "advancedFilterInitialLetter"),
     wordLengths: numericEntryMapItems(wordLengths, "advancedFilterWordLength"),
     allWordLengths: numericEntryMapItems(wordLengths, "advancedFilterWordLength"),
-    characters: topEntryMapItems(characters, 16, "advancedFilterOrthographicCharacter"),
-    allCharacters: topEntryMapItems(characters, Number.MAX_SAFE_INTEGER, "advancedFilterOrthographicCharacter"),
-    bigrams: topEntryMapItems(bigrams, 16, "advancedFilterOrthographicBigram"),
-    allBigrams: topEntryMapItems(bigrams, Number.MAX_SAFE_INTEGER, "advancedFilterOrthographicBigram"),
+    characters: frequencyEntryMapItems(characters, 16, "advancedFilterOrthographicCharacter"),
+    allCharacters: frequencyEntryMapItems(characters, Number.MAX_SAFE_INTEGER, "advancedFilterOrthographicCharacter"),
+    bigrams: frequencyEntryMapItems(bigrams, 16, "advancedFilterOrthographicBigram"),
+    allBigrams: frequencyEntryMapItems(bigrams, Number.MAX_SAFE_INTEGER, "advancedFilterOrthographicBigram"),
   };
 }
 
@@ -10933,16 +10938,19 @@ function analysisBarList(items, options = {}) {
   if (!items.length) {
     return `<p class="muted-text">${escapeHtml(options.empty || aText("暂无数据", "No data"))}</p>`;
   }
-  const max = Math.max(...items.map((item) => item[1]), 1);
-  return `<div class="analysis-bars">${items.map(([label, value, action]) => {
+  const rows = items.map((item) => (Array.isArray(item)
+    ? { label: item[0], value: item[1], action: item[2], valueText: "" }
+    : item));
+  const max = Math.max(...rows.map((item) => item.value), 1);
+  return `<div class="analysis-bars">${rows.map(({ label, value, action, valueText = "" }) => {
     const attrs = analysisActionAttributes(action);
     const labelTag = attrs ? "button" : "span";
     const labelAttrs = attrs ? ` type="button"` : "";
     return `
-    <div class="analysis-bar-row"${attrs}>
+    <div class="analysis-bar-row${valueText ? " has-wide-value" : ""}"${attrs}>
       <${labelTag} class="analysis-bar-label"${labelAttrs}>${escapeHtml(label)}</${labelTag}>
       <div class="analysis-bar-track"><span style="width: ${Math.max(4, (value / max) * 100).toFixed(2)}%"></span></div>
-      <strong>${escapeHtml(value)}</strong>
+      <strong>${escapeHtml(valueText || value)}</strong>
     </div>
   `;
   }).join("")}</div>`;
@@ -11018,22 +11026,24 @@ function entryIdsFrom(items) {
 }
 
 function entryFilterAction(titleDescriptor, filter, options = {}) {
-  const available = options.available ?? (options.count === undefined ? true : Number(options.count) > 0);
+  const available = options.available
+    ?? (options.resultCount === undefined ? true : Number(options.resultCount) > 0);
   if (!available && !options.allowEmptyActive) {
     return null;
   }
   const createVariant = (variantTitleDescriptor, variantFilter, variant = {}) => {
     const search = variant.search ? entryQueryModel.normalizeEntrySearch(variant.search) : null;
-    const hasCount = variant.count !== undefined && Number.isFinite(Number(variant.count));
-    const count = hasCount ? Math.max(0, Number(variant.count)) : null;
+    const hasResultCount = variant.resultCount !== undefined
+      && Number.isFinite(Number(variant.resultCount));
+    const resultCount = hasResultCount ? Math.max(0, Number(variant.resultCount)) : null;
     return {
       key: variant.key || "",
       titleDescriptor: normalizeAdvancedFilterTitleDescriptor(variantTitleDescriptor),
       filter: entryQueryModel.normalizeEntryFilter(variantFilter),
       searchScope: search ? { fields: search.fields, fuzzyFields: search.fuzzyFields } : null,
       initialSearchText: search?.text || "",
-      initialFilterFact: hasCount
-        ? { available: count > 0, total: count }
+      initialFilterFact: hasResultCount
+        ? { available: resultCount > 0, total: resultCount }
         : null,
     };
   };
@@ -11060,11 +11070,11 @@ function binaryPresenceFilterAction(activeTitleDescriptor, field, activeCount, a
   return entryFilterAction(activeTitleDescriptor, {
     presence: [{ field, present: true }],
   }, {
-    count: activeCount,
+    resultCount: activeCount,
     variants: [{
       titleDescriptor: alternateTitleDescriptor,
       filter: { presence: [{ field, present: false }] },
-      count: alternateCount,
+      resultCount: alternateCount,
     }],
   });
 }
@@ -11176,10 +11186,10 @@ function increment(map, key, amount = 1) {
 function incrementEntry(map, key, entry, amount = 1) {
   const label = String(key || aText("未命名", "Untitled"));
   if (!map.has(label)) {
-    map.set(label, { count: 0, entryIds: new Set() });
+    map.set(label, { occurrenceCount: 0, entryIds: new Set() });
   }
   const item = map.get(label);
-  item.count += amount;
+  item.occurrenceCount += amount;
   if (entry?.id) {
     item.entryIds.add(entry.id);
   }
@@ -11205,7 +11215,7 @@ function advancedFilterMapValue(label) {
 function topEntryMapItems(map, limit = 12, labelKey = "") {
   return [...map.entries()]
     .sort((a, b) => (
-      b[1].count - a[1].count
+      b[1].occurrenceCount - a[1].occurrenceCount
       || advancedFilterMapValue(a[0]).label.localeCompare(advancedFilterMapValue(b[0]).label, "zh-CN")
     ))
     .slice(0, limit)
@@ -11213,12 +11223,34 @@ function topEntryMapItems(map, limit = 12, labelKey = "") {
       const { label, valueKey } = advancedFilterMapValue(rawLabel);
       return [
         label,
-        item.count,
+        item.occurrenceCount,
         advancedFilterAction(
           advancedFilterValueTitleDescriptor(labelKey, label, { valueKey }),
           [...item.entryIds],
         ),
       ];
+    });
+}
+
+function frequencyEntryMapItems(map, limit = 12, labelKey = "") {
+  return [...map.entries()]
+    .sort((a, b) => (
+      b[1].occurrenceCount - a[1].occurrenceCount
+      || advancedFilterMapValue(a[0]).label.localeCompare(advancedFilterMapValue(b[0]).label, "zh-CN")
+    ))
+    .slice(0, limit)
+    .map(([rawLabel, item]) => {
+      const { label, valueKey } = advancedFilterMapValue(rawLabel);
+      const entryCount = item.entryIds.size;
+      return {
+        label,
+        value: item.occurrenceCount,
+        valueText: `${item.occurrenceCount} / ${entryCount}`,
+        action: advancedFilterAction(
+          advancedFilterValueTitleDescriptor(labelKey, label, { valueKey }),
+          [...item.entryIds],
+        ),
+      };
     });
 }
 
@@ -11231,7 +11263,7 @@ function numericEntryMapItems(map, labelKey = "") {
     .sort((a, b) => Number(a[0]) - Number(b[0]))
     .map(([label, item]) => [
       label,
-      item.count,
+      item.occurrenceCount,
       advancedFilterAction(
         advancedFilterValueTitleDescriptor(labelKey, label),
         [...item.entryIds],

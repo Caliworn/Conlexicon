@@ -562,7 +562,7 @@ CREATE TABLE entry_morphology_search_values (
 按当前依赖关系建议依次处理：
 
 1. 高级筛选 F1–F3、分析 F4a 以及 F4b-0–F4b-3 后端已完成：统一 EntryQuery/EntryFilter、稳定条件 SQL 编译和前端 descriptor 状态已接入 `/entries` 会话、窗口、定位、排序与搜索；轻量 `/analysis/query` 已以最小 widget planner 聚合 SQLite 任务并异步供前端总览消费；IPA 自动生成比较、IPA 分布和形态分配/覆写统计均已接入可重建 feature result session 与 query/location。10k/30k 基准暂不要求增加后台状态。
-2. 形态分析前端与词根家族排行均已完成接线：`rootFamilyRanking` 返回全部非空家族的 `{ rootId, lemma, derivedCount }` 和 `familyCount`，前端重复关系分组和家族成员 ID 已删除。下一步由 F5 把质量检查推进为独立按需 API，并让词源检查复用同一稳定拓扑。全局衍生词数量仍不得累加各家族数量，以免多来源词条重复计数。
+2. 形态分析前端与词根家族排行均已完成接线：`rootFamilyRanking` 返回全部非空家族的 `{ rootId, lemma, derivedEntryCount }` 和 `familyCount`，前端重复关系分组和家族成员 ID 已删除。下一步由 F5 把质量检查推进为独立按需 API，并让词源检查复用同一稳定拓扑。全局衍生词数量仍不得累加各家族数量，以免多来源词条重复计数。
 3. 正写法统计在 Unicode 与空白语义冻结后迁入轻量 summary/facet；不要为确定性桶建立 feature result session。
 4. 仅在基准表明确认线性扫描成为主要瓶颈后，再选择 FTS、ngram 或其他候选索引。
 5. 语料库进入独立升级阶段后，再把 `module_blobs.corpus` 拆成正式 SQL 表及块/单元级 API。

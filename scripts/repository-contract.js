@@ -235,35 +235,40 @@ async function checkAnalysisQueryContract(repository) {
     ]);
     assert.equal(result.body.widgets.entries.value, 4);
     assert.equal(result.body.widgets.lexicon.entryCount, 4);
-    assert.equal(result.body.widgets.lexicon.rootCount, 3);
-    assert.equal(result.body.widgets.lexicon.derivedCount, 1);
-    assert.equal(result.body.widgets.lexicon.multiSourceCount, 1);
+    assert.equal(result.body.widgets.lexicon.rootEntryCount, 3);
+    assert.equal(result.body.widgets.lexicon.derivedEntryCount, 1);
+    assert.equal(result.body.widgets.lexicon.multiSourceEntryCount, 1);
+    assert.equal(result.body.widgets.lexicon.rootAction.resultCount, 3);
     assert.deepEqual(result.body.widgets.lexicon.rootAction.filter, {
       presence: [{ field: "source", present: false }],
     });
     assert.deepEqual(result.body.widgets.lexicon.multiSourceAction.filter, { sourceCount: { min: 2 } });
 
     const coverage = Object.fromEntries(result.body.widgets.coverage.rows.map((row) => [row.field, row]));
-    assert.equal(coverage.definition.count, 2);
+    assert.equal(result.body.widgets.coverage.entryTotal, 4);
+    assert.equal(coverage.definition.coveredEntryCount, 2);
     assert.equal(coverage.definition.itemCount, 2);
-    assert.equal(coverage.example.count, 1);
-    assert.equal(coverage.entryNote.count, 1);
-    assert.equal(coverage.source.count, 1);
-    assert.equal(coverage.ipa.count, 1);
+    assert.equal(coverage.example.coveredEntryCount, 1);
+    assert.equal(coverage.entryNote.coveredEntryCount, 1);
+    assert.equal(coverage.source.coveredEntryCount, 1);
+    assert.equal(coverage.ipa.coveredEntryCount, 1);
+    assert.equal(coverage.ipa.missingEntryCount, 3);
+    assert.equal(coverage.ipa.action.resultCount, 1);
+    assert.equal(coverage.ipa.missingAction.resultCount, 3);
     assert.deepEqual(coverage.ipa.missingAction.filter, { presence: [{ field: "ipa", present: false }] });
 
     const parts = Object.fromEntries(result.body.widgets.parts.rows.map((row) => [row.part, row]));
-    assert.equal(parts.n.count, 2);
+    assert.equal(parts.n.entryCount, 2);
     assert.equal(parts.n.displayLabel, "Noun");
-    assert.equal(parts.v.count, 1);
-    assert.equal(parts[NO_PART_FILTER_VALUE].count, 1);
+    assert.equal(parts.v.entryCount, 1);
+    assert.equal(parts[NO_PART_FILTER_VALUE].entryCount, 1);
     assert.deepEqual(parts.n.action.filter, { part: "n" });
     assert.equal(result.body.widgets.parts.partTypeCount, 2);
     assert.equal(result.body.widgets.parts.noPartOfSpeechCount, 1);
     assert.deepEqual(result.body.widgets.parts.noPartAction.filter, { part: NO_PART_FILTER_VALUE });
 
     assert.deepEqual(result.body.widgets.tags.rows.map((row) => row.tag), ["root"]);
-    assert.equal(result.body.widgets.tags.rows[0].count, 1);
+    assert.equal(result.body.widgets.tags.rows[0].entryCount, 1);
     assert.deepEqual(result.body.widgets.tags.rows[0].action.filter, {
       tags: { values: ["root"], mode: "any" },
     });
@@ -288,13 +293,13 @@ async function checkAnalysisQueryContract(repository) {
       {
         rootId: "entry-analysis-beta",
         lemma: "beta",
-        derivedCount: 1,
+        derivedEntryCount: 1,
         action: { type: "entry", entryId: "entry-analysis-beta" },
       },
       {
         rootId: "entry-analysis-gamma",
         lemma: "gamma",
-        derivedCount: 1,
+        derivedEntryCount: 1,
         action: { type: "entry", entryId: "entry-analysis-gamma" },
       },
     ]);
@@ -344,7 +349,7 @@ async function checkAnalysisQueryContract(repository) {
     assert.equal(refreshed.body.generation, firstGeneration + 1);
     assert.notEqual(refreshed.body.cacheKey, firstCacheKey);
     assert.equal(
-      refreshed.body.widgets.coverage.rows.find((row) => row.field === "entryNote").count,
+      refreshed.body.widgets.coverage.rows.find((row) => row.field === "entryNote").coveredEntryCount,
       2,
     );
     assert.equal(
@@ -1883,9 +1888,9 @@ async function runRepositoryContractTests(options = {}) {
 
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/facets`);
     assert.equal(apiResult.statusCode, 200);
-    assert.equal(apiResult.body.parts.some((part) => part.tag === "n"), true);
-    assert.equal(apiResult.body.parts.some((part) => part.tag === "v"), true);
-    assert.equal(apiResult.body.tags.some((tag) => tag.tag === "derived" && tag.count === 1), true);
+    assert.equal(apiResult.body.parts.some((part) => part.tag === "n" && part.entryCount === 1), true);
+    assert.equal(apiResult.body.parts.some((part) => part.tag === "v" && part.entryCount === 1), true);
+    assert.equal(apiResult.body.tags.some((tag) => tag.tag === "derived" && tag.entryCount === 1), true);
 
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entry-relations/${encodeURIComponent(rootEntryId)}`);
     assert.equal(apiResult.statusCode, 200);

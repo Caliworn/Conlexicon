@@ -27,7 +27,7 @@ F4b 不建设通用分析任务平台，不把功能结果伪装成普通 `Entry
 | 形态分配覆盖与模板组使用 | F4b-3 `morphologyAnalysis` 与共享 morphology model | source/view descriptor | Feature result（已迁移） | 保持真实多组分配、summary 与 feature query 边界 |
 | 形态生成数与空单元 | 已删除 | 无 | 语义不足，删除 | 当前模型不能区分未定义、不适用与失败；F4b-3 不执行单元格生成 |
 | Override 使用与排行 | F4b-3 nested override summary | source/view descriptor 与单词条定位 | Feature result + bounded summary（已迁移） | 按当前生效与 dormant overlay 中未应用的单元格分别统计 |
-| 词根家族排行 | 前端 `dictionary-query-model` 重建 relation index | 定位词根 | Topology summary | 直接查询 `RootTopologyCache` 的 `{ rootId, lemma, derivedCount }` |
+| 词根家族排行 | 前端 `dictionary-query-model` 重建 relation index | 定位词根 | Topology summary | 直接查询 `RootTopologyCache` 的 `{ rootId, lemma, derivedEntryCount }` |
 | 词长、首字母、字符、双字符组合 | 前端按 JS code point 和 `\s` 规则统计 | 每桶固定 `entryIds` | Deterministic summary/facet | 先固定 Unicode/空白语义，再选择 SQL 函数或轻量 projection |
 | 标签组合 | 显示替换后的标签按原顺序拼接 | 每组合固定 `entryIds` | 语义未定 | 明确 raw tag、顺序和重复语义前不迁移 |
 | 完整活动日期分布 | 前端扫描日期 | 日期行已是 EntryFilter | Summary/navigation | 扩展 F4a activity query，不建立 feature session；按修改时间浏览复用词条列表排序 |
@@ -122,18 +122,18 @@ items 请求分为不变的结果源、可变化的视图和窗口：
     options: {}
   },
   summary: {
-    inputTotal: 9400,
+    inputEntryCount: 9400,
     outcomes: [
-      { key: "exactMatch", count: 8100 },
-      { key: "normalizedOnlyMatch", count: 300 },
-      { key: "mismatch", count: 900 },
-      { key: "unavailable", count: 80 },
-      { key: "failed", count: 20 }
+      { key: "exactMatch", entryCount: 8100 },
+      { key: "normalizedOnlyMatch", entryCount: 300 },
+      { key: "mismatch", entryCount: 900 },
+      { key: "unavailable", entryCount: 80 },
+      { key: "failed", entryCount: 20 }
     ],
     views: [
-      { key: "match", count: 8100 },
-      { key: "looseMismatch", count: 900 },
-      { key: "strictMismatch", count: 1200 }
+      { key: "match", entryCount: 8100 },
+      { key: "looseMismatch", entryCount: 900 },
+      { key: "strictMismatch", entryCount: 1200 }
     ]
   },
   searchSummary: {
@@ -323,7 +323,7 @@ F4b-1 默认在请求内同步构建，记录冷/热耗时、扫描词条数、�
 
 - 已实装独立 `ipaDistribution` source，避免只看音位分布时顺带执行自动生成；完整支持 summary、桶查询、搜索交集、窗口、定位和 cursor。
 - view 使用 `unit / initial / final / syllableCount + value`。summary 一次返回音素单元、首音、尾音和音节数全部桶，不返回固定 ID 数组。
-- 音素单元桶同时返回总出现次数 `count` 和唯一词条数 `entryCount`；首音、尾音和音节数每个词条只贡献一次。首尾音从完整 token 顺序读取，不能从去重集合推导。
+- 音素单元桶同时返回总出现次数 `occurrenceCount` 和唯一词条数 `entryCount`；首音、尾音和音节数每个词条只贡献一次。首尾音从完整 token 顺序读取，不能从去重集合推导。
 - 清洗复用 `ipa-model`：移除包裹符和重音，空白、传统点号及当前配置分隔符均作为音节边界，复杂音素继续按最长优先切分。descriptor 只摘要 complex phoneme 和分隔符，不包含音系引擎、映射或重音设置。
 - 构建每 128 项让出事件循环。10k/30k 临时 SQLite 基准中冷构建约 50/130 ms，热桶约 2 ms，仍不需要后台 job 状态。
 - IPA 分布与音位分析页已改为按需异步消费同一份 summary，具有加载、失败和重试状态；切换分布/音位子页复用按词典版本与 IPA 解析配置识别的前端请求状态。
@@ -356,7 +356,7 @@ source 固定为 `{ type: "morphologyAnalysis", version: 1, options: {} }`。sum
 
 #### Summary 与 items
 
-summary 固定返回 `inputTotal`、互斥 assignment 计数、auto/manual 模式及其 assignment 分解、全部模板组的唯一词条使用量、override 总计、按组/子表的 active/inactive 分布，以及最多 12 条按 stored override 单元格数降序排列的词条排行。summary 不返回完整匹配 ID 数组。
+summary 固定返回 `inputEntryCount`、互斥 assignment 计数、auto/manual 模式及其 assignment 分解、全部模板组的唯一词条使用量、override 总计、按组/子表的 active/inactive 分布，以及最多 12 条按 stored override 单元格数降序排列的词条排行。summary 不返回完整匹配 ID 数组。
 
 items 中的 feature 只返回当前词条的 `{ mode, assignedGroupIds, activeOverrideCellCount, inactiveOverrideCellCount }`。分析卡片和高级筛选 action 保存 source/view descriptor，不保存 materialized ID。搜索、fuzzy、排序、窗口、location 和 cursor 继续复用现有 feature result 契约。
 
@@ -375,7 +375,7 @@ items 中的 feature 只返回当前词条的 `{ mode, assignedGroupIds, activeO
 - query model、service adapter 和 repository 最小读取必须在同一批实现中接入；任何已通过规范化的 source 都必须有明确 adapter，不能落入其他 source 的默认分支。
 - 页面未打开时不构建 morphology feature session；首次请求不读取完整词典 snapshot。
 - 同一 source 的 summary、不同分类、搜索、排序、窗口和 location 复用一次基础形态事实构建。
-- assignment 计数互斥且和为 `inputTotal`；每种 mode 的 assigned/unassigned 之和等于该 mode 的 `entryCount`。
+- assignment 计数互斥且和为 `inputEntryCount`；每种 mode 的 assigned/unassigned 之和等于该 mode 的 `entryCount`。
 - `storedCellCount = activeCellCount + inactiveCellCount`；同一词条同时含 active 与 inactive override 时只在各自词条集合中各计一次。
 - 空模板组、仅标题/备注的 dormant overlay 和空 override 值不会增加 override 单元格计数；未使用模板组仍按配置顺序出现在 summary。
 - HTTP 响应、前端 state 和 action 不携带完整匹配 ID；非法组/子表 ID 与非法 category/value/scope 使用稳定错误码。

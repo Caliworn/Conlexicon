@@ -422,10 +422,10 @@ GET /api/dictionaries/:id/facets
 ```js
 {
   parts: [
-    { tag, displayLabel, count }
+    { tag, displayLabel, entryCount }
   ],
   tags: [
-    { tag, displayLabel, count, isPartOfSpeech }
+    { tag, displayLabel, entryCount, isPartOfSpeech }
   ],
   noPartOfSpeechCount
 }
@@ -652,43 +652,43 @@ F4a 支持 `entryCount`、`lexiconSummary`、`coverageBreakdown`、`partDistribu
     "lexicon": {
       type: "lexiconSummary",
       entryCount: 10000,
-      rootCount: 6400,
-      derivedCount: 3600,
-      multiSourceCount: 180,
+      rootEntryCount: 6400,
+      derivedEntryCount: 3600,
+      multiSourceEntryCount: 180,
       action: { type: "view", target: "editor" },
       rootAction: {
         type: "entryFilter",
-        count: 6400,
+        resultCount: 6400,
         filter: { presence: [{ field: "source", present: false }] }
       },
       derivedAction: {
         type: "entryFilter",
-        count: 3600,
+        resultCount: 3600,
         filter: { presence: [{ field: "source", present: true }] }
       },
       multiSourceAction: {
         type: "entryFilter",
-        count: 180,
+        resultCount: 180,
         filter: { sourceCount: { min: 2 } }
       }
     },
     "coverage": {
       type: "coverageBreakdown",
-      total: 10000,
+      entryTotal: 10000,
       rows: [
         {
           field: "ipa",
-          count: 9400,
-          missingCount: 600,
+          coveredEntryCount: 9400,
+          missingEntryCount: 600,
           ratio: 0.94,
           action: {
             type: "entryFilter",
-            count: 9400,
+            resultCount: 9400,
             filter: { presence: [{ field: "ipa", present: true }] }
           },
           missingAction: {
             type: "entryFilter",
-            count: 600,
+            resultCount: 600,
             filter: { presence: [{ field: "ipa", present: false }] }
           }
         }
@@ -717,9 +717,9 @@ Widget 通过以下任务依赖生成：
 | `activityDistribution` | `activityStats` |
 | `rootFamilyRanking` | `rootTopology` |
 
-同一任务在一次请求中只执行一次；只有 `activityPreview` 时使用请求中的最大 limit 读取日期桶，再分别裁剪；请求包含 `activityDistribution` 时读取完整日期桶，并继续按各自 limit 裁剪预览 widget。`lexiconSummary.rootCount` 严格表示没有任何来源记录的词条数，`derivedCount` 表示至少有一条来源记录的词条数；这两个计数不建立词根拓扑，也不表达孤立词根。`partDistribution` 除排行 `rows` 外返回 `partTypeCount`、`noPartOfSpeechCount` 和对应的 `noPartAction`。`tagFrequency` 从 SQLite 标签聚合阶段排除当前 `partOfSpeechTags` 中的所有标签，返回 `tagTypeCount`、完整或限额后的 `rows` 以及 `{ tags: { values, mode: "any" } }` 筛选 action。两类活动 widget 都返回 `created`、`updated` 日期聚合及结构化日期筛选 action；按修改时间浏览词条由词条列表的编辑时间排序负责。`coverageBreakdown.rows[].field` 支持 `definition`、`example`、`entryNote`、`source`、`ipa`；释义和例句行另带 `itemCount`。词性分布 action 使用 `{ part }` descriptor，无词性行使用保留值 `__conlexicon_no_part__`。
+同一任务在一次请求中只执行一次；只有 `activityPreview` 时使用请求中的最大 limit 读取日期桶，再分别裁剪；请求包含 `activityDistribution` 时读取完整日期桶，并继续按各自 limit 裁剪预览 widget。`lexiconSummary.rootEntryCount` 严格表示没有任何来源记录的词条数，`derivedEntryCount` 表示至少有一条来源记录的词条数；这两个计数不建立词根拓扑，也不表达孤立词根。`partDistribution.rows[].entryCount`、`tagFrequency.rows[].entryCount` 和两类活动 widget 的 `created/updated[].entryCount` 均为唯一词条数。`partDistribution` 另返回 `partTypeCount`、`noPartOfSpeechCount` 和对应的 `noPartAction`；`tagFrequency` 从 SQLite 标签聚合阶段排除当前 `partOfSpeechTags` 中的所有标签，并返回 `tagTypeCount` 及结构化标签筛选 action。所有 `entryFilter` action 使用 `resultCount` 表示目标结果词条数。`coverageBreakdown.rows[].field` 支持 `definition`、`example`、`entryNote`、`source`、`ipa`；每行使用 `coveredEntryCount`、`missingEntryCount`，释义和例句行另带项目单位的 `itemCount`。词性分布 action 使用 `{ part }` descriptor，无词性行使用保留值 `__conlexicon_no_part__`。
 
-`rootFamilyRanking` 按衍生词数量降序、词根词形升序返回全部非空词根家族，同时返回家族总数 `familyCount`。每行固定为 `{ rootId, lemma, derivedCount, action? }`，其中 action 定位词根词条；不会返回家族成员或 `derivedIds`。该任务直接消费与 `/root-groups`、词汇网络共享的稳定 `RootTopologyCache`，同一词典的拓扑已存在时不重新解析来源关系；多来源词条可以分别计入其所属家族，因此不能累加排行得到全局衍生词数量。
+`rootFamilyRanking` 按衍生词数量降序、词根词形升序返回全部非空词根家族，同时返回家族总数 `familyCount`。每行固定为 `{ rootId, lemma, derivedEntryCount, action? }`，其中 action 定位词根词条；不会返回家族成员或 `derivedIds`。该任务直接消费与 `/root-groups`、词汇网络共享的稳定 `RootTopologyCache`，同一词典的拓扑已存在时不重新解析来源关系；多来源词条可以分别计入其所属家族，因此不能累加排行得到全局衍生词数量。
 
 当前总览固定消费四个 widget，分别渲染词汇规模、资料覆盖、词性分布和编辑活动；编辑活动使用 `activityPreview`。进入“词汇 > 标签”后同一次请求完整的 `partDistribution` 与 `tagFrequency`，前端只继续计算标签组合；进入“编辑进度”详情后另行请求 `activityDistribution`，进入“词根家族”详情后另行请求 `rootFamilyRanking`。资料覆盖卡只展示释义、例句、IPA 与备注，避免“来源覆盖”与衍生词比例重复；`coverageBreakdown` 仍保留 `source` 行供其他消费者使用。词根家族不属于首屏轻量总览；孤立词根尚未作为分析 widget 接线。
 
@@ -727,7 +727,7 @@ Widget 通过以下任务依赖生成：
 
 #### Feature result query（F4b-1/F4b-2/F4b-3 后端已实装）
 
-F4b-1 已按 [Feature Result Session Plan](FEATURE_RESULT_SESSION_PLAN.md) 实装 IPA 自动比较试点；F4b-2 新增独立的 IPA 分布 source，并已由分析页与高级筛选消费；F4b-3 已实装 `morphologyAnalysis` 后端 source、最小 repository 输入及 query/location/session 接线，前端形态分析页仍待迁移：
+F4b-1 已按 [Feature Result Session Plan](FEATURE_RESULT_SESSION_PLAN.md) 实装 IPA 自动比较试点；F4b-2 新增独立的 IPA 分布 source，并已由分析页与高级筛选消费；F4b-3 已实装 `morphologyAnalysis` source、最小 repository 输入、query/location/session 及前端形态分析页接线：
 
 ```text
 POST /api/dictionaries/:id/analysis/features/query
@@ -768,6 +768,8 @@ POST /api/dictionaries/:id/analysis/features/location
 
 summary 模式不接受 `view` 或 `page`，其统计不受 category、搜索、排序或窗口影响。服务端建立或复用基础会话后直接返回 `summary`，不建立有序结果视图、不读取 EntrySummary，也不生成 `items`、`pageInfo` 或 cursor。IPA 自动检查页以及 IPA 分布/音位分析页首次加载使用该模式；分布与音位子页共享同一份 `ipaDistribution` summary。
 
+`ipaAutoCompare` summary 使用 `inputEntryCount` 表示参与比较的词条总数；`outcomes` 和 `views` 的每行固定为 `{ key, entryCount }`。outcome 互斥，view 可以组合多个 outcome，因此 view 的词条数由其包含的 outcome 相加得到。
+
 `source` 绑定功能类型、契约版本和算法 options；items 模式的 `view` 选择 category、EntrySearch 与 sort，`page` 使用普通列表相同的窗口语义和 1–200 硬上限。服务端按词典 generation、source、算法版本和 IPA 设置摘要复用内部会话。搜索复用词典的运行期规范化配置和现有 SQLite search projection；只回读当前页 EntrySummary 与 search hits。
 
 IPA 分布使用以下 source 和 view：
@@ -790,11 +792,11 @@ IPA 分布使用以下 source 和 view：
 }
 ```
 
-summary 模式同样只传 `source` 与 `responseMode: "summary"`。`summary.distributions` 一次返回 `units`、`initials`、`finals` 和 `syllableCounts` 全部桶，每行形如 `{ value, count, entryCount }`。音素单元的 `count` 是总出现次数，`entryCount` 是至少包含一次该单元的唯一词条数；其余三类每个词条只贡献一次，因此两者相同。summary 另含全部词条数 `entryTotal`、实际参与 IPA 分布的非空 IPA 词条数 `inputTotal`、`unitTotal`、`syllableEntryCount`、`syllableTotal` 和按两位小数舍入的数值型 `syllableAverage`。
+summary 模式同样只传 `source` 与 `responseMode: "summary"`。`summary.distributions` 一次返回 `units`、`initials`、`finals` 和 `syllableCounts` 全部桶，每行形如 `{ value, occurrenceCount, entryCount }`。音素单元的 `occurrenceCount` 是总出现次数，`entryCount` 是至少包含一次该单元的唯一词条数；其余三类每个词条只贡献一次，因此两者相同。summary 另含全部词条数 `dictionaryEntryCount`、实际参与 IPA 分布的非空 IPA 词条数 `ipaEntryCount`、`unitOccurrenceCount`、`syllableEntryCount`、`syllableOccurrenceCount` 和按两位小数舍入的数值型 `averageSyllablesPerIpaEntry`。
 
 分布解析先移除 IPA 包裹符和重音符，再按空白、传统 `.` 及当前 IPA 设置中的音节分隔符切分；音素单元切分复用 `ipa-model` 的 `complexPhonemes` 最长优先规则。桶查询的搜索语义为 `Distribution(category, value) ∩ EntrySearch`，不会重跑分布计算。items 中的 source-specific feature 为 `{ category, value, occurrenceCount }`；其中 unit 的 `occurrenceCount` 是该词条内出现次数，其余类别为 1。
 
-形态分析使用以下 source 和 view（后端已实现，前端待接线）：
+形态分析使用以下 source 和 view：
 
 ```js
 {
@@ -821,7 +823,7 @@ category/value 组合固定为：`assignment + assigned|unassigned`、`mode + au
 
 ```js
 {
-  inputTotal,
+  inputEntryCount,
   assignment: { assignedEntryCount, unassignedEntryCount },
   modes: [
     { mode: "auto", entryCount, assignedEntryCount, unassignedEntryCount },
@@ -850,7 +852,7 @@ category/value 组合固定为：`assignment + assigned|unassigned`、`mode + au
 }
 ```
 
-assignment 的两个计数互斥且和为 `inputTotal`；每个 mode 行的 assigned/unassigned 之和等于该行 `entryCount`。手动词条可以属于多个模板组，所以 `groups[].assignedEntryCount` 不可相加推导总数。override 的 active/inactive 词条集合允许重叠，`entryCount` 表示至少保存一个非空 override 单元格的唯一词条数；单元格计数满足 `storedCellCount = activeCellCount + inactiveCellCount`。`topEntries` 最多 12 项，按 `storedCellCount` 降序并以现有稳定 `lemmaAsc + entryId` 顺序打破平局；模板组和子表数组按当前配置顺序返回，不携带成员 ID 集合。空 override 值以及只保存标题或备注的 dormant overlay 不增加这些单元格计数。
+assignment 的两个计数互斥且和为 `inputEntryCount`；每个 mode 行的 assigned/unassigned 之和等于该行 `entryCount`。手动词条可以属于多个模板组，所以 `groups[].assignedEntryCount` 不可相加推导总数。override 的 active/inactive 词条集合允许重叠，`entryCount` 表示至少保存一个非空 override 单元格的唯一词条数；单元格计数满足 `storedCellCount = activeCellCount + inactiveCellCount`。`topEntries` 最多 12 项，按 `storedCellCount` 降序并以现有稳定 `lemmaAsc + entryId` 顺序打破平局；模板组和子表数组按当前配置顺序返回，不携带成员 ID 集合。空 override 值以及只保存标题或备注的 dormant overlay 不增加这些单元格计数。
 
 `morphologyAnalysis` items 的 feature 固定为 `{ mode, assignedGroupIds, activeOverrideCellCount, inactiveOverrideCellCount }`。形态覆盖只表示至少解析到一个模板组；该 source 不执行单元格生成，不统计生成形式、空单元、失败或必需形式缺失，也不把未分配或 inactive override 解释为质量问题。
 
@@ -879,7 +881,7 @@ morphologyAnalysis
 activityPreview
   少量创建/编辑日期桶
 
-activityFull
+activityDistribution
   完整创建/编辑日期分布
 ```
 
@@ -892,7 +894,7 @@ F4a 的 light widgets 不返回后台任务状态。F4b 接入重型 widget 后�
 ```js
 {
   type: "entryFilter",
-  count: 608,
+  resultCount: 608,
   filter: {
     presence: [
       { field: "ipa", present: false }
@@ -901,7 +903,7 @@ F4a 的 light widgets 不返回后台任务状态。F4b 接入重型 widget 后�
 }
 ```
 
-点击分析行时，词条列表使用 descriptor 调用 `/entries` 获取匹配项。这样总览 API 只返回 `count` 和可复用 filter spec，避免大词典下把大量 ID 塞进 dashboard 响应。F4b/F5 的功能结果仍需按各自会话边界迁移。
+点击分析行时，词条列表使用 descriptor 调用 `/entries` 获取匹配项。这样总览 API 只返回 `resultCount` 和可复用 filter spec，避免大词典下把大量 ID 塞进 dashboard 响应。F4b/F5 的功能结果仍需按各自会话边界迁移。
 
 #### 诊断修复边界
 

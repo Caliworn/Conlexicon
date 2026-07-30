@@ -3561,6 +3561,10 @@ button.analysis-composition-subset:hover strong {
   min-width: 0;
 }
 
+.analysis-bar-row.has-wide-value {
+  grid-template-columns: minmax(76px, 0.8fr) minmax(80px, 1fr) minmax(70px, auto);
+}
+
 .analysis-bar-label {
   min-width: 0;
   border: 0;

@@ -221,11 +221,11 @@ function morphologyRequest(category, value, options = {}) {
   };
 }
 
-function summaryCounts(response, key) {
-  return Object.fromEntries((response.summary?.[key] || []).map((row) => [row.key, row.count]));
+function summaryEntryCounts(response, key) {
+  return Object.fromEntries((response.summary?.[key] || []).map((row) => [row.key, row.entryCount]));
 }
 
-function distributionCounts(response, facet, countField = "count") {
+function distributionCounts(response, facet, countField = "occurrenceCount") {
   return Object.fromEntries(
     (response.summary?.distributions?.[facet] || [])
       .map((row) => [row.value, row[countField]]),
@@ -330,13 +330,13 @@ async function checkIpaDistributionModel() {
       complexPhonemes: ["t͡s"],
       separator: "-",
     },
-  }, { entryTotal: 3 });
-  assert.equal(result.summary.entryTotal, 3);
-  assert.equal(result.summary.inputTotal, 2);
-  assert.equal(result.summary.unitTotal, 7);
+  }, { dictionaryEntryCount: 3 });
+  assert.equal(result.summary.dictionaryEntryCount, 3);
+  assert.equal(result.summary.ipaEntryCount, 2);
+  assert.equal(result.summary.unitOccurrenceCount, 7);
   assert.equal(result.summary.syllableEntryCount, 2);
-  assert.equal(result.summary.syllableTotal, 4);
-  assert.equal(result.summary.syllableAverage, 2);
+  assert.equal(result.summary.syllableOccurrenceCount, 4);
+  assert.equal(result.summary.averageSyllablesPerIpaEntry, 2);
   assert.deepEqual(distributionCounts({ summary: result.summary }, "units"), {
     a: 4,
     t: 1,
@@ -362,6 +362,7 @@ async function checkMorphologyAnalysisModel() {
     },
     entries: morphologyFixtureEntries(),
   });
+  assert.equal(result.summary.inputEntryCount, 6);
   assert.deepEqual(result.summary.assignment, {
     assignedEntryCount: 4,
     unassignedEntryCount: 2,
@@ -635,7 +636,8 @@ async function checkRepositoryIntegration() {
     assert.equal(orderedViewCalls, 0, "summary mode must not build an ordered result view");
     assert.equal(entrySummaryCalls, 0, "summary mode must not read entry summaries");
     assert.equal(generateCalls, 5);
-    assert.deepEqual(summaryCounts(summary, "views"), {
+    assert.equal(summary.summary.inputEntryCount, 5);
+    assert.deepEqual(summaryEntryCounts(summary, "views"), {
       match: 1,
       looseMismatch: 1,
       strictMismatch: 2,
@@ -648,14 +650,14 @@ async function checkRepositoryIntegration() {
     assert.equal(strict.items[0].feature.outcome, "normalizedOnlyMatch");
     assert.ok(strict.items[0].entry.id);
     assert.equal(Object.hasOwn(strict, "entryIds"), false);
-    assert.deepEqual(summaryCounts(strict, "outcomes"), {
+    assert.deepEqual(summaryEntryCounts(strict, "outcomes"), {
       exactMatch: 1,
       normalizedOnlyMatch: 1,
       mismatch: 1,
       unavailable: 1,
       failed: 1,
     });
-    assert.deepEqual(summaryCounts(strict, "views"), {
+    assert.deepEqual(summaryEntryCounts(strict, "views"), {
       match: 1,
       looseMismatch: 1,
       strictMismatch: 2,
@@ -711,12 +713,12 @@ async function checkRepositoryIntegration() {
     assert.equal(generateCalls, 5, "IPA distribution must not invoke the phonology engine");
     assert.equal(orderedViewCalls, orderedCallsBeforeDistributionSummary);
     assert.equal(entrySummaryCalls, summaryCallsBeforeDistributionSummary);
-    assert.equal(distributionSummary.summary.entryTotal, 6);
-    assert.equal(distributionSummary.summary.inputTotal, 5);
-    assert.equal(distributionSummary.summary.unitTotal, 11);
+    assert.equal(distributionSummary.summary.dictionaryEntryCount, 6);
+    assert.equal(distributionSummary.summary.ipaEntryCount, 5);
+    assert.equal(distributionSummary.summary.unitOccurrenceCount, 11);
     assert.equal(distributionSummary.summary.syllableEntryCount, 5);
-    assert.equal(distributionSummary.summary.syllableTotal, 8);
-    assert.equal(distributionSummary.summary.syllableAverage, 1.6);
+    assert.equal(distributionSummary.summary.syllableOccurrenceCount, 8);
+    assert.equal(distributionSummary.summary.averageSyllablesPerIpaEntry, 1.6);
     assert.deepEqual(distributionCounts(distributionSummary, "units"), {
       a: 6,
       d: 1,
@@ -769,7 +771,7 @@ async function checkRepositoryIntegration() {
     await repository.saveEntry(dictionary.id, { ...saved, pronunciation: "/a.da/" });
     const afterSave = await service.query(dictionary.id, featureRequest("match"));
     assert.equal(generateCalls, 10, "dictionary writes must invalidate the base feature session");
-    assert.equal(summaryCounts(afterSave, "views").match, 0);
+    assert.equal(summaryEntryCounts(afterSave, "views").match, 0);
     const distributionAfterSave = await service.query(dictionary.id, {
       source: DISTRIBUTION_SOURCE,
       responseMode: "summary",
@@ -821,6 +823,7 @@ async function checkRepositoryIntegration() {
     assert.equal(generateCalls, 10, "morphology analysis must not invoke the phonology engine");
     assert.equal(orderedViewCalls, orderedCallsBeforeMorphologySummary);
     assert.equal(entrySummaryCalls, summaryCallsBeforeMorphologySummary);
+    assert.equal(morphologySummary.summary.inputEntryCount, 6);
     assert.deepEqual(morphologySummary.summary.assignment, {
       assignedEntryCount: 4,
       unassignedEntryCount: 2,
