@@ -3036,6 +3036,29 @@ function render() {
   scheduleEntryBrowserHeightUpdate();
 }
 
+function renderLocaleChange() {
+  closeEntryContextMenu();
+  refreshAdvancedFilterLocalization();
+  applyLocale();
+  applyTheme();
+  refreshEditableSurfaceLocale();
+  renderShellNav();
+  renderAvailability();
+  renderShellEntryBrowser();
+  renderMobileAppBar();
+  renderHeader();
+  renderToolNav();
+  renderLocaleActiveView();
+  restoreProcessScroll();
+  scheduleEntryBrowserHeightUpdate();
+}
+
+function renderThemeChange() {
+  hideAppTooltip();
+  applyTheme();
+  applyLocale();
+}
+
 function renderActiveView() {
   const dictionary = activeDictionary();
   if (state.activeView === "editor") {
@@ -3072,6 +3095,44 @@ function renderActiveView() {
   }
   if (state.activeView === "ipa") {
     fillIpaForm(dictionary);
+    renderIpaSandbox();
+    return;
+  }
+  if (state.activeView === "analysis") {
+    renderAnalysis(dictionary);
+    return;
+  }
+  if (state.activeView === "quality") {
+    renderQuality(dictionary);
+  }
+}
+
+function renderLocaleActiveView() {
+  const dictionary = activeDictionary();
+  if (state.activeView === "editor") {
+    renderPartFilterLocale();
+    renderEntries({ allowQueryStart: false });
+    renderDetail({ preserveEditorForm: true });
+    renderLexicalNetwork();
+    return;
+  }
+  if (state.activeView === "manager") {
+    renderDictionaryManager();
+    return;
+  }
+  if (state.activeView === "settings") {
+    setupMasonryLayout(elements.settingsForm, ".settings-section, .form-actions", 18);
+    return;
+  }
+  if (state.activeView === "docs") {
+    renderLanguageDocs(dictionary);
+    return;
+  }
+  if (state.activeView === "corpus") {
+    renderCorpusLocale(dictionary);
+    return;
+  }
+  if (state.activeView === "ipa") {
     renderIpaSandbox();
     return;
   }
@@ -3209,15 +3270,15 @@ function ensureValidSelection() {
   }
 }
 
-function applyLocale() {
+function applyLocale(root = document) {
   document.documentElement.lang = currentLanguage === "zh" ? "zh-CN" : "en";
-  document.querySelectorAll("[data-i18n]").forEach((node) => {
+  root.querySelectorAll("[data-i18n]").forEach((node) => {
     node.textContent = t(node.dataset.i18n);
   });
-  document.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
+  root.querySelectorAll("[data-i18n-placeholder]").forEach((node) => {
     node.placeholder = t(node.dataset.i18nPlaceholder);
   });
-  document.querySelectorAll("[data-i18n-aria-label]").forEach((node) => {
+  root.querySelectorAll("[data-i18n-aria-label]").forEach((node) => {
     node.setAttribute("aria-label", t(node.dataset.i18nAriaLabel));
   });
   document.body.classList.toggle("english-locale", currentLanguage === "en");
@@ -3231,6 +3292,46 @@ function applyLocale() {
   const nextLanguageLabel = currentLanguage === "zh" ? "English" : "中文";
   elements.languageToggleButton.removeAttribute("title");
   elements.languageToggleButton.setAttribute("aria-label", nextLanguageLabel);
+}
+
+function refreshEditableSurfaceLocale() {
+  const entryIsExisting = Boolean(elements.entryId.value);
+  elements.entryMode.textContent = entryIsExisting ? t("edit") : t("new");
+  if (!entryIsExisting) {
+    elements.entryFormTitle.textContent = t("entry");
+  }
+
+  const configuredDictionary = selectedDictionaryConfig();
+  elements.dictionaryMode.textContent = configuredDictionary ? t("config") : t("new");
+  if (!configuredDictionary) {
+    elements.dictionaryFormTitle.textContent = t("newDictionary");
+  }
+
+  elements.toolNavOrderList?.querySelectorAll(".tool-order-card[data-view]").forEach((card) => {
+    const label = card.querySelector("strong");
+    if (label) {
+      label.textContent = toolNavLabel(card.dataset.view);
+    }
+  });
+  elements.entrySectionOrderList?.querySelectorAll(".tool-order-card[data-entry-section]").forEach((card) => {
+    const label = card.querySelector("strong");
+    if (label) {
+      label.textContent = entrySectionLabel(card.dataset.entrySection);
+    }
+  });
+
+  document.querySelectorAll(".ipa-key").forEach((button) => {
+    button.setAttribute("aria-label", formatText("insertSymbol", { symbol: button.textContent || "" }));
+  });
+  elements.morphologyTableList?.querySelectorAll("[data-col-label]").forEach((input) => {
+    const index = Number(input.dataset.colLabel) + 1;
+    input.setAttribute("aria-label", `${t("columnLabels")} ${index}`);
+  });
+  elements.morphologyTableList?.querySelectorAll("[data-row-label]").forEach((input) => {
+    const index = Number(input.dataset.rowLabel) + 1;
+    input.setAttribute("aria-label", `${t("rowLabels")} ${index}`);
+  });
+  refreshCorpusEditorLocale();
 }
 
 function applyTheme() {
@@ -3992,6 +4093,16 @@ function renderPartFilter() {
   }
   startEntryFacetsApiCheck(dictionary);
   const usedParts = entryFacetsPartsForRender(dictionary) || localPartTags(dictionary);
+  activePart = renderPartFilterControls(dictionary, usedParts);
+}
+
+function renderPartFilterLocale() {
+  const dictionary = activeDictionary();
+  const usedParts = entryFacetsPartsForRender(dictionary) || localPartTags(dictionary);
+  renderPartFilterControls(dictionary, usedParts);
+}
+
+function renderPartFilterControls(dictionary, usedParts = []) {
   const options = ["", NO_PART_FILTER_VALUE, ...usedParts];
   const current = activePart;
 
@@ -4008,7 +4119,6 @@ function renderPartFilter() {
   elements.partFilter.disabled = rootMode || Boolean(advancedFilter);
   elements.searchInput.disabled = Boolean(advancedFilter && !advancedFilterUsesRemoteQuery());
   renderEntrySearchConfig();
-  activePart = elements.partFilter.value;
   elements.rootModeToggleButton.textContent = rootMode ? t("normalMode") : t("rootMode");
   elements.rootModeToggleButton.classList.toggle("active", rootMode);
   elements.rootModeToggleButton.hidden = Boolean(advancedFilter);
@@ -4032,6 +4142,7 @@ function renderPartFilter() {
     && (hasRootSearch || !rootGroupsReady || (rootExpansionMode === "all" && !collapsedRootEntries.size));
   elements.collapseAllRootsButton.disabled = rootMode
     && (hasRootSearch || !rootGroupsReady || (rootExpansionMode === "manual" && !expandedRootEntries.size));
+  return elements.partFilter.value;
 }
 
 function renderAdvancedFilterRefreshAvailability() {
@@ -4733,7 +4844,8 @@ function setupQualityMasonryLayouts() {
   ).forEach((container) => setupMasonryLayout(container, ".analysis-card", 14));
 }
 
-function renderEntries() {
+function renderEntries(options = {}) {
+  const allowQueryStart = options.allowQueryStart !== false;
   const dictionary = activeDictionary();
   if (!dictionary) {
     finishStaleContentUpdate("list");
@@ -4743,12 +4855,14 @@ function renderEntries() {
   }
 
   if (!advancedFilter && rootMode) {
-    renderRootModeEntries();
+    renderRootModeEntries({ allowQueryStart });
     return;
   }
 
   if (entryQueryCanUseApi(dictionary)) {
-    startEntryQueryApiCheck(dictionary);
+    if (allowQueryStart) {
+      startEntryQueryApiCheck(dictionary);
+    }
     const queryPages = entryQueryWindowForRender(dictionary);
     if (!queryPages) {
       if (entryQueryState.status === "loading") {
@@ -4859,9 +4973,11 @@ function renderQueryWindowPlaceholder(row) {
   return placeholder;
 }
 
-function renderRootModeEntries() {
+function renderRootModeEntries(options = {}) {
   const dictionary = activeDictionary();
-  startRootGroupsQueryApiCheck(dictionary);
+  if (options.allowQueryStart !== false) {
+    startRootGroupsQueryApiCheck(dictionary);
+  }
   const groupPages = rootGroupsQueryForRender(dictionary);
   if (!groupPages) {
     if (rootGroupsQueryState.status === "loading") {
@@ -6694,6 +6810,18 @@ async function switchToEntry(entryId, options = {}) {
   closeMobileEntryBrowserDrawer();
 }
 
+async function navigateToEntryFromReport(entryId) {
+  if (!entryId) {
+    return;
+  }
+  advancedFilter = null;
+  await showView("editor");
+  if (state.activeView !== "editor") {
+    return;
+  }
+  await switchToEntry(entryId);
+}
+
 function prepareRootModeEntryNavigation(entryId, options = {}) {
   if (!rootMode || advancedFilter) {
     return options;
@@ -7994,7 +8122,7 @@ function fuzzyScore(value, query) {
   return entrySearchModel.fuzzyScore(value, query, { normalizeText: entrySearchQueryOptions().normalizeText });
 }
 
-function renderDetail() {
+function renderDetail(options = {}) {
   const dictionary = activeDictionary();
   const isEditing = editorMode === "edit";
 
@@ -8010,7 +8138,9 @@ function renderDetail() {
     finishStaleContentUpdate("detail");
     elements.entryDisplay.hidden = true;
     elements.entryForm.hidden = false;
-    fillEntryForm(selectedEntry() || entryDraft);
+    if (!options.preserveEditorForm) {
+      fillEntryForm(selectedEntry() || entryDraft);
+    }
     return;
   }
 
@@ -10538,9 +10668,31 @@ function refreshAdvancedFilterLocalization() {
     return;
   }
   const action = rebuildAdvancedFilterAction({ allowEmptyActive: true });
-  if (action) {
-    applyAdvancedFilterAction(action, { keepFirstEmpty: true });
+  if (!action) {
+    return;
   }
+  const localizedVariants = normalizeAdvancedFilterVariants(action, { keepFirstEmpty: true });
+  const localizedByKey = new Map(localizedVariants.map((variant) => [variant.key, variant]));
+  const variants = (advancedFilter.variants || []).map((variant) => {
+    const localized = localizedByKey.get(variant.key);
+    return localized
+      ? {
+        ...variant,
+        titleDescriptor: localized.titleDescriptor,
+        issueMap: localized.issueMap,
+      }
+      : variant;
+  });
+  const activeKey = advancedFilter.key || variants[advancedFilter.variantIndex]?.key || "";
+  const active = localizedByKey.get(activeKey);
+  advancedFilter = {
+    ...advancedFilter,
+    variants,
+    ...(active ? {
+      titleDescriptor: active.titleDescriptor,
+      issueMap: active.issueMap,
+    } : {}),
+  };
 }
 
 function qualityIssueAdvancedFilterAction(titleDescriptor, issues = [], variants = [], options = {}) {
@@ -11258,17 +11410,19 @@ function renderMorphologyEntryControls(host, entry = {}, { full = false } = {}) 
   })).filter(({ templateGroup }) => templateGroup);
   const groups = state.morphologyMode === "manual" ? manualGroups : resolved;
   const availableGroups = normalizeMorphology(dictionary?.morphology).templateGroups;
+  const modeLabelKey = state.morphologyMode === "auto" ? "morphologyAuto" : "morphologyManual";
+  const modeActionKey = state.morphologyMode === "auto" ? "switchToManualMorphology" : "restoreAutoMorphology";
   host.innerHTML = `
     <div class="entry-morphology-mode-row" data-morphology-mode="${escapeHtml(state.morphologyMode)}">
-      <strong>${escapeHtml(state.morphologyMode === "auto" ? t("morphologyAuto") : t("morphologyManual"))}</strong>
-      <button class="secondary-button" type="button" data-action="toggle-entry-morphology-mode">${escapeHtml(state.morphologyMode === "auto" ? t("switchToManualMorphology") : t("restoreAutoMorphology"))}</button>
+      <strong data-i18n="${modeLabelKey}">${escapeHtml(t(modeLabelKey))}</strong>
+      <button class="secondary-button" type="button" data-action="toggle-entry-morphology-mode" data-i18n="${modeActionKey}">${escapeHtml(t(modeActionKey))}</button>
     </div>
     ${state.morphologyMode === "manual" ? `
       <div class="entry-morphology-add-row">
         <select data-field="addMorphologyGroup">${availableGroups.map((group) => `<option value="${escapeHtml(group.id)}">${escapeHtml(group.name)}</option>`).join("")}</select>
-        <button class="primary-button" type="button" data-action="add-entry-morphology-group">${escapeHtml(t("addEntryMorphologyGroup"))}</button>
+        <button class="primary-button" type="button" data-action="add-entry-morphology-group" data-i18n="addEntryMorphologyGroup">${escapeHtml(t("addEntryMorphologyGroup"))}</button>
       </div>` : ""}
-    <p class="field-help">${escapeHtml(t("morphologyOverrideHelp"))}</p>
+    <p class="field-help" data-i18n="morphologyOverrideHelp">${escapeHtml(t("morphologyOverrideHelp"))}</p>
     <div class="entry-morphology-group-list">${groups.map(({ templateGroup, entryGroup }, index) => renderEntryMorphologyGroupEditor(templateGroup, entryGroup, previewEntry, state.morphologyMode, index, groups.length)).join("")}</div>
   `;
 }
@@ -11276,18 +11430,19 @@ function renderMorphologyEntryControls(host, entry = {}, { full = false } = {}) 
 function renderEntryMorphologyGroupEditor(templateGroup, entryGroup, entry, mode, index = 0, total = 1) {
   const group = entryGroup || { templateGroupId: templateGroup.id, title: "", notes: "", overrides: {} };
   const tables = templateGroup.tables.map((table) => renderEntryMorphologyOverrideTable(table, group, entry)).join("");
+  const modeLabelKey = mode === "auto" ? "morphologyAuto" : "morphologyManual";
   return `
     <section class="entry-morphology-group-card" data-template-group-id="${escapeHtml(templateGroup.id)}">
       <div class="entry-morphology-group-heading">
         <div>
           <strong>${escapeHtml(templateGroup.name)}</strong>
-          <span class="field-help">${escapeHtml(mode === "auto" ? t("morphologyAuto") : t("morphologyManual"))}</span>
+          <span class="field-help" data-i18n="${modeLabelKey}">${escapeHtml(t(modeLabelKey))}</span>
         </div>
-        ${mode === "manual" ? `<div class="panel-actions"><button class="secondary-button" type="button" data-action="move-entry-morphology-group-up" ${index === 0 ? "disabled" : ""}>${escapeHtml(t("moveUp"))}</button><button class="secondary-button" type="button" data-action="move-entry-morphology-group-down" ${index === total - 1 ? "disabled" : ""}>${escapeHtml(t("moveDown"))}</button><button class="danger-ghost" type="button" data-action="remove-entry-morphology-group">${escapeHtml(t("removeEntryMorphologyGroup"))}</button></div>` : ""}
+        ${mode === "manual" ? `<div class="panel-actions"><button class="secondary-button" type="button" data-action="move-entry-morphology-group-up" data-i18n="moveUp" ${index === 0 ? "disabled" : ""}>${escapeHtml(t("moveUp"))}</button><button class="secondary-button" type="button" data-action="move-entry-morphology-group-down" data-i18n="moveDown" ${index === total - 1 ? "disabled" : ""}>${escapeHtml(t("moveDown"))}</button><button class="danger-ghost" type="button" data-action="remove-entry-morphology-group" data-i18n="removeEntryMorphologyGroup">${escapeHtml(t("removeEntryMorphologyGroup"))}</button></div>` : ""}
       </div>
       <div class="entry-morphology-group-fields">
-        <label><span>${escapeHtml(t("entryMorphologyGroupTitle"))}</span><input data-field="entryMorphologyTitle" value="${escapeHtml(group.title || "")}" placeholder="${escapeHtml(t("useTemplateGroupTitle"))}"></label>
-        <label><span>${escapeHtml(t("entryMorphologyGroupNotes"))}</span><textarea data-field="entryMorphologyNotes" rows="2">${escapeHtml(group.notes || "")}</textarea></label>
+        <label><span data-i18n="entryMorphologyGroupTitle">${escapeHtml(t("entryMorphologyGroupTitle"))}</span><input data-field="entryMorphologyTitle" value="${escapeHtml(group.title || "")}" data-i18n-placeholder="useTemplateGroupTitle" placeholder="${escapeHtml(t("useTemplateGroupTitle"))}"></label>
+        <label><span data-i18n="entryMorphologyGroupNotes">${escapeHtml(t("entryMorphologyGroupNotes"))}</span><textarea data-field="entryMorphologyNotes" rows="2">${escapeHtml(group.notes || "")}</textarea></label>
       </div>
       ${tables}
     </section>
@@ -11396,14 +11551,14 @@ function definitionFormValue(definition, field) {
 function definitionOptionalFieldHtml(field, labelKey, value) {
   return `
     <label>
-      <span>${escapeHtml(t(labelKey))}</span>
+      <span data-i18n="${escapeHtml(labelKey)}">${escapeHtml(t(labelKey))}</span>
       <textarea data-field="${field}" rows="2">${escapeHtml(value)}</textarea>
     </label>
   `;
 }
 
 function definitionOptionalActionHtml(field, labelKey) {
-  return `<button class="secondary-button additive-button" type="button" data-action="add-definition-optional" data-optional-definition-field="${field}">${escapeHtml(t(labelKey))}</button>`;
+  return `<button class="secondary-button additive-button" type="button" data-action="add-definition-optional" data-optional-definition-field="${field}" data-i18n="${escapeHtml(labelKey)}">${escapeHtml(t(labelKey))}</button>`;
 }
 
 function definitionOptionalFieldsHtml(definition = {}) {
@@ -11430,11 +11585,11 @@ function definitionOptionalFieldsHtml(definition = {}) {
 function definitionFormCardHtml(definition, index, removeAction) {
   return `
     <div class="definition-form-header">
-      <strong>${escapeHtml(t("definitions"))} ${index + 1}</strong>
-      <button class="danger-ghost" type="button" data-action="${removeAction}">${escapeHtml(t("removeDefinition"))}</button>
+      <strong><span data-i18n="definitions">${escapeHtml(t("definitions"))}</span> ${index + 1}</strong>
+      <button class="danger-ghost" type="button" data-action="${removeAction}" data-i18n="removeDefinition">${escapeHtml(t("removeDefinition"))}</button>
     </div>
     <label>
-      <span>${escapeHtml(t("meaning"))}</span>
+      <span data-i18n="meaning">${escapeHtml(t("meaning"))}</span>
       <textarea data-field="meaning" rows="3">${escapeHtml(definitionFormValue(definition, "meaning"))}</textarea>
     </label>
     ${definitionOptionalFieldsHtml(definition)}
@@ -11839,14 +11994,14 @@ function createSearchNormalizationRuleCard(rule = {}) {
   card.className = "search-normalization-rule-card";
   card.innerHTML = `
     <label>
-      <span>${escapeHtml(t("searchCanonical"))}</span>
+      <span data-i18n="searchCanonical">${escapeHtml(t("searchCanonical"))}</span>
       <input type="text" data-search-rule-canonical value="${escapeHtml(rule.canonical || "")}">
     </label>
     <label>
-      <span>${escapeHtml(t("searchVariants"))}</span>
+      <span data-i18n="searchVariants">${escapeHtml(t("searchVariants"))}</span>
       <textarea data-search-rule-variants>${escapeHtml((rule.variants || []).join("\n"))}</textarea>
     </label>
-    <button class="danger-ghost" type="button" data-action="remove-search-normalization-rule">${escapeHtml(t("removeSearchNormalizationRule"))}</button>
+    <button class="danger-ghost" type="button" data-action="remove-search-normalization-rule" data-i18n="removeSearchNormalizationRule">${escapeHtml(t("removeSearchNormalizationRule"))}</button>
   `;
   return card;
 }
@@ -12100,12 +12255,12 @@ function createIpaRuleCard(rule = normalizeIpaRule()) {
   card.className = "ipa-rule-card";
   card.innerHTML = `
     <div class="ipa-rule-grid">
-      <button class="ipa-rule-drag-handle" type="button" draggable="true" data-app-tooltip="always" aria-label="${escapeHtml(t("reorderIpaRule"))}">⋮⋮</button>
-      <textarea class="ipa-single-line" rows="1" data-field="from" aria-label="${escapeHtml(t("ruleFrom"))}" placeholder="${escapeHtml(t("ruleFrom"))}">${escapeHtml(rule.from)}</textarea>
-      <textarea class="ipa-single-line" rows="1" data-field="to" aria-label="${escapeHtml(t("ruleTo"))}" placeholder="${escapeHtml(t("ruleTo"))}">${escapeHtml(rule.to)}</textarea>
-      <textarea class="ipa-single-line" rows="1" data-field="before" aria-label="${escapeHtml(t("ruleBefore"))}" placeholder="${escapeHtml(t("ruleBefore"))}">${escapeHtml(rule.before)}</textarea>
-      <textarea class="ipa-single-line" rows="1" data-field="after" aria-label="${escapeHtml(t("ruleAfter"))}" placeholder="${escapeHtml(t("ruleAfter"))}">${escapeHtml(rule.after)}</textarea>
-      <button class="icon-danger-button" type="button" data-action="remove-ipa-rule" data-app-tooltip="always" aria-label="${escapeHtml(t("removeRule"))}">🗑</button>
+      <button class="ipa-rule-drag-handle" type="button" draggable="true" data-app-tooltip="always" data-i18n-aria-label="reorderIpaRule" aria-label="${escapeHtml(t("reorderIpaRule"))}">⋮⋮</button>
+      <textarea class="ipa-single-line" rows="1" data-field="from" data-i18n-aria-label="ruleFrom" data-i18n-placeholder="ruleFrom" aria-label="${escapeHtml(t("ruleFrom"))}" placeholder="${escapeHtml(t("ruleFrom"))}">${escapeHtml(rule.from)}</textarea>
+      <textarea class="ipa-single-line" rows="1" data-field="to" data-i18n-aria-label="ruleTo" data-i18n-placeholder="ruleTo" aria-label="${escapeHtml(t("ruleTo"))}" placeholder="${escapeHtml(t("ruleTo"))}">${escapeHtml(rule.to)}</textarea>
+      <textarea class="ipa-single-line" rows="1" data-field="before" data-i18n-aria-label="ruleBefore" data-i18n-placeholder="ruleBefore" aria-label="${escapeHtml(t("ruleBefore"))}" placeholder="${escapeHtml(t("ruleBefore"))}">${escapeHtml(rule.before)}</textarea>
+      <textarea class="ipa-single-line" rows="1" data-field="after" data-i18n-aria-label="ruleAfter" data-i18n-placeholder="ruleAfter" aria-label="${escapeHtml(t("ruleAfter"))}" placeholder="${escapeHtml(t("ruleAfter"))}">${escapeHtml(rule.after)}</textarea>
+      <button class="icon-danger-button" type="button" data-action="remove-ipa-rule" data-app-tooltip="always" data-i18n-aria-label="removeRule" aria-label="${escapeHtml(t("removeRule"))}">🗑</button>
     </div>
   `;
   return card;
@@ -13041,6 +13196,65 @@ function renderCorpus(dictionary = activeDictionary()) {
   }
 }
 
+function renderCorpusLocale(dictionary = activeDictionary()) {
+  if (!elements.corpusPanel || !dictionary) {
+    return;
+  }
+  const corpus = ensureCorpusDraft(dictionary);
+  const viewState = activeCorpusViewState();
+  elements.newCorpusItemButton.textContent = t(viewState.mode === "blocks" ? "newCorpusBlock" : "newCorpusUnit");
+  renderCorpusIntegrity(corpus);
+  renderCorpusItemList(corpus, viewState);
+  refreshCorpusEditorLocale();
+}
+
+function refreshCorpusEditorLocale() {
+  const form = elements.corpusEditor?.querySelector(".corpus-form");
+  const corpus = ensureCorpusDraft();
+  if (!form || !corpus) {
+    return;
+  }
+
+  const parentLabels = new Map(corpusParentRefs(corpus).map((ref) => [ref.key, corpusParentLabel(ref)]));
+  form.querySelectorAll('select[data-field="parent"]').forEach((select) => {
+    [...select.options].forEach((option) => {
+      option.textContent = option.value ? parentLabels.get(option.value) || option.textContent : t("corpusOrphan");
+    });
+  });
+
+  const unitsById = new Map(corpus.units.map((unit) => [unit.id, unit]));
+  form.querySelectorAll("select[data-corpus-unit-link]").forEach((select) => {
+    [...select.options].forEach((option) => {
+      option.textContent = option.value
+        ? corpusUnitLabel(unitsById.get(option.value), option.value)
+        : t("chooseUnit");
+    });
+  });
+
+  if (form.dataset.corpusKind === "unit") {
+    const unit = unitsById.get(form.dataset.corpusId);
+    const content = form.querySelector('[data-field="content"]')?.value;
+    const heading = form.querySelector(".corpus-rendered-heading");
+    if (unit && heading && content !== undefined) {
+      heading.innerHTML = renderCorpusUnitNameHtml({ ...unit, content }, "content");
+    }
+    return;
+  }
+
+  const blockTitle = form.querySelector('[data-field="title"]')?.value.trim();
+  const blockHeading = form.querySelector("[data-corpus-block-title-preview]");
+  if (blockHeading) {
+    blockHeading.textContent = blockTitle || t("corpusBlockFallback");
+  }
+  form.querySelectorAll(".corpus-layer-card").forEach((card) => {
+    const name = card.querySelector('[data-field="name"]')?.value.trim();
+    const heading = card.querySelector("[data-corpus-layer-name-preview]");
+    if (heading) {
+      heading.textContent = name || t("corpusLayerFallback");
+    }
+  });
+}
+
 function renderCorpusIntegrity(corpus) {
   const issues = corpusIntegrityIssues(corpus);
   elements.corpusIntegrityPanel.hidden = !issues.length;
@@ -13165,13 +13379,13 @@ function renderCorpusEditor(corpus, viewState) {
     const block = corpus.blocks.find((item) => item.id === viewState.selectedBlockId);
     elements.corpusEditor.innerHTML = block
       ? renderCorpusBlockEditor(block, corpus)
-      : `<p class="corpus-empty-editor">${escapeHtml(t("noCorpusSelection"))}</p>`;
+      : `<p class="corpus-empty-editor" data-i18n="noCorpusSelection">${escapeHtml(t("noCorpusSelection"))}</p>`;
     return;
   }
   const unit = corpus.units.find((item) => item.id === viewState.selectedUnitId);
   elements.corpusEditor.innerHTML = unit
     ? renderCorpusUnitEditor(unit, corpus)
-    : `<p class="corpus-empty-editor">${escapeHtml(t("noCorpusSelection"))}</p>`;
+    : `<p class="corpus-empty-editor" data-i18n="noCorpusSelection">${escapeHtml(t("noCorpusSelection"))}</p>`;
 }
 
 function renderCorpusAttributeEditor(attributes = {}) {
@@ -13179,7 +13393,7 @@ function renderCorpusAttributeEditor(attributes = {}) {
   return `
     <div class="corpus-attribute-editor" data-corpus-attributes>
       <div class="corpus-attribute-rows">${rows}</div>
-      <button class="secondary-button" type="button" data-action="add-corpus-attribute">${escapeHtml(t("addAttribute"))}</button>
+      <button class="secondary-button" type="button" data-action="add-corpus-attribute" data-i18n="addAttribute">${escapeHtml(t("addAttribute"))}</button>
     </div>
   `;
 }
@@ -13187,9 +13401,9 @@ function renderCorpusAttributeEditor(attributes = {}) {
 function renderCorpusAttributeRow(key = "", value = "") {
   return `
     <div class="corpus-attribute-row">
-      <input data-field="attribute-key" aria-label="${escapeHtml(t("attributeName"))}" placeholder="${escapeHtml(t("attributeName"))}" value="${escapeHtml(key)}">
-      <input data-field="attribute-value" aria-label="${escapeHtml(t("attributeValue"))}" placeholder="${escapeHtml(t("attributeValue"))}" value="${escapeHtml(value)}">
-      <button class="corpus-icon-button danger" type="button" data-action="remove-corpus-attribute" data-app-tooltip="always" aria-label="${escapeHtml(t("removeAttribute"))}">×</button>
+      <input data-field="attribute-key" data-i18n-aria-label="attributeName" data-i18n-placeholder="attributeName" aria-label="${escapeHtml(t("attributeName"))}" placeholder="${escapeHtml(t("attributeName"))}" value="${escapeHtml(key)}">
+      <input data-field="attribute-value" data-i18n-aria-label="attributeValue" data-i18n-placeholder="attributeValue" aria-label="${escapeHtml(t("attributeValue"))}" placeholder="${escapeHtml(t("attributeValue"))}" value="${escapeHtml(value)}">
+      <button class="corpus-icon-button danger" type="button" data-action="remove-corpus-attribute" data-app-tooltip="always" data-i18n-aria-label="removeAttribute" aria-label="${escapeHtml(t("removeAttribute"))}">×</button>
     </div>
   `;
 }
@@ -13212,24 +13426,24 @@ function renderCorpusBlockEditor(block, corpus) {
   return `
     <form class="corpus-form" data-corpus-kind="block" data-corpus-id="${escapeHtml(block.id)}" autocomplete="off">
       <div class="form-heading compact-heading">
-        <div><p class="eyebrow">${escapeHtml(t("corpusBlock"))}</p><h3>${escapeHtml(block.title || t("corpusBlockFallback"))}</h3></div>
-        <button class="danger-ghost" type="button" data-action="delete-corpus-block">${escapeHtml(t("deleteCorpusBlock"))}</button>
+        <div><p class="eyebrow" data-i18n="corpusBlock">${escapeHtml(t("corpusBlock"))}</p><h3 data-corpus-block-title-preview>${escapeHtml(block.title || t("corpusBlockFallback"))}</h3></div>
+        <button class="danger-ghost" type="button" data-action="delete-corpus-block" data-i18n="deleteCorpusBlock">${escapeHtml(t("deleteCorpusBlock"))}</button>
       </div>
-      <label><span>${escapeHtml(t("corpusBlockTitle"))}</span><input data-field="title" maxlength="160" value="${escapeHtml(block.title)}"></label>
-      <label><span>${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(serializeTagList(block.tags))}"><small class="field-help">${escapeHtml(t("corpusTagsHelp"))}</small></label>
-      <label><span>${escapeHtml(t("corpusNotes"))}</span><textarea data-field="notes" rows="4">${escapeHtml(block.notes)}</textarea></label>
+      <label><span data-i18n="corpusBlockTitle">${escapeHtml(t("corpusBlockTitle"))}</span><input data-field="title" maxlength="160" value="${escapeHtml(block.title)}"></label>
+      <label><span data-i18n="corpusTags">${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(serializeTagList(block.tags))}"><small class="field-help" data-i18n="corpusTagsHelp">${escapeHtml(t("corpusTagsHelp"))}</small></label>
+      <label><span data-i18n="corpusNotes">${escapeHtml(t("corpusNotes"))}</span><textarea data-field="notes" rows="4">${escapeHtml(block.notes)}</textarea></label>
       <section class="corpus-subsection">
-        <div class="subsection-title"><h3>${escapeHtml(t("corpusAttributes"))}</h3></div>
+        <div class="subsection-title"><h3 data-i18n="corpusAttributes">${escapeHtml(t("corpusAttributes"))}</h3></div>
         ${renderCorpusAttributeEditor(block.attributes)}
       </section>
       <section class="corpus-subsection">
-        <div class="subsection-title"><h3>${escapeHtml(t("directUnits"))}</h3></div>
+        <div class="subsection-title"><h3 data-i18n="directUnits">${escapeHtml(t("directUnits"))}</h3></div>
         ${renderCorpusLinkedUnits(block.unitIds, `block:${block.id}`, corpus)}
       </section>
       <section class="corpus-subsection">
         <div class="form-heading compact-heading">
-          <div><h3>${escapeHtml(t("corpusLayers"))}</h3></div>
-          <button class="secondary-button" type="button" data-action="add-corpus-layer">${escapeHtml(t("addLayer"))}</button>
+          <div><h3 data-i18n="corpusLayers">${escapeHtml(t("corpusLayers"))}</h3></div>
+          <button class="secondary-button" type="button" data-action="add-corpus-layer" data-i18n="addLayer">${escapeHtml(t("addLayer"))}</button>
         </div>
         <div class="corpus-layer-list">
           ${block.layers.map((layer, index) => renderCorpusLayerEditor(block, layer, index, corpus)).join("")}
@@ -13243,23 +13457,23 @@ function renderCorpusLayerEditor(block, layer, index, corpus) {
   return `
     <article class="corpus-layer-card" data-layer-id="${escapeHtml(layer.id)}">
       <div class="corpus-layer-header">
-        <div><p class="eyebrow">${escapeHtml(t("corpusLayer"))} ${index + 1}</p><strong>${escapeHtml(layer.name || t("corpusLayerFallback"))}</strong></div>
+        <div><p class="eyebrow"><span data-i18n="corpusLayer">${escapeHtml(t("corpusLayer"))}</span> ${index + 1}</p><strong data-corpus-layer-name-preview>${escapeHtml(layer.name || t("corpusLayerFallback"))}</strong></div>
         <div class="corpus-order-actions">
-          <button class="corpus-icon-button" type="button" data-action="move-corpus-layer-up" data-app-tooltip="always" aria-label="${escapeHtml(t("moveUp"))}" ${index === 0 ? "disabled" : ""}>↑</button>
-          <button class="corpus-icon-button" type="button" data-action="move-corpus-layer-down" data-app-tooltip="always" aria-label="${escapeHtml(t("moveDown"))}" ${index === block.layers.length - 1 ? "disabled" : ""}>↓</button>
-          <button class="corpus-icon-button danger" type="button" data-action="delete-corpus-layer" data-app-tooltip="always" aria-label="${escapeHtml(t("deleteCorpusLayer"))}">×</button>
+          <button class="corpus-icon-button" type="button" data-action="move-corpus-layer-up" data-app-tooltip="always" data-i18n-aria-label="moveUp" aria-label="${escapeHtml(t("moveUp"))}" ${index === 0 ? "disabled" : ""}>↑</button>
+          <button class="corpus-icon-button" type="button" data-action="move-corpus-layer-down" data-app-tooltip="always" data-i18n-aria-label="moveDown" aria-label="${escapeHtml(t("moveDown"))}" ${index === block.layers.length - 1 ? "disabled" : ""}>↓</button>
+          <button class="corpus-icon-button danger" type="button" data-action="delete-corpus-layer" data-app-tooltip="always" data-i18n-aria-label="deleteCorpusLayer" aria-label="${escapeHtml(t("deleteCorpusLayer"))}">×</button>
         </div>
       </div>
       <div class="form-grid">
-        <label><span>${escapeHtml(t("layerName"))}</span><input data-field="name" value="${escapeHtml(layer.name)}"></label>
-        <label><span>${escapeHtml(t("speaker"))}</span><input data-field="speaker" value="${escapeHtml(layer.speaker)}"></label>
-        <label><span>${escapeHtml(t("modality"))}</span><input data-field="modality" value="${escapeHtml(layer.modality)}"></label>
-        <label><span>${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(serializeTagList(layer.tags))}"><small class="field-help">${escapeHtml(t("corpusTagsHelp"))}</small></label>
+        <label><span data-i18n="layerName">${escapeHtml(t("layerName"))}</span><input data-field="name" value="${escapeHtml(layer.name)}"></label>
+        <label><span data-i18n="speaker">${escapeHtml(t("speaker"))}</span><input data-field="speaker" value="${escapeHtml(layer.speaker)}"></label>
+        <label><span data-i18n="modality">${escapeHtml(t("modality"))}</span><input data-field="modality" value="${escapeHtml(layer.modality)}"></label>
+        <label><span data-i18n="corpusTags">${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(serializeTagList(layer.tags))}"><small class="field-help" data-i18n="corpusTagsHelp">${escapeHtml(t("corpusTagsHelp"))}</small></label>
       </div>
-      <label><span>${escapeHtml(t("corpusNotes"))}</span><textarea data-field="notes" rows="3">${escapeHtml(layer.notes)}</textarea></label>
-      <div class="subsection-title"><h3>${escapeHtml(t("corpusAttributes"))}</h3></div>
+      <label><span data-i18n="corpusNotes">${escapeHtml(t("corpusNotes"))}</span><textarea data-field="notes" rows="3">${escapeHtml(layer.notes)}</textarea></label>
+      <div class="subsection-title"><h3 data-i18n="corpusAttributes">${escapeHtml(t("corpusAttributes"))}</h3></div>
       ${renderCorpusAttributeEditor(layer.attributes)}
-      <div class="subsection-title"><h3>${escapeHtml(t("linkedUnits"))}</h3></div>
+      <div class="subsection-title"><h3 data-i18n="linkedUnits">${escapeHtml(t("linkedUnits"))}</h3></div>
       ${renderCorpusLinkedUnits(layer.unitIds, `layer:${block.id}:${layer.id}`, corpus)}
     </article>
   `;
@@ -13273,9 +13487,9 @@ function renderCorpusLinkedUnits(unitIds, ownerKey, corpus) {
       <li data-linked-unit-id="${escapeHtml(unitId)}">
         <div class="corpus-unit-name-host${unit ? "" : " missing"}">${unit ? renderCorpusUnitNameHtml(unit, "card") : escapeHtml(unitId)}</div>
         <div class="corpus-order-actions">
-          <button class="corpus-icon-button" type="button" data-action="move-corpus-unit-up" data-app-tooltip="always" aria-label="${escapeHtml(t("moveUp"))}" ${index === 0 ? "disabled" : ""}>↑</button>
-          <button class="corpus-icon-button" type="button" data-action="move-corpus-unit-down" data-app-tooltip="always" aria-label="${escapeHtml(t("moveDown"))}" ${index === unitIds.length - 1 ? "disabled" : ""}>↓</button>
-          <button class="corpus-icon-button danger" type="button" data-action="unlink-corpus-unit" data-app-tooltip="always" aria-label="${escapeHtml(t("unlink"))}">×</button>
+          <button class="corpus-icon-button" type="button" data-action="move-corpus-unit-up" data-app-tooltip="always" data-i18n-aria-label="moveUp" aria-label="${escapeHtml(t("moveUp"))}" ${index === 0 ? "disabled" : ""}>↑</button>
+          <button class="corpus-icon-button" type="button" data-action="move-corpus-unit-down" data-app-tooltip="always" data-i18n-aria-label="moveDown" aria-label="${escapeHtml(t("moveDown"))}" ${index === unitIds.length - 1 ? "disabled" : ""}>↓</button>
+          <button class="corpus-icon-button danger" type="button" data-action="unlink-corpus-unit" data-app-tooltip="always" data-i18n-aria-label="unlink" aria-label="${escapeHtml(t("unlink"))}">×</button>
         </div>
       </li>
     `;
@@ -13285,13 +13499,13 @@ function renderCorpusLinkedUnits(unitIds, ownerKey, corpus) {
     <div class="corpus-linked-units" data-corpus-owner="${escapeHtml(ownerKey)}">
       <ol>${linked}</ol>
       <div class="corpus-link-row">
-        <select data-corpus-unit-link aria-label="${escapeHtml(t("chooseUnit"))}" ${availableUnits.length ? "" : "disabled"}>
-          <option value="">${escapeHtml(t("chooseUnit"))}</option>
+        <select data-corpus-unit-link data-i18n-aria-label="chooseUnit" aria-label="${escapeHtml(t("chooseUnit"))}" ${availableUnits.length ? "" : "disabled"}>
+          <option value="" data-i18n="chooseUnit">${escapeHtml(t("chooseUnit"))}</option>
           ${availableUnits.map((unit) => `<option value="${escapeHtml(unit.id)}">${escapeHtml(corpusUnitLabel(unit))}</option>`).join("")}
         </select>
-        <button class="secondary-button" type="button" data-action="link-corpus-unit" ${availableUnits.length ? "" : "disabled"}>${escapeHtml(t("linkUnit"))}</button>
+        <button class="secondary-button" type="button" data-action="link-corpus-unit" data-i18n="linkUnit" ${availableUnits.length ? "" : "disabled"}>${escapeHtml(t("linkUnit"))}</button>
       </div>
-      <p class="field-help">${escapeHtml(t("corpusLinkMovesUnit"))}</p>
+      <p class="field-help" data-i18n="corpusLinkMovesUnit">${escapeHtml(t("corpusLinkMovesUnit"))}</p>
     </div>
   `;
 }
@@ -13302,25 +13516,25 @@ function renderCorpusUnitEditor(unit, corpus) {
   return `
     <form class="corpus-form" data-corpus-kind="unit" data-corpus-id="${escapeHtml(unit.id)}" autocomplete="off">
       <div class="form-heading compact-heading">
-        <div><p class="eyebrow">${escapeHtml(t("corpusUnit"))}</p><div class="corpus-rendered-heading">${renderCorpusUnitNameHtml(unit, "content")}</div></div>
-        <button class="danger-ghost" type="button" data-action="delete-corpus-unit">${escapeHtml(t("deleteCorpusUnit"))}</button>
+        <div><p class="eyebrow" data-i18n="corpusUnit">${escapeHtml(t("corpusUnit"))}</p><div class="corpus-rendered-heading">${renderCorpusUnitNameHtml(unit, "content")}</div></div>
+        <button class="danger-ghost" type="button" data-action="delete-corpus-unit" data-i18n="deleteCorpusUnit">${escapeHtml(t("deleteCorpusUnit"))}</button>
       </div>
-      <label><span>${escapeHtml(t("corpusUnitContent"))}</span><textarea data-field="content" rows="6">${escapeHtml(unit.content)}</textarea></label>
-      <label><span>${escapeHtml(t("corpusParent"))}</span>
+      <label><span data-i18n="corpusUnitContent">${escapeHtml(t("corpusUnitContent"))}</span><textarea data-field="content" rows="6">${escapeHtml(unit.content)}</textarea></label>
+      <label><span data-i18n="corpusParent">${escapeHtml(t("corpusParent"))}</span>
         <select data-field="parent">
-          <option value="">${escapeHtml(t("corpusOrphan"))}</option>
+          <option value="" data-i18n="corpusOrphan">${escapeHtml(t("corpusOrphan"))}</option>
           ${corpusParentRefs(corpus).map((ref) => `<option value="${escapeHtml(ref.key)}"${parent?.key === ref.key ? " selected" : ""}>${escapeHtml(corpusParentLabel(ref))}</option>`).join("")}
         </select>
       </label>
-      <label><span>${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(serializeTagList(unit.tags))}"><small class="field-help">${escapeHtml(t("corpusTagsHelp"))}</small></label>
-      <label><span>${escapeHtml(t("corpusNotes"))}</span><textarea data-field="notes" rows="4">${escapeHtml(unit.notes)}</textarea></label>
+      <label><span data-i18n="corpusTags">${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(serializeTagList(unit.tags))}"><small class="field-help" data-i18n="corpusTagsHelp">${escapeHtml(t("corpusTagsHelp"))}</small></label>
+      <label><span data-i18n="corpusNotes">${escapeHtml(t("corpusNotes"))}</span><textarea data-field="notes" rows="4">${escapeHtml(unit.notes)}</textarea></label>
       <section class="corpus-subsection">
-        <div class="subsection-title"><h3>${escapeHtml(t("corpusAttributes"))}</h3></div>
+        <div class="subsection-title"><h3 data-i18n="corpusAttributes">${escapeHtml(t("corpusAttributes"))}</h3></div>
         ${renderCorpusAttributeEditor(unit.attributes)}
       </section>
       <section class="corpus-subsection">
-        <div class="subsection-title"><h3>${escapeHtml(t("effectiveAttributes"))}</h3></div>
-        <p class="field-help">${escapeHtml(t("effectiveAttributesHelp"))}</p>
+        <div class="subsection-title"><h3 data-i18n="effectiveAttributes">${escapeHtml(t("effectiveAttributes"))}</h3></div>
+        <p class="field-help" data-i18n="effectiveAttributesHelp">${escapeHtml(t("effectiveAttributesHelp"))}</p>
         ${renderCorpusEffectiveAttributes(unit, parent)}
       </section>
     </form>
@@ -13329,23 +13543,23 @@ function renderCorpusUnitEditor(unit, corpus) {
 
 function renderCorpusEffectiveAttributes(unit, parent) {
   const effective = new Map();
-  const apply = (attributes, source) => {
-    Object.entries(attributes || {}).forEach(([key, value]) => effective.set(key, { value, source }));
+  const apply = (attributes, sourceKey) => {
+    Object.entries(attributes || {}).forEach(([key, value]) => effective.set(key, { value, sourceKey }));
   };
   if (parent) {
-    apply(parent.block.attributes, t("attributeSourceBlock"));
+    apply(parent.block.attributes, "attributeSourceBlock");
     if (parent.layer) {
-      apply(parent.layer.attributes, t("attributeSourceLayer"));
+      apply(parent.layer.attributes, "attributeSourceLayer");
     }
   }
-  apply(unit.attributes, t("attributeSourceUnit"));
+  apply(unit.attributes, "attributeSourceUnit");
   if (!effective.size) {
-    return `<p class="muted-text">${escapeHtml(t("noEffectiveAttributes"))}</p>`;
+    return `<p class="muted-text" data-i18n="noEffectiveAttributes">${escapeHtml(t("noEffectiveAttributes"))}</p>`;
   }
   return `
     <div class="corpus-effective-table">
       ${[...effective.entries()].map(([key, detail]) => `
-        <div><strong>${escapeHtml(key)}</strong><span>${escapeHtml(detail.value)}</span><small>${escapeHtml(detail.source)}</small></div>
+        <div><strong>${escapeHtml(key)}</strong><span>${escapeHtml(detail.value)}</span><small data-i18n="${detail.sourceKey}">${escapeHtml(t(detail.sourceKey))}</small></div>
       `).join("")}
     </div>
   `;
@@ -13574,32 +13788,32 @@ function createMorphologyGroupEditor(group, index) {
       <div class="morphology-group-primary-fields">
         <div class="morphology-group-header">
           <div class="morphology-group-title-row">
-            <button class="morphology-drag-handle" type="button" draggable="true" data-action="drag-morphology-group" aria-label="${escapeHtml(t("dragMorphologyTableGroup"))}">⋮⋮</button>
+            <button class="morphology-drag-handle" type="button" draggable="true" data-action="drag-morphology-group" data-i18n-aria-label="dragMorphologyTableGroup" aria-label="${escapeHtml(t("dragMorphologyTableGroup"))}">⋮⋮</button>
             <div>
-              <p class="eyebrow">${escapeHtml(t("morphologyTableGroup"))} ${index + 1}</p>
-              <input data-field="name" value="${escapeHtml(group.name)}" aria-label="${escapeHtml(t("morphologyTableGroupName"))}">
+              <p class="eyebrow"><span data-i18n="morphologyTableGroup">${escapeHtml(t("morphologyTableGroup"))}</span> ${index + 1}</p>
+              <input data-field="name" value="${escapeHtml(group.name)}" data-i18n-aria-label="morphologyTableGroupName" aria-label="${escapeHtml(t("morphologyTableGroupName"))}">
             </div>
           </div>
         </div>
         <div class="morphology-group-fields">
           <label>
-            <span>${escapeHtml(t("autoMatchTags"))}</span>
+            <span data-i18n="autoMatchTags">${escapeHtml(t("autoMatchTags"))}</span>
             <input data-field="matchTags" value="${escapeHtml(serializeTagList(group.matchTags))}">
-            <small class="field-help">${escapeHtml(t("autoMatchTagsHelp"))}</small>
+            <small class="field-help" data-i18n="autoMatchTagsHelp">${escapeHtml(t("autoMatchTagsHelp"))}</small>
           </label>
         </div>
       </div>
       <label class="morphology-group-notes-field">
-        <span>${escapeHtml(t("morphologyTableGroupNotes"))}</span>
+        <span data-i18n="morphologyTableGroupNotes">${escapeHtml(t("morphologyTableGroupNotes"))}</span>
         <textarea data-field="notes" rows="3">${escapeHtml(group.notes || "")}</textarea>
       </label>
       <div class="morphology-group-delete-action">
-        <button class="danger-ghost" type="button" data-action="remove-morphology-group">${escapeHtml(t("removeMorphologyTableGroup"))}</button>
+        <button class="danger-ghost" type="button" data-action="remove-morphology-group" data-i18n="removeMorphologyTableGroup">${escapeHtml(t("removeMorphologyTableGroup"))}</button>
       </div>
     </div>
     <div class="morphology-group-table-toolbar">
-      <span>${escapeHtml(t("morphologyTables"))}</span>
-      <button class="primary-button" type="button" data-action="add-morphology-table">${escapeHtml(t("addMorphologyTable"))}</button>
+      <span data-i18n="morphologyTables">${escapeHtml(t("morphologyTables"))}</span>
+      <button class="primary-button" type="button" data-action="add-morphology-table" data-i18n="addMorphologyTable">${escapeHtml(t("addMorphologyTable"))}</button>
     </div>
     <div class="morphology-group-table-list"></div>
   `;
@@ -13607,7 +13821,10 @@ function createMorphologyGroupEditor(group, index) {
   if (group.tables.length) {
     group.tables.forEach((table) => tableList.append(createMorphologyTableEditor(table)));
   } else {
-    tableList.append(emptyState(t("morphologyTable"), t("emptyMorphologyTableGroup")));
+    const empty = emptyState(t("morphologyTable"), t("emptyMorphologyTableGroup"));
+    empty.querySelector("strong").dataset.i18n = "morphologyTable";
+    empty.querySelector("span").dataset.i18n = "emptyMorphologyTableGroup";
+    tableList.append(empty);
   }
   return card;
 }
@@ -13619,30 +13836,31 @@ function createMorphologyTableEditor(table) {
   card.dataset.tableCreatedAt = table.createdAt || "";
   card.dataset.tableUpdatedAt = table.updatedAt || "";
   const expanded = expandedMorphologyTables.has(table.id);
+  const toggleLabelKey = expanded ? "collapse" : "expand";
   card.classList.toggle("is-collapsed", !expanded);
   card.innerHTML = `
     <div class="morphology-card-header">
       <div class="morphology-table-title-row">
-        <button class="morphology-drag-handle" type="button" draggable="true" data-action="drag-morphology-table" aria-label="${escapeHtml(t("dragMorphologyTable"))}">⋮⋮</button>
+        <button class="morphology-drag-handle" type="button" draggable="true" data-action="drag-morphology-table" data-i18n-aria-label="dragMorphologyTable" aria-label="${escapeHtml(t("dragMorphologyTable"))}">⋮⋮</button>
         <div>
           <div class="morphology-card-title-row">
-            <input data-field="title" value="${escapeHtml(table.title)}" aria-label="${escapeHtml(t("tableName"))}">
-            <button class="morphology-table-toggle${expanded ? " is-expanded" : ""}" type="button" data-action="toggle-morphology-table" data-app-tooltip="always" aria-expanded="${expanded}" aria-label="${escapeHtml(expanded ? t("collapse") : t("expand"))}">
+            <input data-field="title" value="${escapeHtml(table.title)}" data-i18n-aria-label="tableName" aria-label="${escapeHtml(t("tableName"))}">
+            <button class="morphology-table-toggle${expanded ? " is-expanded" : ""}" type="button" data-action="toggle-morphology-table" data-app-tooltip="always" aria-expanded="${expanded}" data-i18n-aria-label="${toggleLabelKey}" aria-label="${escapeHtml(t(toggleLabelKey))}">
               <svg class="morphology-table-toggle-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg>
             </button>
           </div>
         </div>
       </div>
       <div class="panel-actions">
-        <button class="danger-ghost" type="button" data-action="remove-morphology-table">${escapeHtml(t("removeTable"))}</button>
+        <button class="danger-ghost" type="button" data-action="remove-morphology-table" data-i18n="removeTable">${escapeHtml(t("removeTable"))}</button>
       </div>
     </div>
     <div class="morphology-card-body" ${expanded ? "" : "hidden"}>
       <div class="form-grid">
-        <label><span>${escapeHtml(t("rowCount"))}</span><input data-field="rows" type="number" min="1" value="${table.rowCount}"></label>
-        <label><span>${escapeHtml(t("columnCount"))}</span><input data-field="cols" type="number" min="1" value="${table.columnCount}"></label>
+        <label><span data-i18n="rowCount">${escapeHtml(t("rowCount"))}</span><input data-field="rows" type="number" min="1" value="${table.rowCount}"></label>
+        <label><span data-i18n="columnCount">${escapeHtml(t("columnCount"))}</span><input data-field="cols" type="number" min="1" value="${table.columnCount}"></label>
       </div>
-      <button class="secondary-button" type="button" data-action="resize-morphology-table">${escapeHtml(t("applySize"))}</button>
+      <button class="secondary-button" type="button" data-action="resize-morphology-table" data-i18n="applySize">${escapeHtml(t("applySize"))}</button>
       <div class="morphology-edit-scroll">${renderMorphologyRuleInputs(table)}</div>
     </div>
   `;
@@ -14171,17 +14389,24 @@ async function openPartialEdit(section) {
   form.className = "inline-partial-edit-form";
   form.autocomplete = "off";
   form.noValidate = true;
+  const titleKey = {
+    basic: "entry",
+    definitions: "definitions",
+    etymology: "etymology",
+    morphology: "morphologyDisplay",
+    notes: "entryNotes",
+  }[section] || "partialEdit";
   form.innerHTML = `
     <div class="form-heading compact-heading">
       <div>
-        <p class="eyebrow">${escapeHtml(t("partialEdit"))}</p>
-        <h3>${escapeHtml(partialEditTitle(section))}</h3>
+        <p class="eyebrow" data-i18n="partialEdit">${escapeHtml(t("partialEdit"))}</p>
+        <h3 data-i18n="${titleKey}">${escapeHtml(partialEditTitle(section))}</h3>
       </div>
-      <button class="secondary-button" type="button" data-action="cancel-partial-edit">${escapeHtml(t("cancel"))}</button>
+      <button class="secondary-button" type="button" data-action="cancel-partial-edit" data-i18n="cancel">${escapeHtml(t("cancel"))}</button>
     </div>
     <div class="partial-edit-body"></div>
     <div class="form-actions">
-      <button class="primary-button" type="submit">${escapeHtml(t("save"))}</button>
+      <button class="primary-button" type="submit" data-i18n="save">${escapeHtml(t("save"))}</button>
     </div>
   `;
   host.append(form);
@@ -14190,21 +14415,21 @@ async function openPartialEdit(section) {
   if (section === "basic") {
     body.innerHTML = `
       <label>
-        <span>${escapeHtml(t("lemma"))}</span>
+        <span data-i18n="lemma">${escapeHtml(t("lemma"))}</span>
         <input data-field="lemma" aria-required="true" maxlength="80" value="${escapeHtml(entry.lemma)}">
       </label>
       <label>
-        <span>${escapeHtml(t("pronunciation"))}</span>
+        <span data-i18n="pronunciation">${escapeHtml(t("pronunciation"))}</span>
         <div class="inline-field-action">
           <textarea class="ipa-single-line" rows="1" data-field="pronunciation" maxlength="120">${escapeHtml(entry.pronunciation)}</textarea>
-          <button class="secondary-button" type="button" data-action="partial-auto-ipa">${escapeHtml(t("autoIpa"))}</button>
+          <button class="secondary-button" type="button" data-action="partial-auto-ipa" data-i18n="autoIpa">${escapeHtml(t("autoIpa"))}</button>
         </div>
       </label>
       <div class="ipa-keyboard partial-ipa-keyboard"></div>
       <label>
-        <span>${escapeHtml(t("tagsLabel"))}</span>
+        <span data-i18n="tagsLabel">${escapeHtml(t("tagsLabel"))}</span>
         <input data-field="tags" maxlength="180" value="${escapeHtml(serializeTagList(entry.tags))}">
-        <small class="field-help">${escapeHtml(t("tagsHelp"))}</small>
+        <small class="field-help" data-i18n="tagsHelp">${escapeHtml(t("tagsHelp"))}</small>
       </label>
     `;
     renderPartialIpaKeyboard();
@@ -14218,17 +14443,18 @@ async function openPartialEdit(section) {
     addButton.type = "button";
     addButton.className = "secondary-button additive-button";
     addButton.dataset.action = "add-partial-definition";
+    addButton.dataset.i18n = "addDefinition";
     addButton.textContent = t("addDefinition");
     body.append(addButton);
   } else if (section === "etymology") {
     body.innerHTML = `
       <label>
-        <span>${escapeHtml(t("sourceEntry"))}</span>
+        <span data-i18n="sourceEntry">${escapeHtml(t("sourceEntry"))}</span>
         <input data-field="sources" maxlength="220" value="${escapeHtml((entry.etymology?.sources || []).join("，"))}">
         <div class="source-suggestions" data-source-suggestions hidden></div>
       </label>
       <label>
-        <span>${escapeHtml(t("etymologyDescription"))}</span>
+        <span data-i18n="etymologyDescription">${escapeHtml(t("etymologyDescription"))}</span>
         <textarea data-field="description" rows="4">${escapeHtml(entry.etymology?.description || "")}</textarea>
       </label>
     `;
@@ -14236,7 +14462,7 @@ async function openPartialEdit(section) {
   } else if (section === "notes") {
     body.innerHTML = `
       <label>
-        <span>${escapeHtml(t("entryNotes"))}</span>
+        <span data-i18n="entryNotes">${escapeHtml(t("entryNotes"))}</span>
         <textarea data-field="notes" rows="6">${escapeHtml(entry.notes || "")}</textarea>
       </label>
     `;
@@ -15723,9 +15949,7 @@ elements.analysisPanel.addEventListener("click", (event) => {
   if (!target) {
     return;
   }
-  state.activeView = "editor";
-  advancedFilter = null;
-  switchToEntry(target.dataset.entryId);
+  void navigateToEntryFromReport(target.dataset.entryId);
 });
 elements.qualityPanel.addEventListener("click", (event) => {
   const qualityInfoButton = event.target.closest('[data-action="quality-filter-info"]');
@@ -15790,9 +16014,7 @@ elements.qualityPanel.addEventListener("click", (event) => {
   if (!target) {
     return;
   }
-  state.activeView = "editor";
-  advancedFilter = null;
-  switchToEntry(target.dataset.entryId);
+  void navigateToEntryFromReport(target.dataset.entryId);
 });
 elements.advancedFilterRefreshButton.addEventListener("click", refreshAdvancedFilter);
 elements.advancedFilterCycleButton.addEventListener("click", cycleAdvancedFilterVariant);
@@ -16207,7 +16429,8 @@ elements.morphologyTableList.addEventListener("click", (event) => {
     card.classList.toggle("is-collapsed", !expanded);
     toggleButton.classList.toggle("is-expanded", expanded);
     toggleButton.setAttribute("aria-expanded", String(expanded));
-    toggleButton.setAttribute("aria-label", expanded ? t("collapse") : t("expand"));
+    toggleButton.dataset.i18nAriaLabel = expanded ? "collapse" : "expand";
+    toggleButton.setAttribute("aria-label", t(toggleButton.dataset.i18nAriaLabel));
     hideAppTooltip();
     if (expanded) {
       expandedMorphologyTables.add(card.dataset.templateTableId);
@@ -16369,7 +16592,7 @@ elements.themeToggleButton.addEventListener("click", async () => {
   currentTheme = nextTheme;
   state.uiTheme = nextTheme;
   cacheUiPreferences({ uiTheme: nextTheme });
-  render();
+  renderThemeChange();
   if (!backendAvailable) {
     return;
   }
@@ -16382,12 +16605,12 @@ elements.themeToggleButton.addEventListener("click", async () => {
     currentTheme = normalizeUiTheme(saved.uiTheme);
     state.uiTheme = currentTheme;
     cacheUiPreferences({ uiTheme: currentTheme });
-    render();
+    renderThemeChange();
   } catch (error) {
     currentTheme = previousTheme;
     state.uiTheme = previousTheme;
     cacheUiPreferences({ uiTheme: previousTheme });
-    render();
+    renderThemeChange();
     showApiErrorToast(error, "themeSaveFailed");
   } finally {
     elements.themeToggleButton.disabled = false;
@@ -16398,8 +16621,7 @@ elements.languageToggleButton.addEventListener("click", async () => {
   const nextLanguage = currentLanguage === "zh" ? "en" : "zh";
   currentLanguage = nextLanguage;
   state.uiLanguage = nextLanguage;
-  refreshAdvancedFilterLocalization();
-  render();
+  renderLocaleChange();
   if (!backendAvailable) {
     return;
   }
@@ -16414,8 +16636,7 @@ elements.languageToggleButton.addEventListener("click", async () => {
   } catch (error) {
     currentLanguage = previousLanguage;
     state.uiLanguage = previousLanguage;
-    refreshAdvancedFilterLocalization();
-    render();
+    renderLocaleChange();
     showApiErrorToast(error, "languageSaveFailed");
   } finally {
     elements.languageToggleButton.disabled = false;
