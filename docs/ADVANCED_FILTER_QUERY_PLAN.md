@@ -16,7 +16,7 @@
 }
 ```
 
-F0 时，进入高级筛选后前端会以 `entryIds` 扫描当前完整词典快照。该实现曾绕过 `/entries` 查询会话、窗口读取和目标定位；除标签与质量问题外，多数筛选刷新时也只会移除已经不存在的词条 ID。F3 已迁移其中可稳定表达为 SQL 的条件；F4a 又让总览轻量统计直接返回这些 descriptor。F4b-1 已进一步迁移 IPA 自动生成比较；剩余 `entryIds` 还包括 Gloss/形态 feature result、待统一语义的确定性 summary/facet，以及 F5 quality result，不能继续视为一种会话类型。
+F0 时，进入高级筛选后前端会以 `entryIds` 扫描当前完整词典快照。该实现曾绕过 `/entries` 查询会话、窗口读取和目标定位；除标签与质量问题外，多数筛选刷新时也只会移除已经不存在的词条 ID。F3 已迁移其中可稳定表达为 SQL 的条件；F4a 又让轻量统计直接返回 descriptor，F4b-1 至 F4b-3 已迁移 IPA 与形态 feature result。当前剩余本地 ID 结果主要属于暂缓的 Gloss 和 F5 quality result，不能继续视为一种会话类型。
 
 F0 清点确认，现有入口必须分成三类：
 
@@ -79,11 +79,11 @@ F0 清点确认，现有入口必须分成三类：
 
 | 当前入口 | 当前算法 | 阻断点 | 暂定归属 |
 | --- | --- | --- | --- |
-| 标签组合 | 按标签原顺序，将显示替换后的文本连接 | 不同原始标签可能映射为相同显示文本；需要明确顺序是否属于组合身份 | 先保留 analysis result source；确定 raw-tag 组合语义后再变为 filter。 |
-| 词长 | `Array.from(lemma).length` | 必须保持 Unicode code point 语义 | 可由 SQL/确定性函数或轻量 projection 支持。 |
-| 首字母 | `Array.from(lemma.trim())[0]` | JS 与 SQLite 对 Unicode 空白的 trim 语义可能不同 | 先统一共享规范，再下推。 |
-| 正写法字符 | 移除所有 JS `\s` 后按 code point 计数 | SQLite 原生表达式不能无损复刻全部空白规则 | 适合轻量统计 projection。 |
-| 正写法双字符组合 | 同上，再取相邻 code point | 同上 | 适合轻量统计 projection。 |
+| 标签集合 | 按无序完整原始标签集合聚合；单标签集合表示词条仅有该标签 | 显示替换不参与身份，碰撞只由展示层消歧 | 已接 `tagSetDistribution`；action 使用 `tags.mode: "exact"` 排除超集。 |
+| 词长 | `Array.from(lemma).length` | 保持 Unicode code point 语义 | 已接 `orthographyDistribution` 与普通 `orthography.length` filter。 |
+| 首字符 | `Array.from(lemma.trim())[0]` | 共享模型固定 JS trim 与 code point 语义 | 已接 `orthography.initial` filter。 |
+| 正写法字符 | 按 Unicode 空白切分后统计非空白 code point | 同时区分出现次数和贡献词条数 | 已接 `orthography.character` filter，筛选结果按唯一词条计算。 |
+| 正写法双字符组合 | 只统计同一非空白片段内相邻 code point | 不跨空白形成组合 | 已接 `orthography.bigram` filter；暂不新增持久化 projection。 |
 | IPA 音位、首音、尾音 | 依赖 complex phoneme tokenization | 不是普通字符串包含关系 | 适合 IPA projection 或 feature result source。 |
 | 音节数 | 依赖当前 IPA 清理和分隔规则 | 规则随 IPA 设置变化，需要明确失效 | 适合 IPA projection 或 feature result source。 |
 
@@ -97,7 +97,7 @@ F0 清点确认，现有入口必须分成三类：
 | --- | --- | --- |
 | IPA 自动生成一致、宽松不一致、严格不一致 | IPA analysis/service | 依赖当前 IPA 规则生成和两种比较语义。 |
 | Glossed 例句 | Gloss/语料 analysis | 需要解析 Gloss 结构；未来还会迁移到语料链接。 |
-| 已/未分配形态组 | `morphologyAnalysis` feature result | 按共享 morphology model 解析出的实际模板组判断；F4b-3 后端已实现，前端待迁移。 |
+| 已/未分配形态组 | `morphologyAnalysis` feature result | 按共享 morphology model 解析出的实际模板组判断；F4b-3 前后端与列表窗口均已接线。 |
 | 指定形态模板组、自动/手动模式 | `morphologyAnalysis` feature result | 使用模式或模板组 ID descriptor，不保存成员 ID。 |
 | 有/无当前生效或未应用的覆写 | `morphologyAnalysis` feature result | 按 nested override 单元格及其所属组是否当前已分配判断；inactive 不表达质量问题。 |
 | 质量问题：全部、高、中、低 | QualityService | 需要完整规则报告及问题详情。 |
@@ -122,9 +122,9 @@ Feature result source 应由对应 service 产生可重建的查询身份，并�
 - F3 已让稳定条件保存 filter descriptor，并复用普通 `/entries` 的窗口、查询会话、cursor、定位、排序、SWR 和搜索；这些条件不再经过 `filteredEntries()` 或保存匹配 ID 数组。
 - 查询型循环变体保存结构 `filter`、可选 `searchScope` 和初始搜索文本，不再用同一个 `available` 同时表达结构候选与当前搜索命中。前端按词典版本和规范化 filter 缓存 `unknown / available / empty` 结构事实；循环按钮只消费该事实。
 - 进入高级筛选、结构事实失效或词条写入后，前端通过批量 `/entries/filter-facts` 自动补齐未知事实。搜索输入只重查当前 `Filter ∩ Search`，不会为其他变体重复 strict/fuzzy 探测。稳定结构筛选和 IPA feature 筛选正常时不显示刷新按钮；当前远程查询失败时才将该按钮作为重试入口，并且不强制重验已有结构事实。
-- IPA 自动生成比较以及音素单元、首音、尾音、音节数分布均已消费 feature result query/location，不再保存前端结果 ID；分布统计桶以 `{ category, value }` action 进入词条列表，并继续叠加运行期搜索、排序、窗口与定位。Gloss、形态和质量问题仍保存前端功能结果 ID 与可选问题详情。这是 F4b-3 与 F5 尚未迁移的明确边界，不是普通 filter 的兜底。
+- IPA 自动生成比较、音素单元、首音、尾音、音节数以及形态分配/覆写均已消费 feature result query/location，不再保存前端结果 ID；统计桶以 source/view descriptor 进入词条列表，并继续叠加运行期搜索、排序、窗口与定位。当前仍保留本地问题结果的是暂缓的 Gloss 和 F5 质量检查，不是普通 filter 的兜底。
 - 筛选标题使用独立于查询身份的语义化 `titleDescriptor`：固定标题保存主 i18n key，字段值标题保存 label key 及原始值或 value key，循环变体不保存已翻译字符串。语言切换只通过主 i18n 重新渲染标题，不失效列表或 facts 缓存；尚未迁移的本地质量筛选只为带本地化文本的 issue map 定向重建。标签 descriptor 保存原始标签，并使用结构键精确语义。
-- 当前形态覆盖率、表格使用、override 排行和空单元统计仍依赖临时旧形态视图。F4b-3 已冻结为 `morphologyAnalysis` 的分配、模式、模板组及 active/inactive override descriptor；生成数、空单元和子表使用排行不会迁入新契约。
+- 形态“使用情况/覆写”页面已消费 `morphologyAnalysis` 的分配、模式、模板组及 active/inactive override descriptor；旧临时形态视图、生成数、空单元、子表使用排行和固定 ID 结果已经删除。
 - “词根/孤立词根”需要与共享词根拓扑保持重复 lemma、未解析来源和递归来源语义一致；在来源 ID 化或关系结果会话落地前，不新增一套仅供高级筛选使用的直接 SQL 判断。
 
 ## 8. 后续阶段
@@ -154,10 +154,10 @@ Feature result source 应由对应 service 产生可重建的查询身份，并�
 
 ### F4a：轻量分析查询（已完成）
 
-- `POST /api/dictionaries/:id/analysis/query` 已实现 `entryCount`、`coverageBreakdown`、`partDistribution`、`tagFrequency` 和 `activityPreview` 等轻量 widgets，请求规范化限制 widget 数量、ID、类型和 limit。
-- 最小 widget planner 将这些 widgets 合并为 `entryStats`、`partStats`、`tagStats`、`activityStats` 等 SQLite 聚合任务；同一任务只执行一次，action 继续返回 EntryFilter descriptor，不返回完整 ID 数组。`tagFrequency` 在聚合层排除显式词性标签。
+- `POST /api/dictionaries/:id/analysis/query` 已实现 `entryCount`、`lexiconSummary`、`coverageBreakdown`、`partDistribution`、`tagFrequency`、`tagSetDistribution`、`orthographyDistribution`、`activityPreview`、`activityDistribution` 和 `rootFamilyRanking`；请求规范化限制 widget 数量、ID、类型及允许使用 limit 的类型。
+- 最小 widget planner 将这些 widgets 合并为 `entryStats`、`partStats`、`tagStats`、`tagSetStats`、`orthographyStats`、`activityStats` 和 `rootTopology`；同一任务只执行一次，筛选 action 返回 EntryFilter descriptor，不返回完整 ID 数组。`tagFrequency` 在聚合层排除显式词性标签。
 - F4a 使用同步、按需 API；前端以异步状态加载总览，并提供 loading/error/retry。数据分析页未打开时不请求该端点，也没有引入通用后台任务、进度轮询或持久化 job 表。
-- 前端总览以及“词汇 > 标签”的词性分布、其他标签分布已迁移到结构化 widget DTO；已迁移轻量统计不再依赖完整活动词典 snapshot 和本地 report slice。标签组合暂保留前端计算；IPA 音节、Gloss 和完整形态统计留给 F4b feature service；词根家族排行改走稳定 topology summary。
+- 前端总览、“词汇 > 标签”的完整词性/其他标签/标签集合分布、“正写法”的词长/首字符/字符/双字符分布、“编辑进度”的完整新增/编辑日期，以及词根家族排行均已消费结构化 widget DTO。标签集合使用无序 raw-tag 身份和 exact filter；正写法使用共享模型与普通结构筛选；词根家族直接消费稳定 topology。旧本地 report/analysis slice 已删除。
 - repository contract 已覆盖请求规范化、planner 任务合并、widget DTO、筛选 action 和词典写入后的 generation/cacheKey 失效；实现路径直接查询 SQLite 聚合表，不导出完整 snapshot。10k 临时 SQLite 词典中，四个总览 widget 的 5 次定向请求约 56–60 毫秒，响应约 5 KiB。
 
 ### F4b：Feature result session
@@ -168,20 +168,20 @@ Feature result source 应由对应 service 产生可重建的查询身份，并�
 - 基础会话绑定词典 generation、算法版本、功能相关设置和引擎摘要；分类、搜索、排序和窗口只生成查询视图，不重复运行功能算法。
 - F4b-1 已以 IPA 自动生成比较完成试点，经可替换音系引擎 adapter 包装当前简易模型；自动生成 IPA 不持久化。
 - F4b-2 已让 IPA 分布/音位分析页异步共享 `ipaDistribution` summary，并把音素、首尾音和音节数高级筛选迁入 feature query/location；旧本地 IPA slice 与固定 ID action 已删除。
-- F4b-3 已实现 `morphologyAnalysis` 的统计、feature query、source adapter 和 repository 最小读取；前端仍保存旧形态功能结果 ID，下一批迁移到 source/view descriptor。
+- F4b-3 已完成 `morphologyAnalysis` 的统计、feature query、source adapter、repository 最小读取、异步分析页和 source/view 高级筛选接线；旧形态功能结果 ID 已删除。
 - 先同步构建并复用运行时会话。只有 10k/30k 基准或可观察交互证明单次计算需要脱离请求生命周期时，才增加进程内后台状态；近期不增加持久化任务队列。
 
 ### F5：质量 API 与剩余迁移
 
 - `/quality/query` 返回问题摘要、问题详情和 quality result source，并只复用 F4b 的内部会话/cache/cursor 原语，不与分析 API 混成一种 endpoint。
-- 将剩余重型分析 widget 接入对应 feature service 或专用 topology/summary query，不让 analysis planner、repository 和质量算法互相反向调用。
+- 暂缓的 Gloss 在例句/语料链接边界明确后接入对应 feature service；质量结果只进入独立 QualityService，不让 analysis planner、repository 和质量算法互相反向调用。
 - 删除剩余 `advancedFilter.entryIds`、本地质量结果筛选和分析结果 ID 数组桥接。
 
 ## 9. F0 验收结果
 
 - F0 曾覆盖所有本地分析 action 入口；正写法统计迁移后，其词长、首字符、字符和双字符入口已改为结构化 `orthography` filter，不再依赖本地 `entryIds` 聚合 helper。
 - 已区分标准词性筛选、普通高级筛选、功能结果集和非筛选导航。
-- 已记录标签组合、备注范围、Unicode 词形统计和新形态语义等不能静默决定的问题。
+- 标签集合、Unicode 正写法和新形态语义已经冻结并完成接线；备注范围仍保持词条级 `entry.notes` 的显式边界。
 - 已确定 F1 不引入 SQLite schema 变更、不引入通用布尔 DSL、不保留新的前端 ID 兜底。
 
 ## 10. F1 验收结果
@@ -203,3 +203,10 @@ Feature result source 应由对应 service 产生可重建的查询身份，并�
 - 刷新只使当前 entries/feature 查询及其定位页面的前端缓存失效，保留同词典的其他查询、词根窗口和 facets；结构事实由 filter-only 批量请求独立重新验证。正常搜索、循环和有效的非当前响应会继续沉淀到查询页缓存、结构事实缓存或可重建 feature session。
 - 日期契约仍是 UTC `YYYY-MM-DD`，SQLite 实现使用半开范围并可利用创建/修改时间索引；来源数量的最小/最大边界共享一次相关计数。
 - repository 契约覆盖结构筛选叠加搜索、远端定位以及 UTC 日末记录；F3 未引入旧状态兼容或新的完整 ID 兜底。
+
+## 13. F4 验收状态
+
+- F4a 与 F4b-0 至 F4b-3 的核心迁移已经完成：轻量 widgets、IPA 自动比较、IPA 分布、形态分配/覆写、正写法、标签集合、完整活动日期和词根家族均已接线。
+- 数据分析不再保留本地 analysis slice 或固定匹配 ID；稳定条件进入普通 EntryFilter，功能结果进入可重建 source/view，会话之外的词根排行消费稳定 topology。
+- F4 正式收尾前仍需让总览与详情共同消费词典级活跃标签身份快照，消除显示替换碰撞的作用域差异，并在本地服务可用时完成中英文、主题和窄屏浏览器验收。
+- Gloss 与质量检查不属于未完成的 F4 分析迁移：Gloss 等待例句/语料链接边界，质量检查进入 F5 `/quality/query`。

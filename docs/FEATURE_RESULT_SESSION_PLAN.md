@@ -17,7 +17,7 @@ F4b 不建设通用分析任务平台，不把功能结果伪装成普通 `Entry
 
 ## 2. 当前实现清点
 
-当前数据分析除总览 F4a 外仍从活动词典完整快照构建前端 slice；质量检查仍构建完整前端 report。两个 cache 在命中前都要序列化 O(N) 词条字段，首次 miss 仍运行完整算法。
+F4 数据分析迁移已经完成：轻量统计消费 `/analysis/query`，IPA 与形态派生结果消费 feature result session，词根家族消费稳定 topology，旧前端 analysis slice 已删除。质量检查仍构建完整前端 report；暂缓的 Gloss 继续等待例句/语料链接边界。
 
 | 页面/入口 | 当前数据来源 | 当前结果动作 | F4b-0 归类 | 目标边界 |
 | --- | --- | --- | --- | --- |
@@ -27,10 +27,10 @@ F4b 不建设通用分析任务平台，不把功能结果伪装成普通 `Entry
 | 形态分配覆盖与模板组使用 | F4b-3 `morphologyAnalysis` 与共享 morphology model | source/view descriptor | Feature result（已迁移） | 保持真实多组分配、summary 与 feature query 边界 |
 | 形态生成数与空单元 | 已删除 | 无 | 语义不足，删除 | 当前模型不能区分未定义、不适用与失败；F4b-3 不执行单元格生成 |
 | Override 使用与排行 | F4b-3 nested override summary | source/view descriptor 与单词条定位 | Feature result + bounded summary（已迁移） | 按当前生效与 dormant overlay 中未应用的单元格分别统计 |
-| 词根家族排行 | 已删除的旧前端内存关系查询重建 relation index | 定位词根 | Topology summary | 直接查询 `RootTopologyCache` 的 `{ rootId, lemma, derivedEntryCount }` |
-| 词长、首字母、字符、双字符组合 | 前端按 JS code point 和 `\s` 规则统计 | 每桶固定 `entryIds` | Deterministic summary/facet | 先固定 Unicode/空白语义，再选择 SQL 函数或轻量 projection |
-| 标签组合 | 显示替换后的标签按原顺序拼接 | 每组合固定 `entryIds` | 语义未定 | 明确 raw tag、顺序和重复语义前不迁移 |
-| 完整活动日期分布 | 前端扫描日期 | 日期行已是 EntryFilter | Summary/navigation | 扩展 F4a activity query，不建立 feature session；按修改时间浏览复用词条列表排序 |
+| 词根家族排行 | `rootFamilyRanking` widget 复用 `RootTopologyCache` | 定位词根 | Topology summary（已迁移） | 返回全部非空家族的 `{ rootId, lemma, derivedEntryCount }`，不建立 feature session |
+| 词长、首字符、字符、双字符组合 | `orthographyDistribution` 与共享 `orthography-model` | 普通 `orthography` 结构筛选 | Deterministic summary/facet（已迁移） | code point 语义固定；双字符不跨 Unicode 空白片段，不持久化 projection |
+| 标签集合 | `tagSetDistribution` 按无序完整 raw-tag 集合聚合 | `tags.mode: "exact"` EntryFilter | Deterministic summary/facet（已迁移） | 单标签集合排除带额外标签的超集；显示替换不参与身份 |
+| 完整活动日期分布 | `activityDistribution` SQLite widget | UTC 日期 EntryFilter | Summary/navigation（已迁移） | 新增/编辑子页异步消费完整日期桶，不建立 feature session |
 | 质量优先级与模块 | `quality-model` 完整扫描，问题带 entry、severity、module、detail | 固定 ID、问题详情和循环变体 | Quality result | F5 `/quality/query` |
 
 已完成的覆盖率、词性、标签、来源数量和日期继续使用 F4a/EntryFilter，不得回退到 feature result。运行期搜索字段命中量由普通 EntrySearch projection 在同一轮匹配中聚合，并显示在列表字段管理面板；旧分析 slice 已删除。

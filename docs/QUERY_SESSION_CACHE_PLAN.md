@@ -289,7 +289,7 @@ query kind
 - 普通列表直接保存并渲染 API summary DTO，不再先压缩成 ID、再通过完整 `dictionary.entries` 映射回词条。summary 的 `definitionPreviews` 保留全部义项的轻量文本与原位置，因此列表的多义项显示和搜索命中序号不需要完整词条。
 - 当前词条详情统一通过 `/entries/:entryId` 按需读取；前端使用最多 12 项、约 12 MiB 的小型 LRU，并合并同一词条的并发请求。保存响应会立即更新当前详情缓存，查询 DTO 则局部更新后按 `updatedAt` 失效并重查。
 - `/root-groups` 的折叠组只返回 root summary、衍生词数量和匹配数量，不再携带全部衍生词。展开时通过 `/root-groups/:rootId/entries` 一次读取组内全部 summary；该子端点与父端点复用同一关系会话，但不提供分页。
-- 普通编辑器列表与详情已切到上述边界；F3 又将稳定 SQL 高级筛选接入同一窗口与查询会话。F4a 已让数据分析总览的轻量统计改用 `/analysis/query` widget DTO；F4b-1/F4b-2 已让 IPA 自动生成比较和 IPA 分布统计消费 feature query/location 与同一列表窗口。F4b-3 后端也已实现形态统计、adapter 与 repository 最小读取，但前端形态分析仍使用完整活动词典 snapshot 和旧固定 ID；质量检查及 Gloss feature result 同样尚未迁移。详情来源、完整编辑衍生词和词汇网络等关系消费者已经迁移到共享关系 API，不再列入剩余本地消费者。这是尚未迁移模块的当前实现，不是 summary/detail 的运行时兜底。
+- 普通编辑器列表与详情已切到上述边界；F3 又将稳定 SQL 高级筛选接入同一窗口与查询会话。F4a 的总览、标签集合、正写法、完整活动日期和词根家族均已消费 `/analysis/query` widget DTO；F4b-1 至 F4b-3 的 IPA 自动比较、IPA 分布和形态分配/覆写也已消费 feature query/location 与同一列表窗口，不再使用完整活动词典 snapshot 或固定 ID。质量检查及暂缓的 Gloss 仍是剩余本地结果消费者。详情来源、完整编辑衍生词和词汇网络等关系消费者已经迁移到共享关系 API，不再列入剩余本地消费者。
 
 ### Q4：可重建 cursor 与纯滚动窗口化（已完成）
 

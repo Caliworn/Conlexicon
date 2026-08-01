@@ -825,6 +825,27 @@ function checkModelNormalization() {
   assert.equal(tagModel.serializeTagList(["n", "v"], "ideographicComma"), "n、v");
   assert.equal(tagModel.normalizeTagListSeparatorStyle("unknown"), "commaSpace");
   assert.equal(tagModel.normalizeEntryListTagDisplayLimit(99), 10);
+  const displayIdentityIndex = tagModel.buildDisplayIdentityIndex([
+    { value: "topic", displayLabel: "Shared" },
+    { value: "topic", displayLabel: "Shared" },
+    { value: "alias", displayLabel: "Shared" },
+    { value: "n", displayLabel: "Noun" },
+  ]);
+  assert.deepEqual(tagModel.resolveDisplayIdentity("topic", "Shared", displayIdentityIndex), {
+    label: "Shared",
+    rawLabel: "topic",
+    ambiguous: true,
+  });
+  assert.deepEqual(tagModel.resolveDisplayIdentity("alias", "Shared", displayIdentityIndex), {
+    label: "Shared",
+    rawLabel: "alias",
+    ambiguous: true,
+  });
+  assert.deepEqual(tagModel.resolveDisplayIdentity("n", "Noun", displayIdentityIndex), {
+    label: "Noun",
+    rawLabel: "",
+    ambiguous: false,
+  });
   const normalizedTagLists = normalizeDictionary({
     entries: [{ lemma: "entry", tags: [" n ", null, "n", "null"] }],
     settings: {

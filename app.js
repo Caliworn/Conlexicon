@@ -255,7 +255,7 @@ const STALE_CONTENT_UPDATE_DELAY_MS = 200;
 const ANALYSIS_OVERVIEW_QUERY_WIDGETS = [
   { id: "lexicon", type: "lexiconSummary" },
   { id: "coverage", type: "coverageBreakdown" },
-  { id: "parts", type: "partDistribution", limit: 7 },
+  { id: "parts", type: "partDistribution" },
   { id: "activity", type: "activityPreview", limit: 5 },
 ];
 const ANALYSIS_TAG_QUERY_WIDGETS = [
@@ -10148,6 +10148,43 @@ function analysisCoverageRowAction(row) {
   });
 }
 
+function analysisTagDisplayIdentityIndex(response, { includeConfiguredParts = false } = {}) {
+  const widgets = response?.widgets || {};
+  const configuredParts = includeConfiguredParts
+    ? normalizeDictionarySettings(activeDictionary()?.settings).partOfSpeechTags.map((value) => ({
+        value,
+        displayLabel: displayTag(value),
+      }))
+    : [];
+  const identities = [
+    ...configuredParts,
+    ...(widgets.parts?.rows || [])
+      .filter((row) => row.part !== NO_PART_FILTER_VALUE)
+      .map((row) => ({ value: row.part, displayLabel: row.displayLabel })),
+    ...(widgets.tags?.rows || [])
+      .map((row) => ({ value: row.tag, displayLabel: row.displayLabel })),
+    ...(widgets.tagSets?.rows || [])
+      .flatMap((row) => row.tags || [])
+      .map((tag) => ({ value: tag.value, displayLabel: tag.displayLabel })),
+  ];
+  return tagModel.buildDisplayIdentityIndex(identities);
+}
+
+function analysisNoPartAction(partWidget) {
+  return analysisQueryFilterAction(
+    partWidget?.noPartAction,
+    advancedFilterValueTitleDescriptor("advancedFilterPartOfSpeech", "", { valueKey: "noPart" }),
+  );
+}
+
+function analysisPartTypeFactRows(partWidget) {
+  return [[aText("词性种类", "Part types"), Number(partWidget?.partTypeCount || 0)]];
+}
+
+function analysisNoPartFactRows(partWidget) {
+  return [[t("noPart"), Number(partWidget?.noPartOfSpeechCount || 0), analysisNoPartAction(partWidget)]];
+}
+
 function renderAnalysisOverviewQuery(response) {
   const widgets = response?.widgets || {};
   const lexicon = widgets.lexicon || {};
@@ -10196,24 +10233,21 @@ function renderAnalysisOverviewQuery(response) {
     ];
   });
   const partWidget = widgets.parts || {};
+  const partIdentityIndex = analysisTagDisplayIdentityIndex(response, { includeConfiguredParts: true });
   const parts = (partWidget.rows || [])
     .filter((row) => row.part !== NO_PART_FILTER_VALUE)
-    .slice(0, 6)
     .map((row) => {
-      const label = row.displayLabel || row.part;
-      return [
-        label,
-        row.entryCount,
-        analysisQueryFilterAction(
+      const identity = tagModel.resolveDisplayIdentity(row.part, row.displayLabel, partIdentityIndex);
+      return {
+        label: identity.label,
+        secondaryLabel: identity.rawLabel,
+        value: row.entryCount,
+        action: analysisQueryFilterAction(
           row.action,
-          advancedFilterValueTitleDescriptor("advancedFilterPartOfSpeech", label),
+          advancedFilterValueTitleDescriptor("advancedFilterPartOfSpeech", identity.label),
         ),
-      ];
+      };
     });
-  const noPartAction = analysisQueryFilterAction(
-    partWidget.noPartAction,
-    advancedFilterValueTitleDescriptor("advancedFilterPartOfSpeech", "", { valueKey: "noPart" }),
-  );
   const activityWidget = widgets.activity || {};
   const activity = {
     created: (activityWidget.created || []).map((row) => [
@@ -10263,11 +10297,9 @@ function renderAnalysisOverviewQuery(response) {
       `)}
       ${analysisCard(aText("资料覆盖", "Data Coverage"), analysisCoverageList(coverage))}
       ${analysisCard(aText("词性分布", "Part-of-Speech Distribution"), `
+        ${analysisFactList(analysisPartTypeFactRows(partWidget))}
         ${analysisBarList(parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") })}
-        ${analysisFactList([
-          [aText("词性种类", "Part types"), Number(partWidget.partTypeCount || 0)],
-          [t("noPart"), Number(partWidget.noPartOfSpeechCount || 0), noPartAction],
-        ])}
+        ${analysisFactList(analysisNoPartFactRows(partWidget))}
       `, { destinationPage: "entries", destinationSubpage: "tags" })}
       ${analysisCard(aText("编辑活动", "Editing Activity"), `
         ${analysisActivityList(activity)}
@@ -10276,32 +10308,37 @@ function renderAnalysisOverviewQuery(response) {
   `;
 }
 
-function analysisTagPageRows(response) {
+function analysisTagPageRows(response, identityIndex = analysisTagDisplayIdentityIndex(response)) {
   const widgets = response?.widgets || {};
-  const parts = (widgets.parts?.rows || []).map((row) => {
-    const noPart = row.part === NO_PART_FILTER_VALUE;
-    const label = noPart ? t("noPart") : (row.displayLabel || row.part);
-    return [
-      label,
-      Number(row.entryCount || 0),
-      analysisQueryFilterAction(
-        row.action,
-        advancedFilterValueTitleDescriptor(
-          "advancedFilterPartOfSpeech",
-          noPart ? "" : label,
-          noPart ? { valueKey: "noPart" } : {},
+  const parts = (widgets.parts?.rows || [])
+    .filter((row) => row.part !== NO_PART_FILTER_VALUE)
+    .map((row) => {
+      const identity = tagModel.resolveDisplayIdentity(row.part, row.displayLabel, identityIndex);
+      return {
+        label: identity.label,
+        secondaryLabel: identity.rawLabel,
+        value: Number(row.entryCount || 0),
+        action: analysisQueryFilterAction(
+          row.action,
+          advancedFilterValueTitleDescriptor(
+            "advancedFilterPartOfSpeech",
+            identity.label,
+          ),
         ),
+      };
+    });
+  const tags = (widgets.tags?.rows || []).map((row) => {
+    const identity = tagModel.resolveDisplayIdentity(row.tag, row.displayLabel, identityIndex);
+    return {
+      label: identity.label,
+      secondaryLabel: identity.rawLabel,
+      value: Number(row.entryCount || 0),
+      action: analysisQueryFilterAction(
+        row.action,
+        advancedFilterValueTitleDescriptor("tags", row.tag, { valueType: "tag" }),
       ),
-    ];
+    };
   });
-  const tags = (widgets.tags?.rows || []).map((row) => [
-    row.displayLabel || row.tag,
-    Number(row.entryCount || 0),
-    analysisQueryFilterAction(
-      row.action,
-      advancedFilterValueTitleDescriptor("tags", row.tag, { valueType: "tag" }),
-    ),
-  ]);
   return { parts, tags };
 }
 
@@ -10313,7 +10350,7 @@ function analysisTagSetTitleDescriptor(tags) {
   });
 }
 
-function analysisTagSetList(widget, queryKey) {
+function analysisTagSetList(widget, queryKey, identityIndex) {
   const rows = widget?.rows || [];
   if (!rows.length) {
     return `<p class="muted-text">${escapeHtml(aText("暂无组合", "No combinations yet"))}</p>`;
@@ -10323,22 +10360,13 @@ function analysisTagSetList(widget, queryKey) {
   }
   const visibleRows = rows.slice(0, analysisTagSetRenderState.visibleCount);
   const max = Math.max(...rows.map((row) => Number(row.entryCount) || 0), 1);
-  const rawTagsByDisplayLabel = new Map();
-  rows.flatMap((row) => row.tags || []).forEach((tag) => {
-    const label = tag.displayLabel || tag.value;
-    if (!rawTagsByDisplayLabel.has(label)) {
-      rawTagsByDisplayLabel.set(label, new Set());
-    }
-    rawTagsByDisplayLabel.get(label).add(tag.value);
-  });
   const list = visibleRows.map((row) => {
     const tags = row.tags || [];
     const chips = tags.map((tag) => {
-      const label = tag.displayLabel || tag.value;
-      const showRaw = label !== tag.value && rawTagsByDisplayLabel.get(label)?.size > 1;
+      const identity = tagModel.resolveDisplayIdentity(tag.value, tag.displayLabel, identityIndex);
       return `<span class="analysis-tag-set-chip${tag.isPartOfSpeech ? " is-part" : ""}">
-        <span>${escapeHtml(label)}</span>
-        ${showRaw ? `<small>${escapeHtml(tag.value)}</small>` : ""}
+        <span>${escapeHtml(identity.label)}</span>
+        ${identity.rawLabel ? `<small>${escapeHtml(identity.rawLabel)}</small>` : ""}
       </span>`;
     }).join("");
     const entryCount = Math.max(0, Number(row.entryCount) || 0);
@@ -10368,14 +10396,20 @@ function analysisTagSetList(widget, queryKey) {
 function renderAnalysisTagsQueryPage(queryState) {
   let body = "";
   if (queryState.status === "ready") {
-    const rows = analysisTagPageRows(queryState.response);
+    const identityIndex = analysisTagDisplayIdentityIndex(queryState.response);
+    const rows = analysisTagPageRows(queryState.response, identityIndex);
+    const partWidget = queryState.response?.widgets?.parts || {};
     const tagSetWidget = queryState.response?.widgets?.tagSets || {};
     body = `<section class="analysis-detail-grid analysis-tags-grid">
-      ${analysisCard(aText("词性分布", "Part-of-Speech Distribution"), analysisBarList(rows.parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") }))}
+      ${analysisCard(aText("词性分布", "Part-of-Speech Distribution"), `
+        ${analysisFactList(analysisPartTypeFactRows(partWidget))}
+        ${analysisBarList(rows.parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") })}
+        ${analysisFactList(analysisNoPartFactRows(partWidget))}
+      `)}
       ${analysisCard(aText("其他标签分布", "Other Tag Distribution"), analysisBarList(rows.tags, { empty: aText("暂无其他标签", "No other tags yet") }))}
       ${analysisCard(
         aText("标签集合分布", "Tag Set Distribution"),
-        analysisTagSetList(tagSetWidget, queryState.key),
+        analysisTagSetList(tagSetWidget, queryState.key, identityIndex),
         { className: "analysis-tag-set-card" },
       )}
     </section>`;
@@ -10974,16 +11008,19 @@ function analysisBarList(items, options = {}) {
     return `<p class="muted-text">${escapeHtml(options.empty || aText("暂无数据", "No data"))}</p>`;
   }
   const rows = items.map((item) => (Array.isArray(item)
-    ? { label: item[0], value: item[1], action: item[2], valueText: "" }
+    ? { label: item[0], value: item[1], action: item[2], valueText: "", secondaryLabel: "" }
     : item));
   const max = Math.max(...rows.map((item) => item.value), 1);
-  return `<div class="analysis-bars">${rows.map(({ label, value, action, valueText = "" }) => {
+  return `<div class="analysis-bars">${rows.map(({ label, value, action, valueText = "", secondaryLabel = "" }) => {
     const attrs = analysisActionAttributes(action);
     const labelTag = attrs ? "button" : "span";
     const labelAttrs = attrs ? ` type="button"` : "";
+    const labelContent = secondaryLabel
+      ? `<span>${escapeHtml(label)}</span><small>${escapeHtml(secondaryLabel)}</small>`
+      : escapeHtml(label);
     return `
     <div class="analysis-bar-row${valueText ? " has-wide-value" : ""}"${attrs}>
-      <${labelTag} class="analysis-bar-label"${labelAttrs}>${escapeHtml(label)}</${labelTag}>
+      <${labelTag} class="analysis-bar-label${secondaryLabel ? " has-secondary" : ""}"${labelAttrs}>${labelContent}</${labelTag}>
       <div class="analysis-bar-track"><span style="width: ${Math.max(4, (value / max) * 100).toFixed(2)}%"></span></div>
       <strong>${escapeHtml(valueText || value)}</strong>
     </div>

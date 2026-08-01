@@ -365,21 +365,21 @@ GET /api/dictionaries/:id/entry-relations/:entryId
 
 ### 7.5 数据分析 query
 
-F4a 已将轻量总览推进为真实契约：
+F4a 已将轻量数据分析推进为真实契约：
 
 ```text
 POST /api/dictionaries/:id/analysis/query
 ```
 
-请求以 widgets/slices 表达需求，而不是要求完整 report：
+请求以 widgets 表达需求，而不是要求完整 report：
 
 ```js
 {
   widgets: [
-    { id: "entry-count", type: "entryCount" },
+    { id: "lexicon", type: "lexiconSummary" },
     { id: "coverage", type: "coverageBreakdown" },
-    { id: "parts", type: "partDistribution", limit: 12 },
-    { id: "activity", type: "activityPreview", limit: 6 }
+    { id: "parts", type: "partDistribution" },
+    { id: "activity", type: "activityPreview", limit: 5 }
   ],
   options: { includeActions: true }
 }
@@ -388,9 +388,10 @@ POST /api/dictionaries/:id/analysis/query
 当前边界：
 
 - 总览页只是若干 widgets 的组合，不是固定完整分析报告。
-- planner 将 widgets 合并为 `entryStats`、`partStats` 和 `activityStats` 三个 SQL 聚合任务；同一任务在一次请求内只执行一次。
-- F4a 支持 entry count、coverage、part distribution 和 activity preview 单独请求，并返回可复用的筛选/跳转 action descriptor。
-- IPA 音节、Gloss 和形态分配/覆写分析属于 F4b feature result，不得悄悄塞入轻量总览任务；F4b-3 不执行形态单元格生成。root family 排行直接消费稳定 topology summary，不建立 feature session。
+- planner 将 widgets 合并为 `entryStats`、`partStats`、`tagStats`、`tagSetStats`、`orthographyStats`、`activityStats` 和 `rootTopology`；同一任务在一次请求内只执行一次。
+- F4a 支持 entry count、词汇构成、覆盖率、词性、其他标签、标签集合、正写法、活动预览/完整分布和词根家族排行，并返回可复用的筛选/跳转 action descriptor。
+- 正写法使用最小 `id + lemma` 扫描和共享 Unicode/空白语义；词根家族直接消费稳定 topology。两者都不建立 feature session 或持久化分析 projection。
+- IPA 分布、自动生成比较和形态分配/覆写已经进入 F4b feature result；F4b-3 不执行形态单元格生成。Gloss 等待例句/语料链接边界，质量检查进入独立 F5 API。
 
 ### 7.6 质量检查 query
 
@@ -562,9 +563,9 @@ CREATE TABLE entry_morphology_search_values (
 
 按当前依赖关系建议依次处理：
 
-1. 高级筛选 F1–F3、分析 F4a 以及 F4b-0–F4b-3 后端已完成：统一 EntryQuery/EntryFilter、稳定条件 SQL 编译和前端 descriptor 状态已接入 `/entries` 会话、窗口、定位、排序与搜索；轻量 `/analysis/query` 已以最小 widget planner 聚合 SQLite 任务并异步供前端总览消费；IPA 自动生成比较、IPA 分布和形态分配/覆写统计均已接入可重建 feature result session 与 query/location。10k/30k 基准暂不要求增加后台状态。
+1. 高级筛选 F1–F3、分析 F4a 以及 F4b-0–F4b-3 已完成：统一 EntryQuery/EntryFilter、稳定条件 SQL 编译和前端 descriptor 状态已接入 `/entries` 会话、窗口、定位、排序与搜索；`/analysis/query` 已异步供总览、标签、正写法、完整活动日期和词根家族页面消费；IPA 自动生成比较、IPA 分布和形态分配/覆写均已接入可重建 feature result session 与 query/location。10k/30k 基准暂不要求增加后台状态。
 2. 形态分析前端与词根家族排行均已完成接线：`rootFamilyRanking` 返回全部非空家族的 `{ rootId, lemma, derivedEntryCount }` 和 `familyCount`，前端重复关系分组和家族成员 ID 已删除。下一步由 F5 把质量检查推进为独立按需 API，并让词源检查复用同一稳定拓扑。全局衍生词数量仍不得累加各家族数量，以免多来源词条重复计数。
-3. 正写法统计在 Unicode 与空白语义冻结后迁入轻量 summary/facet；不要为确定性桶建立 feature result session。
+3. 正写法统计已在 Unicode 与空白语义冻结后迁入 `orthographyDistribution` 和普通结构筛选；保持当前最小扫描，不为确定性桶建立 feature result session 或持久化 projection。
 4. 仅在基准表明确认线性扫描成为主要瓶颈后，再选择 FTS、ngram 或其他候选索引。
 5. 语料库进入独立升级阶段后，再把 `module_blobs.corpus` 拆成正式 SQL 表及块/单元级 API。
 

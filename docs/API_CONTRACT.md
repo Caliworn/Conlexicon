@@ -737,7 +737,7 @@ Widget 通过以下任务依赖生成：
 
 请求验证失败使用 `invalid_analysis_query_payload`、`invalid_analysis_widgets`、`invalid_analysis_widget`、`invalid_analysis_widget_id`、`unsupported_analysis_widget`、`invalid_analysis_widget_limit` 或 `duplicate_analysis_widget_id`。
 
-#### Feature result query（F4b-1/F4b-2/F4b-3 后端已实装）
+#### Feature result query（F4b-1/F4b-2/F4b-3 已实装）
 
 F4b-1 已按 [Feature Result Session Plan](FEATURE_RESULT_SESSION_PLAN.md) 实装 IPA 自动比较试点；F4b-2 新增独立的 IPA 分布 source，并已由分析页与高级筛选消费；F4b-3 已实装 `morphologyAnalysis` source、最小 repository 输入、query/location/session 及前端形态分析页接线：
 
@@ -878,14 +878,20 @@ source、version、options、response mode、category、分布 value、page 与�
 
 #### Light / full 任务边界
 
-为避免总览卡片触发重型计算，F4a 只实现上述三个轻量任务。F4b-0 复评后，只有功能算法派生结果进入 feature session；可由稳定拓扑或确定性聚合提供的内容使用专用 summary query：
+为避免总览卡片触发重型计算，F4a 只运行前文 planner 表列出的确定性聚合、最小词形扫描和稳定 topology 任务。F4b-0 复评后，只有必须执行功能算法的派生结果进入 feature session；可由普通 EntryFilter、稳定拓扑或确定性聚合提供的内容继续使用 `/analysis/query`：
 
 ```text
-ipaLightStats
-  IPA 覆盖、平均音节等轻量信息
+orthographyStats
+  词长、首字符、字符和不跨空白的双字符分布
 
-ipaFullStats
-  音位频率、首音/尾音、自动生成一致性等完整统计
+tagStats / tagSetStats
+  其他标签频率与无序完整标签集合
+
+rootTopology
+  全部非空词根家族排行
+
+ipaAutoCompare / ipaDistribution
+  自动生成比较与 IPA 音位、首尾音、音节数 feature result
 
 morphologyAnalysis
   模板组分配覆盖、模式/模板组使用量，以及 active/inactive nested override 分布；不执行单元格生成
@@ -915,7 +921,7 @@ F4a 的 light widgets 不返回后台任务状态。F4b 接入重型 widget 后�
 }
 ```
 
-点击分析行时，词条列表使用 descriptor 调用 `/entries` 获取匹配项。这样总览 API 只返回 `resultCount` 和可复用 filter spec，避免大词典下把大量 ID 塞进 dashboard 响应。F4b/F5 的功能结果仍需按各自会话边界迁移。
+点击分析行时，词条列表使用 descriptor 调用 `/entries` 获取匹配项。这样分析 API 只返回 `resultCount` 和可复用 filter spec，避免大词典下传递大量 ID。F4b 的 IPA/形态结果已使用可重建 feature source；F5 质量结果仍需按独立会话边界迁移。
 
 #### 诊断修复边界
 
@@ -941,7 +947,7 @@ F4a 的 light widgets 不返回后台任务状态。F4b 接入重型 widget 后�
 
 1. 已完成的基础继续保持：`listDictionaries()`/词典标题 root count、词根模式和词汇网络复用 SQLite 稳定词根拓扑。
 2. F1–F3 已完成统一 EntryQuery/EntryFilter、SQLite 条件编译和前端 descriptor 迁移；稳定筛选继续复用 `/entries` 的窗口、cursor、缓存与定位。
-3. F4a 已完成 `POST /analysis/query` 的四类 light widgets、最小 planner 和总览异步加载；总览不再为这些统计读取完整 snapshot。
-4. F4b-0/F4b-1 已完成可重建 result source、运行时会话、失效、音系引擎 adapter 与 IPA 自动生成比较迁移；F4b-2 已完成 IPA 分布 source、异步分析页及高级筛选迁移。F4b-3 已完成形态统计、feature query、repository 最小读取、纯 builder 与 source adapter，下一步迁移前端形态分析页和高级筛选 action。root family 排名直接消费稳定 topology，不进入 feature session。
+3. F4a 已完成 `POST /analysis/query` 的轻量 widgets、最小 planner，以及总览、标签集合、正写法、完整活动日期和词根家族异步接线；这些统计不再读取完整 snapshot。
+4. F4b-0 至 F4b-3 已完成可重建 result source、运行时会话、失效、音系引擎 adapter、IPA 自动比较、IPA 分布和形态分配/覆写迁移；前端分析页与高级筛选均已消费 source/view，root family 排名直接消费稳定 topology。
 5. F5 建立独立 `/quality/query`，再让质量高级筛选消费共享的内部会话原语；repository 不反向调用质量算法。
 6. 语料查询在独立服务边界稳定后按需接入，不恢复前端 materialized ID 或完整快照兜底。

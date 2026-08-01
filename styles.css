@@ -3665,6 +3665,25 @@ button.analysis-composition-subset:hover strong {
   white-space: nowrap;
 }
 
+.analysis-bar-label.has-secondary {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.analysis-bar-label.has-secondary > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.analysis-bar-label.has-secondary > small {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
 button.analysis-bar-label,
 .analysis-issue-list button,
 .analysis-bar-row[data-advanced-filter-id],
