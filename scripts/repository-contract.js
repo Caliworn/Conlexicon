@@ -34,7 +34,7 @@ async function assertRejectStatus(promise, status, label) {
     await promise;
   } catch (error) {
     assert.equal(error.status, status, label);
-    return;
+    return error;
   }
   assert.fail(`${label}: expected rejection with status ${status}`);
 }
@@ -104,6 +104,22 @@ async function checkCorpusIdCollisionInvariants(repository) {
     corpus: {
       units: [{ id: "corpus-unit-contract", content: "corpus unit" }],
     },
+    morphology: {
+      templateGroups: [{
+        id: "morph-group-contract",
+        name: "Contract group",
+        matchTags: [],
+        tables: [{
+          id: "morph-table-contract",
+          title: "Contract table",
+          rowCount: 1,
+          columnCount: 1,
+          rowLabels: [""],
+          columnLabels: [""],
+          cells: {},
+        }],
+      }],
+    },
   }));
 
   try {
@@ -116,6 +132,16 @@ async function checkCorpusIdCollisionInvariants(repository) {
       409,
       "entry save rejects entry id colliding with corpus blob id",
     );
+    const createCollision = await assertRejectStatus(
+      repository.saveEntry(dictionary.id, {
+        id: "entry-corpus-contract",
+        lemma: "must not overwrite",
+        definitions: [],
+      }, { createOnly: true }),
+      409,
+      "create-only entry save rejects an existing entry id",
+    );
+    assert.deepEqual(createCollision.details.duplicates, [{ id: "entry-corpus-contract", types: ["entry"] }]);
     await assertRejectStatus(
       repository.saveEntry(dictionary.id, {
         lemma: "definition collides with corpus",
@@ -123,6 +149,23 @@ async function checkCorpusIdCollisionInvariants(repository) {
       }),
       409,
       "entry save rejects definition id colliding with corpus blob id",
+    );
+    await assertRejectStatus(
+      repository.saveEntry(dictionary.id, {
+        id: "entry-payload-duplicate",
+        lemma: "duplicate inside entry payload",
+        definitions: [{ id: "entry-payload-duplicate", meaning: "collision" }],
+      }),
+      409,
+      "entry save rejects duplicate ids inside its replacement scope",
+    );
+    await assertRejectStatus(
+      repository.saveEntry(dictionary.id, {
+        lemma: "definition collides with morphology",
+        definitions: [{ id: "morph-group-contract", meaning: "collision" }],
+      }),
+      409,
+      "entry save rejects definition id colliding with morphology projection id",
     );
     await assertRejectStatus(
       repository.saveCorpusChanges(dictionary.id, {
@@ -148,6 +191,15 @@ async function checkCorpusIdCollisionInvariants(repository) {
       409,
       "corpus save rejects duplicate ids inside corpus blob",
     );
+    await assertRejectStatus(
+      repository.saveMorphology(dictionary.id, {
+        templateGroups: [{ id: "entry-corpus-contract", name: "Collision", tables: [] }],
+      }),
+      409,
+      "morphology save rejects morphology id colliding with existing entry id",
+    );
+    const unchangedMorphology = await repository.saveMorphology(dictionary.id, dictionary.morphology);
+    assert.equal(unchangedMorphology.morphology.templateGroups[0].id, "morph-group-contract");
   } finally {
     try {
       await repository.deleteDictionary(dictionary.id);
@@ -1349,7 +1401,11 @@ function checkModelNormalization() {
       });
       assertUniqueDictionaryEntityIds(duplicate);
     },
-    (error) => error.status === 409,
+    (error) => error.status === 409
+      && Array.isArray(error.details?.duplicates)
+      && error.details.duplicates[0]?.id === "shared-id"
+      && error.details.duplicates[0]?.types.includes("entry")
+      && error.details.duplicates[0]?.types.includes("corpusUnit"),
   );
 
   assert.throws(
@@ -1884,6 +1940,16 @@ async function runRepositoryContractTests(options = {}) {
     assert.equal(savedRoot.entry.definitions[0].meaning, "root meaning");
     assert.deepEqual(savedRoot.summary, { entryCount: 1, rootCount: 1 });
     const rootEntryId = savedRoot.entry.id;
+    await assertRejectStatus(
+      callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(first.id)}/entries`, {
+        id: rootEntryId,
+        lemma: "must not overwrite through POST",
+        definitions: [],
+      }),
+      409,
+      "entry collection POST remains create-only without a separate existence probe",
+    );
+    assert.equal((await repository.getEntry(first.id, rootEntryId)).lemma, "root");
 
     const savedWithNewEntry = await repository.saveEntry(first.id, {
       lemma: "new entry",

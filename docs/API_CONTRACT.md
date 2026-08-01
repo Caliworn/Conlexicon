@@ -15,15 +15,17 @@
   "error": {
     "code": "duplicate_entity_ids",
     "message": "Duplicate dictionary entity IDs: ...",
-    "details": {}
+    "details": {
+      "duplicates": [{ "id": "shared-id", "types": ["entry", "corpusUnit"] }]
+    }
   }
 }
 ```
 
 - `code` 是前端本地化和分流处理的稳定字段。
 - `message` 保留技术信息，主要用于控制台、诊断和未来错误详情页；普通 toast 不应直接依赖英文 `message`。
-- `details` 可选，当前主要用于重复 ID 和不支持字段等调试信息；暂不承诺前端展示形态。
-- 前端应继续在控制台保留原始错误对象，toast 只显示本地化短信息。
+- `details` 可选。重复实体 ID 错误固定返回 `details.duplicates: Array<{ id, types }>`，前端使用应用内弹窗本地化展示；其他错误详情主要用于调试。
+- 前端应继续在控制台保留原始错误对象；普通错误 toast 不直接展示英文 `message`。
 
 ### 请求体大小限制
 
@@ -71,7 +73,7 @@
 | `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | `{ items, pageInfo, searchSummary }`，其中 `items` 固定为词条摘要 DTO | 支持结构化 JSON `filter`，以及现有 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`sort`、`cursor`、`windowOffset`、`limit`。结构化 `filter` 不得与平铺筛选参数混用。无参数请求也使用默认排序和窗口大小，不返回完整词条数组。 |
 | `POST` | `/api/dictionaries/:id/entries/filter-facts` | 批量读取结构筛选是否存在候选 | `{ dictionaryId, generation, facts }` | 最多接受 16 个 filter descriptor；只返回按请求 ID 对应的 `available` 布尔值，不接受搜索、排序或分页语义。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId/location` | 定位词条在当前查询中的窗口 | `{ items, pageInfo, searchSummary, location }` | 接受与 `/entries` 相同的查询 descriptor 和 `limit`，但不接受客户端 cursor；目标存在但被查询排除时返回 `location.found: false`。 |
-| `POST` | `/api/dictionaries/:id/entries` | 新建词条 | `{ entry, summary }` | 检查当前词条及其子对象与全库实体 ID 冲突；`summary` 是写入后的轻量词典计数。 |
+| `POST` | `/api/dictionaries/:id/entries` | 新建词条 | `{ entry, summary }` | 客户端可以省略词条 ID，由后端生成并在 `entry.id` 返回；检查当前词条及其子对象与全库实体 ID 冲突，`summary` 是写入后的轻量词典计数。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
 | `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存单个词条 | `{ entry, summary }` | 检查当前词条及其子对象与全库实体 ID 冲突；`summary` 是写入后的轻量词典计数。 |
 | `DELETE` | `/api/dictionaries/:id/entries/:entryId` | 删除单个词条 | `{ updatedAt, summary }` | 不因无关历史重复 ID 阻断删除；`summary` 是删除后的轻量词典计数。 |
@@ -153,6 +155,7 @@
   - 语料保存检查语料块、层和单元。
   - 元数据、普通设置和语言文档保存不应被无关历史重复 ID 阻断。
 - 跨类型重复仍然视为冲突；后续引入索引后也应保留跨类型比较。
+- 普通增量保存先检查提交范围内部重复，再仅用本次提交的 ID 对 `entries`、`definitions` 和形态主键表执行分块 `WHERE id IN (...)` 查询，并按需读取另一个 blob 模块；不会为了 UUID 防撞枚举全库 ID、执行存在性探针或自动重试。保存整模块时，被本次内容替换的既有同模块范围不与自身比较。
 - 全量重复 ID 诊断和自动修复属于未来诊断/修复模块，不应混入普通保存路径。
 
 ## 当前错误码
@@ -173,7 +176,6 @@
 | `duplicate_entity_ids` | 完整词典存在重复实体 ID。 |
 | `duplicate_entity_ids_scoped` | 当前保存范围存在重复实体 ID。 |
 | `invalid_entry_payload` | 词条请求体格式无效。 |
-| `entry_id_exists` | 新建词条 ID 已存在。 |
 | `invalid_entry_updates_payload` | 批量词条更新请求格式无效。 |
 | `entry_not_found` | 词条不存在或已被删除。 |
 | `invalid_entry_morphology` | 词条携带的当前形态组或覆盖项结构无效。 |

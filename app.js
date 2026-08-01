@@ -69,7 +69,6 @@ let corpusSaveTimer = null;
 let corpusSavePromise = null;
 let corpusSaveRequested = false;
 let corpusUnitPreviewFrame = null;
-let lastDuplicateEntityIdAlert = "";
 let docsDraftState = null;
 let confirmDialogResolver = null;
 let confirmDialogResults = { cancel: false, alternate: false, accept: true };
@@ -691,7 +690,6 @@ const i18n = {
     apiErrorDuplicateEntityIds: "词典中存在重复 ID",
     apiErrorDuplicateEntityIdsScoped: "当前保存范围存在重复 ID",
     apiErrorInvalidEntryPayload: "词条保存请求格式无效",
-    apiErrorEntryIdExists: "词条 ID 已存在",
     apiErrorInvalidEntryUpdatesPayload: "批量词条更新格式无效",
     apiErrorEntryNotFound: "词条不存在或已被删除",
     apiErrorInvalidSettingsPayload: "设置保存请求格式无效",
@@ -834,6 +832,8 @@ const i18n = {
     entryEntity: "词条",
     definitionEntity: "释义",
     morphologyTableEntity: "形态表",
+    morphologyTemplateGroupEntity: "形态模板组",
+    morphologyTemplateTableEntity: "形态模板表",
     corpusBlockFallback: "未命名块",
     corpusLayerFallback: "未命名层",
     corpusUnitFallback: "空单元",
@@ -1273,7 +1273,6 @@ const i18n = {
     apiErrorDuplicateEntityIds: "The dictionary contains duplicate IDs",
     apiErrorDuplicateEntityIdsScoped: "The current save scope contains duplicate IDs",
     apiErrorInvalidEntryPayload: "Invalid entry save request",
-    apiErrorEntryIdExists: "Entry ID already exists",
     apiErrorInvalidEntryUpdatesPayload: "Invalid batch entry update request",
     apiErrorEntryNotFound: "Entry not found or already deleted",
     apiErrorInvalidSettingsPayload: "Invalid settings save request",
@@ -1417,6 +1416,8 @@ const i18n = {
     entryEntity: "Entry",
     definitionEntity: "Definition",
     morphologyTableEntity: "Morphology table",
+    morphologyTemplateGroupEntity: "Morphology template group",
+    morphologyTemplateTableEntity: "Morphology template table",
     corpusBlockFallback: "Untitled Block",
     corpusLayerFallback: "Untitled Layer",
     corpusUnitFallback: "Empty Unit",
@@ -1922,7 +1923,6 @@ const API_ERROR_TOAST_KEYS = {
   duplicate_entity_ids: "apiErrorDuplicateEntityIds",
   duplicate_entity_ids_scoped: "apiErrorDuplicateEntityIdsScoped",
   invalid_entry_payload: "apiErrorInvalidEntryPayload",
-  entry_id_exists: "apiErrorEntryIdExists",
   invalid_entry_updates_payload: "apiErrorInvalidEntryUpdatesPayload",
   entry_not_found: "apiErrorEntryNotFound",
   invalid_settings_payload: "apiErrorInvalidSettingsPayload",
@@ -1951,8 +1951,44 @@ function apiErrorToastMessage(error, fallbackKey = "saveFailed") {
 }
 
 function showApiErrorToast(error, fallbackKey = "saveFailed") {
+  if (showDuplicateEntityIdError(error)) {
+    console.error(error);
+    return;
+  }
   showToast(apiErrorToastMessage(error, fallbackKey));
   console.error(error);
+}
+
+function duplicateEntityTypeLabel(type) {
+  const keys = {
+    entry: "entryEntity",
+    definition: "definitionEntity",
+    morphologyTemplateGroup: "morphologyTemplateGroupEntity",
+    morphologyTemplateTable: "morphologyTemplateTableEntity",
+    corpusBlock: "corpusBlock",
+    corpusLayer: "corpusLayer",
+    corpusUnit: "corpusUnit",
+  };
+  return keys[type] ? t(keys[type]) : String(type || "");
+}
+
+function showDuplicateEntityIdError(error) {
+  if (!["duplicate_entity_ids", "duplicate_entity_ids_scoped"].includes(error?.code)) {
+    return false;
+  }
+  const duplicates = Array.isArray(error?.details?.duplicates) ? error.details.duplicates : [];
+  if (!duplicates.length) {
+    return false;
+  }
+  const details = duplicates.map((duplicate) => {
+    const types = [...new Set((duplicate.types || []).map(duplicateEntityTypeLabel).filter(Boolean))].join(", ");
+    return types ? `${duplicate.id} (${types})` : String(duplicate.id || "");
+  }).filter(Boolean).join("\n");
+  appConfirm(formatText("duplicateEntityIdsMessage", { details }), {
+    title: t("duplicateEntityIdsTitle"),
+    alert: true,
+  });
+  return true;
 }
 
 async function api(path, options = {}) {
@@ -2110,7 +2146,7 @@ function normalizeDictionaryMetadata(dictionary = {}) {
 }
 
 function normalizeDictionary(dictionary) {
-  const usedEntityIds = new Set(dictionaryEntityIdRecords(dictionary).map(({ id }) => id));
+  const usedEntityIds = new Set();
   const entries = Array.isArray(dictionary.entries)
     ? dictionary.entries.map((entry) => normalizeEntry({
       ...entry,
@@ -2525,7 +2561,7 @@ function normalizeDocs(docs = {}) {
 }
 
 function normalizeCorpus(corpus = {}, usedIds = null) {
-  const reservedIds = usedIds || new Set(corpusEntityIdRecords(corpus).map(({ id }) => id));
+  const reservedIds = usedIds || new Set();
   return {
     ...corpus,
     blocks: Array.isArray(corpus.blocks) ? corpus.blocks.map((block) => normalizeCorpusBlock(block, reservedIds)) : [],
@@ -2718,14 +2754,7 @@ function uid(prefix) {
 
 function reserveEntityId(value, prefix, usedIds) {
   const existing = String(value || "").trim();
-  if (existing) {
-    usedIds.add(existing);
-    return existing;
-  }
-  let id = uid(prefix);
-  while (usedIds.has(id)) {
-    id = uid(prefix);
-  }
+  const id = existing || uid(prefix);
   usedIds.add(id);
   return id;
 }
@@ -2744,36 +2773,6 @@ function corpusEntityIdRecords(corpus = {}) {
   return records.filter((record) => record.id);
 }
 
-function dictionaryEntityIdRecords(dictionary = {}) {
-  const records = [];
-  (dictionary.entries || []).forEach((entry) => {
-    records.push({
-      id: String(entry.id || "").trim(),
-      typeKey: "entryEntity",
-    });
-    (entry.definitions || []).forEach((definition) => {
-      records.push({
-        id: String(definition.id || "").trim(),
-        typeKey: "definitionEntity",
-      });
-    });
-  });
-  (dictionary.morphology?.templateGroups || []).forEach((group) => {
-    records.push({
-      id: String(group.id || "").trim(),
-      typeKey: "morphologyTableEntity",
-    });
-    (group.tables || []).forEach((table) => {
-      records.push({
-        id: String(table.id || "").trim(),
-        typeKey: "morphologyTableEntity",
-      });
-    });
-  });
-  records.push(...corpusEntityIdRecords(dictionary.corpus));
-  return records.filter((record) => record.id);
-}
-
 function duplicateEntityIdGroups(records) {
   const recordsById = new Map();
   records.forEach((record) => {
@@ -2785,40 +2784,6 @@ function duplicateEntityIdGroups(records) {
   return [...recordsById.entries()]
     .filter(([, matches]) => matches.length > 1)
     .map(([id, matches]) => ({ id, matches }));
-}
-
-function duplicateDictionaryEntityIds(dictionary = {}) {
-  return duplicateEntityIdGroups(dictionaryEntityIdRecords(dictionary));
-}
-
-function uniqueDictionaryEntityId(prefix, dictionary = activeDictionary()) {
-  const usedIds = new Set(dictionaryEntityIdRecords(dictionary).map((record) => record.id));
-  let id = uid(prefix);
-  while (usedIds.has(id)) {
-    id = uid(prefix);
-  }
-  return id;
-}
-
-function validateDictionaryEntityIds(dictionary = {}) {
-  const duplicates = duplicateDictionaryEntityIds(dictionary);
-  if (!duplicates.length) {
-    lastDuplicateEntityIdAlert = "";
-    return true;
-  }
-  const signature = stableJson(duplicates.map(({ id, matches }) => [id, matches.map(({ typeKey }) => typeKey)]));
-  if (signature !== lastDuplicateEntityIdAlert) {
-    lastDuplicateEntityIdAlert = signature;
-    const details = duplicates.map(({ id, matches }) => {
-      const types = [...new Set(matches.map(({ typeKey }) => t(typeKey)))].join(", ");
-      return `${id} (${types})`;
-    }).join("\n");
-    appConfirm(formatText("duplicateEntityIdsMessage", { details }), {
-      title: t("duplicateEntityIdsTitle"),
-      alert: true,
-    });
-  }
-  return false;
 }
 
 function activeDictionary() {
@@ -13792,7 +13757,7 @@ function addCorpusBlock() {
   }
   syncCorpusEditorToDraft();
   const block = normalizeCorpusBlock({
-    id: uniqueDictionaryEntityId("corpus-block", { ...dictionary, corpus }),
+    id: uid("corpus-block"),
     title: "",
   });
   corpus.blocks.push(block);
@@ -13812,7 +13777,7 @@ function addCorpusUnit() {
   }
   syncCorpusEditorToDraft();
   const unit = normalizeCorpusUnit({
-    id: uniqueDictionaryEntityId("corpus-unit", { ...dictionary, corpus }),
+    id: uid("corpus-unit"),
     content: "",
   });
   corpus.units.push(unit);
@@ -14882,7 +14847,7 @@ async function saveEntry(event) {
   const now = new Date().toISOString();
   const entry = {
     ...candidate,
-    id: entryId || uniqueDictionaryEntityId("entry", dictionary),
+    ...(entryId ? { id: entryId } : {}),
     createdAt: existing?.createdAt || now,
     updatedAt: now,
   };
@@ -14891,7 +14856,7 @@ async function saveEntry(event) {
     const saved = await api(
       wasNewEntry
         ? `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`
-        : `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entry.id)}`,
+        : `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entryId)}`,
       {
         method: wasNewEntry ? "POST" : "PUT",
         body: JSON.stringify(entryApiPayload(entry)),
@@ -15310,9 +15275,6 @@ function importData(event) {
         throw new Error("Invalid file");
       }
       const dictionary = dictionaryFromImportPayload(imported);
-      if (!validateDictionaryEntityIds(normalizeDictionary(dictionary))) {
-        return;
-      }
       const dictionaryId = String(dictionary.id || "").trim();
       let regenerateId = false;
       if (dictionaryId && !isValidDictionaryId(dictionaryId)) {
@@ -16337,7 +16299,7 @@ elements.corpusEditor.addEventListener("click", async (event) => {
 
   if (action === "add-corpus-layer" && block) {
     block.layers.push(normalizeCorpusLayer({
-      id: uniqueDictionaryEntityId("corpus-layer", { ...dictionary, corpus }),
+      id: uid("corpus-layer"),
     }));
     block.updatedAt = new Date().toISOString();
     renderCorpus(dictionary);
