@@ -551,7 +551,8 @@ CREATE TABLE entry_morphology_search_values (
 - 导入和整库覆盖会在写入形态主数据后全量生成。
 - `saveEntry()` 和 `patchEntries()` 随目标词条 projection 局部重建。
 - `deleteEntry()` 通过 `entries` 外键级联删除。
-- `saveMorphology()` 在模板/函数写入后全量重建。
+- `saveMorphology()` 保持完整模块替换契约，但在 repository 内比较规范化前后状态：名称、说明和不参与生成的表格标签只增量更新模板行；规则、函数、表结构与自动匹配变化先定位受影响模板组，再只重建显式使用该组或自动分配发生变化的词条。自动分配定位只扫描轻量的词条 ID、模式和标签，不执行全词典形态求值；完全相同的 payload 不更新时间、模板行或 projection。
+- 删除模板组、删除或移动子表、缩小表格尺寸会先检查 `entry_morphology_groups` 与 override 坐标；可能留下悬空引用时拒绝保存，不静默删除词条配置。
 - NFC、case folding 或自定义等价规则变化时全量重建 `normalized_value`。
 - 标签显示替换不影响形态值，因此不会触发形态 projection 重建。
 

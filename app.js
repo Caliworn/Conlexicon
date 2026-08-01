@@ -696,6 +696,7 @@ const i18n = {
     apiErrorInvalidDocsPayload: "语言文档保存请求格式无效",
     apiErrorInvalidCorpusPayload: "语料库保存请求格式无效",
     apiErrorInvalidMorphologyPayload: "形态学保存请求格式无效",
+    apiErrorMorphologyReferencesInUse: "模板仍被词条形态配置或覆写引用，请先移除对应引用",
     apiErrorInvalidIpaSettingsPayload: "IPA 设置保存请求格式无效",
     apiErrorUnsupportedEntryPatchFields: "批量词条更新包含不支持的字段",
     apiErrorEntryPatchTagsInvalid: "批量标签更新格式无效",
@@ -1279,6 +1280,7 @@ const i18n = {
     apiErrorInvalidDocsPayload: "Invalid language docs save request",
     apiErrorInvalidCorpusPayload: "Invalid corpus save request",
     apiErrorInvalidMorphologyPayload: "Invalid morphology save request",
+    apiErrorMorphologyReferencesInUse: "The template is still referenced by entry morphology settings or overrides",
     apiErrorInvalidIpaSettingsPayload: "Invalid IPA settings save request",
     apiErrorUnsupportedEntryPatchFields: "Batch entry update contains unsupported fields",
     apiErrorEntryPatchTagsInvalid: "Invalid batch tag update format",
@@ -1929,6 +1931,7 @@ const API_ERROR_TOAST_KEYS = {
   invalid_docs_payload: "apiErrorInvalidDocsPayload",
   invalid_corpus_payload: "apiErrorInvalidCorpusPayload",
   invalid_morphology_payload: "apiErrorInvalidMorphologyPayload",
+  morphology_references_in_use: "apiErrorMorphologyReferencesInUse",
   invalid_ipa_settings_payload: "apiErrorInvalidIpaSettingsPayload",
   unsupported_entry_patch_fields: "apiErrorUnsupportedEntryPatchFields",
   entry_patch_tags_invalid: "apiErrorEntryPatchTagsInvalid",
@@ -14599,9 +14602,13 @@ function entryDefinitionsRequirementMessage(entry, dictionary = activeDictionary
   return joinEntryRequirementMessages(entryDefinitionsRequirementMessages(entry, dictionary));
 }
 
-function entryApiPayload(entry = {}) {
+function entryApiPayload(entry = {}, options = {}) {
   const { morphology: _editorMorphology, ...payload } = entry;
-  return payload;
+  if (!options.omitId) {
+    return payload;
+  }
+  const { id: _serverGeneratedId, ...createPayload } = payload;
+  return createPayload;
 }
 
 function collectPartialDefinitions() {
@@ -14859,7 +14866,7 @@ async function saveEntry(event) {
         : `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entryId)}`,
       {
         method: wasNewEntry ? "POST" : "PUT",
-        body: JSON.stringify(entryApiPayload(entry)),
+        body: JSON.stringify(entryApiPayload(entry, { omitId: wasNewEntry })),
       },
     );
     const savedEntry = saved.entry;

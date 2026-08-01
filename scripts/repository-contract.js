@@ -1,5 +1,4 @@
 const assert = require("node:assert/strict");
-const crypto = require("node:crypto");
 const { Readable } = require("node:stream");
 
 const {
@@ -37,31 +36,6 @@ async function assertRejectStatus(promise, status, label) {
     return error;
   }
   assert.fail(`${label}: expected rejection with status ${status}`);
-}
-
-function withPatchedRandomUUID(values, callback) {
-  const originalRandomUUID = crypto.randomUUID;
-  const queue = [...values];
-  crypto.randomUUID = () => {
-    if (!queue.length) {
-      throw new Error("randomUUID test queue exhausted");
-    }
-    return queue.shift();
-  };
-  const restore = () => {
-    crypto.randomUUID = originalRandomUUID;
-  };
-  try {
-    const result = callback();
-    if (result && typeof result.then === "function") {
-      return result.finally(restore);
-    }
-    restore();
-    return result;
-  } catch (error) {
-    restore();
-    throw error;
-  }
 }
 
 async function callApi(repository, method, urlPath, body) {
@@ -1058,6 +1032,22 @@ function checkModelNormalization() {
     }),
     ["BadFn: rightV not configured"],
   );
+  const morphologyWithoutPersistentIds = morphologyModel.normalizeMorphology({
+    templateGroups: [
+      { name: "First", tables: [{ title: "First table" }] },
+      { name: "Second", tables: [{ title: "Second table" }] },
+    ],
+  });
+  assert.deepEqual(
+    morphologyWithoutPersistentIds.templateGroups.map((group) => group.id),
+    ["", ""],
+    "shared morphology normalization must not allocate persistent template group IDs",
+  );
+  assert.deepEqual(
+    morphologyWithoutPersistentIds.templateGroups.flatMap((group) => group.tables.map((table) => table.id)),
+    ["", ""],
+    "shared morphology normalization must not allocate persistent template table IDs",
+  );
   const automaticMorphologyDictionary = {
     morphology: {
       templateGroups: [{
@@ -1465,29 +1455,6 @@ function checkModelNormalization() {
     },
     (error) => error.status === 409,
   );
-
-  withPatchedRandomUUID(["collision", "fresh"], () => {
-    const normalized = normalizeDictionary({
-      id: "dict-static",
-      entries: [
-        {
-          id: "def-collision",
-          lemma: "a",
-          definitions: [{ meaning: "a" }],
-        },
-      ],
-    });
-    assert.equal(normalized.entries[0].definitions[0].id, "def-fresh");
-  });
-
-  withPatchedRandomUUID(["collision", "fresh"], () => {
-    const normalized = normalizeDictionary({
-      id: "dict-static",
-      entries: [{ id: "morph-collision", lemma: "a" }],
-      morphology: { templateGroups: [{ name: "A", tables: [] }] },
-    });
-    assert.equal(normalized.morphology.templateGroups[0].id, "morph-fresh");
-  });
 
   const textOnlyIpa = normalizeDictionary({
     id: "dict-static",
@@ -1940,15 +1907,16 @@ async function runRepositoryContractTests(options = {}) {
     assert.equal(savedRoot.entry.definitions[0].meaning, "root meaning");
     assert.deepEqual(savedRoot.summary, { entryCount: 1, rootCount: 1 });
     const rootEntryId = savedRoot.entry.id;
-    await assertRejectStatus(
+    const explicitPostIdError = await assertRejectStatus(
       callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(first.id)}/entries`, {
         id: rootEntryId,
         lemma: "must not overwrite through POST",
         definitions: [],
       }),
-      409,
-      "entry collection POST remains create-only without a separate existence probe",
+      400,
+      "entry collection POST rejects client-provided IDs",
     );
+    assert.equal(explicitPostIdError.code, "entry_id_not_allowed");
     assert.equal((await repository.getEntry(first.id, rootEntryId)).lemma, "root");
 
     const savedWithNewEntry = await repository.saveEntry(first.id, {
@@ -2186,9 +2154,15 @@ async function runRepositoryContractTests(options = {}) {
     await assertRejectStatus(repository.activateDictionary(first.id), 404, "activate deleted dictionary");
     await assertRejectStatus(repository.exportDictionary(first.id), 404, "export deleted dictionary");
 
-    await repository.createDictionary({ id: "dict-collision", name: "Collision" });
-    const generated = withPatchedRandomUUID(["collision", "fresh"], () => repository.createDictionary({ name: "Generated" }));
-    assert.equal((await generated).id, "dict-fresh");
+    const secondBeforeDuplicateCreate = await repository.getDictionaryMeta(second.id);
+    await assertRejectStatus(
+      repository.createDictionary({ id: second.id, name: "Must Not Overwrite" }),
+      409,
+      "create dictionary does not overwrite an existing dictionary id",
+    );
+    assert.equal((await repository.getDictionaryMeta(second.id)).name, secondBeforeDuplicateCreate.name);
+    const generated = await repository.createDictionary({ name: "Generated" });
+    assert.match(generated.id, /^dict-/);
 
     await assertRejectStatus(
       repository.importDictionary(normalizeDictionary({
@@ -2216,11 +2190,11 @@ async function runRepositoryContractTests(options = {}) {
     );
 
     await assertRejectStatus(repository.importDictionary({ id: "bad id", name: "Bad" }), 400, "invalid dictionary id import");
-    const regeneratedImport = withPatchedRandomUUID(
-      ["collision", "imported"],
-      () => repository.importDictionary({ id: "bad id", name: "Regenerated" }, { regenerateId: true }),
+    const regeneratedImport = await repository.importDictionary(
+      { id: "bad id", name: "Regenerated" },
+      { regenerateId: true },
     );
-    assert.equal((await regeneratedImport).id, "dict-imported");
+    assert.match(regeneratedImport.id, /^dict-/);
     return { completedStage: "all" };
   } finally {
     await cleanup();

@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
+const { planMorphologyWrite } = require("../lib/morphology-write-plan");
 
 const {
   createTempSqliteRepository,
@@ -7,8 +8,173 @@ const {
   sampleSqliteDictionary,
 } = require("./sqlite-check-utils");
 
+function checkMorphologyWritePlanning() {
+  const previous = {
+    functions: { leftV: ["a"], rightV: [] },
+    templateGroups: [
+      {
+        id: "morph-plan-function",
+        name: "Function group",
+        matchTags: ["n"],
+        tables: [{
+          id: "mtable-plan-function",
+          title: "Function table",
+          rowCount: 1,
+          columnCount: 1,
+          cells: { "0,0": { sourceText: "{}/leftV(a) = x; else = y/" } },
+        }],
+      },
+      {
+        id: "morph-plan-static",
+        name: "Static group",
+        matchTags: ["v"],
+        tables: [{
+          id: "mtable-plan-static",
+          title: "Static table",
+          rowCount: 1,
+          columnCount: 1,
+          cells: { "0,0": { sourceText: "{}-static" } },
+        }],
+      },
+    ],
+  };
+  const displayOnly = structuredClone(previous);
+  displayOnly.templateGroups[0].tables[0].title = "Renamed table";
+  const displayPlan = planMorphologyWrite(previous, displayOnly);
+  assert.equal(displayPlan.rows.tables.upsert.length, 1);
+  assert.deepEqual([...displayPlan.projection.generationGroupIds], []);
+  assert.equal(displayPlan.projection.assignmentChanged, false);
+
+  const functionsChanged = structuredClone(previous);
+  functionsChanged.functions.leftV = ["e"];
+  const functionPlan = planMorphologyWrite(previous, functionsChanged);
+  assert.equal(functionPlan.blobChanged, true);
+  assert.deepEqual([...functionPlan.projection.generationGroupIds], ["morph-plan-function"]);
+}
+
+async function checkIncrementalMorphologyWrites(repository) {
+  const dictionary = sampleSqliteDictionary();
+  dictionary.id = "dict-morphology-incremental";
+  dictionary.name = "Incremental Morphology";
+  dictionary.morphology.templateGroups = [
+    {
+      id: "morph-incremental-n",
+      name: "Nouns",
+      matchTags: ["n"],
+      tables: [{
+        id: "mtable-incremental-n",
+        title: "Noun forms",
+        rowCount: 1,
+        columnCount: 1,
+        cells: { "0,0": { sourceText: "{}-n" } },
+      }],
+    },
+    {
+      id: "morph-incremental-v",
+      name: "Verbs",
+      matchTags: ["v"],
+      tables: [{
+        id: "mtable-incremental-v",
+        title: "Verb forms",
+        rowCount: 1,
+        columnCount: 1,
+        cells: { "0,0": { sourceText: "{}-v" } },
+      }],
+    },
+  ];
+  dictionary.entries = [
+    {
+      id: "entry-incremental-manual",
+      lemma: "manual",
+      tags: ["n"],
+      morphologyMode: "manual",
+      morphologyGroups: [{
+        templateGroupId: "morph-incremental-n",
+        overrides: { "mtable-incremental-n": { "0,0": "manual-form" } },
+      }],
+    },
+    { id: "entry-incremental-auto-n", lemma: "auto-n", tags: ["n"] },
+    { id: "entry-incremental-auto-v", lemma: "auto-v", tags: ["v"] },
+  ];
+  await repository.importDictionarySnapshot(dictionary);
+  const db = repository.openDictionaryDatabase(dictionary.id);
+  db.exec(`
+    CREATE TEMP TABLE morphology_projection_delete_audit(entry_id TEXT NOT NULL);
+    CREATE TEMP TRIGGER audit_morphology_projection_delete
+    AFTER DELETE ON entry_morphology_search_values
+    BEGIN
+      INSERT INTO morphology_projection_delete_audit(entry_id) VALUES (OLD.entry_id);
+    END;
+  `);
+  const auditedEntryIds = () => db.prepare(`
+    SELECT DISTINCT entry_id AS entryId
+    FROM morphology_projection_delete_audit
+    ORDER BY entry_id ASC
+  `).all().map((row) => row.entryId);
+  const clearAudit = () => db.prepare("DELETE FROM morphology_projection_delete_audit").run();
+
+  const displayOnly = structuredClone(dictionary.morphology);
+  displayOnly.templateGroups[0].name = "Nouns renamed";
+  const displaySaved = await repository.saveMorphology(dictionary.id, displayOnly);
+  assert.deepEqual(auditedEntryIds(), [], "display-only morphology save must not rebuild entry projections");
+  assert.equal(displaySaved.morphology.templateGroups[0].name, "Nouns renamed");
+
+  clearAudit();
+  const changedRule = structuredClone(displaySaved.morphology);
+  changedRule.templateGroups[0].tables[0].cells["0,0"] = { sourceText: "{}-changed" };
+  const ruleSaved = await repository.saveMorphology(dictionary.id, changedRule);
+  assert.deepEqual(auditedEntryIds(), [
+    "entry-incremental-auto-n",
+    "entry-incremental-manual",
+  ]);
+  assert.equal(db.prepare(`
+    SELECT raw_value AS rawValue
+    FROM entry_morphology_search_values
+    WHERE entry_id = 'entry-incremental-auto-n'
+  `).get().rawValue, "auto-n-changed");
+  assert.equal(db.prepare(`
+    SELECT raw_value AS rawValue
+    FROM entry_morphology_search_values
+    WHERE entry_id = 'entry-incremental-auto-v'
+  `).get().rawValue, "auto-v-v");
+
+  clearAudit();
+  const changedAssignment = structuredClone(ruleSaved.morphology);
+  changedAssignment.templateGroups[0].matchTags = ["x"];
+  const assignmentSaved = await repository.saveMorphology(dictionary.id, changedAssignment);
+  assert.deepEqual(auditedEntryIds(), ["entry-incremental-auto-n"]);
+  assert.equal(db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM entry_morphology_search_values
+    WHERE entry_id = 'entry-incremental-auto-n'
+  `).get().count, 0);
+  assert.equal(db.prepare(`
+    SELECT raw_value AS rawValue
+    FROM entry_morphology_search_values
+    WHERE entry_id = 'entry-incremental-manual'
+  `).get().rawValue, "manual-form");
+
+  const unchanged = await repository.saveMorphology(dictionary.id, assignmentSaved.morphology);
+  assert.equal(unchanged.updatedAt, assignmentSaved.updatedAt);
+  assert.deepEqual(auditedEntryIds(), ["entry-incremental-auto-n"], "no-op save must not touch projections");
+
+  const removedReferencedGroup = structuredClone(assignmentSaved.morphology);
+  removedReferencedGroup.templateGroups.shift();
+  await assert.rejects(
+    repository.saveMorphology(dictionary.id, removedReferencedGroup),
+    (error) => error.status === 409 && error.code === "morphology_references_in_use",
+  );
+  const removedReferencedTable = structuredClone(assignmentSaved.morphology);
+  removedReferencedTable.templateGroups[0].tables = [];
+  await assert.rejects(
+    repository.saveMorphology(dictionary.id, removedReferencedTable),
+    (error) => error.status === 409 && error.code === "morphology_references_in_use",
+  );
+}
+
 async function runSqliteSchemaCheck() {
   requireSqliteRuntime("schema check");
+  checkMorphologyWritePlanning();
 
   const { repository, cleanup } = await createTempSqliteRepository("conlexicon-sqlite-schema-");
   try {
@@ -71,6 +237,7 @@ async function runSqliteSchemaCheck() {
 
     const sourceDictionary = sampleSqliteDictionary();
     await repository.importDictionarySnapshot(sourceDictionary);
+    await checkIncrementalMorphologyWrites(repository);
     const projectionDb = repository.openDictionaryDatabase(sourceDictionary.id);
     const partPlan = projectionDb.prepare(`
       EXPLAIN QUERY PLAN

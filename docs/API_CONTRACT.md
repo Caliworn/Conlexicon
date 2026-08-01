@@ -48,8 +48,8 @@
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/export?dictionaryId=&format=&profile=` | 导出数据 | 当前支持 JSON 完整词典 payload | 默认 `format=json&profile=legacy-json`；`profile=portable-json` 当前只是同结构兼容别名，不代表已有独立 portable 格式。原生 SQLite 与 XLSX 导出尚未实装。 |
-| `POST` | `/api/import?overwrite=&regenerateId=&profile=` | 导入 JSON | 应用状态 | 默认 `profile=legacy-json`；完整快照导入会通过转换服务执行 legacy 兼容解析、规范化和实体 ID 检查。 |
-| `POST` | `/api/dictionaries` | 新建词典 | 完整词典 JSON | 创建空词典，并设为当前词典。 |
+| `POST` | `/api/import?overwrite=&regenerateId=&profile=` | 导入 JSON | 应用状态 | 默认 `profile=legacy-json`；完整快照导入会通过转换服务执行 legacy 兼容解析、规范化和实体 ID 检查。`regenerateId=true` 只生成一次新词典 UUID，并且不会复用 `overwrite` 覆盖理论上同 ID 的既有词典。 |
+| `POST` | `/api/dictionaries` | 新建词典 | 完整词典 JSON | 后端只生成一次词典 UUID，并使用非覆盖式创建；显式或理论生成冲突都不会覆盖既有词典。创建成功后设为当前词典。 |
 | `GET` | `/api/dictionaries/:id` | 读取当前词典完整快照 | 完整词典 JSON | 前端启动或切换当前词典时按需加载详情与尚未拆出的模块；普通列表、搜索、facets 和关系查询优先使用专用读取 API。 |
 | `POST` | `/api/dictionaries/:id/activate` | 切换当前词典 | 应用状态 | 只改 `index.json` 中的当前词典。 |
 | `DELETE` | `/api/dictionaries/:id` | 删除词典 | 应用状态 | 删除词典文件并更新索引。 |
@@ -62,7 +62,7 @@
 | `PUT` | `/api/dictionaries/:id/settings` | 保存其他设置 | `{ id, updatedAt, settings }` | 不做实体 ID 检查；会保留既有 IPA 设置。`settings.search` 含字段级 `enabled/fuzzy`、`etymologyAutocomplete.fuzzy`，以及 `normalization: { unicodeNormalization: "none" | "nfc", caseFolding: boolean, customRules: { canonical, variants[] }[] }`。规范化默认严格关闭；自定义规则按最长变体优先且单次应用。前端据此生成读取 API 参数，并同步用于词根模式、搜索摘要/高亮、字段命中计数和词源自动补全。`settings.tagListSeparatorStyle` 支持 `commaSpace`、`fullwidthComma`、`ideographicComma`，只控制标签列表输入框重新显示时的分隔符。 |
 | `PUT` | `/api/dictionaries/:id/docs` | 保存语言文档 | `{ id, updatedAt, docs }` | 不做实体 ID 检查。 |
 | `PUT` | `/api/dictionaries/:id/corpus` | 保存语料库模块 | `{ id, updatedAt, corpus }` | 检查语料范围内实体 ID 冲突。 |
-| `PUT` | `/api/dictionaries/:id/morphology` | 保存自动形态学模块 | `{ id, updatedAt, morphology }` | 检查形态表实体 ID 冲突，并使用共享形态模块校验规则引用语法和函数对象配置；SQLite 事务提交后只重建并返回形态模块，不重建完整词典 snapshot。 |
+| `PUT` | `/api/dictionaries/:id/morphology` | 保存自动形态学模块 | `{ id, updatedAt, morphology }` | 请求仍表示完整替换形态模块；后端检查实体 ID、规则语法和函数配置，并按稳定组/表 ID 增量写入模板。纯名称、说明、表格标题或行列标签变化不重建生成投影；规则、函数、表结构或自动分配变化只重建实际受影响词条的形态搜索 projection。完全相同的规范化 payload 作为 no-op 返回既有 `updatedAt`。删除组、删除/移动表格或缩小表格会使既有词条形态组或覆写悬空时返回 `morphology_references_in_use`。 |
 | `PUT` | `/api/dictionaries/:id/settings/ipa` | 保存自动 IPA 设置 | `{ id, updatedAt, settings }` | IPA 映射是按顺序保存的纯文本规则 `{ from, to, before, after }`，没有实体 ID，也不参与实体 ID 防撞。 |
 | `POST` | `/api/dictionaries/:id/autosave` | 页面卸载时保存文档/语料草稿 | `{ id, updatedAt, docs?, corpus? }` | 当前只分发 `docs` 和 `corpus`；请求至少须携带其中一个有效对象，否则返回 `invalid_autosave_payload`。 |
 
@@ -73,7 +73,7 @@
 | `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | `{ items, pageInfo, searchSummary }`，其中 `items` 固定为词条摘要 DTO | 支持结构化 JSON `filter`，以及现有 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`sort`、`cursor`、`windowOffset`、`limit`。结构化 `filter` 不得与平铺筛选参数混用。无参数请求也使用默认排序和窗口大小，不返回完整词条数组。 |
 | `POST` | `/api/dictionaries/:id/entries/filter-facts` | 批量读取结构筛选是否存在候选 | `{ dictionaryId, generation, facts }` | 最多接受 16 个 filter descriptor；只返回按请求 ID 对应的 `available` 布尔值，不接受搜索、排序或分页语义。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId/location` | 定位词条在当前查询中的窗口 | `{ items, pageInfo, searchSummary, location }` | 接受与 `/entries` 相同的查询 descriptor 和 `limit`，但不接受客户端 cursor；目标存在但被查询排除时返回 `location.found: false`。 |
-| `POST` | `/api/dictionaries/:id/entries` | 新建词条 | `{ entry, summary }` | 客户端可以省略词条 ID，由后端生成并在 `entry.id` 返回；检查当前词条及其子对象与全库实体 ID 冲突，`summary` 是写入后的轻量词典计数。 |
+| `POST` | `/api/dictionaries/:id/entries` | 新建词条 | `{ entry, summary }` | 客户端不得携带词条 ID；后端为每次请求生成一次 UUID，并在 `entry.id` 返回。生成 ID 的理论冲突作为内部 `500` 失败，不覆盖旧实体、不在单次请求内重试；词条其他子对象继续检查全库实体 ID 冲突。`summary` 是写入后的轻量词典计数。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
 | `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存单个词条 | `{ entry, summary }` | 检查当前词条及其子对象与全库实体 ID 冲突；`summary` 是写入后的轻量词典计数。 |
 | `DELETE` | `/api/dictionaries/:id/entries/:entryId` | 删除单个词条 | `{ updatedAt, summary }` | 不因无关历史重复 ID 阻断删除；`summary` 是删除后的轻量词典计数。 |
@@ -176,6 +176,7 @@
 | `duplicate_entity_ids` | 完整词典存在重复实体 ID。 |
 | `duplicate_entity_ids_scoped` | 当前保存范围存在重复实体 ID。 |
 | `invalid_entry_payload` | 词条请求体格式无效。 |
+| `entry_id_not_allowed` | 新建词条 POST 携带了只能由后端生成的词条 ID。 |
 | `invalid_entry_updates_payload` | 批量词条更新请求格式无效。 |
 | `entry_not_found` | 词条不存在或已被删除。 |
 | `invalid_entry_morphology` | 词条携带的当前形态组或覆盖项结构无效。 |
@@ -200,6 +201,7 @@
 | `query_cursor_required` | 非零窗口 offset 未附带版本化 cursor。 |
 | `query_cursor_stale` | cursor 已因服务进程、词典写入或查询条件变化而失效；`details.reason` 标明原因。 |
 | `invalid_morphology_payload` | 形态学请求体格式无效。 |
+| `morphology_references_in_use` | 形态模板结构变化会使既有词条形态组或单元格覆写失效；`details.referenceCount/references` 返回受影响引用摘要。 |
 | `invalid_ipa_settings_payload` | IPA 设置请求体格式无效。 |
 | `unsupported_entry_patch_fields` | 批量词条 patch 包含不支持字段。 |
 | `entry_patch_tags_invalid` | 批量标签 patch 值不是数组。 |
