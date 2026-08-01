@@ -37,8 +37,6 @@ let activeAppTooltipTarget = null;
 const desktopNavMediaQuery = window.matchMedia("(min-width: 800px)");
 const wideNavMediaQuery = window.matchMedia("(min-width: 1280px)");
 const analysisModel = window.ConlexiconAnalysis;
-const entryRelationsModel = window.ConlexiconEntryRelations;
-const dictionaryQueryModel = window.ConlexiconDictionaryQuery;
 const entryQueryModel = window.ConlexiconEntryQuery;
 const ipaModel = window.ConlexiconIpa;
 const IPA_STRESS_MARKER = ipaModel.IPA_STRESS_MARKER;
@@ -187,6 +185,10 @@ let analysisTagsQueryState = {
   error: null,
   requestId: 0,
 };
+let analysisTagSetRenderState = {
+  key: "",
+  visibleCount: 100,
+};
 let analysisIpaCompareQueryState = {
   key: "",
   status: "idle",
@@ -254,6 +256,7 @@ const ANALYSIS_OVERVIEW_QUERY_WIDGETS = [
 const ANALYSIS_TAG_QUERY_WIDGETS = [
   { id: "parts", type: "partDistribution" },
   { id: "tags", type: "tagFrequency" },
+  { id: "tagSets", type: "tagSetDistribution" },
 ];
 let staleContentUpdateSequence = 0;
 let entryListHasSettledContent = false;
@@ -423,7 +426,7 @@ const i18n = {
     advancedFilterGlossedExampleIssues: "Glossed 例句问题",
     advancedFilterOtherIssues: "其他问题",
     advancedFilterPartOfSpeech: "词性",
-    advancedFilterTagCombination: "标签组合",
+    advancedFilterTagCombination: "标签集合",
     advancedFilterInitialLetter: "首字母",
     advancedFilterWordLength: "词长",
     advancedFilterOrthographicCharacter: "正写法字符",
@@ -1003,7 +1006,7 @@ const i18n = {
     advancedFilterGlossedExampleIssues: "Glossed example issues",
     advancedFilterOtherIssues: "Other issues",
     advancedFilterPartOfSpeech: "Part of Speech",
-    advancedFilterTagCombination: "Tag Combination",
+    advancedFilterTagCombination: "Tag Set",
     advancedFilterInitialLetter: "Initial Letter",
     advancedFilterWordLength: "Word Length",
     advancedFilterOrthographicCharacter: "Orthographic Character",
@@ -3016,9 +3019,9 @@ function splitSourceText(value) {
     .filter(Boolean);
 }
 
-function render() {
+function render(options = {}) {
   closeEntryContextMenu();
-  ensureValidSelection();
+  ensureValidAppState();
   if (state.activeView !== "editor") {
     setEntrySearchConfigOpen(false);
   }
@@ -3031,7 +3034,7 @@ function render() {
   renderMobileAppBar();
   renderHeader();
   renderToolNav();
-  renderActiveView();
+  renderActiveView(options);
   restoreProcessScroll();
   scheduleEntryBrowserHeightUpdate();
 }
@@ -3059,13 +3062,15 @@ function renderThemeChange() {
   applyLocale();
 }
 
-function renderActiveView() {
+function renderActiveView(options = {}) {
   const dictionary = activeDictionary();
   if (state.activeView === "editor") {
     renderPartFilter();
     renderEntries();
-    renderDetail();
-    renderLexicalNetwork();
+    if (!options.preserveEditorSurface) {
+      renderDetail();
+      renderLexicalNetwork();
+    }
     return;
   }
   if (state.activeView === "manager") {
@@ -3238,7 +3243,7 @@ function activeAnalysisSubpage(page = activeAnalysisViewState().page) {
   return subpages.some(([subpage]) => subpage === current) ? current : subpages[0][0];
 }
 
-function ensureValidSelection() {
+function ensureValidAppState() {
   if (!state.dictionaries.length) {
     state.activeDictionaryId = "";
     state.selectedEntryId = "";
@@ -3249,16 +3254,11 @@ function ensureValidSelection() {
 
   if (!state.dictionaries.some((dictionary) => dictionary.id === state.activeDictionaryId)) {
     state.activeDictionaryId = state.dictionaries[0].id;
+    state.selectedEntryId = "";
   }
 
-  const dictionary = activeDictionary();
   if (!state.dictionaries.some((item) => item.id === state.selectedDictionaryConfigId)) {
     state.selectedDictionaryConfigId = state.activeDictionaryId;
-  }
-
-  const isDraftingNewEntry = editorMode === "edit" && !state.selectedEntryId;
-  if (!isDraftingNewEntry && !dictionary.entries.some((entry) => entry.id === state.selectedEntryId)) {
-    state.selectedEntryId = firstLemmaEntry(dictionary)?.id || "";
   }
 
   if (!["editor", "manager", "analysis", "quality", "settings", "docs", "corpus", "morphology-functions", "morphology-tables", "ipa"].includes(state.activeView)) {
@@ -3946,10 +3946,6 @@ function renderHeader() {
   elements.dictionaryMeta.textContent = `${dictionaryStatsText(dictionary)}${details}`;
 }
 
-function firstLemmaEntry(dictionary) {
-  return [...(dictionary?.entries || [])].sort((a, b) => a.lemma.localeCompare(b.lemma, "zh-CN"))[0] || null;
-}
-
 function entrySearchFieldLabel(field) {
   const labels = {
     lemma: "searchFieldLemma",
@@ -4092,19 +4088,21 @@ function renderPartFilter() {
     refreshAdvancedFilterFacts(dictionary);
   }
   startEntryFacetsApiCheck(dictionary);
-  const usedParts = entryFacetsPartsForRender(dictionary) || localPartTags(dictionary);
+  const usedParts = entryFacetsPartsForRender(dictionary);
   activePart = renderPartFilterControls(dictionary, usedParts);
 }
 
 function renderPartFilterLocale() {
   const dictionary = activeDictionary();
-  const usedParts = entryFacetsPartsForRender(dictionary) || localPartTags(dictionary);
+  const usedParts = entryFacetsPartsForRender(dictionary);
   renderPartFilterControls(dictionary, usedParts);
 }
 
-function renderPartFilterControls(dictionary, usedParts = []) {
-  const options = ["", NO_PART_FILTER_VALUE, ...usedParts];
+function renderPartFilterControls(dictionary, usedParts = null) {
   const current = activePart;
+  const facetsReady = Array.isArray(usedParts);
+  const pendingSelection = !facetsReady && current && current !== NO_PART_FILTER_VALUE ? [current] : [];
+  const options = ["", NO_PART_FILTER_VALUE, ...(facetsReady ? usedParts : pendingSelection)];
 
   elements.partFilter.innerHTML = options
     .map((part) => {
@@ -4142,7 +4140,7 @@ function renderPartFilterControls(dictionary, usedParts = []) {
     && (hasRootSearch || !rootGroupsReady || (rootExpansionMode === "all" && !collapsedRootEntries.size));
   elements.collapseAllRootsButton.disabled = rootMode
     && (hasRootSearch || !rootGroupsReady || (rootExpansionMode === "manual" && !expandedRootEntries.size));
-  return elements.partFilter.value;
+  return facetsReady ? elements.partFilter.value : current;
 }
 
 function renderAdvancedFilterRefreshAvailability() {
@@ -4882,6 +4880,7 @@ function renderEntries(options = {}) {
       );
       return;
     }
+    maybeSelectInitialEditorEntry(entryQueryState.items);
     renderEntryRows(entryQueryState.items, {
       pageInfo: entryQueryState.pageInfo,
       windowPages: queryPages,
@@ -6032,6 +6031,27 @@ function syncEntryQueryWindowState() {
   entryQueryState.pageInfo = queryWindowAggregatePageInfo(entryQueryState.pages);
 }
 
+function maybeSelectInitialEditorEntry(entries = []) {
+  const firstEntry = entries[0];
+  const draftingNewEntry = editorMode === "edit" && !state.selectedEntryId;
+  if (
+    !firstEntry
+    || state.activeView !== "editor"
+    || state.selectedEntryId
+    || draftingNewEntry
+    || rootMode
+    || advancedFilter
+  ) {
+    return false;
+  }
+  state.selectedEntryId = firstEntry.id;
+  editorMode = "display";
+  entryDraft = null;
+  void ensureSelectedEntryDetailLoaded();
+  renderEditorEntrySelection();
+  return true;
+}
+
 function entryQueryPageCacheKey(key, cursor = "") {
   return queryPageCacheKey("entries", `${key}\u0000${cursor}`);
 }
@@ -6238,13 +6258,6 @@ function startEntryQueryApiCheck(dictionary) {
     updateToken,
   };
   loadEntryQueryWindowPage(dictionary, firstPage);
-}
-
-function localPartTags(dictionary = activeDictionary()) {
-  return dictionary
-    ? [...new Set((dictionary.entries || []).flatMap((entry) => entryParts(entry, dictionary)).filter(Boolean))]
-        .sort((a, b) => a.localeCompare(b, "zh-CN"))
-    : [];
 }
 
 function entryFacetsCanUseApi(dictionary = activeDictionary()) {
@@ -6640,7 +6653,7 @@ function showEntryContextMenu(event, entry, options = {}) {
       key: "delete",
       label: t("delete"),
       danger: true,
-      handler: () => deleteEntryById(entry.id),
+      handler: () => deleteEntryById(entry),
     },
   ];
   actions.forEach((action) => {
@@ -6796,14 +6809,31 @@ async function switchToEntry(entryId, options = {}) {
     return;
   }
 
+  const previousEntryId = state.selectedEntryId;
+  const previousEntry = selectedEntry();
+  const previousRootNavigationContextId = rootNavigationContextId;
   entryDraft = null;
   state.selectedEntryId = entryId;
   editorMode = "display";
   const navigationOptions = prepareRootModeEntryNavigation(entryId, options);
   const detailLoadPromise = ensureSelectedEntryDetailLoaded();
   renderEditorEntrySelection();
-  await detailLoadPromise;
+  const entry = await detailLoadPromise;
   if (state.selectedEntryId !== entryId) {
+    return;
+  }
+  if (!entry && selectedEntryDetailState.error?.code === "entry_not_found") {
+    const restoreEntryId = previousEntryId !== entryId ? previousEntryId : "";
+    state.selectedEntryId = restoreEntryId;
+    rootNavigationContextId = previousRootNavigationContextId;
+    resetSelectedEntryDetailState();
+    if (restoreEntryId && previousEntry?.id === restoreEntryId) {
+      cacheSavedEntryDetail(dictionary.id, previousEntry);
+    } else if (restoreEntryId) {
+      void ensureSelectedEntryDetailLoaded();
+    }
+    renderEditorEntrySelection();
+    showToast(t("apiErrorEntryNotFound"));
     return;
   }
   scheduleEntryCardScroll(entryId, navigationOptions);
@@ -7510,14 +7540,12 @@ async function enterAdvancedFilter(action) {
     }
     resetEntryQueryState();
   } else {
-    const ids = new Set(advancedFilter.entryIds);
-    const matchingEntries = [...dictionary.entries].filter((entry) => ids.has(entry.id)).sort(compareEntries);
-    const preferredEntry = action.preferredEntryId
-      ? matchingEntries.find((entry) => entry.id === action.preferredEntryId)
-      : null;
-    const firstEntry = preferredEntry || matchingEntries[0];
-    if (firstEntry) {
-      state.selectedEntryId = firstEntry.id;
+    const entryIds = advancedFilter.entryIds || [];
+    const nextEntryId = action.preferredEntryId && entryIds.includes(action.preferredEntryId)
+      ? action.preferredEntryId
+      : entryIds[0];
+    if (nextEntryId) {
+      state.selectedEntryId = nextEntryId;
       editorMode = "display";
       entryDraft = null;
     }
@@ -7559,6 +7587,20 @@ async function applyTagFilter(entry, tag) {
     ...tagAdvancedFilterAction(tag),
     preferredEntryId: entry.id,
   });
+}
+
+function enterPartFilterFromReport(part) {
+  advancedFilter = null;
+  rootMode = false;
+  activePart = part || "";
+  searchQuery = "";
+  state.selectedEntryId = "";
+  editorMode = "display";
+  entryDraft = null;
+  state.activeView = "editor";
+  resetEntryQueryState();
+  revealEntryBrowserForResults();
+  render();
 }
 
 function exitAdvancedFilter() {
@@ -7661,6 +7703,7 @@ function advancedFilterTitleDescriptor(key, options = {}) {
     ...(Object.hasOwn(options, "value") ? { value: String(options.value ?? "") } : {}),
     ...(options.valueKey ? { valueKey: options.valueKey } : {}),
     ...(options.valueType ? { valueType: options.valueType } : {}),
+    ...(Array.isArray(options.values) ? { values: options.values.map((value) => String(value ?? "")) } : {}),
   };
 }
 
@@ -7687,7 +7730,9 @@ function advancedFilterTitleText(descriptor, dictionary = activeDictionary()) {
   }
   const value = normalized.valueKey
     ? t(normalized.valueKey)
-    : normalized.valueType === "tag"
+    : normalized.valueType === "tagList"
+      ? normalized.values.map((tag) => displayTag(tag, dictionary)).join(" + ")
+      : normalized.valueType === "tag"
       ? displayTag(normalized.value, dictionary)
       : normalized.value;
   return formatText(normalized.key, {
@@ -7753,10 +7798,9 @@ function applyAdvancedFilterAction(action, options = {}) {
     resetEntryQueryState();
     return true;
   }
-  const dictionary = activeDictionary();
   const ids = new Set(advancedFilter.entryIds || []);
-  if (dictionary && ids.size && !ids.has(state.selectedEntryId)) {
-    state.selectedEntryId = [...dictionary.entries].filter((entry) => ids.has(entry.id)).sort(compareEntries)[0]?.id || state.selectedEntryId;
+  if (ids.size && !ids.has(state.selectedEntryId)) {
+    state.selectedEntryId = advancedFilter.entryIds[0] || state.selectedEntryId;
     editorMode = "display";
     entryDraft = null;
   }
@@ -7854,8 +7898,7 @@ function cycleAdvancedFilterVariant() {
   }
   const ids = new Set(advancedFilter.entryIds);
   if (!ids.has(state.selectedEntryId)) {
-    const firstEntry = [...dictionary.entries].filter((entry) => ids.has(entry.id)).sort(compareEntries)[0];
-    state.selectedEntryId = firstEntry?.id || state.selectedEntryId;
+    state.selectedEntryId = advancedFilter.entryIds[0] || state.selectedEntryId;
   }
   revealEntryBrowserForResults();
   render();
@@ -7883,7 +7926,9 @@ function dictionaryStatsText(dictionary) {
   if (!dictionary) {
     return "";
   }
-  return `${dictionaryEntryCount(dictionary)} ${t("entries")} · ${dictionaryRootCountSummary(dictionary)} ${t("roots")}`;
+  const entryCount = dictionaryEntryCount(dictionary);
+  const rootCount = dictionaryRootCountSummary(dictionary);
+  return `${entryCount ?? "—"} ${t("entries")} · ${rootCount ?? "—"} ${t("roots")}`;
 }
 
 function dictionaryManagerStatsText(dictionary) {
@@ -7892,46 +7937,12 @@ function dictionaryManagerStatsText(dictionary) {
 
 function dictionaryEntryCount(dictionary) {
   const summaryCount = dictionary?.summary?.entryCount;
-  return Number.isFinite(summaryCount) ? summaryCount : dictionary?.entries?.length || 0;
+  return Number.isFinite(summaryCount) ? summaryCount : null;
 }
 
 function dictionaryRootCountSummary(dictionary) {
   const summaryCount = dictionary?.summary?.rootCount;
-  return Number.isFinite(summaryCount) ? summaryCount : dictionaryRootCount(dictionary);
-}
-
-function dictionaryRootCount(dictionary) {
-  return entryRelationsModel.rootCount(dictionary, { normalizeText: normalize, compareEntries });
-}
-
-function rootModeGroups(dictionary = activeDictionary(), options = {}) {
-  if (!dictionary) {
-    return [];
-  }
-  const searchOptions = entrySearchQueryOptions(dictionary);
-  const query = options.query ?? searchQuery;
-  const normalizedQuery = searchOptions.normalizeText(query);
-  const { fields, fuzzyFields } = searchOptions;
-  const matchOptions = {
-    query,
-    fields,
-    fuzzyFields,
-    respectPart: false,
-  };
-  return entryRelationsModel.rootModeGroups(dictionary, {
-    query: normalizedQuery,
-    normalizeText: normalize,
-    compareEntries,
-    matchesEntry: (entry) => entryMatchesSearch(entry, dictionary, matchOptions),
-  });
-}
-
-function entryHasSources(entry) {
-  return entryRelationsModel.entryHasSources(entry);
-}
-
-function sourceRootEntries(entry, dictionary = activeDictionary(), seen = new Set()) {
-  return entryRelationsModel.sourceRootEntries(entry, dictionary, { normalizeText: normalize, compareEntries }, seen);
+  return Number.isFinite(summaryCount) ? summaryCount : null;
 }
 
 function compareEntries(a, b) {
@@ -8427,8 +8438,7 @@ function renderLexicalNetwork() {
   }
 
   const dictionary = activeDictionary();
-  const entry = dictionary?.entries.find((item) => item.id === networkEntryId)
-    || networkScene.nodes.get(networkEntryId)?.entry
+  const entry = networkScene.nodes.get(networkEntryId)?.entry
     || selectedEntry();
   if (!dictionary || !entry) {
     elements.lexicalNetworkOverlay.hidden = true;
@@ -9093,8 +9103,7 @@ function renderAnalysis(dictionary = activeDictionary()) {
   }
   if (page === "entries" && subpage === "tags") {
     const queryState = analysisTagsStateFor(dictionary);
-    const report = getAnalysisReport(dictionary, { page, subpage });
-    elements.analysisPanel.innerHTML = renderAnalysisTagsQueryPage(queryState, report);
+    elements.analysisPanel.innerHTML = renderAnalysisTagsQueryPage(queryState);
     setupAnalysisMasonryLayouts();
     if (queryState.status === "idle") {
       void loadAnalysisTags(dictionary);
@@ -10291,14 +10300,79 @@ function analysisTagPageRows(response) {
   return { parts, tags };
 }
 
-function renderAnalysisTagsQueryPage(queryState, report) {
+function analysisTagSetTitleDescriptor(tags) {
+  return advancedFilterTitleDescriptor("advancedFilterFieldValue", {
+    labelKey: "advancedFilterTagCombination",
+    valueType: "tagList",
+    values: tags.map((tag) => tag.value),
+  });
+}
+
+function analysisTagSetList(widget, queryKey) {
+  const rows = widget?.rows || [];
+  if (!rows.length) {
+    return `<p class="muted-text">${escapeHtml(aText("暂无组合", "No combinations yet"))}</p>`;
+  }
+  if (analysisTagSetRenderState.key !== queryKey) {
+    analysisTagSetRenderState = { key: queryKey, visibleCount: 100 };
+  }
+  const visibleRows = rows.slice(0, analysisTagSetRenderState.visibleCount);
+  const max = Math.max(...rows.map((row) => Number(row.entryCount) || 0), 1);
+  const rawTagsByDisplayLabel = new Map();
+  rows.flatMap((row) => row.tags || []).forEach((tag) => {
+    const label = tag.displayLabel || tag.value;
+    if (!rawTagsByDisplayLabel.has(label)) {
+      rawTagsByDisplayLabel.set(label, new Set());
+    }
+    rawTagsByDisplayLabel.get(label).add(tag.value);
+  });
+  const list = visibleRows.map((row) => {
+    const tags = row.tags || [];
+    const chips = tags.map((tag) => {
+      const label = tag.displayLabel || tag.value;
+      const showRaw = label !== tag.value && rawTagsByDisplayLabel.get(label)?.size > 1;
+      return `<span class="analysis-tag-set-chip${tag.isPartOfSpeech ? " is-part" : ""}">
+        <span>${escapeHtml(label)}</span>
+        ${showRaw ? `<small>${escapeHtml(tag.value)}</small>` : ""}
+      </span>`;
+    }).join("");
+    const entryCount = Math.max(0, Number(row.entryCount) || 0);
+    const action = analysisQueryFilterAction(row.action, analysisTagSetTitleDescriptor(tags));
+    return `
+      <button type="button" class="analysis-tag-set-row"${analysisActionAttributes(action)}>
+        <span class="analysis-tag-set-label">${chips}</span>
+        <span class="analysis-bar-track" aria-hidden="true"><span style="width: ${Math.max(4, (entryCount / max) * 100).toFixed(2)}%"></span></span>
+        <strong>${escapeHtml(entryCount)}</strong>
+      </button>
+    `;
+  }).join("");
+  const remaining = rows.length - visibleRows.length;
+  return `
+    ${analysisFactList([
+      [aText("集合种类", "Tag sets"), Number(widget.tagSetCount || 0)],
+      [aText("有标签词条", "Tagged entries"), Number(widget.taggedEntryCount || 0)],
+      [aText("多标签词条", "Multi-tag entries"), Number(widget.multiTagEntryCount || 0)],
+    ])}
+    <div class="analysis-tag-set-list">${list}</div>
+    ${remaining > 0 ? `<button type="button" class="secondary-button analysis-tag-set-more" data-analysis-tag-sets-more>${escapeHtml(
+      aText("再显示 {count} 项", "Show {count} more").replace("{count}", Math.min(100, remaining)),
+    )}</button>` : ""}
+  `;
+}
+
+function renderAnalysisTagsQueryPage(queryState) {
   let body = "";
   if (queryState.status === "ready") {
     const rows = analysisTagPageRows(queryState.response);
-    body = `<section class="analysis-detail-grid">
+    const tagSetWidget = queryState.response?.widgets?.tagSets || {};
+    body = `<section class="analysis-detail-grid analysis-tags-grid">
       ${analysisCard(aText("词性分布", "Part-of-Speech Distribution"), analysisBarList(rows.parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") }))}
       ${analysisCard(aText("其他标签分布", "Other Tag Distribution"), analysisBarList(rows.tags, { empty: aText("暂无其他标签", "No other tags yet") }))}
-      ${analysisCard(aText("标签组合", "Tag Combinations"), analysisBarList(report.allTagCombos, { empty: aText("暂无组合", "No combinations yet") }))}
+      ${analysisCard(
+        aText("标签集合分布", "Tag Set Distribution"),
+        analysisTagSetList(tagSetWidget, queryState.key),
+        { className: "analysis-tag-set-card" },
+      )}
     </section>`;
   } else if (queryState.status === "error") {
     body = `<div class="empty-state">
@@ -10311,7 +10385,7 @@ function renderAnalysisTagsQueryPage(queryState, report) {
   }
   return `
     ${analysisPageNav("entries")}
-    ${analysisSubpageNav("entries", "tags", report)}
+    ${analysisSubpageNav("entries", "tags")}
     <section class="analysis-page-body">${body}</section>
   `;
 }
@@ -10325,9 +10399,7 @@ function renderAnalysisEntriesPage(report, subpage) {
       ${analysisCard(aText("正写法双字符频率（次数 / 词条）", "Orthographic Bigram Frequency (Occurrences / Entries)"), analysisBarList(report.allBigrams, { empty: aText("暂无组合", "No bigrams yet") }))}
     </section>`;
   }
-  return `<section class="analysis-detail-grid">
-    ${analysisCard(aText("标签组合", "Tag Combinations"), analysisBarList(report.allTagCombos, { empty: aText("暂无组合", "No combinations yet") }))}
-  </section>`;
+  return "";
 }
 
 function ipaDistributionRows(response, facet, category, labelKey) {
@@ -10813,11 +10885,6 @@ function buildAnalysisContext(dictionary) {
   return {
     dictionary,
     entries,
-    query: dictionaryQueryModel.createDictionaryQueryContext(dictionary, {
-      normalizeText: normalize,
-      compareEntries,
-      entryHasSources,
-    }),
     cacheBaseKey: analysisBaseCacheKey(dictionary),
   };
 }
@@ -10825,37 +10892,13 @@ function buildAnalysisContext(dictionary) {
 function composeLegacyAnalysisReport(context, slices) {
   return {
     entries: context.entries,
-    ...slices.relation,
-    ...slices.tags,
     ...slices.forms,
   };
 }
 
 function analysisSliceBuilders() {
   return {
-    relation: buildAnalysisRelationSlice,
-    tags: buildAnalysisTagSlice,
     forms: buildAnalysisFormSlice,
-  };
-}
-
-function buildAnalysisRelationSlice(context) {
-  return context.query.relationSummary();
-}
-
-function buildAnalysisTagSlice(context) {
-  const { dictionary, entries } = context;
-  const tagCombos = new Map();
-
-  entries.forEach((entry) => {
-    if ((entry.tags || []).length > 1) {
-      incrementEntry(tagCombos, entry.tags.map((tag) => displayTag(tag, dictionary)).join(" + "), entry);
-    }
-  });
-
-  return {
-    tagCombos: topEntryMapItems(tagCombos, 10, "advancedFilterTagCombination"),
-    allTagCombos: topEntryMapItems(tagCombos, Number.MAX_SAFE_INTEGER, "advancedFilterTagCombination"),
   };
 }
 
@@ -10902,7 +10945,8 @@ function analysisCard(title, body, options = {}) {
   const destination = options.destinationPage
     ? `<button type="button" class="analysis-card-navigation" data-analysis-destination-page="${escapeHtml(options.destinationPage)}"${options.destinationSubpage ? ` data-analysis-destination-subpage="${escapeHtml(options.destinationSubpage)}"` : ""}><span>${escapeHtml(aText("详情", "Details"))}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button>`
     : "";
-  return `<article class="analysis-card"><header class="analysis-card-header"><h3>${escapeHtml(title)}</h3>${destination}</header>${body}</article>`;
+  const className = ["analysis-card", options.className].filter(Boolean).join(" ");
+  return `<article class="${escapeHtml(className)}"><header class="analysis-card-header"><h3>${escapeHtml(title)}</h3>${destination}</header>${body}</article>`;
 }
 
 function analysisOverviewPrimaryStat(value, unit) {
@@ -14684,11 +14728,12 @@ async function savePartialEdit(event) {
 
   const shouldScrollAfterSave = partialEditSection === "basic" && previousLemma !== nextEntry.lemma;
   try {
-    const savedEntry = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entry.id)}`, {
+    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entry.id)}`, {
       method: "PUT",
       body: JSON.stringify(entryApiPayload(nextEntry)),
     });
-    upsertEntryInDictionary(dictionary.id, savedEntry);
+    const savedEntry = saved.entry;
+    upsertEntryInDictionary(dictionary.id, savedEntry, { summary: saved.summary });
     state.selectedEntryId = savedEntry.id;
     cacheSavedEntryDetail(dictionary.id, savedEntry);
     updateEntrySummaryDtoAfterSave(activeDictionary(), savedEntry);
@@ -14811,8 +14856,12 @@ async function saveEntry(event) {
   }
 
   const entryId = elements.entryId.value || "";
-  const existing = dictionary.entries.find((entry) => entry.id === entryId);
-  const wasNewEntry = !existing;
+  const wasNewEntry = !entryId;
+  const existing = wasNewEntry ? null : selectedEntry();
+  if (!wasNewEntry && (!existing || existing.id !== entryId)) {
+    showToast(t("apiErrorEntryNotFound"));
+    return false;
+  }
   const previousLemma = existing?.lemma || "";
   const candidate = fullEntryFormCandidate(existing);
 
@@ -14839,7 +14888,7 @@ async function saveEntry(event) {
   };
 
   try {
-    const savedEntry = await api(
+    const saved = await api(
       wasNewEntry
         ? `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`
         : `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entry.id)}`,
@@ -14848,7 +14897,8 @@ async function saveEntry(event) {
         body: JSON.stringify(entryApiPayload(entry)),
       },
     );
-    upsertEntryInDictionary(dictionary.id, savedEntry);
+    const savedEntry = saved.entry;
+    upsertEntryInDictionary(dictionary.id, savedEntry, { summary: saved.summary });
     state.selectedEntryId = savedEntry.id;
     cacheSavedEntryDetail(dictionary.id, savedEntry);
     updateEntrySummaryDtoAfterSave(activeDictionary(), savedEntry);
@@ -14868,13 +14918,35 @@ async function saveEntry(event) {
 }
 
 async function deleteSelectedEntry() {
-  await deleteEntryById(selectedEntry()?.id);
+  await deleteEntryById(selectedEntry());
 }
 
-async function deleteEntryById(entryId) {
+function loadedEntryNavigationIds() {
+  const ids = [];
+  const seen = new Set();
+  entryVirtualList.items.forEach((item) => {
+    const row = item.value;
+    const entryId = row?.entry?.id || row?.group?.root?.id || "";
+    if (entryId && !seen.has(entryId)) {
+      seen.add(entryId);
+      ids.push(entryId);
+    }
+  });
+  return ids;
+}
+
+function adjacentLoadedEntryId(entryId) {
+  const ids = loadedEntryNavigationIds();
+  const index = ids.indexOf(entryId);
+  if (index < 0) {
+    return "";
+  }
+  return ids[index + 1] || ids[index - 1] || "";
+}
+
+async function deleteEntryById(entry) {
   const dictionary = activeDictionary();
-  const entry = dictionary?.entries.find((item) => item.id === entryId);
-  if (!dictionary || !entry) {
+  if (!dictionary || !entry?.id) {
     return false;
   }
 
@@ -14883,20 +14955,28 @@ async function deleteEntryById(entryId) {
     return false;
   }
 
-  const nextEntries = dictionary.entries.filter((item) => item.id !== entry.id);
+  const deletingSelectedEntry = state.selectedEntryId === entry.id;
+  const replacementEntryId = deletingSelectedEntry ? adjacentLoadedEntryId(entry.id) : state.selectedEntryId;
+  const preservedSelectedEntry = deletingSelectedEntry ? null : selectedEntry();
+  const preserveEditorSurface = !deletingSelectedEntry && Boolean(editorMode === "edit" || partialEditForm());
   try {
     const deleted = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entry.id)}`, {
       method: "DELETE",
     });
     removeEntryFromDictionary(dictionary.id, entry.id, deleted);
-    if (state.selectedEntryId === entry.id || !nextEntries.some((item) => item.id === state.selectedEntryId)) {
-      state.selectedEntryId = firstLemmaEntry({ ...dictionary, entries: nextEntries })?.id || "";
+    if (deletingSelectedEntry) {
+      state.selectedEntryId = replacementEntryId;
       editorMode = "display";
       entryDraft = null;
       cancelPartialEdit();
+    } else if (preservedSelectedEntry?.id === state.selectedEntryId) {
+      cacheSavedEntryDetail(dictionary.id, preservedSelectedEntry);
     }
     resetEntryReadStateAfterSave();
-    render();
+    render({ preserveEditorSurface });
+    if (replacementEntryId) {
+      scheduleEntryCardScroll(replacementEntryId);
+    }
     showToast(t("deletedEntry"));
     return true;
   } catch (error) {
@@ -15000,16 +15080,6 @@ function replaceLoadedDictionarySource(dictionaryId, source) {
   return normalized;
 }
 
-function updateDictionarySummaryFromEntries(dictionary, options = {}) {
-  const previousSummary = normalizeDictionarySummary(dictionary.summary);
-  return {
-    entryCount: dictionary.entries.length,
-    rootCount: options.recomputeRootCount === false
-      ? previousSummary?.rootCount ?? null
-      : dictionaryRootCount(dictionary),
-  };
-}
-
 function updateDictionaryMetadataInState(payload) {
   if (!payload?.id) {
     return null;
@@ -15077,7 +15147,7 @@ function upsertEntryInDictionary(dictionaryId, entry, options = {}) {
     entries,
   });
   if (normalized) {
-    normalized.summary = updateDictionarySummaryFromEntries(normalized, { recomputeRootCount: options.recomputeRootCount });
+    normalized.summary = normalizeDictionarySummary(options.summary);
   }
   return normalized?.entries.find((item) => item.id === entry.id) || null;
 }
@@ -15093,7 +15163,7 @@ function removeEntryFromDictionary(dictionaryId, entryId, payload = {}) {
     entries: dictionary.entries.filter((entry) => entry.id !== entryId),
   });
   if (normalized) {
-    normalized.summary = updateDictionarySummaryFromEntries(normalized);
+    normalized.summary = normalizeDictionarySummary(payload.summary);
   }
   return normalized;
 }
@@ -15116,7 +15186,7 @@ function applyEntryPatchPayload(payload) {
     entries: nextEntries,
   });
   if (normalized) {
-    normalized.summary = updateDictionarySummaryFromEntries(normalized, { recomputeRootCount: false });
+    normalized.summary = normalizeDictionarySummary(dictionary.summary);
   }
   return normalized;
 }
@@ -15143,9 +15213,13 @@ async function activateDictionary(dictionaryId) {
     state.activeDictionaryId = dictionary.id;
     resetRootExpansionState();
     state.selectedDictionaryConfigId = dictionary.id;
-    state.selectedEntryId = firstLemmaEntry(dictionary)?.id || "";
+    state.selectedEntryId = "";
+    resetSelectedEntryDetailState();
     editorMode = "display";
     advancedFilter = null;
+    rootMode = false;
+    rootNavigationContextId = "";
+    pendingEntryCardScroll = null;
     searchQuery = "";
     activePart = "";
     elements.searchInput.value = "";
@@ -15893,6 +15967,12 @@ elements.analysisPanel.addEventListener("click", (event) => {
     renderAnalysis(activeDictionary());
     return;
   }
+  const tagSetsMoreButton = event.target.closest("[data-analysis-tag-sets-more]");
+  if (tagSetsMoreButton) {
+    analysisTagSetRenderState.visibleCount += 100;
+    renderAnalysis(activeDictionary());
+    return;
+  }
   const retryButton = event.target.closest("[data-analysis-retry]");
   if (retryButton) {
     void loadAnalysisOverview(activeDictionary(), { force: true });
@@ -15947,28 +16027,7 @@ elements.analysisPanel.addEventListener("click", (event) => {
   }
   const partFilterTarget = event.target.closest("[data-part-filter-value]");
   if (partFilterTarget) {
-    advancedFilter = null;
-    rootMode = false;
-    activePart = partFilterTarget.dataset.partFilterValue || "";
-    searchQuery = "";
-    state.activeView = "editor";
-    revealEntryBrowserForResults();
-    const dictionary = activeDictionary();
-    const firstEntry = dictionary
-      ? [...dictionary.entries]
-        .filter((entry) => {
-          const parts = entryParts(entry, dictionary);
-          return activePart === NO_PART_FILTER_VALUE ? !parts.length : parts.includes(activePart);
-        })
-        .sort(compareEntries)[0]
-      : null;
-    if (firstEntry) {
-      state.selectedEntryId = firstEntry.id;
-      editorMode = "display";
-      entryDraft = null;
-    }
-    render();
-    scheduleEntryCardScroll(state.selectedEntryId);
+    enterPartFilterFromReport(partFilterTarget.dataset.partFilterValue || "");
     return;
   }
   const filterTarget = event.target.closest("[data-advanced-filter-id]");
@@ -16012,28 +16071,7 @@ elements.qualityPanel.addEventListener("click", (event) => {
   }
   const partFilterTarget = event.target.closest("[data-part-filter-value]");
   if (partFilterTarget) {
-    advancedFilter = null;
-    rootMode = false;
-    activePart = partFilterTarget.dataset.partFilterValue || "";
-    searchQuery = "";
-    state.activeView = "editor";
-    revealEntryBrowserForResults();
-    const dictionary = activeDictionary();
-    const firstEntry = dictionary
-      ? [...dictionary.entries]
-        .filter((entry) => {
-          const parts = entryParts(entry, dictionary);
-          return activePart === NO_PART_FILTER_VALUE ? !parts.length : parts.includes(activePart);
-        })
-        .sort(compareEntries)[0]
-      : null;
-    if (firstEntry) {
-      state.selectedEntryId = firstEntry.id;
-      editorMode = "display";
-      entryDraft = null;
-    }
-    render();
-    scheduleEntryCardScroll(state.selectedEntryId);
+    enterPartFilterFromReport(partFilterTarget.dataset.partFilterValue || "");
     return;
   }
   const filterTarget = event.target.closest("[data-advanced-filter-id]");

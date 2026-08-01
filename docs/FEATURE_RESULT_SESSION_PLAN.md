@@ -27,7 +27,7 @@ F4b 不建设通用分析任务平台，不把功能结果伪装成普通 `Entry
 | 形态分配覆盖与模板组使用 | F4b-3 `morphologyAnalysis` 与共享 morphology model | source/view descriptor | Feature result（已迁移） | 保持真实多组分配、summary 与 feature query 边界 |
 | 形态生成数与空单元 | 已删除 | 无 | 语义不足，删除 | 当前模型不能区分未定义、不适用与失败；F4b-3 不执行单元格生成 |
 | Override 使用与排行 | F4b-3 nested override summary | source/view descriptor 与单词条定位 | Feature result + bounded summary（已迁移） | 按当前生效与 dormant overlay 中未应用的单元格分别统计 |
-| 词根家族排行 | 前端 `dictionary-query-model` 重建 relation index | 定位词根 | Topology summary | 直接查询 `RootTopologyCache` 的 `{ rootId, lemma, derivedEntryCount }` |
+| 词根家族排行 | 已删除的旧前端内存关系查询重建 relation index | 定位词根 | Topology summary | 直接查询 `RootTopologyCache` 的 `{ rootId, lemma, derivedEntryCount }` |
 | 词长、首字母、字符、双字符组合 | 前端按 JS code point 和 `\s` 规则统计 | 每桶固定 `entryIds` | Deterministic summary/facet | 先固定 Unicode/空白语义，再选择 SQL 函数或轻量 projection |
 | 标签组合 | 显示替换后的标签按原顺序拼接 | 每组合固定 `entryIds` | 语义未定 | 明确 raw tag、顺序和重复语义前不迁移 |
 | 完整活动日期分布 | 前端扫描日期 | 日期行已是 EntryFilter | Summary/navigation | 扩展 F4a activity query，不建立 feature session；按修改时间浏览复用词条列表排序 |

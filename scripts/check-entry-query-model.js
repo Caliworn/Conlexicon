@@ -105,6 +105,14 @@ function checkStableIdentity() {
   const noSearchA = normalizeEntryQuery({ fields: "lemma", fuzzyFields: "lemma" });
   const noSearchB = normalizeEntryQuery({ fields: "morphology", fuzzyFields: "" });
   assert.deepEqual(entryQueryIdentity(noSearchA), entryQueryIdentity(noSearchB));
+
+  const allTags = normalizeEntryQuery({
+    filter: { tags: { values: ["n", "root"], mode: "all" } },
+  });
+  const exactTags = normalizeEntryQuery({
+    filter: { tags: { values: ["root", "n"], mode: "exact" } },
+  });
+  assert.notDeepEqual(entryQueryIdentity(allTags), entryQueryIdentity(exactTags));
 }
 
 function checkValidation() {

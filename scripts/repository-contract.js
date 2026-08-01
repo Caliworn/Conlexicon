@@ -18,7 +18,6 @@ const ipaModel = require("../lib/ipa-model");
 const tagModel = require("../lib/tag-model");
 const entrySearchModel = require("../lib/entry-search-model");
 const entryRelationsModel = require("../lib/entry-relations-model");
-const dictionaryQueryModel = require("../lib/dictionary-query-model");
 const qualityModel = require("../lib/quality-model");
 
 const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
@@ -396,6 +395,87 @@ async function checkAnalysisQueryContract(repository) {
       400,
       "root-family ranking does not accept a limit",
     );
+  } finally {
+    await repository.deleteDictionary(dictionary.id);
+  }
+}
+
+async function checkTagSetAnalysisContract(repository) {
+  const dictionary = await repository.createDictionary(normalizeDictionary({
+    id: "dict-tag-set-analysis-contract",
+    name: "Tag Set Analysis Contract",
+    settings: {
+      partOfSpeechTags: ["n", "v"],
+      tagDisplayMap: { n: "Noun", topic: "Shared", alias: "Shared" },
+      tagSortOrder: ["n", "topic", "alias", "extra"],
+    },
+    entries: [
+      { id: "tag-set-a", lemma: "a", tags: ["n", "topic"] },
+      { id: "tag-set-b", lemma: "b", tags: ["topic", "n"] },
+      { id: "tag-set-c", lemma: "c", tags: ["n", "topic", "extra"] },
+      { id: "tag-set-d", lemma: "d", tags: ["n", "alias"] },
+      { id: "tag-set-e", lemma: "e", tags: ["v"] },
+      { id: "tag-set-f", lemma: "f", tags: ["v", "extra"] },
+    ],
+  }));
+  try {
+    const response = await repository.queryAnalysis(dictionary.id, {
+      widgets: [{ id: "sets", type: "tagSetDistribution" }],
+    });
+    assert.deepEqual(response.diagnostics.computedTasks, ["tagSetStats"]);
+    const widget = response.widgets.sets;
+    assert.equal(widget.type, "tagSetDistribution");
+    assert.equal(widget.tagSetCount, 5);
+    assert.equal(widget.taggedEntryCount, 6);
+    assert.equal(widget.multiTagEntryCount, 5);
+    assert.equal(widget.rows.length, 5);
+    assert.ok(
+      widget.rows.some((row) => row.tags.length === 1 && row.tags[0].value === "v"),
+      "single-tag entries should form a tag set",
+    );
+
+    const topicSet = widget.rows.find((row) => (
+      row.tags.map((tag) => tag.value).sort().join(",") === "n,topic"
+    ));
+    assert.equal(topicSet.entryCount, 2, "tag order should not change set identity");
+    assert.deepEqual(topicSet.tags.map((tag) => tag.value), ["n", "topic"]);
+    assert.equal(topicSet.tags[0].isPartOfSpeech, true);
+    assert.equal(topicSet.tags[1].displayLabel, "Shared");
+    assert.equal(topicSet.action.resultCount, 2);
+    assert.deepEqual(topicSet.action.filter, {
+      tags: { values: ["n", "topic"], mode: "exact" },
+    });
+    assert.ok(
+      widget.rows.some((row) => row.tags.some((tag) => tag.value === "alias")),
+      "raw tags with the same display label must remain distinct",
+    );
+
+    const allMatches = await repository.queryEntries(dictionary.id, {
+      filter: { tags: { values: ["n", "topic"], mode: "all" } },
+    });
+    const exactMatches = await repository.queryEntries(dictionary.id, {
+      filter: { tags: { values: ["topic", "n"], mode: "exact" } },
+    });
+    assert.equal(allMatches.pageInfo.total, 3);
+    assert.equal(exactMatches.pageInfo.total, 2, "exact tag sets must exclude supersets");
+
+    const allSingleTagMatches = await repository.queryEntries(dictionary.id, {
+      filter: { tags: { values: ["v"], mode: "all" } },
+    });
+    const exactSingleTagMatches = await repository.queryEntries(dictionary.id, {
+      filter: { tags: { values: ["v"], mode: "exact" } },
+    });
+    assert.equal(allSingleTagMatches.pageInfo.total, 2);
+    assert.equal(exactSingleTagMatches.pageInfo.total, 1, "exact single-tag filters must exclude tagged supersets");
+
+    const limited = await repository.queryAnalysis(dictionary.id, {
+      widgets: [{ id: "sets", type: "tagSetDistribution", limit: 1 }],
+      options: { includeActions: false },
+    });
+    assert.equal(limited.widgets.sets.tagSetCount, 5);
+    assert.equal(limited.widgets.sets.taggedEntryCount, 6);
+    assert.equal(limited.widgets.sets.rows.length, 1);
+    assert.equal(limited.widgets.sets.rows[0].action, undefined);
   } finally {
     await repository.deleteDictionary(dictionary.id);
   }
@@ -805,15 +885,6 @@ function checkModelNormalization() {
     ["entry-derived-id", "entry-derived-lemma"],
   );
   assert.equal(entryRelationsModel.rootCount(relationDictionary, { index: relationIndex }), 1);
-  assert.deepEqual(
-    dictionaryQueryModel.createDictionaryQueryContext(relationDictionary, { normalizeText: testNormalize }).relationSummary(),
-    {
-      rootCount: 1,
-      derivedCount: 3,
-      isolatedRootCount: 0,
-      multiSourceCount: 1,
-    },
-  );
   assert.equal(
     entrySearchModel.entryMatchesSearchText(
       { lemma: "acar", definitions: [{ meaning: "root" }] },
@@ -1811,6 +1882,7 @@ async function runRepositoryContractTests(options = {}) {
     });
     assert.equal(savedRoot.entry.tags[0], "n");
     assert.equal(savedRoot.entry.definitions[0].meaning, "root meaning");
+    assert.deepEqual(savedRoot.summary, { entryCount: 1, rootCount: 1 });
     const rootEntryId = savedRoot.entry.id;
 
     const savedWithNewEntry = await repository.saveEntry(first.id, {
@@ -1840,9 +1912,10 @@ async function runRepositoryContractTests(options = {}) {
       definitions: [{ meaning: "created through API" }],
     });
     assert.equal(apiResult.statusCode, 201);
-    assert.match(apiResult.body.id, /^entry-/);
-    assert.equal(apiResult.body.lemma, "api entry");
-    const apiEntryId = apiResult.body.id;
+    assert.match(apiResult.body.entry.id, /^entry-/);
+    assert.equal(apiResult.body.entry.lemma, "api entry");
+    assert.equal(apiResult.body.summary.entryCount, 4);
+    const apiEntryId = apiResult.body.entry.id;
 
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entries/${encodeURIComponent(apiEntryId)}`);
     assert.equal(apiResult.statusCode, 200);
@@ -1853,7 +1926,8 @@ async function runRepositoryContractTests(options = {}) {
       lemma: "api entry updated",
     });
     assert.equal(apiResult.statusCode, 200);
-    assert.equal(apiResult.body.lemma, "api entry updated");
+    assert.equal(apiResult.body.entry.lemma, "api entry updated");
+    assert.equal(apiResult.body.summary.entryCount, 4);
 
     apiResult = await callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(first.id)}/entries`, {
       lemma: "derived smoke",
@@ -1863,7 +1937,8 @@ async function runRepositoryContractTests(options = {}) {
       etymology: { sources: ["root"], description: "" },
     });
     assert.equal(apiResult.statusCode, 201);
-    const derivedEntryId = apiResult.body.id;
+    assert.equal(apiResult.body.summary.rootCount, 4);
+    const derivedEntryId = apiResult.body.entry.id;
     if (shouldStopAfter("entryCrud")) {
       return { completedStage: "entryCrud" };
     }
@@ -1924,8 +1999,9 @@ async function runRepositoryContractTests(options = {}) {
 
     apiResult = await callApi(repository, "DELETE", `/api/dictionaries/${encodeURIComponent(first.id)}/entries/${encodeURIComponent(apiEntryId)}`);
     assert.equal(apiResult.statusCode, 200);
-    assert.deepEqual(Object.keys(apiResult.body), ["updatedAt"]);
+    assert.deepEqual(Object.keys(apiResult.body), ["updatedAt", "summary"]);
     assert.ok(apiResult.body.updatedAt);
+    assert.equal(apiResult.body.summary.entryCount, 4);
     await assertRejectStatus(
       callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entries/${encodeURIComponent(apiEntryId)}`),
       404,
@@ -2024,6 +2100,7 @@ async function runRepositoryContractTests(options = {}) {
     await checkCorpusIdCollisionInvariants(repository);
     await checkEntryFilterFactsContract(repository);
     await checkAnalysisQueryContract(repository);
+    await checkTagSetAnalysisContract(repository);
 
     const preferences = await repository.updatePreferences({ uiLanguage: "en", uiTheme: "dark" });
     assert.deepEqual(preferences, { uiLanguage: "en", uiTheme: "dark" });

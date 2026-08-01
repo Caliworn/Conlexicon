@@ -3280,6 +3280,20 @@ dialog {
   align-items: start;
 }
 
+.analysis-tags-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@container analysis-page (max-width: 700px) {
+  .analysis-tags-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.analysis-tag-set-card {
+  grid-column: 1 / -1;
+}
+
 .masonry-layout {
   grid-auto-flow: dense;
   grid-auto-rows: 4px;
@@ -3551,6 +3565,77 @@ button.analysis-composition-subset:hover strong {
 .analysis-bars {
   display: grid;
   gap: 9px;
+}
+
+.analysis-tag-set-list {
+  display: grid;
+  gap: 9px;
+}
+
+.analysis-tag-set-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(100px, 1fr) 42px;
+  gap: 9px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  padding: 3px 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.analysis-tag-set-row[data-advanced-filter-id] {
+  cursor: pointer;
+}
+
+.analysis-tag-set-row[data-advanced-filter-id]:hover .analysis-tag-set-chip {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--line));
+  color: var(--accent-strong);
+}
+
+.analysis-tag-set-label {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-width: 0;
+}
+
+.analysis-tag-set-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 3px 7px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.analysis-tag-set-chip.is-part {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.analysis-tag-set-chip small {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.analysis-tag-set-row > strong {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-align: right;
+}
+
+.analysis-tag-set-more {
+  justify-self: start;
 }
 
 .analysis-bar-row {
@@ -5006,6 +5091,15 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
 
   .analysis-coverage-row {
     grid-column: 1;
+  }
+
+  .analysis-tag-set-row {
+    grid-template-columns: minmax(0, 1fr) 42px;
+  }
+
+  .analysis-tag-set-row .analysis-bar-track {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 
   .ipa-rule-header {

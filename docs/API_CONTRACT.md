@@ -71,17 +71,17 @@
 | `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | `{ items, pageInfo, searchSummary }`，其中 `items` 固定为词条摘要 DTO | 支持结构化 JSON `filter`，以及现有 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`sort`、`cursor`、`windowOffset`、`limit`。结构化 `filter` 不得与平铺筛选参数混用。无参数请求也使用默认排序和窗口大小，不返回完整词条数组。 |
 | `POST` | `/api/dictionaries/:id/entries/filter-facts` | 批量读取结构筛选是否存在候选 | `{ dictionaryId, generation, facts }` | 最多接受 16 个 filter descriptor；只返回按请求 ID 对应的 `available` 布尔值，不接受搜索、排序或分页语义。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId/location` | 定位词条在当前查询中的窗口 | `{ items, pageInfo, searchSummary, location }` | 接受与 `/entries` 相同的查询 descriptor 和 `limit`，但不接受客户端 cursor；目标存在但被查询排除时返回 `location.found: false`。 |
-| `POST` | `/api/dictionaries/:id/entries` | 新建词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
+| `POST` | `/api/dictionaries/:id/entries` | 新建词条 | `{ entry, summary }` | 检查当前词条及其子对象与全库实体 ID 冲突；`summary` 是写入后的轻量词典计数。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
-| `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存单个词条 | 保存后的词条 | 检查当前词条及其子对象与全库实体 ID 冲突。 |
-| `DELETE` | `/api/dictionaries/:id/entries/:entryId` | 删除单个词条 | `{ updatedAt }` | 不因无关历史重复 ID 阻断删除；前端只用更新时间刷新本地词典状态。 |
+| `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存单个词条 | `{ entry, summary }` | 检查当前词条及其子对象与全库实体 ID 冲突；`summary` 是写入后的轻量词典计数。 |
+| `DELETE` | `/api/dictionaries/:id/entries/:entryId` | 删除单个词条 | `{ updatedAt, summary }` | 不因无关历史重复 ID 阻断删除；`summary` 是删除后的轻量词典计数。 |
 | `PATCH` | `/api/dictionaries/:id/entries` | 批量更新词条字段 | `{ id, updatedAt, entries, settings? }` | 当前仅允许 patch `tags` 和 `pronunciation`；`entries` 只包含本次更新的词条；可附带 `settings` 用于标签排序设置保存。 |
 
 ### 读取侧查询
 
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/dictionaries/:id/facets` | 读取词性和标签统计 | `{ parts, tags, noPartOfSpeechCount }` | 尊重当前词典的词性标签设置和标签显示替换。前端词性筛选选项正常路径以该 API 为准，不再每次本地统计完整词性集合做一致性校验。 |
+| `GET` | `/api/dictionaries/:id/facets` | 读取词性和标签统计 | `{ parts, tags, noPartOfSpeechCount }` | 尊重当前词典的词性标签设置和标签显示替换。前端词性筛选选项只消费该 API 的成功结果；加载、失败或后端不可用时不扫描完整词典快照重算。 |
 | `GET` | `/api/dictionaries/:id/entry-relations/:entryId` | 读取词源/衍生/同根关系 | `{ entryId, sources, derivedEntries, rootGroup }` | SQLite 路径复用稳定词根拓扑的反向索引，并按需读取关系 DTO；同名 lemma 暂按排序后的第一条匹配，后续可由诊断模块报告歧义。 |
 | `GET` | `/api/dictionaries/:id/root-groups` | 读取词根模式分组 | `{ items, pageInfo, searchSummary }` | 支持 `q`、`fields`、`fuzzyFields`、`sort`、`cursor`、`windowOffset`、`limit`。前端词根模式正常路径以该 API 为准，并按窗口加载。 |
 | `GET` | `/api/dictionaries/:id/root-groups/location` | 定位词条所属的父级词根窗口 | `{ items, pageInfo, searchSummary, location }` | 必须传 `entryId`；可传 `preferredRootId` 消除多来源词条的父级歧义，其余参数沿用 `/root-groups` descriptor。 |
@@ -108,7 +108,7 @@
   }
   ```
 
-  所有字段均可省略。`tags.mode` 为 `any` 或 `all`；`presence.field` 支持 `definition`、`example`、`entryNote`、`source`、`ipa`；`sourceCount` 是包含边界的非负整数区间，`max` 可省略，同一查询只执行一次来源计数；`activityDays.field` 支持 `created`、`updated`，日期按 UTC `YYYY-MM-DD` 的 `[dayStart, nextDayStart)` 半开范围比较。同一 presence 或日期字段不得给出冲突条件。当前 `entryNote` 只表示词条级备注，不包含释义备注或形态组备注。
+  所有字段均可省略。`tags.mode` 为 `any`、`all` 或 `exact`；`exact` 要求词条包含全部指定标签且不含任何额外标签。`presence.field` 支持 `definition`、`example`、`entryNote`、`source`、`ipa`；`sourceCount` 是包含边界的非负整数区间，`max` 可省略，同一查询只执行一次来源计数；`activityDays.field` 支持 `created`、`updated`，日期按 UTC `YYYY-MM-DD` 的 `[dayStart, nextDayStart)` 半开范围比较。同一 presence 或日期字段不得给出冲突条件。当前 `entryNote` 只表示词条级备注，不包含释义备注或形态组备注。
 - `fields`：逗号分隔的搜索字段白名单；当前支持 `lemma`、`pronunciation`、`tags`、`definitions`、`examples`、`notes`、`etymology`、`morphology`。为空或全部无效时搜索全部字段。
 - `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；仅对同时出现在 `fields` 中的字段生效。
 - 基础搜索逐个独立字段值匹配：一条释义、一个标签、一个来源或一段备注必须自行包含查询文本，查询不会跨多个值拼接命中；`notes` 中的词条备注、释义备注和每个词条形态组备注也分别作为独立值。多标签组合等条件应使用高级筛选。自由文本按当前词典的 `settings.search.normalization` 处理。SQLite 的严格及 fuzzy 查询均直接读取静态 `entry_search_values` 和按需读取形态 `entry_morphology_search_values`；fuzzy 通过连接级确定性函数复用共享搜索模型的评分语义。该路径支持 NFC、Unicode case folding 和自定义等价规则。结构键和词源关系键不套用该自由文本配置。
@@ -291,13 +291,15 @@ GET /api/dictionaries/:id/entries?filter=&q=&fields=&fuzzyFields=&part=&tags=&ta
 - `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；仅对 `fields` 中的字段生效。
 - `part`：词性筛选；按去除边缘空白后的原始标签精确匹配，特殊值 `__conlexicon_no_part__` 表示无词性。
 - `tags`：逗号分隔的原始标签列表；按去除边缘空白后的原始标签精确匹配。
-- `tagMode`：`any` 或 `all`，默认 `any`。
+- `tagMode`：`any`、`all` 或 `exact`，默认 `any`；`exact` 用于完整标签集合匹配。
 - `sort`：`lemmaAsc`、`lemmaDesc`、`updatedAsc`、`updatedDesc`、`createdAsc`、`createdDesc`。
 - `cursor`：不透明查询游标，前端不得解析。顺序分页使用响应的 `pageInfo.nextCursor`；随机窗口读取使用 `pageInfo.windowCursor`。
 - `windowOffset`：可选的结果窗口起点。非零值必须与同一查询返回的有效 `windowCursor` 一起发送；省略时沿用 cursor 自身的位置。该参数用于纯滚动列表直接读取远端窗口，不是 UI 页码。
 - `limit`：分页大小，必须为 1–200；超限返回 `invalid_entry_query_limit`。
 
 前端普通列表以每窗 200 条读取，最多保留 5 个已加载窗口；未加载和已淘汰窗口使用等高占位，从而让原生滚动条始终代表完整结果集。请求失败时显示失败状态，不回退到前端完整词典快照。基准和诊断使用同一产品窗口，通过会话 `buildMs`、缓存统计和 cursor 窗口分别测量匹配构建与响应开销，不开放大页旁路。
+
+编辑器选择状态不通过完整词典 snapshot 预检目标 ID。没有当前选择时，普通列表首窗的第一项可作为初始选择；搜索或筛选排除当前词条时仍保留既有详情。显式导航直接读取 `/entries/:entryId`，`entry_not_found` 时恢复导航前选择并提示。删除当前词条只从虚拟列表已加载顺序选择下一项或上一项，没有已加载候选时等待刷新后的普通首窗；删除未选中词条不改变选择。旧本地固定 ID 筛选只消费动作自身的稳定 ID 顺序，词汇网络内部导航只消费已加载节点 DTO；两者都不为选择目标扫描完整词典。
 
 当前搜索输入采用 250ms debounce，连续输入会重置计时；前端用递增请求 ID 忽略迟到的旧响应。后端所有排序以词条 ID 作为最终稳定键，避免同词形或同时间记录跨窗口边界漂移。`nextCursor` 表示顺序下一页，最后一页为空；`windowCursor` 始终绑定同一结果集合的起点，即使当前响应来自最后一页也可继续用于任意 `windowOffset`。两类 cursor 都绑定当前服务进程 epoch、词典查询缓存 generation 和规范化查询 descriptor；会话被 TTL/LRU 淘汰时后端可重建查询并继续读取，服务重启、成功写入或查询条件变化则返回 `query_cursor_stale`。前端收到 stale cursor 后从首窗重建查询。
 
@@ -438,6 +440,8 @@ GET /api/dictionaries/:id/facets
 - 标签显示替换；
 - 原始标签显示设置不改变统计键，但可影响前端展示策略。
 
+词条列表控制栏中的具体词性选项以该接口的成功响应为唯一数据源。facets 加载中、请求失败或后端不可用时，前端不得扫描完整活动词典生成本地词性集合；若用户已有当前词性筛选，可以暂时保留这一个运行期选择，待成功响应返回后再按最新集合校验。
+
 ### 词源与词根关系
 
 ```text
@@ -573,7 +577,7 @@ Feature Services
 }
 ```
 
-当前已落地的 `lib/dictionary-query-model.js` 是浏览器/Node 可复用的内存查询模型，但运行期目前只由前端数据分析消费：它接管 `getEntryById()` / `getEntriesByIds()`、relation index、relation summary 和 root family 查询。它不是 SQLite repository 的查询层，也没有消除数据分析对完整活动词典的依赖。SQLite 侧的词根拓扑、反向索引和窗口查询由 repository 独立实现；覆盖率、标签、活动和 corpus placement 仍待后续 API/query planner 迁移。
+早期的前端 `dictionary-query-model` 及其 relation slice 已删除。词根家族、基础关系统计和窗口读取均由 SQLite repository 提供，旧前端正写法页只保留 forms slice；不得重新引入 SQLite repository 之外的完整词典扫描查询上下文作为兜底。
 
 SQLite 路径应逐步用 SQL、持久索引、视图或临时表实现相同接口。旧 JSON conversion 与 migration 不参与运行期查询，上层服务也不应重新引入完整 JSON 扫描后端。
 
@@ -618,7 +622,7 @@ directDerivedEntries
 
 `POST /api/dictionaries/:id/analysis/query`
 
-F4a 支持 `entryCount`、`lexiconSummary`、`coverageBreakdown`、`partDistribution`、`tagFrequency`、`activityPreview`、`activityDistribution` 和 `rootFamilyRanking`。这些 widgets 在一次同步 HTTP 请求内完成；前端异步加载并显示独立的 loading/error/retry 状态。数据分析页未打开时不发起请求。
+F4a 支持 `entryCount`、`lexiconSummary`、`coverageBreakdown`、`partDistribution`、`tagFrequency`、`tagSetDistribution`、`activityPreview`、`activityDistribution` 和 `rootFamilyRanking`。这些 widgets 在一次同步 HTTP 请求内完成；前端异步加载并显示独立的 loading/error/retry 状态。数据分析页未打开时不发起请求。
 
 请求：
 
@@ -638,7 +642,7 @@ F4a 支持 `entryCount`、`lexiconSummary`、`coverageBreakdown`、`partDistribu
 ```
 
 - `widgets` 必须为非空数组，最多 16 项；`id` 在一次请求中必须唯一，只允许字母、数字、点、下划线和连字符，最长 80 字符。
-- `partDistribution` 和 `tagFrequency` 接受可选 `limit`，范围为 1–50；省略时返回完整排行。`activityPreview` 的 `limit` 默认为 6，范围同样为 1–50。`activityDistribution` 返回完整日期桶且不接受 `limit`；包括 `rootFamilyRanking` 在内的其他 widget 同样不接受 `limit`。
+- `partDistribution`、`tagFrequency` 和 `tagSetDistribution` 接受可选 `limit`，范围为 1–50；省略时返回完整排行。`activityPreview` 的 `limit` 默认为 6，范围同样为 1–50。`activityDistribution` 返回完整日期桶且不接受 `limit`；包括 `rootFamilyRanking` 在内的其他 widget 同样不接受 `limit`。
 - `options.includeActions` 默认为 `true`。设为 `false` 时省略 action descriptor。
 
 响应返回结构化 widget data，不返回 HTML：
@@ -713,15 +717,16 @@ Widget 通过以下任务依赖生成：
 | `coverageBreakdown` | `entryStats` |
 | `partDistribution` | `partStats` |
 | `tagFrequency` | `tagStats` |
+| `tagSetDistribution` | `tagSetStats` |
 | `activityPreview` | `activityStats` |
 | `activityDistribution` | `activityStats` |
 | `rootFamilyRanking` | `rootTopology` |
 
-同一任务在一次请求中只执行一次；只有 `activityPreview` 时使用请求中的最大 limit 读取日期桶，再分别裁剪；请求包含 `activityDistribution` 时读取完整日期桶，并继续按各自 limit 裁剪预览 widget。`lexiconSummary.rootEntryCount` 严格表示没有任何来源记录的词条数，`derivedEntryCount` 表示至少有一条来源记录的词条数；这两个计数不建立词根拓扑，也不表达孤立词根。`partDistribution.rows[].entryCount`、`tagFrequency.rows[].entryCount` 和两类活动 widget 的 `created/updated[].entryCount` 均为唯一词条数。`partDistribution` 另返回 `partTypeCount`、`noPartOfSpeechCount` 和对应的 `noPartAction`；`tagFrequency` 从 SQLite 标签聚合阶段排除当前 `partOfSpeechTags` 中的所有标签，并返回 `tagTypeCount` 及结构化标签筛选 action。所有 `entryFilter` action 使用 `resultCount` 表示目标结果词条数。`coverageBreakdown.rows[].field` 支持 `definition`、`example`、`entryNote`、`source`、`ipa`；每行使用 `coveredEntryCount`、`missingEntryCount`，释义和例句行另带项目单位的 `itemCount`。词性分布 action 使用 `{ part }` descriptor，无词性行使用保留值 `__conlexicon_no_part__`。
+同一任务在一次请求中只执行一次；只有 `activityPreview` 时使用请求中的最大 limit 读取日期桶，再分别裁剪；请求包含 `activityDistribution` 时读取完整日期桶，并继续按各自 limit 裁剪预览 widget。`lexiconSummary.rootEntryCount` 严格表示没有任何来源记录的词条数，`derivedEntryCount` 表示至少有一条来源记录的词条数；这两个计数不建立词根拓扑，也不表达孤立词根。`partDistribution.rows[].entryCount`、`tagFrequency.rows[].entryCount`、`tagSetDistribution.rows[].entryCount` 和两类活动 widget 的 `created/updated[].entryCount` 均为唯一词条数。`partDistribution` 另返回 `partTypeCount`、`noPartOfSpeechCount` 和对应的 `noPartAction`；`tagFrequency` 从 SQLite 标签聚合阶段排除当前 `partOfSpeechTags` 中的所有标签，并返回 `tagTypeCount` 及结构化标签筛选 action。`tagSetDistribution` 统计至少有一个标签的词条，以无序的完整原始标签集合为身份，返回 `tagSetCount`、`taggedEntryCount`、`multiTagEntryCount` 和结构化 `tags`；无标签词条不作为空集合混入排行。显示替换和显示顺序不改变集合身份，每行 action 使用 `tags.mode: "exact"`，因此单标签集合表示“仅有该标签”，多标签集合也不会把带额外标签的超集纳入结果。所有 `entryFilter` action 使用 `resultCount` 表示目标结果词条数。`coverageBreakdown.rows[].field` 支持 `definition`、`example`、`entryNote`、`source`、`ipa`；每行使用 `coveredEntryCount`、`missingEntryCount`，释义和例句行另带项目单位的 `itemCount`。词性分布 action 使用 `{ part }` descriptor，无词性行使用保留值 `__conlexicon_no_part__`。
 
 `rootFamilyRanking` 按衍生词数量降序、词根词形升序返回全部非空词根家族，同时返回家族总数 `familyCount`。每行固定为 `{ rootId, lemma, derivedEntryCount, action? }`，其中 action 定位词根词条；不会返回家族成员或 `derivedIds`。该任务直接消费与 `/root-groups`、词汇网络共享的稳定 `RootTopologyCache`，同一词典的拓扑已存在时不重新解析来源关系；多来源词条可以分别计入其所属家族，因此不能累加排行得到全局衍生词数量。
 
-当前总览固定消费四个 widget，分别渲染词汇规模、资料覆盖、词性分布和编辑活动；编辑活动使用 `activityPreview`。进入“词汇 > 标签”后同一次请求完整的 `partDistribution` 与 `tagFrequency`，前端只继续计算标签组合；进入“编辑进度”详情后另行请求 `activityDistribution`，进入“词根家族”详情后另行请求 `rootFamilyRanking`。资料覆盖卡只展示释义、例句、IPA 与备注，避免“来源覆盖”与衍生词比例重复；`coverageBreakdown` 仍保留 `source` 行供其他消费者使用。词根家族不属于首屏轻量总览；孤立词根尚未作为分析 widget 接线。
+当前总览固定消费四个 widget，分别渲染词汇规模、资料覆盖、词性分布和编辑活动；编辑活动使用 `activityPreview`。进入“词汇 > 标签”后同一次请求完整的 `partDistribution`、`tagFrequency` 与 `tagSetDistribution`；标签集合不再由前端扫描完整词典。集合卡片首批渲染 100 行，继续展开只消费已经返回的 widget rows，不追加请求。进入“编辑进度”详情后另行请求 `activityDistribution`，进入“词根家族”详情后另行请求 `rootFamilyRanking`。资料覆盖卡只展示释义、例句、IPA 与备注，避免“来源覆盖”与衍生词比例重复；`coverageBreakdown` 仍保留 `source` 行供其他消费者使用。词根家族不属于首屏轻量总览；孤立词根尚未作为分析 widget 接线。
 
 请求验证失败使用 `invalid_analysis_query_payload`、`invalid_analysis_widgets`、`invalid_analysis_widget`、`invalid_analysis_widget_id`、`unsupported_analysis_widget`、`invalid_analysis_widget_limit` 或 `duplicate_analysis_widget_id`。
 

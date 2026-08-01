@@ -4,7 +4,7 @@ const { checkModelNormalization } = require("./repository-contract");
 
 checkModelNormalization();
 assert.deepEqual(analysisModel.analysisSliceDepsForPage("overview"), []);
-assert.deepEqual(analysisModel.analysisSliceDepsForPage("entries", "tags"), ["tags"]);
+assert.deepEqual(analysisModel.analysisSliceDepsForPage("entries", "tags"), []);
 assert.deepEqual(analysisModel.analysisSliceDepsForPage("entries", "forms"), ["forms"]);
 assert.deepEqual(analysisModel.analysisSliceDepsForPage("entries", "roots"), []);
 assert.deepEqual(analysisModel.analysisSliceDepsForPage("activity"), []);
