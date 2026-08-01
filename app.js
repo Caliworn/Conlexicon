@@ -36,7 +36,6 @@ const shellState = {
 let activeAppTooltipTarget = null;
 const desktopNavMediaQuery = window.matchMedia("(min-width: 800px)");
 const wideNavMediaQuery = window.matchMedia("(min-width: 1280px)");
-const analysisModel = window.ConlexiconAnalysis;
 const entryQueryModel = window.ConlexiconEntryQuery;
 const ipaModel = window.ConlexiconIpa;
 const IPA_STRESS_MARKER = ipaModel.IPA_STRESS_MARKER;
@@ -184,6 +183,13 @@ let analysisTagsQueryState = {
   error: null,
   requestId: 0,
 };
+let analysisOrthographyQueryState = {
+  key: "",
+  status: "idle",
+  response: null,
+  error: null,
+  requestId: 0,
+};
 let analysisTagSetRenderState = {
   key: "",
   visibleCount: 100,
@@ -256,6 +262,9 @@ const ANALYSIS_TAG_QUERY_WIDGETS = [
   { id: "parts", type: "partDistribution" },
   { id: "tags", type: "tagFrequency" },
   { id: "tagSets", type: "tagSetDistribution" },
+];
+const ANALYSIS_ORTHOGRAPHY_QUERY_WIDGETS = [
+  { id: "orthography", type: "orthographyDistribution" },
 ];
 let staleContentUpdateSequence = 0;
 let entryListHasSettledContent = false;
@@ -9078,6 +9087,15 @@ function renderAnalysis(dictionary = activeDictionary()) {
     }
     return;
   }
+  if (page === "entries" && subpage === "forms") {
+    const queryState = analysisOrthographyStateFor(dictionary);
+    elements.analysisPanel.innerHTML = renderAnalysisOrthographyQueryPage(queryState);
+    setupAnalysisMasonryLayouts();
+    if (queryState.status === "idle") {
+      void loadAnalysisOrthography(dictionary);
+    }
+    return;
+  }
   if (page === "entries" && subpage === "roots") {
     const queryState = analysisRootFamiliesStateFor(dictionary);
     elements.analysisPanel.innerHTML = renderAnalysisRootFamiliesQueryPage(queryState);
@@ -9123,9 +9141,6 @@ function renderAnalysis(dictionary = activeDictionary()) {
     }
     return;
   }
-  const report = getAnalysisReport(dictionary, { page, subpage });
-  elements.analysisPanel.innerHTML = renderAnalysisPage(report, page, subpage);
-  setupAnalysisMasonryLayouts();
 }
 
 function analysisOverviewQueryKey(dictionary) {
@@ -9186,6 +9201,78 @@ function analysisTagsStateFor(dictionary) {
     };
   }
   return analysisTagsQueryState;
+}
+
+function analysisOrthographyStateFor(dictionary) {
+  const key = analysisOverviewQueryKey(dictionary);
+  if (analysisOrthographyQueryState.key !== key) {
+    return {
+      key,
+      status: "idle",
+      response: null,
+      error: null,
+      requestId: analysisOrthographyQueryState.requestId,
+    };
+  }
+  return analysisOrthographyQueryState;
+}
+
+async function loadAnalysisOrthography(dictionary, { force = false } = {}) {
+  if (!dictionary?.id) {
+    return;
+  }
+  const key = analysisOverviewQueryKey(dictionary);
+  if (
+    !force
+    && analysisOrthographyQueryState.key === key
+    && ["loading", "ready"].includes(analysisOrthographyQueryState.status)
+  ) {
+    return;
+  }
+  const requestId = analysisOrthographyQueryState.requestId + 1;
+  analysisOrthographyQueryState = {
+    key,
+    status: "loading",
+    response: null,
+    error: null,
+    requestId,
+  };
+  try {
+    const response = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`, {
+      method: "POST",
+      body: JSON.stringify({ widgets: ANALYSIS_ORTHOGRAPHY_QUERY_WIDGETS }),
+    });
+    if (analysisOrthographyQueryState.requestId !== requestId || analysisOrthographyQueryState.key !== key) {
+      return;
+    }
+    analysisOrthographyQueryState = {
+      key,
+      status: "ready",
+      response,
+      error: null,
+      requestId,
+    };
+  } catch (error) {
+    if (analysisOrthographyQueryState.requestId !== requestId || analysisOrthographyQueryState.key !== key) {
+      return;
+    }
+    analysisOrthographyQueryState = {
+      key,
+      status: "error",
+      response: null,
+      error,
+      requestId,
+    };
+    console.error(error);
+  }
+  if (
+    state.activeView === "analysis"
+    && activeAnalysisPage() === "entries"
+    && activeAnalysisSubpage("entries") === "forms"
+    && activeDictionary()?.id === dictionary.id
+  ) {
+    renderAnalysis(activeDictionary());
+  }
 }
 
 async function loadAnalysisTags(dictionary, { force = false } = {}) {
@@ -9843,39 +9930,6 @@ function activeAnalysisPage() {
   return page;
 }
 
-function getAnalysisReport(dictionary, route = {}) {
-  const page = route.page || activeAnalysisPage();
-  const subpage = route.subpage ?? activeAnalysisSubpage(page);
-  return buildAnalysisReportForRoute(dictionary, page, subpage);
-}
-
-function analysisBaseCacheKey(dictionary) {
-  return stableJson({
-    dictionaryId: dictionary?.id || "",
-    dictionaryUpdatedAt: dictionary?.updatedAt || "",
-    language: currentLanguage,
-    settings: dictionary?.settings || {},
-    entries: (dictionary?.entries || []).map((entry) => ({
-      id: entry.id || "",
-      lemma: entry.lemma || "",
-      tags: entry.tags || [],
-      etymology: {
-        sources: entry.etymology?.sources || [],
-      },
-      createdAt: entry.createdAt || "",
-      updatedAt: entry.updatedAt || "",
-    })),
-  });
-}
-
-function analysisSliceCacheKey(context, dep) {
-  return stableJson({
-    base: context.cacheBaseKey,
-    dep,
-    entrySort: dep === "relation" ? entrySort : "",
-  });
-}
-
 function renderQuality(dictionary = activeDictionary()) {
   if (!elements.qualityPanel) {
     return;
@@ -9927,16 +9981,6 @@ function qualityReportCacheKey(dictionary) {
       updatedAt: entry.updatedAt || "",
     })),
   });
-}
-
-function renderAnalysisPage(report, page = activeAnalysisPage(), subpage = activeAnalysisSubpage(page)) {
-  return `
-    ${analysisPageNav(page)}
-    ${analysisSubpageNav(page, subpage, report)}
-    <section class="analysis-page-body">
-      ${analysisPageBody(report, page, subpage)}
-    </section>
-  `;
 }
 
 function analysisPageNav(activePage) {
@@ -10046,13 +10090,6 @@ function qualitySubpageGroups() {
       ],
     },
   ];
-}
-
-function analysisPageBody(report, page, subpage) {
-  if (page === "entries") {
-    return renderAnalysisEntriesPage(report, subpage);
-  }
-  return "";
 }
 
 function analysisQueryFilterAction(action, titleDescriptor, options = {}) {
@@ -10358,16 +10395,68 @@ function renderAnalysisTagsQueryPage(queryState) {
   `;
 }
 
-function renderAnalysisEntriesPage(report, subpage) {
-  if (subpage === "forms") {
-    return `<section class="analysis-detail-grid">
-      ${analysisCard(aText("词长分布", "Word Length Distribution"), analysisBarList(report.allWordLengths, { empty: aText("暂无词形", "No lemmas yet") }))}
-      ${analysisCard(aText("首字母分布", "Initial Letter Distribution"), analysisBarList(report.allInitialLetters, { empty: aText("暂无词形", "No lemmas yet") }))}
-      ${analysisCard(aText("正写法字符频率（次数 / 词条）", "Orthographic Character Frequency (Occurrences / Entries)"), analysisBarList(report.allCharacters, { empty: aText("暂无词形", "No lemmas yet") }))}
-      ${analysisCard(aText("正写法双字符频率（次数 / 词条）", "Orthographic Bigram Frequency (Occurrences / Entries)"), analysisBarList(report.allBigrams, { empty: aText("暂无组合", "No bigrams yet") }))}
-    </section>`;
+function analysisOrthographyRows(rows, labelKey, { frequency = false } = {}) {
+  return (rows || []).map((row) => {
+    const rawValue = String(row.value ?? "");
+    const label = rawValue || aText("未命名", "Untitled");
+    const entryCount = Math.max(0, Number(row.entryCount) || 0);
+    const action = analysisQueryFilterAction(
+      row.action,
+      advancedFilterValueTitleDescriptor(labelKey, label),
+    );
+    if (!frequency) {
+      return [label, entryCount, action];
+    }
+    const occurrenceCount = Math.max(0, Number(row.occurrenceCount) || 0);
+    return {
+      label,
+      value: occurrenceCount,
+      valueText: `${occurrenceCount} / ${entryCount}`,
+      action,
+    };
+  });
+}
+
+function renderAnalysisOrthography(response) {
+  const widget = response?.widgets?.orthography || {};
+  return `<section class="analysis-detail-grid">
+    ${analysisCard(aText("词长分布", "Word Length Distribution"), analysisBarList(
+      analysisOrthographyRows(widget.wordLengths, "advancedFilterWordLength"),
+      { empty: aText("暂无词形", "No lemmas yet") },
+    ))}
+    ${analysisCard(aText("首字母分布", "Initial Letter Distribution"), analysisBarList(
+      analysisOrthographyRows(widget.initials, "advancedFilterInitialLetter"),
+      { empty: aText("暂无词形", "No lemmas yet") },
+    ))}
+    ${analysisCard(aText("正写法字符频率（次数 / 词条）", "Orthographic Character Frequency (Occurrences / Entries)"), analysisBarList(
+      analysisOrthographyRows(widget.characters, "advancedFilterOrthographicCharacter", { frequency: true }),
+      { empty: aText("暂无词形", "No lemmas yet") },
+    ))}
+    ${analysisCard(aText("正写法双字符频率（次数 / 词条）", "Orthographic Bigram Frequency (Occurrences / Entries)"), analysisBarList(
+      analysisOrthographyRows(widget.bigrams, "advancedFilterOrthographicBigram", { frequency: true }),
+      { empty: aText("暂无组合", "No bigrams yet") },
+    ))}
+  </section>`;
+}
+
+function renderAnalysisOrthographyQueryPage(queryState) {
+  let body = "";
+  if (queryState.status === "ready") {
+    body = renderAnalysisOrthography(queryState.response);
+  } else if (queryState.status === "error") {
+    body = `<div class="empty-state">
+      <strong>${escapeHtml(aText("无法加载正写法统计", "Could not load orthography statistics"))}</strong>
+      <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
+      <button type="button" class="secondary-button" data-analysis-orthography-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+    </div>`;
+  } else {
+    body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载正写法统计", "Loading orthography statistics"))}</strong></div>`;
   }
-  return "";
+  return `
+    ${analysisPageNav("entries")}
+    ${analysisSubpageNav("entries", "forms")}
+    <section class="analysis-page-body">${body}</section>
+  `;
 }
 
 function ipaDistributionRows(response, facet, category, labelKey) {
@@ -10838,72 +10927,6 @@ function buildQualityViewReport(dictionary) {
   });
 }
 
-function buildAnalysisReportForRoute(dictionary, page = "overview", subpage = "") {
-  return analysisModel.buildReportForRoute(dictionary, { page, subpage }, {
-    buildContext: buildAnalysisContext,
-    builders: analysisSliceBuilders(),
-    composeReport: composeLegacyAnalysisReport,
-    maxCacheEntries: 24,
-    sliceCacheKey: analysisSliceCacheKey,
-  });
-}
-
-function buildAnalysisContext(dictionary) {
-  const entries = dictionary.entries || [];
-  return {
-    dictionary,
-    entries,
-    cacheBaseKey: analysisBaseCacheKey(dictionary),
-  };
-}
-
-function composeLegacyAnalysisReport(context, slices) {
-  return {
-    entries: context.entries,
-    ...slices.forms,
-  };
-}
-
-function analysisSliceBuilders() {
-  return {
-    forms: buildAnalysisFormSlice,
-  };
-}
-
-function buildAnalysisFormSlice(context) {
-  const { entries } = context;
-  const initialLetters = new Map();
-  const wordLengths = new Map();
-  const characters = new Map();
-  const bigrams = new Map();
-
-  entries.forEach((entry) => {
-    const lemma = String(entry.lemma || "");
-    if (!lemma) {
-      return;
-    }
-    incrementEntry(wordLengths, String(Array.from(lemma).length), entry);
-    incrementEntry(initialLetters, Array.from(lemma.trim())[0] || "", entry);
-    Array.from(lemma.replace(/\s+/g, "")).forEach((char) => incrementEntry(characters, char, entry));
-    Array.from(lemma.replace(/\s+/g, "")).forEach((char, index, chars) => {
-      if (index < chars.length - 1) {
-        incrementEntry(bigrams, `${char}${chars[index + 1]}`, entry);
-      }
-    });
-  });
-
-  return {
-    initialLetters: topEntryMapItems(initialLetters, 14, "advancedFilterInitialLetter"),
-    allInitialLetters: topEntryMapItems(initialLetters, Number.MAX_SAFE_INTEGER, "advancedFilterInitialLetter"),
-    wordLengths: numericEntryMapItems(wordLengths, "advancedFilterWordLength"),
-    allWordLengths: numericEntryMapItems(wordLengths, "advancedFilterWordLength"),
-    characters: frequencyEntryMapItems(characters, 16, "advancedFilterOrthographicCharacter"),
-    allCharacters: frequencyEntryMapItems(characters, Number.MAX_SAFE_INTEGER, "advancedFilterOrthographicCharacter"),
-    bigrams: frequencyEntryMapItems(bigrams, 16, "advancedFilterOrthographicBigram"),
-    allBigrams: frequencyEntryMapItems(bigrams, Number.MAX_SAFE_INTEGER, "advancedFilterOrthographicBigram"),
-  };
-}
-
 function analysisMetricCard(label, value, note = "", action = null) {
   const attrs = analysisActionAttributes(action);
   return `<article class="analysis-metric"${attrs}><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></article>`;
@@ -11188,103 +11211,6 @@ function analysisActionAttributes(action) {
     return ` data-advanced-filter-id="${escapeHtml(id)}"`;
   }
   return "";
-}
-
-function increment(map, key, amount = 1) {
-  const label = String(key || aText("未命名", "Untitled"));
-  map.set(label, (map.get(label) || 0) + amount);
-}
-
-function incrementEntry(map, key, entry, amount = 1) {
-  const label = String(key || aText("未命名", "Untitled"));
-  if (!map.has(label)) {
-    map.set(label, { occurrenceCount: 0, entryIds: new Set() });
-  }
-  const item = map.get(label);
-  item.occurrenceCount += amount;
-  if (entry?.id) {
-    item.entryIds.add(entry.id);
-  }
-}
-
-function mapPush(map, key, value) {
-  if (!map.has(key)) {
-    map.set(key, []);
-  }
-  map.get(key).push(value);
-}
-
-function topMapItems(map, limit = 12) {
-  return [...map.entries()]
-    .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0]), "zh-CN"))
-    .slice(0, limit);
-}
-
-function advancedFilterMapValue(label) {
-  return { label: String(label), valueKey: "" };
-}
-
-function topEntryMapItems(map, limit = 12, labelKey = "") {
-  return [...map.entries()]
-    .sort((a, b) => (
-      b[1].occurrenceCount - a[1].occurrenceCount
-      || advancedFilterMapValue(a[0]).label.localeCompare(advancedFilterMapValue(b[0]).label, "zh-CN")
-    ))
-    .slice(0, limit)
-    .map(([rawLabel, item]) => {
-      const { label, valueKey } = advancedFilterMapValue(rawLabel);
-      return [
-        label,
-        item.occurrenceCount,
-        advancedFilterAction(
-          advancedFilterValueTitleDescriptor(labelKey, label, { valueKey }),
-          [...item.entryIds],
-        ),
-      ];
-    });
-}
-
-function frequencyEntryMapItems(map, limit = 12, labelKey = "") {
-  return [...map.entries()]
-    .sort((a, b) => (
-      b[1].occurrenceCount - a[1].occurrenceCount
-      || advancedFilterMapValue(a[0]).label.localeCompare(advancedFilterMapValue(b[0]).label, "zh-CN")
-    ))
-    .slice(0, limit)
-    .map(([rawLabel, item]) => {
-      const { label, valueKey } = advancedFilterMapValue(rawLabel);
-      const entryCount = item.entryIds.size;
-      return {
-        label,
-        value: item.occurrenceCount,
-        valueText: `${item.occurrenceCount} / ${entryCount}`,
-        action: advancedFilterAction(
-          advancedFilterValueTitleDescriptor(labelKey, label, { valueKey }),
-          [...item.entryIds],
-        ),
-      };
-    });
-}
-
-function numericMapItems(map) {
-  return [...map.entries()].sort((a, b) => Number(a[0]) - Number(b[0]));
-}
-
-function numericEntryMapItems(map, labelKey = "") {
-  return [...map.entries()]
-    .sort((a, b) => Number(a[0]) - Number(b[0]))
-    .map(([label, item]) => [
-      label,
-      item.occurrenceCount,
-      advancedFilterAction(
-        advancedFilterValueTitleDescriptor(labelKey, label),
-        [...item.entryIds],
-      ),
-    ]);
-}
-
-function numericDateItems(map) {
-  return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
 
 function renderMorphologyDisplay(entry, showEmptySections = false) {
@@ -15933,6 +15859,12 @@ elements.analysisPanel.addEventListener("click", (event) => {
   const tagsRetryButton = event.target.closest("[data-analysis-tags-retry]");
   if (tagsRetryButton) {
     void loadAnalysisTags(activeDictionary(), { force: true });
+    renderAnalysis(activeDictionary());
+    return;
+  }
+  const orthographyRetryButton = event.target.closest("[data-analysis-orthography-retry]");
+  if (orthographyRetryButton) {
+    void loadAnalysisOrthography(activeDictionary(), { force: true });
     renderAnalysis(activeDictionary());
     return;
   }

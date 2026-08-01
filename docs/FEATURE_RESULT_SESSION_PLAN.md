@@ -328,7 +328,7 @@ F4b-1 默认在请求内同步构建，记录冷/热耗时、扫描词条数、�
 - 构建每 128 项让出事件循环。10k/30k 临时 SQLite 基准中冷构建约 50/130 ms，热桶约 2 ms，仍不需要后台 job 状态。
 - IPA 分布与音位分析页已改为按需异步消费同一份 summary，具有加载、失败和重试状态；切换分布/音位子页复用按词典版本与 IPA 解析配置识别的前端请求状态。
 - 音素单元、首音、尾音和音节数统计桶已使用 `{ category, value }` action 进入 feature query/location；词条列表继续叠加当前运行期搜索字段/fuzzy、排序和窗口，不保存完整匹配 ID。
-- `analysis-model` 不再声明本地 IPA slice，前端旧 `analyzeIpa()`、固定 ID action 和相关本地分析计算已经删除。
+- 旧 `analysis-model` 中的本地 IPA slice、前端 `analyzeIpa()`、固定 ID action 和相关本地分析计算已经删除；该模块随后也随正写法迁移完成而整体移除。
 
 ### F4b-3：形态分配与覆写分析（已完成）
 

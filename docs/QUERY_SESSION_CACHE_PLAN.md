@@ -317,8 +317,8 @@ query kind
 
 请求失败仍直接进入现有错误状态并报告错误，不重试、不回滚，也不把旧内容冒充为成功结果。SWR 只负责请求进行中的视觉连续性；成功响应提交新内容后立即清除更新状态，后续继续处理局部渲染与共享关系读取。
 
-### Q5：剩余查询消费者（部分完成）
+### Q5：剩余查询消费者（分析部分已完成）
 
 - 高级筛选 F1–F3 已完成共享 filter descriptor、统一 EntryQuery 身份、稳定条件 SQL 编译和前端状态迁移；查询型筛选复用 `/entries` 窗口、缓存、定位、排序与搜索，不再保存匹配 ID 数组。
-- 数据分析总览的 `entryCount`、`coverageBreakdown`、`partDistribution` 和 `activityPreview` 已通过同步 `/analysis/query` 与最小 planner 按需读取；前端异步加载并按 generation/cacheKey 识别结果。F4b-1 已完成 IPA 自动生成比较的可重建会话、异步分析页和高级筛选窗口；F4b-2 已完成独立 IPA 分布会话、共享异步 summary 以及音素/首尾音/音节数高级筛选，10k/30k 基准仍不要求后台状态。F4b-3 已实现形态分配、模式、模板组和 active/inactive override 的后端 source；下一步迁移旧形态分析前端，再由 F5 接入独立质量 API。词根排行和确定性统计分别走 topology 与 summary/facet，不进入 feature session。
+- 数据分析的轻量 widgets 已通过同步 `/analysis/query` 与最小 planner 按需读取；正写法页使用 `orthographyDistribution` 和普通结构筛选，不再保留前端 analysis slice。F4b-1 至 F4b-3 已完成 IPA 自动比较、IPA 分布以及形态分配/覆写的可重建会话、异步分析页和高级筛选窗口，现有基准仍不要求后台状态。词根排行和确定性统计分别走 topology 与 summary/facet，不进入 feature session；下一步由 F5 接入独立质量 API。
 - 语料库在独立升级阶段建立块/单元读取与 changeset；不把 corpus blob 扫描塞进 entries 会话。

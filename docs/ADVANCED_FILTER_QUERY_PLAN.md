@@ -179,7 +179,7 @@ Feature result source 应由对应 service 产生可重建的查询身份，并�
 
 ## 9. F0 验收结果
 
-- 已覆盖所有 `advancedFilterAction()` 直接调用及 `topEntryMapItems()`、`numericEntryMapItems()`、`numericDateEntryItems()` 生成的间接入口。
+- F0 曾覆盖所有本地分析 action 入口；正写法统计迁移后，其词长、首字符、字符和双字符入口已改为结构化 `orthography` filter，不再依赖本地 `entryIds` 聚合 helper。
 - 已区分标准词性筛选、普通高级筛选、功能结果集和非筛选导航。
 - 已记录标签组合、备注范围、Unicode 词形统计和新形态语义等不能静默决定的问题。
 - 已确定 F1 不引入 SQLite schema 变更、不引入通用布尔 DSL、不保留新的前端 ID 兜底。

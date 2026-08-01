@@ -29,6 +29,7 @@ function checkLegacyTransportNormalization() {
       presence: [],
       sourceCount: null,
       activityDays: [],
+      orthography: null,
     },
     search: {
       text: "root",
@@ -56,6 +57,7 @@ function checkCanonicalFilterNormalization() {
       { field: "updated", day: "2026-07-17" },
       { field: "created", day: "2026-07-16" },
     ],
+    orthography: { category: "bigram", value: "ab" },
   });
   assert.deepEqual(filter, {
     part: "v",
@@ -69,6 +71,7 @@ function checkCanonicalFilterNormalization() {
       { field: "created", day: "2026-07-16" },
       { field: "updated", day: "2026-07-17" },
     ],
+    orthography: { category: "bigram", value: "ab" },
   });
   assert.deepEqual(
     normalizeEntryQuery({ filter: serializeEntryFilter(filter) }).filter,
@@ -113,6 +116,10 @@ function checkStableIdentity() {
     filter: { tags: { values: ["root", "n"], mode: "exact" } },
   });
   assert.notDeepEqual(entryQueryIdentity(allTags), entryQueryIdentity(exactTags));
+
+  const characterA = normalizeEntryQuery({ filter: { orthography: { category: "character", value: "a" } } });
+  const bigramA = normalizeEntryQuery({ filter: { orthography: { category: "bigram", value: "aa" } } });
+  assert.notDeepEqual(entryQueryIdentity(characterA), entryQueryIdentity(bigramA));
 }
 
 function checkValidation() {
@@ -153,6 +160,10 @@ function checkValidation() {
     () => normalizeEntryQuery({ filter: "{}", part: "n" }),
     (error) => error instanceof EntryQueryValidationError && error.code === "conflicting_entry_filter_transport",
   );
+  assert.throws(
+    () => normalizeEntryFilter({ orthography: { category: "bigram", value: "a b" } }),
+    (error) => error instanceof EntryQueryValidationError && error.code === "invalid_entry_filter_orthography",
+  );
 }
 
 function checkFilterFactsNormalization() {
@@ -172,6 +183,7 @@ function checkFilterFactsNormalization() {
           presence: [{ field: "ipa", present: false }],
           sourceCount: null,
           activityDays: [],
+          orthography: null,
         },
       }],
     },

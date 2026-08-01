@@ -236,6 +236,7 @@ async function checkAnalysisQueryContract(repository) {
         { id: "entries", type: "entryCount" },
         { id: "lexicon", type: "lexiconSummary" },
         { id: "coverage", type: "coverageBreakdown" },
+        { id: "orthography", type: "orthographyDistribution" },
         { id: "parts", type: "partDistribution", limit: 8 },
         { id: "tags", type: "tagFrequency" },
         { id: "activity", type: "activityPreview", limit: 2 },
@@ -253,6 +254,7 @@ async function checkAnalysisQueryContract(repository) {
     assert.equal(result.body.dictionaryId, dictionary.id);
     assert.deepEqual(result.body.diagnostics.computedTasks, [
       "entryStats",
+      "orthographyStats",
       "partStats",
       "tagStats",
       "activityStats",
@@ -271,16 +273,45 @@ async function checkAnalysisQueryContract(repository) {
 
     const coverage = Object.fromEntries(result.body.widgets.coverage.rows.map((row) => [row.field, row]));
     assert.equal(result.body.widgets.coverage.entryTotal, 4);
+    assert.deepEqual(result.body.widgets.coverage.rows.map((row) => row.field), [
+      "definition",
+      "example",
+      "entryNote",
+      "ipa",
+    ]);
     assert.equal(coverage.definition.coveredEntryCount, 2);
     assert.equal(coverage.definition.itemCount, 2);
     assert.equal(coverage.example.coveredEntryCount, 1);
     assert.equal(coverage.entryNote.coveredEntryCount, 1);
-    assert.equal(coverage.source.coveredEntryCount, 1);
     assert.equal(coverage.ipa.coveredEntryCount, 1);
     assert.equal(coverage.ipa.missingEntryCount, 3);
     assert.equal(coverage.ipa.action.resultCount, 1);
     assert.equal(coverage.ipa.missingAction.resultCount, 3);
     assert.deepEqual(coverage.ipa.missingAction.filter, { presence: [{ field: "ipa", present: false }] });
+
+    const orthography = result.body.widgets.orthography;
+    assert.equal(orthography.lemmaEntryCount, 4);
+    assert.deepEqual(
+      orthography.wordLengths.map((row) => [row.value, row.entryCount]),
+      [["4", 1], ["5", 3]],
+    );
+    assert.equal(orthography.characters.find((row) => row.value === "a").occurrenceCount, 6);
+    assert.equal(orthography.characters.find((row) => row.value === "a").entryCount, 4);
+    const taBigram = orthography.bigrams.find((row) => row.value === "ta");
+    assert.equal(taBigram.occurrenceCount, 2);
+    assert.equal(taBigram.entryCount, 2);
+    assert.deepEqual(taBigram.action.filter, {
+      orthography: { category: "bigram", value: "ta" },
+    });
+
+    const orthographyFilterResult = await callApi(
+      repository,
+      "GET",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries?filter=${encodeURIComponent(JSON.stringify(taBigram.action.filter))}`,
+    );
+    assert.equal(orthographyFilterResult.statusCode, 200);
+    assert.equal(orthographyFilterResult.body.pageInfo.total, 2);
+    assert.deepEqual(orthographyFilterResult.body.items.map((entry) => entry.lemma), ["beta", "delta"]);
 
     const parts = Object.fromEntries(result.body.widgets.parts.rows.map((row) => [row.part, row]));
     assert.equal(parts.n.entryCount, 2);
