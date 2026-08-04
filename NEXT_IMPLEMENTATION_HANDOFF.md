@@ -542,6 +542,7 @@ lib/
    - 形态学结构化存储与 F4b-3 数据分析迁移已完成；DSL v2、表格结构编辑与 layout 设计暂缓，除明确 bug 外不要继续扩展其 schema。
    - F4 已完成。词典级活跃标签身份快照已复用 `entry_tags` 聚合与现有 generation 失效，不新增 SQLite schema；`/facets`、词性/其他标签/标签集合 widgets、词条列表/详情、词性菜单和高级筛选标题现在消费统一的显示碰撞标记。自动补全、标签管理影响预览和疑似重复诊断仍是后续消费者，不属于本次快照基础接线。最终浏览器验收覆盖中英文、明暗主题、320/480/768/1024/1440px、长标签、全部分析子页以及标签集合和词根家族的筛选跳转，未发现横向溢出、卡片重叠、滞留加载状态或控制台错误。下一步进入 F5 质量检查 API，不得把 feature result 伪装成 repository 普通 predicate，也不得为已有 topology/summary 能力重复建会话。
    - 筛选统一化第一阶段已完成：原词性下拉移入列表控制栏的统一“筛选”面板，词性以标准 `EntryFilter.part` 与其他 EntryFilter、feature result 和旧本地质量结果共用唯一 `activeFilter`、当前筛选状态栏及循环/重试/清除控件；独立 `activePart`、专用词性 action/监听和进入筛选前的视图快照已删除。清除或替换筛选保留当前搜索和排序，词性也复用普通查询窗口、缓存身份和定位；旧本地质量结果临时在已有 ID 集合上与当前搜索求交。下一步可扩展稳定条件草稿并把 `activeFilter` 内部明确区分为 entry/feature/legacy-quality；F5 只需替换旧质量结果 adapter，不重做这套 UI。
+   - S0 样式解耦已完成前两步：`theme-tokens.css` 独立承载语义颜色、材质角色和圆角契约，`styles.css` 保留布局与组件规则；文字、边框、强调/警告/危险状态和焦点环已迁入 `--ui-*`，对应旧 token 与别名已删除。剩余 `--bg`、`--surface*` 和 `--shadow` 只服务背景/阴影迁移。明暗主题关键计算样式持续与 S0 前基线逐项一致；下一步按 panel/control/inset/floating/sticky/navigation/tooltip/overlay 迁移材质，再删除组件级暗色分支、主题硬编码和剩余别名。具体契约见 `docs/STYLE_SKIN_PLAN.md`。
    - 评估语料库是否先拆为块/单元级 changeset，再决定何时 SQL 分表。
 5. 旧 JSON 词典当前通过词典管理界面的 JSON 导入功能手动迁入 SQLite；不要在未设计备份、报告和回滚前加入启动时自动迁移。
 6. 增量保存稳定后，再基于目标对象的 `updatedAt` 做轻量冲突检查；短期不引入词典级 revision。
