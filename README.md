@@ -16,7 +16,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - Explicit part-of-speech tags: only tags listed in the dictionary settings are treated as parts of speech for display and filtering; an empty list means the dictionary does not use parts of speech.
 - Display mode and edit mode: saved entries open in a clean reading view, with full editing and inline section editing available.
 - Responsive application shell with collapsible tool navigation, a collapsible entry list, and mobile drawer controls for navigation, entry browsing, and creating entries.
-- Advanced filtering from analytics and quality checks: click analytic rows or quality categories to filter the entry browser, with reversible filter variants for coverage, IPA, morphology, and quality issues. IPA auto-check and distribution filters use rebuildable server result sessions and retain the normal list search, sort, window, and location behavior. The runtime search-field panel shows exact unique matching-entry counts for each enabled field without issuing a separate statistics request.
+- Unified entry filtering: the list toolbar edits part-of-speech conditions, while analytics and quality checks replace the same current filter with structural or result-set conditions. Part-of-speech uses the standard EntryFilter query path, and coverage, IPA, morphology, and quality filters share one status bar with reversible variants where applicable. IPA auto-check and distribution filters use rebuildable server result sessions and retain the normal list search, sort, window, and location behavior. The runtime search-field panel shows exact unique matching-entry counts for each enabled field without issuing a separate statistics request.
 - Root mode entry browsing: derived entries can be nested under their roots, with expand/collapse controls and quick derived-entry creation.
 - Layered SVG lexical network for source and derived relationships, with keyed node refocusing, animated edges, hover details, and responsive horizontal/vertical layouts.
 - Auto IPA rules with mapping, syllabification, onset/coda clusters, complex phonemes, stress settings, sandbox testing, and batch generation.
@@ -35,7 +35,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - 显式词性标签：只有词典设置中列出的标签会被识别为词性，使一个词条可以拥有多个词性并用于显示和筛选；列表留空表示该词典不使用词性。
 - 查看模式与编辑模式：保存后的词条会进入整洁的阅读界面，也支持完整编辑和栏目局部编辑。
 - 响应式应用外壳：支持可收起工具导航、可收起词条列表，以及移动端用于导航、浏览词条和新建词条的抽屉控件。
-- 数据分析与质量检查高级筛选：点击统计行或质量类别可以筛选词条列表，并支持释义覆盖、IPA、形态学、质量问题等项目的筛选条件切换；标签、字段有无、来源数量和日期等稳定条件可继续叠加自由文本搜索，并复用普通词条列表的窗口加载与定位。IPA 自动检查以及音位、首尾音、音节数分布使用可重建的服务端结果会话，同样保留列表搜索、排序、窗口与定位行为。循环条件按候选摘要自动更新，不会因当前搜索暂时无命中而错误隐藏；列表的运行期搜索字段面板会显示每个已启用字段的准确唯一命中词条数，不另发统计请求。
+- 统一词条筛选：列表控制栏通过同一个“筛选”入口选择词性，数据分析与质量检查产生的条件或结果集也使用同一当前筛选状态栏；清除或替换筛选不会恢复旧搜索、排序或视图快照。标签、字段有无、来源数量和日期等稳定条件可继续叠加自由文本搜索，并复用普通词条列表的窗口加载与定位。IPA 自动检查以及音位、首尾音、音节数分布使用可重建的服务端结果会话，同样保留列表搜索、排序、窗口与定位行为。循环条件按候选摘要自动更新，不会因当前搜索暂时无命中而错误隐藏；列表的运行期搜索字段面板会显示每个已启用字段的准确唯一命中词条数，不另发统计请求。
 - 词根模式浏览：衍生词可以嵌套显示在词根下方，支持单组展开/收起、全局展开、全局模式下的单组收起例外，以及快速创建衍生词；父级窗口淘汰只释放数据，不丢失展开意图。
 - 词汇网络：以分层 SVG 展示来源、当前焦点与衍生关系；关联节点会在切换焦点时连续移动并更新连线，同时支持悬浮信息、键盘操作和窄屏纵向布局。
 - 自动 IPA：支持映射、音节划分、音节首/尾辅音簇、复杂音位、重音设置、沙盒测试和批量生成。

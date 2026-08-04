@@ -58,7 +58,7 @@ F0 清点确认，现有入口必须分成三类：
 | 当前入口 | 当前语义 | 目标 | 备注 |
 | --- | --- | --- | --- |
 | 自由文本搜索 | `q + fields + fuzzyFields` | 保留为 `search` | 已接 `/entries`、projection、查询会话和定位 API，不属于高级 filter。 |
-| 词性、无词性 | 只有当前词典显式配置的词性标签会被识别；配置为空时全部词条均为无词性 | `part` filter | 已有 SQLite 查询；应从独立 `activePart` 状态并入统一 EntryQuery。 |
+| 词性、无词性 | 只有当前词典显式配置的词性标签会被识别；配置为空时全部词条均为无词性 | `part` filter | 已并入统一 EntryQuery 和唯一当前筛选状态，不再保留独立 `activePart`。 |
 | 单标签 | 词条包含指定原始标签 | `tag` filter | 已有 SQLite `entry_tags` 查询；descriptor 必须保存原始标签，不能保存显示替换，也不应沿用自由文本模糊规范化。 |
 | 有/无释义 | 至少一条非空 `definition.meaning` | `presence(definition)` | 可直接查询 `definitions`。 |
 | 有/无例句 | 至少一条非空 `definition.example` | `presence(example)` | 当前例句仍存于 definition；未来语料链接升级时由 query 层保持语义。 |
@@ -79,7 +79,7 @@ F0 清点确认，现有入口必须分成三类：
 
 | 当前入口 | 当前算法 | 阻断点 | 暂定归属 |
 | --- | --- | --- | --- |
-| 标签集合 | 按无序完整原始标签集合聚合；单标签集合表示词条仅有该标签 | 显示替换不参与身份，碰撞只由展示层消歧 | 已接 `tagSetDistribution`；action 使用 `tags.mode: "exact"` 排除超集。 |
+| 标签集合 | 按无序完整原始标签集合聚合；单标签集合表示词条仅有该标签 | 显示替换不参与身份，碰撞只由展示层消歧；无标签作为独立状态而非空集合排行项 | 已接 `tagSetDistribution`；非空集合 action 使用 `tags.mode: "exact"`，有/无标签使用 `presence.tag`，多标签使用 `tagCount.min: 2`。 |
 | 词长 | `Array.from(lemma).length` | 保持 Unicode code point 语义 | 已接 `orthographyDistribution` 与普通 `orthography.length` filter。 |
 | 首字符 | `Array.from(lemma.trim())[0]` | 共享模型固定 JS trim 与 code point 语义 | 已接 `orthography.initial` filter。 |
 | 正写法字符 | 按 Unicode 空白切分后统计非空白 code point | 同时区分出现次数和贡献词条数 | 已接 `orthography.character` filter，筛选结果按唯一词条计算。 |
@@ -175,7 +175,7 @@ Feature result source 应由对应 service 产生可重建的查询身份，并�
 
 - `/quality/query` 返回问题摘要、问题详情和 quality result source，并只复用 F4b 的内部会话/cache/cursor 原语，不与分析 API 混成一种 endpoint。
 - 暂缓的 Gloss 在例句/语料链接边界明确后接入对应 feature service；质量结果只进入独立 QualityService，不让 analysis planner、repository 和质量算法互相反向调用。
-- 删除剩余 `advancedFilter.entryIds`、本地质量结果筛选和分析结果 ID 数组桥接。
+- 删除剩余 `activeFilter.entryIds` 本地质量结果筛选和分析结果 ID 数组桥接。
 
 ## 9. F0 验收结果
 
@@ -208,5 +208,12 @@ Feature result source 应由对应 service 产生可重建的查询身份，并�
 
 - F4a 与 F4b-0 至 F4b-3 的核心迁移已经完成：轻量 widgets、IPA 自动比较、IPA 分布、形态分配/覆写、正写法、标签集合、完整活动日期和词根家族均已接线。
 - 数据分析不再保留本地 analysis slice 或固定匹配 ID；稳定条件进入普通 EntryFilter，功能结果进入可重建 source/view，会话之外的词根排行消费稳定 topology。
-- F4 正式收尾前仍需让总览与详情共同消费词典级活跃标签身份快照，消除显示替换碰撞的作用域差异，并在本地服务可用时完成中英文、主题和窄屏浏览器验收。
+- 词典级活跃标签身份快照已由 `/facets` 提供，并由总览、标签详情、标签集合、词条列表/详情、词性菜单和高级筛选标题共同消费；显示替换碰撞不再由各 widget 的局部结果自行推断。
+- F4 浏览器验收已完成：覆盖中英文、明暗主题、320/480/768/1024/1440px、长标签、全部分析子页，以及标签集合和词根家族的筛选跳转；未发现横向溢出、卡片重叠、滞留加载状态或控制台错误。
 - Gloss 与质量检查不属于未完成的 F4 分析迁移：Gloss 等待例句/语料链接边界，质量检查进入 F5 `/quality/query`。
+
+## 14. 筛选统一化
+
+- 第一阶段的可见外壳已完成：列表控制栏以统一“筛选”按钮打开筛选面板，原词性下拉作为首个可编辑条件移入面板；词性、EntryFilter、feature result 和旧本地质量结果共用同一当前筛选状态栏，不再向用户区分“词性筛选”和“高级筛选”。
+- 当前筛选状态栏只显示一个筛选上下文；循环只用于已有变体，刷新只在失败时作为重试，清除使用图标按钮且不恢复进入筛选前的搜索、排序或根模式快照。筛选替换与清除均保留当前搜索，旧本地质量结果在 F5 前临时对已有 ID 集合执行相同前端搜索交集。
+- 第一阶段没有伪造跨 source 求交：面板目前只编辑词性，普通 EntryFilter、feature result 与旧质量结果仍整体替换当前筛选。词性已迁入 `EntryFilter.part`，运行期只保留唯一 `activeFilter`；下一步扩展稳定条件草稿，并把该状态明确区分为 entry/feature/legacy-quality 类型。

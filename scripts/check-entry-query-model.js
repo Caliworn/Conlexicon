@@ -28,6 +28,7 @@ function checkLegacyTransportNormalization() {
       tags: { values: ["motion", "n"], mode: "all" },
       presence: [],
       sourceCount: null,
+      tagCount: null,
       activityDays: [],
       orthography: null,
     },
@@ -51,8 +52,9 @@ function checkCanonicalFilterNormalization() {
   const filter = normalizeEntryFilter({
     part: "v",
     tags: { values: ["motion", "derived", "motion"], mode: "any" },
-    presence: { definition: true, ipa: false },
+    presence: { definition: true, ipa: false, tag: false },
     sourceCount: { min: 2, max: 4 },
+    tagCount: { min: 2, max: 3 },
     activityDays: [
       { field: "updated", day: "2026-07-17" },
       { field: "created", day: "2026-07-16" },
@@ -65,8 +67,10 @@ function checkCanonicalFilterNormalization() {
     presence: [
       { field: "definition", present: true },
       { field: "ipa", present: false },
+      { field: "tag", present: false },
     ],
     sourceCount: { min: 2, max: 4 },
+    tagCount: { min: 2, max: 3 },
     activityDays: [
       { field: "created", day: "2026-07-16" },
       { field: "updated", day: "2026-07-17" },
@@ -137,6 +141,10 @@ function checkValidation() {
     (error) => error instanceof EntryQueryValidationError && error.code === "invalid_entry_filter_source_count",
   );
   assert.throws(
+    () => normalizeEntryFilter({ tagCount: { min: 3, max: 2 } }),
+    (error) => error instanceof EntryQueryValidationError && error.code === "invalid_entry_filter_tag_count",
+  );
+  assert.throws(
     () => normalizeEntryQuery({ windowOffset: "not-a-number" }),
     (error) => error instanceof EntryQueryValidationError && error.code === "invalid_query_window_offset",
   );
@@ -182,6 +190,7 @@ function checkFilterFactsNormalization() {
           tags: { values: [], mode: "any" },
           presence: [{ field: "ipa", present: false }],
           sourceCount: null,
+          tagCount: null,
           activityDays: [],
           orthography: null,
         },

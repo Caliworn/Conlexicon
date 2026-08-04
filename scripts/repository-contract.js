@@ -473,9 +473,45 @@ async function checkTagSetAnalysisContract(repository) {
       { id: "tag-set-d", lemma: "d", tags: ["n", "alias"] },
       { id: "tag-set-e", lemma: "e", tags: ["v"] },
       { id: "tag-set-f", lemma: "f", tags: ["v", "extra"] },
+      { id: "tag-set-g", lemma: "g", tags: [] },
     ],
   }));
   try {
+    const facets = await repository.getEntryFacets(dictionary.id);
+    assert.equal(Number.isSafeInteger(facets.generation), true);
+    assert.deepEqual(facets.collisionGroups, [{
+      displayLabel: "Shared",
+      values: ["alias", "topic"],
+    }]);
+    assert.deepEqual(
+      facets.identities.map((identity) => [
+        identity.value,
+        identity.entryCount,
+        identity.isPartOfSpeech,
+        identity.displayAmbiguous,
+      ]),
+      [
+        ["alias", 1, false, true],
+        ["extra", 2, false, false],
+        ["n", 4, true, false],
+        ["topic", 3, false, true],
+        ["v", 2, true, false],
+      ],
+    );
+    assert.equal(facets.parts.find((part) => part.tag === "n")?.displayAmbiguous, false);
+    assert.equal(facets.tags.find((tag) => tag.tag === "topic")?.displayAmbiguous, true);
+
+    const distributions = await repository.queryAnalysis(dictionary.id, {
+      widgets: [
+        { id: "parts", type: "partDistribution" },
+        { id: "tags", type: "tagFrequency" },
+      ],
+    });
+    assert.deepEqual(distributions.diagnostics.computedTasks, ["partStats", "tagStats"]);
+    assert.equal(distributions.widgets.parts.rows.find((row) => row.part === "n")?.displayAmbiguous, false);
+    assert.equal(distributions.widgets.tags.rows.find((row) => row.tag === "topic")?.displayAmbiguous, true);
+    assert.equal(distributions.widgets.tags.rows.find((row) => row.tag === "alias")?.displayAmbiguous, true);
+
     const response = await repository.queryAnalysis(dictionary.id, {
       widgets: [{ id: "sets", type: "tagSetDistribution" }],
     });
@@ -484,6 +520,7 @@ async function checkTagSetAnalysisContract(repository) {
     assert.equal(widget.type, "tagSetDistribution");
     assert.equal(widget.tagSetCount, 5);
     assert.equal(widget.taggedEntryCount, 6);
+    assert.equal(widget.untaggedEntryCount, 1);
     assert.equal(widget.multiTagEntryCount, 5);
     assert.equal(widget.rows.length, 5);
     assert.ok(
@@ -498,6 +535,7 @@ async function checkTagSetAnalysisContract(repository) {
     assert.deepEqual(topicSet.tags.map((tag) => tag.value), ["n", "topic"]);
     assert.equal(topicSet.tags[0].isPartOfSpeech, true);
     assert.equal(topicSet.tags[1].displayLabel, "Shared");
+    assert.equal(topicSet.tags[1].displayAmbiguous, true);
     assert.equal(topicSet.action.resultCount, 2);
     assert.deepEqual(topicSet.action.filter, {
       tags: { values: ["n", "topic"], mode: "exact" },
@@ -506,6 +544,28 @@ async function checkTagSetAnalysisContract(repository) {
       widget.rows.some((row) => row.tags.some((tag) => tag.value === "alias")),
       "raw tags with the same display label must remain distinct",
     );
+    assert.equal(widget.untaggedAction.resultCount, 1);
+    assert.equal(widget.taggedAction.resultCount, 6);
+    assert.deepEqual(widget.taggedAction.filter, {
+      presence: [{ field: "tag", present: true }],
+    });
+    assert.deepEqual(widget.untaggedAction.filter, {
+      presence: [{ field: "tag", present: false }],
+    });
+    assert.equal(widget.multiTagAction.resultCount, 5);
+    assert.deepEqual(widget.multiTagAction.filter, { tagCount: { min: 2 } });
+    const taggedMatches = await repository.queryEntries(dictionary.id, {
+      filter: widget.taggedAction.filter,
+    });
+    assert.equal(taggedMatches.pageInfo.total, 6);
+    const untaggedMatches = await repository.queryEntries(dictionary.id, {
+      filter: widget.untaggedAction.filter,
+    });
+    assert.deepEqual(untaggedMatches.items.map((entry) => entry.id), ["tag-set-g"]);
+    const multiTagMatches = await repository.queryEntries(dictionary.id, {
+      filter: widget.multiTagAction.filter,
+    });
+    assert.equal(multiTagMatches.pageInfo.total, 5);
 
     const allMatches = await repository.queryEntries(dictionary.id, {
       filter: { tags: { values: ["n", "topic"], mode: "all" } },
@@ -531,8 +591,21 @@ async function checkTagSetAnalysisContract(repository) {
     });
     assert.equal(limited.widgets.sets.tagSetCount, 5);
     assert.equal(limited.widgets.sets.taggedEntryCount, 6);
+    assert.equal(limited.widgets.sets.untaggedEntryCount, 1);
     assert.equal(limited.widgets.sets.rows.length, 1);
     assert.equal(limited.widgets.sets.rows[0].action, undefined);
+    assert.equal(limited.widgets.sets.taggedAction, undefined);
+    assert.equal(limited.widgets.sets.untaggedAction, undefined);
+    assert.equal(limited.widgets.sets.multiTagAction, undefined);
+
+    const aliasEntry = await repository.getEntry(dictionary.id, "tag-set-d");
+    await repository.saveEntry(dictionary.id, { ...aliasEntry, tags: ["n", "new-tag"] });
+    const refreshedFacets = await repository.getEntryFacets(dictionary.id);
+    assert.equal(refreshedFacets.generation, facets.generation + 1);
+    assert.equal(refreshedFacets.identities.some((identity) => identity.value === "alias"), false);
+    assert.equal(refreshedFacets.identities.find((identity) => identity.value === "topic")?.displayAmbiguous, false);
+    assert.equal(refreshedFacets.identities.find((identity) => identity.value === "new-tag")?.entryCount, 1);
+    assert.deepEqual(refreshedFacets.collisionGroups, []);
   } finally {
     await repository.deleteDictionary(dictionary.id);
   }
@@ -1674,6 +1747,18 @@ async function checkReadApiConsistency(repository) {
       dictionary.id,
       { presence: { ipa: false } },
       ["entry-delta", "entry-empty", "entry-same-a", "entry-same-b"],
+    );
+    await assertStructuredEntryFilter(
+      repository,
+      dictionary.id,
+      { presence: { tag: false } },
+      ["entry-delta", "entry-empty"],
+    );
+    await assertStructuredEntryFilter(
+      repository,
+      dictionary.id,
+      { tagCount: { min: 2 } },
+      ["entry-alpha", "entry-beta"],
     );
     await assertStructuredEntryFilter(
       repository,

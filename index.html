@@ -167,9 +167,27 @@
                     <button class="secondary-button entry-search-default-button" id="entrySearchDefaultButton" type="button" data-i18n="restoreSearchDefaults">恢复词典默认值</button>
                   </div>
                 </div>
-                <select id="partFilter" data-i18n-aria-label="partFilterLabel" aria-label="词性筛选">
-                  <option value="" data-i18n="allParts">全部词性</option>
-                </select>
+                <div class="entry-filter-control" id="entryFilterControl">
+                  <button class="secondary-button entry-filter-button" id="entryFilterButton" type="button" aria-controls="entryFilterMenu" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="filterEntries" aria-label="筛选词条">
+                    <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M4 5h16l-6 7v5l-4 2v-7L4 5z"></path>
+                    </svg>
+                  </button>
+                  <div class="entry-filter-menu" id="entryFilterMenu" role="dialog" data-i18n-aria-label="filterEntries" aria-label="筛选词条" hidden>
+                    <label class="entry-filter-field">
+                      <span data-i18n="activeFilterPartOfSpeech">词性</span>
+                      <select id="partFilter" data-i18n-aria-label="partFilterLabel" aria-label="词性条件">
+                        <option value="" data-i18n="filterAny">不限</option>
+                      </select>
+                    </label>
+                    <div class="entry-filter-menu-actions">
+                      <button class="secondary-button" id="entryFilterResetButton" type="button" data-i18n="resetFilter">重置</button>
+                      <span></span>
+                      <button class="secondary-button" id="entryFilterCancelButton" type="button" data-i18n="cancel">取消</button>
+                      <button class="primary-button" id="entryFilterApplyButton" type="button" data-i18n="applyFilter">应用</button>
+                    </div>
+                  </div>
+                </div>
                 <select id="sortSelect" data-i18n-aria-label="entrySortLabel" aria-label="词条排序">
                   <option value="lemmaAsc" data-i18n="sortLemmaAsc">首字母正序</option>
                   <option value="lemmaDesc" data-i18n="sortLemmaDesc">首字母倒序</option>
@@ -187,21 +205,28 @@
                   <button class="secondary-button" id="rootModeToggleButton" type="button" data-i18n="rootMode">词根模式</button>
                   <button class="secondary-button" id="expandAllRootsButton" type="button" data-i18n="expandAll" hidden>全部展开</button>
                   <button class="secondary-button" id="collapseAllRootsButton" type="button" data-i18n="collapseAll" hidden>全部收起</button>
-                  <div class="advanced-filter-toolbar" id="advancedFilterToolbar" hidden>
-                    <span class="advanced-filter-label" id="advancedFilterLabel" data-app-tooltip="overflow" data-app-tooltip-wrap="true" tabindex="0"></span>
-                    <button class="secondary-button advanced-filter-icon-button" id="advancedFilterRefreshButton" type="button" data-app-tooltip="always" data-i18n-aria-label="refreshAdvancedFilter">
-                      <svg class="advanced-filter-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <div class="active-filter-toolbar filter-status-toolbar" id="activeFilterToolbar" hidden>
+                    <svg class="filter-status-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M4 5h16l-6 7v5l-4 2v-7L4 5z"></path>
+                    </svg>
+                    <span class="active-filter-label" id="activeFilterLabel" data-app-tooltip="overflow" data-app-tooltip-wrap="true" tabindex="0"></span>
+                    <button class="secondary-button active-filter-icon-button" id="activeFilterRefreshButton" type="button" data-app-tooltip="always" data-i18n-aria-label="refreshActiveFilter">
+                      <svg class="active-filter-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M20 6v5h-5"></path>
                         <path d="M19 11a7 7 0 1 0-2.05 4.95"></path>
                       </svg>
                     </button>
-                    <button class="secondary-button advanced-filter-icon-button" id="advancedFilterCycleButton" type="button" data-app-tooltip="always" data-i18n-aria-label="cycleAdvancedFilter" hidden>
-                      <svg class="advanced-filter-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <button class="secondary-button active-filter-icon-button" id="activeFilterCycleButton" type="button" data-app-tooltip="always" data-i18n-aria-label="cycleActiveFilter" hidden>
+                      <svg class="active-filter-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M8 7h11m0 0-3-3m3 3-3 3"></path>
                         <path d="M16 17H5m0 0 3 3m-3-3 3-3"></path>
                       </svg>
                     </button>
-                    <button class="secondary-button advanced-filter-exit-button" id="advancedFilterExitButton" type="button" data-i18n="exitAdvancedFilter">退出</button>
+                    <button class="secondary-button active-filter-icon-button filter-clear-button" id="activeFilterExitButton" type="button" data-app-tooltip="always" data-i18n-aria-label="clearFilter" aria-label="清除筛选">
+                      <svg class="active-filter-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6 6 18"></path>
+                      </svg>
+                    </button>
                   </div>
                 </div>
               </div>

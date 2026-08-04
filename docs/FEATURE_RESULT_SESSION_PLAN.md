@@ -178,7 +178,7 @@ items/location 视图的 `searchSummary` 在 feature 候选集合与当前搜索
 
 ```js
 {
-  type: "advanced-filter",
+  type: "active-filter",
   variants: [{
     resultSource: { type: "ipaAutoCompare", version: 1, options: {} },
     category: "looseMismatch",

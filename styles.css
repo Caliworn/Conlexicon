@@ -535,7 +535,7 @@ fieldset {
 
 .filter-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px;
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
   gap: 10px;
   margin-bottom: 0;
   padding-bottom: 12px;
@@ -605,6 +605,82 @@ fieldset {
 
 .entry-search-config-menu > strong {
   font-size: 0.9rem;
+}
+
+.entry-filter-control {
+  position: relative;
+  min-width: 0;
+}
+
+.secondary-button.entry-filter-button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  max-width: 40px;
+  min-height: 40px;
+  max-height: 40px;
+  padding: 0;
+  place-items: center;
+  background: var(--surface);
+}
+
+.secondary-button.entry-filter-button .nav-icon {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.secondary-button.entry-filter-button.active,
+.secondary-button.entry-filter-button[aria-expanded="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.entry-filter-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 12;
+  display: grid;
+  width: min(320px, calc(100vw - 36px));
+  max-height: min(520px, calc(100dvh - 96px));
+  gap: 14px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.entry-filter-field {
+  display: grid;
+  gap: 7px;
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.entry-filter-field select {
+  font-weight: 500;
+}
+
+.entry-filter-menu-actions {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.entry-filter-menu-actions button {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 0.76rem;
 }
 
 .entry-search-config-header,
@@ -741,9 +817,9 @@ fieldset {
   opacity: 0.45;
 }
 
-.advanced-filter-toolbar {
-  --advanced-filter-control-height: 34px;
-  --advanced-filter-control-font-size: 0.78rem;
+.active-filter-toolbar {
+  --active-filter-control-height: 34px;
+  --active-filter-control-font-size: 0.78rem;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -753,13 +829,24 @@ fieldset {
   flex-wrap: nowrap;
 }
 
-.advanced-filter-toolbar[hidden] {
+.active-filter-toolbar[hidden] {
   display: none !important;
 }
 
-.advanced-filter-toolbar .advanced-filter-label {
-  height: var(--advanced-filter-control-height);
-  min-height: var(--advanced-filter-control-height);
+.filter-status-toolbar .filter-status-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: var(--accent-strong);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.active-filter-toolbar .active-filter-label {
+  height: var(--active-filter-control-height);
+  min-height: var(--active-filter-control-height);
   min-width: 0;
   display: inline-flex;
   align-items: center;
@@ -772,13 +859,13 @@ fieldset {
   border-radius: 8px;
   background: var(--accent-soft);
   color: var(--accent-strong);
-  font-size: var(--advanced-filter-control-font-size);
+  font-size: var(--active-filter-control-font-size);
   font-weight: 800;
   line-height: 1.25;
   overflow: visible;
 }
 
-.advanced-filter-toolbar .advanced-filter-label span {
+.active-filter-toolbar .active-filter-label span {
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -788,15 +875,15 @@ fieldset {
   padding-block: 2px;
 }
 
-.advanced-filter-toolbar .advanced-filter-icon-button {
+.active-filter-toolbar .active-filter-icon-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: var(--advanced-filter-control-height);
-  height: var(--advanced-filter-control-height);
-  min-height: var(--advanced-filter-control-height);
-  max-width: var(--advanced-filter-control-height);
-  max-height: var(--advanced-filter-control-height);
+  width: var(--active-filter-control-height);
+  height: var(--active-filter-control-height);
+  min-height: var(--active-filter-control-height);
+  max-width: var(--active-filter-control-height);
+  max-height: var(--active-filter-control-height);
   aspect-ratio: 1;
   flex: 0 0 auto;
   border: 1px solid color-mix(in srgb, var(--accent) 48%, transparent);
@@ -804,13 +891,13 @@ fieldset {
   padding: 0;
   background: var(--surface);
   color: var(--accent-strong);
-  font-size: var(--advanced-filter-control-font-size);
+  font-size: var(--active-filter-control-font-size);
   font-weight: 800;
   line-height: 1;
   cursor: pointer;
 }
 
-.advanced-filter-toolbar .advanced-filter-icon {
+.active-filter-toolbar .active-filter-icon {
   display: inline-block;
   width: 18px;
   height: 18px;
@@ -822,28 +909,40 @@ fieldset {
   stroke-linejoin: round;
 }
 
-.advanced-filter-toolbar .advanced-filter-icon-button:hover {
+.active-filter-toolbar .active-filter-icon-button:hover {
   background: var(--accent);
   color: var(--surface);
 }
 
-.advanced-filter-toolbar .advanced-filter-exit-button {
+.active-filter-toolbar .filter-clear-button {
+  border-color: color-mix(in srgb, var(--danger) 48%, transparent);
+  color: var(--danger);
+}
+
+.active-filter-toolbar .filter-clear-button:hover,
+.active-filter-toolbar .filter-clear-button:focus-visible {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--surface);
+}
+
+.active-filter-toolbar .active-filter-exit-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: var(--advanced-filter-control-height);
-  min-height: var(--advanced-filter-control-height);
+  height: var(--active-filter-control-height);
+  min-height: var(--active-filter-control-height);
   flex: 0 0 auto;
   border-color: color-mix(in srgb, var(--danger) 58%, transparent);
   padding: 0 12px;
   background: var(--surface);
   color: var(--danger);
-  font-size: var(--advanced-filter-control-font-size);
+  font-size: var(--active-filter-control-font-size);
   font-weight: 800;
   line-height: 1;
 }
 
-.advanced-filter-toolbar .advanced-filter-exit-button:hover {
+.active-filter-toolbar .active-filter-exit-button:hover {
   border-color: var(--danger);
   background: var(--danger);
   color: var(--surface);
@@ -862,17 +961,17 @@ body.english-locale .root-mode-controls .secondary-button {
   line-height: 1.1;
 }
 
-body.english-locale .root-mode-controls .advanced-filter-icon-button {
-  width: var(--advanced-filter-control-height);
-  height: var(--advanced-filter-control-height);
+body.english-locale .root-mode-controls .active-filter-icon-button {
+  width: var(--active-filter-control-height);
+  height: var(--active-filter-control-height);
   padding: 0;
-  font-size: var(--advanced-filter-control-font-size);
+  font-size: var(--active-filter-control-font-size);
   line-height: 1;
 }
 
-body.english-locale .root-mode-controls .advanced-filter-exit-button {
+body.english-locale .root-mode-controls .active-filter-exit-button {
   padding: 0 12px;
-  font-size: var(--advanced-filter-control-font-size);
+  font-size: var(--active-filter-control-font-size);
   line-height: 1;
 }
 
@@ -2358,6 +2457,14 @@ body.dark-theme .entry-card p {
   white-space: nowrap;
 }
 
+.tag-identity-raw {
+  margin-inline-start: 5px;
+  color: currentColor;
+  font-size: 0.86em;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
 .chip.amber {
   background: #fff0d1;
   color: var(--amber);
@@ -3586,11 +3693,11 @@ button.analysis-composition-subset:hover strong {
   text-align: left;
 }
 
-.analysis-tag-set-row[data-advanced-filter-id] {
+.analysis-tag-set-row[data-active-filter-id] {
   cursor: pointer;
 }
 
-.analysis-tag-set-row[data-advanced-filter-id]:hover .analysis-tag-set-chip {
+.analysis-tag-set-row[data-active-filter-id]:hover .analysis-tag-set-chip {
   border-color: color-mix(in srgb, var(--accent) 48%, var(--line));
   color: var(--accent-strong);
 }
@@ -3686,16 +3793,13 @@ button.analysis-composition-subset:hover strong {
 
 button.analysis-bar-label,
 .analysis-issue-list button,
-.analysis-bar-row[data-advanced-filter-id],
-.analysis-bar-row[data-part-filter-value],
+.analysis-bar-row[data-active-filter-id],
 .analysis-bar-row[data-entry-id],
 .analysis-bar-row[data-view-target],
-.analysis-metric[data-advanced-filter-id],
-.analysis-metric[data-part-filter-value],
+.analysis-metric[data-active-filter-id],
 .analysis-metric[data-entry-id],
 .analysis-metric[data-view-target],
-.analysis-fact-list div[data-advanced-filter-id],
-.analysis-fact-list div[data-part-filter-value],
+.analysis-fact-list div[data-active-filter-id],
 .analysis-fact-list div[data-entry-id],
 .analysis-fact-list div[data-view-target],
 .analysis-overview-primary[data-view-target],
@@ -3705,16 +3809,13 @@ button.analysis-bar-label,
 
 button.analysis-bar-label:hover,
 .analysis-issue-list button:hover,
-.analysis-bar-row[data-advanced-filter-id]:hover .analysis-bar-label,
-.analysis-bar-row[data-part-filter-value]:hover .analysis-bar-label,
+.analysis-bar-row[data-active-filter-id]:hover .analysis-bar-label,
 .analysis-bar-row[data-entry-id]:hover .analysis-bar-label,
 .analysis-bar-row[data-view-target]:hover .analysis-bar-label,
-.analysis-metric[data-advanced-filter-id]:hover span,
-.analysis-metric[data-part-filter-value]:hover span,
+.analysis-metric[data-active-filter-id]:hover span,
 .analysis-metric[data-entry-id]:hover span,
 .analysis-metric[data-view-target]:hover span,
-.analysis-fact-list div[data-advanced-filter-id]:hover dt,
-.analysis-fact-list div[data-part-filter-value]:hover dt,
+.analysis-fact-list div[data-active-filter-id]:hover dt,
 .analysis-fact-list div[data-entry-id]:hover dt,
 .analysis-fact-list div[data-view-target]:hover dt,
 .analysis-overview-primary[data-view-target]:hover span,
@@ -4996,6 +5097,10 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
 
   .filter-row {
     background: var(--bg);
+  }
+
+  .entry-filter-menu {
+    width: calc(min(380px, 100vw - 32px) - 28px);
   }
 
   .entry-list:not(.virtualized-list) {
