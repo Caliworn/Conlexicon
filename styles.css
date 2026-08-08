@@ -4680,7 +4680,7 @@ dialog::backdrop {
   border: 1px solid var(--material-floating-border);
   border-radius: var(--radius-floating);
   padding: 22px;
-  background: var(--material-floating-background);
+  background: var(--material-overlay-panel-background);
   color: var(--ui-text);
   box-shadow: var(--material-floating-shadow);
   backdrop-filter: var(--material-floating-filter);
@@ -4766,7 +4766,7 @@ dialog::backdrop {
   border: 1px solid var(--material-floating-border);
   border-radius: var(--radius-floating);
   padding: 24px;
-  background: var(--material-floating-background);
+  background: var(--material-overlay-panel-background);
   color: var(--ui-text);
   box-shadow: var(--material-overlay-panel-shadow);
   backdrop-filter: var(--material-floating-filter);

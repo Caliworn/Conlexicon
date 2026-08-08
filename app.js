@@ -38,11 +38,11 @@ const shellState = {
 let activeAppTooltipTarget = null;
 const desktopNavMediaQuery = window.matchMedia("(min-width: 800px)");
 const wideNavMediaQuery = window.matchMedia("(min-width: 1280px)");
-const liquidGlassFinePointerMediaQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
-const liquidGlassReducedMotionMediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
-const liquidGlassReducedTransparencyMediaQuery = window.matchMedia("(prefers-reduced-transparency: reduce)");
-const liquidGlassForcedColorsMediaQuery = window.matchMedia("(forced-colors: active)");
-const LIQUID_GLASS_POINTER_TARGET_SELECTOR = [
+const layeredGlassFinePointerMediaQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
+const layeredGlassReducedMotionMediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+const layeredGlassReducedTransparencyMediaQuery = window.matchMedia("(prefers-reduced-transparency: reduce)");
+const layeredGlassForcedColorsMediaQuery = window.matchMedia("(forced-colors: active)");
+const LAYERED_GLASS_POINTER_TARGET_SELECTOR = [
   ".dictionary-panel",
   ".entry-search-config-menu",
   ".entry-filter-menu",
@@ -50,11 +50,11 @@ const LIQUID_GLASS_POINTER_TARGET_SELECTOR = [
   ".modal-panel",
   ".network-panel",
 ].join(", ");
-const LIQUID_GLASS_POINTER_EXIT_MS = 150;
-const liquidGlassPointerExitTimers = new WeakMap();
-let liquidGlassPointerTarget = null;
-let liquidGlassPointerFrame = 0;
-let pendingLiquidGlassPointer = null;
+const LAYERED_GLASS_POINTER_EXIT_MS = 150;
+const layeredGlassPointerExitTimers = new WeakMap();
+let layeredGlassPointerTarget = null;
+let layeredGlassPointerFrame = 0;
+let pendingLayeredGlassPointer = null;
 const entryQueryModel = window.ConlexiconEntryQuery;
 const ipaModel = window.ConlexiconIpa;
 const IPA_STRESS_MARKER = ipaModel.IPA_STRESS_MARKER;
@@ -402,9 +402,9 @@ const i18n = {
     darkMode: "暗黑模式",
     lightMode: "浅色模式",
     classicSkin: "经典皮肤",
-    liquidGlassSkin: "液态玻璃",
+    layeredGlassSkin: "层叠玻璃",
     switchToClassicSkin: "切换到经典皮肤",
-    switchToLiquidGlassSkin: "切换到液态玻璃皮肤",
+    switchToLayeredGlassSkin: "切换到层叠玻璃皮肤",
     newEntry: "新建词条",
     quickNewEntryTooltip: "新建词条",
     insertSymbol: "插入 {symbol}",
@@ -1001,9 +1001,9 @@ const i18n = {
     darkMode: "Dark Mode",
     lightMode: "Light Mode",
     classicSkin: "Classic Skin",
-    liquidGlassSkin: "Liquid Glass",
+    layeredGlassSkin: "Layered Glass",
     switchToClassicSkin: "Switch to Classic Skin",
-    switchToLiquidGlassSkin: "Switch to Liquid Glass Skin",
+    switchToLayeredGlassSkin: "Switch to Layered Glass Skin",
     newEntry: "New Entry",
     quickNewEntryTooltip: "New Entry",
     insertSymbol: "Insert {symbol}",
@@ -1844,7 +1844,7 @@ function normalizeUiTheme(value) {
 }
 
 function normalizeUiSkin(value) {
-  return value === "liquid-glass" ? "liquid-glass" : "classic";
+  return value === "layered-glass" ? "layered-glass" : "classic";
 }
 
 function readCachedUiPreferences() {
@@ -1858,7 +1858,7 @@ function readCachedUiPreferences() {
       ...(preferences.uiTheme === "dark" || preferences.uiTheme === "light"
         ? { uiTheme: preferences.uiTheme }
         : {}),
-      ...(["classic", "liquid-glass"].includes(preferences.uiSkin)
+      ...(["classic", "layered-glass"].includes(preferences.uiSkin)
         ? { uiSkin: preferences.uiSkin }
         : {}),
     };
@@ -3376,8 +3376,8 @@ function applyLocale(root = document) {
   elements.themeToggleLabel.textContent = nextThemeLabel;
   elements.themeToggleButton.removeAttribute("title");
   elements.themeToggleButton.setAttribute("aria-label", nextThemeLabel);
-  const nextSkinLabel = currentSkin === "liquid-glass" ? t("classicSkin") : t("liquidGlassSkin");
-  const nextSkinAriaLabel = currentSkin === "liquid-glass" ? t("switchToClassicSkin") : t("switchToLiquidGlassSkin");
+  const nextSkinLabel = currentSkin === "layered-glass" ? t("classicSkin") : t("layeredGlassSkin");
+  const nextSkinAriaLabel = currentSkin === "layered-glass" ? t("switchToClassicSkin") : t("switchToLayeredGlassSkin");
   elements.skinToggleLabel.textContent = nextSkinLabel;
   elements.skinToggleButton.removeAttribute("title");
   elements.skinToggleButton.setAttribute("aria-label", nextSkinAriaLabel);
@@ -3428,82 +3428,82 @@ function refreshEditableSurfaceLocale() {
 
 function applyAppearance() {
   document.body.classList.toggle("dark-theme", currentTheme === "dark");
-  if (currentSkin === "liquid-glass") {
-    document.body.dataset.uiSkin = "liquid-glass";
+  if (currentSkin === "layered-glass") {
+    document.body.dataset.uiSkin = "layered-glass";
   } else {
     delete document.body.dataset.uiSkin;
   }
-  if (!liquidGlassPointerEffectsEnabled()) {
-    resetLiquidGlassPointerEffect(true);
+  if (!layeredGlassPointerEffectsEnabled()) {
+    resetLayeredGlassPointerEffect(true);
   }
 }
 
-function liquidGlassPointerEffectsEnabled() {
-  return document.body.dataset.uiSkin === "liquid-glass"
-    && liquidGlassFinePointerMediaQuery.matches
-    && !liquidGlassReducedMotionMediaQuery.matches
-    && !liquidGlassReducedTransparencyMediaQuery.matches
-    && !liquidGlassForcedColorsMediaQuery.matches;
+function layeredGlassPointerEffectsEnabled() {
+  return document.body.dataset.uiSkin === "layered-glass"
+    && layeredGlassFinePointerMediaQuery.matches
+    && !layeredGlassReducedMotionMediaQuery.matches
+    && !layeredGlassReducedTransparencyMediaQuery.matches
+    && !layeredGlassForcedColorsMediaQuery.matches;
 }
 
-function clearLiquidGlassPointerTarget(target, immediate = false) {
+function clearLayeredGlassPointerTarget(target, immediate = false) {
   if (!target) {
     return;
   }
-  const existingTimer = liquidGlassPointerExitTimers.get(target);
+  const existingTimer = layeredGlassPointerExitTimers.get(target);
   if (existingTimer) {
     clearTimeout(existingTimer);
-    liquidGlassPointerExitTimers.delete(target);
+    layeredGlassPointerExitTimers.delete(target);
   }
   const clearStyles = () => {
-    target.removeAttribute("data-liquid-glass-pointer");
-    target.style.removeProperty("--liquid-glass-pointer-x");
-    target.style.removeProperty("--liquid-glass-pointer-y");
-    target.style.removeProperty("--liquid-glass-edge-top");
-    target.style.removeProperty("--liquid-glass-edge-right");
-    target.style.removeProperty("--liquid-glass-edge-bottom");
-    target.style.removeProperty("--liquid-glass-edge-left");
+    target.removeAttribute("data-layered-glass-pointer");
+    target.style.removeProperty("--layered-glass-pointer-x");
+    target.style.removeProperty("--layered-glass-pointer-y");
+    target.style.removeProperty("--layered-glass-edge-top");
+    target.style.removeProperty("--layered-glass-edge-right");
+    target.style.removeProperty("--layered-glass-edge-bottom");
+    target.style.removeProperty("--layered-glass-edge-left");
   };
   if (immediate || !target.isConnected) {
     clearStyles();
     return;
   }
-  target.dataset.liquidGlassPointer = "idle";
+  target.dataset.layeredGlassPointer = "idle";
   const timer = setTimeout(() => {
-    liquidGlassPointerExitTimers.delete(target);
-    if (target.dataset.liquidGlassPointer === "idle") {
+    layeredGlassPointerExitTimers.delete(target);
+    if (target.dataset.layeredGlassPointer === "idle") {
       clearStyles();
     }
-  }, LIQUID_GLASS_POINTER_EXIT_MS);
-  liquidGlassPointerExitTimers.set(target, timer);
+  }, LAYERED_GLASS_POINTER_EXIT_MS);
+  layeredGlassPointerExitTimers.set(target, timer);
 }
 
-function resetLiquidGlassPointerEffect(immediate = false) {
-  if (liquidGlassPointerFrame) {
-    cancelAnimationFrame(liquidGlassPointerFrame);
-    liquidGlassPointerFrame = 0;
+function resetLayeredGlassPointerEffect(immediate = false) {
+  if (layeredGlassPointerFrame) {
+    cancelAnimationFrame(layeredGlassPointerFrame);
+    layeredGlassPointerFrame = 0;
   }
-  pendingLiquidGlassPointer = null;
-  clearLiquidGlassPointerTarget(liquidGlassPointerTarget, immediate);
-  liquidGlassPointerTarget = null;
+  pendingLayeredGlassPointer = null;
+  clearLayeredGlassPointerTarget(layeredGlassPointerTarget, immediate);
+  layeredGlassPointerTarget = null;
 }
 
-function flushLiquidGlassPointerEffect() {
-  liquidGlassPointerFrame = 0;
-  const pending = pendingLiquidGlassPointer;
-  pendingLiquidGlassPointer = null;
-  if (!pending || !pending.target.isConnected || !liquidGlassPointerEffectsEnabled()) {
-    resetLiquidGlassPointerEffect();
+function flushLayeredGlassPointerEffect() {
+  layeredGlassPointerFrame = 0;
+  const pending = pendingLayeredGlassPointer;
+  pendingLayeredGlassPointer = null;
+  if (!pending || !pending.target.isConnected || !layeredGlassPointerEffectsEnabled()) {
+    resetLayeredGlassPointerEffect();
     return;
   }
 
   const bounds = pending.target.getBoundingClientRect();
   if (!bounds.width || !bounds.height) {
-    resetLiquidGlassPointerEffect();
+    resetLayeredGlassPointerEffect();
     return;
   }
-  if (liquidGlassPointerTarget && liquidGlassPointerTarget !== pending.target) {
-    resetLiquidGlassPointerEffect();
+  if (layeredGlassPointerTarget && layeredGlassPointerTarget !== pending.target) {
+    resetLayeredGlassPointerEffect();
   }
 
   const normalizedX = Math.max(0, Math.min(1, (pending.clientX - bounds.left) / bounds.width));
@@ -3514,40 +3514,40 @@ function flushLiquidGlassPointerEffect() {
   const edgeStrength = (distance) => (
     Math.round(Math.max(0, Math.min(1, 1 - distance / edgeReach)) * 50) / 50
   );
-  liquidGlassPointerTarget = pending.target;
-  const exitTimer = liquidGlassPointerExitTimers.get(liquidGlassPointerTarget);
+  layeredGlassPointerTarget = pending.target;
+  const exitTimer = layeredGlassPointerExitTimers.get(layeredGlassPointerTarget);
   if (exitTimer) {
     clearTimeout(exitTimer);
-    liquidGlassPointerExitTimers.delete(liquidGlassPointerTarget);
+    layeredGlassPointerExitTimers.delete(layeredGlassPointerTarget);
   }
-  liquidGlassPointerTarget.dataset.liquidGlassPointer = "active";
-  liquidGlassPointerTarget.style.setProperty("--liquid-glass-pointer-x", `${pointerX}%`);
-  liquidGlassPointerTarget.style.setProperty("--liquid-glass-pointer-y", `${pointerY}%`);
-  liquidGlassPointerTarget.style.setProperty("--liquid-glass-edge-top", edgeStrength(pending.clientY - bounds.top));
-  liquidGlassPointerTarget.style.setProperty("--liquid-glass-edge-right", edgeStrength(bounds.right - pending.clientX));
-  liquidGlassPointerTarget.style.setProperty("--liquid-glass-edge-bottom", edgeStrength(bounds.bottom - pending.clientY));
-  liquidGlassPointerTarget.style.setProperty("--liquid-glass-edge-left", edgeStrength(pending.clientX - bounds.left));
+  layeredGlassPointerTarget.dataset.layeredGlassPointer = "active";
+  layeredGlassPointerTarget.style.setProperty("--layered-glass-pointer-x", `${pointerX}%`);
+  layeredGlassPointerTarget.style.setProperty("--layered-glass-pointer-y", `${pointerY}%`);
+  layeredGlassPointerTarget.style.setProperty("--layered-glass-edge-top", edgeStrength(pending.clientY - bounds.top));
+  layeredGlassPointerTarget.style.setProperty("--layered-glass-edge-right", edgeStrength(bounds.right - pending.clientX));
+  layeredGlassPointerTarget.style.setProperty("--layered-glass-edge-bottom", edgeStrength(bounds.bottom - pending.clientY));
+  layeredGlassPointerTarget.style.setProperty("--layered-glass-edge-left", edgeStrength(pending.clientX - bounds.left));
 }
 
-function scheduleLiquidGlassPointerEffect(event) {
-  if (!liquidGlassPointerEffectsEnabled() || event.pointerType === "touch") {
-    resetLiquidGlassPointerEffect();
+function scheduleLayeredGlassPointerEffect(event) {
+  if (!layeredGlassPointerEffectsEnabled() || event.pointerType === "touch") {
+    resetLayeredGlassPointerEffect();
     return;
   }
   const target = event.target instanceof Element
-    ? event.target.closest(LIQUID_GLASS_POINTER_TARGET_SELECTOR)
+    ? event.target.closest(LAYERED_GLASS_POINTER_TARGET_SELECTOR)
     : null;
   if (!target) {
-    resetLiquidGlassPointerEffect();
+    resetLayeredGlassPointerEffect();
     return;
   }
-  pendingLiquidGlassPointer = {
+  pendingLayeredGlassPointer = {
     target,
     clientX: event.clientX,
     clientY: event.clientY,
   };
-  if (!liquidGlassPointerFrame) {
-    liquidGlassPointerFrame = requestAnimationFrame(flushLiquidGlassPointerEffect);
+  if (!layeredGlassPointerFrame) {
+    layeredGlassPointerFrame = requestAnimationFrame(flushLayeredGlassPointerEffect);
   }
 }
 
@@ -16099,7 +16099,7 @@ document.addEventListener("pointerout", (event) => {
   }
 });
 document.addEventListener("pointermove", syncAppTooltipVisibility, { passive: true });
-document.addEventListener("pointermove", scheduleLiquidGlassPointerEffect, { passive: true });
+document.addEventListener("pointermove", scheduleLayeredGlassPointerEffect, { passive: true });
 document.addEventListener("pointerdown", () => {
   document.body.dataset.inputModality = "pointer";
 }, { capture: true, passive: true });
@@ -16107,32 +16107,32 @@ document.addEventListener("keydown", () => {
   delete document.body.dataset.inputModality;
 }, { capture: true });
 document.addEventListener("pointercancel", hideAppTooltip);
-document.addEventListener("pointercancel", resetLiquidGlassPointerEffect);
+document.addEventListener("pointercancel", resetLayeredGlassPointerEffect);
 document.addEventListener("mouseleave", () => {
   hideAppTooltip();
-  resetLiquidGlassPointerEffect();
+  resetLayeredGlassPointerEffect();
 });
 window.addEventListener("blur", () => {
   hideAppTooltip();
-  resetLiquidGlassPointerEffect(true);
+  resetLayeredGlassPointerEffect(true);
 });
 window.addEventListener("resize", () => {
   hideAppTooltip();
-  resetLiquidGlassPointerEffect(true);
+  resetLayeredGlassPointerEffect(true);
 });
 window.addEventListener("scroll", hideAppTooltip, { passive: true });
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     hideAppTooltip();
-    resetLiquidGlassPointerEffect(true);
+    resetLayeredGlassPointerEffect(true);
   }
 });
 [
-  liquidGlassFinePointerMediaQuery,
-  liquidGlassReducedMotionMediaQuery,
-  liquidGlassReducedTransparencyMediaQuery,
-  liquidGlassForcedColorsMediaQuery,
-].forEach((mediaQuery) => mediaQuery.addEventListener("change", () => resetLiquidGlassPointerEffect(true)));
+  layeredGlassFinePointerMediaQuery,
+  layeredGlassReducedMotionMediaQuery,
+  layeredGlassReducedTransparencyMediaQuery,
+  layeredGlassForcedColorsMediaQuery,
+].forEach((mediaQuery) => mediaQuery.addEventListener("change", () => resetLayeredGlassPointerEffect(true)));
 document.addEventListener("focusin", (event) => {
   const target = appTooltipTargetFromEvent(event);
   if (target) {
@@ -16958,7 +16958,7 @@ elements.themeToggleButton.addEventListener("click", async () => {
 });
 elements.skinToggleButton.addEventListener("click", async () => {
   const previousSkin = currentSkin;
-  const nextSkin = currentSkin === "liquid-glass" ? "classic" : "liquid-glass";
+  const nextSkin = currentSkin === "layered-glass" ? "classic" : "layered-glass";
   currentSkin = nextSkin;
   state.uiSkin = nextSkin;
   cacheUiPreferences({ uiSkin: nextSkin });

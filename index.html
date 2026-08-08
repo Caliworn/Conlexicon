@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Conlexicon</title>
     <link rel="stylesheet" href="theme-tokens.css">
-    <link rel="stylesheet" href="theme-liquid-glass.css">
+    <link rel="stylesheet" href="theme-layered-glass.css">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body class="app-booting">
@@ -17,8 +17,8 @@
           if (preferences.uiTheme === "dark") {
             document.body.classList.add("dark-theme");
           }
-          if (preferences.uiSkin === "liquid-glass") {
-            document.body.dataset.uiSkin = "liquid-glass";
+          if (preferences.uiSkin === "layered-glass") {
+            document.body.dataset.uiSkin = "layered-glass";
           }
         } catch (error) {
           document.body.classList.remove("dark-theme");
@@ -109,9 +109,9 @@
         </nav>
 
         <div class="panel-actions utility-actions">
-          <button class="secondary-button utility-button skin-toggle-button" id="skinToggleButton" type="button" aria-label="切换到液态玻璃皮肤">
+          <button class="secondary-button utility-button skin-toggle-button" id="skinToggleButton" type="button" aria-label="切换到层叠玻璃皮肤">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5S5.5 9.3 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 9.3 12 2.5 12 2.5Z"></path></svg>
-            <span class="utility-label" id="skinToggleLabel">液态玻璃</span>
+            <span class="utility-label" id="skinToggleLabel">层叠玻璃</span>
           </button>
           <button class="secondary-button utility-button" id="themeToggleButton" type="button">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"></path></svg>

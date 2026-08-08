@@ -5,24 +5,24 @@ const path = require("node:path");
 
 const ROOT_DIR = path.resolve(__dirname, "..");
 const tokenPath = path.join(ROOT_DIR, "theme-tokens.css");
-const liquidGlassPath = path.join(ROOT_DIR, "theme-liquid-glass.css");
+const layeredGlassPath = path.join(ROOT_DIR, "theme-layered-glass.css");
 const stylesPath = path.join(ROOT_DIR, "styles.css");
 const indexPath = path.join(ROOT_DIR, "index.html");
 const appPath = path.join(ROOT_DIR, "app.js");
 const tokens = fs.readFileSync(tokenPath, "utf8");
-const liquidGlass = fs.readFileSync(liquidGlassPath, "utf8");
+const layeredGlass = fs.readFileSync(layeredGlassPath, "utf8");
 const styles = fs.readFileSync(stylesPath, "utf8");
 const index = fs.readFileSync(indexPath, "utf8");
 const app = fs.readFileSync(appPath, "utf8");
 
 const tokenLinkPosition = index.indexOf('href="theme-tokens.css"');
-const liquidGlassLinkPosition = index.indexOf('href="theme-liquid-glass.css"');
+const layeredGlassLinkPosition = index.indexOf('href="theme-layered-glass.css"');
 const stylesLinkPosition = index.indexOf('href="styles.css"');
 assert(tokenLinkPosition >= 0, "index.html must load theme-tokens.css");
-assert(liquidGlassLinkPosition >= 0, "index.html must load theme-liquid-glass.css");
+assert(layeredGlassLinkPosition >= 0, "index.html must load theme-layered-glass.css");
 assert(stylesLinkPosition >= 0, "index.html must load styles.css");
 assert(
-  tokenLinkPosition < liquidGlassLinkPosition && liquidGlassLinkPosition < stylesLinkPosition,
+  tokenLinkPosition < layeredGlassLinkPosition && layeredGlassLinkPosition < stylesLinkPosition,
   "Skin stylesheets must load after base tokens and before component styles",
 );
 
@@ -32,7 +32,7 @@ const tokenDefinitions = new Set(
     .map((match) => match[1]),
 );
 const tokenReferences = new Set(
-  [...`${tokens}\n${liquidGlass}\n${styles}`.matchAll(/var\(\s*(--(?:ui|material|radius)-[a-z0-9-]+)/g)]
+  [...`${tokens}\n${layeredGlass}\n${styles}`.matchAll(/var\(\s*(--(?:ui|material|radius)-[a-z0-9-]+)/g)]
     .map((match) => match[1]),
 );
 const undefinedTokens = [...tokenReferences]
@@ -40,17 +40,17 @@ const undefinedTokens = [...tokenReferences]
   .sort();
 assert.deepEqual(undefinedTokens, [], `Undefined skin tokens: ${undefinedTokens.join(", ")}`);
 
-const liquidGlassDefinitions = new Set(
-  [...liquidGlass.matchAll(/(--(?:ui|material|radius)-[a-z0-9-]+)\s*:/g)]
+const layeredGlassDefinitions = new Set(
+  [...layeredGlass.matchAll(/(--(?:ui|material|radius)-[a-z0-9-]+)\s*:/g)]
     .map((match) => match[1]),
 );
-const unknownLiquidGlassTokens = [...liquidGlassDefinitions]
+const unknownLayeredGlassTokens = [...layeredGlassDefinitions]
   .filter((tokenName) => !tokenDefinitions.has(tokenName))
   .sort();
 assert.deepEqual(
-  unknownLiquidGlassTokens,
+  unknownLayeredGlassTokens,
   [],
-  `Liquid Glass may only override base skin tokens: ${unknownLiquidGlassTokens.join(", ")}`,
+  `Layered Glass may only override base skin tokens: ${unknownLayeredGlassTokens.join(", ")}`,
 );
 const classicDarkTheme = tokens.match(/body\.dark-theme\s*\{([\s\S]*?)\n\}/);
 assert(classicDarkTheme, "Base tokens must define a classic dark theme scope");
@@ -68,29 +68,29 @@ for (const tokenName of [
   );
 }
 assert(
-  liquidGlass.includes('body[data-ui-skin="liquid-glass"]'),
-  "Liquid Glass tokens must use the liquid-glass skin scope",
+  layeredGlass.includes('body[data-ui-skin="layered-glass"]'),
+  "Layered Glass tokens must use the layered-glass skin scope",
 );
-assert(!/:root\b/.test(liquidGlass), "Skin overrides must not modify the root token scope");
+assert(!/:root\b/.test(layeredGlass), "Skin overrides must not modify the root token scope");
 assert(
-  /@supports not \(\(backdrop-filter: blur\(1px\)\) or \(-webkit-backdrop-filter: blur\(1px\)\)\)/.test(liquidGlass),
-  "Liquid Glass must provide a no-backdrop-filter fallback",
-);
-assert(
-  /@media \(prefers-reduced-transparency: reduce\)/.test(liquidGlass),
-  "Liquid Glass must provide a reduced-transparency fallback",
+  /@supports not \(\(backdrop-filter: blur\(1px\)\) or \(-webkit-backdrop-filter: blur\(1px\)\)\)/.test(layeredGlass),
+  "Layered Glass must provide a no-backdrop-filter fallback",
 );
 assert(
-  /@media \(forced-colors: active\)/.test(liquidGlass),
-  "Liquid Glass must provide a forced-colors fallback",
+  /@media \(prefers-reduced-transparency: reduce\)/.test(layeredGlass),
+  "Layered Glass must provide a reduced-transparency fallback",
 );
 assert(
-  !/(?:entry-card|analysis-card|table-row|td|th)[^{]*\{[^}]*backdrop-filter/is.test(liquidGlass),
-  "Repeated content surfaces must not receive Liquid Glass backdrop blur",
+  /@media \(forced-colors: active\)/.test(layeredGlass),
+  "Layered Glass must provide a forced-colors fallback",
 );
 assert(
-  !/(?:transition|animation)[^;]*(?:backdrop-filter|blur\(|box-shadow)/i.test(liquidGlass),
-  "Liquid Glass must not animate blur or large material shadows",
+  !/(?:entry-card|analysis-card|table-row|td|th)[^{]*\{[^}]*backdrop-filter/is.test(layeredGlass),
+  "Repeated content surfaces must not receive Layered Glass backdrop blur",
+);
+assert(
+  !/(?:transition|animation)[^;]*(?:backdrop-filter|blur\(|box-shadow)/i.test(layeredGlass),
+  "Layered Glass must not animate blur or large material shadows",
 );
 const overlayAnimationBlock = styles.slice(
   styles.indexOf("@keyframes overlayIn"),
@@ -114,6 +114,7 @@ const componentStyleBlocks = [...styles.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
   .map((match) => ({ selector: match[1].trim(), declarations: match[2] }));
 for (const [backgroundToken, filterToken] of [
   ["--material-floating-background", "--material-floating-filter"],
+  ["--material-overlay-panel-background", "--material-floating-filter"],
   ["--material-rich-tooltip-background", "--material-rich-tooltip-filter"],
   ["--material-entry-detail-background", "--material-entry-detail-filter"],
   ["--material-entry-detail-mobile-background", "--material-entry-detail-mobile-filter"],
@@ -131,8 +132,8 @@ for (const [backgroundToken, filterToken] of [
     );
   }
 }
-const pointerLightingRule = liquidGlass.match(
-  /body\[data-ui-skin="liquid-glass"\] :where\([\s\S]*?\)\[data-liquid-glass-pointer\] \{([\s\S]*?)\n\}/,
+const pointerLightingRule = layeredGlass.match(
+  /body\[data-ui-skin="layered-glass"\] :where\([\s\S]*?\)\[data-layered-glass-pointer\] \{([\s\S]*?)\n\}/,
 );
 assert(pointerLightingRule, "LG-4C must declare a bounded pointer-lighting rule");
 assert.equal(
@@ -141,10 +142,10 @@ assert.equal(
   "LG-4C may use only one point light and four bounded edge glints",
 );
 assert(
-  !/radial-gradient\(/i.test(liquidGlass.replace(pointerLightingRule[0], "")),
+  !/radial-gradient\(/i.test(layeredGlass.replace(pointerLightingRule[0], "")),
   "Radial gradients may only serve the bounded LG-4C pointer response",
 );
-const pointerTargetContract = app.match(/const LIQUID_GLASS_POINTER_TARGET_SELECTOR = \[([\s\S]*?)\]\.join\(", "\);/);
+const pointerTargetContract = app.match(/const LAYERED_GLASS_POINTER_TARGET_SELECTOR = \[([\s\S]*?)\]\.join\(", "\);/);
 assert(pointerTargetContract, "LG-4C must declare an explicit pointer-responsive surface allowlist");
 for (const forbiddenTarget of ["entry-card", "entry-display", "analysis-card", "table-row", "network-node"]) {
   assert(
@@ -153,24 +154,24 @@ for (const forbiddenTarget of ["entry-card", "entry-display", "analysis-card", "
   );
 }
 assert(
-  /requestAnimationFrame\(flushLiquidGlassPointerEffect\)/.test(app),
+  /requestAnimationFrame\(flushLayeredGlassPointerEffect\)/.test(app),
   "LG-4C pointer updates must be coalesced through requestAnimationFrame",
 );
 assert(
-  !/data-liquid-glass-pointer="active"[^}]*background-position/s.test(liquidGlass)
-    && /--liquid-glass-pointer-surface/.test(liquidGlass)
-    && /--liquid-glass-point-alpha/.test(liquidGlass)
-    && /--liquid-glass-edge-alpha/.test(liquidGlass),
+  !/data-layered-glass-pointer="active"[^}]*background-position/s.test(layeredGlass)
+    && /--layered-glass-pointer-surface/.test(layeredGlass)
+    && /--layered-glass-point-alpha/.test(layeredGlass)
+    && /--layered-glass-edge-alpha/.test(layeredGlass),
   "LG-4C.1 must layer bounded point and edge lighting over a fixed base material",
 );
 for (const edge of ["top", "right", "bottom", "left"]) {
-  assert(app.includes(`--liquid-glass-edge-${edge}`), `LG-4C.1 must calculate ${edge} edge proximity`);
+  assert(app.includes(`--layered-glass-edge-${edge}`), `LG-4C.1 must calculate ${edge} edge proximity`);
 }
 for (const mediaQueryName of [
-  "liquidGlassFinePointerMediaQuery",
-  "liquidGlassReducedMotionMediaQuery",
-  "liquidGlassReducedTransparencyMediaQuery",
-  "liquidGlassForcedColorsMediaQuery",
+  "layeredGlassFinePointerMediaQuery",
+  "layeredGlassReducedMotionMediaQuery",
+  "layeredGlassReducedTransparencyMediaQuery",
+  "layeredGlassForcedColorsMediaQuery",
 ]) {
   assert(app.includes(mediaQueryName), `LG-4C must retain its ${mediaQueryName} guard`);
 }
@@ -197,7 +198,7 @@ assert(
   styles.includes("background: var(--material-rich-tooltip-background);")
     && styles.includes("backdrop-filter: var(--material-rich-tooltip-filter);")
     && /--material-rich-tooltip-filter:\s*none;/.test(tokens)
-    && /--material-rich-tooltip-filter:\s*blur\(18px\)/.test(liquidGlass)
+    && /--material-rich-tooltip-filter:\s*blur\(18px\)/.test(layeredGlass)
     && app.includes('group.dataset.appTooltipVariant = "rich";'),
   "Structured tag tooltips must use a skin-scoped, degradable backdrop filter",
 );
@@ -209,7 +210,7 @@ assert(
 );
 
 const liquidTokenValues = (tokenName) => [
-  ...liquidGlass.matchAll(new RegExp(`${tokenName}\\s*:\\s*([^;]+);`, "g")),
+  ...layeredGlass.matchAll(new RegExp(`${tokenName}\\s*:\\s*([^;]+);`, "g")),
 ].map((match) => match[1]);
 for (const tokenName of [
   "--material-floating-background",
@@ -221,7 +222,7 @@ for (const tokenName of [
   "--material-entry-detail-mobile-background",
 ]) {
   const themeValues = liquidTokenValues(tokenName).slice(0, 2);
-  assert.equal(themeValues.length, 2, `${tokenName} must define light and dark Liquid Glass values`);
+  assert.equal(themeValues.length, 2, `${tokenName} must define light and dark Layered Glass values`);
   assert(
     themeValues.every((value) => (value.match(/linear-gradient\(/g) || []).length === 2),
     `${tokenName} must use two static linear optical layers in both themes`,
@@ -233,7 +234,7 @@ for (const tokenName of [
   "--material-browser-background",
 ]) {
   const themeValues = liquidTokenValues(tokenName).slice(0, 2);
-  assert.equal(themeValues.length, 2, `${tokenName} must define light and dark Liquid Glass values`);
+  assert.equal(themeValues.length, 2, `${tokenName} must define light and dark Layered Glass values`);
   assert(
     themeValues.every((value) => !/gradient\(/.test(value)),
     `${tokenName} must remain a stable content surface without optical gradients`,
@@ -250,7 +251,7 @@ assert.deepEqual(
 
 assert(!/body\.dark-theme/.test(styles), "Component CSS must not contain theme branches");
 assert(
-  !/--(?:bg|surface(?:-2)?|shadow)\b/.test(`${tokens}\n${liquidGlass}\n${styles}`),
+  !/--(?:bg|surface(?:-2)?|shadow)\b/.test(`${tokens}\n${layeredGlass}\n${styles}`),
   "Legacy theme aliases must not be restored",
 );
 assert(

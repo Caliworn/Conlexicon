@@ -2279,17 +2279,17 @@ async function runRepositoryContractTests(options = {}) {
     const preferences = await repository.updatePreferences({
       uiLanguage: "en",
       uiTheme: "dark",
-      uiSkin: "liquid-glass",
+      uiSkin: "layered-glass",
     });
     assert.deepEqual(preferences, {
       uiLanguage: "en",
       uiTheme: "dark",
-      uiSkin: "liquid-glass",
+      uiSkin: "layered-glass",
     });
     state = await repository.readState();
     assert.equal(state.uiLanguage, "en");
     assert.equal(state.uiTheme, "dark");
-    assert.equal(state.uiSkin, "liquid-glass");
+    assert.equal(state.uiSkin, "layered-glass");
 
     apiResult = await callApi(repository, "PUT", "/api/preferences", { uiSkin: "classic" });
     assert.equal(apiResult.statusCode, 200);

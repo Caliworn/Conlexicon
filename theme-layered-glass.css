@@ -1,4 +1,4 @@
-body[data-ui-skin="liquid-glass"] {
+body[data-ui-skin="layered-glass"] {
   color-scheme: light;
 
   --ui-canvas-bg: #eef2f1;
@@ -60,7 +60,7 @@ body[data-ui-skin="liquid-glass"] {
   --material-navigation-background: linear-gradient(145deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.018) 38%, transparent 60%), linear-gradient(320deg, rgba(71, 168, 155, 0.09) 0%, transparent 45%), rgb(12, 29, 34);
   --material-navigation-shadow: 0 24px 54px rgba(10, 24, 28, 0.32), inset -1px 0 0 rgba(255, 255, 255, 0.1);
   --material-navigation-filter: none;
-  --material-navigation-drawer-background: linear-gradient(145deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.018) 38%, transparent 60%), linear-gradient(320deg, rgba(71, 168, 155, 0.09) 0%, transparent 45%), rgba(12, 29, 34, 0.89);
+  --material-navigation-drawer-background: linear-gradient(145deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.018) 38%, transparent 60%), linear-gradient(320deg, rgba(71, 168, 155, 0.09) 0%, transparent 45%), rgba(12, 29, 34, 0.76);
   --material-navigation-drawer-filter: blur(24px) saturate(1.08);
   --material-navigation-text: #f7fbfa;
   --material-navigation-muted: #c2d0ce;
@@ -82,16 +82,17 @@ body[data-ui-skin="liquid-glass"] {
   --material-tooltip-muted: rgba(248, 251, 250, 0.74);
   --material-tooltip-border: rgba(255, 255, 255, 0.18);
   --material-tooltip-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
-  --material-rich-tooltip-background: rgba(247, 251, 250, 0.82);
+  --material-rich-tooltip-background: rgba(247, 251, 250, 0.68);
   --material-rich-tooltip-border: rgba(74, 96, 99, 0.24);
   --material-rich-tooltip-text: var(--ui-text);
   --material-rich-tooltip-shadow: var(--material-floating-shadow);
   --material-rich-tooltip-filter: blur(18px) saturate(1.1);
   --material-toast-background: #172126;
   --material-overlay-background: rgba(11, 24, 28, 0.38);
-  --material-overlay-modal-background: rgba(9, 20, 24, 0.44);
-  --material-overlay-strong-background: rgba(8, 18, 22, 0.52);
+  --material-overlay-modal-background: rgba(9, 20, 24, 0.32);
+  --material-overlay-strong-background: rgba(8, 18, 22, 0.38);
   --material-overlay-drawer-background: rgba(11, 24, 28, 0.36);
+  --material-overlay-panel-background: linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.04) 24%, transparent 48%), linear-gradient(315deg, rgba(93, 167, 154, 0.06) 0%, transparent 42%), rgba(247, 251, 250, 0.38);
   --material-overlay-panel-shadow: 0 30px 84px rgba(3, 13, 17, 0.36);
   --material-network-node-shadow: drop-shadow(0 8px 12px rgba(24, 42, 45, 0.1));
   --material-network-node-hover-shadow: drop-shadow(0 12px 18px rgba(24, 42, 45, 0.18));
@@ -100,7 +101,7 @@ body[data-ui-skin="liquid-glass"] {
   --material-network-status-filter: blur(10px);
 }
 
-body.dark-theme[data-ui-skin="liquid-glass"] {
+body.dark-theme[data-ui-skin="layered-glass"] {
   color-scheme: dark;
 
   --ui-canvas-bg: #111719;
@@ -169,23 +170,24 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-list-item-secondary-opacity: 1;
   --material-browser-background: rgba(17, 24, 27, 0.84);
   --material-tooltip-background: #081115;
-  --material-rich-tooltip-background: rgba(21, 31, 35, 0.84);
+  --material-rich-tooltip-background: rgba(21, 31, 35, 0.7);
   --material-rich-tooltip-border: rgba(222, 244, 239, 0.17);
   --material-rich-tooltip-text: var(--ui-text);
   --material-rich-tooltip-shadow: var(--material-floating-shadow);
   --material-rich-tooltip-filter: blur(18px) saturate(1.1);
   --material-toast-background: #081115;
   --material-overlay-background: rgba(0, 8, 11, 0.48);
-  --material-overlay-modal-background: rgba(0, 7, 10, 0.54);
-  --material-overlay-strong-background: rgba(0, 6, 9, 0.62);
+  --material-overlay-modal-background: rgba(0, 7, 10, 0.38);
+  --material-overlay-strong-background: rgba(0, 6, 9, 0.44);
   --material-overlay-drawer-background: rgba(0, 8, 11, 0.46);
+  --material-overlay-panel-background: linear-gradient(135deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.025) 26%, transparent 50%), linear-gradient(315deg, rgba(71, 168, 155, 0.07) 0%, transparent 44%), rgba(25, 36, 40, 0.44);
   --material-overlay-panel-shadow: 0 32px 90px rgba(0, 0, 0, 0.56);
   --material-network-node-shadow: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.28));
   --material-network-node-hover-shadow: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.4));
   --material-network-node-focus-shadow: drop-shadow(0 16px 26px rgba(71, 168, 155, 0.24));
 }
 
-body[data-ui-skin="liquid-glass"] {
+body[data-ui-skin="layered-glass"] {
   background:
     linear-gradient(135deg, rgba(48, 143, 130, 0.24) 0%, rgba(48, 143, 130, 0.05) 38%, transparent 58%),
     linear-gradient(315deg, rgba(222, 175, 64, 0.18) 0%, rgba(222, 175, 64, 0.03) 40%, transparent 62%),
@@ -193,117 +195,123 @@ body[data-ui-skin="liquid-glass"] {
   background-attachment: fixed;
 }
 
-body.dark-theme[data-ui-skin="liquid-glass"] {
+body.dark-theme[data-ui-skin="layered-glass"] {
   background:
     linear-gradient(135deg, rgba(45, 135, 124, 0.22) 0%, rgba(45, 135, 124, 0.035) 40%, transparent 62%),
     linear-gradient(315deg, rgba(181, 137, 47, 0.14) 0%, rgba(181, 137, 47, 0.025) 42%, transparent 64%),
     var(--ui-canvas-bg);
 }
 
-body[data-ui-skin="liquid-glass"] .dictionary-panel {
+body[data-ui-skin="layered-glass"] .dictionary-panel {
   border-right: 1px solid var(--material-navigation-control-border);
   box-shadow: var(--material-navigation-shadow);
 }
 
-body[data-ui-skin="liquid-glass"] .dictionary-panel :where(.utility-button, .nav-collapse-button) {
+body[data-ui-skin="layered-glass"] .dictionary-panel :where(.utility-button, .nav-collapse-button) {
   border-color: var(--material-navigation-action-border);
   background: var(--material-navigation-action-background);
   color: var(--material-navigation-text);
 }
 
-body[data-ui-skin="liquid-glass"] .dictionary-panel :where(.utility-button, .nav-collapse-button):hover:not(:disabled) {
+body[data-ui-skin="layered-glass"] .dictionary-panel :where(.utility-button, .nav-collapse-button):hover:not(:disabled) {
   border-color: var(--material-navigation-control-border);
   background: var(--material-navigation-control-hover-background);
 }
 
-body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {
+body[data-ui-skin="layered-glass"] .dictionary-panel .tool-button.active {
   border-color: color-mix(in srgb, var(--ui-accent) 64%, var(--material-navigation-control-border));
   background: color-mix(in srgb, var(--ui-accent) 20%, var(--material-navigation-control-hover-background));
 }
 
-body.dark-theme[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {
+body.dark-theme[data-ui-skin="layered-glass"] .dictionary-panel .tool-button.active {
   border-color: color-mix(in srgb, var(--ui-accent) 56%, var(--material-navigation-control-border));
   background: color-mix(in srgb, var(--ui-accent) 14%, var(--material-navigation-control-hover-background));
 }
 
-@property --liquid-glass-light-opacity {
+@property --layered-glass-light-opacity {
   syntax: "<number>";
   inherits: false;
   initial-value: 0;
 }
 
-body[data-ui-skin="liquid-glass"] :where(
+body[data-ui-skin="layered-glass"] :where(
   .dictionary-panel,
   .entry-search-config-menu,
   .entry-filter-menu,
   dialog[open],
   .modal-panel,
   .network-panel
-)[data-liquid-glass-pointer] {
-  --liquid-glass-light-opacity: 0;
-  --liquid-glass-point-alpha: 0.055;
-  --liquid-glass-edge-alpha: 0.08;
-  --liquid-glass-point-radius: 240px;
-  --liquid-glass-edge-span: 170px;
+)[data-layered-glass-pointer] {
+  --layered-glass-light-opacity: 0;
+  --layered-glass-point-alpha: 0.055;
+  --layered-glass-edge-alpha: 0.08;
+  --layered-glass-point-radius: 240px;
+  --layered-glass-edge-span: 170px;
   background:
-    radial-gradient(ellipse var(--liquid-glass-edge-span) 12px at var(--liquid-glass-pointer-x, 50%) 0%, rgb(255 255 255 / calc(var(--liquid-glass-light-opacity) * var(--liquid-glass-edge-alpha) * var(--liquid-glass-edge-top, 0))) 0%, transparent 100%),
-    radial-gradient(ellipse 12px var(--liquid-glass-edge-span) at 100% var(--liquid-glass-pointer-y, 50%), rgb(255 255 255 / calc(var(--liquid-glass-light-opacity) * var(--liquid-glass-edge-alpha) * var(--liquid-glass-edge-right, 0))) 0%, transparent 100%),
-    radial-gradient(ellipse var(--liquid-glass-edge-span) 12px at var(--liquid-glass-pointer-x, 50%) 100%, rgb(255 255 255 / calc(var(--liquid-glass-light-opacity) * var(--liquid-glass-edge-alpha) * var(--liquid-glass-edge-bottom, 0))) 0%, transparent 100%),
-    radial-gradient(ellipse 12px var(--liquid-glass-edge-span) at 0% var(--liquid-glass-pointer-y, 50%), rgb(255 255 255 / calc(var(--liquid-glass-light-opacity) * var(--liquid-glass-edge-alpha) * var(--liquid-glass-edge-left, 0))) 0%, transparent 100%),
-    radial-gradient(circle var(--liquid-glass-point-radius) at var(--liquid-glass-pointer-x, 50%) var(--liquid-glass-pointer-y, 50%), rgb(255 255 255 / calc(var(--liquid-glass-light-opacity) * var(--liquid-glass-point-alpha))) 0%, rgb(255 255 255 / calc(var(--liquid-glass-light-opacity) * var(--liquid-glass-point-alpha) * 0.5)) 34%, transparent 72%),
-    var(--liquid-glass-pointer-surface);
-  transition: --liquid-glass-light-opacity 150ms ease-out;
+    radial-gradient(ellipse var(--layered-glass-edge-span) 12px at var(--layered-glass-pointer-x, 50%) 0%, rgb(255 255 255 / calc(var(--layered-glass-light-opacity) * var(--layered-glass-edge-alpha) * var(--layered-glass-edge-top, 0))) 0%, transparent 100%),
+    radial-gradient(ellipse 12px var(--layered-glass-edge-span) at 100% var(--layered-glass-pointer-y, 50%), rgb(255 255 255 / calc(var(--layered-glass-light-opacity) * var(--layered-glass-edge-alpha) * var(--layered-glass-edge-right, 0))) 0%, transparent 100%),
+    radial-gradient(ellipse var(--layered-glass-edge-span) 12px at var(--layered-glass-pointer-x, 50%) 100%, rgb(255 255 255 / calc(var(--layered-glass-light-opacity) * var(--layered-glass-edge-alpha) * var(--layered-glass-edge-bottom, 0))) 0%, transparent 100%),
+    radial-gradient(ellipse 12px var(--layered-glass-edge-span) at 0% var(--layered-glass-pointer-y, 50%), rgb(255 255 255 / calc(var(--layered-glass-light-opacity) * var(--layered-glass-edge-alpha) * var(--layered-glass-edge-left, 0))) 0%, transparent 100%),
+    radial-gradient(circle var(--layered-glass-point-radius) at var(--layered-glass-pointer-x, 50%) var(--layered-glass-pointer-y, 50%), rgb(255 255 255 / calc(var(--layered-glass-light-opacity) * var(--layered-glass-point-alpha))) 0%, rgb(255 255 255 / calc(var(--layered-glass-light-opacity) * var(--layered-glass-point-alpha) * 0.5)) 34%, transparent 72%),
+    var(--layered-glass-pointer-surface);
+  transition: --layered-glass-light-opacity 150ms ease-out;
 }
 
-body[data-ui-skin="liquid-glass"] .dictionary-panel[data-liquid-glass-pointer] {
-  --liquid-glass-pointer-surface: var(--material-navigation-background);
-  --liquid-glass-point-alpha: 0.04;
-  --liquid-glass-edge-alpha: 0.055;
-  --liquid-glass-point-radius: 360px;
-  --liquid-glass-edge-span: 240px;
+body[data-ui-skin="layered-glass"] .dictionary-panel[data-layered-glass-pointer] {
+  --layered-glass-pointer-surface: var(--material-navigation-background);
+  --layered-glass-point-alpha: 0.04;
+  --layered-glass-edge-alpha: 0.055;
+  --layered-glass-point-radius: 360px;
+  --layered-glass-edge-span: 240px;
 }
 
-body[data-ui-skin="liquid-glass"] :where(
+body[data-ui-skin="layered-glass"] :where(
   .entry-search-config-menu,
   .entry-filter-menu,
-  dialog[open],
+  dialog[open]
+)[data-layered-glass-pointer] {
+  --layered-glass-pointer-surface: var(--material-floating-background);
+}
+
+body[data-ui-skin="layered-glass"] :where(
   .modal-panel,
   .network-panel
-)[data-liquid-glass-pointer] {
-  --liquid-glass-pointer-surface: var(--material-floating-background);
+)[data-layered-glass-pointer] {
+  --layered-glass-pointer-surface: var(--material-overlay-panel-background);
 }
 
-body[data-ui-skin="liquid-glass"] .network-panel[data-liquid-glass-pointer] {
-  --liquid-glass-point-alpha: 0.025;
-  --liquid-glass-edge-alpha: 0;
-  --liquid-glass-point-radius: 560px;
+body[data-ui-skin="layered-glass"] .network-panel[data-layered-glass-pointer] {
+  --layered-glass-point-alpha: 0.11;
+  --layered-glass-edge-alpha: 0.08;
+  --layered-glass-point-radius: 400px;
 }
 
-body.dark-theme[data-ui-skin="liquid-glass"] :where(
+body.dark-theme[data-ui-skin="layered-glass"] :where(
   .entry-search-config-menu,
   .entry-filter-menu,
   dialog[open],
   .modal-panel
-)[data-liquid-glass-pointer] {
-  --liquid-glass-point-alpha: 0.045;
-  --liquid-glass-edge-alpha: 0.065;
+)[data-layered-glass-pointer] {
+  --layered-glass-point-alpha: 0.045;
+  --layered-glass-edge-alpha: 0.065;
 }
 
-body.dark-theme[data-ui-skin="liquid-glass"] .dictionary-panel[data-liquid-glass-pointer] {
-  --liquid-glass-point-alpha: 0.035;
-  --liquid-glass-edge-alpha: 0.05;
+body.dark-theme[data-ui-skin="layered-glass"] .dictionary-panel[data-layered-glass-pointer] {
+  --layered-glass-point-alpha: 0.035;
+  --layered-glass-edge-alpha: 0.05;
 }
 
-body.dark-theme[data-ui-skin="liquid-glass"] .network-panel[data-liquid-glass-pointer] {
-  --liquid-glass-point-alpha: 0.02;
+body.dark-theme[data-ui-skin="layered-glass"] .network-panel[data-layered-glass-pointer] {
+  --layered-glass-point-alpha: 0.035;
+  --layered-glass-edge-alpha: 0.04;
 }
 
-body[data-ui-skin="liquid-glass"] [data-liquid-glass-pointer="active"] {
-  --liquid-glass-light-opacity: 1;
+body[data-ui-skin="layered-glass"] [data-layered-glass-pointer="active"] {
+  --layered-glass-light-opacity: 1;
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  body[data-ui-skin="liquid-glass"] {
+  body[data-ui-skin="layered-glass"] {
     background: var(--ui-canvas-bg);
     --material-panel-background: #fafcfb;
     --material-entry-detail-background: #fafcfb;
@@ -327,9 +335,10 @@ body[data-ui-skin="liquid-glass"] [data-liquid-glass-pointer="active"] {
     --material-browser-background: #eef3f1;
     --material-rich-tooltip-background: #f2f7f5;
     --material-rich-tooltip-filter: none;
+    --material-overlay-panel-background: #f2f7f5;
   }
 
-  body.dark-theme[data-ui-skin="liquid-glass"] {
+  body.dark-theme[data-ui-skin="layered-glass"] {
     --material-panel-background: #1c262a;
     --material-entry-detail-background: #1c262a;
     --material-entry-detail-mobile-background: #1c262a;
@@ -348,7 +357,7 @@ body[data-ui-skin="liquid-glass"] [data-liquid-glass-pointer="active"] {
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  body[data-ui-skin="liquid-glass"] {
+  body[data-ui-skin="layered-glass"] {
     background: var(--ui-canvas-bg);
     --material-panel-background: #fafcfb;
     --material-entry-detail-background: #fafcfb;
@@ -372,9 +381,10 @@ body[data-ui-skin="liquid-glass"] [data-liquid-glass-pointer="active"] {
     --material-browser-background: #eef3f1;
     --material-rich-tooltip-background: #f2f7f5;
     --material-rich-tooltip-filter: none;
+    --material-overlay-panel-background: #f2f7f5;
   }
 
-  body.dark-theme[data-ui-skin="liquid-glass"] {
+  body.dark-theme[data-ui-skin="layered-glass"] {
     --material-panel-background: #1c262a;
     --material-entry-detail-background: #1c262a;
     --material-entry-detail-mobile-background: #1c262a;
@@ -393,8 +403,8 @@ body[data-ui-skin="liquid-glass"] [data-liquid-glass-pointer="active"] {
 }
 
 @media (forced-colors: active) {
-  body[data-ui-skin="liquid-glass"],
-  body.dark-theme[data-ui-skin="liquid-glass"] {
+  body[data-ui-skin="layered-glass"],
+  body.dark-theme[data-ui-skin="layered-glass"] {
     background: Canvas;
     --ui-canvas-bg: Canvas;
     --ui-text: CanvasText;
@@ -460,18 +470,19 @@ body[data-ui-skin="liquid-glass"] [data-liquid-glass-pointer="active"] {
     --material-overlay-modal-background: transparent;
     --material-overlay-strong-background: transparent;
     --material-overlay-drawer-background: transparent;
+    --material-overlay-panel-background: Canvas;
     --material-overlay-panel-shadow: none;
   }
 
-  body[data-ui-skin="liquid-glass"] .dictionary-panel {
+  body[data-ui-skin="layered-glass"] .dictionary-panel {
     border-color: CanvasText;
     box-shadow: none;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
 
-  body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active,
-  body.dark-theme[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {
+  body[data-ui-skin="layered-glass"] .dictionary-panel .tool-button.active,
+  body.dark-theme[data-ui-skin="layered-glass"] .dictionary-panel .tool-button.active {
     border-color: Highlight;
     background: Canvas;
     color: CanvasText;

@@ -94,6 +94,7 @@
   --material-overlay-modal-background: rgba(10, 18, 24, 0.52);
   --material-overlay-strong-background: rgba(10, 18, 24, 0.58);
   --material-overlay-drawer-background: rgba(13, 23, 31, 0.42);
+  --material-overlay-panel-background: var(--material-floating-background);
   --material-overlay-panel-shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
   --material-network-node-shadow: drop-shadow(0 8px 12px rgba(24, 36, 48, 0.08));
   --material-network-node-hover-shadow: drop-shadow(0 12px 18px rgba(24, 36, 48, 0.16));
