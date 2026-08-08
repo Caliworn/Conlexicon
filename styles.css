@@ -4575,11 +4575,14 @@ dialog::backdrop {
 }
 
 .app-tooltip.chip-list-tooltip,
-.app-tooltip.tag-info-tooltip {
+.app-tooltip.tag-info-tooltip,
+.app-tooltip.rich-tooltip {
   border-color: var(--material-rich-tooltip-border);
   background: var(--material-rich-tooltip-background);
   color: var(--material-rich-tooltip-text);
   box-shadow: var(--material-rich-tooltip-shadow);
+  backdrop-filter: var(--material-rich-tooltip-filter);
+  -webkit-backdrop-filter: var(--material-rich-tooltip-filter);
 }
 
 .app-tooltip-tag-info {
@@ -4983,17 +4986,14 @@ dialog::backdrop {
 }
 
 @keyframes overlayIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from { background-color: transparent; }
 }
 
 @keyframes networkIn {
   from {
-    opacity: 0;
     transform: translateY(14px) scale(0.98);
   }
   to {
-    opacity: 1;
     transform: translateY(0) scale(1);
   }
 }
@@ -5411,6 +5411,7 @@ dialog::backdrop {
     animation: none;
   }
 
+  .modal-overlay,
   .network-overlay,
   .network-panel {
     animation: none;

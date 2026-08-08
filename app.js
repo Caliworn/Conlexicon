@@ -3840,6 +3840,7 @@ function showAppTooltip(target) {
   elements.appTooltip.classList.toggle("wrap", target.dataset.appTooltipWrap === "true");
   elements.appTooltip.classList.toggle("chip-list-tooltip", target.dataset.appTooltipVariant === "chip-list");
   elements.appTooltip.classList.toggle("tag-info-tooltip", target.dataset.appTooltipVariant === "tag-info");
+  elements.appTooltip.classList.toggle("rich-tooltip", target.dataset.appTooltipVariant === "rich");
   elements.appTooltip.hidden = false;
   target.setAttribute("aria-describedby", "appTooltip");
   requestAnimationFrame(() => {
@@ -3880,6 +3881,7 @@ function hideAppTooltip() {
   elements.appTooltip.classList.remove("wrap");
   elements.appTooltip.classList.remove("chip-list-tooltip");
   elements.appTooltip.classList.remove("tag-info-tooltip");
+  elements.appTooltip.classList.remove("rich-tooltip");
   elements.appTooltip.textContent = "";
   elements.appTooltip.hidden = true;
 }
@@ -8966,6 +8968,7 @@ function updateLexicalNetworkNodeElement(group, node, position) {
   group.dataset.entryId = node.id;
   group.dataset.appTooltip = "always";
   group.dataset.appTooltipWrap = "true";
+  group.dataset.appTooltipVariant = "rich";
   group.dataset.appTooltipHtml = networkNodeTooltipHtml(node.entry);
   const pronunciationText = String(node.entry.pronunciation || "");
   const partText = entryPartText(node.entry);

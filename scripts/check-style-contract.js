@@ -92,6 +92,45 @@ assert(
   !/(?:transition|animation)[^;]*(?:backdrop-filter|blur\(|box-shadow)/i.test(liquidGlass),
   "Liquid Glass must not animate blur or large material shadows",
 );
+const overlayAnimationBlock = styles.slice(
+  styles.indexOf("@keyframes overlayIn"),
+  styles.indexOf("@keyframes networkIn"),
+);
+const networkAnimationBlock = styles.slice(
+  styles.indexOf("@keyframes networkIn"),
+  styles.indexOf("@keyframes tooltipIn"),
+);
+assert(
+  overlayAnimationBlock.includes("background-color: transparent")
+    && !overlayAnimationBlock.includes("opacity"),
+  "Overlay entry animation must fade the scrim color without creating an opacity backdrop root",
+);
+assert(
+  networkAnimationBlock.includes("transform:")
+    && !networkAnimationBlock.includes("opacity"),
+  "Network panel entry animation must preserve backdrop sampling while moving the panel",
+);
+const componentStyleBlocks = [...styles.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+  .map((match) => ({ selector: match[1].trim(), declarations: match[2] }));
+for (const [backgroundToken, filterToken] of [
+  ["--material-floating-background", "--material-floating-filter"],
+  ["--material-rich-tooltip-background", "--material-rich-tooltip-filter"],
+  ["--material-entry-detail-background", "--material-entry-detail-filter"],
+  ["--material-entry-detail-mobile-background", "--material-entry-detail-mobile-filter"],
+  ["--material-mobile-bar-background", "--material-mobile-bar-filter"],
+  ["--material-navigation-drawer-background", "--material-navigation-drawer-filter"],
+]) {
+  const consumers = componentStyleBlocks.filter(({ declarations }) => (
+    declarations.includes(`background: var(${backgroundToken});`)
+  ));
+  assert(consumers.length > 0, `Material background must have an active consumer: ${backgroundToken}`);
+  for (const { selector, declarations } of consumers) {
+    assert(
+      declarations.includes(`backdrop-filter: var(${filterToken});`),
+      `${selector} must pair ${backgroundToken} with ${filterToken}`,
+    );
+  }
+}
 const pointerLightingRule = liquidGlass.match(
   /body\[data-ui-skin="liquid-glass"\] :where\([\s\S]*?\)\[data-liquid-glass-pointer\] \{([\s\S]*?)\n\}/,
 );
@@ -153,6 +192,14 @@ assert(
     && styles.includes("background: var(--material-entry-detail-section-background);")
     && styles.includes("backdrop-filter: var(--material-entry-detail-filter);"),
   "Entry detail must use its focused-object shell and stable section materials",
+);
+assert(
+  styles.includes("background: var(--material-rich-tooltip-background);")
+    && styles.includes("backdrop-filter: var(--material-rich-tooltip-filter);")
+    && /--material-rich-tooltip-filter:\s*none;/.test(tokens)
+    && /--material-rich-tooltip-filter:\s*blur\(18px\)/.test(liquidGlass)
+    && app.includes('group.dataset.appTooltipVariant = "rich";'),
+  "Structured tag tooltips must use a skin-scoped, degradable backdrop filter",
 );
 assert(
   /input:is\(\[type="checkbox"\], \[type="radio"\]\)\s*\{[^}]*box-shadow:\s*none;/s.test(styles)

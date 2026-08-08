@@ -86,6 +86,7 @@ body[data-ui-skin="liquid-glass"] {
   --material-rich-tooltip-border: rgba(74, 96, 99, 0.24);
   --material-rich-tooltip-text: var(--ui-text);
   --material-rich-tooltip-shadow: var(--material-floating-shadow);
+  --material-rich-tooltip-filter: blur(18px) saturate(1.1);
   --material-toast-background: #172126;
   --material-overlay-background: rgba(11, 24, 28, 0.38);
   --material-overlay-modal-background: rgba(9, 20, 24, 0.44);
@@ -172,6 +173,7 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-rich-tooltip-border: rgba(222, 244, 239, 0.17);
   --material-rich-tooltip-text: var(--ui-text);
   --material-rich-tooltip-shadow: var(--material-floating-shadow);
+  --material-rich-tooltip-filter: blur(18px) saturate(1.1);
   --material-toast-background: #081115;
   --material-overlay-background: rgba(0, 8, 11, 0.48);
   --material-overlay-modal-background: rgba(0, 7, 10, 0.54);
@@ -324,6 +326,7 @@ body[data-ui-skin="liquid-glass"] [data-liquid-glass-pointer="active"] {
     --material-list-item-background: #fafcfb;
     --material-browser-background: #eef3f1;
     --material-rich-tooltip-background: #f2f7f5;
+    --material-rich-tooltip-filter: none;
   }
 
   body.dark-theme[data-ui-skin="liquid-glass"] {
@@ -368,6 +371,7 @@ body[data-ui-skin="liquid-glass"] [data-liquid-glass-pointer="active"] {
     --material-list-item-background: #fafcfb;
     --material-browser-background: #eef3f1;
     --material-rich-tooltip-background: #f2f7f5;
+    --material-rich-tooltip-filter: none;
   }
 
   body.dark-theme[data-ui-skin="liquid-glass"] {
@@ -451,6 +455,7 @@ body[data-ui-skin="liquid-glass"] [data-liquid-glass-pointer="active"] {
     --material-rich-tooltip-border: CanvasText;
     --material-rich-tooltip-text: CanvasText;
     --material-rich-tooltip-shadow: none;
+    --material-rich-tooltip-filter: none;
     --material-overlay-background: transparent;
     --material-overlay-modal-background: transparent;
     --material-overlay-strong-background: transparent;
