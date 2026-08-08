@@ -2614,14 +2614,6 @@ button.pending-source:focus-visible {
   backdrop-filter: var(--material-panel-filter);
 }
 
-dialog {
-  background: var(--material-floating-background);
-  border: 1px solid var(--material-floating-border);
-  border-radius: var(--radius-floating);
-  box-shadow: var(--material-floating-shadow);
-  backdrop-filter: var(--material-floating-filter);
-}
-
 .editor-panel {
   min-width: 0;
   max-width: 100%;
@@ -4499,16 +4491,6 @@ textarea.ipa-single-line::-webkit-scrollbar {
 
 .file-trigger input {
   display: none;
-}
-
-dialog {
-  width: min(620px, calc(100vw - 28px));
-  padding: 22px;
-  color: var(--ui-text);
-}
-
-dialog::backdrop {
-  background: var(--material-overlay-background);
 }
 
 .dialog-actions > div {

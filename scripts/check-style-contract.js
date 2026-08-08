@@ -147,6 +147,10 @@ assert(
 );
 const pointerTargetContract = app.match(/const LAYERED_GLASS_POINTER_TARGET_SELECTOR = \[([\s\S]*?)\]\.join\(", "\);/);
 assert(pointerTargetContract, "LG-4C must declare an explicit pointer-responsive surface allowlist");
+assert(
+  !pointerTargetContract[1].includes("dictionary-panel"),
+  "LG-4C pointer response must remain limited to popup surfaces",
+);
 for (const forbiddenTarget of ["entry-card", "entry-display", "analysis-card", "table-row", "network-node"]) {
   assert(
     !pointerTargetContract[1].includes(forbiddenTarget),
@@ -217,6 +221,16 @@ for (const tokenName of [
   "--material-mobile-bar-background",
   "--material-navigation-background",
   "--material-navigation-drawer-background",
+  "--material-overlay-panel-background",
+]) {
+  const themeValues = layeredGlassTokenValues(tokenName).slice(0, 2);
+  assert.equal(themeValues.length, 2, `${tokenName} must define light and dark Layered Glass values`);
+  assert(
+    themeValues.every((value) => !/gradient\(/.test(value)),
+    `${tokenName} must remain free of fixed optical gradients`,
+  );
+}
+for (const tokenName of [
   "--material-entry-detail-background",
   "--material-entry-detail-mobile-background",
 ]) {
@@ -224,7 +238,7 @@ for (const tokenName of [
   assert.equal(themeValues.length, 2, `${tokenName} must define light and dark Layered Glass values`);
   assert(
     themeValues.every((value) => (value.match(/linear-gradient\(/g) || []).length === 2),
-    `${tokenName} must use two static linear optical layers in both themes`,
+    `${tokenName} must remain the sole two-layer fixed-reflection material`,
   );
 }
 for (const tokenName of [

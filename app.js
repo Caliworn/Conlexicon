@@ -43,10 +43,8 @@ const layeredGlassReducedMotionMediaQuery = window.matchMedia("(prefers-reduced-
 const layeredGlassReducedTransparencyMediaQuery = window.matchMedia("(prefers-reduced-transparency: reduce)");
 const layeredGlassForcedColorsMediaQuery = window.matchMedia("(forced-colors: active)");
 const LAYERED_GLASS_POINTER_TARGET_SELECTOR = [
-  ".dictionary-panel",
   ".entry-search-config-menu",
   ".entry-filter-menu",
-  "dialog[open]",
   ".modal-panel",
   ".network-panel",
 ].join(", ");

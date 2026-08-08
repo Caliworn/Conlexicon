@@ -46,18 +46,18 @@ body[data-ui-skin="layered-glass"] {
   --material-control-filter: none;
   --material-inset-background: rgba(229, 237, 236, 0.84);
   --material-inset-border: var(--ui-border);
-  --material-floating-background: linear-gradient(135deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.12) 24%, transparent 48%), linear-gradient(315deg, rgba(93, 167, 154, 0.1) 0%, transparent 42%), rgba(247, 251, 250, 0.58);
+  --material-floating-background: rgba(247, 251, 250, 0.58);
   --material-floating-border: rgba(74, 96, 99, 0.34);
   --material-floating-shadow: 0 24px 58px rgba(20, 37, 41, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.96), inset 0 -1px 0 rgba(67, 101, 99, 0.1);
   --material-floating-soft-shadow: 0 16px 38px rgba(20, 37, 41, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.82);
   --material-floating-filter: blur(28px) saturate(1.15);
-  --material-mobile-bar-background: linear-gradient(145deg, rgba(255, 255, 255, 0.36) 0%, rgba(255, 255, 255, 0.08) 36%, transparent 58%), linear-gradient(315deg, rgba(93, 167, 154, 0.09) 0%, transparent 44%), rgba(238, 244, 242, 0.6);
+  --material-mobile-bar-background: rgba(238, 244, 242, 0.6);
   --material-mobile-bar-shadow: 0 12px 28px rgba(20, 37, 41, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.68);
   --material-mobile-bar-filter: blur(26px) saturate(1.12);
-  --material-navigation-background: linear-gradient(145deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.018) 38%, transparent 60%), linear-gradient(320deg, rgba(71, 168, 155, 0.09) 0%, transparent 45%), rgb(12, 29, 34);
+  --material-navigation-background: rgb(12, 29, 34);
   --material-navigation-shadow: 0 24px 54px rgba(10, 24, 28, 0.32), inset -1px 0 0 rgba(255, 255, 255, 0.1);
   --material-navigation-filter: none;
-  --material-navigation-drawer-background: linear-gradient(145deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.018) 38%, transparent 60%), linear-gradient(320deg, rgba(71, 168, 155, 0.09) 0%, transparent 45%), rgba(12, 29, 34, 0.76);
+  --material-navigation-drawer-background: rgba(12, 29, 34, 0.76);
   --material-navigation-drawer-filter: blur(24px) saturate(1.08);
   --material-navigation-text: #f7fbfa;
   --material-navigation-muted: #c2d0ce;
@@ -89,7 +89,7 @@ body[data-ui-skin="layered-glass"] {
   --material-overlay-modal-background: rgba(9, 20, 24, 0.32);
   --material-overlay-strong-background: rgba(8, 18, 22, 0.38);
   --material-overlay-drawer-background: rgba(11, 24, 28, 0.36);
-  --material-overlay-panel-background: linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.04) 24%, transparent 48%), linear-gradient(315deg, rgba(93, 167, 154, 0.06) 0%, transparent 42%), rgba(247, 251, 250, 0.38);
+  --material-overlay-panel-background: rgba(247, 251, 250, 0.38);
   --material-overlay-panel-shadow: 0 30px 84px rgba(3, 13, 17, 0.36);
   --material-network-node-shadow: drop-shadow(0 8px 12px rgba(24, 42, 45, 0.1));
   --material-network-node-hover-shadow: drop-shadow(0 12px 18px rgba(24, 42, 45, 0.18));
@@ -141,15 +141,15 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --material-action-pressed-shadow: 0 3px 7px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(0, 0, 0, 0.32);
   --material-inset-background: rgba(38, 50, 54, 0.84);
   --material-inset-border: var(--ui-border);
-  --material-floating-background: linear-gradient(135deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.035) 26%, transparent 50%), linear-gradient(315deg, rgba(71, 168, 155, 0.09) 0%, transparent 44%), rgba(25, 36, 40, 0.56);
+  --material-floating-background: rgba(25, 36, 40, 0.56);
   --material-floating-border: rgba(222, 244, 239, 0.26);
   --material-floating-shadow: 0 26px 64px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(0, 0, 0, 0.24);
   --material-floating-soft-shadow: 0 18px 42px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  --material-mobile-bar-background: linear-gradient(145deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.025) 36%, transparent 58%), linear-gradient(315deg, rgba(71, 168, 155, 0.08) 0%, transparent 46%), rgba(17, 25, 28, 0.6);
+  --material-mobile-bar-background: rgba(17, 25, 28, 0.6);
   --material-mobile-bar-shadow: 0 14px 34px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.09);
-  --material-navigation-background: linear-gradient(145deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.018) 40%, transparent 62%), linear-gradient(320deg, rgba(71, 168, 155, 0.1) 0%, transparent 46%), rgb(9, 22, 26);
+  --material-navigation-background: rgb(9, 22, 26);
   --material-navigation-shadow: 0 26px 58px rgba(0, 0, 0, 0.5), inset -1px 0 0 rgba(255, 255, 255, 0.12);
-  --material-navigation-drawer-background: linear-gradient(145deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.018) 40%, transparent 62%), linear-gradient(320deg, rgba(71, 168, 155, 0.1) 0%, transparent 46%), rgba(9, 22, 26, 0.72);
+  --material-navigation-drawer-background: rgba(9, 22, 26, 0.72);
   --material-navigation-text: #f4faf8;
   --material-navigation-muted: #a8c0be;
   --material-navigation-control-background: rgba(255, 255, 255, 0.08);
@@ -175,7 +175,7 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --material-overlay-modal-background: rgba(0, 7, 10, 0.38);
   --material-overlay-strong-background: rgba(0, 6, 9, 0.44);
   --material-overlay-drawer-background: rgba(0, 8, 11, 0.46);
-  --material-overlay-panel-background: linear-gradient(135deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.025) 26%, transparent 50%), linear-gradient(315deg, rgba(71, 168, 155, 0.07) 0%, transparent 44%), rgba(25, 36, 40, 0.44);
+  --material-overlay-panel-background: rgba(25, 36, 40, 0.44);
   --material-overlay-panel-shadow: 0 32px 90px rgba(0, 0, 0, 0.56);
   --material-network-node-shadow: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.28));
   --material-network-node-hover-shadow: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.4));
@@ -230,10 +230,8 @@ body.dark-theme[data-ui-skin="layered-glass"] .dictionary-panel .tool-button.act
 }
 
 body[data-ui-skin="layered-glass"] :where(
-  .dictionary-panel,
   .entry-search-config-menu,
   .entry-filter-menu,
-  dialog[open],
   .modal-panel,
   .network-panel
 )[data-layered-glass-pointer] {
@@ -252,18 +250,9 @@ body[data-ui-skin="layered-glass"] :where(
   transition: --layered-glass-light-opacity 150ms ease-out;
 }
 
-body[data-ui-skin="layered-glass"] .dictionary-panel[data-layered-glass-pointer] {
-  --layered-glass-pointer-surface: var(--material-navigation-background);
-  --layered-glass-point-alpha: 0.04;
-  --layered-glass-edge-alpha: 0.055;
-  --layered-glass-point-radius: 360px;
-  --layered-glass-edge-span: 240px;
-}
-
 body[data-ui-skin="layered-glass"] :where(
   .entry-search-config-menu,
-  .entry-filter-menu,
-  dialog[open]
+  .entry-filter-menu
 )[data-layered-glass-pointer] {
   --layered-glass-pointer-surface: var(--material-floating-background);
 }
@@ -284,16 +273,10 @@ body[data-ui-skin="layered-glass"] .network-panel[data-layered-glass-pointer] {
 body.dark-theme[data-ui-skin="layered-glass"] :where(
   .entry-search-config-menu,
   .entry-filter-menu,
-  dialog[open],
   .modal-panel
 )[data-layered-glass-pointer] {
   --layered-glass-point-alpha: 0.045;
   --layered-glass-edge-alpha: 0.065;
-}
-
-body.dark-theme[data-ui-skin="layered-glass"] .dictionary-panel[data-layered-glass-pointer] {
-  --layered-glass-point-alpha: 0.035;
-  --layered-glass-edge-alpha: 0.05;
 }
 
 body.dark-theme[data-ui-skin="layered-glass"] .network-panel[data-layered-glass-pointer] {
