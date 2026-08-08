@@ -75,6 +75,43 @@ assert(
   !/(?:transition|animation)[^;]*(?:backdrop-filter|blur\(|box-shadow)/i.test(liquidGlass),
   "Liquid Glass must not animate blur or large material shadows",
 );
+assert(
+  styles.includes("box-shadow: var(--material-navigation-control-hover-shadow);"),
+  "Navigation controls must use the navigation hover shadow instead of generic control hover styling",
+);
+assert(
+  styles.includes("box-shadow: var(--material-navigation-control-pressed-shadow);"),
+  "Navigation controls must use the navigation pressed shadow instead of generic control pressed styling",
+);
+
+const liquidTokenValues = (tokenName) => [
+  ...liquidGlass.matchAll(new RegExp(`${tokenName}\\s*:\\s*([^;]+);`, "g")),
+].map((match) => match[1]);
+for (const tokenName of [
+  "--material-floating-background",
+  "--material-sticky-background",
+  "--material-mobile-bar-background",
+  "--material-navigation-background",
+]) {
+  const themeValues = liquidTokenValues(tokenName).slice(0, 2);
+  assert.equal(themeValues.length, 2, `${tokenName} must define light and dark Liquid Glass values`);
+  assert(
+    themeValues.every((value) => (value.match(/linear-gradient\(/g) || []).length === 2),
+    `${tokenName} must use two static linear optical layers in both themes`,
+  );
+}
+for (const tokenName of [
+  "--material-panel-background",
+  "--material-list-item-background",
+  "--material-browser-background",
+]) {
+  const themeValues = liquidTokenValues(tokenName).slice(0, 2);
+  assert.equal(themeValues.length, 2, `${tokenName} must define light and dark Liquid Glass values`);
+  assert(
+    themeValues.every((value) => !/gradient\(/.test(value)),
+    `${tokenName} must remain a stable content surface without optical gradients`,
+  );
+}
 
 const componentTokenDefinitions = [...styles.matchAll(new RegExp(`(${skinTokenPattern.source})\\s*:`, "g"))]
   .map((match) => match[1]);

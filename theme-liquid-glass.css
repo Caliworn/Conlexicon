@@ -21,49 +21,51 @@ body[data-ui-skin="liquid-glass"] {
   --ui-focus: #d9a937;
   --ui-focus-ring: 0 0 0 3px rgba(217, 169, 55, 0.26);
 
-  --material-panel-background: rgba(250, 252, 251, 0.88);
+  --material-panel-background: rgba(250, 252, 251, 0.82);
   --material-panel-border: var(--ui-border);
-  --material-panel-shadow: 0 18px 42px rgba(20, 42, 45, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.88), inset 0 -1px 0 rgba(87, 118, 116, 0.08);
-  --material-panel-soft-shadow: 0 12px 30px rgba(20, 42, 45, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.76);
-  --material-card-shadow: 0 8px 22px rgba(20, 42, 45, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.62);
+  --material-panel-shadow: 0 18px 42px rgba(20, 42, 45, 0.11), inset 0 1px 0 rgba(255, 255, 255, 0.82), inset 0 -1px 0 rgba(87, 118, 116, 0.08);
+  --material-panel-soft-shadow: 0 12px 30px rgba(20, 42, 45, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  --material-card-shadow: 0 8px 22px rgba(20, 42, 45, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.58);
   --material-panel-filter: none;
-  --material-control-background: rgba(252, 254, 253, 0.76);
+  --material-control-background: rgba(252, 254, 253, 0.7);
   --material-control-border: rgba(74, 96, 99, 0.26);
-  --material-control-shadow: 0 4px 10px rgba(20, 42, 45, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.88), inset 0 -1px 0 rgba(67, 101, 99, 0.06);
-  --material-control-hover-shadow: 0 7px 16px rgba(20, 42, 45, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.94), inset 0 -1px 0 rgba(67, 101, 99, 0.07);
-  --material-control-pressed-shadow: 0 2px 5px rgba(20, 42, 45, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.58), inset 0 -1px 0 rgba(67, 101, 99, 0.1);
-  --material-action-shadow: 0 7px 16px rgba(14, 34, 37, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 -1px 0 rgba(0, 0, 0, 0.12);
-  --material-action-hover-shadow: 0 9px 20px rgba(14, 34, 37, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.34), inset 0 -1px 0 rgba(0, 0, 0, 0.14);
-  --material-action-pressed-shadow: 0 3px 7px rgba(14, 34, 37, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(0, 0, 0, 0.16);
+  --material-control-shadow: 0 4px 10px rgba(20, 42, 45, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.96), inset 0 2px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(67, 101, 99, 0.11);
+  --material-control-hover-shadow: 0 7px 16px rgba(20, 42, 45, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.99), inset 0 2px 0 rgba(255, 255, 255, 0.36), inset 0 -1px 0 rgba(67, 101, 99, 0.14);
+  --material-control-pressed-shadow: 0 2px 5px rgba(20, 42, 45, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.68), inset 0 2px 0 rgba(255, 255, 255, 0.12), inset 0 -1px 0 rgba(67, 101, 99, 0.18);
+  --material-action-shadow: 0 7px 16px rgba(14, 34, 37, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 2px 0 rgba(255, 255, 255, 0.08), inset 0 -1px 0 rgba(0, 0, 0, 0.14);
+  --material-action-hover-shadow: 0 9px 20px rgba(14, 34, 37, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.56), inset 0 2px 0 rgba(255, 255, 255, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.16);
+  --material-action-pressed-shadow: 0 3px 7px rgba(14, 34, 37, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 -1px 0 rgba(0, 0, 0, 0.2);
   --material-control-filter: none;
-  --material-inset-background: rgba(229, 237, 236, 0.88);
+  --material-inset-background: rgba(229, 237, 236, 0.84);
   --material-inset-border: var(--ui-border);
-  --material-floating-background: rgba(247, 251, 250, 0.66);
-  --material-floating-border: rgba(74, 96, 99, 0.3);
+  --material-floating-background: linear-gradient(135deg, rgba(255, 255, 255, 0.42) 0%, rgba(255, 255, 255, 0.12) 24%, transparent 48%), linear-gradient(315deg, rgba(93, 167, 154, 0.1) 0%, transparent 42%), rgba(247, 251, 250, 0.58);
+  --material-floating-border: rgba(74, 96, 99, 0.34);
   --material-floating-shadow: 0 24px 58px rgba(20, 37, 41, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.96), inset 0 -1px 0 rgba(67, 101, 99, 0.1);
   --material-floating-soft-shadow: 0 16px 38px rgba(20, 37, 41, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.82);
-  --material-floating-filter: blur(24px) saturate(1.12);
-  --material-sticky-background: rgba(238, 244, 242, 0.68);
+  --material-floating-filter: blur(28px) saturate(1.15);
+  --material-sticky-background: linear-gradient(145deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0.08) 34%, transparent 56%), linear-gradient(315deg, rgba(93, 167, 154, 0.08) 0%, transparent 44%), rgba(238, 244, 242, 0.62);
   --material-sticky-shadow: 0 14px 30px rgba(24, 42, 45, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.84);
-  --material-sticky-filter: blur(18px) saturate(1.08);
-  --material-mobile-bar-background: rgba(238, 244, 242, 0.68);
+  --material-sticky-filter: blur(22px) saturate(1.1);
+  --material-mobile-bar-background: linear-gradient(145deg, rgba(255, 255, 255, 0.36) 0%, rgba(255, 255, 255, 0.08) 36%, transparent 58%), linear-gradient(315deg, rgba(93, 167, 154, 0.09) 0%, transparent 44%), rgba(238, 244, 242, 0.6);
   --material-mobile-bar-shadow: 0 12px 28px rgba(20, 37, 41, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.68);
-  --material-mobile-bar-filter: blur(22px) saturate(1.1);
-  --material-navigation-background: rgba(12, 29, 34, 0.9);
+  --material-mobile-bar-filter: blur(26px) saturate(1.12);
+  --material-navigation-background: linear-gradient(145deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.018) 38%, transparent 60%), linear-gradient(320deg, rgba(71, 168, 155, 0.09) 0%, transparent 45%), rgba(12, 29, 34, 0.89);
   --material-navigation-shadow: 0 24px 54px rgba(10, 24, 28, 0.32), inset -1px 0 0 rgba(255, 255, 255, 0.1);
-  --material-navigation-filter: blur(20px) saturate(1.04);
+  --material-navigation-filter: blur(24px) saturate(1.08);
   --material-navigation-text: #f7fbfa;
-  --material-navigation-muted: #afc3c2;
-  --material-navigation-control-background: rgba(255, 255, 255, 0.07);
-  --material-navigation-control-hover-background: rgba(255, 255, 255, 0.13);
-  --material-navigation-control-border: rgba(255, 255, 255, 0.15);
-  --material-navigation-control-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 5px 14px rgba(0, 0, 0, 0.1);
-  --material-navigation-action-background: rgba(255, 255, 255, 0.1);
-  --material-navigation-action-border: rgba(255, 255, 255, 0.16);
-  --material-list-item-background: rgba(250, 252, 251, 0.9);
+  --material-navigation-muted: #c2d0ce;
+  --material-navigation-control-background: rgba(255, 255, 255, 0.1);
+  --material-navigation-control-hover-background: rgba(255, 255, 255, 0.18);
+  --material-navigation-control-border: rgba(255, 255, 255, 0.2);
+  --material-navigation-control-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.26), inset 0 2px 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 rgba(0, 0, 0, 0.12), 0 5px 14px rgba(0, 0, 0, 0.1);
+  --material-navigation-control-hover-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.48), inset 0 2px 0 rgba(255, 255, 255, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.16), 0 7px 18px rgba(0, 0, 0, 0.16);
+  --material-navigation-control-pressed-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 -1px 0 rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
+  --material-navigation-action-background: rgba(255, 255, 255, 0.13);
+  --material-navigation-action-border: rgba(255, 255, 255, 0.21);
+  --material-list-item-background: rgba(250, 252, 251, 0.86);
   --material-list-item-secondary-color: inherit;
   --material-list-item-secondary-opacity: 0.76;
-  --material-browser-background: rgba(238, 243, 241, 0.88);
+  --material-browser-background: rgba(238, 243, 241, 0.84);
   --material-browser-filter: none;
   --material-tooltip-background: #10191d;
   --material-tooltip-text: #f8fbfa;
@@ -109,43 +111,45 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --ui-focus: #d2aa4b;
   --ui-focus-ring: 0 0 0 3px rgba(210, 170, 75, 0.28);
 
-  --material-panel-background: rgba(28, 38, 42, 0.88);
+  --material-panel-background: rgba(28, 38, 42, 0.84);
   --material-panel-border: var(--ui-border);
-  --material-panel-shadow: 0 20px 48px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(0, 0, 0, 0.18);
-  --material-panel-soft-shadow: 0 14px 34px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  --material-card-shadow: 0 8px 22px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  --material-control-background: rgba(37, 49, 53, 0.76);
+  --material-panel-shadow: 0 20px 48px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+  --material-panel-soft-shadow: 0 14px 34px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  --material-card-shadow: 0 8px 22px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --material-control-background: rgba(37, 49, 53, 0.7);
   --material-control-border: rgba(222, 244, 239, 0.2);
-  --material-control-shadow: 0 5px 12px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 -1px 0 rgba(0, 0, 0, 0.18);
-  --material-control-hover-shadow: 0 8px 18px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(0, 0, 0, 0.2);
-  --material-control-pressed-shadow: 0 2px 6px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.24);
-  --material-action-shadow: 0 8px 18px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(0, 0, 0, 0.22);
-  --material-action-hover-shadow: 0 10px 22px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.24);
-  --material-action-pressed-shadow: 0 3px 7px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 -1px 0 rgba(0, 0, 0, 0.26);
-  --material-inset-background: rgba(38, 50, 54, 0.88);
+  --material-control-shadow: 0 5px 12px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 2px 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 rgba(0, 0, 0, 0.22);
+  --material-control-hover-shadow: 0 8px 18px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.38), inset 0 2px 0 rgba(255, 255, 255, 0.09), inset 0 -1px 0 rgba(0, 0, 0, 0.26);
+  --material-control-pressed-shadow: 0 2px 6px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  --material-action-shadow: 0 8px 18px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 2px 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 rgba(0, 0, 0, 0.24);
+  --material-action-hover-shadow: 0 10px 22px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.42), inset 0 2px 0 rgba(255, 255, 255, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.28);
+  --material-action-pressed-shadow: 0 3px 7px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(0, 0, 0, 0.32);
+  --material-inset-background: rgba(38, 50, 54, 0.84);
   --material-inset-border: var(--ui-border);
-  --material-floating-background: rgba(25, 36, 40, 0.66);
-  --material-floating-border: rgba(222, 244, 239, 0.22);
+  --material-floating-background: linear-gradient(135deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.035) 26%, transparent 50%), linear-gradient(315deg, rgba(71, 168, 155, 0.09) 0%, transparent 44%), rgba(25, 36, 40, 0.56);
+  --material-floating-border: rgba(222, 244, 239, 0.26);
   --material-floating-shadow: 0 26px 64px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(0, 0, 0, 0.24);
   --material-floating-soft-shadow: 0 18px 42px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  --material-sticky-background: rgba(17, 25, 28, 0.68);
+  --material-sticky-background: linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.025) 36%, transparent 58%), linear-gradient(315deg, rgba(71, 168, 155, 0.08) 0%, transparent 46%), rgba(17, 25, 28, 0.6);
   --material-sticky-shadow: 0 12px 28px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  --material-mobile-bar-background: rgba(17, 25, 28, 0.68);
+  --material-mobile-bar-background: linear-gradient(145deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.025) 36%, transparent 58%), linear-gradient(315deg, rgba(71, 168, 155, 0.08) 0%, transparent 46%), rgba(17, 25, 28, 0.6);
   --material-mobile-bar-shadow: 0 14px 34px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.09);
-  --material-navigation-background: rgba(9, 22, 26, 0.76);
+  --material-navigation-background: linear-gradient(145deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.018) 40%, transparent 62%), linear-gradient(320deg, rgba(71, 168, 155, 0.1) 0%, transparent 46%), rgba(9, 22, 26, 0.72);
   --material-navigation-shadow: 0 26px 58px rgba(0, 0, 0, 0.5), inset -1px 0 0 rgba(255, 255, 255, 0.12);
   --material-navigation-text: #f4faf8;
   --material-navigation-muted: #a8c0be;
   --material-navigation-control-background: rgba(255, 255, 255, 0.08);
   --material-navigation-control-hover-background: rgba(255, 255, 255, 0.15);
   --material-navigation-control-border: rgba(255, 255, 255, 0.17);
-  --material-navigation-control-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15), 0 6px 16px rgba(0, 0, 0, 0.2);
+  --material-navigation-control-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 2px 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 rgba(0, 0, 0, 0.2), 0 6px 16px rgba(0, 0, 0, 0.2);
+  --material-navigation-control-hover-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 2px 0 rgba(255, 255, 255, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.26), 0 8px 20px rgba(0, 0, 0, 0.28);
+  --material-navigation-control-pressed-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(0, 0, 0, 0.32), 0 2px 7px rgba(0, 0, 0, 0.22);
   --material-navigation-action-background: rgba(255, 255, 255, 0.11);
   --material-navigation-action-border: rgba(255, 255, 255, 0.17);
-  --material-list-item-background: rgba(30, 42, 46, 0.9);
+  --material-list-item-background: rgba(30, 42, 46, 0.86);
   --material-list-item-secondary-color: var(--ui-text-muted);
   --material-list-item-secondary-opacity: 1;
-  --material-browser-background: rgba(17, 24, 27, 0.88);
+  --material-browser-background: rgba(17, 24, 27, 0.84);
   --material-tooltip-background: #081115;
   --material-rich-tooltip-background: rgba(21, 31, 35, 0.84);
   --material-rich-tooltip-border: rgba(222, 244, 239, 0.17);
@@ -164,16 +168,16 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
 
 body[data-ui-skin="liquid-glass"] {
   background:
-    linear-gradient(135deg, rgba(48, 143, 130, 0.2) 0%, rgba(48, 143, 130, 0.04) 38%, transparent 58%),
-    linear-gradient(315deg, rgba(222, 175, 64, 0.16) 0%, rgba(222, 175, 64, 0.025) 40%, transparent 62%),
+    linear-gradient(135deg, rgba(48, 143, 130, 0.24) 0%, rgba(48, 143, 130, 0.05) 38%, transparent 58%),
+    linear-gradient(315deg, rgba(222, 175, 64, 0.18) 0%, rgba(222, 175, 64, 0.03) 40%, transparent 62%),
     var(--ui-canvas-bg);
   background-attachment: fixed;
 }
 
 body.dark-theme[data-ui-skin="liquid-glass"] {
   background:
-    linear-gradient(135deg, rgba(45, 135, 124, 0.18) 0%, rgba(45, 135, 124, 0.025) 40%, transparent 62%),
-    linear-gradient(315deg, rgba(181, 137, 47, 0.12) 0%, rgba(181, 137, 47, 0.02) 42%, transparent 64%),
+    linear-gradient(135deg, rgba(45, 135, 124, 0.22) 0%, rgba(45, 135, 124, 0.035) 40%, transparent 62%),
+    linear-gradient(315deg, rgba(181, 137, 47, 0.14) 0%, rgba(181, 137, 47, 0.025) 42%, transparent 64%),
     var(--ui-canvas-bg);
 }
 
@@ -196,6 +200,11 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel :where(.utility-button, .nav
 }
 
 body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {
+  border-color: color-mix(in srgb, var(--ui-accent) 64%, var(--material-navigation-control-border));
+  background: color-mix(in srgb, var(--ui-accent) 20%, var(--material-navigation-control-hover-background));
+}
+
+body.dark-theme[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {
   border-color: color-mix(in srgb, var(--ui-accent) 56%, var(--material-navigation-control-border));
   background: color-mix(in srgb, var(--ui-accent) 14%, var(--material-navigation-control-hover-background));
 }
@@ -311,6 +320,8 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {
     --material-navigation-text: CanvasText;
     --material-navigation-muted: CanvasText;
     --material-navigation-control-shadow: none;
+    --material-navigation-control-hover-shadow: none;
+    --material-navigation-control-pressed-shadow: none;
     --material-list-item-background: Canvas;
     --material-browser-background: Canvas;
     --material-rich-tooltip-background: Canvas;
@@ -331,7 +342,8 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {
     -webkit-backdrop-filter: none;
   }
 
-  body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {
+  body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active,
+  body.dark-theme[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {
     border-color: Highlight;
     background: Canvas;
     color: CanvasText;

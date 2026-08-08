@@ -60,6 +60,8 @@
   --material-navigation-control-hover-background: rgba(255, 255, 255, 0.16);
   --material-navigation-control-border: rgba(255, 255, 255, 0.24);
   --material-navigation-control-shadow: none;
+  --material-navigation-control-hover-shadow: none;
+  --material-navigation-control-pressed-shadow: none;
   --material-navigation-action-background: rgba(255, 255, 255, 0.12);
   --material-navigation-action-border: rgba(255, 255, 255, 0.18);
   --material-list-item-background: #ffffff;

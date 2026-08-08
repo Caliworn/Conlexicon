@@ -1177,7 +1177,8 @@ label span {
 .tool-list {
   align-content: start;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .tool-button,
@@ -1202,6 +1203,15 @@ label span {
 
 .dictionary-panel :where(.utility-button, .nav-collapse-button) {
   box-shadow: var(--material-navigation-control-shadow);
+}
+
+.dictionary-panel :where(.tool-button, .utility-button, .nav-collapse-button):hover:not(:disabled) {
+  box-shadow: var(--material-navigation-control-hover-shadow);
+}
+
+.dictionary-panel :where(.tool-button, .utility-button, .nav-collapse-button):active:not(:disabled) {
+  box-shadow: var(--material-navigation-control-pressed-shadow);
+  transform: translateY(1px);
 }
 
 .tool-icon {
