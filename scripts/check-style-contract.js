@@ -8,10 +8,12 @@ const tokenPath = path.join(ROOT_DIR, "theme-tokens.css");
 const liquidGlassPath = path.join(ROOT_DIR, "theme-liquid-glass.css");
 const stylesPath = path.join(ROOT_DIR, "styles.css");
 const indexPath = path.join(ROOT_DIR, "index.html");
+const appPath = path.join(ROOT_DIR, "app.js");
 const tokens = fs.readFileSync(tokenPath, "utf8");
 const liquidGlass = fs.readFileSync(liquidGlassPath, "utf8");
 const styles = fs.readFileSync(stylesPath, "utf8");
 const index = fs.readFileSync(indexPath, "utf8");
+const app = fs.readFileSync(appPath, "utf8");
 
 const tokenLinkPosition = index.indexOf('href="theme-tokens.css"');
 const liquidGlassLinkPosition = index.indexOf('href="theme-liquid-glass.css"');
@@ -75,6 +77,27 @@ assert(
   !/(?:transition|animation)[^;]*(?:backdrop-filter|blur\(|box-shadow)/i.test(liquidGlass),
   "Liquid Glass must not animate blur or large material shadows",
 );
+assert(!/radial-gradient\(/i.test(liquidGlass), "Liquid Glass optical layers must not use gradient orbs");
+const pointerTargetContract = app.match(/const LIQUID_GLASS_POINTER_TARGET_SELECTOR = \[([\s\S]*?)\]\.join\(", "\);/);
+assert(pointerTargetContract, "LG-4C must declare an explicit pointer-responsive surface allowlist");
+for (const forbiddenTarget of ["entry-card", "analysis-card", "table-row", "network-node"]) {
+  assert(
+    !pointerTargetContract[1].includes(forbiddenTarget),
+    `LG-4C pointer response must not target repeated content surface: ${forbiddenTarget}`,
+  );
+}
+assert(
+  /requestAnimationFrame\(flushLiquidGlassPointerEffect\)/.test(app),
+  "LG-4C pointer updates must be coalesced through requestAnimationFrame",
+);
+for (const mediaQueryName of [
+  "liquidGlassFinePointerMediaQuery",
+  "liquidGlassReducedMotionMediaQuery",
+  "liquidGlassReducedTransparencyMediaQuery",
+  "liquidGlassForcedColorsMediaQuery",
+]) {
+  assert(app.includes(mediaQueryName), `LG-4C must retain its ${mediaQueryName} guard`);
+}
 assert(
   styles.includes("box-shadow: var(--material-navigation-control-hover-shadow);"),
   "Navigation controls must use the navigation hover shadow instead of generic control hover styling",
@@ -82,6 +105,17 @@ assert(
 assert(
   styles.includes("box-shadow: var(--material-navigation-control-pressed-shadow);"),
   "Navigation controls must use the navigation pressed shadow instead of generic control pressed styling",
+);
+assert(
+  styles.includes("background: var(--material-navigation-drawer-background);")
+    && styles.includes("backdrop-filter: var(--material-navigation-drawer-filter);"),
+  "Mobile navigation drawers must consume their dedicated overlay material",
+);
+assert(
+  /input:is\(\[type="checkbox"\], \[type="radio"\]\)\s*\{[^}]*box-shadow:\s*none;/s.test(styles)
+    && /input:is\(\[type="checkbox"\], \[type="radio"\]\):focus-visible/.test(styles)
+    && /body\[data-input-modality="pointer"\][^{]*input:is\(\[type="checkbox"\], \[type="radio"\]\):focus-visible/.test(styles),
+  "Native choice controls must avoid text-control material shadows and retain keyboard focus visibility",
 );
 
 const liquidTokenValues = (tokenName) => [
@@ -92,6 +126,7 @@ for (const tokenName of [
   "--material-sticky-background",
   "--material-mobile-bar-background",
   "--material-navigation-background",
+  "--material-navigation-drawer-background",
 ]) {
   const themeValues = liquidTokenValues(tokenName).slice(0, 2);
   assert.equal(themeValues.length, 2, `${tokenName} must define light and dark Liquid Glass values`);

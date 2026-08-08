@@ -40,7 +40,7 @@ body.app-boot-settling :where(.app-shell, .content-grid, .dictionary-panel, .ent
 }
 
 button,
-input,
+input:not([type="checkbox"]):not([type="radio"]),
 select,
 textarea {
   font: inherit;
@@ -141,6 +141,8 @@ body.mobile-drawer-open {
   min-height: 0;
   padding: 24px;
   background: var(--material-navigation-background);
+  backdrop-filter: var(--material-navigation-filter);
+  -webkit-backdrop-filter: var(--material-navigation-filter);
   color: var(--material-navigation-text);
   overflow: hidden;
   transition: padding 180ms ease;
@@ -955,7 +957,7 @@ textarea {
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 
-input,
+input:not([type="checkbox"]):not([type="radio"]),
 select {
   height: 40px;
   padding: 0 12px;
@@ -968,11 +970,31 @@ textarea {
   line-height: 1.55;
 }
 
-input:focus,
+input:not([type="checkbox"]):not([type="radio"]):focus,
 select:focus,
 textarea:focus {
   border-color: var(--ui-focus);
   box-shadow: var(--ui-focus-ring);
+}
+
+input:is([type="checkbox"], [type="radio"]) {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  accent-color: var(--ui-accent);
+  outline: none;
+  transition: none;
+}
+
+input:is([type="checkbox"], [type="radio"]):focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+body[data-input-modality="pointer"] input:is([type="checkbox"], [type="radio"]):focus-visible {
+  outline: none;
 }
 
 label {
@@ -5098,8 +5120,10 @@ dialog::backdrop {
     min-height: 0;
     padding: 20px;
     overflow-y: auto;
+    background: var(--material-navigation-drawer-background);
     box-shadow: var(--material-navigation-shadow);
-    backdrop-filter: var(--material-navigation-filter);
+    backdrop-filter: var(--material-navigation-drawer-filter);
+    -webkit-backdrop-filter: var(--material-navigation-drawer-filter);
   }
 
   .app-nav[data-nav-state="rail"] .brand-row,

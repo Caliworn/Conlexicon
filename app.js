@@ -38,6 +38,21 @@ const shellState = {
 let activeAppTooltipTarget = null;
 const desktopNavMediaQuery = window.matchMedia("(min-width: 800px)");
 const wideNavMediaQuery = window.matchMedia("(min-width: 1280px)");
+const liquidGlassFinePointerMediaQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
+const liquidGlassReducedMotionMediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+const liquidGlassReducedTransparencyMediaQuery = window.matchMedia("(prefers-reduced-transparency: reduce)");
+const liquidGlassForcedColorsMediaQuery = window.matchMedia("(forced-colors: active)");
+const LIQUID_GLASS_POINTER_TARGET_SELECTOR = [
+  ".dictionary-panel",
+  ".entry-search-config-menu",
+  ".entry-filter-menu",
+  "dialog[open]",
+  ".modal-panel",
+  ".network-panel",
+].join(", ");
+let liquidGlassPointerTarget = null;
+let liquidGlassPointerFrame = 0;
+let pendingLiquidGlassPointer = null;
 const entryQueryModel = window.ConlexiconEntryQuery;
 const ipaModel = window.ConlexiconIpa;
 const IPA_STRESS_MARKER = ipaModel.IPA_STRESS_MARKER;
@@ -3415,6 +3430,82 @@ function applyAppearance() {
     document.body.dataset.uiSkin = "liquid-glass";
   } else {
     delete document.body.dataset.uiSkin;
+  }
+  if (!liquidGlassPointerEffectsEnabled()) {
+    resetLiquidGlassPointerEffect();
+  }
+}
+
+function liquidGlassPointerEffectsEnabled() {
+  return document.body.dataset.uiSkin === "liquid-glass"
+    && liquidGlassFinePointerMediaQuery.matches
+    && !liquidGlassReducedMotionMediaQuery.matches
+    && !liquidGlassReducedTransparencyMediaQuery.matches
+    && !liquidGlassForcedColorsMediaQuery.matches;
+}
+
+function resetLiquidGlassPointerEffect() {
+  if (liquidGlassPointerFrame) {
+    cancelAnimationFrame(liquidGlassPointerFrame);
+    liquidGlassPointerFrame = 0;
+  }
+  pendingLiquidGlassPointer = null;
+  if (!liquidGlassPointerTarget) {
+    return;
+  }
+  liquidGlassPointerTarget.removeAttribute("data-liquid-glass-pointer");
+  liquidGlassPointerTarget.style.removeProperty("--liquid-glass-pointer-x");
+  liquidGlassPointerTarget.style.removeProperty("--liquid-glass-pointer-y");
+  liquidGlassPointerTarget = null;
+}
+
+function flushLiquidGlassPointerEffect() {
+  liquidGlassPointerFrame = 0;
+  const pending = pendingLiquidGlassPointer;
+  pendingLiquidGlassPointer = null;
+  if (!pending || !pending.target.isConnected || !liquidGlassPointerEffectsEnabled()) {
+    resetLiquidGlassPointerEffect();
+    return;
+  }
+
+  const bounds = pending.target.getBoundingClientRect();
+  if (!bounds.width || !bounds.height) {
+    resetLiquidGlassPointerEffect();
+    return;
+  }
+  if (liquidGlassPointerTarget && liquidGlassPointerTarget !== pending.target) {
+    resetLiquidGlassPointerEffect();
+  }
+
+  const normalizedX = Math.max(0, Math.min(1, (pending.clientX - bounds.left) / bounds.width));
+  const normalizedY = Math.max(0, Math.min(1, (pending.clientY - bounds.top) / bounds.height));
+  const pointerX = Math.round((12 + normalizedX * 76) / 2) * 2;
+  const pointerY = Math.round((12 + normalizedY * 76) / 2) * 2;
+  liquidGlassPointerTarget = pending.target;
+  liquidGlassPointerTarget.dataset.liquidGlassPointer = "active";
+  liquidGlassPointerTarget.style.setProperty("--liquid-glass-pointer-x", `${pointerX}%`);
+  liquidGlassPointerTarget.style.setProperty("--liquid-glass-pointer-y", `${pointerY}%`);
+}
+
+function scheduleLiquidGlassPointerEffect(event) {
+  if (!liquidGlassPointerEffectsEnabled() || event.pointerType === "touch") {
+    resetLiquidGlassPointerEffect();
+    return;
+  }
+  const target = event.target instanceof Element
+    ? event.target.closest(LIQUID_GLASS_POINTER_TARGET_SELECTOR)
+    : null;
+  if (!target) {
+    resetLiquidGlassPointerEffect();
+    return;
+  }
+  pendingLiquidGlassPointer = {
+    target,
+    clientX: event.clientX,
+    clientY: event.clientY,
+  };
+  if (!liquidGlassPointerFrame) {
+    liquidGlassPointerFrame = requestAnimationFrame(flushLiquidGlassPointerEffect);
   }
 }
 
@@ -15963,16 +16054,40 @@ document.addEventListener("pointerout", (event) => {
   }
 });
 document.addEventListener("pointermove", syncAppTooltipVisibility, { passive: true });
+document.addEventListener("pointermove", scheduleLiquidGlassPointerEffect, { passive: true });
+document.addEventListener("pointerdown", () => {
+  document.body.dataset.inputModality = "pointer";
+}, { capture: true, passive: true });
+document.addEventListener("keydown", () => {
+  delete document.body.dataset.inputModality;
+}, { capture: true });
 document.addEventListener("pointercancel", hideAppTooltip);
-document.addEventListener("mouseleave", hideAppTooltip);
-window.addEventListener("blur", hideAppTooltip);
-window.addEventListener("resize", hideAppTooltip);
+document.addEventListener("pointercancel", resetLiquidGlassPointerEffect);
+document.addEventListener("mouseleave", () => {
+  hideAppTooltip();
+  resetLiquidGlassPointerEffect();
+});
+window.addEventListener("blur", () => {
+  hideAppTooltip();
+  resetLiquidGlassPointerEffect();
+});
+window.addEventListener("resize", () => {
+  hideAppTooltip();
+  resetLiquidGlassPointerEffect();
+});
 window.addEventListener("scroll", hideAppTooltip, { passive: true });
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     hideAppTooltip();
+    resetLiquidGlassPointerEffect();
   }
 });
+[
+  liquidGlassFinePointerMediaQuery,
+  liquidGlassReducedMotionMediaQuery,
+  liquidGlassReducedTransparencyMediaQuery,
+  liquidGlassForcedColorsMediaQuery,
+].forEach((mediaQuery) => mediaQuery.addEventListener("change", resetLiquidGlassPointerEffect));
 document.addEventListener("focusin", (event) => {
   const target = appTooltipTargetFromEvent(event);
   if (target) {

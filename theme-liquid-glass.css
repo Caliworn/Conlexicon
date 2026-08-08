@@ -49,9 +49,11 @@ body[data-ui-skin="liquid-glass"] {
   --material-mobile-bar-background: linear-gradient(145deg, rgba(255, 255, 255, 0.36) 0%, rgba(255, 255, 255, 0.08) 36%, transparent 58%), linear-gradient(315deg, rgba(93, 167, 154, 0.09) 0%, transparent 44%), rgba(238, 244, 242, 0.6);
   --material-mobile-bar-shadow: 0 12px 28px rgba(20, 37, 41, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.68);
   --material-mobile-bar-filter: blur(26px) saturate(1.12);
-  --material-navigation-background: linear-gradient(145deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.018) 38%, transparent 60%), linear-gradient(320deg, rgba(71, 168, 155, 0.09) 0%, transparent 45%), rgba(12, 29, 34, 0.89);
+  --material-navigation-background: linear-gradient(145deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.018) 38%, transparent 60%), linear-gradient(320deg, rgba(71, 168, 155, 0.09) 0%, transparent 45%), rgb(12, 29, 34);
   --material-navigation-shadow: 0 24px 54px rgba(10, 24, 28, 0.32), inset -1px 0 0 rgba(255, 255, 255, 0.1);
-  --material-navigation-filter: blur(24px) saturate(1.08);
+  --material-navigation-filter: none;
+  --material-navigation-drawer-background: linear-gradient(145deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.018) 38%, transparent 60%), linear-gradient(320deg, rgba(71, 168, 155, 0.09) 0%, transparent 45%), rgba(12, 29, 34, 0.89);
+  --material-navigation-drawer-filter: blur(24px) saturate(1.08);
   --material-navigation-text: #f7fbfa;
   --material-navigation-muted: #c2d0ce;
   --material-navigation-control-background: rgba(255, 255, 255, 0.1);
@@ -134,8 +136,9 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-sticky-shadow: 0 12px 28px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   --material-mobile-bar-background: linear-gradient(145deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.025) 36%, transparent 58%), linear-gradient(315deg, rgba(71, 168, 155, 0.08) 0%, transparent 46%), rgba(17, 25, 28, 0.6);
   --material-mobile-bar-shadow: 0 14px 34px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.09);
-  --material-navigation-background: linear-gradient(145deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.018) 40%, transparent 62%), linear-gradient(320deg, rgba(71, 168, 155, 0.1) 0%, transparent 46%), rgba(9, 22, 26, 0.72);
+  --material-navigation-background: linear-gradient(145deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.018) 40%, transparent 62%), linear-gradient(320deg, rgba(71, 168, 155, 0.1) 0%, transparent 46%), rgb(9, 22, 26);
   --material-navigation-shadow: 0 26px 58px rgba(0, 0, 0, 0.5), inset -1px 0 0 rgba(255, 255, 255, 0.12);
+  --material-navigation-drawer-background: linear-gradient(145deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.018) 40%, transparent 62%), linear-gradient(320deg, rgba(71, 168, 155, 0.1) 0%, transparent 46%), rgba(9, 22, 26, 0.72);
   --material-navigation-text: #f4faf8;
   --material-navigation-muted: #a8c0be;
   --material-navigation-control-background: rgba(255, 255, 255, 0.08);
@@ -184,8 +187,6 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
 body[data-ui-skin="liquid-glass"] .dictionary-panel {
   border-right: 1px solid var(--material-navigation-control-border);
   box-shadow: var(--material-navigation-shadow);
-  backdrop-filter: var(--material-navigation-filter);
-  -webkit-backdrop-filter: var(--material-navigation-filter);
 }
 
 body[data-ui-skin="liquid-glass"] .dictionary-panel :where(.utility-button, .nav-collapse-button) {
@@ -209,6 +210,21 @@ body.dark-theme[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.acti
   background: color-mix(in srgb, var(--ui-accent) 14%, var(--material-navigation-control-hover-background));
 }
 
+body[data-ui-skin="liquid-glass"] :where(
+  .dictionary-panel,
+  .entry-search-config-menu,
+  .entry-filter-menu,
+  dialog[open],
+  .modal-panel,
+  .network-panel
+)[data-liquid-glass-pointer="active"] {
+  background-position:
+    var(--liquid-glass-pointer-x, 50%) var(--liquid-glass-pointer-y, 50%),
+    calc(100% - var(--liquid-glass-pointer-x, 50%)) calc(100% - var(--liquid-glass-pointer-y, 50%));
+  background-size: 160% 160%, 145% 145%;
+  background-repeat: no-repeat;
+}
+
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   body[data-ui-skin="liquid-glass"] {
     background: var(--ui-canvas-bg);
@@ -223,6 +239,8 @@ body.dark-theme[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.acti
     --material-mobile-bar-filter: none;
     --material-navigation-background: #13272c;
     --material-navigation-filter: none;
+    --material-navigation-drawer-background: #13272c;
+    --material-navigation-drawer-filter: none;
     --material-list-item-background: #fafcfb;
     --material-browser-background: #eef3f1;
     --material-rich-tooltip-background: #f2f7f5;
@@ -236,6 +254,7 @@ body.dark-theme[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.acti
     --material-sticky-background: #11191c;
     --material-mobile-bar-background: #11191c;
     --material-navigation-background: #09161a;
+    --material-navigation-drawer-background: #09161a;
     --material-list-item-background: #1e2a2e;
     --material-browser-background: #11181b;
     --material-rich-tooltip-background: #151f23;
@@ -256,6 +275,8 @@ body.dark-theme[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.acti
     --material-mobile-bar-filter: none;
     --material-navigation-background: #13272c;
     --material-navigation-filter: none;
+    --material-navigation-drawer-background: #13272c;
+    --material-navigation-drawer-filter: none;
     --material-list-item-background: #fafcfb;
     --material-browser-background: #eef3f1;
     --material-rich-tooltip-background: #f2f7f5;
@@ -269,6 +290,7 @@ body.dark-theme[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.acti
     --material-sticky-background: #11191c;
     --material-mobile-bar-background: #11191c;
     --material-navigation-background: #09161a;
+    --material-navigation-drawer-background: #09161a;
     --material-list-item-background: #1e2a2e;
     --material-browser-background: #11181b;
     --material-rich-tooltip-background: #151f23;
@@ -317,6 +339,8 @@ body.dark-theme[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.acti
     --material-navigation-background: Canvas;
     --material-navigation-shadow: none;
     --material-navigation-filter: none;
+    --material-navigation-drawer-background: Canvas;
+    --material-navigation-drawer-filter: none;
     --material-navigation-text: CanvasText;
     --material-navigation-muted: CanvasText;
     --material-navigation-control-shadow: none;

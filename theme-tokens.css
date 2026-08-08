@@ -54,6 +54,8 @@
   --material-navigation-background: #22313a;
   --material-navigation-shadow: 0 18px 40px rgba(24, 36, 48, 0.12);
   --material-navigation-filter: none;
+  --material-navigation-drawer-background: var(--material-navigation-background);
+  --material-navigation-drawer-filter: none;
   --material-navigation-text: #f8fbfa;
   --material-navigation-muted: #a9c0c3;
   --material-navigation-control-background: rgba(255, 255, 255, 0.08);
