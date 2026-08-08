@@ -27,6 +27,14 @@ body[data-ui-skin="liquid-glass"] {
   --material-panel-soft-shadow: 0 12px 30px rgba(20, 42, 45, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.7);
   --material-card-shadow: 0 8px 22px rgba(20, 42, 45, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.58);
   --material-panel-filter: none;
+  --material-entry-detail-background: linear-gradient(135deg, rgba(255, 255, 255, 0.38) 0%, rgba(255, 255, 255, 0.1) 24%, transparent 48%), linear-gradient(315deg, rgba(93, 167, 154, 0.07) 0%, transparent 44%), rgba(250, 252, 251, 0.7);
+  --material-entry-detail-mobile-background: linear-gradient(135deg, rgba(255, 255, 255, 0.38) 0%, rgba(255, 255, 255, 0.1) 24%, transparent 48%), linear-gradient(315deg, rgba(93, 167, 154, 0.07) 0%, transparent 44%), rgba(250, 252, 251, 0.78);
+  --material-entry-detail-border: rgba(74, 96, 99, 0.28);
+  --material-entry-detail-shadow: 0 18px 42px rgba(20, 42, 45, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.88), inset 0 -1px 0 rgba(87, 118, 116, 0.08);
+  --material-entry-detail-filter: blur(18px) saturate(1.08);
+  --material-entry-detail-mobile-filter: blur(12px) saturate(1.06);
+  --material-entry-detail-section-background: rgba(250, 252, 251, 0.92);
+  --material-entry-detail-section-border: rgba(74, 96, 99, 0.2);
   --material-control-background: rgba(252, 254, 253, 0.7);
   --material-control-border: rgba(74, 96, 99, 0.26);
   --material-control-shadow: 0 4px 10px rgba(20, 42, 45, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.96), inset 0 2px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(67, 101, 99, 0.11);
@@ -118,6 +126,12 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-panel-shadow: 0 20px 48px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 rgba(0, 0, 0, 0.18);
   --material-panel-soft-shadow: 0 14px 34px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   --material-card-shadow: 0 8px 22px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  --material-entry-detail-background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.03) 26%, transparent 50%), linear-gradient(315deg, rgba(71, 168, 155, 0.07) 0%, transparent 46%), rgba(28, 38, 42, 0.74);
+  --material-entry-detail-mobile-background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.03) 26%, transparent 50%), linear-gradient(315deg, rgba(71, 168, 155, 0.07) 0%, transparent 46%), rgba(28, 38, 42, 0.82);
+  --material-entry-detail-border: rgba(222, 244, 239, 0.2);
+  --material-entry-detail-shadow: 0 20px 48px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  --material-entry-detail-section-background: rgba(28, 38, 42, 0.93);
+  --material-entry-detail-section-border: rgba(222, 244, 239, 0.15);
   --material-control-background: rgba(37, 49, 53, 0.7);
   --material-control-border: rgba(222, 244, 239, 0.2);
   --material-control-shadow: 0 5px 12px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 2px 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 rgba(0, 0, 0, 0.22);
@@ -210,6 +224,12 @@ body.dark-theme[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.acti
   background: color-mix(in srgb, var(--ui-accent) 14%, var(--material-navigation-control-hover-background));
 }
 
+@property --liquid-glass-light-opacity {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
 body[data-ui-skin="liquid-glass"] :where(
   .dictionary-panel,
   .entry-search-config-menu,
@@ -217,18 +237,78 @@ body[data-ui-skin="liquid-glass"] :where(
   dialog[open],
   .modal-panel,
   .network-panel
-)[data-liquid-glass-pointer="active"] {
-  background-position:
-    var(--liquid-glass-pointer-x, 50%) var(--liquid-glass-pointer-y, 50%),
-    calc(100% - var(--liquid-glass-pointer-x, 50%)) calc(100% - var(--liquid-glass-pointer-y, 50%));
-  background-size: 160% 160%, 145% 145%;
-  background-repeat: no-repeat;
+)[data-liquid-glass-pointer] {
+  --liquid-glass-light-opacity: 0;
+  --liquid-glass-point-alpha: 0.055;
+  --liquid-glass-edge-alpha: 0.08;
+  --liquid-glass-point-radius: 240px;
+  --liquid-glass-edge-span: 170px;
+  background:
+    radial-gradient(ellipse var(--liquid-glass-edge-span) 12px at var(--liquid-glass-pointer-x, 50%) 0%, rgb(255 255 255 / calc(var(--liquid-glass-light-opacity) * var(--liquid-glass-edge-alpha) * var(--liquid-glass-edge-top, 0))) 0%, transparent 100%),
+    radial-gradient(ellipse 12px var(--liquid-glass-edge-span) at 100% var(--liquid-glass-pointer-y, 50%), rgb(255 255 255 / calc(var(--liquid-glass-light-opacity) * var(--liquid-glass-edge-alpha) * var(--liquid-glass-edge-right, 0))) 0%, transparent 100%),
+    radial-gradient(ellipse var(--liquid-glass-edge-span) 12px at var(--liquid-glass-pointer-x, 50%) 100%, rgb(255 255 255 / calc(var(--liquid-glass-light-opacity) * var(--liquid-glass-edge-alpha) * var(--liquid-glass-edge-bottom, 0))) 0%, transparent 100%),
+    radial-gradient(ellipse 12px var(--liquid-glass-edge-span) at 0% var(--liquid-glass-pointer-y, 50%), rgb(255 255 255 / calc(var(--liquid-glass-light-opacity) * var(--liquid-glass-edge-alpha) * var(--liquid-glass-edge-left, 0))) 0%, transparent 100%),
+    radial-gradient(circle var(--liquid-glass-point-radius) at var(--liquid-glass-pointer-x, 50%) var(--liquid-glass-pointer-y, 50%), rgb(255 255 255 / calc(var(--liquid-glass-light-opacity) * var(--liquid-glass-point-alpha))) 0%, rgb(255 255 255 / calc(var(--liquid-glass-light-opacity) * var(--liquid-glass-point-alpha) * 0.5)) 34%, transparent 72%),
+    var(--liquid-glass-pointer-surface);
+  transition: --liquid-glass-light-opacity 150ms ease-out;
+}
+
+body[data-ui-skin="liquid-glass"] .dictionary-panel[data-liquid-glass-pointer] {
+  --liquid-glass-pointer-surface: var(--material-navigation-background);
+  --liquid-glass-point-alpha: 0.04;
+  --liquid-glass-edge-alpha: 0.055;
+  --liquid-glass-point-radius: 360px;
+  --liquid-glass-edge-span: 240px;
+}
+
+body[data-ui-skin="liquid-glass"] :where(
+  .entry-search-config-menu,
+  .entry-filter-menu,
+  dialog[open],
+  .modal-panel,
+  .network-panel
+)[data-liquid-glass-pointer] {
+  --liquid-glass-pointer-surface: var(--material-floating-background);
+}
+
+body[data-ui-skin="liquid-glass"] .network-panel[data-liquid-glass-pointer] {
+  --liquid-glass-point-alpha: 0.025;
+  --liquid-glass-edge-alpha: 0;
+  --liquid-glass-point-radius: 560px;
+}
+
+body.dark-theme[data-ui-skin="liquid-glass"] :where(
+  .entry-search-config-menu,
+  .entry-filter-menu,
+  dialog[open],
+  .modal-panel
+)[data-liquid-glass-pointer] {
+  --liquid-glass-point-alpha: 0.045;
+  --liquid-glass-edge-alpha: 0.065;
+}
+
+body.dark-theme[data-ui-skin="liquid-glass"] .dictionary-panel[data-liquid-glass-pointer] {
+  --liquid-glass-point-alpha: 0.035;
+  --liquid-glass-edge-alpha: 0.05;
+}
+
+body.dark-theme[data-ui-skin="liquid-glass"] .network-panel[data-liquid-glass-pointer] {
+  --liquid-glass-point-alpha: 0.02;
+}
+
+body[data-ui-skin="liquid-glass"] [data-liquid-glass-pointer="active"] {
+  --liquid-glass-light-opacity: 1;
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   body[data-ui-skin="liquid-glass"] {
     background: var(--ui-canvas-bg);
     --material-panel-background: #fafcfb;
+    --material-entry-detail-background: #fafcfb;
+    --material-entry-detail-mobile-background: #fafcfb;
+    --material-entry-detail-filter: none;
+    --material-entry-detail-mobile-filter: none;
+    --material-entry-detail-section-background: #ffffff;
     --material-control-background: #f8fbfa;
     --material-inset-background: #e5edec;
     --material-floating-background: #f2f7f5;
@@ -248,6 +328,9 @@ body[data-ui-skin="liquid-glass"] :where(
 
   body.dark-theme[data-ui-skin="liquid-glass"] {
     --material-panel-background: #1c262a;
+    --material-entry-detail-background: #1c262a;
+    --material-entry-detail-mobile-background: #1c262a;
+    --material-entry-detail-section-background: #202b2f;
     --material-control-background: #253135;
     --material-inset-background: #263236;
     --material-floating-background: #192428;
@@ -265,6 +348,11 @@ body[data-ui-skin="liquid-glass"] :where(
   body[data-ui-skin="liquid-glass"] {
     background: var(--ui-canvas-bg);
     --material-panel-background: #fafcfb;
+    --material-entry-detail-background: #fafcfb;
+    --material-entry-detail-mobile-background: #fafcfb;
+    --material-entry-detail-filter: none;
+    --material-entry-detail-mobile-filter: none;
+    --material-entry-detail-section-background: #ffffff;
     --material-control-background: #f8fbfa;
     --material-inset-background: #e5edec;
     --material-floating-background: #f2f7f5;
@@ -284,6 +372,9 @@ body[data-ui-skin="liquid-glass"] :where(
 
   body.dark-theme[data-ui-skin="liquid-glass"] {
     --material-panel-background: #1c262a;
+    --material-entry-detail-background: #1c262a;
+    --material-entry-detail-mobile-background: #1c262a;
+    --material-entry-detail-section-background: #202b2f;
     --material-control-background: #253135;
     --material-inset-background: #263236;
     --material-floating-background: #192428;
@@ -315,6 +406,14 @@ body[data-ui-skin="liquid-glass"] :where(
     --material-panel-shadow: none;
     --material-panel-soft-shadow: none;
     --material-card-shadow: none;
+    --material-entry-detail-background: Canvas;
+    --material-entry-detail-mobile-background: Canvas;
+    --material-entry-detail-border: CanvasText;
+    --material-entry-detail-shadow: none;
+    --material-entry-detail-filter: none;
+    --material-entry-detail-mobile-filter: none;
+    --material-entry-detail-section-background: Canvas;
+    --material-entry-detail-section-border: CanvasText;
     --material-control-background: ButtonFace;
     --material-control-border: ButtonText;
     --material-control-shadow: none;

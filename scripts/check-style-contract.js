@@ -52,6 +52,21 @@ assert.deepEqual(
   [],
   `Liquid Glass may only override base skin tokens: ${unknownLiquidGlassTokens.join(", ")}`,
 );
+const classicDarkTheme = tokens.match(/body\.dark-theme\s*\{([\s\S]*?)\n\}/);
+assert(classicDarkTheme, "Base tokens must define a classic dark theme scope");
+for (const tokenName of [
+  "--material-entry-detail-background",
+  "--material-entry-detail-mobile-background",
+  "--material-entry-detail-border",
+  "--material-entry-detail-shadow",
+  "--material-entry-detail-section-background",
+  "--material-entry-detail-section-border",
+]) {
+  assert(
+    classicDarkTheme[1].includes(`${tokenName}:`),
+    `Classic dark theme must override scoped entry detail token: ${tokenName}`,
+  );
+}
 assert(
   liquidGlass.includes('body[data-ui-skin="liquid-glass"]'),
   "Liquid Glass tokens must use the liquid-glass skin scope",
@@ -77,10 +92,22 @@ assert(
   !/(?:transition|animation)[^;]*(?:backdrop-filter|blur\(|box-shadow)/i.test(liquidGlass),
   "Liquid Glass must not animate blur or large material shadows",
 );
-assert(!/radial-gradient\(/i.test(liquidGlass), "Liquid Glass optical layers must not use gradient orbs");
+const pointerLightingRule = liquidGlass.match(
+  /body\[data-ui-skin="liquid-glass"\] :where\([\s\S]*?\)\[data-liquid-glass-pointer\] \{([\s\S]*?)\n\}/,
+);
+assert(pointerLightingRule, "LG-4C must declare a bounded pointer-lighting rule");
+assert.equal(
+  (pointerLightingRule[1].match(/radial-gradient\(/gi) || []).length,
+  5,
+  "LG-4C may use only one point light and four bounded edge glints",
+);
+assert(
+  !/radial-gradient\(/i.test(liquidGlass.replace(pointerLightingRule[0], "")),
+  "Radial gradients may only serve the bounded LG-4C pointer response",
+);
 const pointerTargetContract = app.match(/const LIQUID_GLASS_POINTER_TARGET_SELECTOR = \[([\s\S]*?)\]\.join\(", "\);/);
 assert(pointerTargetContract, "LG-4C must declare an explicit pointer-responsive surface allowlist");
-for (const forbiddenTarget of ["entry-card", "analysis-card", "table-row", "network-node"]) {
+for (const forbiddenTarget of ["entry-card", "entry-display", "analysis-card", "table-row", "network-node"]) {
   assert(
     !pointerTargetContract[1].includes(forbiddenTarget),
     `LG-4C pointer response must not target repeated content surface: ${forbiddenTarget}`,
@@ -90,6 +117,16 @@ assert(
   /requestAnimationFrame\(flushLiquidGlassPointerEffect\)/.test(app),
   "LG-4C pointer updates must be coalesced through requestAnimationFrame",
 );
+assert(
+  !/data-liquid-glass-pointer="active"[^}]*background-position/s.test(liquidGlass)
+    && /--liquid-glass-pointer-surface/.test(liquidGlass)
+    && /--liquid-glass-point-alpha/.test(liquidGlass)
+    && /--liquid-glass-edge-alpha/.test(liquidGlass),
+  "LG-4C.1 must layer bounded point and edge lighting over a fixed base material",
+);
+for (const edge of ["top", "right", "bottom", "left"]) {
+  assert(app.includes(`--liquid-glass-edge-${edge}`), `LG-4C.1 must calculate ${edge} edge proximity`);
+}
 for (const mediaQueryName of [
   "liquidGlassFinePointerMediaQuery",
   "liquidGlassReducedMotionMediaQuery",
@@ -112,6 +149,12 @@ assert(
   "Mobile navigation drawers must consume their dedicated overlay material",
 );
 assert(
+  styles.includes("background: var(--material-entry-detail-background);")
+    && styles.includes("background: var(--material-entry-detail-section-background);")
+    && styles.includes("backdrop-filter: var(--material-entry-detail-filter);"),
+  "Entry detail must use its focused-object shell and stable section materials",
+);
+assert(
   /input:is\(\[type="checkbox"\], \[type="radio"\]\)\s*\{[^}]*box-shadow:\s*none;/s.test(styles)
     && /input:is\(\[type="checkbox"\], \[type="radio"\]\):focus-visible/.test(styles)
     && /body\[data-input-modality="pointer"\][^{]*input:is\(\[type="checkbox"\], \[type="radio"\]\):focus-visible/.test(styles),
@@ -127,6 +170,8 @@ for (const tokenName of [
   "--material-mobile-bar-background",
   "--material-navigation-background",
   "--material-navigation-drawer-background",
+  "--material-entry-detail-background",
+  "--material-entry-detail-mobile-background",
 ]) {
   const themeValues = liquidTokenValues(tokenName).slice(0, 2);
   assert.equal(themeValues.length, 2, `${tokenName} must define light and dark Liquid Glass values`);

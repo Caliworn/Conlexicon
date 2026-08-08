@@ -29,6 +29,14 @@
   --material-panel-soft-shadow: 0 12px 28px rgba(20, 32, 42, 0.06);
   --material-card-shadow: 0 1px 0 rgba(24, 36, 48, 0.04);
   --material-panel-filter: none;
+  --material-entry-detail-background: var(--material-panel-background);
+  --material-entry-detail-mobile-background: var(--material-entry-detail-background);
+  --material-entry-detail-border: var(--material-panel-border);
+  --material-entry-detail-shadow: var(--material-panel-shadow);
+  --material-entry-detail-filter: none;
+  --material-entry-detail-mobile-filter: var(--material-entry-detail-filter);
+  --material-entry-detail-section-background: var(--material-panel-background);
+  --material-entry-detail-section-border: var(--ui-border);
   --material-control-background: #ffffff;
   --material-control-border: var(--ui-border);
   --material-control-shadow: none;
@@ -122,6 +130,12 @@ body.dark-theme {
   --material-panel-background: #1f282d;
   --material-panel-border: var(--ui-border);
   --material-panel-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+  --material-entry-detail-background: var(--material-panel-background);
+  --material-entry-detail-mobile-background: var(--material-entry-detail-background);
+  --material-entry-detail-border: var(--material-panel-border);
+  --material-entry-detail-shadow: var(--material-panel-shadow);
+  --material-entry-detail-section-background: var(--material-panel-background);
+  --material-entry-detail-section-border: var(--ui-border);
   --material-control-background: #1f282d;
   --material-control-border: var(--ui-border);
   --material-inset-background: #263238;

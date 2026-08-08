@@ -1278,13 +1278,14 @@ label span {
 
 .entry-display {
   display: grid;
-  gap: 28px;
+  gap: 20px;
   padding: 28px;
-  border: 1px solid var(--material-panel-border);
+  border: 1px solid var(--material-entry-detail-border);
   border-radius: var(--radius-panel);
-  background: var(--material-panel-background);
-  box-shadow: var(--material-panel-shadow);
-  backdrop-filter: var(--material-panel-filter);
+  background: var(--material-entry-detail-background);
+  box-shadow: var(--material-entry-detail-shadow);
+  backdrop-filter: var(--material-entry-detail-filter);
+  -webkit-backdrop-filter: var(--material-entry-detail-filter);
 }
 
 .entry-display-header {
@@ -1293,6 +1294,8 @@ label span {
   justify-content: space-between;
   gap: 18px;
   flex-wrap: wrap;
+  padding-bottom: 20px;
+  border-bottom: 1px solid color-mix(in srgb, var(--material-entry-detail-border) 72%, transparent);
 }
 
 .entry-display-header > div:first-child {
@@ -1441,10 +1444,10 @@ label span {
   gap: 14px;
   min-width: 0;
   max-width: 100%;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-entry-detail-section-border);
   border-radius: 2px;
   padding: 16px;
-  background: color-mix(in srgb, var(--material-panel-background) 88%, var(--ui-canvas-bg));
+  background: var(--material-entry-detail-section-background);
 }
 
 .section-heading {
@@ -4830,16 +4833,14 @@ dialog::backdrop {
   min-width: 0;
   min-height: 0;
   height: min(72vh, 760px);
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
   overflow: auto;
-  background: color-mix(in srgb, var(--material-panel-background) 88%, var(--ui-canvas-bg));
   scrollbar-gutter: stable;
 }
 
 .network-svg {
   display: block;
   width: 100%;
+  min-height: 100%;
   min-width: 300px;
   overflow: visible;
 }
@@ -5096,6 +5097,12 @@ dialog::backdrop {
     overflow-y: auto;
     overscroll-behavior: none;
     padding: 14px 14px 24px;
+  }
+
+  .entry-display {
+    background: var(--material-entry-detail-mobile-background);
+    backdrop-filter: var(--material-entry-detail-mobile-filter);
+    -webkit-backdrop-filter: var(--material-entry-detail-mobile-filter);
   }
 
   .content-grid,
@@ -5373,6 +5380,7 @@ dialog::backdrop {
   .entry-display-header {
     flex-direction: column;
     gap: 14px;
+    padding-bottom: 18px;
   }
 
   .entry-display-header > div:first-child {

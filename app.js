@@ -50,6 +50,8 @@ const LIQUID_GLASS_POINTER_TARGET_SELECTOR = [
   ".modal-panel",
   ".network-panel",
 ].join(", ");
+const LIQUID_GLASS_POINTER_EXIT_MS = 150;
+const liquidGlassPointerExitTimers = new WeakMap();
 let liquidGlassPointerTarget = null;
 let liquidGlassPointerFrame = 0;
 let pendingLiquidGlassPointer = null;
@@ -3432,7 +3434,7 @@ function applyAppearance() {
     delete document.body.dataset.uiSkin;
   }
   if (!liquidGlassPointerEffectsEnabled()) {
-    resetLiquidGlassPointerEffect();
+    resetLiquidGlassPointerEffect(true);
   }
 }
 
@@ -3444,18 +3446,45 @@ function liquidGlassPointerEffectsEnabled() {
     && !liquidGlassForcedColorsMediaQuery.matches;
 }
 
-function resetLiquidGlassPointerEffect() {
+function clearLiquidGlassPointerTarget(target, immediate = false) {
+  if (!target) {
+    return;
+  }
+  const existingTimer = liquidGlassPointerExitTimers.get(target);
+  if (existingTimer) {
+    clearTimeout(existingTimer);
+    liquidGlassPointerExitTimers.delete(target);
+  }
+  const clearStyles = () => {
+    target.removeAttribute("data-liquid-glass-pointer");
+    target.style.removeProperty("--liquid-glass-pointer-x");
+    target.style.removeProperty("--liquid-glass-pointer-y");
+    target.style.removeProperty("--liquid-glass-edge-top");
+    target.style.removeProperty("--liquid-glass-edge-right");
+    target.style.removeProperty("--liquid-glass-edge-bottom");
+    target.style.removeProperty("--liquid-glass-edge-left");
+  };
+  if (immediate || !target.isConnected) {
+    clearStyles();
+    return;
+  }
+  target.dataset.liquidGlassPointer = "idle";
+  const timer = setTimeout(() => {
+    liquidGlassPointerExitTimers.delete(target);
+    if (target.dataset.liquidGlassPointer === "idle") {
+      clearStyles();
+    }
+  }, LIQUID_GLASS_POINTER_EXIT_MS);
+  liquidGlassPointerExitTimers.set(target, timer);
+}
+
+function resetLiquidGlassPointerEffect(immediate = false) {
   if (liquidGlassPointerFrame) {
     cancelAnimationFrame(liquidGlassPointerFrame);
     liquidGlassPointerFrame = 0;
   }
   pendingLiquidGlassPointer = null;
-  if (!liquidGlassPointerTarget) {
-    return;
-  }
-  liquidGlassPointerTarget.removeAttribute("data-liquid-glass-pointer");
-  liquidGlassPointerTarget.style.removeProperty("--liquid-glass-pointer-x");
-  liquidGlassPointerTarget.style.removeProperty("--liquid-glass-pointer-y");
+  clearLiquidGlassPointerTarget(liquidGlassPointerTarget, immediate);
   liquidGlassPointerTarget = null;
 }
 
@@ -3479,12 +3508,25 @@ function flushLiquidGlassPointerEffect() {
 
   const normalizedX = Math.max(0, Math.min(1, (pending.clientX - bounds.left) / bounds.width));
   const normalizedY = Math.max(0, Math.min(1, (pending.clientY - bounds.top) / bounds.height));
-  const pointerX = Math.round((12 + normalizedX * 76) / 2) * 2;
-  const pointerY = Math.round((12 + normalizedY * 76) / 2) * 2;
+  const pointerX = Math.round(normalizedX * 200) / 2;
+  const pointerY = Math.round(normalizedY * 200) / 2;
+  const edgeReach = 72;
+  const edgeStrength = (distance) => (
+    Math.round(Math.max(0, Math.min(1, 1 - distance / edgeReach)) * 50) / 50
+  );
   liquidGlassPointerTarget = pending.target;
+  const exitTimer = liquidGlassPointerExitTimers.get(liquidGlassPointerTarget);
+  if (exitTimer) {
+    clearTimeout(exitTimer);
+    liquidGlassPointerExitTimers.delete(liquidGlassPointerTarget);
+  }
   liquidGlassPointerTarget.dataset.liquidGlassPointer = "active";
   liquidGlassPointerTarget.style.setProperty("--liquid-glass-pointer-x", `${pointerX}%`);
   liquidGlassPointerTarget.style.setProperty("--liquid-glass-pointer-y", `${pointerY}%`);
+  liquidGlassPointerTarget.style.setProperty("--liquid-glass-edge-top", edgeStrength(pending.clientY - bounds.top));
+  liquidGlassPointerTarget.style.setProperty("--liquid-glass-edge-right", edgeStrength(bounds.right - pending.clientX));
+  liquidGlassPointerTarget.style.setProperty("--liquid-glass-edge-bottom", edgeStrength(bounds.bottom - pending.clientY));
+  liquidGlassPointerTarget.style.setProperty("--liquid-glass-edge-left", edgeStrength(pending.clientX - bounds.left));
 }
 
 function scheduleLiquidGlassPointerEffect(event) {
@@ -16069,17 +16111,17 @@ document.addEventListener("mouseleave", () => {
 });
 window.addEventListener("blur", () => {
   hideAppTooltip();
-  resetLiquidGlassPointerEffect();
+  resetLiquidGlassPointerEffect(true);
 });
 window.addEventListener("resize", () => {
   hideAppTooltip();
-  resetLiquidGlassPointerEffect();
+  resetLiquidGlassPointerEffect(true);
 });
 window.addEventListener("scroll", hideAppTooltip, { passive: true });
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     hideAppTooltip();
-    resetLiquidGlassPointerEffect();
+    resetLiquidGlassPointerEffect(true);
   }
 });
 [
@@ -16087,7 +16129,7 @@ document.addEventListener("visibilitychange", () => {
   liquidGlassReducedMotionMediaQuery,
   liquidGlassReducedTransparencyMediaQuery,
   liquidGlassForcedColorsMediaQuery,
-].forEach((mediaQuery) => mediaQuery.addEventListener("change", resetLiquidGlassPointerEffect));
+].forEach((mediaQuery) => mediaQuery.addEventListener("change", () => resetLiquidGlassPointerEffect(true)));
 document.addEventListener("focusin", (event) => {
   const target = appTooltipTargetFromEvent(event);
   if (target) {
