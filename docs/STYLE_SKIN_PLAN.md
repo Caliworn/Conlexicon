@@ -10,7 +10,7 @@
 
 ## 2. Token 层级
 
-语义颜色以 `--ui-*` 命名，表达画布、文字、边框、强调、警告、危险和焦点等含义。材质角色以 `--material-*` 命名，分别表达 panel、control、inset、floating、sticky、navigation、tooltip 和 overlay 的背景、边框、阴影与滤镜。圆角只保留 control、panel、floating 和 pill 四种角色。
+语义颜色以 `--ui-*` 命名，表达画布、文字、边框、强调、警告、危险和焦点等含义。材质角色以 `--material-*` 命名，分别表达 panel、control、inset、floating、mobile-bar、navigation、tooltip 和 overlay 的背景、边框、阴影与滤镜。圆角只保留 control、panel、floating 和 pill 四种角色。
 
 布局间距、虚拟列表尺寸、网格轨道、响应式断点和 z-index 不属于皮肤，不迁入 `theme-tokens.css`。`uiTheme` 仍只表达 light/dark，不在 S0 中引入 skin 设置。
 

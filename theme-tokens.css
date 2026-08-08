@@ -53,9 +53,6 @@
   --material-floating-shadow: 0 18px 40px rgba(24, 36, 48, 0.12);
   --material-floating-soft-shadow: 0 10px 24px rgba(24, 36, 48, 0.08);
   --material-floating-filter: none;
-  --material-sticky-background: #f4f6f2;
-  --material-sticky-shadow: none;
-  --material-sticky-filter: none;
   --material-mobile-bar-background: color-mix(in srgb, #f4f6f2 88%, #ffffff);
   --material-mobile-bar-shadow: 0 10px 24px rgba(24, 36, 48, 0.12);
   --material-mobile-bar-filter: blur(12px);
@@ -145,7 +142,6 @@ body.dark-theme {
   --material-floating-background: #1f282d;
   --material-floating-border: var(--ui-border);
   --material-floating-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
-  --material-sticky-background: #151a1d;
   --material-mobile-bar-background: color-mix(in srgb, #151a1d 86%, #1f282d);
   --material-navigation-background: #10181c;
   --material-navigation-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);

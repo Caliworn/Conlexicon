@@ -13,7 +13,7 @@
 | [Advanced Filter Query Plan](ADVANCED_FILTER_QUERY_PLAN.md) | F0–F4 核心完成 / F5 待办 | EntryFilter、轻量分析、IPA/形态 feature result，以及 Gloss/质量结果的后续边界。 |
 | [Feature Result Session Plan](FEATURE_RESULT_SESSION_PLAN.md) | F4b-0–F4b-3 已完成 | IPA/形态结果源、运行时会话、音系引擎边界和分阶段验收。 |
 | [Style Skin Plan](STYLE_SKIN_PLAN.md) | S0 已完成 | 样式 token、材质角色、视觉基线与通用皮肤边界。 |
-| [Layered Glass Skin Specification](LAYERED_GLASS_SKIN_SPEC.md) | LG-1–LG-4C 已完成 | 层叠玻璃皮肤的层级、透明度、静态与指针响应光学层、运行期选择、降级、性能验收与滚动适应边界。 |
+| [Layered Glass Skin Specification](LAYERED_GLASS_SKIN_SPEC.md) | LG-1–LG-4C 已完成 | 层叠玻璃皮肤的层级、透明度、静态与指针响应光学层、运行期选择、降级与性能验收。 |
 
 ## 推荐阅读顺序
 

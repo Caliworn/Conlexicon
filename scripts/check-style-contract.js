@@ -209,19 +209,18 @@ assert(
   "Native choice controls must avoid text-control material shadows and retain keyboard focus visibility",
 );
 
-const liquidTokenValues = (tokenName) => [
+const layeredGlassTokenValues = (tokenName) => [
   ...layeredGlass.matchAll(new RegExp(`${tokenName}\\s*:\\s*([^;]+);`, "g")),
 ].map((match) => match[1]);
 for (const tokenName of [
   "--material-floating-background",
-  "--material-sticky-background",
   "--material-mobile-bar-background",
   "--material-navigation-background",
   "--material-navigation-drawer-background",
   "--material-entry-detail-background",
   "--material-entry-detail-mobile-background",
 ]) {
-  const themeValues = liquidTokenValues(tokenName).slice(0, 2);
+  const themeValues = layeredGlassTokenValues(tokenName).slice(0, 2);
   assert.equal(themeValues.length, 2, `${tokenName} must define light and dark Layered Glass values`);
   assert(
     themeValues.every((value) => (value.match(/linear-gradient\(/g) || []).length === 2),
@@ -233,7 +232,7 @@ for (const tokenName of [
   "--material-list-item-background",
   "--material-browser-background",
 ]) {
-  const themeValues = liquidTokenValues(tokenName).slice(0, 2);
+  const themeValues = layeredGlassTokenValues(tokenName).slice(0, 2);
   assert.equal(themeValues.length, 2, `${tokenName} must define light and dark Layered Glass values`);
   assert(
     themeValues.every((value) => !/gradient\(/.test(value)),

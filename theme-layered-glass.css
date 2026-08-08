@@ -51,9 +51,6 @@ body[data-ui-skin="layered-glass"] {
   --material-floating-shadow: 0 24px 58px rgba(20, 37, 41, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.96), inset 0 -1px 0 rgba(67, 101, 99, 0.1);
   --material-floating-soft-shadow: 0 16px 38px rgba(20, 37, 41, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.82);
   --material-floating-filter: blur(28px) saturate(1.15);
-  --material-sticky-background: linear-gradient(145deg, rgba(255, 255, 255, 0.32) 0%, rgba(255, 255, 255, 0.08) 34%, transparent 56%), linear-gradient(315deg, rgba(93, 167, 154, 0.08) 0%, transparent 44%), rgba(238, 244, 242, 0.62);
-  --material-sticky-shadow: 0 14px 30px rgba(24, 42, 45, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.84);
-  --material-sticky-filter: blur(22px) saturate(1.1);
   --material-mobile-bar-background: linear-gradient(145deg, rgba(255, 255, 255, 0.36) 0%, rgba(255, 255, 255, 0.08) 36%, transparent 58%), linear-gradient(315deg, rgba(93, 167, 154, 0.09) 0%, transparent 44%), rgba(238, 244, 242, 0.6);
   --material-mobile-bar-shadow: 0 12px 28px rgba(20, 37, 41, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.68);
   --material-mobile-bar-filter: blur(26px) saturate(1.12);
@@ -148,8 +145,6 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --material-floating-border: rgba(222, 244, 239, 0.26);
   --material-floating-shadow: 0 26px 64px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(0, 0, 0, 0.24);
   --material-floating-soft-shadow: 0 18px 42px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  --material-sticky-background: linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.025) 36%, transparent 58%), linear-gradient(315deg, rgba(71, 168, 155, 0.08) 0%, transparent 46%), rgba(17, 25, 28, 0.6);
-  --material-sticky-shadow: 0 12px 28px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
   --material-mobile-bar-background: linear-gradient(145deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.025) 36%, transparent 58%), linear-gradient(315deg, rgba(71, 168, 155, 0.08) 0%, transparent 46%), rgba(17, 25, 28, 0.6);
   --material-mobile-bar-shadow: 0 14px 34px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.09);
   --material-navigation-background: linear-gradient(145deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.018) 40%, transparent 62%), linear-gradient(320deg, rgba(71, 168, 155, 0.1) 0%, transparent 46%), rgb(9, 22, 26);
@@ -323,8 +318,6 @@ body[data-ui-skin="layered-glass"] [data-layered-glass-pointer="active"] {
     --material-inset-background: #e5edec;
     --material-floating-background: #f2f7f5;
     --material-floating-filter: none;
-    --material-sticky-background: #eef4f2;
-    --material-sticky-filter: none;
     --material-mobile-bar-background: #eef4f2;
     --material-mobile-bar-filter: none;
     --material-navigation-background: #13272c;
@@ -346,7 +339,6 @@ body[data-ui-skin="layered-glass"] [data-layered-glass-pointer="active"] {
     --material-control-background: #253135;
     --material-inset-background: #263236;
     --material-floating-background: #192428;
-    --material-sticky-background: #11191c;
     --material-mobile-bar-background: #11191c;
     --material-navigation-background: #09161a;
     --material-navigation-drawer-background: #09161a;
@@ -369,8 +361,6 @@ body[data-ui-skin="layered-glass"] [data-layered-glass-pointer="active"] {
     --material-inset-background: #e5edec;
     --material-floating-background: #f2f7f5;
     --material-floating-filter: none;
-    --material-sticky-background: #eef4f2;
-    --material-sticky-filter: none;
     --material-mobile-bar-background: #eef4f2;
     --material-mobile-bar-filter: none;
     --material-navigation-background: #13272c;
@@ -392,7 +382,6 @@ body[data-ui-skin="layered-glass"] [data-layered-glass-pointer="active"] {
     --material-control-background: #253135;
     --material-inset-background: #263236;
     --material-floating-background: #192428;
-    --material-sticky-background: #11191c;
     --material-mobile-bar-background: #11191c;
     --material-navigation-background: #09161a;
     --material-navigation-drawer-background: #09161a;
@@ -443,9 +432,6 @@ body[data-ui-skin="layered-glass"] [data-layered-glass-pointer="active"] {
     --material-floating-shadow: none;
     --material-floating-soft-shadow: none;
     --material-floating-filter: none;
-    --material-sticky-background: Canvas;
-    --material-sticky-shadow: none;
-    --material-sticky-filter: none;
     --material-mobile-bar-background: Canvas;
     --material-mobile-bar-shadow: none;
     --material-mobile-bar-filter: none;
