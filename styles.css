@@ -383,7 +383,7 @@ fieldset {
   align-self: start;
   height: var(--entry-browser-height, calc(100vh - 172px));
   min-height: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .content-update-frame {
@@ -504,11 +504,8 @@ fieldset {
   gap: 10px;
   margin-bottom: 0;
   padding-bottom: 12px;
-  background: var(--material-sticky-background);
-  backdrop-filter: var(--material-sticky-filter);
-  position: sticky;
-  top: 0;
-  z-index: 2;
+  background: none;
+  backdrop-filter: none;
 }
 
 .entry-search-control {
@@ -1006,11 +1003,13 @@ label span {
 
 .primary-button {
   background: var(--ui-accent);
+  box-shadow: var(--material-action-shadow);
   color: var(--ui-text-on-solid);
 }
 
 .primary-button:hover {
   background: var(--ui-accent-hover);
+  box-shadow: var(--material-action-hover-shadow);
 }
 
 .secondary-button {
@@ -1023,11 +1022,38 @@ label span {
 
 .secondary-button:hover {
   border-color: var(--ui-border-strong);
+  box-shadow: var(--material-control-hover-shadow);
 }
 
 .danger-button {
   background: var(--ui-danger);
+  box-shadow: var(--material-action-shadow);
   color: var(--ui-text-on-solid);
+}
+
+.danger-button:hover {
+  box-shadow: var(--material-action-hover-shadow);
+}
+
+.primary-button:active:not(:disabled),
+.danger-button:active:not(:disabled) {
+  box-shadow: var(--material-action-pressed-shadow);
+  transform: translateY(1px);
+}
+
+.secondary-button:active:not(:disabled) {
+  box-shadow: var(--material-control-pressed-shadow);
+  transform: translateY(1px);
+}
+
+:is(.primary-button, .secondary-button, .danger-button, .danger-ghost, .icon-button):focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+:is(.primary-button, .secondary-button, .danger-button):disabled {
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 .ipa-batch-safe {
@@ -1045,6 +1071,18 @@ label span {
 .danger-ghost {
   background: var(--ui-danger-soft);
   color: var(--ui-danger);
+}
+
+.mobile-new-entry-button:is(:hover, :focus-visible):not(:disabled),
+.secondary-button.entry-list-new-button:is(:hover, :focus-visible),
+.active-filter-toolbar :is(.filter-clear-button, .active-filter-exit-button):is(:hover, :focus-visible) {
+  box-shadow: var(--material-action-hover-shadow);
+}
+
+.mobile-new-entry-button:active:not(:disabled),
+.secondary-button.entry-list-new-button:active:not(:disabled),
+.active-filter-toolbar :is(.filter-clear-button, .active-filter-exit-button):active:not(:disabled) {
+  box-shadow: var(--material-action-pressed-shadow);
 }
 
 .icon-button {
@@ -1158,7 +1196,12 @@ label span {
   min-height: 50px;
   padding: 14px;
   background: var(--material-navigation-control-background);
+  box-shadow: var(--material-navigation-control-shadow);
   color: var(--material-navigation-text);
+}
+
+.dictionary-panel :where(.utility-button, .nav-collapse-button) {
+  box-shadow: var(--material-navigation-control-shadow);
 }
 
 .tool-icon {
@@ -5091,11 +5134,6 @@ dialog::backdrop {
     background: var(--material-browser-background);
     box-shadow: var(--material-floating-shadow);
     backdrop-filter: var(--material-browser-filter);
-  }
-
-  .filter-row {
-    background: var(--material-sticky-background);
-    backdrop-filter: var(--material-sticky-filter);
   }
 
   .entry-filter-menu {

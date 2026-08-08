@@ -32,6 +32,11 @@
   --material-control-background: #ffffff;
   --material-control-border: var(--ui-border);
   --material-control-shadow: none;
+  --material-control-hover-shadow: none;
+  --material-control-pressed-shadow: none;
+  --material-action-shadow: none;
+  --material-action-hover-shadow: none;
+  --material-action-pressed-shadow: none;
   --material-control-filter: none;
   --material-inset-background: #eef3f8;
   --material-inset-border: var(--ui-border);
@@ -54,6 +59,7 @@
   --material-navigation-control-background: rgba(255, 255, 255, 0.08);
   --material-navigation-control-hover-background: rgba(255, 255, 255, 0.16);
   --material-navigation-control-border: rgba(255, 255, 255, 0.24);
+  --material-navigation-control-shadow: none;
   --material-navigation-action-background: rgba(255, 255, 255, 0.12);
   --material-navigation-action-border: rgba(255, 255, 255, 0.18);
   --material-list-item-background: #ffffff;
