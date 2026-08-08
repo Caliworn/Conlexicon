@@ -61,12 +61,17 @@ for (const tokenName of [
   "--material-entry-detail-shadow",
   "--material-entry-detail-section-background",
   "--material-entry-detail-section-border",
+  "--material-navigation-drawer-background",
 ]) {
   assert(
     classicDarkTheme[1].includes(`${tokenName}:`),
     `Classic dark theme must override scoped entry detail token: ${tokenName}`,
   );
 }
+assert(
+  classicDarkTheme[1].includes("--material-navigation-drawer-background: var(--material-navigation-background);"),
+  "Classic dark navigation drawer must rebind to the navigation background in the same theme scope",
+);
 assert(
   layeredGlass.includes('body[data-ui-skin="layered-glass"]'),
   "Layered Glass tokens must use the layered-glass skin scope",

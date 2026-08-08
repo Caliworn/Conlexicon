@@ -1544,6 +1544,8 @@ const elements = {
   themeToggleButton: document.querySelector("#themeToggleButton"),
   themeToggleLabel: document.querySelector("#themeToggleLabel"),
   skinToggleButton: document.querySelector("#skinToggleButton"),
+  classicSkinIcon: document.querySelector("#classicSkinIcon"),
+  layeredGlassSkinIcon: document.querySelector("#layeredGlassSkinIcon"),
   skinToggleLabel: document.querySelector("#skinToggleLabel"),
   languageToggleButton: document.querySelector("#languageToggleButton"),
   brandEyebrow: document.querySelector("#brandEyebrow"),
@@ -3374,8 +3376,11 @@ function applyLocale(root = document) {
   elements.themeToggleLabel.textContent = nextThemeLabel;
   elements.themeToggleButton.removeAttribute("title");
   elements.themeToggleButton.setAttribute("aria-label", nextThemeLabel);
-  const nextSkinLabel = currentSkin === "layered-glass" ? t("classicSkin") : t("layeredGlassSkin");
-  const nextSkinAriaLabel = currentSkin === "layered-glass" ? t("switchToClassicSkin") : t("switchToLayeredGlassSkin");
+  const nextSkin = currentSkin === "layered-glass" ? "classic" : "layered-glass";
+  const nextSkinLabel = nextSkin === "classic" ? t("classicSkin") : t("layeredGlassSkin");
+  const nextSkinAriaLabel = nextSkin === "classic" ? t("switchToClassicSkin") : t("switchToLayeredGlassSkin");
+  elements.classicSkinIcon.toggleAttribute("hidden", nextSkin !== "classic");
+  elements.layeredGlassSkinIcon.toggleAttribute("hidden", nextSkin !== "layered-glass");
   elements.skinToggleLabel.textContent = nextSkinLabel;
   elements.skinToggleButton.removeAttribute("title");
   elements.skinToggleButton.setAttribute("aria-label", nextSkinAriaLabel);

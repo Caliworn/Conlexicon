@@ -144,6 +144,7 @@ body.dark-theme {
   --material-floating-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
   --material-mobile-bar-background: color-mix(in srgb, #151a1d 86%, #1f282d);
   --material-navigation-background: #10181c;
+  --material-navigation-drawer-background: var(--material-navigation-background);
   --material-navigation-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
   --material-list-item-background: #202b31;
   --material-list-item-secondary-color: var(--ui-text-muted);
