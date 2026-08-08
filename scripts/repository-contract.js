@@ -7,6 +7,7 @@ const {
   importDictionaryFromPayload,
   normalizeDictionary,
   normalizeUiLanguage,
+  normalizeUiSkin,
   normalizeUiTheme,
 } = require("../lib/dictionary-model");
 const { createApiRouter } = require("../lib/api-routes");
@@ -1980,6 +1981,7 @@ async function runRepositoryContractTests(options = {}) {
     defaultIndex: DEFAULT_INDEX,
     normalizeDictionary,
     normalizeUiLanguage,
+    normalizeUiSkin,
     normalizeUiTheme,
     validateDictionary: assertUniqueDictionaryEntityIds,
   });
@@ -1993,6 +1995,7 @@ async function runRepositoryContractTests(options = {}) {
     assert.deepEqual(state.dictionaries, []);
     assert.equal(state.uiLanguage, "zh");
     assert.equal(state.uiTheme, "light");
+    assert.equal(state.uiSkin, "classic");
 
     const first = await repository.createDictionary(normalizeDictionary({
       name: "First",
@@ -2273,11 +2276,30 @@ async function runRepositoryContractTests(options = {}) {
     await checkAnalysisQueryContract(repository);
     await checkTagSetAnalysisContract(repository);
 
-    const preferences = await repository.updatePreferences({ uiLanguage: "en", uiTheme: "dark" });
-    assert.deepEqual(preferences, { uiLanguage: "en", uiTheme: "dark" });
+    const preferences = await repository.updatePreferences({
+      uiLanguage: "en",
+      uiTheme: "dark",
+      uiSkin: "liquid-glass",
+    });
+    assert.deepEqual(preferences, {
+      uiLanguage: "en",
+      uiTheme: "dark",
+      uiSkin: "liquid-glass",
+    });
     state = await repository.readState();
     assert.equal(state.uiLanguage, "en");
     assert.equal(state.uiTheme, "dark");
+    assert.equal(state.uiSkin, "liquid-glass");
+
+    apiResult = await callApi(repository, "PUT", "/api/preferences", { uiSkin: "classic" });
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.uiSkin, "classic");
+    const invalidSkinError = await assertRejectStatus(
+      callApi(repository, "PUT", "/api/preferences", { uiSkin: "unknown" }),
+      400,
+      "invalid UI skin",
+    );
+    assert.equal(invalidSkinError.code, "invalid_ui_skin");
 
     await assertRejectStatus(repository.importDictionary(first), 409, "duplicate import");
     await repository.importDictionary({ ...first, name: "First Overwritten" }, { overwrite: true });

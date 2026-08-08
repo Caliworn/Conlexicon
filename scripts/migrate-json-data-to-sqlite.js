@@ -7,6 +7,7 @@ const {
   assertUniqueDictionaryEntityIds,
   normalizeDictionary,
   normalizeUiLanguage,
+  normalizeUiSkin,
   normalizeUiTheme,
 } = require("../lib/dictionary-model");
 const { createDictionaryConversionService } = require("../lib/dictionary-conversion-service");
@@ -18,6 +19,7 @@ function repositoryOptions(dataDir) {
     defaultIndex: DEFAULT_INDEX,
     normalizeDictionary,
     normalizeUiLanguage,
+    normalizeUiSkin,
     normalizeUiTheme,
     validateDictionary: assertUniqueDictionaryEntityIds,
   };
@@ -118,6 +120,7 @@ async function readLegacyDataIndex(sourceDataDir) {
       : [],
     uiLanguage: normalizeUiLanguage(source.uiLanguage),
     uiTheme: normalizeUiTheme(source.uiTheme),
+    uiSkin: normalizeUiSkin(source.uiSkin),
   };
 }
 
@@ -203,6 +206,7 @@ async function migrateJsonDataDirectoryToSqlite({
       dictionaryIds: migratedIds,
       uiLanguage: sourceIndex.uiLanguage,
       uiTheme: sourceIndex.uiTheme,
+      uiSkin: sourceIndex.uiSkin,
     });
     report.targetActiveDictionaryId = activeDictionaryId;
     report.finishedAt = new Date().toISOString();

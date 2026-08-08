@@ -278,7 +278,7 @@ async function writeMorphologyTestData(dataDir) {
   await fs.mkdir(path.join(target, "dictionaries"), { recursive: true });
   await fs.writeFile(
     path.join(target, "index.json"),
-    `${JSON.stringify({ activeDictionaryId: dictionary.id, dictionaryIds: [dictionary.id], uiLanguage: "zh", uiTheme: "light" }, null, 2)}\n`,
+    `${JSON.stringify({ activeDictionaryId: dictionary.id, dictionaryIds: [dictionary.id], uiLanguage: "zh", uiTheme: "light", uiSkin: "classic" }, null, 2)}\n`,
     "utf8",
   );
   await fs.writeFile(

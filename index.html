@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Conlexicon</title>
     <link rel="stylesheet" href="theme-tokens.css">
+    <link rel="stylesheet" href="theme-liquid-glass.css">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body class="app-booting">
@@ -16,8 +17,12 @@
           if (preferences.uiTheme === "dark") {
             document.body.classList.add("dark-theme");
           }
+          if (preferences.uiSkin === "liquid-glass") {
+            document.body.dataset.uiSkin = "liquid-glass";
+          }
         } catch (error) {
           document.body.classList.remove("dark-theme");
+          delete document.body.dataset.uiSkin;
         }
       })();
     </script>
@@ -104,6 +109,10 @@
         </nav>
 
         <div class="panel-actions utility-actions">
+          <button class="secondary-button utility-button skin-toggle-button" id="skinToggleButton" type="button" aria-label="切换到液态玻璃皮肤">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5S5.5 9.3 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 9.3 12 2.5 12 2.5Z"></path></svg>
+            <span class="utility-label" id="skinToggleLabel">液态玻璃</span>
+          </button>
           <button class="secondary-button utility-button" id="themeToggleButton" type="button">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"></path></svg>
             <span class="utility-label" id="themeToggleLabel">暗黑模式</span>
@@ -1183,15 +1192,24 @@
           </div>
           <button class="secondary-button" id="closeLexicalNetworkButton" type="button" data-i18n="closeNetwork">关闭网络</button>
         </div>
+        <div class="network-summary-bar" role="group" data-i18n-aria-label="networkRelationSummary" aria-label="网络关系统计">
+          <div class="network-summary-item source">
+            <span data-i18n="source">来源</span>
+            <strong id="networkSourceCount">0</strong>
+          </div>
+          <div class="network-summary-item derived">
+            <span data-i18n="derivedEntries">衍生</span>
+            <strong id="networkDerivedCount">0</strong>
+          </div>
+        </div>
         <div class="network-viewport" id="networkViewport">
-          <span class="network-layer-label source" id="networkSourceLabel" data-i18n="source">来源</span>
-          <span class="network-layer-label derived" id="networkDerivedLabel" data-i18n="derivedEntries">衍生</span>
           <svg class="network-svg" id="networkSvg" role="group" aria-labelledby="networkTitle">
             <defs>
               <marker id="networkArrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto" markerUnits="strokeWidth">
                 <path d="M0,0 L8,4.5 L0,9 Z"></path>
               </marker>
             </defs>
+            <g class="network-section-layer" id="networkSections"></g>
             <g class="network-edge-layer" id="networkEdges"></g>
             <g class="network-node-layer" id="networkNodes"></g>
           </svg>

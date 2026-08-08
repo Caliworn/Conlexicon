@@ -17,6 +17,7 @@ const CHECK_GROUPS = [
       "check-entry-query-model.js",
       "check-query-page-cache.js",
       "check-http-request-limits.js",
+      "check-style-contract.js",
     ],
   },
   {

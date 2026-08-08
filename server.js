@@ -7,6 +7,7 @@ const {
   assertUniqueDictionaryEntityIds,
   normalizeDictionary,
   normalizeUiLanguage,
+  normalizeUiSkin,
   normalizeUiTheme,
 } = require("./lib/dictionary-model");
 const { sendJson, sendText } = require("./lib/http-utils");
@@ -23,6 +24,7 @@ function repositoryOptions() {
     defaultIndex: DEFAULT_INDEX,
     normalizeDictionary,
     normalizeUiLanguage,
+    normalizeUiSkin,
     normalizeUiTheme,
     validateDictionary: assertUniqueDictionaryEntityIds,
   };

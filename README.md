@@ -27,7 +27,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - Gloss rendering for `\gla`, `\glb`, `\glc`, and `\ft`, with independent render-object and alignment settings for corpus unit cards, unit content headings, and entry examples, plus per-object font, size, bold, italic, and `\glb` small-caps styles.
 - Per-dictionary UI/settings options, including explicitly configured part-of-speech tags, a shared tag-list separator style, per-field search/fuzzy controls, optional NFC and Unicode case folding, custom search equivalence rules, etymology autocomplete matching, label display replacement, highlighted tags, gloss rendering, polysemy display, save/discard/prompt handling for edits during navigation, corpus/docs auto-save, IPA keyboard symbols, and left navigation order.
 - SQLite-backed per-value search projections for static entry fields and generated morphology, with configurable strict/fuzzy matching and localized hit summaries. Large entry and root-mode results use versioned query windows while retaining one continuous native scrollbar.
-- Dark mode and Chinese/English UI switching, with the global interface theme and language remembered in `data/index.json`.
+- Classic/Liquid Glass skins, dark mode, and Chinese/English UI switching, with the global interface skin, theme, and language remembered in `data/index.json`.
 
 - 多词典管理：新建、切换、导入、导出、配置和删除词典；导入相同词典 ID 的词典前会明确确认是否覆盖。
 - 词典级 SQLite 保存：词条及其结构化子对象、形态模板组/子表/覆盖项、语料库、设置、语言文档和 IPA 规则都会随当前词典保存在本地。旧 JSON 仅作为显式导入、导出和迁移格式保留。
@@ -46,7 +46,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - Gloss 渲染：语料单元卡片、单元内容名称和词条例句可分别配置渲染对象与对齐，并支持 `\gla`、`\glb`、`\glc`、`\ft` 独立配置字体、字号、粗体和斜体，以及 `\glb` small caps。
 - 词典级界面设置：包括显式词性标签、统一的标签列表分隔符、新会话默认使用的逐字段搜索/模糊匹配、可选 NFC 与 Unicode 大小写折叠、自定义搜索等价规则、词源自动补全、标签显示替换、红色高亮标签、gloss 渲染、多义项显示、导航时保存/放弃/提示编辑、语料库/文档自动保存、IPA 虚拟键盘符号和左侧导航栏排序。词条列表搜索框旁可在不改写默认值的情况下，按当前运行期临时调整搜索字段和每个字段的 fuzzy 状态。
 - SQLite 逐值搜索投射：静态词条字段和自动生成形态均支持可配置的严格/模糊搜索及本地化命中摘要；词根模式和词汇网络复用仅在关系变化时失效、带双向定位索引的稳定拓扑。大型词条列表与词根模式结果通过版本化查询窗口加载，同时保持一条连续的原生滚动条。切换查询或词条详情时会先保留当前内容，旧详情会立即停止响应交互；读取超过 200ms 后再以统一遮罩标明正在更新，避免快速本地读取产生闪烁。
-- 暗黑模式和中英界面切换；全局界面主题和语言会记忆在 `data/index.json` 中。
+- 经典/液态玻璃皮肤、暗黑模式和中英界面切换；全局界面皮肤、主题和语言会记忆在 `data/index.json` 中。
 
 ## Keyboard Shortcuts / 快捷键
 
@@ -126,9 +126,9 @@ data/index.json
 data/dictionaries/*.sqlite
 ```
 
-`data/index.json` stores the dictionary index, active dictionary ID, global interface language, and global interface theme. Per-dictionary content and settings are stored in `data/dictionaries/*.sqlite` by default.
+`data/index.json` stores the dictionary index, active dictionary ID, global interface language, global interface theme, and global interface skin. Per-dictionary content and settings are stored in `data/dictionaries/*.sqlite` by default.
 
-`data/index.json` 保存词典索引、当前词典 ID、全局界面语言和全局界面主题；默认情况下，各词典的内容与设置分别保存在 `data/dictionaries/*.sqlite` 中。
+`data/index.json` 保存词典索引、当前词典 ID、全局界面语言、全局界面主题和全局界面皮肤；默认情况下，各词典的内容与设置分别保存在 `data/dictionaries/*.sqlite` 中。
 
 Legacy JSON dictionaries are not migrated automatically on startup. To reuse an old JSON dictionary, import the JSON file from the app's dictionary management UI.
 

@@ -1,0 +1,329 @@
+body[data-ui-skin="liquid-glass"] {
+  color-scheme: light;
+
+  --ui-canvas-bg: #eef2f1;
+  --ui-text: #172126;
+  --ui-text-muted: #5f6c72;
+  --ui-text-on-solid: #ffffff;
+  --ui-border: rgba(74, 96, 99, 0.2);
+  --ui-border-strong: rgba(54, 78, 82, 0.34);
+  --ui-accent: #247d73;
+  --ui-accent-hover: #185f57;
+  --ui-accent-soft: rgba(211, 237, 231, 0.82);
+  --ui-accent-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 16%, transparent);
+  --ui-warning: #b87916;
+  --ui-warning-soft: rgba(255, 240, 209, 0.9);
+  --ui-warning-tag-background: rgba(255, 240, 209, 0.9);
+  --ui-warning-badge-background: rgba(255, 244, 215, 0.92);
+  --ui-warning-badge-text: #805300;
+  --ui-danger: #b43f46;
+  --ui-danger-soft: rgba(250, 229, 230, 0.9);
+  --ui-focus: #d9a937;
+  --ui-focus-ring: 0 0 0 3px rgba(217, 169, 55, 0.26);
+
+  --material-panel-background: rgba(250, 252, 251, 0.88);
+  --material-panel-border: var(--ui-border);
+  --material-panel-shadow: 0 18px 42px rgba(20, 42, 45, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.88), inset 0 -1px 0 rgba(87, 118, 116, 0.08);
+  --material-panel-soft-shadow: 0 12px 30px rgba(20, 42, 45, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.76);
+  --material-card-shadow: 0 8px 22px rgba(20, 42, 45, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.62);
+  --material-panel-filter: none;
+  --material-control-background: rgba(252, 254, 253, 0.76);
+  --material-control-border: rgba(74, 96, 99, 0.26);
+  --material-control-shadow: 0 7px 18px rgba(20, 42, 45, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.92), inset 0 -1px 0 rgba(67, 101, 99, 0.06);
+  --material-control-filter: none;
+  --material-inset-background: rgba(229, 237, 236, 0.88);
+  --material-inset-border: var(--ui-border);
+  --material-floating-background: rgba(247, 251, 250, 0.66);
+  --material-floating-border: rgba(74, 96, 99, 0.3);
+  --material-floating-shadow: 0 24px 58px rgba(20, 37, 41, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.96), inset 0 -1px 0 rgba(67, 101, 99, 0.1);
+  --material-floating-soft-shadow: 0 16px 38px rgba(20, 37, 41, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.82);
+  --material-floating-filter: blur(24px) saturate(1.12);
+  --material-sticky-background: rgba(238, 244, 242, 0.68);
+  --material-sticky-shadow: 0 14px 30px rgba(24, 42, 45, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  --material-sticky-filter: blur(18px) saturate(1.08);
+  --material-mobile-bar-background: rgba(238, 244, 242, 0.68);
+  --material-mobile-bar-shadow: 0 12px 28px rgba(20, 37, 41, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.68);
+  --material-mobile-bar-filter: blur(22px) saturate(1.1);
+  --material-navigation-background: rgba(12, 29, 34, 0.9);
+  --material-navigation-shadow: 0 24px 54px rgba(10, 24, 28, 0.32), inset -1px 0 0 rgba(255, 255, 255, 0.1);
+  --material-navigation-filter: blur(20px) saturate(1.04);
+  --material-navigation-text: #f7fbfa;
+  --material-navigation-muted: #afc3c2;
+  --material-navigation-control-background: rgba(255, 255, 255, 0.07);
+  --material-navigation-control-hover-background: rgba(255, 255, 255, 0.13);
+  --material-navigation-control-border: rgba(255, 255, 255, 0.15);
+  --material-navigation-action-background: rgba(255, 255, 255, 0.1);
+  --material-navigation-action-border: rgba(255, 255, 255, 0.16);
+  --material-list-item-background: rgba(250, 252, 251, 0.9);
+  --material-list-item-secondary-color: inherit;
+  --material-list-item-secondary-opacity: 0.76;
+  --material-browser-background: rgba(238, 243, 241, 0.88);
+  --material-browser-filter: none;
+  --material-tooltip-background: #10191d;
+  --material-tooltip-text: #f8fbfa;
+  --material-tooltip-muted: rgba(248, 251, 250, 0.74);
+  --material-tooltip-border: rgba(255, 255, 255, 0.18);
+  --material-tooltip-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  --material-rich-tooltip-background: rgba(247, 251, 250, 0.82);
+  --material-rich-tooltip-border: rgba(74, 96, 99, 0.24);
+  --material-rich-tooltip-text: var(--ui-text);
+  --material-rich-tooltip-shadow: var(--material-floating-shadow);
+  --material-toast-background: #172126;
+  --material-overlay-background: rgba(11, 24, 28, 0.38);
+  --material-overlay-modal-background: rgba(9, 20, 24, 0.44);
+  --material-overlay-strong-background: rgba(8, 18, 22, 0.52);
+  --material-overlay-drawer-background: rgba(11, 24, 28, 0.36);
+  --material-overlay-panel-shadow: 0 30px 84px rgba(3, 13, 17, 0.36);
+  --material-network-node-shadow: drop-shadow(0 8px 12px rgba(24, 42, 45, 0.1));
+  --material-network-node-hover-shadow: drop-shadow(0 12px 18px rgba(24, 42, 45, 0.18));
+  --material-network-node-focus-shadow: drop-shadow(0 16px 24px rgba(36, 125, 115, 0.2));
+  --material-network-label-filter: blur(8px);
+  --material-network-status-filter: blur(10px);
+}
+
+body.dark-theme[data-ui-skin="liquid-glass"] {
+  color-scheme: dark;
+
+  --ui-canvas-bg: #111719;
+  --ui-text: #edf4f2;
+  --ui-text-muted: #aab8b8;
+  --ui-border: rgba(222, 244, 239, 0.15);
+  --ui-border-strong: rgba(222, 244, 239, 0.26);
+  --ui-accent: #47a89b;
+  --ui-accent-hover: #65c7b8;
+  --ui-accent-soft: rgba(23, 60, 57, 0.86);
+  --ui-accent-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 18%, transparent);
+  --ui-warning: #e4bd63;
+  --ui-warning-soft: rgba(63, 50, 24, 0.9);
+  --ui-warning-tag-background: rgba(63, 50, 24, 0.9);
+  --ui-warning-badge-background: rgba(63, 50, 24, 0.94);
+  --ui-warning-badge-text: #ffd36f;
+  --ui-danger: #ee7c84;
+  --ui-danger-soft: rgba(62, 34, 38, 0.92);
+  --ui-focus: #d2aa4b;
+  --ui-focus-ring: 0 0 0 3px rgba(210, 170, 75, 0.28);
+
+  --material-panel-background: rgba(28, 38, 42, 0.88);
+  --material-panel-border: var(--ui-border);
+  --material-panel-shadow: 0 20px 48px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+  --material-panel-soft-shadow: 0 14px 34px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --material-card-shadow: 0 8px 22px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --material-control-background: rgba(37, 49, 53, 0.76);
+  --material-control-border: rgba(222, 244, 239, 0.2);
+  --material-control-shadow: 0 8px 20px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.15), inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+  --material-inset-background: rgba(38, 50, 54, 0.88);
+  --material-inset-border: var(--ui-border);
+  --material-floating-background: rgba(25, 36, 40, 0.66);
+  --material-floating-border: rgba(222, 244, 239, 0.22);
+  --material-floating-shadow: 0 26px 64px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(0, 0, 0, 0.24);
+  --material-floating-soft-shadow: 0 18px 42px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --material-sticky-background: rgba(17, 25, 28, 0.68);
+  --material-sticky-shadow: 0 12px 28px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --material-mobile-bar-background: rgba(17, 25, 28, 0.68);
+  --material-mobile-bar-shadow: 0 14px 34px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  --material-navigation-background: rgba(9, 22, 26, 0.76);
+  --material-navigation-shadow: 0 26px 58px rgba(0, 0, 0, 0.5), inset -1px 0 0 rgba(255, 255, 255, 0.12);
+  --material-navigation-text: #f4faf8;
+  --material-navigation-muted: #a8c0be;
+  --material-navigation-control-background: rgba(255, 255, 255, 0.08);
+  --material-navigation-control-hover-background: rgba(255, 255, 255, 0.15);
+  --material-navigation-control-border: rgba(255, 255, 255, 0.17);
+  --material-navigation-action-background: rgba(255, 255, 255, 0.11);
+  --material-navigation-action-border: rgba(255, 255, 255, 0.17);
+  --material-list-item-background: rgba(30, 42, 46, 0.9);
+  --material-list-item-secondary-color: var(--ui-text-muted);
+  --material-list-item-secondary-opacity: 1;
+  --material-browser-background: rgba(17, 24, 27, 0.88);
+  --material-tooltip-background: #081115;
+  --material-rich-tooltip-background: rgba(21, 31, 35, 0.84);
+  --material-rich-tooltip-border: rgba(222, 244, 239, 0.17);
+  --material-rich-tooltip-text: var(--ui-text);
+  --material-rich-tooltip-shadow: var(--material-floating-shadow);
+  --material-toast-background: #081115;
+  --material-overlay-background: rgba(0, 8, 11, 0.48);
+  --material-overlay-modal-background: rgba(0, 7, 10, 0.54);
+  --material-overlay-strong-background: rgba(0, 6, 9, 0.62);
+  --material-overlay-drawer-background: rgba(0, 8, 11, 0.46);
+  --material-overlay-panel-shadow: 0 32px 90px rgba(0, 0, 0, 0.56);
+  --material-network-node-shadow: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.28));
+  --material-network-node-hover-shadow: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.4));
+  --material-network-node-focus-shadow: drop-shadow(0 16px 26px rgba(71, 168, 155, 0.24));
+}
+
+body[data-ui-skin="liquid-glass"] {
+  background:
+    linear-gradient(135deg, rgba(48, 143, 130, 0.2) 0%, rgba(48, 143, 130, 0.04) 38%, transparent 58%),
+    linear-gradient(315deg, rgba(222, 175, 64, 0.16) 0%, rgba(222, 175, 64, 0.025) 40%, transparent 62%),
+    var(--ui-canvas-bg);
+  background-attachment: fixed;
+}
+
+body.dark-theme[data-ui-skin="liquid-glass"] {
+  background:
+    linear-gradient(135deg, rgba(45, 135, 124, 0.18) 0%, rgba(45, 135, 124, 0.025) 40%, transparent 62%),
+    linear-gradient(315deg, rgba(181, 137, 47, 0.12) 0%, rgba(181, 137, 47, 0.02) 42%, transparent 64%),
+    var(--ui-canvas-bg);
+}
+
+body[data-ui-skin="liquid-glass"] .dictionary-panel {
+  border-right: 1px solid var(--material-navigation-control-border);
+  box-shadow: var(--material-navigation-shadow);
+  backdrop-filter: var(--material-navigation-filter);
+  -webkit-backdrop-filter: var(--material-navigation-filter);
+}
+
+body[data-ui-skin="liquid-glass"] .dictionary-panel :where(.tool-button, .utility-button, .nav-collapse-button) {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+body[data-ui-skin="liquid-glass"] .dictionary-panel :where(.utility-button, .nav-collapse-button) {
+  border-color: var(--material-navigation-action-border);
+  background: var(--material-navigation-action-background);
+  color: var(--material-navigation-text);
+}
+
+body[data-ui-skin="liquid-glass"] .dictionary-panel :where(.utility-button, .nav-collapse-button):hover:not(:disabled) {
+  border-color: var(--material-navigation-control-border);
+  background: var(--material-navigation-control-hover-background);
+}
+
+body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {
+  border-color: color-mix(in srgb, var(--ui-accent) 56%, var(--material-navigation-control-border));
+  background: color-mix(in srgb, var(--ui-accent) 14%, var(--material-navigation-control-hover-background));
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  body[data-ui-skin="liquid-glass"] {
+    background: var(--ui-canvas-bg);
+    --material-panel-background: #fafcfb;
+    --material-control-background: #f8fbfa;
+    --material-inset-background: #e5edec;
+    --material-floating-background: #f2f7f5;
+    --material-floating-filter: none;
+    --material-sticky-background: #eef4f2;
+    --material-sticky-filter: none;
+    --material-mobile-bar-background: #eef4f2;
+    --material-mobile-bar-filter: none;
+    --material-navigation-background: #13272c;
+    --material-navigation-filter: none;
+    --material-list-item-background: #fafcfb;
+    --material-browser-background: #eef3f1;
+    --material-rich-tooltip-background: #f2f7f5;
+  }
+
+  body.dark-theme[data-ui-skin="liquid-glass"] {
+    --material-panel-background: #1c262a;
+    --material-control-background: #253135;
+    --material-inset-background: #263236;
+    --material-floating-background: #192428;
+    --material-sticky-background: #11191c;
+    --material-mobile-bar-background: #11191c;
+    --material-navigation-background: #09161a;
+    --material-list-item-background: #1e2a2e;
+    --material-browser-background: #11181b;
+    --material-rich-tooltip-background: #151f23;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  body[data-ui-skin="liquid-glass"] {
+    background: var(--ui-canvas-bg);
+    --material-panel-background: #fafcfb;
+    --material-control-background: #f8fbfa;
+    --material-inset-background: #e5edec;
+    --material-floating-background: #f2f7f5;
+    --material-floating-filter: none;
+    --material-sticky-background: #eef4f2;
+    --material-sticky-filter: none;
+    --material-mobile-bar-background: #eef4f2;
+    --material-mobile-bar-filter: none;
+    --material-navigation-background: #13272c;
+    --material-navigation-filter: none;
+    --material-list-item-background: #fafcfb;
+    --material-browser-background: #eef3f1;
+    --material-rich-tooltip-background: #f2f7f5;
+  }
+
+  body.dark-theme[data-ui-skin="liquid-glass"] {
+    --material-panel-background: #1c262a;
+    --material-control-background: #253135;
+    --material-inset-background: #263236;
+    --material-floating-background: #192428;
+    --material-sticky-background: #11191c;
+    --material-mobile-bar-background: #11191c;
+    --material-navigation-background: #09161a;
+    --material-list-item-background: #1e2a2e;
+    --material-browser-background: #11181b;
+    --material-rich-tooltip-background: #151f23;
+  }
+}
+
+@media (forced-colors: active) {
+  body[data-ui-skin="liquid-glass"],
+  body.dark-theme[data-ui-skin="liquid-glass"] {
+    background: Canvas;
+    --ui-canvas-bg: Canvas;
+    --ui-text: CanvasText;
+    --ui-text-muted: CanvasText;
+    --ui-text-on-solid: HighlightText;
+    --ui-border: CanvasText;
+    --ui-border-strong: CanvasText;
+    --ui-accent: Highlight;
+    --ui-accent-hover: Highlight;
+    --ui-accent-soft: Canvas;
+    --material-panel-background: Canvas;
+    --material-panel-border: CanvasText;
+    --material-panel-shadow: none;
+    --material-panel-soft-shadow: none;
+    --material-card-shadow: none;
+    --material-control-background: ButtonFace;
+    --material-control-border: ButtonText;
+    --material-control-shadow: none;
+    --material-inset-background: Canvas;
+    --material-inset-border: CanvasText;
+    --material-floating-background: Canvas;
+    --material-floating-border: CanvasText;
+    --material-floating-shadow: none;
+    --material-floating-soft-shadow: none;
+    --material-floating-filter: none;
+    --material-sticky-background: Canvas;
+    --material-sticky-shadow: none;
+    --material-sticky-filter: none;
+    --material-mobile-bar-background: Canvas;
+    --material-mobile-bar-shadow: none;
+    --material-mobile-bar-filter: none;
+    --material-navigation-background: Canvas;
+    --material-navigation-shadow: none;
+    --material-navigation-filter: none;
+    --material-navigation-text: CanvasText;
+    --material-navigation-muted: CanvasText;
+    --material-list-item-background: Canvas;
+    --material-browser-background: Canvas;
+    --material-rich-tooltip-background: Canvas;
+    --material-rich-tooltip-border: CanvasText;
+    --material-rich-tooltip-text: CanvasText;
+    --material-rich-tooltip-shadow: none;
+    --material-overlay-background: transparent;
+    --material-overlay-modal-background: transparent;
+    --material-overlay-strong-background: transparent;
+    --material-overlay-drawer-background: transparent;
+    --material-overlay-panel-shadow: none;
+  }
+
+  body[data-ui-skin="liquid-glass"] .dictionary-panel {
+    border-color: CanvasText;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  body[data-ui-skin="liquid-glass"] .dictionary-panel :where(.tool-button, .utility-button, .nav-collapse-button) {
+    box-shadow: none;
+  }
+
+  body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {
+    border-color: Highlight;
+    background: Canvas;
+    color: CanvasText;
+  }
+}

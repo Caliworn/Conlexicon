@@ -7,6 +7,7 @@ const {
   assertUniqueDictionaryEntityIds,
   normalizeDictionary,
   normalizeUiLanguage,
+  normalizeUiSkin,
   normalizeUiTheme,
 } = require("../lib/dictionary-model");
 const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
@@ -403,6 +404,7 @@ function repositoryOptions(dataDir) {
     defaultIndex: DEFAULT_INDEX,
     normalizeDictionary,
     normalizeUiLanguage,
+    normalizeUiSkin,
     normalizeUiTheme,
     validateDictionary: assertUniqueDictionaryEntityIds,
   };

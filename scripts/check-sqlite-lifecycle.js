@@ -17,6 +17,7 @@ async function runSqliteLifecycleCheck() {
       dictionaryIds: [],
       uiLanguage: "zh",
       uiTheme: "light",
+      uiSkin: "classic",
     });
 
     const first = await repository.createDictionary(normalizeDictionary({
@@ -83,11 +84,20 @@ async function runSqliteLifecycleCheck() {
     assert.equal(topologyBuilds, 1, "listing dictionaries should not build additional root topologies");
     assert.equal((await repository.getDictionarySnapshot(second.id)).name, "Second");
 
-    const preferences = await repository.updatePreferences({ uiLanguage: "en", uiTheme: "dark" });
-    assert.deepEqual(preferences, { uiLanguage: "en", uiTheme: "dark" });
+    const preferences = await repository.updatePreferences({
+      uiLanguage: "en",
+      uiTheme: "dark",
+      uiSkin: "liquid-glass",
+    });
+    assert.deepEqual(preferences, {
+      uiLanguage: "en",
+      uiTheme: "dark",
+      uiSkin: "liquid-glass",
+    });
     state = await repository.readState();
     assert.equal(state.uiLanguage, "en");
     assert.equal(state.uiTheme, "dark");
+    assert.equal(state.uiSkin, "liquid-glass");
 
     await repository.deleteDictionary(first.id);
     state = await repository.readState();

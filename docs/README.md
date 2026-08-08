@@ -12,7 +12,8 @@
 | [Query Session Cache Plan](QUERY_SESSION_CACHE_PLAN.md) | 已实装设计参考 | 查询会话、cursor、缓存失效、窗口化和结果定位语义。 |
 | [Advanced Filter Query Plan](ADVANCED_FILTER_QUERY_PLAN.md) | F0–F4 核心完成 / F5 待办 | EntryFilter、轻量分析、IPA/形态 feature result，以及 Gloss/质量结果的后续边界。 |
 | [Feature Result Session Plan](FEATURE_RESULT_SESSION_PLAN.md) | F4b-0–F4b-3 已完成 | IPA/形态结果源、运行时会话、音系引擎边界和分阶段验收。 |
-| [Style Skin Plan](STYLE_SKIN_PLAN.md) | S0 进行中 | 样式 token、材质角色、视觉基线与后续皮肤边界。 |
+| [Style Skin Plan](STYLE_SKIN_PLAN.md) | S0 已完成 | 样式 token、材质角色、视觉基线与通用皮肤边界。 |
+| [Liquid Glass Skin Specification](LIQUID_GLASS_SKIN_SPEC.md) | LG-1–LG-3 已完成 | 液态玻璃皮肤的层级、材质参数、运行期选择、降级、性能验收与高级效果决策。 |
 
 ## 推荐阅读顺序
 
@@ -20,6 +21,6 @@
 2. 修改存储、查询或索引时再读 [SQLite Backend Plan](SQLITE_BACKEND_PLAN.md)。
 3. 涉及旧 JSON、导入、导出或迁移时读 [SQLite Migration Plan](SQLITE_MIGRATION_PLAN.md)。
 4. 处理查询窗口、cursor 或筛选时分别补读查询缓存、高级筛选与功能结果会话专题文档。
-5. 修改主题、材质或组件视觉时读 [Style Skin Plan](STYLE_SKIN_PLAN.md)。
+5. 修改主题、材质或组件视觉时先读 [Style Skin Plan](STYLE_SKIN_PLAN.md)；实现液态玻璃皮肤时再读 [Liquid Glass Skin Specification](LIQUID_GLASS_SKIN_SPEC.md)。
 
 文档中以反引号标出的源码和脚本路径默认相对于仓库根目录；Markdown 链接则相对于当前文档解析。

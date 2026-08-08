@@ -178,6 +178,7 @@ GET /api/export?dictionaryId=...&format=xlsx
   "activeDictionaryId": "dict-...",
   "uiLanguage": "zh",
   "uiTheme": "light",
+  "uiSkin": "classic",
   "dictionaryIds": ["dict-..."]
 }
 ```

@@ -8,6 +8,7 @@ const {
   assertUniqueDictionaryEntityIds,
   normalizeDictionary,
   normalizeUiLanguage,
+  normalizeUiSkin,
   normalizeUiTheme,
 } = require("../lib/dictionary-model");
 const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
@@ -20,6 +21,7 @@ function repositoryOptions(dataDir) {
     defaultIndex: DEFAULT_INDEX,
     normalizeDictionary,
     normalizeUiLanguage,
+    normalizeUiSkin,
     normalizeUiTheme,
     validateDictionary: assertUniqueDictionaryEntityIds,
   };
@@ -70,6 +72,7 @@ async function main() {
       dictionaryIds: [first.id, second.id],
       uiLanguage: "en",
       uiTheme: "dark",
+      uiSkin: "liquid-glass",
     });
 
     const before = await readSourceSnapshot(sourceDataDir, [first.id, second.id]);
@@ -86,6 +89,7 @@ async function main() {
     assert.equal(state.activeDictionaryId, first.id);
     assert.equal(state.uiLanguage, "en");
     assert.equal(state.uiTheme, "dark");
+    assert.equal(state.uiSkin, "liquid-glass");
     assert.deepEqual(state.dictionaries.map((dictionary) => dictionary.id), [first.id, second.id]);
     assert.deepEqual(state.dictionaries.map((dictionary) => dictionary.summary.entryCount), [1, 1]);
 

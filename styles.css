@@ -22,7 +22,7 @@ body {
   margin: 0;
   min-width: 0;
   min-height: 100vh;
-  background: var(--bg);
+  background: var(--ui-canvas-bg);
   color: var(--ui-text);
 }
 
@@ -86,9 +86,11 @@ body.mobile-drawer-open {
   min-height: 42px;
   padding: 0;
   place-items: center;
-  border: 1px solid var(--ui-border);
-  border-radius: 10px;
-  background: var(--surface);
+  border: 1px solid var(--material-control-border);
+  border-radius: var(--radius-mobile-control);
+  background: var(--material-control-background);
+  box-shadow: var(--material-control-shadow);
+  backdrop-filter: var(--material-control-filter);
   color: var(--ui-text);
 }
 
@@ -106,7 +108,7 @@ body.mobile-drawer-open {
 .mobile-new-entry-button:focus-visible:not(:disabled) {
   border-color: var(--ui-accent);
   background: var(--ui-accent);
-  color: var(--surface);
+  color: var(--ui-text-on-solid);
 }
 
 .mobile-app-bar-title {
@@ -138,14 +140,10 @@ body.mobile-drawer-open {
   height: 100vh;
   min-height: 0;
   padding: 24px;
-  background: #22313a;
+  background: var(--material-navigation-background);
   color: var(--material-navigation-text);
   overflow: hidden;
   transition: padding 180ms ease;
-}
-
-body.dark-theme .dictionary-panel {
-  background: #10181c;
 }
 
 .brand-row,
@@ -337,7 +335,7 @@ fieldset {
   padding: 28px;
   border: 1px dashed var(--ui-border);
   border-radius: 8px;
-  background: var(--surface);
+  background: var(--material-panel-background);
 }
 
 .notice-panel[hidden] {
@@ -411,7 +409,7 @@ fieldset {
   place-items: center;
   min-width: 0;
   min-height: 0;
-  background: color-mix(in srgb, var(--bg) 24%, transparent);
+  background: color-mix(in srgb, var(--ui-canvas-bg) 24%, transparent);
   cursor: progress;
 }
 
@@ -429,8 +427,8 @@ fieldset {
   padding: 8px 13px;
   border: 1px solid color-mix(in srgb, var(--ui-accent) 55%, var(--ui-border));
   border-radius: 999px;
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  box-shadow: var(--shadow);
+  background: color-mix(in srgb, var(--material-panel-background) 94%, transparent);
+  box-shadow: var(--material-panel-shadow);
   color: var(--ui-accent-hover);
   font-size: 0.82rem;
   font-weight: 850;
@@ -506,7 +504,8 @@ fieldset {
   gap: 10px;
   margin-bottom: 0;
   padding-bottom: 12px;
-  background: var(--bg);
+  background: var(--material-sticky-background);
+  backdrop-filter: var(--material-sticky-filter);
   position: sticky;
   top: 0;
   z-index: 2;
@@ -537,7 +536,7 @@ fieldset {
   min-height: 40px;
   padding: 0;
   place-items: center;
-  background: var(--surface);
+  background: var(--material-control-background);
 }
 
 .secondary-button.entry-search-config-button .nav-icon {
@@ -563,11 +562,12 @@ fieldset {
   max-height: min(520px, calc(100dvh - 96px));
   gap: 10px;
   overflow: auto;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-floating-border);
   border-radius: 8px;
   padding: 14px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  background: var(--material-floating-background);
+  box-shadow: var(--material-floating-shadow);
+  backdrop-filter: var(--material-floating-filter);
 }
 
 .entry-search-config-menu > strong {
@@ -589,7 +589,7 @@ fieldset {
   max-height: 40px;
   padding: 0;
   place-items: center;
-  background: var(--surface);
+  background: var(--material-control-background);
 }
 
 .secondary-button.entry-filter-button .nav-icon {
@@ -616,11 +616,12 @@ fieldset {
   max-height: min(520px, calc(100dvh - 96px));
   gap: 14px;
   overflow: auto;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-floating-border);
   border-radius: 8px;
   padding: 14px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  background: var(--material-floating-background);
+  box-shadow: var(--material-floating-shadow);
+  backdrop-filter: var(--material-floating-filter);
 }
 
 .entry-filter-field {
@@ -743,7 +744,7 @@ fieldset {
   align-items: center;
   justify-items: center;
   place-items: center;
-  background: var(--surface);
+  background: var(--material-control-background);
   color: var(--ui-accent-hover);
   line-height: 1;
   aspect-ratio: 1;
@@ -762,7 +763,7 @@ fieldset {
 .secondary-button.entry-list-new-button:focus-visible {
   border-color: var(--ui-accent);
   background: var(--ui-accent);
-  color: var(--surface);
+  color: var(--ui-text-on-solid);
 }
 
 .root-mode-controls {
@@ -856,7 +857,7 @@ fieldset {
   border: 1px solid color-mix(in srgb, var(--ui-accent) 48%, transparent);
   border-radius: 8px;
   padding: 0;
-  background: var(--surface);
+  background: var(--material-control-background);
   color: var(--ui-accent-hover);
   font-size: var(--active-filter-control-font-size);
   font-weight: 800;
@@ -878,7 +879,7 @@ fieldset {
 
 .active-filter-toolbar .active-filter-icon-button:hover {
   background: var(--ui-accent);
-  color: var(--surface);
+  color: var(--ui-text-on-solid);
 }
 
 .active-filter-toolbar .filter-clear-button {
@@ -890,7 +891,7 @@ fieldset {
 .active-filter-toolbar .filter-clear-button:focus-visible {
   border-color: var(--ui-danger);
   background: var(--ui-danger);
-  color: var(--surface);
+  color: var(--ui-text-on-solid);
 }
 
 .active-filter-toolbar .active-filter-exit-button {
@@ -902,7 +903,7 @@ fieldset {
   flex: 0 0 auto;
   border-color: color-mix(in srgb, var(--ui-danger) 58%, transparent);
   padding: 0 12px;
-  background: var(--surface);
+  background: var(--material-control-background);
   color: var(--ui-danger);
   font-size: var(--active-filter-control-font-size);
   font-weight: 800;
@@ -912,7 +913,7 @@ fieldset {
 .active-filter-toolbar .active-filter-exit-button:hover {
   border-color: var(--ui-danger);
   background: var(--ui-danger);
-  color: var(--surface);
+  color: var(--ui-text-on-solid);
 }
 
 .filter-row input:disabled,
@@ -946,9 +947,11 @@ input,
 select,
 textarea {
   width: 100%;
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
-  background: var(--surface);
+  border: 1px solid var(--material-control-border);
+  border-radius: var(--radius-control);
+  background: var(--material-control-background);
+  box-shadow: var(--material-control-shadow);
+  backdrop-filter: var(--material-control-filter);
   color: var(--ui-text);
   font-weight: 600;
   outline: none;
@@ -1011,9 +1014,11 @@ label span {
 }
 
 .secondary-button {
-  background: var(--surface);
+  background: var(--material-control-background);
   color: var(--ui-text);
-  border-color: var(--ui-border);
+  border-color: var(--material-control-border);
+  box-shadow: var(--material-control-shadow);
+  backdrop-filter: var(--material-control-filter);
 }
 
 .secondary-button:hover {
@@ -1047,9 +1052,9 @@ label span {
   place-items: center;
   width: 40px;
   padding: 0;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--material-navigation-action-background);
   color: var(--ui-text-on-solid);
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: var(--material-navigation-action-border);
   font-size: 1.25rem;
 }
 
@@ -1058,9 +1063,9 @@ label span {
   place-items: center;
   width: 28px;
   height: 28px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-control-border);
   border-radius: 999px;
-  background: var(--surface);
+  background: var(--material-control-background);
   color: var(--ui-accent);
   font-weight: 950;
   line-height: 1;
@@ -1117,9 +1122,9 @@ label span {
   place-items: center;
   min-height: 32px;
   padding: 5px 10px;
-  border: 1px dashed var(--ui-border);
+  border: 1px dashed var(--material-inset-border);
   border-radius: 8px;
-  background: var(--surface-2);
+  background: var(--material-inset-background);
   color: var(--ui-text-muted);
   font-size: 0.78rem;
   font-weight: 750;
@@ -1152,7 +1157,7 @@ label span {
   gap: 10px;
   min-height: 50px;
   padding: 14px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--material-navigation-control-background);
   color: var(--material-navigation-text);
 }
 
@@ -1166,8 +1171,8 @@ label span {
 
 .tool-button:hover,
 .tool-button.active {
-  background: rgba(255, 255, 255, 0.16);
-  border-color: rgba(255, 255, 255, 0.24);
+  background: var(--material-navigation-control-hover-background);
+  border-color: var(--material-navigation-control-border);
 }
 
 .tool-button .tool-label {
@@ -1188,8 +1193,8 @@ label span {
 
 .entry-card small,
 .entry-card p {
-  color: inherit;
-  opacity: 0.74;
+  color: var(--material-list-item-secondary-color);
+  opacity: var(--material-list-item-secondary-opacity);
 }
 
 .entry-detail-panel {
@@ -1200,10 +1205,11 @@ label span {
   display: grid;
   gap: 28px;
   padding: 28px;
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  border: 1px solid var(--material-panel-border);
+  border-radius: var(--radius-panel);
+  background: var(--material-panel-background);
+  box-shadow: var(--material-panel-shadow);
+  backdrop-filter: var(--material-panel-filter);
 }
 
 .entry-display-header {
@@ -1294,10 +1300,10 @@ label span {
   display: inline-flex;
   align-items: center;
   min-height: 30px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-inset-border);
   border-radius: 2px;
   padding: 4px 10px;
-  background: var(--surface-2);
+  background: var(--material-inset-background);
   font-weight: 800;
 }
 
@@ -1323,10 +1329,10 @@ label span {
   display: inline-flex;
   align-items: center;
   min-height: 30px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-inset-border);
   border-radius: 2px;
   padding: 4px 10px;
-  background: var(--surface-2);
+  background: var(--material-inset-background);
   font-weight: 800;
 }
 
@@ -1363,7 +1369,7 @@ label span {
   border: 1px solid var(--ui-border);
   border-radius: 2px;
   padding: 16px;
-  background: color-mix(in srgb, var(--surface) 88%, var(--bg));
+  background: color-mix(in srgb, var(--material-panel-background) 88%, var(--ui-canvas-bg));
 }
 
 .section-heading {
@@ -1387,7 +1393,7 @@ label span {
   max-width: 100%;
   padding: 18px;
   border: 1px solid var(--ui-border);
-  background: var(--surface);
+  background: var(--material-panel-background);
 }
 
 .definition-number {
@@ -1420,7 +1426,7 @@ label span {
   max-width: 100%;
   padding: 12px;
   border: 1px solid var(--ui-border);
-  background: color-mix(in srgb, var(--surface) 92%, var(--bg));
+  background: color-mix(in srgb, var(--material-panel-background) 92%, var(--ui-canvas-bg));
 }
 
 .example-box > span,
@@ -1468,11 +1474,12 @@ label span {
   gap: 4px;
   max-height: 180px;
   overflow: auto;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-floating-border);
   border-radius: 8px;
   padding: 6px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  background: var(--material-floating-background);
+  box-shadow: var(--material-floating-shadow);
+  backdrop-filter: var(--material-floating-filter);
 }
 
 .source-suggestions button {
@@ -1507,10 +1514,10 @@ label span {
   gap: 2px;
   min-width: 120px;
   max-width: 100%;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-control-border);
   border-radius: 8px;
   padding: 10px 12px;
-  background: var(--surface);
+  background: var(--material-control-background);
   color: var(--ui-text);
   text-align: left;
 }
@@ -1531,7 +1538,7 @@ button.derived-link:hover {
 
 .pending-source {
   color: var(--ui-text-muted);
-  background: var(--surface-2);
+  background: var(--material-inset-background);
 }
 
 button.pending-source:hover,
@@ -1669,7 +1676,7 @@ button.pending-source:focus-visible {
   padding: 14px;
   border: 1px solid var(--ui-border);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--surface) 94%, var(--bg));
+  background: color-mix(in srgb, var(--material-panel-background) 94%, var(--ui-canvas-bg));
 }
 
 .entry-morphology-group-heading {
@@ -1710,7 +1717,7 @@ button.pending-source:focus-visible {
   padding: 14px;
   border: 1px solid var(--ui-border);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--surface) 92%, var(--bg));
+  background: color-mix(in srgb, var(--material-panel-background) 92%, var(--ui-canvas-bg));
 }
 
 .morphology-display-group-heading {
@@ -1782,7 +1789,7 @@ button.pending-source:focus-visible {
   padding: 18px;
   border: 1px solid var(--ui-border);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--surface-2) 76%, var(--surface));
+  background: color-mix(in srgb, var(--material-inset-background) 76%, var(--material-panel-background));
   transition: border-color 140ms ease, opacity 140ms ease;
   container-type: inline-size;
 }
@@ -1826,9 +1833,9 @@ button.pending-source:focus-visible {
   width: 30px;
   height: 30px;
   padding: 0;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-control-border);
   border-radius: 7px;
-  background: var(--surface);
+  background: var(--material-control-background);
   color: var(--ui-text-muted);
 }
 
@@ -1937,7 +1944,7 @@ button.pending-source:focus-visible {
 
 .morphology-drag-handle:hover,
 .morphology-drag-handle:focus-visible {
-  background: var(--surface-2);
+  background: var(--material-inset-background);
   color: var(--ui-text);
 }
 
@@ -1953,7 +1960,7 @@ button.pending-source:focus-visible {
   padding: 16px;
   border: 1px solid var(--ui-border);
   border-radius: 8px;
-  background: var(--surface);
+  background: var(--material-panel-background);
   transition: border-color 140ms ease, opacity 140ms ease;
 }
 
@@ -2042,7 +2049,7 @@ button.pending-source:focus-visible {
 
 .morphology-table th,
 .morphology-edit-table th {
-  background: color-mix(in srgb, var(--surface-2) 72%, var(--surface));
+  background: color-mix(in srgb, var(--material-inset-background) 72%, var(--material-panel-background));
   font-weight: 900;
 }
 
@@ -2067,9 +2074,9 @@ button.pending-source:focus-visible {
   min-height: 126px;
   min-width: 0;
   padding: 14px;
-  background: var(--surface);
+  background: var(--material-list-item-background);
   color: var(--ui-text);
-  box-shadow: 0 1px 0 rgba(24, 36, 48, 0.04);
+  box-shadow: var(--material-card-shadow);
 }
 
 .entry-card > div {
@@ -2110,17 +2117,6 @@ button.pending-source:focus-visible {
   min-width: 0;
 }
 
-body.dark-theme .entry-card {
-  background: #202b31;
-  color: var(--ui-text);
-}
-
-body.dark-theme .entry-card small,
-body.dark-theme .entry-card p {
-  color: var(--ui-text-muted);
-  opacity: 1;
-}
-
 .entry-card:hover,
 .entry-card.active {
   border-color: var(--ui-accent);
@@ -2142,10 +2138,10 @@ body.dark-theme .entry-card p {
   width: 28px;
   height: 28px;
   margin-left: 18px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-control-border);
   border-radius: 999px;
   padding: 0;
-  background: var(--surface);
+  background: var(--material-control-background);
   color: var(--ui-accent);
   cursor: pointer;
   transition: border-color 120ms ease, background 120ms ease;
@@ -2190,7 +2186,7 @@ body.dark-theme .entry-card p {
 
 .derived-entry-card {
   min-height: 104px;
-  background: color-mix(in srgb, var(--surface) 88%, var(--bg));
+  background: color-mix(in srgb, var(--material-panel-background) 88%, var(--ui-canvas-bg));
 }
 
 .entry-card p {
@@ -2272,7 +2268,7 @@ body.dark-theme .entry-card p {
   border: 1px solid color-mix(in srgb, var(--ui-border) 76%, var(--ui-accent));
   border-radius: 7px;
   padding: 2px 7px;
-  background: color-mix(in srgb, var(--surface-2) 72%, var(--surface));
+  background: color-mix(in srgb, var(--material-inset-background) 72%, var(--material-panel-background));
   color: var(--ui-text);
   font-size: 0.72rem;
   font-weight: 900;
@@ -2287,7 +2283,7 @@ body.dark-theme .entry-card p {
 
 .entry-quality-issue.medium {
   border-color: color-mix(in srgb, var(--ui-warning) 62%, var(--ui-border));
-  background: color-mix(in srgb, var(--ui-focus) 24%, var(--surface));
+  background: color-mix(in srgb, var(--ui-focus) 24%, var(--material-panel-background));
   color: var(--ui-warning);
 }
 
@@ -2311,12 +2307,13 @@ body.dark-theme .entry-card p {
   width: var(--entry-quality-tooltip-width, min(280px, calc(100vw - 16px)));
   max-width: calc(100vw - 16px);
   gap: 5px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-floating-border);
   border-radius: 10px;
   padding: 10px 12px;
-  background: var(--surface);
+  background: var(--material-floating-background);
   color: var(--ui-text);
-  box-shadow: var(--shadow);
+  box-shadow: var(--material-floating-shadow);
+  backdrop-filter: var(--material-floating-filter);
   font-size: 0.78rem;
   font-weight: 700;
   line-height: 1.35;
@@ -2352,12 +2349,13 @@ body.dark-theme .entry-card p {
   z-index: 80;
   display: grid;
   min-width: 180px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-floating-border);
   border-radius: 10px;
   padding: 6px;
-  background: var(--surface);
+  background: var(--material-floating-background);
   color: var(--ui-text);
-  box-shadow: var(--shadow);
+  box-shadow: var(--material-floating-shadow);
+  backdrop-filter: var(--material-floating-filter);
 }
 
 .entry-context-menu button {
@@ -2481,10 +2479,11 @@ body.dark-theme .entry-card p {
   gap: 10px;
   width: 100%;
   padding: 16px;
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: 0 1px 0 rgba(24, 36, 48, 0.04);
+  border: 1px solid var(--material-panel-border);
+  border-radius: var(--radius-panel);
+  background: var(--material-panel-background);
+  box-shadow: var(--material-card-shadow);
+  backdrop-filter: var(--material-panel-filter);
 }
 
 .dictionary-manager-card.selected {
@@ -2529,12 +2528,20 @@ body.dark-theme .entry-card p {
   background: var(--ui-accent);
 }
 
-.editor-panel,
+.editor-panel {
+  background: var(--material-panel-background);
+  border: 1px solid var(--material-panel-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--material-panel-shadow);
+  backdrop-filter: var(--material-panel-filter);
+}
+
 dialog {
-  background: var(--surface);
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
+  background: var(--material-floating-background);
+  border: 1px solid var(--material-floating-border);
+  border-radius: var(--radius-floating);
+  box-shadow: var(--material-floating-shadow);
+  backdrop-filter: var(--material-floating-filter);
 }
 
 .editor-panel {
@@ -2603,7 +2610,7 @@ dialog {
   border: 1px solid var(--ui-border);
   border-radius: 8px;
   padding: 10px 12px;
-  background: var(--surface);
+  background: var(--material-panel-background);
   color: var(--ui-text);
   font-family: "Segoe UI", "Noto Sans", sans-serif;
   font-weight: 800;
@@ -2616,7 +2623,7 @@ dialog {
   padding: 16px;
   border: 1px solid var(--ui-border);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--surface) 90%, var(--bg));
+  background: color-mix(in srgb, var(--material-panel-background) 90%, var(--ui-canvas-bg));
 }
 
 .compact-heading {
@@ -2634,7 +2641,7 @@ dialog {
   padding: 14px;
   border: 1px solid var(--ui-border);
   border-radius: 8px;
-  background: var(--surface);
+  background: var(--material-panel-background);
 }
 
 .definition-form-header {
@@ -2693,10 +2700,10 @@ dialog {
   place-items: center;
   min-width: 38px;
   min-height: 34px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-inset-border);
   border-radius: 8px;
   padding: 0 10px;
-  background: var(--surface-2);
+  background: var(--material-inset-background);
   color: var(--ui-text);
   font-size: 1rem;
   font-weight: 900;
@@ -2715,14 +2722,14 @@ dialog {
   padding: 16px;
   border: 1px solid var(--ui-border);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--surface) 90%, var(--bg));
+  background: color-mix(in srgb, var(--material-panel-background) 90%, var(--ui-canvas-bg));
 }
 
 .settings-section input:disabled,
 .settings-section textarea:disabled,
 .settings-section select:disabled {
-  border-color: color-mix(in srgb, var(--ui-border) 70%, var(--bg));
-  background: color-mix(in srgb, var(--surface-2) 65%, var(--bg));
+  border-color: color-mix(in srgb, var(--ui-border) 70%, var(--ui-canvas-bg));
+  background: color-mix(in srgb, var(--material-inset-background) 65%, var(--ui-canvas-bg));
   color: var(--ui-text-muted);
   cursor: not-allowed;
   opacity: 0.72;
@@ -2792,9 +2799,9 @@ dialog {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-control-border);
   border-radius: 6px;
-  background: var(--surface);
+  background: var(--material-control-background);
   color: var(--ui-text);
   cursor: pointer;
 }
@@ -2833,9 +2840,9 @@ dialog {
   gap: 10px;
   min-height: 44px;
   padding: 10px 12px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-control-border);
   border-radius: 8px;
-  background: var(--surface);
+  background: var(--material-control-background);
   color: var(--ui-text);
   cursor: grab;
   user-select: none;
@@ -2916,7 +2923,7 @@ dialog {
   border: 1px solid var(--ui-border);
   border-radius: 8px;
   padding: 11px 12px;
-  background: var(--surface);
+  background: var(--material-panel-background);
   color: var(--ui-text);
   text-align: left;
 }
@@ -2998,11 +3005,12 @@ dialog {
 .corpus-editor-panel {
   min-width: 0;
   max-width: 100%;
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border: 1px solid var(--material-panel-border);
+  border-radius: var(--radius-panel);
   padding: 20px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  background: var(--material-panel-background);
+  box-shadow: var(--material-panel-shadow);
+  backdrop-filter: var(--material-panel-filter);
 }
 
 .corpus-form,
@@ -3021,7 +3029,7 @@ dialog {
   padding: 16px;
   border: 1px solid var(--ui-border);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--surface) 88%, var(--bg));
+  background: color-mix(in srgb, var(--material-panel-background) 88%, var(--ui-canvas-bg));
 }
 
 .corpus-layer-header,
@@ -3055,10 +3063,10 @@ dialog {
   place-items: center;
   width: 34px;
   height: 34px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-control-border);
   border-radius: 8px;
   padding: 0;
-  background: var(--surface);
+  background: var(--material-control-background);
   color: var(--ui-text);
   font: inherit;
   font-weight: 900;
@@ -3108,7 +3116,7 @@ dialog {
   border: 1px solid var(--ui-border);
   border-radius: 8px;
   padding: 6px 8px 6px 11px;
-  background: var(--surface);
+  background: var(--material-panel-background);
 }
 
 .corpus-linked-units li > .corpus-unit-name-host {
@@ -3215,9 +3223,9 @@ dialog {
 
 .analysis-page-tabs button,
 .analysis-subpage-tabs button {
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-control-border);
   border-radius: 8px;
-  background: var(--surface);
+  background: var(--material-control-background);
   color: var(--ui-text-muted);
   font: inherit;
   font-size: 0.84rem;
@@ -3252,7 +3260,7 @@ dialog {
   min-height: 22px;
   border-radius: 999px;
   padding: 0 6px;
-  background: var(--surface-2);
+  background: var(--material-inset-background);
   color: var(--ui-text-muted);
   font-size: 0.72rem;
   font-weight: 950;
@@ -3260,7 +3268,7 @@ dialog {
 }
 
 .analysis-subpage-tabs button.active .analysis-tab-count {
-  background: var(--surface);
+  background: var(--material-panel-background);
   color: var(--ui-accent-hover);
 }
 
@@ -3388,10 +3396,11 @@ dialog {
 .analysis-metric,
 .analysis-card {
   min-width: 0;
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: 0 12px 28px rgba(20, 32, 42, 0.06);
+  border: 1px solid var(--material-panel-border);
+  border-radius: var(--radius-panel);
+  background: var(--material-panel-background);
+  box-shadow: var(--material-panel-soft-shadow);
+  backdrop-filter: var(--material-panel-filter);
 }
 
 .analysis-metric {
@@ -3441,10 +3450,10 @@ dialog {
   align-items: center;
   gap: 3px;
   min-height: 28px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-inset-border);
   border-radius: 6px;
   padding: 4px 6px 4px 9px;
-  background: var(--surface-2);
+  background: var(--material-inset-background);
   color: var(--ui-accent-hover);
   font: inherit;
   font-size: 0.78rem;
@@ -3581,7 +3590,7 @@ button.analysis-composition-subset:hover strong {
   height: 10px;
   overflow: hidden;
   border-radius: 999px;
-  background: var(--surface-2);
+  background: var(--material-inset-background);
 }
 
 .analysis-composition span {
@@ -3681,10 +3690,10 @@ button.analysis-composition-subset:hover strong {
   align-items: baseline;
   gap: 5px;
   min-width: 0;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-inset-border);
   border-radius: 2px;
   padding: 3px 7px;
-  background: var(--surface-2);
+  background: var(--material-inset-background);
   color: var(--ui-text-muted);
   font-size: 0.78rem;
   font-weight: 700;
@@ -3794,7 +3803,7 @@ button.analysis-bar-label:hover,
   height: 9px;
   overflow: hidden;
   border-radius: 999px;
-  background: var(--surface-2);
+  background: var(--material-inset-background);
 }
 
 .analysis-bar-track span {
@@ -3886,7 +3895,7 @@ button.analysis-bar-label:hover,
   padding: 10px;
   border: 1px solid var(--ui-border);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--surface) 88%, var(--bg));
+  background: color-mix(in srgb, var(--material-panel-background) 88%, var(--ui-canvas-bg));
 }
 
 .analysis-issue-list li[data-entry-id] {
@@ -3895,14 +3904,14 @@ button.analysis-bar-label:hover,
 
 .analysis-issue-list li[data-entry-id]:hover {
   border-color: var(--ui-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 14%, transparent);
+  box-shadow: var(--ui-accent-focus-ring);
 }
 
 .analysis-issue-list li > span {
   min-width: 44px;
   border-radius: 999px;
   padding: 3px 7px;
-  background: var(--surface-2);
+  background: var(--material-inset-background);
   color: var(--ui-text-muted);
   font-size: 0.68rem;
   font-weight: 900;
@@ -3967,9 +3976,9 @@ button.analysis-bar-label:hover,
 .segmented-control {
   display: inline-flex;
   overflow: hidden;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--material-control-border);
   border-radius: 8px;
-  background: var(--surface);
+  background: var(--material-control-background);
 }
 
 .segmented-control button {
@@ -4016,10 +4025,11 @@ button.analysis-bar-label:hover,
   min-width: 0;
   max-width: 100%;
   min-height: 560px;
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  border: 1px solid var(--material-panel-border);
+  border-radius: var(--radius-panel);
+  background: var(--material-panel-background);
+  box-shadow: var(--material-panel-shadow);
+  backdrop-filter: var(--material-panel-filter);
 }
 
 .docs-editor-pane textarea {
@@ -4067,14 +4077,14 @@ button.analysis-bar-label:hover,
 .markdown-preview code {
   border-radius: 4px;
   padding: 2px 5px;
-  background: var(--surface-2);
+  background: var(--material-inset-background);
 }
 
 .markdown-preview pre {
   overflow: auto;
   padding: 12px;
   border-radius: 8px;
-  background: var(--surface-2);
+  background: var(--material-inset-background);
 }
 
 .markdown-preview a {
@@ -4106,7 +4116,7 @@ button.analysis-bar-label:hover,
   padding: 8px;
   border: 1px solid var(--ui-border);
   border-radius: 8px;
-  background: var(--surface);
+  background: var(--material-panel-background);
   transition: border-color 140ms ease, opacity 140ms ease;
 }
 
@@ -4141,7 +4151,7 @@ button.analysis-bar-label:hover,
 
 .ipa-rule-drag-handle:hover,
 .ipa-rule-drag-handle:focus-visible {
-  background: var(--surface-2);
+  background: var(--material-inset-background);
   color: var(--ui-text);
 }
 
@@ -4222,6 +4232,10 @@ textarea.ipa-single-line::-webkit-scrollbar {
 .utility-actions {
   display: grid;
   grid-template-columns: 1fr 72px;
+}
+
+.skin-toggle-button {
+  grid-column: 1 / -1;
 }
 
 .utility-button {
@@ -4339,7 +4353,7 @@ textarea.ipa-single-line::-webkit-scrollbar {
   padding: 6px 10px;
   border: 1px solid var(--ui-border);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--surface) 92%, var(--bg));
+  background: color-mix(in srgb, var(--material-panel-background) 92%, var(--ui-canvas-bg));
 }
 
 .search-field-setting label {
@@ -4359,7 +4373,7 @@ textarea.ipa-single-line::-webkit-scrollbar {
 
 .search-field-setting.is-search-disabled {
   color: var(--ui-text-muted);
-  background: color-mix(in srgb, var(--surface-2) 65%, var(--bg));
+  background: color-mix(in srgb, var(--material-inset-background) 65%, var(--ui-canvas-bg));
 }
 
 .search-normalization-rule-list {
@@ -4376,7 +4390,7 @@ textarea.ipa-single-line::-webkit-scrollbar {
   padding: 10px;
   border: 1px solid var(--ui-border);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--surface) 92%, var(--bg));
+  background: color-mix(in srgb, var(--material-panel-background) 92%, var(--ui-canvas-bg));
 }
 
 .search-normalization-rule-card label {
@@ -4416,7 +4430,7 @@ dialog {
 }
 
 dialog::backdrop {
-  background: rgba(13, 23, 31, 0.48);
+  background: var(--material-overlay-background);
 }
 
 .dialog-actions > div {
@@ -4431,8 +4445,8 @@ dialog::backdrop {
   padding: 16px;
   border: 1px solid var(--ui-border);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--surface) 92%, var(--bg));
-  box-shadow: 0 10px 24px rgba(24, 36, 48, 0.08);
+  background: color-mix(in srgb, var(--material-panel-background) 92%, var(--ui-canvas-bg));
+  box-shadow: var(--material-floating-soft-shadow);
 }
 
 .partial-edit-body {
@@ -4461,11 +4475,11 @@ dialog::backdrop {
   z-index: var(--layer-app-tooltip);
   max-width: min(260px, calc(100vw - 16px));
   padding: 8px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  border: 1px solid var(--material-tooltip-border);
   border-radius: 7px;
-  background: #10181c;
+  background: var(--material-tooltip-background);
   color: var(--material-tooltip-text);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  box-shadow: var(--material-tooltip-shadow);
   font-size: 0.78rem;
   font-weight: 800;
   line-height: 1.2;
@@ -4484,18 +4498,10 @@ dialog::backdrop {
 
 .app-tooltip.chip-list-tooltip,
 .app-tooltip.tag-info-tooltip {
-  border-color: var(--ui-border);
-  background: var(--surface);
-  color: var(--ui-text);
-  box-shadow: var(--shadow);
-}
-
-body.dark-theme .app-tooltip.chip-list-tooltip,
-body.dark-theme .app-tooltip.tag-info-tooltip {
-  border-color: rgba(255, 255, 255, 0.18);
-  background: #10181c;
-  color: #f8fbfa;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  border-color: var(--material-rich-tooltip-border);
+  background: var(--material-rich-tooltip-background);
+  color: var(--material-rich-tooltip-text);
+  box-shadow: var(--material-rich-tooltip-shadow);
 }
 
 .app-tooltip-tag-info {
@@ -4555,9 +4561,9 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   max-width: min(360px, calc(100vw - 44px));
   padding: 12px 14px;
   border-radius: 8px;
-  background: #17202a;
+  background: var(--material-toast-background);
   color: var(--ui-text-on-solid);
-  box-shadow: var(--shadow);
+  box-shadow: var(--material-floating-shadow);
   opacity: 0;
   transform: translateY(12px);
   transition: opacity 160ms ease, transform 160ms ease;
@@ -4576,7 +4582,7 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(10, 18, 24, 0.52);
+  background: var(--material-overlay-modal-background);
   animation: overlayIn 160ms ease both;
 }
 
@@ -4590,12 +4596,13 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   width: min(760px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);
   overflow: auto;
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border: 1px solid var(--material-floating-border);
+  border-radius: var(--radius-floating);
   padding: 22px;
-  background: var(--surface);
+  background: var(--material-floating-background);
   color: var(--ui-text);
-  box-shadow: var(--shadow);
+  box-shadow: var(--material-floating-shadow);
+  backdrop-filter: var(--material-floating-filter);
 }
 
 .modal-header {
@@ -4662,25 +4669,26 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   display: grid;
   place-items: center;
   padding: 28px;
-  background: rgba(10, 18, 24, 0.58);
+  background: var(--material-overlay-strong-background);
   animation: overlayIn 180ms ease both;
 }
 
 .network-panel {
   display: grid;
-  gap: 22px;
+  gap: 14px;
   width: min(1180px, calc(100vw - 56px));
   min-width: 0;
   max-width: 100%;
   min-height: min(720px, calc(100vh - 56px));
   max-height: calc(100vh - 56px);
-  grid-template-rows: auto minmax(0, 1fr);
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  border: 1px solid var(--material-floating-border);
+  border-radius: var(--radius-floating);
   padding: 24px;
-  background: var(--surface);
+  background: var(--material-floating-background);
   color: var(--ui-text);
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.34);
+  box-shadow: var(--material-overlay-panel-shadow);
+  backdrop-filter: var(--material-floating-filter);
   transform-origin: center;
   animation: networkIn 220ms ease both;
 }
@@ -4701,6 +4709,47 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   margin: 4px 0 0;
 }
 
+.network-summary-bar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+  border: 1px solid var(--material-inset-border);
+  border-radius: var(--radius-panel);
+  background: var(--material-inset-background);
+  overflow: hidden;
+}
+
+.network-summary-item {
+  display: flex;
+  min-width: 0;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+.network-summary-item + .network-summary-item {
+  border-left: 1px solid var(--material-inset-border);
+}
+
+.network-summary-item span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ui-text-muted);
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.network-summary-item strong {
+  flex: 0 0 auto;
+  color: var(--ui-text);
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .network-viewport {
   position: relative;
   min-width: 0;
@@ -4709,7 +4758,7 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   border: 1px solid var(--ui-border);
   border-radius: 8px;
   overflow: auto;
-  background: color-mix(in srgb, var(--surface) 88%, var(--bg));
+  background: color-mix(in srgb, var(--material-panel-background) 88%, var(--ui-canvas-bg));
   scrollbar-gutter: stable;
 }
 
@@ -4720,37 +4769,8 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   overflow: visible;
 }
 
-.network-layer-label {
-  position: absolute;
-  top: 14px;
-  z-index: 2;
-  border: 1px solid color-mix(in srgb, var(--ui-accent) 38%, var(--ui-border));
-  border-radius: 999px;
-  padding: 4px 10px;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  color: var(--ui-text-muted);
-  font-size: 0.78rem;
-  font-weight: 850;
-  pointer-events: none;
-  backdrop-filter: blur(8px);
-}
-
-.network-layer-label.source {
-  left: 16px;
-}
-
-.network-layer-label.derived {
-  right: 16px;
-}
-
-.network-viewport[data-layout="vertical"] .network-layer-label {
-  left: 50%;
-  right: auto;
-  transform: translateX(-50%);
-}
-
-.network-viewport[data-layout="vertical"] .network-layer-label.derived {
-  top: var(--network-derived-label-top, 14px);
+.network-viewport[data-layout="vertical"] .network-svg {
+  min-width: 0;
 }
 
 .network-edge {
@@ -4759,6 +4779,18 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
   transition: d 300ms cubic-bezier(0.22, 0.75, 0.25, 1), opacity 180ms ease;
+}
+
+.network-section-label {
+  fill: var(--ui-text-muted);
+  font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.network-section-label.focus {
+  fill: var(--ui-accent-hover);
 }
 
 #networkArrow path {
@@ -4775,29 +4807,30 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
 }
 
 .network-svg-node rect {
-  fill: var(--surface);
+  fill: var(--material-panel-background);
   stroke: var(--ui-border);
   stroke-width: 1.5;
   vector-effect: non-scaling-stroke;
-  filter: drop-shadow(0 8px 12px rgba(24, 36, 48, 0.08));
+  filter: var(--material-network-node-shadow);
   transition: fill 180ms ease, stroke 180ms ease, filter 180ms ease;
 }
 
 .network-svg-node:hover rect,
 .network-svg-node:focus-visible rect {
   stroke: var(--ui-accent);
-  filter: drop-shadow(0 12px 18px rgba(24, 36, 48, 0.16));
+  filter: var(--material-network-node-hover-shadow);
 }
 
 .network-svg-node.focus rect {
   fill: var(--ui-accent-soft);
   stroke: var(--ui-accent);
   stroke-width: 2;
-  filter: drop-shadow(0 16px 24px rgba(24, 121, 108, 0.17));
+  filter: var(--material-network-node-focus-shadow);
 }
 
 .network-node-lemma,
-.network-node-subtitle {
+.network-node-pronunciation,
+.network-node-part {
   pointer-events: none;
   dominant-baseline: middle;
 }
@@ -4813,11 +4846,16 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   font-size: 1.45rem;
 }
 
-.network-node-subtitle {
+.network-node-pronunciation,
+.network-node-part {
   fill: var(--ui-text-muted);
   font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 800;
+}
+
+.network-node-part {
+  fill: color-mix(in srgb, var(--ui-accent-hover) 72%, var(--ui-text-muted));
 }
 
 .network-status {
@@ -4832,12 +4870,12 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
   border: 1px solid color-mix(in srgb, var(--ui-accent) 52%, var(--ui-border));
   border-radius: 999px;
   padding: 7px 12px;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  background: color-mix(in srgb, var(--material-panel-background) 92%, transparent);
   color: var(--ui-accent-hover);
   font-size: 0.8rem;
   font-weight: 850;
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(10px);
+  box-shadow: var(--material-panel-shadow);
+  backdrop-filter: var(--material-network-status-filter);
 }
 
 .network-status.error {
@@ -4953,14 +4991,10 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
     gap: 12px;
     min-height: 58px;
     padding: 8px 12px;
-    border-bottom: 1px solid var(--ui-border);
-    background: color-mix(in srgb, var(--bg) 88%, var(--surface));
-    box-shadow: 0 10px 24px rgba(24, 36, 48, 0.12);
-    backdrop-filter: blur(12px);
-  }
-
-  body.dark-theme .mobile-app-bar {
-    background: color-mix(in srgb, var(--bg) 86%, var(--surface));
+    border-bottom: 1px solid var(--material-floating-border);
+    background: var(--material-mobile-bar-background);
+    box-shadow: var(--material-mobile-bar-shadow);
+    backdrop-filter: var(--material-mobile-bar-filter);
   }
 
   .mobile-drawer-backdrop {
@@ -4968,7 +5002,7 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
     inset: 0;
     z-index: var(--layer-drawer-backdrop);
     display: block;
-    background: rgba(13, 23, 31, 0.42);
+    background: var(--material-overlay-drawer-background);
   }
 
   .app-shell,
@@ -5011,7 +5045,8 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
     min-height: 0;
     padding: 20px;
     overflow-y: auto;
-    box-shadow: var(--shadow);
+    box-shadow: var(--material-navigation-shadow);
+    backdrop-filter: var(--material-navigation-filter);
   }
 
   .app-nav[data-nav-state="rail"] .brand-row,
@@ -5053,12 +5088,14 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
     height: 100dvh;
     padding: 14px;
     overflow: hidden;
-    background: var(--bg);
-    box-shadow: var(--shadow);
+    background: var(--material-browser-background);
+    box-shadow: var(--material-floating-shadow);
+    backdrop-filter: var(--material-browser-filter);
   }
 
   .filter-row {
-    background: var(--bg);
+    background: var(--material-sticky-background);
+    backdrop-filter: var(--material-sticky-filter);
   }
 
   .entry-filter-menu {
@@ -5111,10 +5148,6 @@ body.dark-theme .app-tooltip.tag-info-tooltip {
 
   .network-viewport {
     height: auto;
-  }
-
-  .network-layer-label {
-    top: 10px;
   }
 
   .workspace,

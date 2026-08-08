@@ -5,6 +5,7 @@ let state = {
   activeView: "editor",
   uiLanguage: "zh",
   uiTheme: "light",
+  uiSkin: "classic",
   dictionaries: [],
 };
 
@@ -23,6 +24,7 @@ let entrySort = "lemmaAsc";
 let toastTimer = null;
 let editorMode = "display";
 let currentTheme = "light";
+let currentSkin = "classic";
 let currentLanguage = "zh";
 let loadedDictionaryIds = new Set();
 const UI_PREFERENCES_STORAGE_KEY = "conlexicon:ui-preferences";
@@ -382,6 +384,10 @@ const i18n = {
     settings: "设置",
     darkMode: "暗黑模式",
     lightMode: "浅色模式",
+    classicSkin: "经典皮肤",
+    liquidGlassSkin: "液态玻璃",
+    switchToClassicSkin: "切换到经典皮肤",
+    switchToLiquidGlassSkin: "切换到液态玻璃皮肤",
     newEntry: "新建词条",
     quickNewEntryTooltip: "新建词条",
     insertSymbol: "插入 {symbol}",
@@ -701,10 +707,12 @@ const i18n = {
     importFailed: "无法读取这个 JSON 文件",
     languageSaveFailed: "界面语言保存失败",
     themeSaveFailed: "界面主题保存失败",
+    skinSaveFailed: "界面皮肤保存失败",
     apiErrorRequestBodyTooLarge: "保存内容过大",
     apiErrorInvalidJsonBody: "请求内容不是有效 JSON",
     apiErrorInvalidUiLanguage: "界面语言值无效",
     apiErrorInvalidUiTheme: "界面主题值无效",
+    apiErrorInvalidUiSkin: "界面皮肤值无效",
     apiErrorInvalidImportPayload: "导入文件格式无效",
     apiErrorInvalidDictionaryId: "词典 ID 格式无效",
     apiErrorDictionaryNotFound: "词典不存在或已被删除",
@@ -866,6 +874,8 @@ const i18n = {
     corpusUnitParentLabel: "父级：{parent}",
     lexicalNetwork: "词汇网络",
     closeNetwork: "关闭网络",
+    networkRelationSummary: "网络关系统计",
+    networkCurrentEntry: "当前词条",
     lexicalNetworkLoading: "正在加载词汇网络",
     contentUpdating: "正在更新",
     lexicalNetworkLoadFailed: "无法加载词汇网络",
@@ -973,6 +983,10 @@ const i18n = {
     settings: "Settings",
     darkMode: "Dark Mode",
     lightMode: "Light Mode",
+    classicSkin: "Classic Skin",
+    liquidGlassSkin: "Liquid Glass",
+    switchToClassicSkin: "Switch to Classic Skin",
+    switchToLiquidGlassSkin: "Switch to Liquid Glass Skin",
     newEntry: "New Entry",
     quickNewEntryTooltip: "New Entry",
     insertSymbol: "Insert {symbol}",
@@ -1294,10 +1308,12 @@ const i18n = {
     importFailed: "Cannot read this JSON file",
     languageSaveFailed: "Failed to save the interface language",
     themeSaveFailed: "Failed to save the interface theme",
+    skinSaveFailed: "Failed to save the interface skin",
     apiErrorRequestBodyTooLarge: "Saved content is too large",
     apiErrorInvalidJsonBody: "Request body is not valid JSON",
     apiErrorInvalidUiLanguage: "Invalid interface language value",
     apiErrorInvalidUiTheme: "Invalid interface theme value",
+    apiErrorInvalidUiSkin: "Invalid interface skin value",
     apiErrorInvalidImportPayload: "Invalid import file format",
     apiErrorInvalidDictionaryId: "Invalid dictionary ID",
     apiErrorDictionaryNotFound: "Dictionary not found or already deleted",
@@ -1460,6 +1476,8 @@ const i18n = {
     corpusUnitParentLabel: "Parent: {parent}",
     lexicalNetwork: "Lexical Network",
     closeNetwork: "Close Network",
+    networkRelationSummary: "Network relation summary",
+    networkCurrentEntry: "Current entry",
     lexicalNetworkLoading: "Loading lexical network",
     contentUpdating: "Updating",
     lexicalNetworkLoadFailed: "Could not load lexical network",
@@ -1510,6 +1528,8 @@ const elements = {
   addDictionaryButton: document.querySelector("#addDictionaryButton"),
   themeToggleButton: document.querySelector("#themeToggleButton"),
   themeToggleLabel: document.querySelector("#themeToggleLabel"),
+  skinToggleButton: document.querySelector("#skinToggleButton"),
+  skinToggleLabel: document.querySelector("#skinToggleLabel"),
   languageToggleButton: document.querySelector("#languageToggleButton"),
   brandEyebrow: document.querySelector("#brandEyebrow"),
   brandTitle: document.querySelector('[data-i18n="appTitle"]'),
@@ -1711,11 +1731,12 @@ const elements = {
   networkTitle: document.querySelector("#networkTitle"),
   networkViewport: document.querySelector("#networkViewport"),
   networkSvg: document.querySelector("#networkSvg"),
+  networkSections: document.querySelector("#networkSections"),
   networkEdges: document.querySelector("#networkEdges"),
   networkNodes: document.querySelector("#networkNodes"),
   networkStatus: document.querySelector("#networkStatus"),
-  networkSourceLabel: document.querySelector("#networkSourceLabel"),
-  networkDerivedLabel: document.querySelector("#networkDerivedLabel"),
+  networkSourceCount: document.querySelector("#networkSourceCount"),
+  networkDerivedCount: document.querySelector("#networkDerivedCount"),
   confirmDialog: document.querySelector("#confirmDialog"),
   confirmDialogTitle: document.querySelector("#confirmDialogTitle"),
   confirmDialogMessage: document.querySelector("#confirmDialogMessage"),
@@ -1805,6 +1826,10 @@ function normalizeUiTheme(value) {
   return value === "dark" ? "dark" : "light";
 }
 
+function normalizeUiSkin(value) {
+  return value === "liquid-glass" ? "liquid-glass" : "classic";
+}
+
 function readCachedUiPreferences() {
   try {
     const raw = localStorage.getItem(UI_PREFERENCES_STORAGE_KEY);
@@ -1816,6 +1841,9 @@ function readCachedUiPreferences() {
       ...(preferences.uiTheme === "dark" || preferences.uiTheme === "light"
         ? { uiTheme: preferences.uiTheme }
         : {}),
+      ...(["classic", "liquid-glass"].includes(preferences.uiSkin)
+        ? { uiSkin: preferences.uiSkin }
+        : {}),
     };
   } catch (error) {
     return {};
@@ -1826,6 +1854,7 @@ function cacheUiPreferences(preferences = {}) {
   const cached = readCachedUiPreferences();
   const next = {
     uiTheme: normalizeUiTheme(preferences.uiTheme ?? cached.uiTheme ?? currentTheme),
+    uiSkin: normalizeUiSkin(preferences.uiSkin ?? cached.uiSkin ?? currentSkin),
   };
   try {
     localStorage.setItem(UI_PREFERENCES_STORAGE_KEY, JSON.stringify(next));
@@ -1837,8 +1866,10 @@ function cacheUiPreferences(preferences = {}) {
 function hydrateInitialUiPreferences() {
   const cached = readCachedUiPreferences();
   currentTheme = normalizeUiTheme(cached.uiTheme ?? currentTheme);
+  currentSkin = normalizeUiSkin(cached.uiSkin ?? currentSkin);
   state.uiTheme = currentTheme;
-  document.body.classList.toggle("dark-theme", currentTheme === "dark");
+  state.uiSkin = currentSkin;
+  applyAppearance();
 }
 
 function finishAppBoot() {
@@ -1955,6 +1986,7 @@ const API_ERROR_TOAST_KEYS = {
   invalid_json_body: "apiErrorInvalidJsonBody",
   invalid_ui_language: "apiErrorInvalidUiLanguage",
   invalid_ui_theme: "apiErrorInvalidUiTheme",
+  invalid_ui_skin: "apiErrorInvalidUiSkin",
   invalid_import_payload: "apiErrorInvalidImportPayload",
   invalid_dictionary_id: "apiErrorInvalidDictionaryId",
   dictionary_not_found: "apiErrorDictionaryNotFound",
@@ -2069,7 +2101,8 @@ async function loadState() {
     backendMessage = "";
     currentLanguage = normalizeUiLanguage(serverState.uiLanguage);
     currentTheme = normalizeUiTheme(serverState.uiTheme);
-    cacheUiPreferences({ uiTheme: currentTheme });
+    currentSkin = normalizeUiSkin(serverState.uiSkin);
+    cacheUiPreferences({ uiTheme: currentTheme, uiSkin: currentSkin });
     await applyServerState({
       ...serverState,
       selectedEntryId: state.selectedEntryId,
@@ -2169,6 +2202,7 @@ function normalizeState(source) {
     activeView: source.activeView || "editor",
     uiLanguage: normalizeUiLanguage(source.uiLanguage),
     uiTheme: normalizeUiTheme(source.uiTheme),
+    uiSkin: normalizeUiSkin(source.uiSkin),
     dictionaries: Array.isArray(source.dictionaries) ? source.dictionaries.map(normalizeDictionaryMetadata) : [],
   };
 }
@@ -3062,7 +3096,7 @@ function render(options = {}) {
     setEntrySearchConfigOpen(false);
   }
   applyLocale();
-  applyTheme();
+  applyAppearance();
   renderShellNav();
   renderView();
   renderAvailability();
@@ -3079,7 +3113,7 @@ function renderLocaleChange() {
   closeEntryContextMenu();
   refreshActiveFilterLocalization();
   applyLocale();
-  applyTheme();
+  applyAppearance();
   refreshEditableSurfaceLocale();
   renderShellNav();
   renderAvailability();
@@ -3092,9 +3126,9 @@ function renderLocaleChange() {
   scheduleEntryBrowserHeightUpdate();
 }
 
-function renderThemeChange() {
+function renderAppearanceChange() {
   hideAppTooltip();
-  applyTheme();
+  applyAppearance();
   applyLocale();
 }
 
@@ -3325,6 +3359,11 @@ function applyLocale(root = document) {
   elements.themeToggleLabel.textContent = nextThemeLabel;
   elements.themeToggleButton.removeAttribute("title");
   elements.themeToggleButton.setAttribute("aria-label", nextThemeLabel);
+  const nextSkinLabel = currentSkin === "liquid-glass" ? t("classicSkin") : t("liquidGlassSkin");
+  const nextSkinAriaLabel = currentSkin === "liquid-glass" ? t("switchToClassicSkin") : t("switchToLiquidGlassSkin");
+  elements.skinToggleLabel.textContent = nextSkinLabel;
+  elements.skinToggleButton.removeAttribute("title");
+  elements.skinToggleButton.setAttribute("aria-label", nextSkinAriaLabel);
   const nextLanguageLabel = currentLanguage === "zh" ? "English" : "中文";
   elements.languageToggleButton.removeAttribute("title");
   elements.languageToggleButton.setAttribute("aria-label", nextLanguageLabel);
@@ -3370,8 +3409,13 @@ function refreshEditableSurfaceLocale() {
   refreshCorpusEditorLocale();
 }
 
-function applyTheme() {
+function applyAppearance() {
   document.body.classList.toggle("dark-theme", currentTheme === "dark");
+  if (currentSkin === "liquid-glass") {
+    document.body.dataset.uiSkin = "liquid-glass";
+  } else {
+    delete document.body.dataset.uiSkin;
+  }
 }
 
 function mobileShellMode() {
@@ -8535,6 +8579,9 @@ function resetLexicalNetworkScene() {
   if (elements.networkNodes) {
     elements.networkNodes.replaceChildren();
   }
+  if (elements.networkSections) {
+    elements.networkSections.replaceChildren();
+  }
   if (elements.networkEdges) {
     elements.networkEdges.replaceChildren();
   }
@@ -8562,14 +8609,14 @@ function renderLexicalNetworkScene(focusEntry, relation) {
   nextScene.layout = layout;
 
   elements.networkViewport.dataset.layout = layout.orientation;
-  elements.networkViewport.style.setProperty("--network-derived-label-top", `${layout.derivedLabelTop || 14}px`);
   elements.networkSvg.setAttribute("viewBox", `0 0 ${layout.width} ${layout.height}`);
   elements.networkSvg.style.height = `${layout.height}px`;
   const sourceCount = [...nextScene.nodes.values()].filter((node) => node.role === "source").length;
   const derivedCount = [...nextScene.nodes.values()].filter((node) => node.role === "derived").length;
-  elements.networkSourceLabel.textContent = `${t("source")} · ${sourceCount}`;
-  elements.networkDerivedLabel.textContent = `${t("derivedEntries")} · ${derivedCount}`;
+  elements.networkSourceCount.textContent = String(sourceCount);
+  elements.networkDerivedCount.textContent = String(derivedCount);
   renderLexicalNetworkStatus(relation.status);
+  updateLexicalNetworkSectionLabels(layout);
   updateLexicalNetworkEdges(nextScene);
   updateLexicalNetworkNodes(nextScene);
   networkScene = nextScene;
@@ -8636,43 +8683,52 @@ function layoutLexicalNetworkScene(scene) {
   if (viewportWidth < 720) {
     const width = viewportWidth;
     const nodeWidth = Math.min(280, width - 40);
-    const nodeHeight = 72;
-    const focusHeight = 108;
+    const nodeHeight = 84;
+    const focusHeight = 124;
     const gap = 18;
-    const topPadding = 52;
-    let cursorY = topPadding;
-    sources.forEach((node) => {
-      positions.set(node.id, { x: width / 2, y: cursorY + nodeHeight / 2, width: nodeWidth, height: nodeHeight });
-      cursorY += nodeHeight + gap;
-    });
+    const sectionLabels = [];
+    let cursorY = 16;
+    const addSectionLabel = (role, labelKey) => {
+      sectionLabels.push({ role, labelKey, x: 20, y: cursorY + 15 });
+      cursorY += 34;
+    };
+    const addNodeList = (nodes) => {
+      nodes.forEach((node, index) => {
+        positions.set(node.id, { x: width / 2, y: cursorY + nodeHeight / 2, width: nodeWidth, height: nodeHeight });
+        cursorY += nodeHeight + (index < nodes.length - 1 ? gap : 0);
+      });
+    };
     if (sources.length) {
-      cursorY += 26;
+      addSectionLabel("source", "source");
+      addNodeList(sources);
+      cursorY += 18;
     }
+    addSectionLabel("focus", "networkCurrentEntry");
     positions.set(scene.focusEntryId, { x: width / 2, y: cursorY + focusHeight / 2, width: nodeWidth, height: focusHeight });
-    cursorY += focusHeight + (derived.length ? 44 : 22);
-    const derivedLabelTop = cursorY - 34;
-    derived.forEach((node) => {
-      positions.set(node.id, { x: width / 2, y: cursorY + nodeHeight / 2, width: nodeWidth, height: nodeHeight });
-      cursorY += nodeHeight + gap;
-    });
+    cursorY += focusHeight;
+    if (derived.length) {
+      cursorY += 18;
+      addSectionLabel("derived", "derivedEntries");
+      addNodeList(derived);
+    }
     return {
       orientation: "vertical",
       width,
       height: Math.max(420, cursorY + 28),
-      derivedLabelTop,
+      sectionLabels,
       positions,
     };
   }
 
   const width = viewportWidth;
   const nodeWidth = Math.min(230, Math.max(168, (width - 210) / 3));
-  const nodeHeight = 72;
+  const nodeHeight = 84;
   const focusWidth = Math.min(250, nodeWidth + 22);
-  const focusHeight = 118;
+  const focusHeight = 124;
   const maxSideCount = Math.max(1, sources.length, derived.length);
-  const height = Math.max(520, maxSideCount * 92 + 112);
-  const sideTop = 74;
-  const sideBottom = height - 38;
+  const height = Math.max(520, maxSideCount * 104 + 120);
+  const sideTop = 58;
+  const sideBottom = height - 58;
   const sideY = (items, index) => {
     if (items.length <= 1) {
       return height / 2;
@@ -8688,7 +8744,23 @@ function layoutLexicalNetworkScene(scene) {
     positions.set(node.id, { x: rightX, y: sideY(derived, index), width: nodeWidth, height: nodeHeight });
   });
   positions.set(scene.focusEntryId, { x: width / 2, y: height / 2, width: focusWidth, height: focusHeight });
-  return { orientation: "horizontal", width, height, positions };
+  return { orientation: "horizontal", width, height, sectionLabels: [], positions };
+}
+
+function updateLexicalNetworkSectionLabels(layout) {
+  if (!elements.networkSections) {
+    return;
+  }
+  const labels = (layout.sectionLabels || []).map((section) => {
+    const text = createNetworkSvgElement("text", {
+      class: `network-section-label ${section.role}`,
+      x: section.x,
+      y: section.y,
+    });
+    text.textContent = t(section.labelKey);
+    return text;
+  });
+  elements.networkSections.replaceChildren(...labels);
 }
 
 function renderLexicalNetworkStatus(status) {
@@ -8712,10 +8784,6 @@ function renderLexicalNetworkStatus(status) {
 
 function networkNodeTransform(position) {
   return `translate(${position.x} ${position.y})`;
-}
-
-function networkEntrySubtitle(entry) {
-  return [entry?.pronunciation || "", entryPartText(entry)].filter(Boolean).join(" · ");
 }
 
 function networkTruncatedLabel(value, width, fontSize = 16) {
@@ -8746,8 +8814,9 @@ function createLexicalNetworkNodeElement(node, initialPosition) {
   });
   const rect = createNetworkSvgElement("rect", { rx: "10", ry: "10" });
   const lemma = createNetworkSvgElement("text", { class: "network-node-lemma", "text-anchor": "middle" });
-  const subtitle = createNetworkSvgElement("text", { class: "network-node-subtitle", "text-anchor": "middle" });
-  group.append(rect, lemma, subtitle);
+  const pronunciation = createNetworkSvgElement("text", { class: "network-node-pronunciation", "text-anchor": "middle" });
+  const part = createNetworkSvgElement("text", { class: "network-node-part", "text-anchor": "middle" });
+  group.append(rect, lemma, pronunciation, part);
   group.addEventListener("click", () => navigateLexicalNetwork(node.id));
   group.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
@@ -8765,8 +8834,9 @@ function updateLexicalNetworkNodeElement(group, node, position) {
   group.dataset.appTooltip = "always";
   group.dataset.appTooltipWrap = "true";
   group.dataset.appTooltipHtml = networkNodeTooltipHtml(node.entry);
-  const subtitleText = networkEntrySubtitle(node.entry);
-  group.setAttribute("aria-label", [node.entry.lemma, subtitleText].filter(Boolean).join(", "));
+  const pronunciationText = String(node.entry.pronunciation || "");
+  const partText = entryPartText(node.entry);
+  group.setAttribute("aria-label", [node.entry.lemma, pronunciationText, partText].filter(Boolean).join(", "));
   group.classList.toggle("focus", node.role === "focus");
   group.classList.toggle("source", node.role === "source");
   group.classList.toggle("derived", node.role === "derived");
@@ -8777,10 +8847,25 @@ function updateLexicalNetworkNodeElement(group, node, position) {
   rect.setAttribute("height", String(position.height));
   const lemma = group.querySelector(".network-node-lemma");
   lemma.textContent = networkTruncatedLabel(node.entry.lemma, position.width - 28, node.role === "focus" ? 24 : 16);
-  lemma.setAttribute("y", node.role === "focus" ? "-6" : "-5");
-  const subtitle = group.querySelector(".network-node-subtitle");
-  subtitle.textContent = networkTruncatedLabel(subtitleText, position.width - 28, 13);
-  subtitle.setAttribute("y", node.role === "focus" ? "25" : "20");
+  const pronunciation = group.querySelector(".network-node-pronunciation");
+  const part = group.querySelector(".network-node-part");
+  pronunciation.textContent = networkTruncatedLabel(pronunciationText, position.width - 28, 12);
+  part.textContent = networkTruncatedLabel(partText, position.width - 28, 12);
+  const metadataCount = Number(Boolean(pronunciationText)) + Number(Boolean(partText));
+  if (metadataCount === 2) {
+    lemma.setAttribute("y", node.role === "focus" ? "-20" : "-17");
+    pronunciation.setAttribute("y", node.role === "focus" ? "10" : "8");
+    part.setAttribute("y", node.role === "focus" ? "32" : "28");
+  } else if (metadataCount === 1) {
+    lemma.setAttribute("y", node.role === "focus" ? "-10" : "-8");
+    const metadataY = node.role === "focus" ? "24" : "21";
+    pronunciation.setAttribute("y", metadataY);
+    part.setAttribute("y", metadataY);
+  } else {
+    lemma.setAttribute("y", "5");
+    pronunciation.setAttribute("y", "0");
+    part.setAttribute("y", "0");
+  }
 }
 
 function updateLexicalNetworkNodes(scene) {
@@ -15396,6 +15481,8 @@ async function refreshState() {
   backendMessage = "";
   currentLanguage = normalizeUiLanguage(serverState.uiLanguage);
   currentTheme = normalizeUiTheme(serverState.uiTheme);
+  currentSkin = normalizeUiSkin(serverState.uiSkin);
+  cacheUiPreferences({ uiTheme: currentTheme, uiSkin: currentSkin });
   await applyServerState({
     ...serverState,
     selectedEntryId: state.selectedEntryId,
@@ -16685,7 +16772,7 @@ elements.themeToggleButton.addEventListener("click", async () => {
   currentTheme = nextTheme;
   state.uiTheme = nextTheme;
   cacheUiPreferences({ uiTheme: nextTheme });
-  renderThemeChange();
+  renderAppearanceChange();
   if (!backendAvailable) {
     return;
   }
@@ -16698,15 +16785,45 @@ elements.themeToggleButton.addEventListener("click", async () => {
     currentTheme = normalizeUiTheme(saved.uiTheme);
     state.uiTheme = currentTheme;
     cacheUiPreferences({ uiTheme: currentTheme });
-    renderThemeChange();
+    renderAppearanceChange();
   } catch (error) {
     currentTheme = previousTheme;
     state.uiTheme = previousTheme;
     cacheUiPreferences({ uiTheme: previousTheme });
-    renderThemeChange();
+    renderAppearanceChange();
     showApiErrorToast(error, "themeSaveFailed");
   } finally {
     elements.themeToggleButton.disabled = false;
+  }
+});
+elements.skinToggleButton.addEventListener("click", async () => {
+  const previousSkin = currentSkin;
+  const nextSkin = currentSkin === "liquid-glass" ? "classic" : "liquid-glass";
+  currentSkin = nextSkin;
+  state.uiSkin = nextSkin;
+  cacheUiPreferences({ uiSkin: nextSkin });
+  renderAppearanceChange();
+  if (!backendAvailable) {
+    return;
+  }
+  elements.skinToggleButton.disabled = true;
+  try {
+    const saved = await api("/api/preferences", {
+      method: "PUT",
+      body: JSON.stringify({ uiSkin: nextSkin }),
+    });
+    currentSkin = normalizeUiSkin(saved.uiSkin);
+    state.uiSkin = currentSkin;
+    cacheUiPreferences({ uiSkin: currentSkin });
+    renderAppearanceChange();
+  } catch (error) {
+    currentSkin = previousSkin;
+    state.uiSkin = previousSkin;
+    cacheUiPreferences({ uiSkin: previousSkin });
+    renderAppearanceChange();
+    showApiErrorToast(error, "skinSaveFailed");
+  } finally {
+    elements.skinToggleButton.disabled = false;
   }
 });
 elements.languageToggleButton.addEventListener("click", async () => {
@@ -16939,5 +17056,5 @@ elements.appShell.addEventListener("transitionend", (event) => {
 
 hydrateInitialUiPreferences();
 applyLocale();
-applyTheme();
+applyAppearance();
 loadState();
