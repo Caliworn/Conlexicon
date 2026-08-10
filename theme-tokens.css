@@ -84,6 +84,7 @@
   --material-rich-tooltip-background: #ffffff;
   --material-rich-tooltip-border: #d8e0e8;
   --material-rich-tooltip-text: #17202a;
+  --material-rich-tooltip-muted: var(--ui-text-muted);
   --material-rich-tooltip-shadow: 0 18px 40px rgba(24, 36, 48, 0.12);
   --material-rich-tooltip-filter: none;
   --material-toast-background: #17202a;
@@ -153,6 +154,7 @@ body.dark-theme {
   --material-rich-tooltip-background: #10181c;
   --material-rich-tooltip-border: rgba(255, 255, 255, 0.18);
   --material-rich-tooltip-text: #f8fbfa;
+  --material-rich-tooltip-muted: var(--ui-text-muted);
   --material-rich-tooltip-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
   --material-overlay-panel-background: var(--material-floating-background);
 }

@@ -82,6 +82,7 @@ body[data-ui-skin="layered-glass"] {
   --material-rich-tooltip-background: rgba(247, 251, 250, 0.68);
   --material-rich-tooltip-border: rgba(74, 96, 99, 0.24);
   --material-rich-tooltip-text: var(--ui-text);
+  --material-rich-tooltip-muted: var(--ui-text-muted);
   --material-rich-tooltip-shadow: var(--material-floating-shadow);
   --material-rich-tooltip-filter: blur(18px) saturate(1.1);
   --material-toast-background: #172126;
@@ -168,6 +169,7 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --material-rich-tooltip-background: rgba(21, 31, 35, 0.7);
   --material-rich-tooltip-border: rgba(222, 244, 239, 0.17);
   --material-rich-tooltip-text: var(--ui-text);
+  --material-rich-tooltip-muted: var(--ui-text-muted);
   --material-rich-tooltip-shadow: var(--material-floating-shadow);
   --material-rich-tooltip-filter: blur(18px) saturate(1.1);
   --material-toast-background: #081115;
@@ -180,6 +182,14 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --material-network-node-shadow: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.28));
   --material-network-node-hover-shadow: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.4));
   --material-network-node-focus-shadow: drop-shadow(0 16px 26px rgba(71, 168, 155, 0.24));
+}
+
+body[data-ui-skin="layered-glass"] :where(#entryForm) {
+  border-color: var(--material-entry-detail-border);
+  background: var(--material-entry-detail-background);
+  box-shadow: var(--material-entry-detail-shadow);
+  backdrop-filter: var(--material-entry-detail-filter);
+  -webkit-backdrop-filter: var(--material-entry-detail-filter);
 }
 
 body[data-ui-skin="layered-glass"] {
@@ -295,6 +305,14 @@ body.dark-theme[data-ui-skin="layered-glass"] .network-panel[data-layered-glass-
 
 body[data-ui-skin="layered-glass"] [data-layered-glass-pointer="active"] {
   --layered-glass-light-opacity: 1;
+}
+
+@media (max-width: 799.98px) {
+  body[data-ui-skin="layered-glass"] :where(#entryForm) {
+    background: var(--material-entry-detail-mobile-background);
+    backdrop-filter: var(--material-entry-detail-mobile-filter);
+    -webkit-backdrop-filter: var(--material-entry-detail-mobile-filter);
+  }
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -442,6 +460,7 @@ body[data-ui-skin="layered-glass"] [data-layered-glass-pointer="active"] {
     --material-rich-tooltip-background: Canvas;
     --material-rich-tooltip-border: CanvasText;
     --material-rich-tooltip-text: CanvasText;
+    --material-rich-tooltip-muted: CanvasText;
     --material-rich-tooltip-shadow: none;
     --material-rich-tooltip-filter: none;
     --material-overlay-background: transparent;

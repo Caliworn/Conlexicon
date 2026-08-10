@@ -414,7 +414,6 @@ const i18n = {
     otherSettings: "其他设置",
     settings: "设置",
     darkMode: "暗黑模式",
-    lightMode: "浅色模式",
     classicSkin: "经典皮肤",
     layeredGlassSkin: "层叠玻璃",
     liquidGlassSkin: "液态玻璃",
@@ -1013,7 +1012,6 @@ const i18n = {
     otherSettings: "Other Settings",
     settings: "Settings",
     darkMode: "Dark Mode",
-    lightMode: "Light Mode",
     classicSkin: "Classic Skin",
     layeredGlassSkin: "Layered Glass",
     liquidGlassSkin: "Liquid Glass",
@@ -3393,10 +3391,10 @@ function applyLocale(root = document) {
   elements.brandEyebrow.hidden = currentLanguage === "en";
   elements.brandTitle.textContent = currentLanguage === "en" ? "CONLEXICON" : t("appTitle");
   elements.languageToggleButton.textContent = currentLanguage === "zh" ? "EN" : "中";
-  const nextThemeLabel = currentTheme === "dark" ? t("lightMode") : t("darkMode");
-  elements.themeToggleLabel.textContent = nextThemeLabel;
+  const themeToggleLabel = t("darkMode");
+  elements.themeToggleLabel.textContent = themeToggleLabel;
   elements.themeToggleButton.removeAttribute("title");
-  elements.themeToggleButton.setAttribute("aria-label", nextThemeLabel);
+  elements.themeToggleButton.setAttribute("aria-label", themeToggleLabel);
   renderSkinPicker();
   const currentSkinLabel = skinOptionLabel(currentSkin);
   elements.skinToggleLabel.textContent = currentSkinLabel;
@@ -3562,8 +3560,19 @@ function refreshEditableSurfaceLocale() {
   refreshCorpusEditorLocale();
 }
 
+function syncToastLiquidGlassSurface() {
+  if (elements.toast.classList.contains("show")) {
+    liquidGlassOpticalEngine?.registerMappedSurface(elements.toast);
+    return;
+  }
+  liquidGlassOpticalEngine?.unregisterMappedSurface(elements.toast);
+}
+
 function applyAppearance() {
-  document.body.classList.toggle("dark-theme", currentTheme === "dark");
+  const darkThemeActive = currentTheme === "dark";
+  document.body.classList.toggle("dark-theme", darkThemeActive);
+  elements.themeToggleButton.dataset.themeState = darkThemeActive ? "dark" : "light";
+  elements.themeToggleButton.setAttribute("aria-pressed", String(darkThemeActive));
   if (currentSkin !== "classic") {
     document.body.dataset.uiSkin = currentSkin;
   } else {
@@ -3573,6 +3582,7 @@ function applyAppearance() {
     resetLayeredGlassPointerEffect(true);
   }
   liquidGlassOpticalEngine?.setEnabled(currentSkin === "liquid-glass");
+  syncToastLiquidGlassSurface();
 }
 
 function layeredGlassPointerEffectsEnabled() {
@@ -15870,8 +15880,11 @@ function showToast(message) {
   clearTimeout(toastTimer);
   elements.toast.textContent = message;
   elements.toast.classList.add("show");
+  syncToastLiquidGlassSurface();
   toastTimer = setTimeout(() => {
     elements.toast.classList.remove("show");
+    syncToastLiquidGlassSurface();
+    toastTimer = null;
   }, 2200);
 }
 
@@ -16327,6 +16340,7 @@ document.addEventListener("visibilitychange", () => {
 ].forEach((mediaQuery) => mediaQuery.addEventListener("change", () => {
   resetGlassInteractiveEffects(true);
   liquidGlassOpticalEngine?.setEnabled(currentSkin === "liquid-glass");
+  syncToastLiquidGlassSurface();
 }));
 document.addEventListener("focusin", (event) => {
   if (skinPickerOpen

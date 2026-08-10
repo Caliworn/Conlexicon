@@ -234,11 +234,36 @@ assert(
     && liquidGlassEngine.includes('result: "opticalSpecular"'),
   "Liquid Glass must derive environment specular from a retained light vector and the cached normal/rim map",
 );
+const liquidGlassBlurPosition = liquidGlassEngine.indexOf('svgElement(this.document, "feGaussianBlur"');
+const liquidGlassFirstDisplacementPosition = liquidGlassEngine.indexOf('svgElement(this.document, "feDisplacementMap"');
+assert(
+  liquidGlassBlurPosition >= 0
+    && liquidGlassBlurPosition < liquidGlassFirstDisplacementPosition
+    && liquidGlassEngine.includes('stdDeviation: options.opticalBlur')
+    && liquidGlassEngine.includes('edgeMode: "duplicate"')
+    && liquidGlassEngine.includes("const blurExpansion = Math.ceil(options.opticalBlur * 3);")
+    && !liquidGlassEngine.includes("preBlur"),
+  "Q3 must blur the sampled backdrop inside the optical filter before displacement and expand its clipped edge",
+);
 const liquidGlassSurfaceDefinitions = liquidGlassEngineApi.SURFACE_ROLE_DEFINITIONS;
 assert.deepEqual(
   [...new Set(liquidGlassSurfaceDefinitions.map(({ role }) => role))],
   ["continuous", "focus", "floating", "modal", "micro"],
   "LQ-5 must retain the five formal surface roles in migration order",
+);
+assert.deepEqual(
+  Object.fromEntries(Object.entries(liquidGlassEngineApi.ROLE_DEFAULTS).map(([role, value]) => [
+    role,
+    value.opticalBlur,
+  ])),
+  {
+    continuous: 3,
+    focus: 4,
+    floating: 5.5,
+    modal: 7,
+    micro: 0.1,
+  },
+  "Q3 role defaults must retain the approved integrated optical blur strengths",
 );
 const liquidGlassOpticalRoleRule = liquidGlass.match(
   /body\[data-ui-skin="liquid-glass"\]\[data-liquid-glass-optics-quality="q3"\] :is\([\s\S]*?\[data-liquid-glass-role="continuous"\]\[data-liquid-glass-optics="ready"\][\s\S]*?\[data-liquid-glass-role="focus"\]\[data-liquid-glass-optics="ready"\][\s\S]*?\[data-liquid-glass-role="floating"\]\[data-liquid-glass-optics="ready"\][\s\S]*?\[data-liquid-glass-role="modal"\]\[data-liquid-glass-optics="ready"\][\s\S]*?\) \{([\s\S]*?)\n  \}/,
@@ -269,24 +294,34 @@ for (const materialToken of [
     `${materialToken} must remain a pure tint instead of painted component lighting`,
   );
 }
-for (const q3Tint of [
-  "navigation",
-  "navigation-drawer",
-  "mobile-bar",
-  "focus",
-  "floating",
-  "tooltip",
-  "modal",
-]) {
-  assert(
-    (liquidGlass.match(new RegExp(`--liquid-glass-q3-${q3Tint}-tint:`, "g")) || []).length === 2,
-    `Q3 must define light and dark low-alpha ${q3Tint} tints`,
-  );
+for (const [q3Tint, expectedValues] of Object.entries({
+  navigation: ["rgba(19, 39, 49, 0.52)", "rgba(7, 18, 24, 0.56)"],
+  "navigation-drawer": ["rgba(19, 39, 49, 0.62)", "rgba(7, 18, 24, 0.66)"],
+  "mobile-bar": ["rgba(235, 246, 247, 0.28)", "rgba(13, 26, 32, 0.34)"],
+  focus: ["rgba(241, 249, 250, 0.3)", "rgba(18, 30, 36, 0.34)"],
+  floating: ["rgba(239, 248, 249, 0.28)", "rgba(16, 29, 35, 0.32)"],
+  tooltip: ["rgba(239, 248, 249, 0.36)", "rgba(14, 27, 33, 0.4)"],
+  modal: ["rgba(235, 246, 248, 0.32)", "rgba(13, 26, 32, 0.36)"],
+})) {
+  const values = [...liquidGlass.matchAll(new RegExp(`--liquid-glass-q3-${q3Tint}-tint:\\s*([^;]+);`, "g"))]
+    .map((match) => match[1]);
+  assert.deepEqual(values, expectedValues, `Q3 must retain the approved light and dark ${q3Tint} tints`);
 }
-assert.equal(
-  (liquidGlass.match(/repeating-linear-gradient\(/g) || []).length >= 6,
-  true,
-  "Liquid Glass must provide subtle structured background references in both themes",
+const liquidGlassLightProductBackground = liquidGlass.match(
+  /body\[data-ui-skin="liquid-glass"\] \{\n  background:\n([\s\S]*?)\n  background-attachment:/,
+);
+const liquidGlassDarkProductBackground = liquidGlass.match(
+  /body\.dark-theme\[data-ui-skin="liquid-glass"\] \{\n  background:\n([\s\S]*?)\n\}/,
+);
+assert(
+  liquidGlassLightProductBackground
+    && liquidGlassDarkProductBackground
+    && !/repeating-linear-gradient\(/.test(liquidGlassLightProductBackground[1])
+    && !/repeating-linear-gradient\(/.test(liquidGlassDarkProductBackground[1])
+    && (liquidGlassLightProductBackground[1].match(/radial-gradient\(/g) || []).length === 3
+    && (liquidGlassDarkProductBackground[1].match(/radial-gradient\(/g) || []).length === 3
+    && (liquidGlass.match(/repeating-linear-gradient\(/g) || []).length === 2,
+  "Liquid Glass product backgrounds must use only the continuous color field while diagnostics retain their test grid",
 );
 assert(
   !liquidGlass.includes("--liquid-glass-static-refraction")
@@ -322,6 +357,7 @@ for (const explicitSelector of [
   ".app-tooltip.tag-info-tooltip",
   ".app-tooltip.rich-tooltip",
   ".entry-quality-issue-tooltip",
+  ".toast",
 ]) {
   const definition = liquidGlassSurfaceDefinitions.find(({ selector }) => selector.includes(explicitSelector));
   assert.equal(
@@ -330,6 +366,21 @@ for (const explicitSelector of [
     `Transient or virtualized surface must use explicit lifecycle registration: ${explicitSelector}`,
   );
 }
+const liquidGlassFocusDefinition = liquidGlassSurfaceDefinitions.find(({ role }) => role === "focus");
+assert(
+  liquidGlassFocusDefinition?.registration === "automatic"
+    && liquidGlassFocusDefinition.selector.includes(".entry-display")
+    && liquidGlassFocusDefinition.selector.includes("#entryForm")
+    && liquidGlass.includes(':is(.entry-display, #entryForm)')
+    && /:where\(#entryForm\)\s*\{[\s\S]*?background:\s*var\(--material-entry-detail-background\);[\s\S]*?backdrop-filter:\s*var\(--material-entry-detail-filter\);/.test(liquidGlass),
+  "Liquid Glass focus optics must cover both the current entry display and the primary entry form shell",
+);
+assert(
+  /function syncToastLiquidGlassSurface\(\) \{[\s\S]*?classList\.contains\("show"\)[\s\S]*?registerMappedSurface\(elements\.toast\)[\s\S]*?unregisterMappedSurface\(elements\.toast\)[\s\S]*?\n\}/.test(app)
+    && /function showToast\(message\) \{[\s\S]*?classList\.add\("show"\);\n  syncToastLiquidGlassSurface\(\);[\s\S]*?classList\.remove\("show"\);\n    syncToastLiquidGlassSurface\(\);/.test(app)
+    && /body\[data-ui-skin="liquid-glass"\] \.toast \{[\s\S]*?background:\s*var\(--material-floating-background\);[\s\S]*?color:\s*var\(--ui-text\);[\s\S]*?backdrop-filter:\s*var\(--material-floating-filter\);/.test(liquidGlass),
+  "Liquid Glass toast optics must use the floating material only for the visible toast lifecycle",
+);
 assert.deepEqual(
   liquidGlassStyleBlocks
     .filter(({ selector, declarations }) => (
@@ -352,8 +403,15 @@ assert(
   /@media \(forced-colors: active\)/.test(layeredGlass),
   "Layered Glass must provide a forced-colors fallback",
 );
-assert(
-  !/(?:entry-card|analysis-card|table-row|td|th)[^{]*\{[^}]*backdrop-filter/is.test(layeredGlass),
+const layeredGlassStyleBlocks = [...layeredGlass.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+  .map((match) => ({ selector: match[1].trim(), declarations: match[2] }));
+assert.deepEqual(
+  layeredGlassStyleBlocks
+    .filter(({ selector, declarations }) => (
+      repeatedSurfaceSelectorPattern.test(selector) && /backdrop-filter\s*:/.test(declarations)
+    ))
+    .map(({ selector }) => selector),
+  [],
   "Repeated content surfaces must not receive Layered Glass backdrop blur",
 );
 assert(
@@ -400,8 +458,18 @@ for (const [backgroundToken, filterToken] of [
     );
   }
 }
+assert(
+  /body\[data-ui-skin="layered-glass"\] :where\(#entryForm\) \{[\s\S]*?border-color:\s*var\(--material-entry-detail-border\);[\s\S]*?background:\s*var\(--material-entry-detail-background\);[\s\S]*?box-shadow:\s*var\(--material-entry-detail-shadow\);[\s\S]*?backdrop-filter:\s*var\(--material-entry-detail-filter\);/.test(layeredGlass)
+    && /@media \(max-width: 799\.98px\) \{[\s\S]*?body\[data-ui-skin="layered-glass"\] :where\(#entryForm\) \{[\s\S]*?background:\s*var\(--material-entry-detail-mobile-background\);[\s\S]*?backdrop-filter:\s*var\(--material-entry-detail-mobile-filter\);/.test(layeredGlass),
+  "Layered Glass must treat the mutually exclusive primary entry form as the focused entry workspace shell",
+);
+assert.deepEqual(
+  [...layeredGlass.matchAll(/--material-toast-background:\s*([^;]+);/g)].map((match) => match[1]),
+  ["#172126", "#081115"],
+  "Layered Glass toast must remain a high-contrast solid in light and dark themes",
+);
 const pointerLightingRule = layeredGlass.match(
-  /body\[data-ui-skin="layered-glass"\] :where\([\s\S]*?\)\[data-layered-glass-pointer\] \{([\s\S]*?)\n\}/,
+  /body\[data-ui-skin="layered-glass"\] :where\([^)]*\)\[data-layered-glass-pointer\] \{([\s\S]*?)\n\}/,
 );
 assert(pointerLightingRule, "LG-4C must declare a bounded pointer-lighting rule");
 assert.equal(
@@ -454,10 +522,19 @@ assert(
   !pointerTargetContract[1].includes("dictionary-panel"),
   "LG-4C pointer response must remain limited to popup surfaces",
 );
-for (const forbiddenTarget of ["entry-card", "entry-display", "analysis-card", "table-row", "network-node"]) {
+for (const forbiddenTarget of [
+  "entry-card",
+  "entry-display",
+  "entryForm",
+  "toast",
+  "analysis-card",
+  "table-row",
+  "network-node",
+]) {
   assert(
-    !pointerTargetContract[1].includes(forbiddenTarget),
-    `LG-4C pointer response must not target repeated content surface: ${forbiddenTarget}`,
+    !pointerTargetContract[1].includes(forbiddenTarget)
+      && !pointerLightingRule[0].includes(forbiddenTarget),
+    `LG-4C pointer response must remain off non-popup surface: ${forbiddenTarget}`,
   );
 }
 assert(
@@ -541,10 +618,76 @@ assert(
   "Structured tag tooltips must use a skin-scoped, degradable backdrop filter",
 );
 assert(
+  (tokens.match(/--material-rich-tooltip-muted:\s*var\(--ui-text-muted\);/g) || []).length === 2
+    && (layeredGlass.match(/--material-rich-tooltip-muted:\s*var\(--ui-text-muted\);/g) || []).length === 2
+    && (liquidGlass.match(/--material-rich-tooltip-muted:\s*var\(--ui-text-muted\);/g) || []).length === 2
+    && layeredGlass.includes("--material-rich-tooltip-muted: CanvasText;")
+    && liquidGlass.includes("--material-rich-tooltip-muted: CanvasText;")
+    && styles.includes(".tag-tooltip-label {\n  color: var(--material-rich-tooltip-muted);")
+    && /\.app-tooltip \.network-tooltip-content > span,[\s\S]*?color:\s*var\(--material-rich-tooltip-muted\);/.test(styles)
+    && !/\.network-tooltip-content[\s\S]*?color:\s*var\(--material-tooltip-muted\);/.test(styles)
+    && /\.chip\.amber\s*\{[^}]*color:\s*var\(--ui-warning-badge-text\);/s.test(styles)
+    && /\.chip\.part-chip\s*\{[^}]*color:\s*var\(--ui-warning-badge-text\);/s.test(styles)
+    && /\.entry-quality-issue\.medium\s*\{[^}]*color:\s*var\(--ui-warning-badge-text\);/s.test(styles)
+    && !styles.includes("var(--text)"),
+  "Structured tooltips and compact warning badges must use theme-aware readable text contracts",
+);
+assert(
   /input:is\(\[type="checkbox"\], \[type="radio"\]\)\s*\{[^}]*box-shadow:\s*none;/s.test(styles)
     && /input:is\(\[type="checkbox"\], \[type="radio"\]\):focus-visible/.test(styles)
     && /body\[data-input-modality="pointer"\][^{]*input:is\(\[type="checkbox"\], \[type="radio"\]\):focus-visible/.test(styles),
   "Native choice controls must avoid text-control material shadows and retain keyboard focus visibility",
+);
+
+const themeToggleMarkup = index.match(/<button[^>]*id="themeToggleButton"[\s\S]*?<\/button>/)?.[0] || "";
+const languageToggleMarkup = index.match(/<button[^>]*id="languageToggleButton"[\s\S]*?<\/button>/)?.[0] || "";
+assert(
+  themeToggleMarkup.includes('class="secondary-button utility-button theme-toggle-button"')
+    && themeToggleMarkup.includes('type="button"')
+    && themeToggleMarkup.includes('data-theme-state="light"')
+    && themeToggleMarkup.includes('aria-pressed="false"')
+    && themeToggleMarkup.includes('aria-label="暗黑模式"')
+    && themeToggleMarkup.includes('class="nav-icon theme-toggle-icon"')
+    && themeToggleMarkup.includes('class="theme-toggle-glyph theme-toggle-sun"')
+    && themeToggleMarkup.includes('<circle cx="12" cy="12" r="4"></circle>')
+    && themeToggleMarkup.includes('class="theme-toggle-glyph theme-toggle-moon"'),
+  "Theme toggle must provide both current-state glyphs and an accessible light-theme default",
+);
+assert(
+  !app.includes("lightMode:")
+    && app.includes('const themeToggleLabel = t("darkMode");')
+    && app.includes("elements.themeToggleLabel.textContent = themeToggleLabel;")
+    && app.includes('elements.themeToggleButton.setAttribute("aria-label", themeToggleLabel);')
+    && app.includes('elements.themeToggleButton.dataset.themeState = darkThemeActive ? "dark" : "light";')
+    && app.includes('elements.themeToggleButton.setAttribute("aria-pressed", String(darkThemeActive));')
+    && languageToggleMarkup.includes('aria-label="English"')
+    && !languageToggleMarkup.includes("aria-pressed"),
+  "Theme toggle must keep a stable setting label and pressed state without changing language-button semantics",
+);
+const themeToggleMotionStart = styles.indexOf(".theme-toggle-icon {");
+const themeToggleMotionEnd = styles.indexOf(".nav-collapse-icon {");
+const themeToggleMotion = styles.slice(themeToggleMotionStart, themeToggleMotionEnd);
+assert(
+  themeToggleMotionStart >= 0
+    && themeToggleMotionEnd > themeToggleMotionStart
+    && themeToggleMotion.includes("transform-box: fill-box;")
+    && themeToggleMotion.includes("transform-origin: center;")
+    && themeToggleMotion.includes("transition: opacity 180ms cubic-bezier(0.22, 0.75, 0.25, 1), transform 180ms cubic-bezier(0.22, 0.75, 0.25, 1);")
+    && themeToggleMotion.includes('.theme-toggle-button[data-theme-state="light"] .theme-toggle-sun')
+    && themeToggleMotion.includes('.theme-toggle-button[data-theme-state="dark"] .theme-toggle-moon')
+    && themeToggleMotion.includes("transform: rotate(0deg) scale(1);")
+    && themeToggleMotion.includes("transform: rotate(-28deg) scale(0.72);")
+    && themeToggleMotion.includes("transform: rotate(28deg) scale(0.72);")
+    && !/(?:color|filter|animation)\s*:/.test(themeToggleMotion),
+  "Theme glyphs must use the shared color-neutral 180ms orbital transition",
+);
+const finalReducedMotionBlock = styles.slice(styles.lastIndexOf("@media (prefers-reduced-motion: reduce)"));
+assert(
+  /body\.app-booting :where\([^)]*\.theme-toggle-glyph/.test(styles)
+    && /body\.app-boot-settling :where\([^)]*\.theme-toggle-glyph/.test(styles)
+    && finalReducedMotionBlock.includes(".theme-toggle-glyph {")
+    && finalReducedMotionBlock.includes("transition: none;"),
+  "Theme glyph motion must be suppressed during boot and when reduced motion is requested",
 );
 
 const layeredGlassTokenValues = (tokenName) => [
