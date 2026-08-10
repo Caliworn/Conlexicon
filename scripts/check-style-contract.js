@@ -7,19 +7,68 @@ const ROOT_DIR = path.resolve(__dirname, "..");
 const tokenPath = path.join(ROOT_DIR, "theme-tokens.css");
 const layeredGlassPath = path.join(ROOT_DIR, "theme-layered-glass.css");
 const liquidGlassPath = path.join(ROOT_DIR, "theme-liquid-glass.css");
+const liquidGlassGeometryPath = path.join(ROOT_DIR, "lib", "liquid-glass-geometry.js");
+const liquidGlassWorkerPath = path.join(ROOT_DIR, "lib", "liquid-glass-map-worker.js");
+const liquidGlassEnginePath = path.join(ROOT_DIR, "lib", "liquid-glass-engine.js");
 const stylesPath = path.join(ROOT_DIR, "styles.css");
 const indexPath = path.join(ROOT_DIR, "index.html");
 const appPath = path.join(ROOT_DIR, "app.js");
 const tokens = fs.readFileSync(tokenPath, "utf8");
 const layeredGlass = fs.readFileSync(layeredGlassPath, "utf8");
 const liquidGlass = fs.readFileSync(liquidGlassPath, "utf8");
+const liquidGlassGeometry = fs.readFileSync(liquidGlassGeometryPath, "utf8");
+const liquidGlassWorker = fs.readFileSync(liquidGlassWorkerPath, "utf8");
+const liquidGlassEngine = fs.readFileSync(liquidGlassEnginePath, "utf8");
 const styles = fs.readFileSync(stylesPath, "utf8");
 const index = fs.readFileSync(indexPath, "utf8");
 const app = fs.readFileSync(appPath, "utf8");
 
+const liquidGlassGeometryScriptPosition = index.indexOf('src="lib/liquid-glass-geometry.js"');
+const liquidGlassEngineScriptPosition = index.indexOf('src="lib/liquid-glass-engine.js"');
+const appScriptPosition = index.indexOf('src="app.js"');
+assert(
+  liquidGlassGeometryScriptPosition >= 0
+    && liquidGlassGeometryScriptPosition < liquidGlassEngineScriptPosition
+    && liquidGlassEngineScriptPosition < appScriptPosition,
+  "LQ-4 geometry and engine scripts must load in dependency order before app.js",
+);
+assert(
+  liquidGlassWorker.includes('importScripts("liquid-glass-geometry.js")')
+    && liquidGlassWorker.includes("geometry.generateSurfaceMaps")
+    && liquidGlassWorker.includes("OffscreenCanvas"),
+  "LQ-4 worker must reuse the pure geometry model and prefer off-main-thread PNG generation",
+);
+assert(
+  liquidGlassGeometry.includes("function roundedRectMetrics")
+    && liquidGlassGeometry.includes("function refractionProfile")
+    && liquidGlassGeometry.includes("function createSurfaceMapGenerator")
+    && liquidGlassGeometry.includes("function buildCacheKey"),
+  "LQ-4 must provide geometry-aware, chunkable, cacheable surface map generation",
+);
+assert(
+  liquidGlassEngine.includes("class ByteBudgetLru")
+    && liquidGlassEngine.includes("class ResilientMapRenderer")
+    && liquidGlassEngine.includes("ResizeObserver")
+    && liquidGlassEngine.includes("liquid-glass-map-worker.js")
+    && !liquidGlassEngine.includes("MutationObserver"),
+  "LQ-4 must use a byte-budget cache, Worker fallback, and registered-surface resize observation without scanning virtual lists",
+);
+assert(
+  app.includes("ConlexiconLiquidGlassEngine?.createEngine")
+    && app.includes('liquidGlassOpticalEngine?.setEnabled(currentSkin === "liquid-glass")'),
+  "The shared app must limit LQ-4 integration to the skin lifecycle adapter",
+);
+
 function numericLayer(name) {
   const match = styles.match(new RegExp(`${name}:\\s*(\\d+)`));
   return match ? Number(match[1]) : Number.NaN;
+}
+
+function customPropertyMap(block) {
+  return new Map(
+    [...block.matchAll(/(--(?:ui|material|radius)-[a-z0-9-]+)\s*:\s*([^;]+);/g)]
+      .map((match) => [match[1], match[2].trim()]),
+  );
 }
 
 const tokenLinkPosition = index.indexOf('href="theme-tokens.css"');
@@ -77,6 +126,10 @@ assert.deepEqual(
 );
 const classicDarkTheme = tokens.match(/body\.dark-theme\s*\{([\s\S]*?)\n\}/);
 assert(classicDarkTheme, "Base tokens must define a classic dark theme scope");
+const classicLightTheme = tokens.match(/:root\s*\{([\s\S]*?)\n\}/);
+assert(classicLightTheme, "Base tokens must define a classic light root scope");
+const classicLightTokenValues = customPropertyMap(classicLightTheme[1]);
+const classicDarkTokenValues = customPropertyMap(classicDarkTheme[1]);
 for (const tokenName of [
   "--material-entry-detail-background",
   "--material-entry-detail-mobile-background",
@@ -85,10 +138,22 @@ for (const tokenName of [
   "--material-entry-detail-section-background",
   "--material-entry-detail-section-border",
   "--material-navigation-drawer-background",
+  "--material-overlay-panel-background",
 ]) {
   assert(
     classicDarkTheme[1].includes(`${tokenName}:`),
-    `Classic dark theme must override scoped entry detail token: ${tokenName}`,
+    `Classic dark theme must override scoped material token: ${tokenName}`,
+  );
+}
+for (const [tokenName, lightValue] of classicLightTokenValues) {
+  const aliasMatch = lightValue.match(/^var\((--(?:ui|material|radius)-[a-z0-9-]+)\)$/);
+  if (!aliasMatch || !classicDarkTokenValues.has(aliasMatch[1])) {
+    continue;
+  }
+  assert.equal(
+    classicDarkTokenValues.get(tokenName),
+    lightValue,
+    `Classic dark theme must rebind ${tokenName} to its dark-scoped dependency ${aliasMatch[1]}`,
   );
 }
 assert(

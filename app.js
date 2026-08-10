@@ -100,6 +100,13 @@ const entryDetailCache = new QueryPageCache({
   maxEntries: 12,
   maxBytes: 12 * 1024 * 1024,
 });
+const liquidGlassOpticalEngine = window.ConlexiconLiquidGlassEngine?.createEngine({
+  workerUrl: "lib/liquid-glass-map-worker.js",
+  maxBytes: 32 * 1024 * 1024,
+}) || null;
+if (liquidGlassOpticalEngine) {
+  window.ConlexiconLiquidGlassRuntime = liquidGlassOpticalEngine;
+}
 const entryFilterFactsByDictionaryVersion = new Map();
 const entryFilterFactsInFlight = new Map();
 let docsViewMode = "split";
@@ -3576,6 +3583,7 @@ function applyAppearance() {
   if (!liquidGlassPointerEffectsEnabled()) {
     resetLiquidGlassPointerEffect(true);
   }
+  liquidGlassOpticalEngine?.setEnabled(currentSkin === "liquid-glass");
 }
 
 function layeredGlassPointerEffectsEnabled() {
@@ -16425,7 +16433,10 @@ document.addEventListener("visibilitychange", () => {
   glassReducedMotionMediaQuery,
   glassReducedTransparencyMediaQuery,
   glassForcedColorsMediaQuery,
-].forEach((mediaQuery) => mediaQuery.addEventListener("change", () => resetGlassPointerEffects(true)));
+].forEach((mediaQuery) => mediaQuery.addEventListener("change", () => {
+  resetGlassPointerEffects(true);
+  liquidGlassOpticalEngine?.setEnabled(currentSkin === "liquid-glass");
+}));
 document.addEventListener("focusin", (event) => {
   if (skinPickerOpen
     && !elements.skinPickerMenu.contains(event.target)

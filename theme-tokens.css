@@ -154,4 +154,5 @@ body.dark-theme {
   --material-rich-tooltip-border: rgba(255, 255, 255, 0.18);
   --material-rich-tooltip-text: #f8fbfa;
   --material-rich-tooltip-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+  --material-overlay-panel-background: var(--material-floating-background);
 }
