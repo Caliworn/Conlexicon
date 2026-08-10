@@ -40,7 +40,7 @@
 
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/state` | 读取轻量应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme, uiSkin }` | `dictionaries` 只包含 metadata 和 summary；所有词典都通过轻量 SQL 返回 `entryCount` 和严格的 `rootCount`。前端把它当轻量索引，并按需读取当前词典快照；未加载词典不会因此建立词根拓扑。`uiSkin` 为 `classic` 或 `layered-glass`。 |
+| `GET` | `/api/state` | 读取轻量应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme, uiSkin }` | `dictionaries` 只包含 metadata 和 summary；所有词典都通过轻量 SQL 返回 `entryCount` 和严格的 `rootCount`。前端把它当轻量索引，并按需读取当前词典快照；未加载词典不会因此建立词根拓扑。`uiSkin` 为 `classic`、`layered-glass` 或 `liquid-glass`。 |
 | `PUT` | `/api/preferences` | 保存全局界面偏好 | `{ uiLanguage, uiTheme, uiSkin }` | 支持独立更新 `uiLanguage`、`uiTheme` 和 `uiSkin`；皮肤与明暗主题正交。未知皮肤值不会写入，并返回 `invalid_ui_skin`。 |
 
 ### 导入、导出与词典生命周期
@@ -889,6 +889,39 @@ assignment 的两个计数互斥且和为 `inputEntryCount`；每个 mode 行的
 
 source、version、options、response mode、category、分布 value、page 与搜索字段验证失败分别使用 `invalid_feature_result_source`、`unsupported_feature_result_source`、`invalid_feature_result_source_version`、`invalid_feature_result_source_options`、`invalid_feature_result_response_mode`、`invalid_feature_result_category`、`invalid_feature_result_value` 或既有 EntryQuery 校验码。summary 模式携带 `view` 或 `page` 时返回 `invalid_feature_result_summary_request`；location 缺少目标 ID 时返回 `invalid_feature_result_location_entry_id`。
 
+#### Quality result query（F5-0 契约已冻结，尚未实装）
+
+F5 的完整规则、issue、summary、执行 planner 和会话边界见 [Quality Result Plan](QUALITY_RESULT_PLAN.md)。计划新增：
+
+```text
+POST /api/dictionaries/:id/quality/query
+POST /api/dictionaries/:id/quality/location
+```
+
+基础 source 固定为 `{ type: "dictionaryQuality", version: 1, options: {} }`。`responseMode: "summary"` 只接受 source，返回 `{ dictionaryId, generation, resultKey, source, rulesetVersion, summary, diagnostics }`；summary 固定区分 `issueCount`、`affectedEntryCount`、`globalIssueCount`，并按 severity/module 分别返回 `{ key, issueCount, entryCount }`。
+
+`responseMode: "items"` 的 view 固定为：
+
+```js
+{
+  itemKind: "issue" | "entry",
+  selector: {
+    group: "all" | "severity" | "module",
+    value: "high" // all 不携带；其他分组按自身枚举校验
+  },
+  search: {
+    text: "",
+    fields: ["lemma", "pronunciation"],
+    fuzzyFields: []
+  },
+  sort: "lemmaAsc"
+}
+```
+
+`issue` 视图按问题分页，可返回没有主词条的全局问题，不接受 EntrySearch 或词条 sort；item 携带稳定 `{ id, code, severity, module, entryId, params }` 和可选轻量 entry label，不返回本地化 title/detail。`entry` 视图按唯一受影响词条分页，复用普通 EntrySearch、sort、EntrySummary 和 cursor，每项只附加当前 selector 命中的 issue DTO。location 只接受 entry 视图，并增加 `entryId`。
+
+质量规则可以把普通 EntryFilter、SQLite 聚合和稳定来源拓扑作为内部执行原语，但 repository 只返回中性事实或候选，不生成质量 code、严重度和详情。HTTP 响应、前端 action 和持久化状态均不得携带完整匹配 ID 数组；F5-1 实装端点时再将其加入“当前端点”和“当前错误码”。
+
 #### Light / full 任务边界
 
 为避免总览卡片触发重型计算，F4a 只运行前文 planner 表列出的确定性聚合、最小词形扫描和稳定 topology 任务。F4b-0 复评后，只有必须执行功能算法的派生结果进入 feature session；可由普通 EntryFilter、稳定拓扑或确定性聚合提供的内容继续使用 `/analysis/query`：
@@ -962,5 +995,5 @@ F4a 的 light widgets 不返回后台任务状态。F4b 接入重型 widget 后�
 2. F1–F3 已完成统一 EntryQuery/EntryFilter、SQLite 条件编译和前端 descriptor 迁移；稳定筛选继续复用 `/entries` 的窗口、cursor、缓存与定位。
 3. F4a 已完成 `POST /analysis/query` 的轻量 widgets、最小 planner，以及总览、标签集合、正写法、完整活动日期和词根家族异步接线；这些统计不再读取完整 snapshot。
 4. F4b-0 至 F4b-3 已完成可重建 result source、运行时会话、失效、音系引擎 adapter、IPA 自动比较、IPA 分布和形态分配/覆写迁移；前端分析页与高级筛选均已消费 source/view，root family 排名直接消费稳定 topology。
-5. F5 建立独立 `/quality/query`，再让质量高级筛选消费共享的内部会话原语；repository 不反向调用质量算法。
+5. F5-0 已冻结独立 `/quality/query`、规则集 v1、issue/summary 和混合执行 planner；F5-1 再实装 QualityService/API，随后让质量高级筛选消费共享的内部会话原语。repository 不反向调用质量算法。
 6. 语料查询在独立服务边界稳定后按需接入，不恢复前端 materialized ID 或完整快照兜底。

@@ -6,6 +6,7 @@
     <title>Conlexicon</title>
     <link rel="stylesheet" href="theme-tokens.css">
     <link rel="stylesheet" href="theme-layered-glass.css">
+    <link rel="stylesheet" href="theme-liquid-glass.css">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body class="app-booting">
@@ -17,8 +18,8 @@
           if (preferences.uiTheme === "dark") {
             document.body.classList.add("dark-theme");
           }
-          if (preferences.uiSkin === "layered-glass") {
-            document.body.dataset.uiSkin = "layered-glass";
+          if (["layered-glass", "liquid-glass"].includes(preferences.uiSkin)) {
+            document.body.dataset.uiSkin = preferences.uiSkin;
           }
         } catch (error) {
           document.body.classList.remove("dark-theme");

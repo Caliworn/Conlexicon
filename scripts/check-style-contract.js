@@ -6,11 +6,13 @@ const path = require("node:path");
 const ROOT_DIR = path.resolve(__dirname, "..");
 const tokenPath = path.join(ROOT_DIR, "theme-tokens.css");
 const layeredGlassPath = path.join(ROOT_DIR, "theme-layered-glass.css");
+const liquidGlassPath = path.join(ROOT_DIR, "theme-liquid-glass.css");
 const stylesPath = path.join(ROOT_DIR, "styles.css");
 const indexPath = path.join(ROOT_DIR, "index.html");
 const appPath = path.join(ROOT_DIR, "app.js");
 const tokens = fs.readFileSync(tokenPath, "utf8");
 const layeredGlass = fs.readFileSync(layeredGlassPath, "utf8");
+const liquidGlass = fs.readFileSync(liquidGlassPath, "utf8");
 const styles = fs.readFileSync(stylesPath, "utf8");
 const index = fs.readFileSync(indexPath, "utf8");
 const app = fs.readFileSync(appPath, "utf8");
@@ -22,12 +24,16 @@ function numericLayer(name) {
 
 const tokenLinkPosition = index.indexOf('href="theme-tokens.css"');
 const layeredGlassLinkPosition = index.indexOf('href="theme-layered-glass.css"');
+const liquidGlassLinkPosition = index.indexOf('href="theme-liquid-glass.css"');
 const stylesLinkPosition = index.indexOf('href="styles.css"');
 assert(tokenLinkPosition >= 0, "index.html must load theme-tokens.css");
 assert(layeredGlassLinkPosition >= 0, "index.html must load theme-layered-glass.css");
+assert(liquidGlassLinkPosition >= 0, "index.html must load theme-liquid-glass.css");
 assert(stylesLinkPosition >= 0, "index.html must load styles.css");
 assert(
-  tokenLinkPosition < layeredGlassLinkPosition && layeredGlassLinkPosition < stylesLinkPosition,
+  tokenLinkPosition < layeredGlassLinkPosition
+    && layeredGlassLinkPosition < liquidGlassLinkPosition
+    && liquidGlassLinkPosition < stylesLinkPosition,
   "Skin stylesheets must load after base tokens and before component styles",
 );
 
@@ -37,7 +43,7 @@ const tokenDefinitions = new Set(
     .map((match) => match[1]),
 );
 const tokenReferences = new Set(
-  [...`${tokens}\n${layeredGlass}\n${styles}`.matchAll(/var\(\s*(--(?:ui|material|radius)-[a-z0-9-]+)/g)]
+  [...`${tokens}\n${layeredGlass}\n${liquidGlass}\n${styles}`.matchAll(/var\(\s*(--(?:ui|material|radius)-[a-z0-9-]+)/g)]
     .map((match) => match[1]),
 );
 const undefinedTokens = [...tokenReferences]
@@ -56,6 +62,18 @@ assert.deepEqual(
   unknownLayeredGlassTokens,
   [],
   `Layered Glass may only override base skin tokens: ${unknownLayeredGlassTokens.join(", ")}`,
+);
+const liquidGlassDefinitions = new Set(
+  [...liquidGlass.matchAll(/(--(?:ui|material|radius)-[a-z0-9-]+)\s*:/g)]
+    .map((match) => match[1]),
+);
+const unknownLiquidGlassTokens = [...liquidGlassDefinitions]
+  .filter((tokenName) => !tokenDefinitions.has(tokenName))
+  .sort();
+assert.deepEqual(
+  unknownLiquidGlassTokens,
+  [],
+  `Liquid Glass may only override base skin tokens: ${unknownLiquidGlassTokens.join(", ")}`,
 );
 const classicDarkTheme = tokens.match(/body\.dark-theme\s*\{([\s\S]*?)\n\}/);
 assert(classicDarkTheme, "Base tokens must define a classic dark theme scope");
@@ -82,6 +100,35 @@ assert(
   "Layered Glass tokens must use the layered-glass skin scope",
 );
 assert(!/:root\b/.test(layeredGlass), "Skin overrides must not modify the root token scope");
+assert(
+  liquidGlass.includes('body[data-ui-skin="liquid-glass"]'),
+  "Liquid Glass tokens must use the liquid-glass skin scope",
+);
+assert(!/:root\b/.test(liquidGlass), "Liquid Glass overrides must not modify the root token scope");
+assert(
+  /@supports not \(\(backdrop-filter: blur\(1px\)\) or \(-webkit-backdrop-filter: blur\(1px\)\)\)/.test(liquidGlass),
+  "Liquid Glass must provide a no-backdrop-filter fallback",
+);
+assert(
+  /@media \(prefers-reduced-transparency: reduce\)/.test(liquidGlass),
+  "Liquid Glass must provide a reduced-transparency fallback",
+);
+assert(
+  /@media \(forced-colors: active\)/.test(liquidGlass),
+  "Liquid Glass must provide a forced-colors fallback",
+);
+assert(
+  !/(?:entry-card|analysis-card|table-row|td|th)[^{]*\{[^}]*backdrop-filter/is.test(liquidGlass),
+  "Repeated content surfaces must not receive Liquid Glass backdrop blur",
+);
+assert(
+  !/(?:transition|animation)[^;]*(?:backdrop-filter|blur\(|box-shadow)/i.test(liquidGlass),
+  "Liquid Glass must not animate blur or large material shadows",
+);
+assert(
+  !/(?:feDisplacementMap|liquid-glass-refraction|backdrop-filter\s*:\s*url\()/i.test(liquidGlass),
+  "LQ-1 must remain token-only without SVG refraction",
+);
 assert(
   /@supports not \(\(backdrop-filter: blur\(1px\)\) or \(-webkit-backdrop-filter: blur\(1px\)\)\)/.test(layeredGlass),
   "Layered Glass must provide a no-backdrop-filter fallback",
@@ -288,7 +335,7 @@ assert.deepEqual(
 
 assert(!/body\.dark-theme/.test(styles), "Component CSS must not contain theme branches");
 assert(
-  !/--(?:bg|surface(?:-2)?|shadow)\b/.test(`${tokens}\n${layeredGlass}\n${styles}`),
+  !/--(?:bg|surface(?:-2)?|shadow)\b/.test(`${tokens}\n${layeredGlass}\n${liquidGlass}\n${styles}`),
   "Legacy theme aliases must not be restored",
 );
 assert(

@@ -1,0 +1,375 @@
+body[data-ui-skin="liquid-glass"] {
+  color-scheme: light;
+
+  --ui-canvas-bg: #eaf0f2;
+  --ui-text: #122026;
+  --ui-text-muted: #596a72;
+  --ui-text-on-solid: #ffffff;
+  --ui-border: rgba(72, 103, 112, 0.22);
+  --ui-border-strong: rgba(47, 80, 90, 0.38);
+  --ui-accent: #177c75;
+  --ui-accent-hover: #0d5e59;
+  --ui-accent-soft: rgba(196, 239, 234, 0.72);
+  --ui-accent-focus-ring: 0 0 0 3px rgba(23, 124, 117, 0.2);
+  --ui-warning: #b87916;
+  --ui-warning-soft: rgba(255, 239, 204, 0.88);
+  --ui-warning-tag-background: rgba(255, 239, 204, 0.88);
+  --ui-warning-badge-background: rgba(255, 244, 215, 0.92);
+  --ui-warning-badge-text: #805300;
+  --ui-danger: #b43f46;
+  --ui-danger-soft: rgba(250, 226, 229, 0.88);
+  --ui-focus: #d3a32d;
+  --ui-focus-ring: 0 0 0 3px rgba(211, 163, 45, 0.27);
+
+  --material-panel-background: rgba(247, 251, 252, 0.74);
+  --material-panel-border: rgba(255, 255, 255, 0.68);
+  --material-panel-shadow: 0 22px 54px rgba(20, 43, 51, 0.12), 0 3px 12px rgba(20, 43, 51, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 0 -1px 0 rgba(58, 94, 103, 0.12);
+  --material-panel-soft-shadow: 0 15px 34px rgba(20, 43, 51, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.76), inset 0 -1px 0 rgba(58, 94, 103, 0.08);
+  --material-card-shadow: 0 9px 24px rgba(20, 43, 51, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  --material-panel-filter: none;
+  --material-entry-detail-background: linear-gradient(137deg, rgba(255, 255, 255, 0.68) 0%, rgba(255, 255, 255, 0.18) 24%, transparent 50%), linear-gradient(318deg, rgba(74, 215, 207, 0.17) 0%, transparent 43%), linear-gradient(34deg, rgba(169, 120, 229, 0.11) 0%, transparent 40%), rgba(241, 249, 250, 0.53);
+  --material-entry-detail-mobile-background: linear-gradient(137deg, rgba(255, 255, 255, 0.68) 0%, rgba(255, 255, 255, 0.18) 24%, transparent 50%), linear-gradient(318deg, rgba(74, 215, 207, 0.14) 0%, transparent 43%), rgba(241, 249, 250, 0.68);
+  --material-entry-detail-border: rgba(255, 255, 255, 0.78);
+  --material-entry-detail-shadow: 0 26px 68px rgba(14, 39, 48, 0.18), 0 4px 14px rgba(14, 39, 48, 0.1), inset 0 2px 1px rgba(255, 255, 255, 0.92), inset 0 -2px 1px rgba(47, 86, 96, 0.14);
+  --material-entry-detail-filter: blur(20px) saturate(1.22) contrast(1.03);
+  --material-entry-detail-mobile-filter: blur(13px) saturate(1.16);
+  --material-entry-detail-section-background: rgba(249, 252, 252, 0.9);
+  --material-entry-detail-section-border: rgba(65, 99, 108, 0.18);
+  --material-control-background: linear-gradient(145deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.16) 48%, rgba(133, 219, 212, 0.12)), rgba(246, 251, 251, 0.58);
+  --material-control-border: rgba(255, 255, 255, 0.78);
+  --material-control-shadow: 0 6px 14px rgba(17, 43, 51, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.98), inset 0 2px 1px rgba(255, 255, 255, 0.24), inset 0 -1px 1px rgba(40, 84, 92, 0.16);
+  --material-control-hover-shadow: 0 10px 22px rgba(17, 43, 51, 0.16), inset 0 1px 0 rgba(255, 255, 255, 1), inset 0 3px 2px rgba(255, 255, 255, 0.38), inset 0 -1px 1px rgba(40, 84, 92, 0.18);
+  --material-control-pressed-shadow: 0 2px 6px rgba(17, 43, 51, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.7), inset 0 3px 8px rgba(32, 76, 84, 0.12), inset 0 -1px 1px rgba(40, 84, 92, 0.22);
+  --material-action-shadow: 0 8px 20px rgba(9, 44, 45, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.44), inset 0 -1px 1px rgba(0, 0, 0, 0.16);
+  --material-action-hover-shadow: 0 12px 26px rgba(9, 44, 45, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.62), inset 0 -1px 1px rgba(0, 0, 0, 0.18);
+  --material-action-pressed-shadow: 0 3px 8px rgba(9, 44, 45, 0.22), inset 0 2px 5px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  --material-control-filter: none;
+  --material-inset-background: rgba(220, 233, 235, 0.68);
+  --material-inset-border: rgba(72, 103, 112, 0.2);
+  --material-floating-background: linear-gradient(138deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.12) 34%, transparent 57%), linear-gradient(318deg, rgba(74, 215, 207, 0.16), transparent 46%), rgba(239, 248, 249, 0.42);
+  --material-floating-border: rgba(255, 255, 255, 0.72);
+  --material-floating-shadow: 0 32px 78px rgba(7, 28, 36, 0.3), 0 8px 24px rgba(7, 28, 36, 0.16), inset 0 2px 1px rgba(255, 255, 255, 0.92), inset 0 -2px 1px rgba(45, 86, 96, 0.16);
+  --material-floating-soft-shadow: 0 20px 50px rgba(7, 28, 36, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  --material-floating-filter: blur(28px) saturate(1.24) contrast(1.03);
+  --material-mobile-bar-background: linear-gradient(145deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.08) 52%, rgba(79, 215, 205, 0.12)), rgba(235, 246, 247, 0.42);
+  --material-mobile-bar-shadow: 0 15px 36px rgba(12, 35, 43, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.86), inset 0 -1px 0 rgba(46, 83, 92, 0.14);
+  --material-mobile-bar-filter: blur(24px) saturate(1.2);
+  --material-navigation-background: linear-gradient(155deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.035) 36%, transparent 58%), linear-gradient(330deg, rgba(40, 195, 186, 0.14), transparent 46%), rgba(19, 39, 49, 0.76);
+  --material-navigation-shadow: 0 28px 70px rgba(3, 17, 23, 0.38), inset -1px 0 0 rgba(255, 255, 255, 0.18), inset 1px 0 0 rgba(78, 217, 208, 0.08);
+  --material-navigation-filter: blur(30px) saturate(1.18) contrast(1.04);
+  --material-navigation-drawer-background: linear-gradient(155deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.035) 36%, transparent 58%), linear-gradient(330deg, rgba(40, 195, 186, 0.14), transparent 46%), rgba(19, 39, 49, 0.84);
+  --material-navigation-drawer-filter: blur(24px) saturate(1.14);
+  --material-navigation-text: #f8fcfb;
+  --material-navigation-muted: #c2d7d6;
+  --material-navigation-control-background: linear-gradient(145deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.045) 52%, rgba(73, 220, 209, 0.08)), rgba(255, 255, 255, 0.06);
+  --material-navigation-control-hover-background: linear-gradient(145deg, rgba(255, 255, 255, 0.27), rgba(255, 255, 255, 0.075) 52%, rgba(73, 220, 209, 0.14)), rgba(255, 255, 255, 0.08);
+  --material-navigation-control-border: rgba(255, 255, 255, 0.24);
+  --material-navigation-control-shadow: 0 7px 18px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.34), inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+  --material-navigation-control-hover-shadow: 0 11px 24px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.58), inset 0 2px 1px rgba(255, 255, 255, 0.1), inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  --material-navigation-control-pressed-shadow: 0 3px 8px rgba(0, 0, 0, 0.2), inset 0 2px 6px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  --material-navigation-action-background: rgba(255, 255, 255, 0.12);
+  --material-navigation-action-border: rgba(255, 255, 255, 0.24);
+  --material-list-item-background: rgba(248, 251, 252, 0.79);
+  --material-list-item-secondary-color: inherit;
+  --material-list-item-secondary-opacity: 0.77;
+  --material-browser-background: rgba(232, 241, 243, 0.66);
+  --material-browser-filter: none;
+  --material-rich-tooltip-background: linear-gradient(140deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.08) 52%), rgba(239, 248, 249, 0.52);
+  --material-rich-tooltip-border: rgba(255, 255, 255, 0.68);
+  --material-rich-tooltip-text: var(--ui-text);
+  --material-rich-tooltip-shadow: var(--material-floating-shadow);
+  --material-rich-tooltip-filter: blur(18px) saturate(1.18);
+  --material-overlay-background: rgba(7, 22, 29, 0.32);
+  --material-overlay-modal-background: rgba(5, 18, 25, 0.27);
+  --material-overlay-strong-background: rgba(4, 16, 23, 0.32);
+  --material-overlay-drawer-background: rgba(6, 20, 27, 0.3);
+  --material-overlay-panel-background: linear-gradient(137deg, rgba(255, 255, 255, 0.56), rgba(255, 255, 255, 0.08) 36%, transparent 58%), linear-gradient(320deg, rgba(68, 211, 202, 0.14), transparent 48%), rgba(235, 246, 248, 0.34);
+  --material-overlay-panel-shadow: 0 38px 110px rgba(1, 13, 19, 0.42), 0 10px 30px rgba(1, 13, 19, 0.2), inset 0 2px 1px rgba(255, 255, 255, 0.84);
+}
+
+body.dark-theme[data-ui-skin="liquid-glass"] {
+  color-scheme: dark;
+
+  --ui-canvas-bg: #0d1419;
+  --ui-text: #edf7f5;
+  --ui-text-muted: #a9bcbe;
+  --ui-border: rgba(221, 248, 244, 0.16);
+  --ui-border-strong: rgba(221, 248, 244, 0.3);
+  --ui-accent: #52bdb0;
+  --ui-accent-hover: #79d8cb;
+  --ui-accent-soft: rgba(21, 69, 65, 0.74);
+  --ui-accent-focus-ring: 0 0 0 3px rgba(82, 189, 176, 0.22);
+  --ui-warning: #e4bd63;
+  --ui-warning-soft: rgba(63, 50, 24, 0.88);
+  --ui-warning-tag-background: rgba(63, 50, 24, 0.88);
+  --ui-warning-badge-background: rgba(63, 50, 24, 0.94);
+  --ui-warning-badge-text: #ffd36f;
+  --ui-danger: #ee7c84;
+  --ui-danger-soft: rgba(62, 34, 38, 0.9);
+  --ui-focus: #d2aa4b;
+  --ui-focus-ring: 0 0 0 3px rgba(210, 170, 75, 0.29);
+
+  --material-panel-background: rgba(23, 34, 40, 0.72);
+  --material-panel-border: rgba(229, 255, 251, 0.16);
+  --material-panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.38), 0 4px 16px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.17), inset 0 -1px 0 rgba(0, 0, 0, 0.28);
+  --material-panel-soft-shadow: 0 16px 38px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --material-card-shadow: 0 10px 26px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.09);
+  --material-entry-detail-background: linear-gradient(137deg, rgba(255, 255, 255, 0.19) 0%, rgba(255, 255, 255, 0.045) 27%, transparent 51%), linear-gradient(318deg, rgba(47, 205, 194, 0.13) 0%, transparent 45%), linear-gradient(34deg, rgba(173, 112, 232, 0.09) 0%, transparent 42%), rgba(18, 30, 36, 0.53);
+  --material-entry-detail-mobile-background: linear-gradient(137deg, rgba(255, 255, 255, 0.17) 0%, rgba(255, 255, 255, 0.04) 27%, transparent 51%), linear-gradient(318deg, rgba(47, 205, 194, 0.11) 0%, transparent 45%), rgba(18, 30, 36, 0.68);
+  --material-entry-detail-border: rgba(230, 255, 251, 0.22);
+  --material-entry-detail-shadow: 0 30px 78px rgba(0, 0, 0, 0.48), 0 5px 18px rgba(0, 0, 0, 0.28), inset 0 2px 1px rgba(255, 255, 255, 0.2), inset 0 -2px 1px rgba(0, 0, 0, 0.3);
+  --material-entry-detail-section-background: rgba(24, 36, 42, 0.9);
+  --material-entry-detail-section-border: rgba(221, 248, 244, 0.15);
+  --material-control-background: linear-gradient(145deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.025) 50%, rgba(54, 195, 185, 0.07)), rgba(29, 43, 49, 0.62);
+  --material-control-border: rgba(229, 255, 251, 0.2);
+  --material-control-shadow: 0 7px 17px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 2px 1px rgba(255, 255, 255, 0.05), inset 0 -1px 1px rgba(0, 0, 0, 0.32);
+  --material-control-hover-shadow: 0 11px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.38), inset 0 2px 1px rgba(255, 255, 255, 0.09), inset 0 -1px 1px rgba(0, 0, 0, 0.36);
+  --material-control-pressed-shadow: 0 3px 8px rgba(0, 0, 0, 0.32), inset 0 3px 8px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  --material-action-shadow: 0 9px 22px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 -1px 1px rgba(0, 0, 0, 0.28);
+  --material-action-hover-shadow: 0 13px 28px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.44), inset 0 -1px 1px rgba(0, 0, 0, 0.3);
+  --material-action-pressed-shadow: 0 4px 9px rgba(0, 0, 0, 0.4), inset 0 3px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  --material-inset-background: rgba(31, 47, 53, 0.7);
+  --material-inset-border: rgba(221, 248, 244, 0.15);
+  --material-floating-background: linear-gradient(138deg, rgba(255, 255, 255, 0.17) 0%, rgba(255, 255, 255, 0.025) 36%, transparent 58%), linear-gradient(318deg, rgba(47, 205, 194, 0.12), transparent 47%), rgba(16, 29, 35, 0.44);
+  --material-floating-border: rgba(229, 255, 251, 0.22);
+  --material-floating-shadow: 0 34px 86px rgba(0, 0, 0, 0.62), 0 9px 26px rgba(0, 0, 0, 0.36), inset 0 2px 1px rgba(255, 255, 255, 0.2), inset 0 -2px 1px rgba(0, 0, 0, 0.36);
+  --material-floating-soft-shadow: 0 22px 56px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  --material-mobile-bar-background: linear-gradient(145deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.02) 52%, rgba(49, 205, 194, 0.08)), rgba(13, 26, 32, 0.46);
+  --material-mobile-bar-shadow: 0 17px 42px rgba(0, 0, 0, 0.44), inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  --material-navigation-background: linear-gradient(155deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.025) 38%, transparent 60%), linear-gradient(330deg, rgba(42, 190, 181, 0.12), transparent 48%), rgba(7, 18, 24, 0.78);
+  --material-navigation-shadow: 0 30px 76px rgba(0, 0, 0, 0.62), inset -1px 0 0 rgba(255, 255, 255, 0.16), inset 1px 0 0 rgba(71, 215, 205, 0.07);
+  --material-navigation-drawer-background: linear-gradient(155deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.025) 38%, transparent 60%), linear-gradient(330deg, rgba(42, 190, 181, 0.12), transparent 48%), rgba(7, 18, 24, 0.86);
+  --material-navigation-text: #f4fbf9;
+  --material-navigation-muted: #a9c4c2;
+  --material-navigation-control-background: linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.03) 54%, rgba(62, 211, 200, 0.07)), rgba(255, 255, 255, 0.035);
+  --material-navigation-control-hover-background: linear-gradient(145deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.055) 54%, rgba(62, 211, 200, 0.12)), rgba(255, 255, 255, 0.055);
+  --material-navigation-control-border: rgba(255, 255, 255, 0.2);
+  --material-navigation-control-shadow: 0 8px 20px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.23), inset 0 -1px 0 rgba(0, 0, 0, 0.28);
+  --material-navigation-control-hover-shadow: 0 12px 28px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 2px 1px rgba(255, 255, 255, 0.08), inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+  --material-navigation-control-pressed-shadow: 0 3px 9px rgba(0, 0, 0, 0.3), inset 0 3px 7px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.17);
+  --material-navigation-action-background: rgba(255, 255, 255, 0.09);
+  --material-navigation-action-border: rgba(255, 255, 255, 0.2);
+  --material-list-item-background: rgba(26, 39, 45, 0.8);
+  --material-list-item-secondary-color: var(--ui-text-muted);
+  --material-list-item-secondary-opacity: 1;
+  --material-browser-background: rgba(12, 23, 29, 0.68);
+  --material-rich-tooltip-background: linear-gradient(140deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.02) 54%), rgba(14, 27, 33, 0.56);
+  --material-rich-tooltip-border: rgba(229, 255, 251, 0.2);
+  --material-rich-tooltip-text: var(--ui-text);
+  --material-rich-tooltip-shadow: var(--material-floating-shadow);
+  --material-overlay-background: rgba(0, 7, 11, 0.44);
+  --material-overlay-modal-background: rgba(0, 6, 10, 0.37);
+  --material-overlay-strong-background: rgba(0, 5, 9, 0.43);
+  --material-overlay-drawer-background: rgba(0, 7, 11, 0.41);
+  --material-overlay-panel-background: linear-gradient(137deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.02) 38%, transparent 60%), linear-gradient(320deg, rgba(46, 199, 189, 0.11), transparent 50%), rgba(13, 26, 32, 0.43);
+  --material-overlay-panel-shadow: 0 42px 120px rgba(0, 0, 0, 0.68), 0 12px 34px rgba(0, 0, 0, 0.4), inset 0 2px 1px rgba(255, 255, 255, 0.16);
+}
+
+body[data-ui-skin="liquid-glass"] {
+  background:
+    radial-gradient(circle at 8% 4%, rgba(58, 202, 190, 0.32) 0%, rgba(58, 202, 190, 0.08) 22%, transparent 42%),
+    radial-gradient(circle at 96% 9%, rgba(154, 112, 224, 0.25) 0%, rgba(154, 112, 224, 0.055) 23%, transparent 43%),
+    radial-gradient(circle at 74% 96%, rgba(232, 174, 58, 0.22) 0%, rgba(232, 174, 58, 0.04) 24%, transparent 45%),
+    linear-gradient(135deg, #edf5f4 0%, #edf1f5 52%, #f5f0e7 100%);
+  background-attachment: fixed;
+}
+
+body.dark-theme[data-ui-skin="liquid-glass"] {
+  background:
+    radial-gradient(circle at 7% 3%, rgba(34, 174, 163, 0.26) 0%, rgba(34, 174, 163, 0.055) 24%, transparent 45%),
+    radial-gradient(circle at 96% 8%, rgba(135, 86, 206, 0.23) 0%, rgba(135, 86, 206, 0.045) 24%, transparent 45%),
+    radial-gradient(circle at 76% 97%, rgba(203, 139, 32, 0.17) 0%, rgba(203, 139, 32, 0.035) 25%, transparent 47%),
+    linear-gradient(135deg, #0b1619 0%, #10141c 54%, #19150f 100%);
+}
+
+body[data-ui-skin="liquid-glass"] .dictionary-panel {
+  border-right: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: var(--material-navigation-shadow);
+}
+
+body[data-ui-skin="liquid-glass"] .dictionary-panel :where(.utility-button, .nav-collapse-button) {
+  border-color: var(--material-navigation-action-border);
+  background: var(--material-navigation-action-background);
+  color: var(--material-navigation-text);
+}
+
+body[data-ui-skin="liquid-glass"] .dictionary-panel :where(.utility-button, .nav-collapse-button):hover:not(:disabled) {
+  border-color: var(--material-navigation-control-border);
+  background: var(--material-navigation-control-hover-background);
+}
+
+body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {
+  border-color: rgba(120, 238, 225, 0.5);
+  background: linear-gradient(145deg, rgba(131, 244, 230, 0.23), rgba(255, 255, 255, 0.075) 55%, rgba(162, 108, 229, 0.09));
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  body[data-ui-skin="liquid-glass"] {
+    background: var(--ui-canvas-bg);
+    --material-panel-background: #f8fbfb;
+    --material-entry-detail-background: #f8fbfb;
+    --material-entry-detail-mobile-background: #f8fbfb;
+    --material-entry-detail-filter: none;
+    --material-entry-detail-mobile-filter: none;
+    --material-entry-detail-section-background: #ffffff;
+    --material-control-background: #f7fbfb;
+    --material-inset-background: #e2ecee;
+    --material-floating-background: #eff7f7;
+    --material-floating-filter: none;
+    --material-mobile-bar-background: #eaf3f4;
+    --material-mobile-bar-filter: none;
+    --material-navigation-background: #17303a;
+    --material-navigation-filter: none;
+    --material-navigation-drawer-background: #17303a;
+    --material-navigation-drawer-filter: none;
+    --material-list-item-background: #f8fbfb;
+    --material-browser-background: #eaf1f3;
+    --material-rich-tooltip-background: #eff7f7;
+    --material-rich-tooltip-filter: none;
+    --material-overlay-panel-background: #eff7f7;
+  }
+
+  body.dark-theme[data-ui-skin="liquid-glass"] {
+    --material-panel-background: #172228;
+    --material-entry-detail-background: #172228;
+    --material-entry-detail-mobile-background: #172228;
+    --material-entry-detail-section-background: #1c2a30;
+    --material-control-background: #1d2b31;
+    --material-inset-background: #1f3036;
+    --material-floating-background: #102027;
+    --material-mobile-bar-background: #0d1a20;
+    --material-navigation-background: #071820;
+    --material-navigation-drawer-background: #071820;
+    --material-list-item-background: #1a292f;
+    --material-browser-background: #0c171d;
+    --material-rich-tooltip-background: #102027;
+    --material-overlay-panel-background: #102027;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  body[data-ui-skin="liquid-glass"] {
+    background: var(--ui-canvas-bg);
+    --material-panel-background: #f8fbfb;
+    --material-entry-detail-background: #f8fbfb;
+    --material-entry-detail-mobile-background: #f8fbfb;
+    --material-entry-detail-filter: none;
+    --material-entry-detail-mobile-filter: none;
+    --material-entry-detail-section-background: #ffffff;
+    --material-control-background: #f7fbfb;
+    --material-inset-background: #e2ecee;
+    --material-floating-background: #eff7f7;
+    --material-floating-filter: none;
+    --material-mobile-bar-background: #eaf3f4;
+    --material-mobile-bar-filter: none;
+    --material-navigation-background: #17303a;
+    --material-navigation-filter: none;
+    --material-navigation-drawer-background: #17303a;
+    --material-navigation-drawer-filter: none;
+    --material-list-item-background: #f8fbfb;
+    --material-browser-background: #eaf1f3;
+    --material-rich-tooltip-background: #eff7f7;
+    --material-rich-tooltip-filter: none;
+    --material-overlay-panel-background: #eff7f7;
+  }
+
+  body.dark-theme[data-ui-skin="liquid-glass"] {
+    --material-panel-background: #172228;
+    --material-entry-detail-background: #172228;
+    --material-entry-detail-mobile-background: #172228;
+    --material-entry-detail-section-background: #1c2a30;
+    --material-control-background: #1d2b31;
+    --material-inset-background: #1f3036;
+    --material-floating-background: #102027;
+    --material-mobile-bar-background: #0d1a20;
+    --material-navigation-background: #071820;
+    --material-navigation-drawer-background: #071820;
+    --material-list-item-background: #1a292f;
+    --material-browser-background: #0c171d;
+    --material-rich-tooltip-background: #102027;
+    --material-overlay-panel-background: #102027;
+  }
+}
+
+@media (forced-colors: active) {
+  body[data-ui-skin="liquid-glass"],
+  body.dark-theme[data-ui-skin="liquid-glass"] {
+    background: Canvas;
+    --ui-canvas-bg: Canvas;
+    --ui-text: CanvasText;
+    --ui-text-muted: CanvasText;
+    --ui-text-on-solid: HighlightText;
+    --ui-border: CanvasText;
+    --ui-border-strong: CanvasText;
+    --ui-accent: Highlight;
+    --ui-accent-hover: Highlight;
+    --ui-accent-soft: Canvas;
+    --material-panel-background: Canvas;
+    --material-panel-border: CanvasText;
+    --material-panel-shadow: none;
+    --material-panel-soft-shadow: none;
+    --material-card-shadow: none;
+    --material-entry-detail-background: Canvas;
+    --material-entry-detail-mobile-background: Canvas;
+    --material-entry-detail-border: CanvasText;
+    --material-entry-detail-shadow: none;
+    --material-entry-detail-filter: none;
+    --material-entry-detail-mobile-filter: none;
+    --material-entry-detail-section-background: Canvas;
+    --material-entry-detail-section-border: CanvasText;
+    --material-control-background: ButtonFace;
+    --material-control-border: ButtonText;
+    --material-control-shadow: none;
+    --material-control-hover-shadow: none;
+    --material-control-pressed-shadow: none;
+    --material-action-shadow: none;
+    --material-action-hover-shadow: none;
+    --material-action-pressed-shadow: none;
+    --material-inset-background: Canvas;
+    --material-inset-border: CanvasText;
+    --material-floating-background: Canvas;
+    --material-floating-border: CanvasText;
+    --material-floating-shadow: none;
+    --material-floating-soft-shadow: none;
+    --material-floating-filter: none;
+    --material-mobile-bar-background: Canvas;
+    --material-mobile-bar-shadow: none;
+    --material-mobile-bar-filter: none;
+    --material-navigation-background: Canvas;
+    --material-navigation-shadow: none;
+    --material-navigation-filter: none;
+    --material-navigation-drawer-background: Canvas;
+    --material-navigation-drawer-filter: none;
+    --material-navigation-text: CanvasText;
+    --material-navigation-muted: CanvasText;
+    --material-navigation-control-shadow: none;
+    --material-navigation-control-hover-shadow: none;
+    --material-navigation-control-pressed-shadow: none;
+    --material-list-item-background: Canvas;
+    --material-browser-background: Canvas;
+    --material-rich-tooltip-background: Canvas;
+    --material-rich-tooltip-border: CanvasText;
+    --material-rich-tooltip-text: CanvasText;
+    --material-rich-tooltip-shadow: none;
+    --material-rich-tooltip-filter: none;
+    --material-overlay-background: transparent;
+    --material-overlay-modal-background: transparent;
+    --material-overlay-strong-background: transparent;
+    --material-overlay-drawer-background: transparent;
+    --material-overlay-panel-background: Canvas;
+    --material-overlay-panel-shadow: none;
+  }
+
+  body[data-ui-skin="liquid-glass"] .dictionary-panel {
+    border-color: CanvasText;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {
+    border-color: Highlight;
+    background: Canvas;
+    color: CanvasText;
+  }
+}

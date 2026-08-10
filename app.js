@@ -58,6 +58,7 @@ let pendingLayeredGlassPointer = null;
 const SKIN_OPTIONS = [
   { id: "classic", labelKey: "classicSkin" },
   { id: "layered-glass", labelKey: "layeredGlassSkin" },
+  { id: "liquid-glass", labelKey: "liquidGlassSkin" },
 ];
 const entryQueryModel = window.ConlexiconEntryQuery;
 const ipaModel = window.ConlexiconIpa;
@@ -407,6 +408,7 @@ const i18n = {
     lightMode: "浅色模式",
     classicSkin: "经典皮肤",
     layeredGlassSkin: "层叠玻璃",
+    liquidGlassSkin: "液态玻璃",
     selectSkinCurrent: "选择皮肤，当前：{skin}",
     newEntry: "新建词条",
     quickNewEntryTooltip: "新建词条",
@@ -1005,6 +1007,7 @@ const i18n = {
     lightMode: "Light Mode",
     classicSkin: "Classic Skin",
     layeredGlassSkin: "Layered Glass",
+    liquidGlassSkin: "Liquid Glass",
     selectSkinCurrent: "Choose skin, current: {skin}",
     newEntry: "New Entry",
     quickNewEntryTooltip: "New Entry",
@@ -3546,8 +3549,8 @@ function refreshEditableSurfaceLocale() {
 
 function applyAppearance() {
   document.body.classList.toggle("dark-theme", currentTheme === "dark");
-  if (currentSkin === "layered-glass") {
-    document.body.dataset.uiSkin = "layered-glass";
+  if (currentSkin !== "classic") {
+    document.body.dataset.uiSkin = currentSkin;
   } else {
     delete document.body.dataset.uiSkin;
   }
@@ -11378,7 +11381,6 @@ function analysisIpaCompareRows(response) {
 function buildQualityViewReport(dictionary) {
   return qualityModel.buildQualityReport(dictionary, {
     text: aText,
-    normalizeText: normalize,
   });
 }
 

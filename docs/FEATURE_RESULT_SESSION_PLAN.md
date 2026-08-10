@@ -9,7 +9,7 @@
 1. **Feature result**：必须运行 IPA、Gloss 或形态算法才能得到的派生结果，由 F4b feature service 负责。
 2. **Topology summary**：词根家族排行直接消费现有稳定词根拓扑，不建立 feature session。
 3. **Deterministic summary/facet**：词长、首字母、字符和双字符组合先统一 Unicode 语义，再由轻量 projection 或 summary query 提供。
-4. **Quality result**：质量检查需要问题分类和详情，F5 使用独立 `/quality/query`，只复用 F4b 的内部会话原语。
+4. **Quality result**：质量检查需要问题分类和详情；F5-0 已在 [Quality Result Plan](QUALITY_RESULT_PLAN.md) 冻结独立 `/quality/query`、规则集 v1 和混合执行 planner，后续只复用 F4b 的内部会话原语。
 
 F4b 不建设通用分析任务平台，不把功能结果伪装成普通 `EntryFilter`，也不把前端 `entryIds` 机械搬进 HTTP 响应。
 
@@ -387,7 +387,7 @@ items 中的 feature 只返回当前词条的 `{ mode, assignedGroupIds, activeO
 - 词根家族排行已通过 `rootFamilyRanking` widget 复用稳定 `RootTopologyCache`，返回全部非空家族的轻量摘要，不建立 feature session。
 - 正写法统计先冻结 Unicode 语义，再选择轻量 projection 或 summary query。
 - Gloss 结果等待阶段 C 的例句/语料链接读取边界，避免为即将删除的 `definition.example` 建长期契约。
-- F5 建立独立质量 API，复用内部会话原语并删除剩余质量 ID/issue bridge。
+- F5-0 已冻结独立质量 API、12 类 issue、summary 计数和混合执行 planner；F5-1–F5-3 继续实装 QualityService 并删除剩余质量 ID/issue bridge。
 
 ## 11. F4b-1 验收门槛
 

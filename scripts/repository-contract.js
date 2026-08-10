@@ -2291,6 +2291,10 @@ async function runRepositoryContractTests(options = {}) {
     assert.equal(state.uiTheme, "dark");
     assert.equal(state.uiSkin, "layered-glass");
 
+    apiResult = await callApi(repository, "PUT", "/api/preferences", { uiSkin: "liquid-glass" });
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.uiSkin, "liquid-glass");
+
     apiResult = await callApi(repository, "PUT", "/api/preferences", { uiSkin: "classic" });
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.uiSkin, "classic");

@@ -4445,6 +4445,40 @@ textarea.ipa-single-line::-webkit-scrollbar {
   bottom: 2px;
 }
 
+.skin-picker-preview-liquid-glass {
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--ui-text-on-solid) 48%, transparent);
+  background:
+    radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--ui-accent) 54%, transparent), transparent 44%),
+    radial-gradient(circle at 88% 82%, color-mix(in srgb, var(--ui-warning) 42%, transparent), transparent 48%),
+    color-mix(in srgb, var(--material-navigation-background) 74%, transparent);
+}
+
+.skin-picker-preview-liquid-glass::before {
+  position: absolute;
+  inset: 3px 4px;
+  border: 1px solid color-mix(in srgb, var(--ui-text-on-solid) 76%, transparent);
+  border-radius: 7px;
+  background:
+    linear-gradient(140deg, color-mix(in srgb, var(--ui-text-on-solid) 48%, transparent), transparent 42%),
+    color-mix(in srgb, var(--material-panel-background) 54%, transparent);
+  box-shadow: var(--material-card-shadow);
+  content: "";
+  transform: rotate(-5deg);
+}
+
+.skin-picker-preview-liquid-glass::after {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  width: 10px;
+  height: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ui-text-on-solid) 86%, transparent);
+  content: "";
+  transform: rotate(-5deg);
+}
+
 .utility-button {
   display: inline-flex;
   min-width: 0;

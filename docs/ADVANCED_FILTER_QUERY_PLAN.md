@@ -173,9 +173,11 @@ Feature result source 应由对应 service 产生可重建的查询身份，并�
 
 ### F5：质量 API 与剩余迁移
 
-- `/quality/query` 返回问题摘要、问题详情和 quality result source，并只复用 F4b 的内部会话/cache/cursor 原语，不与分析 API 混成一种 endpoint。
+- F5-0 已完成，详细契约见 [Quality Result Plan](QUALITY_RESULT_PLAN.md)：冻结 12 类稳定 issue code、严重度/模块、详情参数、issue/entry/global 计数，以及独立 `/quality/query` 和 `/quality/location` 的 source/view/window 形状。
+- 简单缺失规则允许复用普通 EntryFilter 或合并 SQL facts，Gloss/重音使用 fact scan，重复词形/近似标签使用 aggregation，来源问题使用稳定 topology；这些只是内部执行原语，质量 code、政策和结果汇总仍由 QualityService 拥有。
+- F5-1 实装 `/quality/query` 与 QualityService，只复用 F4b 的内部会话/cache/cursor 原语，不与分析 API 混成一种 endpoint。
 - 暂缓的 Gloss 在例句/语料链接边界明确后接入对应 feature service；质量结果只进入独立 QualityService，不让 analysis planner、repository 和质量算法互相反向调用。
-- 删除剩余 `activeFilter.entryIds` 本地质量结果筛选和分析结果 ID 数组桥接。
+- F5-2/F5-3 依次迁移质量页面和词条筛选，删除剩余 `activeFilter.entryIds`、`issueMap` 和本地完整 report 桥接。
 
 ## 9. F0 验收结果
 
