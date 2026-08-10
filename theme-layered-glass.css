@@ -232,6 +232,7 @@ body.dark-theme[data-ui-skin="layered-glass"] .dictionary-panel .tool-button.act
 body[data-ui-skin="layered-glass"] :where(
   .entry-search-config-menu,
   .entry-filter-menu,
+  .skin-picker-menu,
   .modal-panel,
   .network-panel
 )[data-layered-glass-pointer] {
@@ -252,7 +253,8 @@ body[data-ui-skin="layered-glass"] :where(
 
 body[data-ui-skin="layered-glass"] :where(
   .entry-search-config-menu,
-  .entry-filter-menu
+  .entry-filter-menu,
+  .skin-picker-menu
 )[data-layered-glass-pointer] {
   --layered-glass-pointer-surface: var(--material-floating-background);
 }
@@ -273,6 +275,7 @@ body[data-ui-skin="layered-glass"] .network-panel[data-layered-glass-pointer] {
 body.dark-theme[data-ui-skin="layered-glass"] :where(
   .entry-search-config-menu,
   .entry-filter-menu,
+  .skin-picker-menu,
   .modal-panel
 )[data-layered-glass-pointer] {
   --layered-glass-point-alpha: 0.045;

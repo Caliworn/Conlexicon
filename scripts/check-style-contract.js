@@ -15,6 +15,11 @@ const styles = fs.readFileSync(stylesPath, "utf8");
 const index = fs.readFileSync(indexPath, "utf8");
 const app = fs.readFileSync(appPath, "utf8");
 
+function numericLayer(name) {
+  const match = styles.match(new RegExp(`${name}:\\s*(\\d+)`));
+  return match ? Number(match[1]) : Number.NaN;
+}
+
 const tokenLinkPosition = index.indexOf('href="theme-tokens.css"');
 const layeredGlassLinkPosition = index.indexOf('href="theme-layered-glass.css"');
 const stylesLinkPosition = index.indexOf('href="styles.css"');
@@ -152,6 +157,20 @@ assert(
 );
 const pointerTargetContract = app.match(/const LAYERED_GLASS_POINTER_TARGET_SELECTOR = \[([\s\S]*?)\]\.join\(", "\);/);
 assert(pointerTargetContract, "LG-4C must declare an explicit pointer-responsive surface allowlist");
+assert(
+  index.includes('aria-controls="skinPickerMenu"')
+    && index.includes('id="skinPickerMenu" role="menu"'),
+  "The skin selector must expose a top-level menu controlled by its navigation trigger",
+);
+assert(
+  numericLayer("--layer-drawer") < numericLayer("--layer-floating-menu")
+    && numericLayer("--layer-floating-menu") < numericLayer("--layer-network-overlay"),
+  "Top-level floating menus must render above mobile drawers and below full overlays",
+);
+assert(
+  pointerTargetContract[1].includes("skin-picker-menu"),
+  "The floating skin selector must participate in the LG-4C pointer response",
+);
 assert(
   !pointerTargetContract[1].includes("dictionary-panel"),
   "LG-4C pointer response must remain limited to popup surfaces",

@@ -15,6 +15,7 @@ let searchQuery = "";
 const runtimeEntrySearchProfiles = new Map();
 let entrySearchConfigOpen = false;
 let entryFilterMenuOpen = false;
+let skinPickerOpen = false;
 const ENTRY_SEARCH_DEBOUNCE_MS = 250;
 const ENTRY_QUERY_WINDOW_PAGE_SIZE = 200;
 const ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE = 100;
@@ -45,6 +46,7 @@ const layeredGlassForcedColorsMediaQuery = window.matchMedia("(forced-colors: ac
 const LAYERED_GLASS_POINTER_TARGET_SELECTOR = [
   ".entry-search-config-menu",
   ".entry-filter-menu",
+  ".skin-picker-menu",
   ".modal-panel",
   ".network-panel",
 ].join(", ");
@@ -53,6 +55,10 @@ const layeredGlassPointerExitTimers = new WeakMap();
 let layeredGlassPointerTarget = null;
 let layeredGlassPointerFrame = 0;
 let pendingLayeredGlassPointer = null;
+const SKIN_OPTIONS = [
+  { id: "classic", labelKey: "classicSkin" },
+  { id: "layered-glass", labelKey: "layeredGlassSkin" },
+];
 const entryQueryModel = window.ConlexiconEntryQuery;
 const ipaModel = window.ConlexiconIpa;
 const IPA_STRESS_MARKER = ipaModel.IPA_STRESS_MARKER;
@@ -401,8 +407,7 @@ const i18n = {
     lightMode: "浅色模式",
     classicSkin: "经典皮肤",
     layeredGlassSkin: "层叠玻璃",
-    switchToClassicSkin: "切换到经典皮肤",
-    switchToLayeredGlassSkin: "切换到层叠玻璃皮肤",
+    selectSkinCurrent: "选择皮肤，当前：{skin}",
     newEntry: "新建词条",
     quickNewEntryTooltip: "新建词条",
     insertSymbol: "插入 {symbol}",
@@ -1000,8 +1005,7 @@ const i18n = {
     lightMode: "Light Mode",
     classicSkin: "Classic Skin",
     layeredGlassSkin: "Layered Glass",
-    switchToClassicSkin: "Switch to Classic Skin",
-    switchToLayeredGlassSkin: "Switch to Layered Glass Skin",
+    selectSkinCurrent: "Choose skin, current: {skin}",
     newEntry: "New Entry",
     quickNewEntryTooltip: "New Entry",
     insertSymbol: "Insert {symbol}",
@@ -1544,9 +1548,8 @@ const elements = {
   themeToggleButton: document.querySelector("#themeToggleButton"),
   themeToggleLabel: document.querySelector("#themeToggleLabel"),
   skinToggleButton: document.querySelector("#skinToggleButton"),
-  classicSkinIcon: document.querySelector("#classicSkinIcon"),
-  layeredGlassSkinIcon: document.querySelector("#layeredGlassSkinIcon"),
   skinToggleLabel: document.querySelector("#skinToggleLabel"),
+  skinPickerMenu: document.querySelector("#skinPickerMenu"),
   languageToggleButton: document.querySelector("#languageToggleButton"),
   brandEyebrow: document.querySelector("#brandEyebrow"),
   brandTitle: document.querySelector('[data-i18n="appTitle"]'),
@@ -1844,7 +1847,7 @@ function normalizeUiTheme(value) {
 }
 
 function normalizeUiSkin(value) {
-  return value === "layered-glass" ? "layered-glass" : "classic";
+  return SKIN_OPTIONS.some((option) => option.id === value) ? value : "classic";
 }
 
 function readCachedUiPreferences() {
@@ -1858,7 +1861,7 @@ function readCachedUiPreferences() {
       ...(preferences.uiTheme === "dark" || preferences.uiTheme === "light"
         ? { uiTheme: preferences.uiTheme }
         : {}),
-      ...(["classic", "layered-glass"].includes(preferences.uiSkin)
+      ...(SKIN_OPTIONS.some((option) => option.id === preferences.uiSkin)
         ? { uiSkin: preferences.uiSkin }
         : {}),
     };
@@ -3376,17 +3379,129 @@ function applyLocale(root = document) {
   elements.themeToggleLabel.textContent = nextThemeLabel;
   elements.themeToggleButton.removeAttribute("title");
   elements.themeToggleButton.setAttribute("aria-label", nextThemeLabel);
-  const nextSkin = currentSkin === "layered-glass" ? "classic" : "layered-glass";
-  const nextSkinLabel = nextSkin === "classic" ? t("classicSkin") : t("layeredGlassSkin");
-  const nextSkinAriaLabel = nextSkin === "classic" ? t("switchToClassicSkin") : t("switchToLayeredGlassSkin");
-  elements.classicSkinIcon.toggleAttribute("hidden", nextSkin !== "classic");
-  elements.layeredGlassSkinIcon.toggleAttribute("hidden", nextSkin !== "layered-glass");
-  elements.skinToggleLabel.textContent = nextSkinLabel;
+  renderSkinPicker();
+  const currentSkinLabel = skinOptionLabel(currentSkin);
+  elements.skinToggleLabel.textContent = currentSkinLabel;
   elements.skinToggleButton.removeAttribute("title");
-  elements.skinToggleButton.setAttribute("aria-label", nextSkinAriaLabel);
+  elements.skinToggleButton.setAttribute("aria-label", formatText("selectSkinCurrent", { skin: currentSkinLabel }));
   const nextLanguageLabel = currentLanguage === "zh" ? "English" : "中文";
   elements.languageToggleButton.removeAttribute("title");
   elements.languageToggleButton.setAttribute("aria-label", nextLanguageLabel);
+}
+
+function skinOptionLabel(skinId) {
+  const option = SKIN_OPTIONS.find((item) => item.id === skinId) || SKIN_OPTIONS[0];
+  return t(option.labelKey);
+}
+
+function renderSkinPicker() {
+  if (!elements.skinPickerMenu) {
+    return;
+  }
+  if (elements.skinPickerMenu.childElementCount !== SKIN_OPTIONS.length) {
+    elements.skinPickerMenu.innerHTML = SKIN_OPTIONS.map((option) => `
+      <button class="skin-picker-option" type="button" role="menuitemradio" data-skin-option="${option.id}" aria-checked="false" tabindex="-1">
+        <span class="skin-picker-preview skin-picker-preview-${option.id}" aria-hidden="true"></span>
+        <span class="skin-picker-option-label"></span>
+        <svg class="skin-picker-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>
+      </button>
+    `).join("");
+  }
+  elements.skinPickerMenu.querySelectorAll("[data-skin-option]").forEach((button) => {
+    const option = SKIN_OPTIONS.find((item) => item.id === button.dataset.skinOption);
+    const selected = option?.id === currentSkin;
+    button.querySelector(".skin-picker-option-label").textContent = option ? t(option.labelKey) : "";
+    button.setAttribute("aria-checked", String(selected));
+    button.tabIndex = selected ? 0 : -1;
+  });
+}
+
+function positionSkinPickerMenu() {
+  if (!skinPickerOpen || !elements.skinPickerMenu || !elements.skinToggleButton) {
+    return;
+  }
+  const margin = 12;
+  const gap = 8;
+  const triggerRect = elements.skinToggleButton.getBoundingClientRect();
+  const menuRect = elements.skinPickerMenu.getBoundingClientRect();
+  const railMode = desktopNavMediaQuery.matches && elements.appNav.dataset.navState === "rail";
+  let left = railMode ? triggerRect.right + gap : triggerRect.left;
+  let top = railMode ? triggerRect.bottom - menuRect.height : triggerRect.top - menuRect.height - gap;
+
+  if (!railMode && top < margin && triggerRect.bottom + gap + menuRect.height <= window.innerHeight - margin) {
+    top = triggerRect.bottom + gap;
+  }
+  left = Math.max(margin, Math.min(left, window.innerWidth - menuRect.width - margin));
+  top = Math.max(margin, Math.min(top, window.innerHeight - menuRect.height - margin));
+  elements.skinPickerMenu.style.left = `${Math.round(left)}px`;
+  elements.skinPickerMenu.style.top = `${Math.round(top)}px`;
+}
+
+function setSkinPickerOpen(open, focusMenu = false) {
+  skinPickerOpen = Boolean(open);
+  elements.skinToggleButton.setAttribute("aria-expanded", String(skinPickerOpen));
+  elements.skinPickerMenu.hidden = !skinPickerOpen;
+  if (!skinPickerOpen) {
+    resetLayeredGlassPointerEffect();
+    return;
+  }
+  hideAppTooltip();
+  renderSkinPicker();
+  elements.skinPickerMenu.style.visibility = "hidden";
+  positionSkinPickerMenu();
+  elements.skinPickerMenu.style.removeProperty("visibility");
+  if (focusMenu) {
+    elements.skinPickerMenu.querySelector('[aria-checked="true"]')?.focus();
+  }
+}
+
+async function selectUiSkin(nextSkin) {
+  const normalizedSkin = normalizeUiSkin(nextSkin);
+  if (normalizedSkin === currentSkin) {
+    setSkinPickerOpen(false);
+    elements.skinToggleButton.focus();
+    return;
+  }
+  const previousSkin = currentSkin;
+  currentSkin = normalizedSkin;
+  state.uiSkin = normalizedSkin;
+  cacheUiPreferences({ uiSkin: normalizedSkin });
+  renderAppearanceChange();
+  if (!backendAvailable) {
+    setSkinPickerOpen(false);
+    elements.skinToggleButton.focus();
+    return;
+  }
+  elements.skinToggleButton.disabled = true;
+  elements.skinPickerMenu.querySelectorAll("button").forEach((button) => {
+    button.disabled = true;
+  });
+  try {
+    const saved = await api("/api/preferences", {
+      method: "PUT",
+      body: JSON.stringify({ uiSkin: normalizedSkin }),
+    });
+    currentSkin = normalizeUiSkin(saved.uiSkin);
+    state.uiSkin = currentSkin;
+    cacheUiPreferences({ uiSkin: currentSkin });
+    renderAppearanceChange();
+    setSkinPickerOpen(false);
+    elements.skinToggleButton.focus();
+  } catch (error) {
+    currentSkin = previousSkin;
+    state.uiSkin = previousSkin;
+    cacheUiPreferences({ uiSkin: previousSkin });
+    renderAppearanceChange();
+    showApiErrorToast(error, "skinSaveFailed");
+  } finally {
+    elements.skinToggleButton.disabled = false;
+    elements.skinPickerMenu.querySelectorAll("button").forEach((button) => {
+      button.disabled = false;
+    });
+    if (skinPickerOpen) {
+      elements.skinPickerMenu.querySelector('[aria-checked="true"]')?.focus();
+    }
+  }
 }
 
 function refreshEditableSurfaceLocale() {
@@ -15862,6 +15977,11 @@ elements.entrySearchDefaultButton.addEventListener("click", () => {
 });
 
 document.addEventListener("pointerdown", (event) => {
+  if (skinPickerOpen
+    && !elements.skinPickerMenu.contains(event.target)
+    && !elements.skinToggleButton.contains(event.target)) {
+    setSkinPickerOpen(false);
+  }
   if (entrySearchConfigOpen && !elements.entrySearchControl.contains(event.target)) {
     setEntrySearchConfigOpen(false);
   }
@@ -15871,6 +15991,12 @@ document.addEventListener("pointerdown", (event) => {
 }, true);
 
 document.addEventListener("keydown", (event) => {
+  if (skinPickerOpen && event.key === "Escape") {
+    event.preventDefault();
+    setSkinPickerOpen(false);
+    elements.skinToggleButton.focus();
+    return;
+  }
   if (entrySearchConfigOpen && event.key === "Escape") {
     event.preventDefault();
     setEntrySearchConfigOpen(false);
@@ -16122,12 +16248,19 @@ window.addEventListener("blur", () => {
 window.addEventListener("resize", () => {
   hideAppTooltip();
   resetLayeredGlassPointerEffect(true);
+  setSkinPickerOpen(false);
 });
 window.addEventListener("scroll", hideAppTooltip, { passive: true });
+document.addEventListener("scroll", (event) => {
+  if (skinPickerOpen && !elements.skinPickerMenu.contains(event.target)) {
+    setSkinPickerOpen(false);
+  }
+}, { capture: true, passive: true });
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     hideAppTooltip();
     resetLayeredGlassPointerEffect(true);
+    setSkinPickerOpen(false);
   }
 });
 [
@@ -16137,6 +16270,11 @@ document.addEventListener("visibilitychange", () => {
   layeredGlassForcedColorsMediaQuery,
 ].forEach((mediaQuery) => mediaQuery.addEventListener("change", () => resetLayeredGlassPointerEffect(true)));
 document.addEventListener("focusin", (event) => {
+  if (skinPickerOpen
+    && !elements.skinPickerMenu.contains(event.target)
+    && !elements.skinToggleButton.contains(event.target)) {
+    setSkinPickerOpen(false);
+  }
   const target = appTooltipTargetFromEvent(event);
   if (target) {
     showAppTooltip(target);
@@ -16959,34 +17097,39 @@ elements.themeToggleButton.addEventListener("click", async () => {
     elements.themeToggleButton.disabled = false;
   }
 });
-elements.skinToggleButton.addEventListener("click", async () => {
-  const previousSkin = currentSkin;
-  const nextSkin = currentSkin === "layered-glass" ? "classic" : "layered-glass";
-  currentSkin = nextSkin;
-  state.uiSkin = nextSkin;
-  cacheUiPreferences({ uiSkin: nextSkin });
-  renderAppearanceChange();
-  if (!backendAvailable) {
+elements.skinToggleButton.addEventListener("click", () => {
+  if (elements.skinToggleButton.disabled) {
     return;
   }
-  elements.skinToggleButton.disabled = true;
-  try {
-    const saved = await api("/api/preferences", {
-      method: "PUT",
-      body: JSON.stringify({ uiSkin: nextSkin }),
+  setSkinPickerOpen(!skinPickerOpen, !skinPickerOpen);
+});
+
+elements.skinPickerMenu.addEventListener("click", (event) => {
+  const option = event.target.closest("[data-skin-option]");
+  if (option && !option.disabled) {
+    selectUiSkin(option.dataset.skinOption);
+  }
+});
+
+elements.skinPickerMenu.addEventListener("keydown", (event) => {
+  const options = Array.from(elements.skinPickerMenu.querySelectorAll("[data-skin-option]:not(:disabled)"));
+  const currentIndex = options.indexOf(document.activeElement);
+  let nextIndex = -1;
+  if (event.key === "ArrowDown") {
+    nextIndex = (currentIndex + 1) % options.length;
+  } else if (event.key === "ArrowUp") {
+    nextIndex = (currentIndex - 1 + options.length) % options.length;
+  } else if (event.key === "Home") {
+    nextIndex = 0;
+  } else if (event.key === "End") {
+    nextIndex = options.length - 1;
+  }
+  if (nextIndex >= 0) {
+    event.preventDefault();
+    options.forEach((option, index) => {
+      option.tabIndex = index === nextIndex ? 0 : -1;
     });
-    currentSkin = normalizeUiSkin(saved.uiSkin);
-    state.uiSkin = currentSkin;
-    cacheUiPreferences({ uiSkin: currentSkin });
-    renderAppearanceChange();
-  } catch (error) {
-    currentSkin = previousSkin;
-    state.uiSkin = previousSkin;
-    cacheUiPreferences({ uiSkin: previousSkin });
-    renderAppearanceChange();
-    showApiErrorToast(error, "skinSaveFailed");
-  } finally {
-    elements.skinToggleButton.disabled = false;
+    options[nextIndex].focus();
   }
 });
 elements.languageToggleButton.addEventListener("click", async () => {
