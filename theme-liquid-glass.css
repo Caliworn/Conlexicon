@@ -1,3 +1,9 @@
+@property --liquid-glass-caustic-opacity {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
 body[data-ui-skin="liquid-glass"] {
   color-scheme: light;
 
@@ -85,6 +91,10 @@ body[data-ui-skin="liquid-glass"] {
   --material-overlay-drawer-background: rgba(6, 20, 27, 0.3);
   --material-overlay-panel-background: linear-gradient(137deg, rgba(255, 255, 255, 0.56), rgba(255, 255, 255, 0.08) 36%, transparent 58%), linear-gradient(320deg, rgba(68, 211, 202, 0.14), transparent 48%), rgba(235, 246, 248, 0.34);
   --material-overlay-panel-shadow: 0 38px 110px rgba(1, 13, 19, 0.42), 0 10px 30px rgba(1, 13, 19, 0.2), inset 0 2px 1px rgba(255, 255, 255, 0.84);
+  --liquid-glass-edge-cool-soft: rgba(65, 211, 212, 0.18);
+  --liquid-glass-edge-warm-soft: rgba(184, 120, 229, 0.13);
+  --liquid-glass-edge-cool-strong: rgba(78, 224, 218, 0.3);
+  --liquid-glass-edge-warm-strong: rgba(194, 127, 235, 0.23);
 }
 
 body.dark-theme[data-ui-skin="liquid-glass"] {
@@ -163,6 +173,10 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-overlay-drawer-background: rgba(0, 7, 11, 0.41);
   --material-overlay-panel-background: linear-gradient(137deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.02) 38%, transparent 60%), linear-gradient(320deg, rgba(46, 199, 189, 0.11), transparent 50%), rgba(13, 26, 32, 0.43);
   --material-overlay-panel-shadow: 0 42px 120px rgba(0, 0, 0, 0.68), 0 12px 34px rgba(0, 0, 0, 0.4), inset 0 2px 1px rgba(255, 255, 255, 0.16);
+  --liquid-glass-edge-cool-soft: rgba(74, 220, 211, 0.2);
+  --liquid-glass-edge-warm-soft: rgba(188, 124, 232, 0.16);
+  --liquid-glass-edge-cool-strong: rgba(86, 232, 221, 0.34);
+  --liquid-glass-edge-warm-strong: rgba(203, 137, 240, 0.27);
 }
 
 body[data-ui-skin="liquid-glass"] {
@@ -201,6 +215,123 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel :where(.utility-button, .nav
 body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {
   border-color: rgba(120, 238, 225, 0.5);
   background: linear-gradient(145deg, rgba(131, 244, 230, 0.23), rgba(255, 255, 255, 0.075) 55%, rgba(162, 108, 229, 0.09));
+}
+
+@supports ((backdrop-filter: url("#liquid-glass-refraction-soft")) or (-webkit-backdrop-filter: url("#liquid-glass-refraction-soft"))) {
+  body[data-ui-skin="liquid-glass"] .entry-display {
+    box-shadow: var(--material-entry-detail-shadow), inset 1px 0 0 var(--liquid-glass-edge-cool-soft), inset -1px 0 0 var(--liquid-glass-edge-warm-soft);
+    backdrop-filter: url("#liquid-glass-refraction-soft") var(--material-entry-detail-filter);
+    -webkit-backdrop-filter: url("#liquid-glass-refraction-soft") var(--material-entry-detail-filter);
+  }
+
+  body[data-ui-skin="liquid-glass"] .mobile-app-bar {
+    box-shadow: var(--material-mobile-bar-shadow), inset 1px 0 0 var(--liquid-glass-edge-cool-soft), inset -1px 0 0 var(--liquid-glass-edge-warm-soft);
+    backdrop-filter: url("#liquid-glass-refraction-soft") var(--material-mobile-bar-filter);
+    -webkit-backdrop-filter: url("#liquid-glass-refraction-soft") var(--material-mobile-bar-filter);
+  }
+
+  body[data-ui-skin="liquid-glass"] :is(
+    .entry-search-config-menu:not([hidden]),
+    .entry-filter-menu:not([hidden]),
+    .source-suggestions:not([hidden]),
+    .entry-context-menu:not([hidden]),
+    .skin-picker-menu:not([hidden]),
+    .app-tooltip.chip-list-tooltip,
+    .app-tooltip.tag-info-tooltip,
+    .app-tooltip.rich-tooltip
+  ) {
+    box-shadow: var(--material-floating-shadow), inset 1px 0 0 var(--liquid-glass-edge-cool-strong), inset -1px 0 0 var(--liquid-glass-edge-warm-strong);
+    backdrop-filter: url("#liquid-glass-refraction-strong") var(--material-floating-filter);
+    -webkit-backdrop-filter: url("#liquid-glass-refraction-strong") var(--material-floating-filter);
+  }
+
+  body[data-ui-skin="liquid-glass"] .modal-panel {
+    box-shadow: var(--material-floating-shadow), inset 1px 0 0 var(--liquid-glass-edge-cool-strong), inset -1px 0 0 var(--liquid-glass-edge-warm-strong);
+    backdrop-filter: url("#liquid-glass-refraction-strong") var(--material-floating-filter);
+    -webkit-backdrop-filter: url("#liquid-glass-refraction-strong") var(--material-floating-filter);
+  }
+
+  body[data-ui-skin="liquid-glass"] .network-panel {
+    box-shadow: var(--material-overlay-panel-shadow), inset 1px 0 0 var(--liquid-glass-edge-cool-soft), inset -1px 0 0 var(--liquid-glass-edge-warm-soft);
+    backdrop-filter: url("#liquid-glass-refraction-soft") var(--material-floating-filter);
+    -webkit-backdrop-filter: url("#liquid-glass-refraction-soft") var(--material-floating-filter);
+  }
+
+  @media (max-width: 799.98px) {
+    body[data-ui-skin="liquid-glass"] .entry-display {
+      backdrop-filter: url("#liquid-glass-refraction-soft") var(--material-entry-detail-mobile-filter);
+      -webkit-backdrop-filter: url("#liquid-glass-refraction-soft") var(--material-entry-detail-mobile-filter);
+    }
+  }
+}
+
+body[data-ui-skin="liquid-glass"] :where(
+  .entry-search-config-menu,
+  .entry-filter-menu,
+  .source-suggestions,
+  .entry-context-menu,
+  .skin-picker-menu,
+  .modal-panel,
+  .network-panel
+)[data-liquid-glass-pointer] {
+  --liquid-glass-caustic-opacity: 0;
+  --liquid-glass-caustic-alpha: 0.16;
+  --liquid-glass-edge-glint-alpha: 0.2;
+  --liquid-glass-caustic-radius: 250px;
+  --liquid-glass-edge-glint-span: 170px;
+  background:
+    radial-gradient(ellipse var(--liquid-glass-edge-glint-span) 10px at var(--liquid-glass-pointer-x, 50%) 0%, rgb(255 255 255 / calc(var(--liquid-glass-caustic-opacity) * var(--liquid-glass-edge-glint-alpha) * var(--liquid-glass-edge-top, 0))) 0%, rgb(79 226 216 / calc(var(--liquid-glass-caustic-opacity) * var(--liquid-glass-edge-glint-alpha) * var(--liquid-glass-edge-top, 0) * 0.48)) 38%, transparent 100%),
+    radial-gradient(ellipse 10px var(--liquid-glass-edge-glint-span) at 100% var(--liquid-glass-pointer-y, 50%), rgb(255 255 255 / calc(var(--liquid-glass-caustic-opacity) * var(--liquid-glass-edge-glint-alpha) * var(--liquid-glass-edge-right, 0))) 0%, rgb(199 137 238 / calc(var(--liquid-glass-caustic-opacity) * var(--liquid-glass-edge-glint-alpha) * var(--liquid-glass-edge-right, 0) * 0.42)) 38%, transparent 100%),
+    radial-gradient(ellipse var(--liquid-glass-edge-glint-span) 10px at var(--liquid-glass-pointer-x, 50%) 100%, rgb(255 255 255 / calc(var(--liquid-glass-caustic-opacity) * var(--liquid-glass-edge-glint-alpha) * var(--liquid-glass-edge-bottom, 0))) 0%, rgb(199 137 238 / calc(var(--liquid-glass-caustic-opacity) * var(--liquid-glass-edge-glint-alpha) * var(--liquid-glass-edge-bottom, 0) * 0.42)) 38%, transparent 100%),
+    radial-gradient(ellipse 10px var(--liquid-glass-edge-glint-span) at 0% var(--liquid-glass-pointer-y, 50%), rgb(255 255 255 / calc(var(--liquid-glass-caustic-opacity) * var(--liquid-glass-edge-glint-alpha) * var(--liquid-glass-edge-left, 0))) 0%, rgb(79 226 216 / calc(var(--liquid-glass-caustic-opacity) * var(--liquid-glass-edge-glint-alpha) * var(--liquid-glass-edge-left, 0) * 0.48)) 38%, transparent 100%),
+    radial-gradient(circle var(--liquid-glass-caustic-radius) at var(--liquid-glass-pointer-x, 50%) var(--liquid-glass-pointer-y, 50%), rgb(255 255 255 / calc(var(--liquid-glass-caustic-opacity) * var(--liquid-glass-caustic-alpha))) 0%, rgb(93 226 216 / calc(var(--liquid-glass-caustic-opacity) * var(--liquid-glass-caustic-alpha) * 0.58)) 25%, rgb(195 137 235 / calc(var(--liquid-glass-caustic-opacity) * var(--liquid-glass-caustic-alpha) * 0.24)) 43%, transparent 72%),
+    var(--liquid-glass-pointer-surface);
+  transition: --liquid-glass-caustic-opacity 180ms ease-out;
+}
+
+body[data-ui-skin="liquid-glass"] :where(
+  .entry-search-config-menu,
+  .entry-filter-menu,
+  .source-suggestions,
+  .entry-context-menu,
+  .skin-picker-menu
+)[data-liquid-glass-pointer] {
+  --liquid-glass-pointer-surface: var(--material-floating-background);
+}
+
+body[data-ui-skin="liquid-glass"] :where(
+  .modal-panel,
+  .network-panel
+)[data-liquid-glass-pointer] {
+  --liquid-glass-pointer-surface: var(--material-overlay-panel-background);
+}
+
+body[data-ui-skin="liquid-glass"] .network-panel[data-liquid-glass-pointer] {
+  --liquid-glass-caustic-alpha: 0.1;
+  --liquid-glass-edge-glint-alpha: 0.12;
+  --liquid-glass-caustic-radius: 460px;
+  --liquid-glass-edge-glint-span: 260px;
+}
+
+body.dark-theme[data-ui-skin="liquid-glass"] :where(
+  .entry-search-config-menu,
+  .entry-filter-menu,
+  .source-suggestions,
+  .entry-context-menu,
+  .skin-picker-menu,
+  .modal-panel
+)[data-liquid-glass-pointer] {
+  --liquid-glass-caustic-alpha: 0.11;
+  --liquid-glass-edge-glint-alpha: 0.15;
+}
+
+body.dark-theme[data-ui-skin="liquid-glass"] .network-panel[data-liquid-glass-pointer] {
+  --liquid-glass-caustic-alpha: 0.065;
+  --liquid-glass-edge-glint-alpha: 0.08;
+}
+
+body[data-ui-skin="liquid-glass"] [data-liquid-glass-pointer="active"] {
+  --liquid-glass-caustic-opacity: 1;
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
@@ -289,6 +420,52 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {
     --material-rich-tooltip-background: #102027;
     --material-overlay-panel-background: #102027;
   }
+
+  body[data-ui-skin="liquid-glass"] .entry-display {
+    box-shadow: var(--material-entry-detail-shadow);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  body[data-ui-skin="liquid-glass"] .mobile-app-bar {
+    box-shadow: var(--material-mobile-bar-shadow);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  body[data-ui-skin="liquid-glass"] :is(
+    .entry-search-config-menu,
+    .entry-filter-menu,
+    .source-suggestions,
+    .entry-context-menu,
+    .skin-picker-menu,
+    .app-tooltip.chip-list-tooltip,
+    .app-tooltip.tag-info-tooltip,
+    .app-tooltip.rich-tooltip,
+    .modal-panel
+  ) {
+    box-shadow: var(--material-floating-shadow);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  body[data-ui-skin="liquid-glass"] .network-panel {
+    box-shadow: var(--material-overlay-panel-shadow);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  body[data-ui-skin="liquid-glass"] [data-liquid-glass-pointer] {
+    --liquid-glass-caustic-opacity: 0;
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-ui-skin="liquid-glass"] [data-liquid-glass-pointer] {
+    --liquid-glass-caustic-opacity: 0;
+    transition: none;
+  }
 }
 
 @media (forced-colors: active) {
@@ -371,5 +548,29 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {
     border-color: Highlight;
     background: Canvas;
     color: CanvasText;
+  }
+
+  body[data-ui-skin="liquid-glass"] :is(
+    .entry-display,
+    .mobile-app-bar,
+    .entry-search-config-menu,
+    .entry-filter-menu,
+    .source-suggestions,
+    .entry-context-menu,
+    .skin-picker-menu,
+    .app-tooltip.chip-list-tooltip,
+    .app-tooltip.tag-info-tooltip,
+    .app-tooltip.rich-tooltip,
+    .modal-panel,
+    .network-panel
+  ) {
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  body[data-ui-skin="liquid-glass"] [data-liquid-glass-pointer] {
+    --liquid-glass-caustic-opacity: 0;
+    transition: none;
   }
 }

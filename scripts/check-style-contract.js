@@ -117,17 +117,76 @@ assert(
   /@media \(forced-colors: active\)/.test(liquidGlass),
   "Liquid Glass must provide a forced-colors fallback",
 );
-assert(
-  !/(?:entry-card|analysis-card|table-row|td|th)[^{]*\{[^}]*backdrop-filter/is.test(liquidGlass),
+const liquidGlassStyleBlocks = [...liquidGlass.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+  .map((match) => ({ selector: match[1].trim(), declarations: match[2] }));
+const repeatedSurfaceSelectorPattern = /(?:^|[\s,>+~])(?:\.entry-card|\.analysis-card|\.table-row|td|th)(?:$|[\s,:.#\[>+~])/i;
+assert.deepEqual(
+  liquidGlassStyleBlocks
+    .filter(({ selector, declarations }) => (
+      repeatedSurfaceSelectorPattern.test(selector) && /backdrop-filter\s*:/.test(declarations)
+    ))
+    .map(({ selector }) => selector),
+  [],
   "Repeated content surfaces must not receive Liquid Glass backdrop blur",
 );
 assert(
   !/(?:transition|animation)[^;]*(?:backdrop-filter|blur\(|box-shadow)/i.test(liquidGlass),
   "Liquid Glass must not animate blur or large material shadows",
 );
+const liquidGlassFilterDefs = index.match(
+  /<svg id="liquidGlassFilterDefs"[\s\S]*?<\/svg>/,
+);
+assert(liquidGlassFilterDefs, "LQ-2 must provide page-level SVG filter definitions");
+assert.equal(
+  (liquidGlassFilterDefs[0].match(/<filter id="liquid-glass-refraction-(?:soft|strong)"/g) || []).length,
+  2,
+  "LQ-2 must define exactly one soft and one strong refraction filter",
+);
+assert.equal(
+  (liquidGlassFilterDefs[0].match(/<feDisplacementMap\b/g) || []).length,
+  2,
+  "Each Liquid Glass filter must contain one displacement stage",
+);
 assert(
-  !/(?:feDisplacementMap|liquid-glass-refraction|backdrop-filter\s*:\s*url\()/i.test(liquidGlass),
-  "LQ-1 must remain token-only without SVG refraction",
+  liquidGlassFilterDefs[0].includes('id="liquid-glass-refraction-soft"')
+    && liquidGlassFilterDefs[0].includes('scale="6"')
+    && liquidGlassFilterDefs[0].includes('id="liquid-glass-refraction-strong"')
+    && liquidGlassFilterDefs[0].includes('scale="14"'),
+  "LQ-2 soft and strong filters must retain bounded, distinct displacement scales",
+);
+assert(
+  /@supports \(\(backdrop-filter: url\("#liquid-glass-refraction-soft"\)\) or \(-webkit-backdrop-filter: url\("#liquid-glass-refraction-soft"\)\)\)/.test(liquidGlass),
+  "Liquid Glass refraction must be a progressive enhancement behind a URL-filter support query",
+);
+assert(
+  /body\[data-ui-skin="liquid-glass"\] :is\([\s\S]*?\.app-tooltip\.chip-list-tooltip,[\s\S]*?\.app-tooltip\.tag-info-tooltip,[\s\S]*?\.app-tooltip\.rich-tooltip[\s\S]*?\) \{[\s\S]*?liquid-glass-refraction-strong/.test(liquidGlass),
+  "Structured tooltip refraction must outrank the shared two-class tooltip material rule",
+);
+for (const selector of [
+  ".entry-display",
+  ".mobile-app-bar",
+  ".entry-search-config-menu:not([hidden])",
+  ".entry-filter-menu:not([hidden])",
+  ".source-suggestions:not([hidden])",
+  ".entry-context-menu:not([hidden])",
+  ".skin-picker-menu:not([hidden])",
+  ".app-tooltip.chip-list-tooltip",
+  ".app-tooltip.tag-info-tooltip",
+  ".app-tooltip.rich-tooltip",
+  ".modal-panel",
+  ".network-panel",
+]) {
+  assert(liquidGlass.includes(selector), `LQ-2 refraction allowlist must include ${selector}`);
+}
+assert.deepEqual(
+  liquidGlassStyleBlocks
+    .filter(({ selector, declarations }) => (
+      /(?:^|[\s,>+~])(?:\.entry-card|\.analysis-card|\.table-row|\.network-node)(?:$|[\s,:.#\[>+~])/i.test(selector)
+        && /liquid-glass-refraction/.test(declarations)
+    ))
+    .map(({ selector }) => selector),
+  [],
+  "Repeated surfaces must not receive Liquid Glass SVG refraction",
 );
 assert(
   /@supports not \(\(backdrop-filter: blur\(1px\)\) or \(-webkit-backdrop-filter: blur\(1px\)\)\)/.test(layeredGlass),
@@ -214,10 +273,31 @@ assert(
     && numericLayer("--layer-floating-menu") < numericLayer("--layer-network-overlay"),
   "Top-level floating menus must render above mobile drawers and below full overlays",
 );
-assert(
-  pointerTargetContract[1].includes("skin-picker-menu"),
-  "The floating skin selector must participate in the LG-4C pointer response",
-);
+for (const requiredTarget of [
+  "entry-search-config-menu",
+  "entry-filter-menu",
+  "source-suggestions",
+  "entry-context-menu",
+  "skin-picker-menu",
+  "modal-panel",
+  "network-panel",
+]) {
+  assert(
+    pointerTargetContract[1].includes(requiredTarget),
+    `LG-4C pointer allowlist must include ${requiredTarget}`,
+  );
+  assert(
+    pointerLightingRule[0].includes(`.${requiredTarget}`),
+    `LG-4C pointer styling must include ${requiredTarget}`,
+  );
+}
+for (const floatingTarget of ["source-suggestions", "entry-context-menu"]) {
+  assert.equal(
+    (layeredGlass.match(new RegExp(`\\.${floatingTarget}\\b`, "g")) || []).length,
+    3,
+    `LG-4C floating pointer styling must cover ${floatingTarget} in base, surface, and dark rules`,
+  );
+}
 assert(
   !pointerTargetContract[1].includes("dictionary-panel"),
   "LG-4C pointer response must remain limited to popup surfaces",
@@ -243,12 +323,78 @@ for (const edge of ["top", "right", "bottom", "left"]) {
   assert(app.includes(`--layered-glass-edge-${edge}`), `LG-4C.1 must calculate ${edge} edge proximity`);
 }
 for (const mediaQueryName of [
-  "layeredGlassFinePointerMediaQuery",
-  "layeredGlassReducedMotionMediaQuery",
-  "layeredGlassReducedTransparencyMediaQuery",
-  "layeredGlassForcedColorsMediaQuery",
+  "glassFinePointerMediaQuery",
+  "glassReducedMotionMediaQuery",
+  "glassReducedTransparencyMediaQuery",
+  "glassForcedColorsMediaQuery",
 ]) {
   assert(app.includes(mediaQueryName), `LG-4C must retain its ${mediaQueryName} guard`);
+}
+const liquidPointerLightingRule = liquidGlass.match(
+  /body\[data-ui-skin="liquid-glass"\] :where\([\s\S]*?\)\[data-liquid-glass-pointer\] \{([\s\S]*?)\n\}/,
+);
+assert(liquidPointerLightingRule, "LQ-3 must declare a bounded caustic rule");
+assert.equal(
+  (liquidPointerLightingRule[1].match(/radial-gradient\(/gi) || []).length,
+  5,
+  "LQ-3 may use only one broad caustic and four bounded edge glints",
+);
+assert(
+  liquidPointerLightingRule[1].includes("--liquid-glass-caustic-opacity: 0")
+    && liquidPointerLightingRule[1].includes("var(--liquid-glass-pointer-surface)"),
+  "LQ-3 must layer an idle caustic over the fixed material surface",
+);
+assert(
+  !/(?:backdrop-filter|liquid-glass-refraction)/.test(liquidPointerLightingRule[1]),
+  "LQ-3 pointer updates must not animate refraction or backdrop blur",
+);
+const liquidPointerTargetContract = app.match(/const LIQUID_GLASS_POINTER_TARGET_SELECTOR = \[([\s\S]*?)\]\.join\(", "\);/);
+assert(liquidPointerTargetContract, "LQ-3 must declare an explicit pointer-responsive surface allowlist");
+for (const requiredTarget of [
+  "entry-search-config-menu",
+  "entry-filter-menu",
+  "source-suggestions",
+  "entry-context-menu",
+  "skin-picker-menu",
+  "modal-panel",
+  "network-panel",
+]) {
+  assert(
+    liquidPointerTargetContract[1].includes(requiredTarget),
+    `LQ-3 pointer allowlist must include ${requiredTarget}`,
+  );
+}
+for (const forbiddenTarget of [
+  "entry-card",
+  "entry-display",
+  "analysis-card",
+  "table-row",
+  "network-node",
+  "mobile-app-bar",
+  "app-tooltip",
+]) {
+  assert(
+    !liquidPointerTargetContract[1].includes(forbiddenTarget),
+    `LQ-3 pointer response must not target ${forbiddenTarget}`,
+  );
+}
+assert(
+  /requestAnimationFrame\(flushLiquidGlassPointerEffect\)/.test(app),
+  "LQ-3 pointer updates must be coalesced through requestAnimationFrame",
+);
+assert(
+  app.includes('document.addEventListener("pointermove", handleDocumentPointerMove, { passive: true });')
+    && !app.includes('document.addEventListener("pointermove", scheduleLayeredGlassPointerEffect')
+    && !app.includes('document.addEventListener("pointermove", scheduleLiquidGlassPointerEffect'),
+  "Glass pointer effects must share one passive document-level pointermove dispatcher",
+);
+assert(
+  /event\.pointerType === "touch"/.test(app)
+    && /function liquidGlassPointerEffectsEnabled\(\)[\s\S]*glassFinePointerMediaQuery\.matches[\s\S]*!glassReducedMotionMediaQuery\.matches[\s\S]*!glassReducedTransparencyMediaQuery\.matches[\s\S]*!glassForcedColorsMediaQuery\.matches/.test(app),
+  "LQ-3 must disable caustics for touch, reduced motion, reduced transparency, and forced colors",
+);
+for (const edge of ["top", "right", "bottom", "left"]) {
+  assert(app.includes(`--liquid-glass-edge-${edge}`), `LQ-3 must calculate ${edge} edge proximity`);
 }
 assert(
   styles.includes("box-shadow: var(--material-navigation-control-hover-shadow);"),

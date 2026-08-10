@@ -27,6 +27,24 @@
         }
       })();
     </script>
+    <svg id="liquidGlassFilterDefs" width="0" height="0" aria-hidden="true" focusable="false" style="position: absolute; overflow: hidden; pointer-events: none">
+      <defs>
+        <filter id="liquid-glass-refraction-soft" x="-6%" y="-6%" width="112%" height="112%" color-interpolation-filters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.012 0.024" numOctaves="1" seed="7" stitchTiles="stitch" result="softNoise"></feTurbulence>
+          <feGaussianBlur in="softNoise" stdDeviation="0.75" result="softField"></feGaussianBlur>
+          <feDisplacementMap in="SourceGraphic" in2="softField" scale="6" xChannelSelector="R" yChannelSelector="G" result="softDisplaced"></feDisplacementMap>
+          <feGaussianBlur in="softDisplaced" stdDeviation="0.12" result="softened"></feGaussianBlur>
+          <feColorMatrix in="softened" type="saturate" values="1.06"></feColorMatrix>
+        </filter>
+        <filter id="liquid-glass-refraction-strong" x="-9%" y="-9%" width="118%" height="118%" color-interpolation-filters="sRGB">
+          <feTurbulence type="fractalNoise" baseFrequency="0.009 0.018" numOctaves="2" seed="19" stitchTiles="stitch" result="strongNoise"></feTurbulence>
+          <feGaussianBlur in="strongNoise" stdDeviation="0.6" result="strongField"></feGaussianBlur>
+          <feDisplacementMap in="SourceGraphic" in2="strongField" scale="14" xChannelSelector="R" yChannelSelector="G" result="strongDisplaced"></feDisplacementMap>
+          <feGaussianBlur in="strongDisplaced" stdDeviation="0.22" result="strongSoftened"></feGaussianBlur>
+          <feColorMatrix in="strongSoftened" type="saturate" values="1.12"></feColorMatrix>
+        </filter>
+      </defs>
+    </svg>
     <div class="app-shell" id="appShell" data-nav-state="expanded" data-browser-state="expanded" data-nav-drawer="closed" data-browser-drawer="closed">
       <header class="mobile-app-bar" id="mobileAppBar">
         <button class="mobile-app-bar-button" id="mobileNavButton" type="button" aria-controls="appNav" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="openToolNavigation" aria-label="打开工具导航">
