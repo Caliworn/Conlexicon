@@ -57,7 +57,10 @@ const layeredGlassPointerExitTimers = new WeakMap();
 let layeredGlassPointerTarget = null;
 let layeredGlassPointerFrame = 0;
 let pendingLayeredGlassPointer = null;
-const LIQUID_GLASS_POINTER_TARGET_SELECTOR = [
+const LIQUID_GLASS_LIGHT_TARGET_SELECTOR = [
+  ".dictionary-panel",
+  ".mobile-app-bar",
+  ".entry-display",
   ".entry-search-config-menu",
   ".entry-filter-menu",
   ".source-suggestions",
@@ -66,11 +69,11 @@ const LIQUID_GLASS_POINTER_TARGET_SELECTOR = [
   ".modal-panel",
   ".network-panel",
 ].join(", ");
-const LIQUID_GLASS_POINTER_EXIT_MS = 180;
-const liquidGlassPointerExitTimers = new WeakMap();
-let liquidGlassPointerTarget = null;
-let liquidGlassPointerFrame = 0;
-let pendingLiquidGlassPointer = null;
+const LIQUID_GLASS_LIGHT_EXIT_MS = 180;
+const liquidGlassLightExitTimers = new WeakMap();
+let liquidGlassLightTarget = null;
+let liquidGlassLightFrame = 0;
+let pendingLiquidGlassLight = null;
 const SKIN_OPTIONS = [
   { id: "classic", labelKey: "classicSkin" },
   { id: "layered-glass", labelKey: "layeredGlassSkin" },
@@ -1983,6 +1986,7 @@ function appInfoDialog(title, options = {}) {
   elements.infoDialogTitle.textContent = title;
   elements.infoDialogBody.innerHTML = options.html || infoDialogTextHtml(options.text);
   elements.infoDialog.hidden = false;
+  liquidGlassOpticalEngine?.registerMappedSurface(elements.infoDialog.querySelector(".modal-panel"));
   elements.closeInfoDialogButton.focus();
 }
 
@@ -2002,6 +2006,7 @@ function appConfirm(message, options = {}) {
     elements.confirmAcceptButton.classList.toggle("danger-button", Boolean(options.danger));
     elements.confirmAcceptButton.classList.toggle("primary-button", !options.danger);
     elements.confirmDialog.hidden = false;
+    liquidGlassOpticalEngine?.registerMappedSurface(elements.confirmDialog.querySelector(".modal-panel"));
     elements.confirmAcceptButton.focus();
   });
 }
@@ -2023,6 +2028,7 @@ function appEditSwitchPrompt(message) {
     elements.confirmAcceptButton.classList.remove("danger-button");
     elements.confirmAcceptButton.classList.add("primary-button");
     elements.confirmDialog.hidden = false;
+    liquidGlassOpticalEngine?.registerMappedSurface(elements.confirmDialog.querySelector(".modal-panel"));
     elements.confirmAcceptButton.focus();
   });
 }
@@ -3153,6 +3159,7 @@ function render(options = {}) {
   renderActiveView(options);
   restoreProcessScroll();
   scheduleEntryBrowserHeightUpdate();
+  liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
 
 function renderLocaleChange() {
@@ -3170,12 +3177,14 @@ function renderLocaleChange() {
   renderLocaleActiveView();
   restoreProcessScroll();
   scheduleEntryBrowserHeightUpdate();
+  liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
 
 function renderAppearanceChange() {
   hideAppTooltip();
   applyAppearance();
   applyLocale();
+  liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
 
 function renderActiveView(options = {}) {
@@ -3468,7 +3477,7 @@ function setSkinPickerOpen(open, focusMenu = false) {
   elements.skinToggleButton.setAttribute("aria-expanded", String(skinPickerOpen));
   elements.skinPickerMenu.hidden = !skinPickerOpen;
   if (!skinPickerOpen) {
-    resetGlassPointerEffects();
+    resetGlassInteractiveEffects();
     return;
   }
   hideAppTooltip();
@@ -3580,8 +3589,8 @@ function applyAppearance() {
   if (!layeredGlassPointerEffectsEnabled()) {
     resetLayeredGlassPointerEffect(true);
   }
-  if (!liquidGlassPointerEffectsEnabled()) {
-    resetLiquidGlassPointerEffect(true);
+  if (!liquidGlassLightEffectsEnabled()) {
+    resetLiquidGlassLightEffect(true);
   }
   liquidGlassOpticalEngine?.setEnabled(currentSkin === "liquid-glass");
 }
@@ -3699,141 +3708,151 @@ function scheduleLayeredGlassPointerEffect(event) {
   }
 }
 
-function liquidGlassPointerEffectsEnabled() {
+function liquidGlassLightEffectsEnabled() {
   return document.body.dataset.uiSkin === "liquid-glass"
+    && document.body.dataset.liquidGlassOpticsQuality === "q3"
     && glassFinePointerMediaQuery.matches
     && !glassReducedMotionMediaQuery.matches
     && !glassReducedTransparencyMediaQuery.matches
     && !glassForcedColorsMediaQuery.matches;
 }
 
-function clearLiquidGlassPointerTarget(target, immediate = false) {
+function clearLiquidGlassLightTarget(target, immediate = false) {
   if (!target) {
     return;
   }
-  const existingTimer = liquidGlassPointerExitTimers.get(target);
+  const existingTimer = liquidGlassLightExitTimers.get(target);
   if (existingTimer) {
     clearTimeout(existingTimer);
-    liquidGlassPointerExitTimers.delete(target);
+    liquidGlassLightExitTimers.delete(target);
   }
   const clearStyles = () => {
-    target.removeAttribute("data-liquid-glass-pointer");
-    target.style.removeProperty("--liquid-glass-pointer-x");
-    target.style.removeProperty("--liquid-glass-pointer-y");
-    target.style.removeProperty("--liquid-glass-edge-top");
-    target.style.removeProperty("--liquid-glass-edge-right");
-    target.style.removeProperty("--liquid-glass-edge-bottom");
-    target.style.removeProperty("--liquid-glass-edge-left");
+    target.removeAttribute("data-liquid-glass-light");
+    target.style.removeProperty("--liquid-glass-light-origin-x");
+    target.style.removeProperty("--liquid-glass-light-origin-y");
+    target.style.removeProperty("--liquid-glass-light-vector-x");
+    target.style.removeProperty("--liquid-glass-light-vector-y");
+    target.style.removeProperty("--liquid-glass-light-angle");
   };
   if (immediate || !target.isConnected) {
     clearStyles();
     return;
   }
-  target.dataset.liquidGlassPointer = "idle";
+  target.dataset.liquidGlassLight = "idle";
   const timer = setTimeout(() => {
-    liquidGlassPointerExitTimers.delete(target);
-    if (target.dataset.liquidGlassPointer === "idle") {
+    liquidGlassLightExitTimers.delete(target);
+    if (target.dataset.liquidGlassLight === "idle") {
       clearStyles();
     }
-  }, LIQUID_GLASS_POINTER_EXIT_MS);
-  liquidGlassPointerExitTimers.set(target, timer);
+  }, LIQUID_GLASS_LIGHT_EXIT_MS);
+  liquidGlassLightExitTimers.set(target, timer);
 }
 
-function resetLiquidGlassPointerEffect(immediate = false) {
-  if (liquidGlassPointerFrame) {
-    cancelAnimationFrame(liquidGlassPointerFrame);
-    liquidGlassPointerFrame = 0;
+function resetLiquidGlassLightEffect(immediate = false) {
+  if (liquidGlassLightFrame) {
+    cancelAnimationFrame(liquidGlassLightFrame);
+    liquidGlassLightFrame = 0;
   }
-  pendingLiquidGlassPointer = null;
-  clearLiquidGlassPointerTarget(liquidGlassPointerTarget, immediate);
-  liquidGlassPointerTarget = null;
+  pendingLiquidGlassLight = null;
+  clearLiquidGlassLightTarget(liquidGlassLightTarget, immediate);
+  liquidGlassLightTarget = null;
+  liquidGlassOpticalEngine?.resetLightVector();
 }
 
-function flushLiquidGlassPointerEffect() {
-  liquidGlassPointerFrame = 0;
-  const pending = pendingLiquidGlassPointer;
-  pendingLiquidGlassPointer = null;
-  if (!pending || !pending.target.isConnected || !liquidGlassPointerEffectsEnabled()) {
-    resetLiquidGlassPointerEffect();
+function flushLiquidGlassLightEffect() {
+  liquidGlassLightFrame = 0;
+  const pending = pendingLiquidGlassLight;
+  pendingLiquidGlassLight = null;
+  if (!pending || !pending.target.isConnected || !liquidGlassLightEffectsEnabled()) {
+    resetLiquidGlassLightEffect();
     return;
   }
 
   const bounds = pending.target.getBoundingClientRect();
   if (!bounds.width || !bounds.height) {
-    resetLiquidGlassPointerEffect();
+    resetLiquidGlassLightEffect();
     return;
   }
-  if (liquidGlassPointerTarget && liquidGlassPointerTarget !== pending.target) {
-    resetLiquidGlassPointerEffect();
+  if (liquidGlassLightTarget && liquidGlassLightTarget !== pending.target) {
+    resetLiquidGlassLightEffect();
   }
 
   const normalizedX = Math.max(0, Math.min(1, (pending.clientX - bounds.left) / bounds.width));
   const normalizedY = Math.max(0, Math.min(1, (pending.clientY - bounds.top) / bounds.height));
-  const pointerX = Math.round(normalizedX * 200) / 2;
-  const pointerY = Math.round(normalizedY * 200) / 2;
-  const edgeReach = 72;
-  const edgeStrength = (distance) => (
-    Math.round(Math.max(0, Math.min(1, 1 - distance / edgeReach)) * 50) / 50
-  );
-  liquidGlassPointerTarget = pending.target;
-  const exitTimer = liquidGlassPointerExitTimers.get(liquidGlassPointerTarget);
+  const originX = Math.round(normalizedX * 200) / 2;
+  const originY = Math.round(normalizedY * 200) / 2;
+  let vectorX = normalizedX * 2 - 1;
+  let vectorY = normalizedY * 2 - 1;
+  const vectorLength = Math.hypot(vectorX, vectorY);
+  if (vectorLength < 0.08) {
+    vectorX = -0.55;
+    vectorY = -0.84;
+  } else {
+    vectorX /= vectorLength;
+    vectorY /= vectorLength;
+  }
+  vectorX = Math.round(vectorX * 1000) / 1000;
+  vectorY = Math.round(vectorY * 1000) / 1000;
+  const lightAngle = Math.round((Math.atan2(vectorY, vectorX) * 180 / Math.PI + 450) % 360);
+  liquidGlassLightTarget = pending.target;
+  const exitTimer = liquidGlassLightExitTimers.get(liquidGlassLightTarget);
   if (exitTimer) {
     clearTimeout(exitTimer);
-    liquidGlassPointerExitTimers.delete(liquidGlassPointerTarget);
+    liquidGlassLightExitTimers.delete(liquidGlassLightTarget);
   }
-  liquidGlassPointerTarget.dataset.liquidGlassPointer = "active";
-  liquidGlassPointerTarget.style.setProperty("--liquid-glass-pointer-x", `${pointerX}%`);
-  liquidGlassPointerTarget.style.setProperty("--liquid-glass-pointer-y", `${pointerY}%`);
-  liquidGlassPointerTarget.style.setProperty("--liquid-glass-edge-top", edgeStrength(pending.clientY - bounds.top));
-  liquidGlassPointerTarget.style.setProperty("--liquid-glass-edge-right", edgeStrength(bounds.right - pending.clientX));
-  liquidGlassPointerTarget.style.setProperty("--liquid-glass-edge-bottom", edgeStrength(bounds.bottom - pending.clientY));
-  liquidGlassPointerTarget.style.setProperty("--liquid-glass-edge-left", edgeStrength(pending.clientX - bounds.left));
+  liquidGlassLightTarget.dataset.liquidGlassLight = "active";
+  liquidGlassLightTarget.style.setProperty("--liquid-glass-light-origin-x", `${originX}%`);
+  liquidGlassLightTarget.style.setProperty("--liquid-glass-light-origin-y", `${originY}%`);
+  liquidGlassLightTarget.style.setProperty("--liquid-glass-light-vector-x", vectorX);
+  liquidGlassLightTarget.style.setProperty("--liquid-glass-light-vector-y", vectorY);
+  liquidGlassLightTarget.style.setProperty("--liquid-glass-light-angle", `${lightAngle}deg`);
+  liquidGlassOpticalEngine?.setLightVector(vectorX, vectorY, 1.08);
 }
 
-function scheduleLiquidGlassPointerEffect(event) {
-  if (!liquidGlassPointerEffectsEnabled() || event.pointerType === "touch") {
-    resetLiquidGlassPointerEffect();
+function scheduleLiquidGlassLightEffect(event) {
+  if (!liquidGlassLightEffectsEnabled() || event.pointerType === "touch") {
+    resetLiquidGlassLightEffect();
     return;
   }
   const target = event.target instanceof Element
-    ? event.target.closest(LIQUID_GLASS_POINTER_TARGET_SELECTOR)
+    ? event.target.closest(LIQUID_GLASS_LIGHT_TARGET_SELECTOR)
     : null;
   if (!target) {
-    resetLiquidGlassPointerEffect();
+    resetLiquidGlassLightEffect();
     return;
   }
-  pendingLiquidGlassPointer = {
+  pendingLiquidGlassLight = {
     target,
     clientX: event.clientX,
     clientY: event.clientY,
   };
-  if (!liquidGlassPointerFrame) {
-    liquidGlassPointerFrame = requestAnimationFrame(flushLiquidGlassPointerEffect);
+  if (!liquidGlassLightFrame) {
+    liquidGlassLightFrame = requestAnimationFrame(flushLiquidGlassLightEffect);
   }
 }
 
-function resetGlassPointerEffects(immediate = false) {
+function resetGlassInteractiveEffects(immediate = false) {
   resetLayeredGlassPointerEffect(immediate);
-  resetLiquidGlassPointerEffect(immediate);
+  resetLiquidGlassLightEffect(immediate);
 }
 
-function scheduleGlassPointerEffect(event) {
+function scheduleGlassInteractiveEffect(event) {
   if (document.body.dataset.uiSkin === "layered-glass") {
-    resetLiquidGlassPointerEffect(true);
+    resetLiquidGlassLightEffect(true);
     scheduleLayeredGlassPointerEffect(event);
     return;
   }
   if (document.body.dataset.uiSkin === "liquid-glass") {
     resetLayeredGlassPointerEffect(true);
-    scheduleLiquidGlassPointerEffect(event);
+    scheduleLiquidGlassLightEffect(event);
     return;
   }
-  resetGlassPointerEffects(true);
+  resetGlassInteractiveEffects(true);
 }
 
 function handleDocumentPointerMove(event) {
   syncAppTooltipVisibility(event);
-  scheduleGlassPointerEffect(event);
+  scheduleGlassInteractiveEffect(event);
 }
 
 function mobileShellMode() {
@@ -4127,6 +4146,7 @@ function showAppTooltip(target) {
   elements.appTooltip.classList.toggle("tag-info-tooltip", target.dataset.appTooltipVariant === "tag-info");
   elements.appTooltip.classList.toggle("rich-tooltip", target.dataset.appTooltipVariant === "rich");
   elements.appTooltip.hidden = false;
+  liquidGlassOpticalEngine?.registerMappedSurface(elements.appTooltip);
   target.setAttribute("aria-describedby", "appTooltip");
   requestAnimationFrame(() => {
     if (activeAppTooltipTarget !== target || elements.appTooltip.hidden) {
@@ -4163,6 +4183,7 @@ function hideAppTooltip() {
     activeAppTooltipTarget.removeAttribute("aria-describedby");
   }
   activeAppTooltipTarget = null;
+  liquidGlassOpticalEngine?.unregisterMappedSurface(elements.appTooltip);
   elements.appTooltip.classList.remove("wrap");
   elements.appTooltip.classList.remove("chip-list-tooltip");
   elements.appTooltip.classList.remove("tag-info-tooltip");
@@ -7183,6 +7204,7 @@ function closeEntryContextMenu() {
     return;
   }
   activeEntryContextMenu.cleanup?.forEach((cleanup) => cleanup());
+  liquidGlassOpticalEngine?.unregisterMappedSurface(activeEntryContextMenu.element);
   activeEntryContextMenu.element.remove();
   activeEntryContextMenu = null;
 }
@@ -7234,6 +7256,7 @@ function showEntryContextMenu(event, entry, options = {}) {
     menu.append(button);
   });
   document.body.append(menu);
+  liquidGlassOpticalEngine?.registerMappedSurface(menu);
   positionEntryContextMenu(menu, event.clientX, event.clientY);
 
   const closeOnPointerDown = (pointerEvent) => {
@@ -8968,6 +8991,7 @@ function renderLexicalNetwork() {
   if (!networkOpen) {
     return;
   }
+  liquidGlassOpticalEngine?.registerMappedSurface(elements.lexicalNetworkPanel);
 
   const dictionary = activeDictionary();
   const entry = networkScene.nodes.get(networkEntryId)?.entry
@@ -12472,6 +12496,7 @@ function bindSourceAutocompleteInput(input) {
   if (!input) {
     return;
   }
+  liquidGlassOpticalEngine?.registerMappedSurface(sourceAutocompleteBoxForInput(input));
   input.addEventListener("keydown", handleSourceAutocompleteKeydown);
   input.addEventListener("input", () => {
     sourceSuggestionIndex = 0;
@@ -16371,6 +16396,22 @@ elements.entryList.addEventListener("pointerover", (event) => {
     return;
   }
   updateEntryQualityIssueTooltipPlacement(issue);
+  liquidGlassOpticalEngine?.registerMappedSurface(
+    issue.querySelector(".entry-quality-issue-tooltip"),
+  );
+});
+elements.entryList.addEventListener("pointerout", (event) => {
+  const issue = event.target instanceof Element ? event.target.closest(".entry-quality-issue") : null;
+  if (
+    !issue
+    || !elements.entryList.contains(issue)
+    || (event.relatedTarget instanceof Node && issue.contains(event.relatedTarget))
+  ) {
+    return;
+  }
+  liquidGlassOpticalEngine?.unregisterMappedSurface(
+    issue.querySelector(".entry-quality-issue-tooltip"),
+  );
 });
 elements.entryList.addEventListener("scroll", updateHoveredEntryQualityIssueTooltipPlacement, { passive: true });
 
@@ -16401,18 +16442,18 @@ document.addEventListener("keydown", () => {
   delete document.body.dataset.inputModality;
 }, { capture: true });
 document.addEventListener("pointercancel", hideAppTooltip);
-document.addEventListener("pointercancel", resetGlassPointerEffects);
+document.addEventListener("pointercancel", resetGlassInteractiveEffects);
 document.addEventListener("mouseleave", () => {
   hideAppTooltip();
-  resetGlassPointerEffects();
+  resetGlassInteractiveEffects();
 });
 window.addEventListener("blur", () => {
   hideAppTooltip();
-  resetGlassPointerEffects(true);
+  resetGlassInteractiveEffects(true);
 });
 window.addEventListener("resize", () => {
   hideAppTooltip();
-  resetGlassPointerEffects(true);
+  resetGlassInteractiveEffects(true);
   setSkinPickerOpen(false);
 });
 window.addEventListener("scroll", hideAppTooltip, { passive: true });
@@ -16424,7 +16465,7 @@ document.addEventListener("scroll", (event) => {
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     hideAppTooltip();
-    resetGlassPointerEffects(true);
+    resetGlassInteractiveEffects(true);
     setSkinPickerOpen(false);
   }
 });
@@ -16434,7 +16475,7 @@ document.addEventListener("visibilitychange", () => {
   glassReducedTransparencyMediaQuery,
   glassForcedColorsMediaQuery,
 ].forEach((mediaQuery) => mediaQuery.addEventListener("change", () => {
-  resetGlassPointerEffects(true);
+  resetGlassInteractiveEffects(true);
   liquidGlassOpticalEngine?.setEnabled(currentSkin === "liquid-glass");
 }));
 document.addEventListener("focusin", (event) => {

@@ -6,6 +6,8 @@
 
 ### 改进
 
+- 完成液态玻璃 LQ-6 旧光学路径收束：动态 filter 以几何位移图分别采样并重组 R/G/B，法线/rim 图与跨表面统一光源向量实时合成 specular，指针移动只更新现有矩阵而不重建贴图；正式表面增加单层局部焦散、方向性白色 glint 与资源提交 settle。删除 LQ-2 soft/strong 固定滤镜、`feTurbulence`、静态 fallback、青紫 inset 色边，以及 LQ-3 五层焦散和旧 pointer 状态；等待、生成失败或无 URL filter 时直接保留普通 blur，辅助模式继续使用既有实色降级，不改变公共偏好或业务接口。
+- 完成液态玻璃 LQ-5 正式表面迁移：以引擎内唯一角色清单接入 continuous 导航、focus 当前词条、floating 菜单/来源建议/右键菜单/结构化 tooltip 与按需质量 tooltip，以及 modal/词汇网络；Q3 优先使用按实际尺寸生成的几何滤镜，LQ-2 固定滤镜只承担等待和 Q1 后备。临时与虚拟化表面显式注册/注销，micro 控件保持无逐项 backdrop 贴图的 CSS 体积材质，换皮肤与辅助模式会完整清理或关闭光学状态。
 - 完成液态玻璃 LQ-4 几何与滤镜引擎：新增支持四角圆角、bezel、厚度和 IOR 的确定性折射/高光模型，专用 Worker 优先以 OffscreenCanvas 生成 PNG 贴图，并以可取消的分块主线程 renderer 后备；内部引擎提供动态 SVG filter registry、引用计数字节 LRU、ResizeObserver 尺寸合并、generation token、Worker 懒加载和换皮肤完整清理。新增只由 `?liquid-glass-diagnostics=1` 开启的独立验收表面，Chromium 明暗主题均确认 Q3 几何折射生效，现有正式消费者仍保持 LQ-1–LQ-3，等待 LQ-5 迁移。
 - 冻结液态玻璃 LQ-4–LQ-7 全量光学重构设计：正常质量路径将从固定噪声位移升级为按表面尺寸、圆角、bezel、厚度和 IOR 生成的几何位移图与高光图，并通过独立 Worker、动态 SVG filter registry、字节预算 LRU 和角色化 surface registry 接入导航、当前词条、浮层、modal 与微型控件；同时明确参考项目的独立实现边界、结构化产品背景、RGB 边缘色散、光学分层、动态光照、辅助降级、共享模块影响和 LQ-4–LQ-7 分批验收。现有 LQ-1–LQ-3 保留为实施前基线及未来 Q1 降级，不代表最终视觉上限。
 - 补齐两套玻璃皮肤的同类表面覆盖：液态玻璃的 chip list、标签信息和 rich 三种结构化 app tooltip 统一使用 `strong` 静态 SVG 折射与青紫色散边缘，并在减少透明度和强制高对比模式下完整关闭；层叠玻璃将来源建议和右键菜单纳入既有 LG-4C 指针点光 allowlist，继续复用单一监听器、逐帧合并、150ms 淡出及触摸/辅助模式停用边界。
