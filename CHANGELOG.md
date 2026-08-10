@@ -6,6 +6,7 @@
 
 ### 改进
 
+- 校正液态玻璃 Q3 的正式光学主线：资源就绪表面现在只消费按实际几何生成的动态 URL filter，不再叠加角色级 `13–30px` 普通 blur；导航、抽屉、移动栏、当前词条、浮层、结构化 tooltip、modal 与词汇网络改用独立低透明中性 tint，并移除组件假渐变、固定方向彩色/明暗边、CSS radial/conic 假光、默认高光和 settle。当前方向性表现只来自 SVG 内的几何折射、RGB 色散与静态环境 specular；局部指针光照暂停至坐标模型另行设计。产品背景新增两层极弱固定交叉纤维参照，Q1 普通 blur、Q0 实色降级、micro 控件与 Q2 定义保持不变。
 - 完成液态玻璃 LQ-6 旧光学路径收束：动态 filter 以几何位移图分别采样并重组 R/G/B，法线/rim 图与跨表面统一光源向量实时合成 specular，指针移动只更新现有矩阵而不重建贴图；正式表面增加单层局部焦散、方向性白色 glint 与资源提交 settle。删除 LQ-2 soft/strong 固定滤镜、`feTurbulence`、静态 fallback、青紫 inset 色边，以及 LQ-3 五层焦散和旧 pointer 状态；等待、生成失败或无 URL filter 时直接保留普通 blur，辅助模式继续使用既有实色降级，不改变公共偏好或业务接口。
 - 完成液态玻璃 LQ-5 正式表面迁移：以引擎内唯一角色清单接入 continuous 导航、focus 当前词条、floating 菜单/来源建议/右键菜单/结构化 tooltip 与按需质量 tooltip，以及 modal/词汇网络；Q3 优先使用按实际尺寸生成的几何滤镜，LQ-2 固定滤镜只承担等待和 Q1 后备。临时与虚拟化表面显式注册/注销，micro 控件保持无逐项 backdrop 贴图的 CSS 体积材质，换皮肤与辅助模式会完整清理或关闭光学状态。
 - 完成液态玻璃 LQ-4 几何与滤镜引擎：新增支持四角圆角、bezel、厚度和 IOR 的确定性折射/高光模型，专用 Worker 优先以 OffscreenCanvas 生成 PNG 贴图，并以可取消的分块主线程 renderer 后备；内部引擎提供动态 SVG filter registry、引用计数字节 LRU、ResizeObserver 尺寸合并、generation token、Worker 懒加载和换皮肤完整清理。新增只由 `?liquid-glass-diagnostics=1` 开启的独立验收表面，Chromium 明暗主题均确认 Q3 几何折射生效，现有正式消费者仍保持 LQ-1–LQ-3，等待 LQ-5 迁移。

@@ -1,9 +1,3 @@
-@property --liquid-glass-light-opacity {
-  syntax: "<number>";
-  inherits: true;
-  initial-value: 0;
-}
-
 body[data-ui-skin="liquid-glass"] {
   color-scheme: light;
 
@@ -33,10 +27,10 @@ body[data-ui-skin="liquid-glass"] {
   --material-panel-soft-shadow: 0 15px 34px rgba(20, 43, 51, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.76), inset 0 -1px 0 rgba(58, 94, 103, 0.08);
   --material-card-shadow: 0 9px 24px rgba(20, 43, 51, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.72);
   --material-panel-filter: none;
-  --material-entry-detail-background: linear-gradient(137deg, rgba(255, 255, 255, 0.68) 0%, rgba(255, 255, 255, 0.18) 24%, transparent 50%), linear-gradient(318deg, rgba(74, 215, 207, 0.17) 0%, transparent 43%), linear-gradient(34deg, rgba(169, 120, 229, 0.11) 0%, transparent 40%), rgba(241, 249, 250, 0.53);
-  --material-entry-detail-mobile-background: linear-gradient(137deg, rgba(255, 255, 255, 0.68) 0%, rgba(255, 255, 255, 0.18) 24%, transparent 50%), linear-gradient(318deg, rgba(74, 215, 207, 0.14) 0%, transparent 43%), rgba(241, 249, 250, 0.68);
+  --material-entry-detail-background: rgba(241, 249, 250, 0.53);
+  --material-entry-detail-mobile-background: rgba(241, 249, 250, 0.68);
   --material-entry-detail-border: rgba(255, 255, 255, 0.78);
-  --material-entry-detail-shadow: 0 26px 68px rgba(14, 39, 48, 0.18), 0 4px 14px rgba(14, 39, 48, 0.1), inset 0 2px 1px rgba(255, 255, 255, 0.92), inset 0 -2px 1px rgba(47, 86, 96, 0.14);
+  --material-entry-detail-shadow: 0 26px 68px rgba(14, 39, 48, 0.18), 0 4px 14px rgba(14, 39, 48, 0.1);
   --material-entry-detail-filter: blur(20px) saturate(1.22) contrast(1.03);
   --material-entry-detail-mobile-filter: blur(13px) saturate(1.16);
   --material-entry-detail-section-background: rgba(249, 252, 252, 0.9);
@@ -52,18 +46,18 @@ body[data-ui-skin="liquid-glass"] {
   --material-control-filter: none;
   --material-inset-background: rgba(220, 233, 235, 0.68);
   --material-inset-border: rgba(72, 103, 112, 0.2);
-  --material-floating-background: linear-gradient(138deg, rgba(255, 255, 255, 0.62) 0%, rgba(255, 255, 255, 0.12) 34%, transparent 57%), linear-gradient(318deg, rgba(74, 215, 207, 0.16), transparent 46%), rgba(239, 248, 249, 0.42);
+  --material-floating-background: rgba(239, 248, 249, 0.42);
   --material-floating-border: rgba(255, 255, 255, 0.72);
-  --material-floating-shadow: 0 32px 78px rgba(7, 28, 36, 0.3), 0 8px 24px rgba(7, 28, 36, 0.16), inset 0 2px 1px rgba(255, 255, 255, 0.92), inset 0 -2px 1px rgba(45, 86, 96, 0.16);
-  --material-floating-soft-shadow: 0 20px 50px rgba(7, 28, 36, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  --material-floating-shadow: 0 32px 78px rgba(7, 28, 36, 0.3), 0 8px 24px rgba(7, 28, 36, 0.16);
+  --material-floating-soft-shadow: 0 20px 50px rgba(7, 28, 36, 0.2);
   --material-floating-filter: blur(28px) saturate(1.24) contrast(1.03);
-  --material-mobile-bar-background: linear-gradient(145deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.08) 52%, rgba(79, 215, 205, 0.12)), rgba(235, 246, 247, 0.42);
-  --material-mobile-bar-shadow: 0 15px 36px rgba(12, 35, 43, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.86), inset 0 -1px 0 rgba(46, 83, 92, 0.14);
+  --material-mobile-bar-background: rgba(235, 246, 247, 0.42);
+  --material-mobile-bar-shadow: 0 15px 36px rgba(12, 35, 43, 0.2);
   --material-mobile-bar-filter: blur(24px) saturate(1.2);
-  --material-navigation-background: linear-gradient(155deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.035) 36%, transparent 58%), linear-gradient(330deg, rgba(40, 195, 186, 0.14), transparent 46%), rgba(19, 39, 49, 0.76);
-  --material-navigation-shadow: 0 28px 70px rgba(3, 17, 23, 0.38), inset -1px 0 0 rgba(255, 255, 255, 0.18), inset 1px 0 0 rgba(78, 217, 208, 0.08);
+  --material-navigation-background: rgba(19, 39, 49, 0.76);
+  --material-navigation-shadow: 0 28px 70px rgba(3, 17, 23, 0.38);
   --material-navigation-filter: blur(30px) saturate(1.18) contrast(1.04);
-  --material-navigation-drawer-background: linear-gradient(155deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.035) 36%, transparent 58%), linear-gradient(330deg, rgba(40, 195, 186, 0.14), transparent 46%), rgba(19, 39, 49, 0.84);
+  --material-navigation-drawer-background: rgba(19, 39, 49, 0.84);
   --material-navigation-drawer-filter: blur(24px) saturate(1.14);
   --material-navigation-text: #f8fcfb;
   --material-navigation-muted: #c2d7d6;
@@ -80,7 +74,7 @@ body[data-ui-skin="liquid-glass"] {
   --material-list-item-secondary-opacity: 0.77;
   --material-browser-background: rgba(232, 241, 243, 0.66);
   --material-browser-filter: none;
-  --material-rich-tooltip-background: linear-gradient(140deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.08) 52%), rgba(239, 248, 249, 0.52);
+  --material-rich-tooltip-background: rgba(239, 248, 249, 0.52);
   --material-rich-tooltip-border: rgba(255, 255, 255, 0.68);
   --material-rich-tooltip-text: var(--ui-text);
   --material-rich-tooltip-shadow: var(--material-floating-shadow);
@@ -89,10 +83,15 @@ body[data-ui-skin="liquid-glass"] {
   --material-overlay-modal-background: rgba(5, 18, 25, 0.27);
   --material-overlay-strong-background: rgba(4, 16, 23, 0.32);
   --material-overlay-drawer-background: rgba(6, 20, 27, 0.3);
-  --material-overlay-panel-background: linear-gradient(137deg, rgba(255, 255, 255, 0.56), rgba(255, 255, 255, 0.08) 36%, transparent 58%), linear-gradient(320deg, rgba(68, 211, 202, 0.14), transparent 48%), rgba(235, 246, 248, 0.34);
-  --material-overlay-panel-shadow: 0 38px 110px rgba(1, 13, 19, 0.42), 0 10px 30px rgba(1, 13, 19, 0.2), inset 0 2px 1px rgba(255, 255, 255, 0.84);
-  --liquid-glass-light-caustic-alpha: 0.16;
-  --liquid-glass-light-rim-alpha: 0.62;
+  --material-overlay-panel-background: rgba(235, 246, 248, 0.34);
+  --material-overlay-panel-shadow: 0 38px 110px rgba(1, 13, 19, 0.42), 0 10px 30px rgba(1, 13, 19, 0.2);
+  --liquid-glass-q3-navigation-tint: rgba(19, 39, 49, 0.52);
+  --liquid-glass-q3-navigation-drawer-tint: rgba(19, 39, 49, 0.62);
+  --liquid-glass-q3-mobile-bar-tint: rgba(235, 246, 247, 0.2);
+  --liquid-glass-q3-focus-tint: rgba(241, 249, 250, 0.18);
+  --liquid-glass-q3-floating-tint: rgba(239, 248, 249, 0.16);
+  --liquid-glass-q3-tooltip-tint: rgba(239, 248, 249, 0.18);
+  --liquid-glass-q3-modal-tint: rgba(235, 246, 248, 0.18);
 }
 
 body.dark-theme[data-ui-skin="liquid-glass"] {
@@ -122,10 +121,10 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.38), 0 4px 16px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.17), inset 0 -1px 0 rgba(0, 0, 0, 0.28);
   --material-panel-soft-shadow: 0 16px 38px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   --material-card-shadow: 0 10px 26px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.09);
-  --material-entry-detail-background: linear-gradient(137deg, rgba(255, 255, 255, 0.19) 0%, rgba(255, 255, 255, 0.045) 27%, transparent 51%), linear-gradient(318deg, rgba(47, 205, 194, 0.13) 0%, transparent 45%), linear-gradient(34deg, rgba(173, 112, 232, 0.09) 0%, transparent 42%), rgba(18, 30, 36, 0.53);
-  --material-entry-detail-mobile-background: linear-gradient(137deg, rgba(255, 255, 255, 0.17) 0%, rgba(255, 255, 255, 0.04) 27%, transparent 51%), linear-gradient(318deg, rgba(47, 205, 194, 0.11) 0%, transparent 45%), rgba(18, 30, 36, 0.68);
+  --material-entry-detail-background: rgba(18, 30, 36, 0.53);
+  --material-entry-detail-mobile-background: rgba(18, 30, 36, 0.68);
   --material-entry-detail-border: rgba(230, 255, 251, 0.22);
-  --material-entry-detail-shadow: 0 30px 78px rgba(0, 0, 0, 0.48), 0 5px 18px rgba(0, 0, 0, 0.28), inset 0 2px 1px rgba(255, 255, 255, 0.2), inset 0 -2px 1px rgba(0, 0, 0, 0.3);
+  --material-entry-detail-shadow: 0 30px 78px rgba(0, 0, 0, 0.48), 0 5px 18px rgba(0, 0, 0, 0.28);
   --material-entry-detail-section-background: rgba(24, 36, 42, 0.9);
   --material-entry-detail-section-border: rgba(221, 248, 244, 0.15);
   --material-control-background: linear-gradient(145deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.025) 50%, rgba(54, 195, 185, 0.07)), rgba(29, 43, 49, 0.62);
@@ -138,15 +137,15 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-action-pressed-shadow: 0 4px 9px rgba(0, 0, 0, 0.4), inset 0 3px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   --material-inset-background: rgba(31, 47, 53, 0.7);
   --material-inset-border: rgba(221, 248, 244, 0.15);
-  --material-floating-background: linear-gradient(138deg, rgba(255, 255, 255, 0.17) 0%, rgba(255, 255, 255, 0.025) 36%, transparent 58%), linear-gradient(318deg, rgba(47, 205, 194, 0.12), transparent 47%), rgba(16, 29, 35, 0.44);
+  --material-floating-background: rgba(16, 29, 35, 0.44);
   --material-floating-border: rgba(229, 255, 251, 0.22);
-  --material-floating-shadow: 0 34px 86px rgba(0, 0, 0, 0.62), 0 9px 26px rgba(0, 0, 0, 0.36), inset 0 2px 1px rgba(255, 255, 255, 0.2), inset 0 -2px 1px rgba(0, 0, 0, 0.36);
-  --material-floating-soft-shadow: 0 22px 56px rgba(0, 0, 0, 0.46), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  --material-mobile-bar-background: linear-gradient(145deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.02) 52%, rgba(49, 205, 194, 0.08)), rgba(13, 26, 32, 0.46);
-  --material-mobile-bar-shadow: 0 17px 42px rgba(0, 0, 0, 0.44), inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 rgba(0, 0, 0, 0.3);
-  --material-navigation-background: linear-gradient(155deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.025) 38%, transparent 60%), linear-gradient(330deg, rgba(42, 190, 181, 0.12), transparent 48%), rgba(7, 18, 24, 0.78);
-  --material-navigation-shadow: 0 30px 76px rgba(0, 0, 0, 0.62), inset -1px 0 0 rgba(255, 255, 255, 0.16), inset 1px 0 0 rgba(71, 215, 205, 0.07);
-  --material-navigation-drawer-background: linear-gradient(155deg, rgba(255, 255, 255, 0.13) 0%, rgba(255, 255, 255, 0.025) 38%, transparent 60%), linear-gradient(330deg, rgba(42, 190, 181, 0.12), transparent 48%), rgba(7, 18, 24, 0.86);
+  --material-floating-shadow: 0 34px 86px rgba(0, 0, 0, 0.62), 0 9px 26px rgba(0, 0, 0, 0.36);
+  --material-floating-soft-shadow: 0 22px 56px rgba(0, 0, 0, 0.46);
+  --material-mobile-bar-background: rgba(13, 26, 32, 0.46);
+  --material-mobile-bar-shadow: 0 17px 42px rgba(0, 0, 0, 0.44);
+  --material-navigation-background: rgba(7, 18, 24, 0.78);
+  --material-navigation-shadow: 0 30px 76px rgba(0, 0, 0, 0.62);
+  --material-navigation-drawer-background: rgba(7, 18, 24, 0.86);
   --material-navigation-text: #f4fbf9;
   --material-navigation-muted: #a9c4c2;
   --material-navigation-control-background: linear-gradient(145deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.03) 54%, rgba(62, 211, 200, 0.07)), rgba(255, 255, 255, 0.035);
@@ -161,7 +160,7 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-list-item-secondary-color: var(--ui-text-muted);
   --material-list-item-secondary-opacity: 1;
   --material-browser-background: rgba(12, 23, 29, 0.68);
-  --material-rich-tooltip-background: linear-gradient(140deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.02) 54%), rgba(14, 27, 33, 0.56);
+  --material-rich-tooltip-background: rgba(14, 27, 33, 0.56);
   --material-rich-tooltip-border: rgba(229, 255, 251, 0.2);
   --material-rich-tooltip-text: var(--ui-text);
   --material-rich-tooltip-shadow: var(--material-floating-shadow);
@@ -169,14 +168,21 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-overlay-modal-background: rgba(0, 6, 10, 0.37);
   --material-overlay-strong-background: rgba(0, 5, 9, 0.43);
   --material-overlay-drawer-background: rgba(0, 7, 11, 0.41);
-  --material-overlay-panel-background: linear-gradient(137deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.02) 38%, transparent 60%), linear-gradient(320deg, rgba(46, 199, 189, 0.11), transparent 50%), rgba(13, 26, 32, 0.43);
-  --material-overlay-panel-shadow: 0 42px 120px rgba(0, 0, 0, 0.68), 0 12px 34px rgba(0, 0, 0, 0.4), inset 0 2px 1px rgba(255, 255, 255, 0.16);
-  --liquid-glass-light-caustic-alpha: 0.11;
-  --liquid-glass-light-rim-alpha: 0.46;
+  --material-overlay-panel-background: rgba(13, 26, 32, 0.43);
+  --material-overlay-panel-shadow: 0 42px 120px rgba(0, 0, 0, 0.68), 0 12px 34px rgba(0, 0, 0, 0.4);
+  --liquid-glass-q3-navigation-tint: rgba(7, 18, 24, 0.56);
+  --liquid-glass-q3-navigation-drawer-tint: rgba(7, 18, 24, 0.66);
+  --liquid-glass-q3-mobile-bar-tint: rgba(13, 26, 32, 0.28);
+  --liquid-glass-q3-focus-tint: rgba(18, 30, 36, 0.22);
+  --liquid-glass-q3-floating-tint: rgba(16, 29, 35, 0.18);
+  --liquid-glass-q3-tooltip-tint: rgba(14, 27, 33, 0.22);
+  --liquid-glass-q3-modal-tint: rgba(13, 26, 32, 0.22);
 }
 
 body[data-ui-skin="liquid-glass"] {
   background:
+    repeating-linear-gradient(118deg, rgba(29, 76, 82, 0.034) 0 1px, transparent 1px 47px),
+    repeating-linear-gradient(62deg, rgba(75, 91, 115, 0.026) 0 1px, transparent 1px 73px),
     radial-gradient(circle at 8% 4%, rgba(58, 202, 190, 0.32) 0%, rgba(58, 202, 190, 0.08) 22%, transparent 42%),
     radial-gradient(circle at 96% 9%, rgba(154, 112, 224, 0.25) 0%, rgba(154, 112, 224, 0.055) 23%, transparent 43%),
     radial-gradient(circle at 74% 96%, rgba(232, 174, 58, 0.22) 0%, rgba(232, 174, 58, 0.04) 24%, transparent 45%),
@@ -186,6 +192,8 @@ body[data-ui-skin="liquid-glass"] {
 
 body.dark-theme[data-ui-skin="liquid-glass"] {
   background:
+    repeating-linear-gradient(118deg, rgba(205, 242, 236, 0.026) 0 1px, transparent 1px 47px),
+    repeating-linear-gradient(62deg, rgba(194, 180, 224, 0.02) 0 1px, transparent 1px 73px),
     radial-gradient(circle at 7% 3%, rgba(34, 174, 163, 0.26) 0%, rgba(34, 174, 163, 0.055) 24%, transparent 45%),
     radial-gradient(circle at 96% 8%, rgba(135, 86, 206, 0.23) 0%, rgba(135, 86, 206, 0.045) 24%, transparent 45%),
     radial-gradient(circle at 76% 97%, rgba(203, 139, 32, 0.17) 0%, rgba(203, 139, 32, 0.035) 25%, transparent 47%),
@@ -224,23 +232,19 @@ body[data-ui-skin="liquid-glass"] :where(
 }
 
 body[data-ui-skin="liquid-glass"] .dictionary-panel {
-  --liquid-glass-surface-filter: var(--material-navigation-filter);
-  --liquid-glass-light-surface: var(--material-navigation-background);
+  --liquid-glass-q3-surface-tint: var(--liquid-glass-q3-navigation-tint);
 }
 
 body[data-ui-skin="liquid-glass"] .dictionary-panel[data-nav-state="drawer"] {
-  --liquid-glass-surface-filter: var(--material-navigation-drawer-filter);
-  --liquid-glass-light-surface: var(--material-navigation-drawer-background);
+  --liquid-glass-q3-surface-tint: var(--liquid-glass-q3-navigation-drawer-tint);
 }
 
 body[data-ui-skin="liquid-glass"] .mobile-app-bar {
-  --liquid-glass-surface-filter: var(--material-mobile-bar-filter);
-  --liquid-glass-light-surface: var(--material-mobile-bar-background);
+  --liquid-glass-q3-surface-tint: var(--liquid-glass-q3-mobile-bar-tint);
 }
 
 body[data-ui-skin="liquid-glass"] .entry-display {
-  --liquid-glass-surface-filter: var(--material-entry-detail-filter);
-  --liquid-glass-light-surface: var(--material-entry-detail-background);
+  --liquid-glass-q3-surface-tint: var(--liquid-glass-q3-focus-tint);
 }
 
 body[data-ui-skin="liquid-glass"] :is(
@@ -250,8 +254,7 @@ body[data-ui-skin="liquid-glass"] :is(
   .entry-context-menu,
   .skin-picker-menu
 ) {
-  --liquid-glass-surface-filter: var(--material-floating-filter);
-  --liquid-glass-light-surface: var(--material-floating-background);
+  --liquid-glass-q3-surface-tint: var(--liquid-glass-q3-floating-tint);
 }
 
 body[data-ui-skin="liquid-glass"] :is(
@@ -259,123 +262,32 @@ body[data-ui-skin="liquid-glass"] :is(
   .app-tooltip.tag-info-tooltip,
   .app-tooltip.rich-tooltip
 ) {
-  --liquid-glass-surface-filter: var(--material-rich-tooltip-filter);
+  --liquid-glass-q3-surface-tint: var(--liquid-glass-q3-tooltip-tint);
 }
 
 body[data-ui-skin="liquid-glass"] .entry-quality-issue-tooltip {
-  --liquid-glass-surface-filter: var(--material-floating-filter);
+  --liquid-glass-q3-surface-tint: var(--liquid-glass-q3-floating-tint);
 }
 
 body[data-ui-skin="liquid-glass"] .modal-panel {
-  --liquid-glass-surface-filter: var(--material-floating-filter);
-  --liquid-glass-light-surface: var(--material-overlay-panel-background);
+  --liquid-glass-q3-surface-tint: var(--liquid-glass-q3-modal-tint);
 }
 
 body[data-ui-skin="liquid-glass"] .network-panel {
-  --liquid-glass-surface-filter: var(--material-floating-filter);
-  --liquid-glass-light-surface: var(--material-overlay-panel-background);
+  --liquid-glass-q3-surface-tint: var(--liquid-glass-q3-modal-tint);
 }
 
 @supports ((backdrop-filter: url("#liquid-glass-optical-probe")) or (-webkit-backdrop-filter: url("#liquid-glass-optical-probe"))) {
-  body[data-ui-skin="liquid-glass"] :is(
+  body[data-ui-skin="liquid-glass"][data-liquid-glass-optics-quality="q3"] :is(
     [data-liquid-glass-role="continuous"][data-liquid-glass-optics="ready"],
     [data-liquid-glass-role="focus"][data-liquid-glass-optics="ready"],
     [data-liquid-glass-role="floating"][data-liquid-glass-optics="ready"],
     [data-liquid-glass-role="modal"][data-liquid-glass-optics="ready"]
   ) {
-    backdrop-filter: var(--liquid-glass-optical-filter) var(--liquid-glass-surface-filter);
-    -webkit-backdrop-filter: var(--liquid-glass-optical-filter) var(--liquid-glass-surface-filter);
+    background: var(--liquid-glass-q3-surface-tint);
+    backdrop-filter: var(--liquid-glass-optical-filter);
+    -webkit-backdrop-filter: var(--liquid-glass-optical-filter);
   }
-
-  @media (max-width: 799.98px) {
-    body[data-ui-skin="liquid-glass"] .entry-display {
-      --liquid-glass-surface-filter: var(--material-entry-detail-mobile-filter);
-    }
-  }
-}
-
-body[data-ui-skin="liquid-glass"] :where(
-  .entry-display,
-  .source-suggestions,
-  .modal-panel,
-  .network-panel
-) {
-  position: relative;
-}
-
-body[data-ui-skin="liquid-glass"][data-liquid-glass-optics-quality="q3"] [data-liquid-glass-role][data-liquid-glass-optics="ready"] {
-  --liquid-glass-light-opacity: 0.2;
-  --liquid-glass-light-origin-x: 28%;
-  --liquid-glass-light-origin-y: 18%;
-  --liquid-glass-light-angle: 326deg;
-}
-
-body[data-ui-skin="liquid-glass"][data-liquid-glass-optics-quality="q3"] :where(
-  .dictionary-panel,
-  .mobile-app-bar,
-  .entry-display,
-  .entry-search-config-menu,
-  .entry-filter-menu,
-  .source-suggestions,
-  .entry-context-menu,
-  .skin-picker-menu,
-  .modal-panel,
-  .network-panel
-)[data-liquid-glass-optics="ready"] {
-  --liquid-glass-light-radius: 300px;
-  background:
-    radial-gradient(
-      circle var(--liquid-glass-light-radius) at var(--liquid-glass-light-origin-x) var(--liquid-glass-light-origin-y),
-      rgb(255 255 255 / calc(var(--liquid-glass-light-opacity) * var(--liquid-glass-light-caustic-alpha))) 0%,
-      rgb(255 255 255 / calc(var(--liquid-glass-light-opacity) * var(--liquid-glass-light-caustic-alpha) * 0.34)) 31%,
-      transparent 72%
-    ),
-    var(--liquid-glass-light-surface);
-  transition: --liquid-glass-light-opacity 180ms ease-out;
-}
-
-body[data-ui-skin="liquid-glass"][data-liquid-glass-optics-quality="q3"] .network-panel[data-liquid-glass-optics="ready"] {
-  --liquid-glass-light-radius: 520px;
-  --liquid-glass-light-caustic-alpha: 0.085;
-}
-
-body[data-ui-skin="liquid-glass"][data-liquid-glass-optics-quality="q3"] [data-liquid-glass-role][data-liquid-glass-optics="ready"]:not(.liquid-glass-diagnostic-surface)::after {
-  position: absolute;
-  z-index: 2;
-  inset: 0;
-  border: 1px solid transparent;
-  border-radius: inherit;
-  background: conic-gradient(
-    from var(--liquid-glass-light-angle) at 50% 50%,
-    transparent 0deg,
-    rgb(255 255 255 / 0.08) 38deg,
-    rgb(255 255 255 / 0.98) 86deg,
-    rgb(255 255 255 / 0.16) 132deg,
-    transparent 186deg 360deg
-  ) border-box;
-  content: "";
-  opacity: calc(var(--liquid-glass-light-opacity) * var(--liquid-glass-light-rim-alpha));
-  pointer-events: none;
-  transform: scale(1);
-  transform-origin: center;
-  transition: opacity 180ms ease-out, transform 240ms cubic-bezier(0.2, 0.78, 0.24, 1);
-  -webkit-mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) padding-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
-}
-
-body[data-ui-skin="liquid-glass"][data-liquid-glass-optics-quality="q3"] [data-liquid-glass-optics="ready"][data-liquid-glass-light="active"] {
-  --liquid-glass-light-opacity: 1;
-}
-
-body[data-ui-skin="liquid-glass"][data-liquid-glass-optics-quality="q3"] [data-liquid-glass-optics="ready"][data-liquid-glass-light="idle"] {
-  --liquid-glass-light-opacity: 0.2;
-}
-
-body[data-ui-skin="liquid-glass"][data-liquid-glass-optics-quality="q3"] [data-liquid-glass-optics="ready"][data-liquid-glass-settle="forming"]::after {
-  opacity: 0;
-  transform: scale(0.975);
 }
 
 body[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-stage {
@@ -444,8 +356,8 @@ body[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-surface {
     0 24px 60px rgba(6, 29, 37, 0.3),
     inset 0 2px 1px rgba(255, 255, 255, 0.92),
     inset 0 -2px 2px rgba(29, 75, 84, 0.2);
-  backdrop-filter: var(--liquid-glass-optical-filter, none) var(--material-floating-filter);
-  -webkit-backdrop-filter: var(--liquid-glass-optical-filter, none) var(--material-floating-filter);
+  backdrop-filter: var(--liquid-glass-optical-filter, none);
+  -webkit-backdrop-filter: var(--liquid-glass-optical-filter, none);
 }
 
 body[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-surface::after {
@@ -639,15 +551,6 @@ body.dark-theme[data-ui-skin="liquid-glass"] [data-liquid-glass-diagnostic-statu
     -webkit-backdrop-filter: none;
   }
 
-  body[data-ui-skin="liquid-glass"] [data-liquid-glass-light] {
-    --liquid-glass-light-opacity: 0;
-    transition: none;
-  }
-
-  body[data-ui-skin="liquid-glass"] [data-liquid-glass-optics="ready"]::after {
-    display: none;
-  }
-
   body[data-ui-skin="liquid-glass"] [data-liquid-glass-role] {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
@@ -661,17 +564,6 @@ body.dark-theme[data-ui-skin="liquid-glass"] [data-liquid-glass-diagnostic-statu
     background: var(--material-floating-background);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  body[data-ui-skin="liquid-glass"][data-liquid-glass-optics-quality="q3"] [data-liquid-glass-optics="ready"][data-liquid-glass-light] {
-    --liquid-glass-light-opacity: 0.2;
-    transition: none;
-  }
-
-  body[data-ui-skin="liquid-glass"][data-liquid-glass-optics-quality="q3"] [data-liquid-glass-optics="ready"]::after {
-    transition: none;
   }
 }
 
@@ -789,15 +681,6 @@ body.dark-theme[data-ui-skin="liquid-glass"] [data-liquid-glass-diagnostic-statu
     box-shadow: none;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-  }
-
-  body[data-ui-skin="liquid-glass"] [data-liquid-glass-light] {
-    --liquid-glass-light-opacity: 0;
-    transition: none;
-  }
-
-  body[data-ui-skin="liquid-glass"] [data-liquid-glass-optics="ready"]::after {
-    display: none;
   }
 
   body[data-ui-skin="liquid-glass"] [data-liquid-glass-role] {

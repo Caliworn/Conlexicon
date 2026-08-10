@@ -232,7 +232,7 @@ assert(
     && liquidGlassEngine.includes("setLightVector(x, y, strength = 1)")
     && liquidGlassEngine.includes('result: "opticalNormalRimMap"')
     && liquidGlassEngine.includes('result: "opticalSpecular"'),
-  "LQ-6 must derive runtime specular light from a shared vector and the cached normal/rim map",
+  "Liquid Glass must derive environment specular from a retained light vector and the cached normal/rim map",
 );
 const liquidGlassSurfaceDefinitions = liquidGlassEngineApi.SURFACE_ROLE_DEFINITIONS;
 assert.deepEqual(
@@ -241,14 +241,52 @@ assert.deepEqual(
   "LQ-5 must retain the five formal surface roles in migration order",
 );
 const liquidGlassOpticalRoleRule = liquidGlass.match(
-  /body\[data-ui-skin="liquid-glass"\] :is\([\s\S]*?\[data-liquid-glass-role="continuous"\]\[data-liquid-glass-optics="ready"\][\s\S]*?\[data-liquid-glass-role="focus"\]\[data-liquid-glass-optics="ready"\][\s\S]*?\[data-liquid-glass-role="floating"\]\[data-liquid-glass-optics="ready"\][\s\S]*?\[data-liquid-glass-role="modal"\]\[data-liquid-glass-optics="ready"\][\s\S]*?\) \{([\s\S]*?)\n  \}/,
+  /body\[data-ui-skin="liquid-glass"\]\[data-liquid-glass-optics-quality="q3"\] :is\([\s\S]*?\[data-liquid-glass-role="continuous"\]\[data-liquid-glass-optics="ready"\][\s\S]*?\[data-liquid-glass-role="focus"\]\[data-liquid-glass-optics="ready"\][\s\S]*?\[data-liquid-glass-role="floating"\]\[data-liquid-glass-optics="ready"\][\s\S]*?\[data-liquid-glass-role="modal"\]\[data-liquid-glass-optics="ready"\][\s\S]*?\) \{([\s\S]*?)\n  \}/,
 );
-assert(liquidGlassOpticalRoleRule, "LQ-6 must apply generated optics only to ready runtime roles");
+assert(liquidGlassOpticalRoleRule, "Q3 must apply generated optics only to ready runtime roles");
 assert(
-  liquidGlassOpticalRoleRule[1].includes(
-    "var(--liquid-glass-optical-filter) var(--liquid-glass-surface-filter)",
-  ),
-  "LQ-6 Q3 surfaces must compose generated optics with the long-lived material blur",
+  liquidGlassOpticalRoleRule[1].includes("background: var(--liquid-glass-q3-surface-tint);")
+    && liquidGlassOpticalRoleRule[1].includes("backdrop-filter: var(--liquid-glass-optical-filter);")
+    && !liquidGlassOpticalRoleRule[1].includes("--liquid-glass-surface-filter")
+    && !/blur\(/.test(liquidGlassOpticalRoleRule[1]),
+  "Q3 must use a low-alpha role tint and generated optics without the Q1 material blur",
+);
+for (const materialToken of [
+  "--material-entry-detail-background",
+  "--material-entry-detail-mobile-background",
+  "--material-floating-background",
+  "--material-mobile-bar-background",
+  "--material-navigation-background",
+  "--material-navigation-drawer-background",
+  "--material-rich-tooltip-background",
+  "--material-overlay-panel-background",
+]) {
+  const values = [...liquidGlass.matchAll(new RegExp(`${materialToken}:\\s*([^;]+);`, "g"))]
+    .map((match) => match[1]);
+  assert(values.length >= 2, `Liquid Glass must define light and dark values for ${materialToken}`);
+  assert(
+    values.every((value) => !/gradient\(/i.test(value)),
+    `${materialToken} must remain a pure tint instead of painted component lighting`,
+  );
+}
+for (const q3Tint of [
+  "navigation",
+  "navigation-drawer",
+  "mobile-bar",
+  "focus",
+  "floating",
+  "tooltip",
+  "modal",
+]) {
+  assert(
+    (liquidGlass.match(new RegExp(`--liquid-glass-q3-${q3Tint}-tint:`, "g")) || []).length === 2,
+    `Q3 must define light and dark low-alpha ${q3Tint} tints`,
+  );
+}
+assert.equal(
+  (liquidGlass.match(/repeating-linear-gradient\(/g) || []).length >= 6,
+  true,
+  "Liquid Glass must provide subtle structured background references in both themes",
 );
 assert(
   !liquidGlass.includes("--liquid-glass-static-refraction")
@@ -444,84 +482,17 @@ for (const mediaQueryName of [
 ]) {
   assert(app.includes(mediaQueryName), `LG-4C must retain its ${mediaQueryName} guard`);
 }
-const liquidLightSurfaceRule = liquidGlass.match(
-  /body\[data-ui-skin="liquid-glass"\]\[data-liquid-glass-optics-quality="q3"\] :where\([\s\S]*?\)\[data-liquid-glass-optics="ready"\] \{([\s\S]*?)\n\}/,
-);
-assert(liquidLightSurfaceRule, "LQ-6 must declare one ready-surface light and caustic rule");
-assert.equal(
-  (liquidLightSurfaceRule[1].match(/radial-gradient\(/gi) || []).length,
-  1,
-  "LQ-6 surfaces may add one broad local caustic; RGB dispersion belongs to the SVG compositor",
-);
-assert(
-  liquidGlass.includes('[data-liquid-glass-role][data-liquid-glass-optics="ready"] {\n  --liquid-glass-light-opacity: 0.2;')
-    && liquidLightSurfaceRule[1].includes("var(--liquid-glass-light-surface)"),
-  "LQ-6 must layer ambient and interactive light over the role's stable material surface",
-);
-assert(
-  !/(?:backdrop-filter|box-shadow)/.test(liquidLightSurfaceRule[1]),
-  "LQ-6 light updates must not animate blur or large material shadows",
-);
-const liquidLightTargetContract = app.match(/const LIQUID_GLASS_LIGHT_TARGET_SELECTOR = \[([\s\S]*?)\]\.join\(", "\);/);
-assert(liquidLightTargetContract, "LQ-6 must declare an explicit surface-light allowlist");
-for (const requiredTarget of [
-  "dictionary-panel",
-  "mobile-app-bar",
-  "entry-display",
-  "entry-search-config-menu",
-  "entry-filter-menu",
-  "source-suggestions",
-  "entry-context-menu",
-  "skin-picker-menu",
-  "modal-panel",
-  "network-panel",
-]) {
-  assert(
-    liquidLightTargetContract[1].includes(requiredTarget),
-    `LQ-6 light allowlist must include ${requiredTarget}`,
-  );
-}
-for (const forbiddenTarget of [
-  "entry-card",
-  "analysis-card",
-  "table-row",
-  "network-node",
-  "app-tooltip",
-]) {
-  assert(
-    !liquidLightTargetContract[1].includes(forbiddenTarget),
-    `LQ-6 light response must not target repeated or micro surface ${forbiddenTarget}`,
-  );
-}
-assert(
-  /requestAnimationFrame\(flushLiquidGlassLightEffect\)/.test(app),
-  "LQ-6 light updates must be coalesced through requestAnimationFrame",
-);
 assert(
   app.includes('document.addEventListener("pointermove", handleDocumentPointerMove, { passive: true });')
     && !app.includes('document.addEventListener("pointermove", scheduleLayeredGlassPointerEffect')
-    && !app.includes('document.addEventListener("pointermove", scheduleLiquidGlassLightEffect'),
-  "Both glass skins must share one passive document-level pointermove dispatcher",
+    && !app.includes("scheduleLiquidGlassLightEffect"),
+  "The shared passive pointer dispatcher must retain tooltip and Layered Glass behavior without Liquid Glass local lighting",
 );
 assert(
-  /event\.pointerType === "touch"/.test(app)
-    && /function liquidGlassLightEffectsEnabled\(\)[\s\S]*liquidGlassOpticsQuality === "q3"[\s\S]*glassFinePointerMediaQuery\.matches[\s\S]*!glassReducedMotionMediaQuery\.matches[\s\S]*!glassReducedTransparencyMediaQuery\.matches[\s\S]*!glassForcedColorsMediaQuery\.matches/.test(app),
-  "LQ-6 must disable interactive light outside Q3 and for touch or assisted display modes",
-);
-for (const property of ["origin-x", "origin-y", "vector-x", "vector-y", "angle"]) {
-  assert(app.includes(`--liquid-glass-light-${property}`), `LQ-6 must publish local ${property}`);
-}
-assert(
-  app.includes("liquidGlassOpticalEngine?.setLightVector(vectorX, vectorY, 1.08)")
-    && app.includes("liquidGlassOpticalEngine?.resetLightVector()"),
-  "LQ-6 local light response must drive and restore the shared optical light vector",
-);
-assert(
-  liquidGlassEngine.includes('element.dataset.liquidGlassSettle = "forming"')
-    && liquidGlassEngine.includes('element.dataset.liquidGlassSettle = "settled"')
-    && liquidGlass.includes('[data-liquid-glass-settle="forming"]::after')
-    && liquidGlassEngine.includes('(prefers-reduced-motion: reduce)'),
-  "LQ-6 must settle newly committed surfaces without rebuilding filters and skip motion when requested",
+  !/conic-gradient\(/i.test(liquidGlass)
+    && !/--liquid-glass-light|data-liquid-glass-light|liquidGlassLight/.test(`${liquidGlass}\n${app}`)
+    && !/liquid-glass-settle|SurfaceSettle|settleTasks/.test(`${liquidGlass}\n${liquidGlassEngine}`),
+  "Q3 must not retain CSS caustics, painted rims, local-light scheduling, or decorative settle state",
 );
 const retiredLiquidOptics = `${index}\n${liquidGlass}\n${app}\n${liquidGlassEngine}`;
 for (const retiredIdentifier of [

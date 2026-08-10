@@ -57,23 +57,6 @@ const layeredGlassPointerExitTimers = new WeakMap();
 let layeredGlassPointerTarget = null;
 let layeredGlassPointerFrame = 0;
 let pendingLayeredGlassPointer = null;
-const LIQUID_GLASS_LIGHT_TARGET_SELECTOR = [
-  ".dictionary-panel",
-  ".mobile-app-bar",
-  ".entry-display",
-  ".entry-search-config-menu",
-  ".entry-filter-menu",
-  ".source-suggestions",
-  ".entry-context-menu",
-  ".skin-picker-menu",
-  ".modal-panel",
-  ".network-panel",
-].join(", ");
-const LIQUID_GLASS_LIGHT_EXIT_MS = 180;
-const liquidGlassLightExitTimers = new WeakMap();
-let liquidGlassLightTarget = null;
-let liquidGlassLightFrame = 0;
-let pendingLiquidGlassLight = null;
 const SKIN_OPTIONS = [
   { id: "classic", labelKey: "classicSkin" },
   { id: "layered-glass", labelKey: "layeredGlassSkin" },
@@ -3589,9 +3572,6 @@ function applyAppearance() {
   if (!layeredGlassPointerEffectsEnabled()) {
     resetLayeredGlassPointerEffect(true);
   }
-  if (!liquidGlassLightEffectsEnabled()) {
-    resetLiquidGlassLightEffect(true);
-  }
   liquidGlassOpticalEngine?.setEnabled(currentSkin === "liquid-glass");
 }
 
@@ -3708,146 +3688,16 @@ function scheduleLayeredGlassPointerEffect(event) {
   }
 }
 
-function liquidGlassLightEffectsEnabled() {
-  return document.body.dataset.uiSkin === "liquid-glass"
-    && document.body.dataset.liquidGlassOpticsQuality === "q3"
-    && glassFinePointerMediaQuery.matches
-    && !glassReducedMotionMediaQuery.matches
-    && !glassReducedTransparencyMediaQuery.matches
-    && !glassForcedColorsMediaQuery.matches;
-}
-
-function clearLiquidGlassLightTarget(target, immediate = false) {
-  if (!target) {
-    return;
-  }
-  const existingTimer = liquidGlassLightExitTimers.get(target);
-  if (existingTimer) {
-    clearTimeout(existingTimer);
-    liquidGlassLightExitTimers.delete(target);
-  }
-  const clearStyles = () => {
-    target.removeAttribute("data-liquid-glass-light");
-    target.style.removeProperty("--liquid-glass-light-origin-x");
-    target.style.removeProperty("--liquid-glass-light-origin-y");
-    target.style.removeProperty("--liquid-glass-light-vector-x");
-    target.style.removeProperty("--liquid-glass-light-vector-y");
-    target.style.removeProperty("--liquid-glass-light-angle");
-  };
-  if (immediate || !target.isConnected) {
-    clearStyles();
-    return;
-  }
-  target.dataset.liquidGlassLight = "idle";
-  const timer = setTimeout(() => {
-    liquidGlassLightExitTimers.delete(target);
-    if (target.dataset.liquidGlassLight === "idle") {
-      clearStyles();
-    }
-  }, LIQUID_GLASS_LIGHT_EXIT_MS);
-  liquidGlassLightExitTimers.set(target, timer);
-}
-
-function resetLiquidGlassLightEffect(immediate = false) {
-  if (liquidGlassLightFrame) {
-    cancelAnimationFrame(liquidGlassLightFrame);
-    liquidGlassLightFrame = 0;
-  }
-  pendingLiquidGlassLight = null;
-  clearLiquidGlassLightTarget(liquidGlassLightTarget, immediate);
-  liquidGlassLightTarget = null;
-  liquidGlassOpticalEngine?.resetLightVector();
-}
-
-function flushLiquidGlassLightEffect() {
-  liquidGlassLightFrame = 0;
-  const pending = pendingLiquidGlassLight;
-  pendingLiquidGlassLight = null;
-  if (!pending || !pending.target.isConnected || !liquidGlassLightEffectsEnabled()) {
-    resetLiquidGlassLightEffect();
-    return;
-  }
-
-  const bounds = pending.target.getBoundingClientRect();
-  if (!bounds.width || !bounds.height) {
-    resetLiquidGlassLightEffect();
-    return;
-  }
-  if (liquidGlassLightTarget && liquidGlassLightTarget !== pending.target) {
-    resetLiquidGlassLightEffect();
-  }
-
-  const normalizedX = Math.max(0, Math.min(1, (pending.clientX - bounds.left) / bounds.width));
-  const normalizedY = Math.max(0, Math.min(1, (pending.clientY - bounds.top) / bounds.height));
-  const originX = Math.round(normalizedX * 200) / 2;
-  const originY = Math.round(normalizedY * 200) / 2;
-  let vectorX = normalizedX * 2 - 1;
-  let vectorY = normalizedY * 2 - 1;
-  const vectorLength = Math.hypot(vectorX, vectorY);
-  if (vectorLength < 0.08) {
-    vectorX = -0.55;
-    vectorY = -0.84;
-  } else {
-    vectorX /= vectorLength;
-    vectorY /= vectorLength;
-  }
-  vectorX = Math.round(vectorX * 1000) / 1000;
-  vectorY = Math.round(vectorY * 1000) / 1000;
-  const lightAngle = Math.round((Math.atan2(vectorY, vectorX) * 180 / Math.PI + 450) % 360);
-  liquidGlassLightTarget = pending.target;
-  const exitTimer = liquidGlassLightExitTimers.get(liquidGlassLightTarget);
-  if (exitTimer) {
-    clearTimeout(exitTimer);
-    liquidGlassLightExitTimers.delete(liquidGlassLightTarget);
-  }
-  liquidGlassLightTarget.dataset.liquidGlassLight = "active";
-  liquidGlassLightTarget.style.setProperty("--liquid-glass-light-origin-x", `${originX}%`);
-  liquidGlassLightTarget.style.setProperty("--liquid-glass-light-origin-y", `${originY}%`);
-  liquidGlassLightTarget.style.setProperty("--liquid-glass-light-vector-x", vectorX);
-  liquidGlassLightTarget.style.setProperty("--liquid-glass-light-vector-y", vectorY);
-  liquidGlassLightTarget.style.setProperty("--liquid-glass-light-angle", `${lightAngle}deg`);
-  liquidGlassOpticalEngine?.setLightVector(vectorX, vectorY, 1.08);
-}
-
-function scheduleLiquidGlassLightEffect(event) {
-  if (!liquidGlassLightEffectsEnabled() || event.pointerType === "touch") {
-    resetLiquidGlassLightEffect();
-    return;
-  }
-  const target = event.target instanceof Element
-    ? event.target.closest(LIQUID_GLASS_LIGHT_TARGET_SELECTOR)
-    : null;
-  if (!target) {
-    resetLiquidGlassLightEffect();
-    return;
-  }
-  pendingLiquidGlassLight = {
-    target,
-    clientX: event.clientX,
-    clientY: event.clientY,
-  };
-  if (!liquidGlassLightFrame) {
-    liquidGlassLightFrame = requestAnimationFrame(flushLiquidGlassLightEffect);
-  }
-}
-
 function resetGlassInteractiveEffects(immediate = false) {
   resetLayeredGlassPointerEffect(immediate);
-  resetLiquidGlassLightEffect(immediate);
 }
 
 function scheduleGlassInteractiveEffect(event) {
   if (document.body.dataset.uiSkin === "layered-glass") {
-    resetLiquidGlassLightEffect(true);
     scheduleLayeredGlassPointerEffect(event);
     return;
   }
-  if (document.body.dataset.uiSkin === "liquid-glass") {
-    resetLayeredGlassPointerEffect(true);
-    scheduleLiquidGlassLightEffect(event);
-    return;
-  }
-  resetGlassInteractiveEffects(true);
+  resetLayeredGlassPointerEffect(true);
 }
 
 function handleDocumentPointerMove(event) {
