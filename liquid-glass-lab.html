@@ -1,0 +1,1080 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Conlexicon Liquid Glass Lab</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --lab-page: #eaf1f2;
+      --lab-panel: #f7fbfb;
+      --lab-panel-strong: #ffffff;
+      --lab-text: #132126;
+      --lab-muted: #607177;
+      --lab-border: rgba(19, 48, 57, 0.16);
+      --lab-accent: #087f8f;
+      --lab-accent-soft: rgba(8, 127, 143, 0.12);
+      --lab-stage: #dce9eb;
+      --lab-shadow: 0 18px 48px rgba(24, 48, 56, 0.13);
+    }
+
+    :root[data-theme="dark"] {
+      --lab-page: #091216;
+      --lab-panel: #101c21;
+      --lab-panel-strong: #16252b;
+      --lab-text: #edf7f8;
+      --lab-muted: #99abb1;
+      --lab-border: rgba(205, 238, 244, 0.14);
+      --lab-accent: #79dbe7;
+      --lab-accent-soft: rgba(121, 219, 231, 0.12);
+      --lab-stage: #071116;
+      --lab-shadow: 0 20px 54px rgba(0, 0, 0, 0.36);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--lab-page);
+      color: var(--lab-text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button,
+    select {
+      min-height: 36px;
+      border: 1px solid var(--lab-border);
+      border-radius: 10px;
+      background: var(--lab-panel-strong);
+      color: var(--lab-text);
+    }
+
+    button {
+      padding: 0 13px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: var(--lab-accent);
+    }
+
+    button:focus-visible,
+    select:focus-visible,
+    input:focus-visible {
+      outline: 2px solid var(--lab-accent);
+      outline-offset: 2px;
+    }
+
+    .lab-shell {
+      max-width: 1560px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    .lab-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .lab-title {
+      margin: 0;
+      font-size: clamp(20px, 3vw, 30px);
+      font-weight: 650;
+      letter-spacing: -0.025em;
+    }
+
+    .lab-subtitle {
+      margin: 4px 0 0;
+      color: var(--lab-muted);
+      font-size: 13px;
+    }
+
+    .lab-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .lab-workspace,
+    .lab-controls {
+      border: 1px solid var(--lab-border);
+      border-radius: 18px;
+      background: var(--lab-panel);
+      box-shadow: var(--lab-shadow);
+    }
+
+    .lab-workspace {
+      overflow: hidden;
+    }
+
+    .lab-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--lab-border);
+    }
+
+    .lab-toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .lab-toolbar label {
+      color: var(--lab-muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .lab-toolbar select {
+      max-width: 180px;
+      padding: 0 30px 0 10px;
+    }
+
+    .lab-stage {
+      position: relative;
+      display: grid;
+      min-height: 590px;
+      place-items: center;
+      overflow: hidden;
+      isolation: isolate;
+      background: var(--lab-stage);
+    }
+
+    .lab-backdrop {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    .lab-backdrop::before,
+    .lab-backdrop::after {
+      content: "";
+      position: absolute;
+      border-radius: 999px;
+    }
+
+    .lab-backdrop::before {
+      width: 48%;
+      aspect-ratio: 1;
+      left: -8%;
+      top: -18%;
+      background: radial-gradient(circle, rgba(21, 188, 203, 0.9), rgba(21, 188, 203, 0) 68%);
+    }
+
+    .lab-backdrop::after {
+      width: 42%;
+      aspect-ratio: 1;
+      right: -4%;
+      bottom: -24%;
+      background: radial-gradient(circle, rgba(175, 90, 222, 0.84), rgba(175, 90, 222, 0) 68%);
+    }
+
+    .lab-grid {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.36) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.36) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+
+    :root[data-theme="light"] .lab-grid {
+      background-image:
+        linear-gradient(rgba(5, 37, 44, 0.28) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(5, 37, 44, 0.28) 1px, transparent 1px);
+    }
+
+    .lab-bands {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      background:
+        linear-gradient(90deg,
+          #f04455 0 12.5%, #f6a625 12.5% 25%, #f2e85c 25% 37.5%, #38c58d 37.5% 50%,
+          #20a5d5 50% 62.5%, #5067d8 62.5% 75%, #a75bd9 75% 87.5%, #ec69a2 87.5% 100%);
+    }
+
+    .lab-words {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      place-items: center;
+      gap: 20px;
+      padding: 26px;
+      color: rgba(235, 249, 251, 0.88);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(44px, 8vw, 108px);
+      font-weight: 700;
+      letter-spacing: -0.05em;
+      opacity: 0;
+    }
+
+    :root[data-theme="light"] .lab-words {
+      color: rgba(7, 35, 42, 0.82);
+    }
+
+    .lab-stage[data-scene="grid"] .lab-grid,
+    .lab-stage[data-scene="bands"] .lab-bands,
+    .lab-stage[data-scene="type"] .lab-words {
+      opacity: 1;
+    }
+
+    .lab-stage[data-scene="grid"] .lab-backdrop::before,
+    .lab-stage[data-scene="grid"] .lab-backdrop::after,
+    .lab-stage[data-scene="bands"] .lab-backdrop::before,
+    .lab-stage[data-scene="bands"] .lab-backdrop::after {
+      opacity: 0.34;
+    }
+
+    .lab-surface {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      width: 620px;
+      height: 280px;
+      max-width: calc(100% - 40px);
+      padding: clamp(22px, 5vw, 44px);
+      overflow: hidden;
+      border: 1px solid rgba(224, 249, 252, 0.28);
+      border-radius: 8px;
+      background: rgba(230, 246, 248, 0.28);
+      color: #f4fcfd;
+      box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24);
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+      will-change: transform;
+    }
+
+    .lab-surface.is-dragging {
+      cursor: grabbing;
+    }
+
+    :root[data-theme="light"] .lab-surface {
+      border-color: rgba(9, 48, 57, 0.18);
+      color: #0c252c;
+      box-shadow: 0 24px 70px rgba(23, 59, 67, 0.18);
+    }
+
+    .lab-surface[data-liquid-glass-optics="ready"] {
+      -webkit-backdrop-filter: var(--liquid-glass-optical-filter);
+      backdrop-filter: var(--liquid-glass-optical-filter);
+    }
+
+    .lab-surface:is([data-liquid-glass-optics="pending"], [data-liquid-glass-optics="fallback"]) {
+      -webkit-backdrop-filter: blur(var(--lab-fallback-blur, 5px)) saturate(1.08);
+      backdrop-filter: blur(var(--lab-fallback-blur, 5px)) saturate(1.08);
+    }
+
+    .lab-surface-kicker {
+      margin: 0 0 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      opacity: 0.7;
+    }
+
+    .lab-surface h2 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(40px, 8vw, 76px);
+      line-height: 0.95;
+      letter-spacing: -0.055em;
+    }
+
+    .lab-readout {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      border-top: 1px solid var(--lab-border);
+    }
+
+    .lab-metric {
+      min-width: 0;
+      padding: 12px 14px;
+      border-right: 1px solid var(--lab-border);
+    }
+
+    .lab-metric:last-child {
+      border-right: 0;
+    }
+
+    .lab-metric-label {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--lab-muted);
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .lab-metric-value {
+      display: block;
+      overflow: hidden;
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .lab-maps {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      padding: 14px;
+      border-top: 1px solid var(--lab-border);
+    }
+
+    .lab-map-figure {
+      margin: 0;
+      min-width: 0;
+    }
+
+    .lab-map-figure figcaption {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 7px;
+      color: var(--lab-muted);
+      font-size: 11px;
+    }
+
+    .lab-map-canvas {
+      display: block;
+      width: 100%;
+      aspect-ratio: 2.2;
+      border: 1px solid var(--lab-border);
+      border-radius: 10px;
+      background: #7f7f7f;
+      image-rendering: pixelated;
+    }
+
+    .lab-controls {
+      padding: 14px;
+    }
+
+    .lab-controls-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .lab-controls h2 {
+      margin: 0;
+      font-size: 15px;
+    }
+
+    .lab-control-section {
+      padding: 12px 0;
+      border-top: 1px solid var(--lab-border);
+    }
+
+    .lab-control-section h3 {
+      margin: 0 0 10px;
+      color: var(--lab-muted);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .lab-select-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .lab-field {
+      display: grid;
+      gap: 6px;
+      min-width: 0;
+      margin-bottom: 11px;
+    }
+
+    .lab-field:last-child {
+      margin-bottom: 0;
+    }
+
+    .lab-field-heading {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    .lab-field-value {
+      color: var(--lab-accent);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .lab-field select {
+      width: 100%;
+      padding: 0 9px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      margin: 0;
+      accent-color: var(--lab-accent);
+    }
+
+    .lab-status-note {
+      margin: 10px 0 0;
+      padding: 9px 10px;
+      border-radius: 10px;
+      background: var(--lab-accent-soft);
+      color: var(--lab-muted);
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 980px) {
+      .lab-layout {
+        grid-template-columns: 1fr;
+      }
+
+    }
+
+    @media (max-width: 680px) {
+      .lab-shell {
+        padding: 10px;
+      }
+
+      .lab-header,
+      .lab-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .lab-toolbar-group {
+        justify-content: space-between;
+      }
+
+      .lab-stage {
+        min-height: 430px;
+      }
+
+      .lab-readout {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .lab-metric:nth-child(2n) {
+        border-right: 0;
+      }
+
+      .lab-metric:nth-child(-n + 4) {
+        border-bottom: 1px solid var(--lab-border);
+      }
+
+      .lab-maps,
+      .lab-select-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+      .lab-surface {
+        background: Canvas;
+        color: CanvasText;
+        border-color: CanvasText;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="lab-shell">
+    <header class="lab-header">
+      <div>
+        <h1 class="lab-title">Liquid Glass Lab</h1>
+        <p class="lab-subtitle">生产几何与滤镜管线的独立、无持久化实验页</p>
+      </div>
+      <button id="themeButton" type="button" aria-pressed="true">切换浅色场景</button>
+    </header>
+
+    <div class="lab-layout">
+      <section class="lab-workspace" aria-label="液态玻璃预览">
+        <div class="lab-toolbar">
+          <div class="lab-toolbar-group">
+            <label for="sceneSelect">背景参照</label>
+            <select id="sceneSelect">
+              <option value="field">连续色场</option>
+              <option value="grid">高对比网格</option>
+              <option value="bands">色带</option>
+              <option value="type">大号文字</option>
+            </select>
+          </div>
+          <div class="lab-toolbar-group">
+            <span id="liveStatus" role="status" aria-live="polite">初始化</span>
+          </div>
+        </div>
+
+        <div id="labStage" class="lab-stage" data-scene="field">
+          <div class="lab-backdrop">
+            <div class="lab-grid"></div>
+            <div class="lab-bands"></div>
+            <div class="lab-words" aria-hidden="true"><span>a</span><span>ɬ</span><span>ŋ</span><span>ə</span></div>
+          </div>
+          <article id="labSurface" class="lab-surface" aria-label="可拖动液态玻璃示例卡片">
+            <div>
+              <p class="lab-surface-kicker">Neutral preview text</p>
+              <h2>Sample</h2>
+            </div>
+          </article>
+        </div>
+
+        <div class="lab-readout" aria-label="运行状态">
+          <div class="lab-metric"><span class="lab-metric-label">Quality</span><span id="qualityValue" class="lab-metric-value">—</span></div>
+          <div class="lab-metric"><span class="lab-metric-label">Surface</span><span id="surfaceStateValue" class="lab-metric-value">—</span></div>
+          <div class="lab-metric"><span class="lab-metric-label">Actual size</span><span id="sizeValue" class="lab-metric-value">—</span></div>
+          <div class="lab-metric"><span class="lab-metric-label">Effective bezel</span><span id="bezelValue" class="lab-metric-value">—</span></div>
+          <div class="lab-metric"><span class="lab-metric-label">Map</span><span id="mapValue" class="lab-metric-value">—</span></div>
+          <div class="lab-metric"><span class="lab-metric-label">Cache</span><span id="cacheValue" class="lab-metric-value">—</span></div>
+        </div>
+
+        <div class="lab-maps">
+          <figure class="lab-map-figure">
+            <figcaption><span>位移图</span><span>R = X · G = Y · B = rim</span></figcaption>
+            <canvas id="displacementCanvas" class="lab-map-canvas" aria-label="当前参数生成的位移贴图"></canvas>
+          </figure>
+          <figure class="lab-map-figure">
+            <figcaption><span>法线 / rim 图</span><span>R = normal X · G = normal Y</span></figcaption>
+            <canvas id="normalCanvas" class="lab-map-canvas" aria-label="当前参数生成的法线和边缘贴图"></canvas>
+          </figure>
+        </div>
+      </section>
+
+      <aside class="lab-controls" aria-label="液态玻璃参数">
+        <div class="lab-controls-header">
+          <h2>参数</h2>
+          <button id="resetButton" type="button">恢复角色默认值</button>
+        </div>
+
+        <section class="lab-control-section">
+          <h3>角色与边界</h3>
+          <div class="lab-select-grid">
+            <label class="lab-field" for="presetSelect">
+              <span class="lab-field-heading"><span>预设</span></span>
+              <select id="presetSelect">
+                <option value="focus">Focus</option>
+                <option value="continuous">Continuous</option>
+                <option value="floating">Floating</option>
+                <option value="modal">Modal</option>
+                <option value="custom">Custom</option>
+              </select>
+            </label>
+            <label class="lab-field" for="roleSelect">
+              <span class="lab-field-heading"><span>引擎角色</span></span>
+              <select id="roleSelect" data-optic-control>
+                <option value="focus">Focus</option>
+                <option value="continuous">Continuous</option>
+                <option value="floating">Floating</option>
+                <option value="modal">Modal</option>
+              </select>
+            </label>
+            <label class="lab-field" for="edgeModeSelect">
+              <span class="lab-field-heading"><span>有效边</span></span>
+              <select id="edgeModeSelect" data-optic-control>
+                <option value="all">四边</option>
+                <option value="right">仅右边</option>
+                <option value="bottom">仅下边</option>
+              </select>
+            </label>
+            <label class="lab-field" for="mapLimitSelect">
+              <span class="lab-field-heading"><span>贴图上限</span></span>
+              <select id="mapLimitSelect" data-optic-control>
+                <option value="256">256px</option>
+                <option value="420">420px</option>
+                <option value="448">448px</option>
+                <option value="480">480px</option>
+                <option value="512">512px</option>
+                <option value="768">768px</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="lab-control-section">
+          <h3>表面几何</h3>
+          <label class="lab-field" for="widthInput">
+            <span class="lab-field-heading"><span>宽度</span><output id="widthOutput" class="lab-field-value">620px</output></span>
+            <input id="widthInput" data-optic-control type="range" min="180" max="900" step="2" value="620">
+          </label>
+          <label class="lab-field" for="heightInput">
+            <span class="lab-field-heading"><span>高度</span><output id="heightOutput" class="lab-field-value">280px</output></span>
+            <input id="heightInput" data-optic-control type="range" min="80" max="480" step="2" value="280">
+          </label>
+          <label class="lab-field" for="radiusInput">
+            <span class="lab-field-heading"><span>圆角</span><output id="radiusOutput" class="lab-field-value">8px</output></span>
+            <input id="radiusInput" data-optic-control type="range" min="0" max="120" step="1" value="8">
+          </label>
+          <label class="lab-field" for="bezelInput">
+            <span class="lab-field-heading"><span>请求 bezel</span><output id="bezelOutput" class="lab-field-value">46px</output></span>
+            <input id="bezelInput" data-optic-control type="range" min="2" max="72" step="1" value="46">
+          </label>
+          <label class="lab-field" for="thicknessInput">
+            <span class="lab-field-heading"><span>光学厚度</span><output id="thicknessOutput" class="lab-field-value">21px</output></span>
+            <input id="thicknessInput" data-optic-control type="range" min="1" max="64" step="1" value="21">
+          </label>
+        </section>
+
+        <section class="lab-control-section">
+          <h3>折射与材质</h3>
+          <label class="lab-field" for="iorInput">
+            <span class="lab-field-heading"><span>折射率 IOR</span><output id="iorOutput" class="lab-field-value">1.46</output></span>
+            <input id="iorInput" data-optic-control type="range" min="1.01" max="2.2" step="0.01" value="1.46">
+          </label>
+          <label class="lab-field" for="displacementInput">
+            <span class="lab-field-heading"><span>最大位移</span><output id="displacementOutput" class="lab-field-value">17px</output></span>
+            <input id="displacementInput" data-optic-control type="range" min="0.5" max="48" step="0.5" value="17">
+          </label>
+          <label class="lab-field" for="blurInput">
+            <span class="lab-field-heading"><span>光学内模糊</span><output id="blurOutput" class="lab-field-value">4px</output></span>
+            <input id="blurInput" data-optic-control type="range" min="0" max="12" step="0.1" value="4">
+          </label>
+          <label class="lab-field" for="saturationInput">
+            <span class="lab-field-heading"><span>饱和度</span><output id="saturationOutput" class="lab-field-value">1.09×</output></span>
+            <input id="saturationInput" data-optic-control type="range" min="0.7" max="1.5" step="0.01" value="1.09">
+          </label>
+          <label class="lab-field" for="tintInput">
+            <span class="lab-field-heading"><span>中性 tint</span><output id="tintOutput" class="lab-field-value">0.30</output></span>
+            <input id="tintInput" type="range" min="0" max="0.8" step="0.01" value="0.30">
+          </label>
+        </section>
+
+        <section class="lab-control-section">
+          <h3>环境镜面</h3>
+          <label class="lab-field" for="specularInput">
+            <span class="lab-field-heading"><span>Specular 强度</span><output id="specularOutput" class="lab-field-value">0.64</output></span>
+            <input id="specularInput" data-optic-control type="range" min="0" max="1" step="0.01" value="0.64">
+          </label>
+          <label class="lab-field" for="lightAngleInput">
+            <span class="lab-field-heading"><span>光源角度</span><output id="lightAngleOutput" class="lab-field-value">−123°</output></span>
+            <input id="lightAngleInput" type="range" min="-180" max="180" step="1" value="-123">
+          </label>
+          <label class="lab-field" for="lightStrengthInput">
+            <span class="lab-field-heading"><span>光源强度</span><output id="lightStrengthOutput" class="lab-field-value">1.00</output></span>
+            <input id="lightStrengthInput" type="range" min="0" max="1.35" step="0.01" value="1">
+          </label>
+          <p class="lab-status-note">RGB 三路色散比例仍使用生产引擎当前固定值。首版不为实验页扩张公共参数接口。</p>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <svg id="liquidGlassFilterDefs" width="0" height="0" aria-hidden="true" focusable="false"><defs></defs></svg>
+  <script src="lib/liquid-glass-geometry.js"></script>
+  <script src="lib/liquid-glass-engine.js"></script>
+  <script>
+    (() => {
+      "use strict";
+
+      const geometry = window.ConlexiconLiquidGlassGeometry;
+      const engineApi = window.ConlexiconLiquidGlassEngine;
+      if (!geometry || !engineApi) {
+        throw new Error("Liquid Glass production modules failed to load.");
+      }
+
+      const elements = {
+        root: document.documentElement,
+        stage: document.querySelector("#labStage"),
+        surface: document.querySelector("#labSurface"),
+        themeButton: document.querySelector("#themeButton"),
+        sceneSelect: document.querySelector("#sceneSelect"),
+        presetSelect: document.querySelector("#presetSelect"),
+        roleSelect: document.querySelector("#roleSelect"),
+        edgeModeSelect: document.querySelector("#edgeModeSelect"),
+        mapLimitSelect: document.querySelector("#mapLimitSelect"),
+        resetButton: document.querySelector("#resetButton"),
+        liveStatus: document.querySelector("#liveStatus"),
+        displacementCanvas: document.querySelector("#displacementCanvas"),
+        normalCanvas: document.querySelector("#normalCanvas"),
+        qualityValue: document.querySelector("#qualityValue"),
+        surfaceStateValue: document.querySelector("#surfaceStateValue"),
+        sizeValue: document.querySelector("#sizeValue"),
+        bezelValue: document.querySelector("#bezelValue"),
+        mapValue: document.querySelector("#mapValue"),
+        cacheValue: document.querySelector("#cacheValue"),
+      };
+
+      const rangeSpecs = {
+        width: { input: "widthInput", output: "widthOutput", suffix: "px", digits: 0 },
+        height: { input: "heightInput", output: "heightOutput", suffix: "px", digits: 0 },
+        radius: { input: "radiusInput", output: "radiusOutput", suffix: "px", digits: 0 },
+        bezel: { input: "bezelInput", output: "bezelOutput", suffix: "px", digits: 0 },
+        thickness: { input: "thicknessInput", output: "thicknessOutput", suffix: "px", digits: 0 },
+        ior: { input: "iorInput", output: "iorOutput", suffix: "", digits: 2 },
+        maxDisplacement: { input: "displacementInput", output: "displacementOutput", suffix: "px", digits: 1 },
+        opticalBlur: { input: "blurInput", output: "blurOutput", suffix: "px", digits: 1 },
+        saturation: { input: "saturationInput", output: "saturationOutput", suffix: "×", digits: 2 },
+        tint: { input: "tintInput", output: "tintOutput", suffix: "", digits: 2 },
+        specularStrength: { input: "specularInput", output: "specularOutput", suffix: "", digits: 2 },
+        lightAngle: { input: "lightAngleInput", output: "lightAngleOutput", suffix: "°", digits: 0 },
+        lightStrength: { input: "lightStrengthInput", output: "lightStrengthOutput", suffix: "", digits: 2 },
+      };
+
+      Object.values(rangeSpecs).forEach((spec) => {
+        spec.input = document.getElementById(spec.input);
+        spec.output = document.getElementById(spec.output);
+      });
+
+      const presets = {
+        continuous: { role: "continuous", width: 720, height: 180, radius: 0, edgeMode: "right", tintLight: 0.52, tintDark: 0.56 },
+        focus: { role: "focus", width: 620, height: 280, radius: 8, edgeMode: "all", tintLight: 0.30, tintDark: 0.34 },
+        floating: { role: "floating", width: 430, height: 220, radius: 8, edgeMode: "all", tintLight: 0.28, tintDark: 0.32 },
+        modal: { role: "modal", width: 700, height: 390, radius: 8, edgeMode: "all", tintLight: 0.32, tintDark: 0.36 },
+      };
+
+      const opticalEngine = engineApi.createEngine({
+        workerUrl: "lib/liquid-glass-map-worker.js",
+        maxBytes: 64 * 1024 * 1024,
+      });
+      let refreshTimer = 0;
+      let previewGeneration = 0;
+      let dragFrame = 0;
+      let dragState = null;
+      let dragPosition = { x: 0, y: 0 };
+      let pendingDragPosition = null;
+
+      function setRangeValue(name, value) {
+        rangeSpecs[name].input.value = String(value);
+      }
+
+      function readNumber(name) {
+        return Number(rangeSpecs[name].input.value);
+      }
+
+      function formatRange(name) {
+        const spec = rangeSpecs[name];
+        const value = Number(spec.input.value);
+        const formatted = spec.digits === 0 ? String(Math.round(value)) : value.toFixed(spec.digits);
+        spec.output.value = `${name === "lightAngle" && value < 0 ? "−" : ""}${name === "lightAngle" ? Math.abs(value) : formatted}${spec.suffix}`;
+      }
+
+      function updateAllOutputs() {
+        Object.keys(rangeSpecs).forEach(formatRange);
+      }
+
+      function applyPreset(name) {
+        const preset = presets[name];
+        if (!preset) {
+          return;
+        }
+        const defaults = engineApi.ROLE_DEFAULTS[preset.role];
+        elements.roleSelect.value = preset.role;
+        elements.edgeModeSelect.value = preset.edgeMode;
+        elements.mapLimitSelect.value = String(defaults.maximumMapDimension);
+        setRangeValue("width", preset.width);
+        setRangeValue("height", preset.height);
+        setRangeValue("radius", preset.radius);
+        setRangeValue("bezel", defaults.bezel);
+        setRangeValue("thickness", defaults.thickness);
+        setRangeValue("ior", defaults.ior);
+        setRangeValue("maxDisplacement", defaults.maxDisplacement);
+        setRangeValue("opticalBlur", defaults.opticalBlur);
+        setRangeValue("saturation", defaults.saturation);
+        setRangeValue("tint", elements.root.dataset.theme === "dark" ? preset.tintDark : preset.tintLight);
+        setRangeValue("specularStrength", defaults.specularStrength);
+        updateAllOutputs();
+        scheduleRefresh();
+      }
+
+      function currentConfig() {
+        const bounds = elements.surface.getBoundingClientRect();
+        const mapDimensions = geometry.mapDimensions(
+          bounds.width || readNumber("width"),
+          bounds.height || readNumber("height"),
+          window.devicePixelRatio || 1,
+          Number(elements.mapLimitSelect.value),
+        );
+        const normalized = geometry.normalizeSurfaceOptions({
+          width: bounds.width || readNumber("width"),
+          height: bounds.height || readNumber("height"),
+          radius: readNumber("radius"),
+          bezel: readNumber("bezel"),
+          thickness: readNumber("thickness"),
+          ior: readNumber("ior"),
+          maxDisplacement: readNumber("maxDisplacement"),
+          specularStrength: readNumber("specularStrength"),
+          edgeMode: elements.edgeModeSelect.value,
+          mapWidth: mapDimensions.width,
+          mapHeight: mapDimensions.height,
+        });
+        return {
+          ...normalized,
+          role: elements.roleSelect.value,
+          maximumMapDimension: Number(elements.mapLimitSelect.value),
+          opticalBlur: readNumber("opticalBlur"),
+          saturation: readNumber("saturation"),
+        };
+      }
+
+      function updateSurfaceAppearance() {
+        const requestedWidth = readNumber("width");
+        const availableWidth = Math.max(120, elements.stage.clientWidth - 40);
+        const width = Math.min(requestedWidth, availableWidth);
+        const height = readNumber("height");
+        const radius = readNumber("radius");
+        const tint = readNumber("tint");
+        const light = elements.root.dataset.theme === "light";
+        elements.surface.style.width = `${width}px`;
+        elements.surface.style.height = `${height}px`;
+        elements.surface.style.borderRadius = `${radius}px`;
+        elements.surface.style.background = light
+          ? `rgba(235, 247, 249, ${tint})`
+          : `rgba(12, 26, 32, ${tint})`;
+        elements.surface.style.setProperty("--lab-fallback-blur", `${readNumber("opticalBlur")}px`);
+        window.requestAnimationFrame(clampSurfacePosition);
+      }
+
+      function surfaceDragLimits() {
+        return {
+          x: Math.max(0, (elements.stage.clientWidth - elements.surface.offsetWidth) / 2),
+          y: Math.max(0, (elements.stage.clientHeight - elements.surface.offsetHeight) / 2),
+        };
+      }
+
+      function setSurfacePosition(x, y) {
+        const limits = surfaceDragLimits();
+        dragPosition = {
+          x: Math.max(-limits.x, Math.min(limits.x, x)),
+          y: Math.max(-limits.y, Math.min(limits.y, y)),
+        };
+        elements.surface.style.transform = `translate3d(${dragPosition.x}px, ${dragPosition.y}px, 0)`;
+      }
+
+      function clampSurfacePosition() {
+        setSurfacePosition(dragPosition.x, dragPosition.y);
+      }
+
+      function flushSurfaceDrag() {
+        dragFrame = 0;
+        if (!pendingDragPosition) {
+          return;
+        }
+        setSurfacePosition(pendingDragPosition.x, pendingDragPosition.y);
+        pendingDragPosition = null;
+      }
+
+      function handleSurfacePointerDown(event) {
+        if (event.button !== 0) {
+          return;
+        }
+        dragState = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          surfaceX: dragPosition.x,
+          surfaceY: dragPosition.y,
+        };
+        elements.surface.classList.add("is-dragging");
+        elements.surface.setPointerCapture(event.pointerId);
+        event.preventDefault();
+      }
+
+      function handleSurfacePointerMove(event) {
+        if (!dragState || event.pointerId !== dragState.pointerId) {
+          return;
+        }
+        pendingDragPosition = {
+          x: dragState.surfaceX + event.clientX - dragState.startX,
+          y: dragState.surfaceY + event.clientY - dragState.startY,
+        };
+        if (!dragFrame) {
+          dragFrame = window.requestAnimationFrame(flushSurfaceDrag);
+        }
+      }
+
+      function finishSurfaceDrag(event) {
+        if (!dragState || event.pointerId !== dragState.pointerId) {
+          return;
+        }
+        if (elements.surface.hasPointerCapture(event.pointerId)) {
+          elements.surface.releasePointerCapture(event.pointerId);
+        }
+        clearSurfaceDrag();
+      }
+
+      function clearSurfaceDrag() {
+        dragState = null;
+        elements.surface.classList.remove("is-dragging");
+      }
+
+      function registerSurface() {
+        updateSurfaceAppearance();
+        opticalEngine.unregister(elements.surface);
+        opticalEngine.register(elements.surface, elements.roleSelect.value, {
+          bezel: readNumber("bezel"),
+          thickness: readNumber("thickness"),
+          ior: readNumber("ior"),
+          maxDisplacement: readNumber("maxDisplacement"),
+          specularStrength: readNumber("specularStrength"),
+          maximumMapDimension: Number(elements.mapLimitSelect.value),
+          opticalBlur: readNumber("opticalBlur"),
+          saturation: readNumber("saturation"),
+          edgeMode: elements.edgeModeSelect.value,
+        }, { forceRefresh: true });
+      }
+
+      function drawMap(canvas, bytes, width, height) {
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d", { alpha: false });
+        const image = context.createImageData(width, height);
+        image.data.set(bytes);
+        context.putImageData(image, 0, 0);
+      }
+
+      function renderMapPreviews(config) {
+        const generation = previewGeneration + 1;
+        previewGeneration = generation;
+        window.setTimeout(() => {
+          if (generation !== previewGeneration) {
+            return;
+          }
+          const previewDimensions = geometry.mapDimensions(config.width, config.height, 1, 220);
+          const maps = geometry.generateSurfaceMaps({
+            ...config,
+            mapWidth: previewDimensions.width,
+            mapHeight: previewDimensions.height,
+          });
+          if (generation !== previewGeneration) {
+            return;
+          }
+          drawMap(elements.displacementCanvas, maps.displacement, maps.width, maps.height);
+          drawMap(elements.normalCanvas, maps.specular, maps.width, maps.height);
+        }, 0);
+      }
+
+      function updateReadout(config = currentConfig()) {
+        const stats = opticalEngine.stats();
+        const surfaceState = elements.surface.dataset.liquidGlassOptics || "unregistered";
+        elements.qualityValue.textContent = stats.quality.toUpperCase();
+        elements.surfaceStateValue.textContent = surfaceState;
+        elements.sizeValue.textContent = `${config.width.toFixed(0)} × ${config.height.toFixed(0)}`;
+        elements.bezelValue.textContent = `${config.effectiveBezel.toFixed(1)}px / guard ${config.bezelGuard.toFixed(1)}`;
+        elements.mapValue.textContent = `${config.mapWidth} × ${config.mapHeight}`;
+        elements.cacheValue.textContent = `${stats.cache.entries} · ${(stats.cache.bytes / 1048576).toFixed(2)} MiB`;
+        elements.liveStatus.textContent = config.q3Eligible
+          ? `${surfaceState} · ${elements.roleSelect.value}`
+          : "Q1 fallback · safe bezel 不足";
+      }
+
+      function refresh() {
+        window.clearTimeout(refreshTimer);
+        registerSurface();
+        const config = currentConfig();
+        renderMapPreviews(config);
+        updateReadout(config);
+        window.setTimeout(() => updateReadout(currentConfig()), 180);
+      }
+
+      function scheduleRefresh() {
+        window.clearTimeout(refreshTimer);
+        refreshTimer = window.setTimeout(refresh, 90);
+      }
+
+      function updateLight() {
+        const radians = readNumber("lightAngle") * Math.PI / 180;
+        opticalEngine.setLightVector(
+          Math.cos(radians),
+          Math.sin(radians),
+          readNumber("lightStrength"),
+        );
+        updateReadout();
+      }
+
+      elements.presetSelect.addEventListener("change", () => {
+        if (elements.presetSelect.value !== "custom") {
+          applyPreset(elements.presetSelect.value);
+        }
+      });
+      elements.resetButton.addEventListener("click", () => {
+        const preset = elements.presetSelect.value === "custom" ? elements.roleSelect.value : elements.presetSelect.value;
+        elements.presetSelect.value = preset;
+        applyPreset(preset);
+      });
+      document.querySelectorAll("[data-optic-control]").forEach((control) => {
+        control.addEventListener("input", () => {
+          elements.presetSelect.value = "custom";
+          updateAllOutputs();
+          scheduleRefresh();
+        });
+        control.addEventListener("change", scheduleRefresh);
+      });
+      rangeSpecs.tint.input.addEventListener("input", () => {
+        formatRange("tint");
+        updateSurfaceAppearance();
+      });
+      rangeSpecs.lightAngle.input.addEventListener("input", () => {
+        formatRange("lightAngle");
+        updateLight();
+      });
+      rangeSpecs.lightStrength.input.addEventListener("input", () => {
+        formatRange("lightStrength");
+        updateLight();
+      });
+      elements.sceneSelect.addEventListener("change", () => {
+        elements.stage.dataset.scene = elements.sceneSelect.value;
+      });
+      elements.themeButton.addEventListener("click", () => {
+        const nextTheme = elements.root.dataset.theme === "dark" ? "light" : "dark";
+        elements.root.dataset.theme = nextTheme;
+        elements.themeButton.setAttribute("aria-pressed", String(nextTheme === "dark"));
+        elements.themeButton.textContent = nextTheme === "dark" ? "切换浅色场景" : "切换暗色场景";
+        const activePreset = presets[elements.presetSelect.value];
+        if (activePreset) {
+          setRangeValue("tint", nextTheme === "dark" ? activePreset.tintDark : activePreset.tintLight);
+          formatRange("tint");
+        }
+        updateSurfaceAppearance();
+      });
+      elements.surface.addEventListener("pointerdown", handleSurfacePointerDown);
+      elements.surface.addEventListener("pointermove", handleSurfacePointerMove);
+      elements.surface.addEventListener("pointerup", finishSurfaceDrag);
+      elements.surface.addEventListener("pointercancel", finishSurfaceDrag);
+      elements.surface.addEventListener("lostpointercapture", clearSurfaceDrag);
+      window.addEventListener("mouseup", clearSurfaceDrag);
+      window.addEventListener("blur", clearSurfaceDrag);
+
+      new MutationObserver(() => updateReadout()).observe(elements.surface, {
+        attributes: true,
+        attributeFilter: ["data-liquid-glass-optics"],
+      });
+      new ResizeObserver(scheduleRefresh).observe(elements.stage);
+
+      applyPreset("focus");
+      opticalEngine.activate(opticalEngine.detectQuality());
+      updateLight();
+      refresh();
+      window.addEventListener("beforeunload", () => opticalEngine.destroy(), { once: true });
+    })();
+  </script>
+</body>
+</html>

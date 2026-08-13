@@ -10,6 +10,7 @@ const liquidGlassPath = path.join(ROOT_DIR, "theme-liquid-glass.css");
 const liquidGlassGeometryPath = path.join(ROOT_DIR, "lib", "liquid-glass-geometry.js");
 const liquidGlassWorkerPath = path.join(ROOT_DIR, "lib", "liquid-glass-map-worker.js");
 const liquidGlassEnginePath = path.join(ROOT_DIR, "lib", "liquid-glass-engine.js");
+const liquidGlassLabPath = path.join(ROOT_DIR, "liquid-glass-lab.html");
 const stylesPath = path.join(ROOT_DIR, "styles.css");
 const indexPath = path.join(ROOT_DIR, "index.html");
 const appPath = path.join(ROOT_DIR, "app.js");
@@ -19,6 +20,8 @@ const liquidGlass = fs.readFileSync(liquidGlassPath, "utf8");
 const liquidGlassGeometry = fs.readFileSync(liquidGlassGeometryPath, "utf8");
 const liquidGlassWorker = fs.readFileSync(liquidGlassWorkerPath, "utf8");
 const liquidGlassEngine = fs.readFileSync(liquidGlassEnginePath, "utf8");
+const liquidGlassLab = fs.readFileSync(liquidGlassLabPath, "utf8");
+const liquidGlassGeometryApi = require(liquidGlassGeometryPath);
 const liquidGlassEngineApi = require(liquidGlassEnginePath);
 const styles = fs.readFileSync(stylesPath, "utf8");
 const index = fs.readFileSync(indexPath, "utf8");
@@ -46,6 +49,39 @@ assert(
     && liquidGlassGeometry.includes("function buildCacheKey"),
   "LQ-4 must provide geometry-aware, chunkable, cacheable surface map generation",
 );
+assert.equal(
+  Object.hasOwn(liquidGlassGeometryApi, "MAP_VERSION"),
+  false,
+  "The session-only geometry cache must not expose a meaningless persistent format version",
+);
+assert(
+  liquidGlassGeometry.includes("function sampleNormalizedSurface(x, y, options)")
+    && liquidGlassGeometry.includes("sampleNormalizedSurface(surfaceX, surfaceY, options)")
+    && !liquidGlassGeometry.includes("version: MAP_VERSION")
+    && !liquidGlassGeometry.includes("`v${MAP_VERSION}`"),
+  "Map generation must use an internal normalized sampling path without version-tagged options or cache keys",
+);
+assert.deepEqual(
+  liquidGlassGeometryApi.EDGE_MODES,
+  ["all", "right", "bottom"],
+  "Liquid Glass geometry must expose only the implemented all-edge and attached-surface edge models",
+);
+assert(
+  liquidGlassGeometry.includes("const effectiveBezel = Math.max(0, Math.min(")
+    && liquidGlassGeometry.includes("effectiveBezel >= MINIMUM_Q3_BEZEL")
+    && liquidGlassGeometry.includes("options.edgeMode")
+    && liquidGlassGeometry.includes("const horizontalInfluence = clamp(")
+    && liquidGlassGeometry.includes("const verticalInfluence = clamp(")
+    && liquidGlassGeometry.includes("const blend = smoothstep(0, blendDepth, edgeDistance);")
+    && liquidGlassGeometry.includes("displacementX: -metrics.normalX * displacement")
+    && liquidGlassGeometry.includes("displacementY: -metrics.normalY * displacement")
+    && liquidGlassGeometry.includes("function lateralOffset(sampleProgress)")
+    && liquidGlassGeometry.includes("Math.max(sampleProgress, 1 / 128)")
+    && liquidGlassGeometry.includes("const derivative = Math.pow(remaining, 3) / Math.pow(base, 0.75);")
+    && liquidGlassGeometry.includes("const rim = Math.pow(1 - edgeProgress, 1.5);")
+    && liquidGlassGeometry.includes("quantize(options.effectiveBezel, 0.5)"),
+  "Q3 geometry must retain a dimension-safe straight-edge bezel, smoothly blend overlapping corner normals, and apply reference-aligned optics",
+);
 assert(
   liquidGlassEngine.includes("class ByteBudgetLru")
     && liquidGlassEngine.includes("class ResilientMapRenderer")
@@ -61,6 +97,64 @@ assert(
     && app.includes("liquidGlassOpticalEngine?.registerMappedSurface")
     && app.includes("liquidGlassOpticalEngine?.unregisterMappedSurface"),
   "The shared app must limit Liquid Glass integration to skin and surface lifecycle signals",
+);
+const liquidGlassLabInlineScripts = [...liquidGlassLab.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
+  .map((match) => match[1].trim())
+  .filter(Boolean);
+assert.equal(liquidGlassLabInlineScripts.length, 1, "The standalone Liquid Glass lab must keep one auditable inline controller");
+assert.doesNotThrow(
+  () => new Function(liquidGlassLabInlineScripts[0]),
+  "The standalone Liquid Glass lab controller must be valid JavaScript",
+);
+assert(
+  liquidGlassLab.indexOf('src="lib/liquid-glass-geometry.js"')
+    < liquidGlassLab.indexOf('src="lib/liquid-glass-engine.js"')
+    && liquidGlassLab.includes('id="liquidGlassFilterDefs"')
+    && liquidGlassLab.includes("engineApi.createEngine")
+    && liquidGlassLab.includes("opticalEngine.register")
+    && liquidGlassLab.includes("geometry.generateSurfaceMaps")
+    && liquidGlassLab.includes("opticalEngine.detectQuality()"),
+  "The standalone lab must execute the production geometry, Worker/filter engine, and quality path",
+);
+for (const requiredLabControl of [
+  "presetSelect",
+  "roleSelect",
+  "edgeModeSelect",
+  "mapLimitSelect",
+  "widthInput",
+  "heightInput",
+  "radiusInput",
+  "bezelInput",
+  "thicknessInput",
+  "iorInput",
+  "displacementInput",
+  "blurInput",
+  "saturationInput",
+  "tintInput",
+  "specularInput",
+  "lightAngleInput",
+  "lightStrengthInput",
+  "displacementCanvas",
+  "normalCanvas",
+]) {
+  assert(liquidGlassLab.includes(`id="${requiredLabControl}"`), `Liquid Glass lab control is missing: ${requiredLabControl}`);
+}
+assert(
+  liquidGlassLab.includes("const availableWidth = Math.max(120, elements.stage.clientWidth - 40);")
+    && liquidGlassLab.includes("const width = Math.min(requestedWidth, availableWidth);")
+    && liquidGlassLab.includes('aria-label="可拖动液态玻璃示例卡片"')
+    && liquidGlassLab.includes("elements.surface.setPointerCapture(event.pointerId)")
+    && liquidGlassLab.includes("window.requestAnimationFrame(flushSurfaceDrag)")
+    && liquidGlassLab.includes('window.addEventListener("blur", clearSurfaceDrag)')
+    && liquidGlassLab.includes('id="radiusInput" data-optic-control type="range" min="0" max="120"')
+    && liquidGlassLab.includes("elements.surface.style.borderRadius = `${radius}px`;")
+    && liquidGlassLab.includes('focus: { role: "focus", width: 620, height: 280, radius: 8')
+    && liquidGlassLab.includes("<h2>Sample</h2>")
+    && !liquidGlassLab.includes("lab-surface-meta")
+    && !liquidGlassLab.includes("acar")
+    && !/(?:fetch\s*\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB|\/api\/)/.test(liquidGlassLab)
+    && !/(?:feGaussianBlur|feDisplacementMap|opticalRefractedRed)/.test(liquidGlassLab),
+  "The lab must stay draggable, neutral, responsive, non-persistent, API-free, and free of a duplicated optical pipeline",
 );
 
 function numericLayer(name) {
@@ -265,6 +359,41 @@ assert.deepEqual(
   },
   "Q3 role defaults must retain the approved integrated optical blur strengths",
 );
+assert.deepEqual(
+  Object.fromEntries(Object.entries(liquidGlassEngineApi.ROLE_DEFAULTS).map(([role, value]) => [
+    role,
+    value.bezel,
+  ])),
+  {
+    continuous: 44,
+    focus: 46,
+    floating: 36,
+    modal: 52,
+    micro: 8,
+  },
+  "Q3 role bezels must retain broad straight-edge optics independently of shared UI corner radii",
+);
+const liquidGlassContinuousDefinitions = liquidGlassSurfaceDefinitions.filter(({ role }) => role === "continuous");
+assert.deepEqual(
+  liquidGlassContinuousDefinitions.map(({ selector, overrides }) => [selector, overrides?.edgeMode]),
+  [[".dictionary-panel", "right"], [".mobile-app-bar", "bottom"]],
+  "Attached continuous surfaces must sample only their exposed edge instead of synthesizing a four-corner lens",
+);
+assert(
+  /if \(!options\.q3Eligible\) \{[\s\S]*?record\.generation \+= 1;[\s\S]*?releaseSurfaceResource\(record\);[\s\S]*?liquidGlassOptics = "fallback";/.test(liquidGlassEngine),
+  "Surfaces without a usable optical rim must cancel stale resources and remain on Q1",
+);
+const liquidGlassFormalSurfaceRadiusPattern = /(?:\.dictionary-panel|\.mobile-app-bar|\.entry-display|#entryForm|\.entry-search-config-menu|\.entry-filter-menu|\.source-suggestions|\.entry-context-menu|\.skin-picker-menu|\.toast|\.app-tooltip|\.entry-quality-issue-tooltip|\.modal-panel|\.network-panel)/;
+assert.deepEqual(
+  liquidGlassStyleBlocks
+    .filter(({ selector, declarations }) => (
+      liquidGlassFormalSurfaceRadiusPattern.test(selector) && /border-radius\s*:/.test(declarations)
+    ))
+    .map(({ selector }) => selector),
+  [],
+  "Liquid Glass formal surfaces must preserve shared component corner radii instead of imposing skin-only geometry",
+);
+assert(!liquidGlass.includes("--liquid-glass-radius-"), "Liquid Glass must not define private surface-radius tokens");
 const liquidGlassOpticalRoleRule = liquidGlass.match(
   /body\[data-ui-skin="liquid-glass"\]\[data-liquid-glass-optics-quality="q3"\] :is\([\s\S]*?\[data-liquid-glass-role="continuous"\]\[data-liquid-glass-optics="ready"\][\s\S]*?\[data-liquid-glass-role="focus"\]\[data-liquid-glass-optics="ready"\][\s\S]*?\[data-liquid-glass-role="floating"\]\[data-liquid-glass-optics="ready"\][\s\S]*?\[data-liquid-glass-role="modal"\]\[data-liquid-glass-optics="ready"\][\s\S]*?\) \{([\s\S]*?)\n  \}/,
 );

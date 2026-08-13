@@ -4,7 +4,7 @@
 
 ## 1. 状态与身份
 
-- 当前状态：LQ-1–LQ-6 已完成并完成第一优先级光学校正与可读性修正；正式 continuous、focus、floating 与 modal 表面在 Q3 使用角色化光学模糊、几何滤镜、真实 RGB rim 和静态环境 specular，micro 保持无逐控件 backdrop 采样的 CSS 体积材质。LQ-7 尚未实施。
+- 当前状态：LQ-1–LQ-6 已完成并完成第一优先级光学校正、可读性修正与圆角法线连续性修正；正式 continuous、focus、floating 与 modal 表面在 Q3 使用角色化光学模糊、受安全 bezel 约束的几何滤镜、真实 RGB rim 和静态环境 specular，micro 保持无逐控件 backdrop 采样的 CSS 体积材质。LQ-7 尚未实施。
 - 用户可见名称：`液态玻璃 / Liquid Glass`。
 - 内部 ID：`liquid-glass`。
 - 经典皮肤继续作为默认与未知值回退；`layered-glass` 继续保持已经冻结的层叠玻璃边界。
@@ -226,7 +226,11 @@ liquidGlassEngine.deactivate();
 - 角色：continuous、focus、floating、modal 或 micro。
 - 输出：X/Y 位移图、X/Y 法线与 rim 图，以及滤镜安全扩展范围。
 
-几何计算以到圆角矩形边界的有符号距离为基础，在 bezel 区域构造平滑高度函数并求局部法线；折射方向由空气到玻璃再回到空气的近似 Snell 路径得到。中心区域保持低位移，边缘在可控宽度内快速弯折，四角按连续法线过渡，禁止使用与形状无关的随机波纹冒充液体。
+几何计算以到圆角矩形边界的有符号距离为基础，在完整 effective bezel 内使用与参考项目一致的 128 采样 convex-squircle 截面和 Snell 路径生成折射轮廓。外缘从 `1 / 128` 采样位置归一化，避免截面导数的奇点把有效折射压缩到最外数像素；轮廓必须连续衰减，外侧四分之一仍保持可见折射，中心边界归零。法线保持朝外用于环境 specular，位移则沿负法线从玻璃内侧取样，与参考实现的 `-normal × displacement` 方向一致，禁止把组件外侧背景整段拖入 rim。specular 使用同一完整 effective bezel，并按相同边缘进度连续衰减；不设置独立百分比限宽。四角按连续法线过渡，禁止使用与形状无关的随机波纹冒充液体。
+
+圆角矩形的最近边法线在内部 medial axis 上会发生方向切换。Q3 先按实际元素尺寸归一化四角半径，外轮廓与最外层法线严格服从组件自身圆角；进入宽 bezel 后，若相邻直边光学区域重叠，则按到两条直边的影响连续混合法线，避免在对角分界产生跳变。`effectiveBezel = min(requestedBezel, minDimension / 2 - guard)`，不再让最小视觉圆角钳制整条直边；`guard` 至少为 `2px` 或一个贴图采样间距。continuous/focus/floating/modal 请求 bezel 为 `44/46/36/52px`。液态皮肤不得覆盖正式组件的 `border-radius` 或定义私有表面圆角 token；导航保持原有贴边几何，内容、菜单、tooltip、modal 和网络面板继续消费共享 UI 圆角。Lab 的圆角滑杆是独立诊断输入，不受此约束。
+
+连续附着表面不被错误建模为四边自由透镜：桌面导航和移动抽屉只激活右边，移动应用栏只激活下边；focus、floating 与 modal 使用完整四边模型。单边模型仍受元素短边与采样 guard 限制，但不受连接到应用边界的零圆角影响。若安全宽度不足 `4px`，该表面稳定使用 Q1 普通 blur，不生成畸形贴图；尺寸恢复后可由既有 `ResizeObserver` 重新进入 Q3。
 
 位移图的 R/G 通道分别编码归一化 X/Y 偏移；第二张图的 R/G/B 分别编码 X 法线、Y 法线与 rim。光源方向不进入几何缓存键；当前产品路径使用默认环境光向量，内部 `setLightVector()` 能力保留给后续正确坐标模型，但应用不再从局部指针位置驱动全部表面。滤镜管线依次完成：
 
@@ -255,7 +259,7 @@ page background            被采样的环境内容
 
 | 角色 | 消费者 | 折射策略 | 动态策略 |
 | --- | --- | --- | --- |
-| `continuous` | 桌面导航、移动应用栏、移动导航抽屉 | `3px` 光学模糊；大面积、中等强度、低频几何折射 | 静态环境 specular；不跟随局部指针 |
+| `continuous` | 桌面导航、移动应用栏、移动导航抽屉 | `3px` 光学模糊；导航/抽屉仅右边、应用栏仅下边参与折射 | 静态环境 specular；不跟随局部指针 |
 | `focus` | 当前词条详情外壳、当前主编辑聚焦面 | `4px` 光学模糊；清晰内容、明显但较宽的边缘折射 | 静态环境 specular；不跟随滚动抖动 |
 | `floating` | 搜索/筛选/皮肤菜单、来源建议、右键菜单、全部结构化 tooltip/popover、toast | `5.5px` 光学模糊；最强边缘厚度、清楚色散和局部放大 | 静态环境 specular；无 CSS 焦散或 settle |
 | `modal` | 信息/确认 modal、词汇网络主面板 | `7px` 光学模糊；中强折射、更宽 rim、更稳定的内容中心 | 静态环境 specular；遮罩不成为 Backdrop Root |
@@ -293,7 +297,7 @@ page background            被采样的环境内容
 ### 13.9 生成、缓存和尺寸生命周期
 
 - Worker 接收纯数值参数并返回 `ImageBitmap`、Blob 或可被 SVG `feImage` 使用的资源；不得把 DOM 传入 Worker。
-- 缓存键至少包含量化后的宽高、圆角、bezel、厚度、IOR、最大位移、角色和贴图版本。宽高默认按约 `4px` 量化，圆角和 bezel 使用更细粒度，不能让小 tooltip 因过度量化明显变形。
+- 缓存键至少包含量化后的宽高、圆角、统一 `effectiveBezel`、有效边模型、厚度、IOR、最大位移和角色。请求 bezel 若收束为相同有效几何应共享资源；宽高默认按约 `4px` 量化，圆角和 bezel 使用更细粒度，不能让小 tooltip 因过度量化明显变形。缓存只存在于当前页面内存，皮肤停用或页面关闭即清空，不使用持久化版本字段。
 - 贴图分辨率按视觉尺寸和设备像素比决定，并设角色级上限；高 DPI 不需要无限增长。优先保证 rim 的采样密度，中心可以低频表示。
 - 使用按字节预算的 LRU，而不是只按元素数量缓存；资源被淘汰或皮肤停用时撤销 object URL 并移除无消费者的 filter。
 - `ResizeObserver` 只观察已注册表面。连续 resize 期间复用最近资源并合并请求，尺寸稳定后再生成精确贴图；旧任务通过 generation token 丢弃。
@@ -308,7 +312,7 @@ page background            被采样的环境内容
 | --- | --- | --- |
 | Q3 完整光学 | URL backdrop filter、Worker/Canvas 和正常透明度可用 | 仅动态 URL filter：角色化光学模糊、几何折射、RGB rim 色散、静态环境 specular 与中性 tint |
 | Q2 缓存光学 | 生成受限但存在相同几何缓存资源 | 复用量化尺寸的几何贴图与统一光源合成，保留真实位移 |
-| Q1 基线玻璃 | URL filter、Canvas 或贴图生成不可用 | LQ-1 普通 blur 和稳定材质边界，无固定 SVG filter 或 CSS 彩色 rim |
+| Q1 基线玻璃 | URL filter、Canvas 或贴图生成不可用，或单个表面安全 bezel 小于 `4px` | LQ-1 普通 blur 和稳定材质边界，无固定 SVG filter 或 CSS 彩色 rim |
 | Q0 辅助实色 | 减少透明度、强制高对比或 backdrop filter 不可用 | 实色材质、系统色和明确边界，无折射/色散 |
 
 能力检测只决定可用上限，不依据设备名称或用户代理猜测性能。若运行期出现持续长任务、资源生成失败或显存压力，可以按表面从 Q3 降到 Q2/Q1，但必须记录可诊断原因，不能静默让同类浮层随机呈现不同材质。
@@ -351,6 +355,7 @@ page background            被采样的环境内容
 视觉验收必须至少确认：
 
 - 不使用背景照片时，组件边界和色域边界在玻璃 rim 内产生与圆角法线一致的弯折；中心区域不出现随机水波或可辨识的下层正文。
+- 全边表面的相邻活跃采样法线连续，corner-to-center medial line 不得形成高梯度斜线；连续导航只在暴露边产生 rim，不在连接屏幕的边缘生成透镜。
 - 同一表面在不同宽高和圆角下具有一致的视觉厚度，而不是纹理被拉伸。
 - 正文、图标、输入光标和焦点环保持清晰，不被 backdrop 位移。
 - 浅色/暗色、中英文、长词典名/标签/tooltip、320/480/768/1024/1440px 全部通过。
@@ -396,8 +401,15 @@ page background            被采样的环境内容
 
 ### 13.16 LQ-6 实施记录
 
-- 几何贴图版本升级；第二张贴图改为编码 X/Y 法线与 rim，光源方向从缓存键移除。全局 `setLightVector()` 只更新缓存 filter 内的 facing-light color matrix 和强度函数，所有可见表面共享同一环境光方向，不因指针移动重建 Worker 贴图。
+- 第二张几何贴图编码 X/Y 法线与 rim，光源方向从缓存键移除。全局 `setLightVector()` 只更新缓存 filter 内的 facing-light color matrix 和强度函数，所有可见表面共享同一环境光方向，不因指针移动重建 Worker 贴图；贴图资源仅在页面内存中存活，不维护跨启动格式版本。
 - 动态 SVG filter 以红、绿、蓝三组有差异的位移尺度分别采样背景，再提取并 screen 重组通道形成依附真实背景的 RGB rim；法线/rim 图与统一光向量合成白色 specular。旧 soft/strong filter、`feTurbulence`、静态 fallback 变量和青紫 inset 色边已经删除，页面只保留空的动态 SVG defs 宿主。
 - Q3 仅在资源 `ready` 时接入动态 URL filter；filter 在 RGB 位移前执行 `3–7px` 角色化光学模糊，并且不再与外部角色级普通 blur 串接。`pending`、生成失败、URL filter 不可用和 Canvas 不可用均继续显示 Q1 普通 blur。减少透明度与强制高对比进入 Q0 实色路径；减少动态保留无动画的静态几何折射。
 - 第一优先级光学校正删除了 LQ-6 初版的 light CSS 状态、环境/局部 radial 焦散、conic rim、默认 `20%` 假高光、局部 pointer 调度和共享向量写入。正式表面的方向性高光现在只来自法线/rim 图和默认环境光在 SVG filter 内合成的 specular。
 - 引擎不再设置 `forming → settled` 或维护 settle 计时器；资源生成成功即原子进入 ready。换皮肤、注销、resize 和辅助媒体变化继续释放资源与质量状态。没有改变公共皮肤偏好、组件 DOM、业务接口或数据存储。
+
+### 13.17 独立 Liquid Glass Lab
+
+- `liquid-glass-lab.html` 是由现有静态服务器直接提供的独立开发页，不进入主应用导航，不读取或写入词典、界面偏好、`data/`、Web Storage 或任何 `/api/` 端点。
+- Lab 必须加载并复用生产 `liquid-glass-geometry.js` 与 `liquid-glass-engine.js`；不得复制 `feGaussianBlur`、三路 displacement、RGB 重组或 specular 合成管线。这样实验页观察到的 Q3/Q1 状态、Worker 生成、LRU 资源和安全 bezel 与产品实现属于同一条执行路径。
+- 首版可调范围限定为生产引擎已经支持的角色、有效边模型、表面宽高与圆角、贴图上限、请求 bezel、厚度、IOR、最大位移、光学内模糊、饱和度、tint、specular 强度及统一光源角度/强度。RGB 三路色散比例继续使用生产固定值，不为实验页单独扩张公共参数接口。
+- 舞台提供连续色场、高对比网格、色带和大号文字四种折射参照，并同步显示实际表面尺寸、Q3/Q1 状态、统一 effective bezel/guard、贴图尺寸、会话缓存占用，以及缩小后的位移图和法线/rim 图。预览卡片使用明确的中性示例文字且可在舞台范围内拖动；拖动只更新合帧后的 transform，不重建几何资源。窄屏时实际几何宽度按舞台净宽收束，避免可见表面与引擎测量不一致。

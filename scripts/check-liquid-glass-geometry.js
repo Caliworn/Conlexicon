@@ -19,8 +19,8 @@ function almostEqual(actual, expected, epsilon, message) {
 const options = geometry.normalizeSurfaceOptions({
   width: 200,
   height: 100,
-  radii: [20, 20, 20, 20],
-  bezel: 20,
+  radii: [8, 8, 8, 8],
+  bezel: 46,
   thickness: 18,
   ior: 1.45,
   maxDisplacement: 15,
@@ -37,10 +37,10 @@ const left = geometry.sampleSurface(2, 50, options);
 const right = geometry.sampleSurface(198, 50, options);
 const top = geometry.sampleSurface(100, 2, options);
 const bottom = geometry.sampleSurface(100, 98, options);
-assert(left.displacementX < 0, "Left edge must sample toward its outward normal");
-assert(right.displacementX > 0, "Right edge must sample toward its outward normal");
-assert(top.displacementY < 0, "Top edge must sample toward its outward normal");
-assert(bottom.displacementY > 0, "Bottom edge must sample toward its outward normal");
+assert(left.displacementX > 0, "Left edge must sample inward instead of importing the exterior backdrop");
+assert(right.displacementX < 0, "Right edge must sample inward instead of importing the exterior backdrop");
+assert(top.displacementY > 0, "Top edge must sample inward instead of importing the exterior backdrop");
+assert(bottom.displacementY < 0, "Bottom edge must sample inward instead of importing the exterior backdrop");
 almostEqual(Math.abs(left.displacementX), Math.abs(right.displacementX), 1e-9, "Opposite horizontal edges must be symmetric");
 almostEqual(Math.abs(top.displacementY), Math.abs(bottom.displacementY), 1e-9, "Opposite vertical edges must be symmetric");
 assert.equal(left.normalX, -1, "Left-edge lighting normals must point out of the surface");
@@ -48,8 +48,8 @@ assert.equal(right.normalX, 1, "Right-edge lighting normals must point out of th
 assert.equal(top.normalY, -1, "Top-edge lighting normals must point out of the surface");
 assert.equal(bottom.normalY, 1, "Bottom-edge lighting normals must point out of the surface");
 
-const cornerA = geometry.sampleSurface(7, 16, options);
-const cornerB = geometry.sampleSurface(16, 7, options);
+const cornerA = geometry.sampleSurface(10, 20, options);
+const cornerB = geometry.sampleSurface(20, 10, options);
 almostEqual(
   Math.hypot(cornerA.displacementX, cornerA.displacementY),
   Math.hypot(cornerB.displacementX, cornerB.displacementY),
@@ -61,6 +61,116 @@ almostEqual(
   Math.abs(cornerB.displacementY),
   0.12,
   "Rounded-corner normals must mirror across the diagonal",
+);
+assert.equal(options.requestedBezel, 46, "Geometry must retain the requested optical bezel");
+assert.equal(options.effectiveBezel, 46, "Small UI corners must not collapse the straight-edge optical bezel");
+
+let minimumAdjacentNormalDot = 1;
+for (let y = 1; y < options.height - 1; y += 1) {
+  for (let x = 1; x < options.width - 1; x += 1) {
+    const sample = geometry.sampleSurface(x, y, options);
+    if (sample.rim <= 0.05) {
+      continue;
+    }
+    for (const adjacent of [
+      geometry.sampleSurface(x + 1, y, options),
+      geometry.sampleSurface(x, y + 1, options),
+    ]) {
+      if (adjacent.rim <= 0.05) {
+        continue;
+      }
+      minimumAdjacentNormalDot = Math.min(
+        minimumAdjacentNormalDot,
+        sample.normalX * adjacent.normalX + sample.normalY * adjacent.normalY,
+      );
+    }
+  }
+}
+assert(
+  minimumAdjacentNormalDot > 0.96,
+  `Active rounded rims must not contain abrupt diagonal normal changes: ${minimumAdjacentNormalDot}`,
+);
+const topOuterOptics = geometry.sampleSurface(options.width / 2, 1, options);
+const topQuarterOptics = geometry.sampleSurface(options.width / 2, options.bezel / 4, options);
+const topMiddleOptics = geometry.sampleSurface(options.width / 2, options.bezel / 2, options);
+const topInnerOptics = geometry.sampleSurface(options.width / 2, options.bezel * 0.75, options);
+assert(
+  Math.abs(topOuterOptics.displacementY) > Math.abs(topQuarterOptics.displacementY)
+    && Math.abs(topQuarterOptics.displacementY) > Math.abs(topMiddleOptics.displacementY),
+  "Reference-aligned convex-squircle refraction must decay continuously toward the readable center",
+);
+assert(
+  Math.abs(topQuarterOptics.displacementY) > Math.abs(topOuterOptics.displacementY) * 0.2,
+  "The full-width profile must retain visible refraction through at least the outer quarter of the bezel",
+);
+assert(
+  Math.abs(topMiddleOptics.displacementY) > 0,
+  "The middle of the requested bezel must remain optically active instead of being hard-clipped",
+);
+assert(
+  topOuterOptics.rim > topQuarterOptics.rim
+    && topQuarterOptics.rim > topMiddleOptics.rim
+    && topMiddleOptics.rim > topInnerOptics.rim
+    && topInnerOptics.rim > 0,
+  "Specular must span and decay across the complete effective bezel",
+);
+assert.equal(
+  geometry.sampleSurface(options.width / 2, options.bezel).rim,
+  0,
+  "Specular must end at the inner boundary of the effective bezel",
+);
+
+const unequalRadii = geometry.normalizeSurfaceOptions({
+  width: 240,
+  height: 120,
+  radii: [44, 36, 28, 18],
+  bezel: 30,
+  mapWidth: 240,
+  mapHeight: 120,
+});
+assert.equal(unequalRadii.effectiveBezel, 30, "Corner radii must not globally clamp the straight-edge optical bezel");
+assert(unequalRadii.q3Eligible, "A dimensionally usable all-edge bezel must remain Q3 eligible");
+
+const rightEdge = geometry.normalizeSurfaceOptions({
+  width: 240,
+  height: 20,
+  radii: [0, 0, 0, 0],
+  bezel: 30,
+  edgeMode: "right",
+  mapWidth: 240,
+  mapHeight: 20,
+});
+assert.equal(rightEdge.effectiveBezel, 8, "A single exposed edge must be constrained by element size, not attached corners");
+assert.equal(geometry.sampleSurface(239, 10, rightEdge).normalX, 1, "Right-edge optics must face only right");
+assert(geometry.sampleSurface(239, 10, rightEdge).displacementX < 0, "Right-edge refraction must sample back into the surface");
+assert.equal(geometry.sampleSurface(120, 1, rightEdge).rim, 0, "Inactive top edges must not receive an optical rim");
+
+const bottomEdge = geometry.normalizeSurfaceOptions({
+  width: 240,
+  height: 40,
+  radii: [0, 0, 0, 0],
+  bezel: 30,
+  edgeMode: "bottom",
+  mapWidth: 240,
+  mapHeight: 40,
+});
+assert.equal(geometry.sampleSurface(120, 39, bottomEdge).normalY, 1, "Bottom-edge optics must face only down");
+assert(geometry.sampleSurface(120, 39, bottomEdge).displacementY < 0, "Bottom-edge refraction must sample back into the surface");
+assert.equal(geometry.sampleSurface(239, 20, bottomEdge).rim, 0, "Inactive right edges must not receive an optical rim");
+
+const tinySurface = geometry.normalizeSurfaceOptions({
+  width: 80,
+  height: 10,
+  radius: 5,
+  bezel: 22,
+  mapWidth: 80,
+  mapHeight: 10,
+});
+assert.equal(tinySurface.q3Eligible, false, "Surfaces without a usable optical rim must select Q1");
+assert.deepEqual(
+  geometry.sampleSurface(1, 1, tinySurface),
+  { displacementX: 0, displacementY: 0, normalX: 0, normalY: 0, rim: 0 },
+  "Ineligible surfaces must not emit malformed displacement or lighting data",
 );
 
 const invalid = geometry.normalizeSurfaceOptions({
@@ -74,19 +184,30 @@ const invalid = geometry.normalizeSurfaceOptions({
 });
 assert(invalid.width >= 8 && invalid.height >= 8, "Invalid surface dimensions must be clamped");
 assert(invalid.ior > 1, "Invalid IOR must be clamped above air");
-assert(invalid.bezel >= 2, "Invalid bezel width must be clamped");
+assert(invalid.requestedBezel >= 2, "Invalid requested bezel width must be clamped");
+assert.equal(invalid.q3Eligible, false, "A normalized zero-radius surface must fall back instead of crossing its medial seam");
 assert(invalid.radii.every((radius) => radius <= Math.min(invalid.width, invalid.height) / 2), "Corner radii must fit the surface");
 
 const keyA = geometry.buildCacheKey(options);
 const keyB = geometry.buildCacheKey({ ...options });
 const keyC = geometry.buildCacheKey({ ...options, width: options.width + 8 });
 const keyWithMovedLight = geometry.buildCacheKey({ ...options, lightX: 0.92, lightY: 0.38 });
+const keyWithRightEdge = geometry.buildCacheKey({ ...options, edgeMode: "right" });
+const keyWithQuantizedBezel = geometry.buildCacheKey({ ...unequalRadii, bezel: 30.2 });
+assert.equal(Object.hasOwn(options, "version"), false, "Normalized geometry must not carry a cache format version");
+assert(!/^v\d+:/.test(keyA), "Session-only geometry cache keys must not carry a persistent format version");
 assert.equal(keyA, keyB, "Equivalent geometry must produce a stable cache key");
 assert.notEqual(keyA, keyC, "Materially different geometry must not share a cache key");
 assert.equal(
   keyA,
   keyWithMovedLight,
   "The unified light vector must update filter matrices without regenerating geometry maps",
+);
+assert.notEqual(keyA, keyWithRightEdge, "Different active-edge models must not share a geometry cache entry");
+assert.equal(
+  geometry.buildCacheKey(unequalRadii),
+  keyWithQuantizedBezel,
+  "Requested bezels that resolve to the same quantized effective bezel must share a cache entry",
 );
 
 const mapsA = geometry.generateSurfaceMaps(options);
