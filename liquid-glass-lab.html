@@ -6,7 +6,7 @@
   <title>Conlexicon Liquid Glass Lab</title>
   <style>
     :root {
-      color-scheme: light dark;
+      color-scheme: light;
       --lab-page: #eaf1f2;
       --lab-panel: #f7fbfb;
       --lab-panel-strong: #ffffff;
@@ -20,6 +20,7 @@
     }
 
     :root[data-theme="dark"] {
+      color-scheme: dark;
       --lab-page: #091216;
       --lab-panel: #101c21;
       --lab-panel-strong: #16252b;
@@ -542,13 +543,37 @@
       }
     }
 
-    @media (prefers-reduced-transparency: reduce), (forced-colors: active) {
-      .lab-surface {
-        background: Canvas;
-        color: CanvasText;
-        border-color: CanvasText;
+    @media (prefers-reduced-transparency: reduce) {
+      .lab-surface,
+      .lab-surface[data-renderer] {
+        border: 1px solid var(--lab-border);
+        background: var(--lab-panel-strong) !important;
+        color: var(--lab-text);
+        box-shadow: var(--lab-shadow);
         -webkit-backdrop-filter: none !important;
         backdrop-filter: none !important;
+      }
+
+      .lab-surface[data-renderer="reference"]::before,
+      .lab-surface[data-renderer="reference"]::after {
+        content: none;
+      }
+    }
+
+    @media (forced-colors: active) {
+      .lab-surface,
+      .lab-surface[data-renderer] {
+        border: 1px solid CanvasText;
+        background: Canvas !important;
+        color: CanvasText;
+        box-shadow: none;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
+
+      .lab-surface[data-renderer="reference"]::before,
+      .lab-surface[data-renderer="reference"]::after {
+        content: none;
       }
     }
   </style>
@@ -875,6 +900,8 @@
         workerUrl: "lib/liquid-glass-map-worker.js",
         maxBytes: 64 * 1024 * 1024,
       });
+      const reducedTransparencyQuery = window.matchMedia("(prefers-reduced-transparency: reduce)");
+      const forcedColorsQuery = window.matchMedia("(forced-colors: active)");
       let refreshTimer = 0;
       let previewGeneration = 0;
       let dragFrame = 0;
@@ -1145,10 +1172,28 @@
         image.src = url;
       }
 
+      function assistedOpticsSuppressed() {
+        return reducedTransparencyQuery.matches || forcedColorsQuery.matches;
+      }
+
+      function clearMapPreviews() {
+        previewGeneration += 1;
+        [elements.displacementCanvas, elements.normalCanvas].forEach((canvas) => {
+          canvas.width = 1;
+          canvas.height = 1;
+          canvas.getContext("2d")?.clearRect(0, 0, 1, 1);
+        });
+      }
+
       function renderReferenceBaseline() {
         updateSurfaceAppearance();
         opticalEngine.unregister(elements.surface);
         const config = currentReferenceConfig();
+        if (assistedOpticsSuppressed()) {
+          elements.referenceSvgDefs.replaceChildren();
+          clearMapPreviews();
+          return { config, result: null };
+        }
         const result = referenceBaseline.rebuildFilter(elements.surface, elements.referenceSvgDefs, config);
         previewGeneration += 1;
         if (result) {
@@ -1194,24 +1239,30 @@
           const width = elements.surface.offsetWidth;
           const height = elements.surface.offsetHeight;
           const clampedBezel = Math.min(referenceConfig.bezelWidth, referenceConfig.radius - 1, Math.min(width, height) / 2 - 1);
-          elements.qualityValue.textContent = "REFERENCE";
-          elements.surfaceStateValue.textContent = "baseline";
+          const suppressed = assistedOpticsSuppressed();
+          elements.qualityValue.textContent = suppressed ? "Q0" : "REFERENCE";
+          elements.surfaceStateValue.textContent = suppressed ? "solid fallback" : "baseline";
           elements.sizeValue.textContent = `${width} × ${height}`;
           elements.bezelValue.textContent = `${clampedBezel.toFixed(1)}px`;
-          elements.mapValue.textContent = `${width} × ${height}`;
+          elements.mapValue.textContent = suppressed ? "disabled" : `${width} × ${height}`;
           elements.cacheValue.textContent = "none";
-          elements.liveStatus.textContent = "Reference Baseline · convex_squircle";
+          elements.liveStatus.textContent = suppressed
+            ? "Reference Baseline · optics disabled"
+            : "Reference Baseline · convex_squircle";
           return;
         }
         const stats = opticalEngine.stats();
         const surfaceState = elements.surface.dataset.liquidGlassOptics || "unregistered";
+        const suppressed = assistedOpticsSuppressed();
         elements.qualityValue.textContent = stats.quality.toUpperCase();
-        elements.surfaceStateValue.textContent = surfaceState;
+        elements.surfaceStateValue.textContent = suppressed ? "solid fallback" : surfaceState;
         elements.sizeValue.textContent = `${config.width.toFixed(0)} × ${config.height.toFixed(0)}`;
         elements.bezelValue.textContent = `${config.effectiveBezel.toFixed(1)}px / guard ${config.bezelGuard.toFixed(1)}`;
-        elements.mapValue.textContent = `${config.mapWidth} × ${config.mapHeight}`;
+        elements.mapValue.textContent = suppressed ? "disabled" : `${config.mapWidth} × ${config.mapHeight}`;
         elements.cacheValue.textContent = `${stats.cache.entries} · ${(stats.cache.bytes / 1048576).toFixed(2)} MiB`;
-        elements.liveStatus.textContent = config.q3Eligible
+        elements.liveStatus.textContent = suppressed
+          ? "Q0 · transparency disabled"
+          : config.q3Eligible
           ? `${surfaceState} · ${elements.roleSelect.value}`
           : "Q1 fallback · safe bezel 不足";
       }
@@ -1226,7 +1277,11 @@
         elements.referenceSvgDefs.replaceChildren();
         registerSurface();
         const config = currentConfig();
-        renderMapPreviews(config);
+        if (assistedOpticsSuppressed()) {
+          clearMapPreviews();
+        } else {
+          renderMapPreviews(config);
+        }
         updateReadout(config);
         window.setTimeout(() => updateReadout(currentConfig()), 180);
       }
@@ -1325,6 +1380,12 @@
       elements.surface.addEventListener("lostpointercapture", clearSurfaceDrag);
       window.addEventListener("mouseup", clearSurfaceDrag);
       window.addEventListener("blur", clearSurfaceDrag);
+      [reducedTransparencyQuery, forcedColorsQuery].forEach((query) => {
+        query.addEventListener("change", () => {
+          opticalEngine.setEnabled(true);
+          refresh();
+        });
+      });
 
       new MutationObserver(() => updateReadout()).observe(elements.surface, {
         attributes: true,

@@ -4383,7 +4383,7 @@ textarea.ipa-single-line::-webkit-scrollbar {
 }
 
 .skin-picker-option:focus-visible {
-  outline: 2px solid var(--ui-focus-ring);
+  outline: 2px solid var(--ui-focus);
   outline-offset: -2px;
 }
 
@@ -5583,6 +5583,10 @@ textarea.ipa-single-line::-webkit-scrollbar {
   .nav-collapse-icon,
   .content-grid,
   .entry-browser-toggle-icon,
+  .morphology-table-toggle-icon,
+  .root-toggle-button .chevron-icon,
+  .entry-quality-issue-tooltip,
+  .toast,
   .theme-toggle-glyph {
     transition: none;
   }

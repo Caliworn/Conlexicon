@@ -55,7 +55,7 @@
   --material-floating-filter: none;
   --material-mobile-bar-background: color-mix(in srgb, #f4f6f2 88%, #ffffff);
   --material-mobile-bar-shadow: 0 10px 24px rgba(24, 36, 48, 0.12);
-  --material-mobile-bar-filter: blur(12px);
+  --material-mobile-bar-filter: none;
   --material-navigation-background: #22313a;
   --material-navigation-shadow: 0 18px 40px rgba(24, 36, 48, 0.12);
   --material-navigation-filter: none;
