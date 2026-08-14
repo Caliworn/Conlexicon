@@ -6,6 +6,7 @@
 
 ### 改进
 
+- Liquid Glass Lab 新增隔离的 `SDF Baseline`：改编 MIT 许可 `PallavAg/liquid-glass-web-react` 的四象限圆角矩形 SDF、edge falloff、线性/球顶位移梯度、RGB 三路色散和 B 通道镜面合成，并保留来源的二值 Alpha 轮廓与方形贴图质量以供真实对照。三条路径共享背景、尺寸、圆角、拖动和读数；新基线不接入生产 Worker、角色 registry 或 LRU。新增第三方许可文本和研究记录，明确 Apple 仅公开设计/API、最初 Reference 来源未声明许可证，以及未经人工 Lab 验收的结果不得进入 Product Engine。
 - Liquid Glass Lab 新增隔离的 `Reference Baseline` 渲染路径：以独立模块逐行移植 `archisvaze/liquid-glass` 当前 SVG 示例的 convex-squircle/Snell profile、全尺寸单路位移图、specular 图和原始 filter primitive 顺序，并保留其源默认参数；Lab 初始展示宽度独立设为可容纳示例文字的 `420px`。Lab 可即时切换 Baseline 与现有 Product Engine，贴图预览和状态读数随路径切换；参考实现不调用或改写生产几何、Worker、RGB 重组、角色注册与 LRU。
 - 收束玻璃效果的样式与几何契约：删除 Lab 控件结构、精确 blur/bezel/tint/动画数值、旧滤镜与缓存标识符墓碑，以及将小圆角与宽 bezel、全宽 rim 误当长期不变量的断言；保留并改写为模块 API、主题分层、正式表面覆盖、辅助降级、单监听器、确定性贴图和字节预算回收等当前行为边界，避免后续光学算法修正被历史实现细节阻挡。
 - 新增独立静态 `liquid-glass-lab.html`：直接复用生产几何、Worker、动态 SVG filter 和会话 LRU，可调角色、有效边、尺寸、圆角、bezel、厚度、IOR、位移、光学模糊、饱和度、tint、specular 与统一光源；提供连续色场/网格/色带/文字背景、Q3/Q1 与 effective bezel 状态、缓存统计及位移/法线贴图预览。预览卡片使用中性示例文字并支持舞台内合帧拖动，不再借用词典词条或展示 IPA/词性标签；实验页不接入产品导航、应用 API、词典数据或参数持久化，窄屏几何按舞台实际净宽收束。
@@ -24,7 +25,9 @@
 
 ### 修复
 
-- 修正三处共享辅助交互缺口：皮肤选择器键盘焦点环改用合法的焦点颜色 token；减少动态模式进一步关闭形态表、词根折叠箭头、质量问题提示和 toast 的空间位移 transition；Liquid Glass Lab 在减少透明度或强制颜色启用时不再只做 CSS 遮蔽，而会停止 Reference SVG/贴图及两条路径的诊断贴图生成，并让 Product Engine 实时切换至 Q0 实色降级。
+- 修复 Liquid Glass Lab 浅色主题的通用 surface 阴影覆盖 Reference Baseline 来源外阴影的问题；Reference 现在在明暗场景下都使用来源项目的 `0 4px var(--reference-outer-shadow-blur) rgba(0,0,0,.18)`，不再混入 Product/Lab 的大面积投影。
+- 移除 Liquid Glass Lab 的 SDF Baseline 上无来源的 tint、`1px` inset 边界与外阴影，使该路径默认只展示来源光学贴图经 Lab `backdrop-filter` 适配后的结果；Reference 和 Product 外观不变，减少透明度与强制颜色降级继续关闭光学伪元素。
+- 修正三处共享辅助交互缺口：皮肤选择器键盘焦点环改用合法的焦点颜色 token；减少动态模式进一步关闭形态表、词根折叠箭头、质量问题提示和 toast 的空间位移 transition；Liquid Glass Lab 在减少透明度或强制颜色启用时不再只做 CSS 遮蔽，而会停止两条 Baseline 的 SVG/贴图及三条路径的诊断贴图生成，并让 Product Engine 实时切换至 Q0 实色降级。
 - 修复 Liquid Glass Lab 在系统关闭透明效果时的暗色降级：Lab 的原生控件色彩模式现在与自身明暗主题同步；减少透明度使用主题化实色面板和文字，并完整关闭 Reference 的透明底色、滤镜及 tint/阴影伪元素，`Canvas` / `CanvasText` 仅保留给强制颜色模式，避免黑色玻璃与黑色文字叠加。
 - 修正液态玻璃边缘的折射与镜面轮廓：位移沿负法线从玻璃内侧取样，外向法线继续只用于环境 specular；折射轮廓改为与参考项目一致的 128 采样 convex-squircle 截面和 Snell 路径，并在完整 effective bezel 内连续衰减，不再由快速归一化把有效折射压缩到最外数像素。specular 同样在完整 effective bezel 内连续衰减，不再保留未经验证的外侧 `18%` 人工限宽。几何缓存只存在于页面内存，新几何直接由有效边模型、effective bezel、尺寸和材质参数区分，不再维护无意义的版本字段。
 - 修复液态玻璃四角可见斜线并恢复应用原有圆角：删除未提交批次新增的液态专用 `34/34/28/42px` 圆角覆盖，导航继续贴合应用边界，内容与浮层重新消费共享组件圆角；Lab 仍可独立调整圆角。几何层不再用最小圆角钳制整个表面的 bezel，continuous/focus/floating/modal 保留 `44/46/36/52px` 请求宽度；外轮廓使用真实组件圆角，宽边带重叠区平滑混合法线，避免 medial-axis 斜线。桌面导航与移动抽屉只生成右侧光学边，移动应用栏只生成下侧光学边；尺寸不足 `4px` 安全宽度的小表面稳定退回 Q1。缓存键和契约继续纳入有效边模型与 effective bezel。

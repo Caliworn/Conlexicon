@@ -15,7 +15,8 @@
 | [Quality Result Plan](QUALITY_RESULT_PLAN.md) | F5-0 已完成 / F5-1–F5-3 待办 | 质量规则集、issue/summary、独立查询 API、结果会话与迁移验收。 |
 | [Style Skin Plan](STYLE_SKIN_PLAN.md) | S0 已完成 | 样式 token、材质角色、视觉基线与通用皮肤边界。 |
 | [Layered Glass Skin Specification](LAYERED_GLASS_SKIN_SPEC.md) | LG-1–LG-4C 已完成 | 层叠玻璃皮肤的层级、透明度、静态与指针响应光学层、运行期选择、降级与性能验收。 |
-| [Liquid Glass Skin Specification](LIQUID_GLASS_SKIN_SPEC.md) | LQ-1–LQ-3 已完成 | 液态玻璃的 token 基线、静态折射、限定动态焦散、降级和性能边界。 |
+| [Liquid Glass Skin Specification](LIQUID_GLASS_SKIN_SPEC.md) | LQ-1–LQ-6 已完成 / LQ-7 待实施 | 液态玻璃的材质角色、生产光学引擎、正式表面覆盖、降级和性能边界。 |
+| [Liquid Glass Web Research](LIQUID_GLASS_RESEARCH.md) | 活跃研究记录 | Apple 公开设计边界、开源实现/许可、三条 Lab 基线、已纠正结论与决策门槛。 |
 
 ## 推荐阅读顺序
 

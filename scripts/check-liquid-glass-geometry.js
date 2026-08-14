@@ -2,6 +2,7 @@
 const assert = require("node:assert/strict");
 
 const geometry = require("../lib/liquid-glass-geometry");
+const sdfBaseline = require("../lib/liquid-glass-sdf-baseline");
 const {
   ByteBudgetLru,
   LiquidGlassEngine,
@@ -163,6 +164,44 @@ assert.deepEqual(mapsA.specular, mapsB.specular, "Specular generation must be de
 assert(
   mapsA.specular.some((value) => value > 0),
   "The generated lighting map must not be empty",
+);
+
+const sdfOptions = {
+  width: 200,
+  height: 100,
+  radius: 30,
+  depth: 14,
+  curvature: 0.65,
+  quality: 128,
+};
+const sdfMapA = sdfBaseline.computeDisplacementMap(sdfOptions);
+const sdfMapB = sdfBaseline.computeDisplacementMap(sdfOptions);
+assert.equal(sdfMapA.width, 128, "The SDF baseline must preserve its requested square map quality");
+assert.equal(sdfMapA.height, 128, "The SDF baseline map must remain square like the upstream renderer");
+assert.equal(sdfMapA.pixels.length, 128 * 128 * 4, "The SDF baseline must emit a complete RGBA map");
+assert.deepEqual(sdfMapA.pixels, sdfMapB.pixels, "The SDF baseline map must be deterministic");
+assert(
+  sdfMapA.pixels.every((value, index) => index % 4 !== 3 || value === 0 || value === 255),
+  "The SDF research baseline must preserve the upstream binary alpha mask for honest aliasing comparisons",
+);
+
+function sdfPixel(map, x, y) {
+  const offset = (y * map.width + x) * 4;
+  return Array.from(map.pixels.slice(offset, offset + 4));
+}
+
+assert.equal(sdfPixel(sdfMapA, 0, 0)[3], 0, "The rounded SDF corner must stay outside the binary shape mask");
+assert.equal(sdfPixel(sdfMapA, 64, 64)[3], 255, "The SDF center must stay inside the binary shape mask");
+const sdfTopLeft = sdfPixel(sdfMapA, 20, 20);
+const sdfTopRight = sdfPixel(sdfMapA, 107, 20);
+const sdfBottomLeft = sdfPixel(sdfMapA, 20, 107);
+assert(Math.abs(sdfTopLeft[0] + sdfTopRight[0] - 255) <= 1, "Mirrored SDF X displacement must remain symmetric");
+assert(Math.abs(sdfTopLeft[1] + sdfBottomLeft[1] - 255) <= 1, "Mirrored SDF Y displacement must remain symmetric");
+assert(
+  !sdfBaseline.computeDisplacementMap({ ...sdfOptions, depth: 30 }).pixels.every(
+    (value, index) => value === sdfMapA.pixels[index],
+  ),
+  "Changing SDF optical depth must materially change the generated map",
 );
 
 const evicted = [];
