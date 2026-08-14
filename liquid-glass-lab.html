@@ -269,6 +269,43 @@
       will-change: transform;
     }
 
+    .lab-surface-content {
+      position: relative;
+      z-index: 2;
+    }
+
+    .lab-surface[data-renderer="reference"] {
+      isolation: isolate;
+      overflow: visible;
+      border: 0;
+      background: transparent !important;
+      box-shadow: 0 4px var(--reference-outer-shadow-blur) rgba(0, 0, 0, 0.18);
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+    }
+
+    .lab-surface[data-renderer="reference"]::before,
+    .lab-surface[data-renderer="reference"]::after {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      content: "";
+      pointer-events: none;
+    }
+
+    .lab-surface[data-renderer="reference"]::before {
+      z-index: 1;
+      background-color: rgba(var(--reference-tint-color), var(--reference-tint-opacity));
+      box-shadow: inset 0 0 var(--reference-shadow-blur) var(--reference-shadow-spread) var(--reference-shadow-color);
+    }
+
+    .lab-surface[data-renderer="reference"]::after {
+      z-index: -1;
+      isolation: isolate;
+      -webkit-backdrop-filter: url(#liquid-glass-reference-filter);
+      backdrop-filter: url(#liquid-glass-reference-filter);
+    }
+
     .lab-surface.is-dragging {
       cursor: grabbing;
     }
@@ -453,6 +490,14 @@
       line-height: 1.45;
     }
 
+    .lab-renderer-controls[hidden] {
+      display: none;
+    }
+
+    .lab-source-link {
+      color: var(--lab-accent);
+    }
+
     @media (max-width: 980px) {
       .lab-layout {
         grid-template-columns: 1fr;
@@ -513,7 +558,7 @@
     <header class="lab-header">
       <div>
         <h1 class="lab-title">Liquid Glass Lab</h1>
-        <p class="lab-subtitle">生产几何与滤镜管线的独立、无持久化实验页</p>
+        <p class="lab-subtitle">Reference Baseline 与生产管线并列、无持久化的实验页</p>
       </div>
       <button id="themeButton" type="button" aria-pressed="true">切换浅色场景</button>
     </header>
@@ -521,6 +566,13 @@
     <div class="lab-layout">
       <section class="lab-workspace" aria-label="液态玻璃预览">
         <div class="lab-toolbar">
+          <div class="lab-toolbar-group">
+            <label for="rendererSelect">渲染路径</label>
+            <select id="rendererSelect">
+              <option value="reference" selected>Reference Baseline</option>
+              <option value="product">Product Engine</option>
+            </select>
+          </div>
           <div class="lab-toolbar-group">
             <label for="sceneSelect">背景参照</label>
             <select id="sceneSelect">
@@ -541,8 +593,8 @@
             <div class="lab-bands"></div>
             <div class="lab-words" aria-hidden="true"><span>a</span><span>ɬ</span><span>ŋ</span><span>ə</span></div>
           </div>
-          <article id="labSurface" class="lab-surface" aria-label="可拖动液态玻璃示例卡片">
-            <div>
+          <article id="labSurface" class="lab-surface" data-renderer="reference" aria-label="可拖动液态玻璃示例卡片">
+            <div class="lab-surface-content">
               <p class="lab-surface-kicker">Neutral preview text</p>
               <h2>Sample</h2>
             </div>
@@ -560,11 +612,11 @@
 
         <div class="lab-maps">
           <figure class="lab-map-figure">
-            <figcaption><span>位移图</span><span>R = X · G = Y · B = rim</span></figcaption>
+            <figcaption><span>位移图</span><span id="displacementLegend">R = X · G = Y</span></figcaption>
             <canvas id="displacementCanvas" class="lab-map-canvas" aria-label="当前参数生成的位移贴图"></canvas>
           </figure>
           <figure class="lab-map-figure">
-            <figcaption><span>法线 / rim 图</span><span>R = normal X · G = normal Y</span></figcaption>
+            <figcaption><span id="secondaryMapTitle">Specular 图</span><span id="secondaryMapLegend">灰度 + Alpha</span></figcaption>
             <canvas id="normalCanvas" class="lab-map-canvas" aria-label="当前参数生成的法线和边缘贴图"></canvas>
           </figure>
         </div>
@@ -573,9 +625,10 @@
       <aside class="lab-controls" aria-label="液态玻璃参数">
         <div class="lab-controls-header">
           <h2>参数</h2>
-          <button id="resetButton" type="button">恢复角色默认值</button>
+          <button id="resetButton" type="button">恢复参考默认值</button>
         </div>
 
+        <div id="productControls" class="lab-renderer-controls" hidden>
         <section class="lab-control-section">
           <h3>角色与边界</h3>
           <div class="lab-select-grid">
@@ -684,21 +737,57 @@
           </label>
           <p class="lab-status-note">RGB 三路色散比例仍使用生产引擎当前固定值。首版不为实验页扩张公共参数接口。</p>
         </section>
+        </div>
+
+        <div id="referenceControls" class="lab-renderer-controls">
+          <section class="lab-control-section">
+            <h3>Reference Glass Shape</h3>
+            <label class="lab-field"><span class="lab-field-heading"><span>Width</span><output id="referenceWidthOutput" class="lab-field-value">420px</output></span><input id="referenceWidthInput" data-reference-control type="range" min="200" max="700" value="420"></label>
+            <label class="lab-field"><span class="lab-field-heading"><span>Height</span><output id="referenceHeightOutput" class="lab-field-value">200px</output></span><input id="referenceHeightInput" data-reference-control type="range" min="200" max="800" value="200"></label>
+            <label class="lab-field"><span class="lab-field-heading"><span>Border Radius</span><output id="referenceRadiusOutput" class="lab-field-value">60px</output></span><input id="referenceRadiusInput" data-reference-control type="range" min="20" max="100" value="60"></label>
+          </section>
+          <section class="lab-control-section">
+            <h3>Reference Refraction</h3>
+            <label class="lab-field"><span class="lab-field-heading"><span>Glass Thickness</span><output id="referenceThicknessOutput" class="lab-field-value">80</output></span><input id="referenceThicknessInput" data-reference-control type="range" min="10" max="200" value="80"></label>
+            <label class="lab-field"><span class="lab-field-heading"><span>Bezel Width</span><output id="referenceBezelOutput" class="lab-field-value">60px</output></span><input id="referenceBezelInput" data-reference-control type="range" min="2" max="60" value="60"></label>
+            <label class="lab-field"><span class="lab-field-heading"><span>Refractive Index</span><output id="referenceIorOutput" class="lab-field-value">3.00</output></span><input id="referenceIorInput" data-reference-control type="range" min="1" max="3" step="0.05" value="3"></label>
+            <label class="lab-field"><span class="lab-field-heading"><span>Scale Ratio</span><output id="referenceScaleOutput" class="lab-field-value">1.00</output></span><input id="referenceScaleInput" data-reference-control type="range" min="0" max="2" step="0.05" value="1"></label>
+          </section>
+          <section class="lab-control-section">
+            <h3>Reference Appearance</h3>
+            <label class="lab-field"><span class="lab-field-heading"><span>Blur</span><output id="referenceBlurOutput" class="lab-field-value">0.3px</output></span><input id="referenceBlurInput" data-reference-control type="range" min="0" max="8" step="0.1" value="0.3"></label>
+            <label class="lab-field"><span class="lab-field-heading"><span>Specular Opacity</span><output id="referenceSpecularOpacityOutput" class="lab-field-value">0.50</output></span><input id="referenceSpecularOpacityInput" data-reference-control type="range" min="0" max="1" step="0.05" value="0.5"></label>
+            <label class="lab-field"><span class="lab-field-heading"><span>Specular Saturation</span><output id="referenceSpecularSaturationOutput" class="lab-field-value">4</output></span><input id="referenceSpecularSaturationInput" data-reference-control type="range" min="0" max="12" step="1" value="4"></label>
+          </section>
+          <section class="lab-control-section">
+            <h3>Reference Surface Styling</h3>
+            <label class="lab-field"><span class="lab-field-heading"><span>Inner Shadow Color</span></span><input id="referenceShadowColorInput" data-reference-control type="color" value="#ffffff"></label>
+            <label class="lab-field"><span class="lab-field-heading"><span>Inner Shadow Blur</span><output id="referenceShadowBlurOutput" class="lab-field-value">20px</output></span><input id="referenceShadowBlurInput" data-reference-control type="range" min="0" max="40" value="20"></label>
+            <label class="lab-field"><span class="lab-field-heading"><span>Inner Shadow Spread</span><output id="referenceShadowSpreadOutput" class="lab-field-value">−5px</output></span><input id="referenceShadowSpreadInput" data-reference-control type="range" min="-15" max="10" value="-5"></label>
+            <label class="lab-field"><span class="lab-field-heading"><span>Tint Color</span></span><input id="referenceTintColorInput" data-reference-control type="color" value="#ffffff"></label>
+            <label class="lab-field"><span class="lab-field-heading"><span>Tint Opacity</span><output id="referenceTintOpacityOutput" class="lab-field-value">6%</output></span><input id="referenceTintOpacityInput" data-reference-control type="range" min="0" max="40" value="6"></label>
+            <label class="lab-field"><span class="lab-field-heading"><span>Outer Shadow Blur</span><output id="referenceOuterShadowOutput" class="lab-field-value">24px</output></span><input id="referenceOuterShadowInput" data-reference-control type="range" min="0" max="50" value="24"></label>
+            <p class="lab-status-note">算法与滤镜顺序逐行移植自 <a class="lab-source-link" href="https://github.com/archisvaze/liquid-glass/blob/main/index.html">archisvaze/liquid-glass</a> 当前 SVG 示例；Baseline 不调用生产几何、Worker、RGB 重组或 LRU。</p>
+          </section>
+        </div>
       </aside>
     </div>
   </main>
 
   <svg id="liquidGlassFilterDefs" width="0" height="0" aria-hidden="true" focusable="false"><defs></defs></svg>
+  <svg width="0" height="0" aria-hidden="true" focusable="false" color-interpolation-filters="sRGB"><defs id="referenceSvgDefs"></defs></svg>
   <script src="lib/liquid-glass-geometry.js"></script>
   <script src="lib/liquid-glass-engine.js"></script>
+  <script src="lib/liquid-glass-reference-baseline.js"></script>
   <script>
     (() => {
       "use strict";
 
       const geometry = window.ConlexiconLiquidGlassGeometry;
       const engineApi = window.ConlexiconLiquidGlassEngine;
-      if (!geometry || !engineApi) {
-        throw new Error("Liquid Glass production modules failed to load.");
+      const referenceBaseline = window.ConlexiconLiquidGlassReferenceBaseline;
+      if (!geometry || !engineApi || !referenceBaseline) {
+        throw new Error("Liquid Glass lab modules failed to load.");
       }
 
       const elements = {
@@ -706,6 +795,7 @@
         stage: document.querySelector("#labStage"),
         surface: document.querySelector("#labSurface"),
         themeButton: document.querySelector("#themeButton"),
+        rendererSelect: document.querySelector("#rendererSelect"),
         sceneSelect: document.querySelector("#sceneSelect"),
         presetSelect: document.querySelector("#presetSelect"),
         roleSelect: document.querySelector("#roleSelect"),
@@ -721,6 +811,14 @@
         bezelValue: document.querySelector("#bezelValue"),
         mapValue: document.querySelector("#mapValue"),
         cacheValue: document.querySelector("#cacheValue"),
+        productControls: document.querySelector("#productControls"),
+        referenceControls: document.querySelector("#referenceControls"),
+        referenceSvgDefs: document.querySelector("#referenceSvgDefs"),
+        displacementLegend: document.querySelector("#displacementLegend"),
+        secondaryMapTitle: document.querySelector("#secondaryMapTitle"),
+        secondaryMapLegend: document.querySelector("#secondaryMapLegend"),
+        referenceShadowColorInput: document.querySelector("#referenceShadowColorInput"),
+        referenceTintColorInput: document.querySelector("#referenceTintColorInput"),
       };
 
       const rangeSpecs = {
@@ -740,6 +838,28 @@
       };
 
       Object.values(rangeSpecs).forEach((spec) => {
+        spec.input = document.getElementById(spec.input);
+        spec.output = document.getElementById(spec.output);
+      });
+
+      const referenceRangeSpecs = {
+        width: { input: "referenceWidthInput", output: "referenceWidthOutput", suffix: "px", digits: 0 },
+        height: { input: "referenceHeightInput", output: "referenceHeightOutput", suffix: "px", digits: 0 },
+        radius: { input: "referenceRadiusInput", output: "referenceRadiusOutput", suffix: "px", digits: 0 },
+        glassThickness: { input: "referenceThicknessInput", output: "referenceThicknessOutput", suffix: "", digits: 0 },
+        bezelWidth: { input: "referenceBezelInput", output: "referenceBezelOutput", suffix: "px", digits: 0 },
+        ior: { input: "referenceIorInput", output: "referenceIorOutput", suffix: "", digits: 2 },
+        scaleRatio: { input: "referenceScaleInput", output: "referenceScaleOutput", suffix: "", digits: 2 },
+        blurAmount: { input: "referenceBlurInput", output: "referenceBlurOutput", suffix: "px", digits: 1 },
+        specularOpacity: { input: "referenceSpecularOpacityInput", output: "referenceSpecularOpacityOutput", suffix: "", digits: 2 },
+        specularSaturation: { input: "referenceSpecularSaturationInput", output: "referenceSpecularSaturationOutput", suffix: "", digits: 0 },
+        shadowBlur: { input: "referenceShadowBlurInput", output: "referenceShadowBlurOutput", suffix: "px", digits: 0 },
+        shadowSpread: { input: "referenceShadowSpreadInput", output: "referenceShadowSpreadOutput", suffix: "px", digits: 0 },
+        tintOpacity: { input: "referenceTintOpacityInput", output: "referenceTintOpacityOutput", suffix: "%", digits: 0 },
+        outerShadowBlur: { input: "referenceOuterShadowInput", output: "referenceOuterShadowOutput", suffix: "px", digits: 0 },
+      };
+
+      Object.values(referenceRangeSpecs).forEach((spec) => {
         spec.input = document.getElementById(spec.input);
         spec.output = document.getElementById(spec.output);
       });
@@ -779,6 +899,33 @@
 
       function updateAllOutputs() {
         Object.keys(rangeSpecs).forEach(formatRange);
+      }
+
+      function readReferenceNumber(name) {
+        return Number(referenceRangeSpecs[name].input.value);
+      }
+
+      function formatReferenceRange(name) {
+        const spec = referenceRangeSpecs[name];
+        const value = Number(spec.input.value);
+        const formatted = spec.digits === 0 ? String(Math.round(value)) : value.toFixed(spec.digits);
+        spec.output.value = `${value < 0 ? "−" : ""}${value < 0 ? formatted.slice(1) : formatted}${spec.suffix}`;
+      }
+
+      function updateReferenceOutputs() {
+        Object.keys(referenceRangeSpecs).forEach(formatReferenceRange);
+      }
+
+      function applyReferenceDefaults() {
+        Object.entries(referenceBaseline.LAB_DEFAULTS).forEach(([name, value]) => {
+          if (referenceRangeSpecs[name]) {
+            referenceRangeSpecs[name].input.value = String(value);
+          }
+        });
+        elements.referenceShadowColorInput.value = referenceBaseline.DEFAULTS.shadowColor;
+        elements.referenceTintColorInput.value = referenceBaseline.DEFAULTS.tintColor;
+        updateReferenceOutputs();
+        scheduleRefresh();
       }
 
       function applyPreset(name) {
@@ -835,21 +982,61 @@
         };
       }
 
+      function currentReferenceConfig() {
+        return {
+          ...referenceBaseline.LAB_DEFAULTS,
+          width: readReferenceNumber("width"),
+          height: readReferenceNumber("height"),
+          radius: readReferenceNumber("radius"),
+          glassThickness: readReferenceNumber("glassThickness"),
+          bezelWidth: readReferenceNumber("bezelWidth"),
+          ior: readReferenceNumber("ior"),
+          scaleRatio: readReferenceNumber("scaleRatio"),
+          blurAmount: readReferenceNumber("blurAmount"),
+          specularOpacity: readReferenceNumber("specularOpacity"),
+          specularSaturation: readReferenceNumber("specularSaturation"),
+          shadowBlur: readReferenceNumber("shadowBlur"),
+          shadowSpread: readReferenceNumber("shadowSpread"),
+          tintOpacity: readReferenceNumber("tintOpacity"),
+          outerShadowBlur: readReferenceNumber("outerShadowBlur"),
+          shadowColor: elements.referenceShadowColorInput.value,
+          tintColor: elements.referenceTintColorInput.value,
+        };
+      }
+
+      function hexToRgb(hex) {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `${r}, ${g}, ${b}`;
+      }
+
       function updateSurfaceAppearance() {
-        const requestedWidth = readNumber("width");
+        const reference = elements.rendererSelect.value === "reference";
+        const config = reference ? currentReferenceConfig() : null;
+        const requestedWidth = reference ? config.width : readNumber("width");
         const availableWidth = Math.max(120, elements.stage.clientWidth - 40);
         const width = Math.min(requestedWidth, availableWidth);
-        const height = readNumber("height");
-        const radius = readNumber("radius");
+        const height = reference ? config.height : readNumber("height");
+        const radius = reference ? config.radius : readNumber("radius");
+        elements.surface.dataset.renderer = reference ? "reference" : "product";
         const tint = readNumber("tint");
         const light = elements.root.dataset.theme === "light";
         elements.surface.style.width = `${width}px`;
         elements.surface.style.height = `${height}px`;
         elements.surface.style.borderRadius = `${radius}px`;
-        elements.surface.style.background = light
+        elements.surface.style.background = reference ? "transparent" : light
           ? `rgba(235, 247, 249, ${tint})`
           : `rgba(12, 26, 32, ${tint})`;
         elements.surface.style.setProperty("--lab-fallback-blur", `${readNumber("opticalBlur")}px`);
+        if (reference) {
+          elements.surface.style.setProperty("--reference-outer-shadow-blur", `${config.outerShadowBlur}px`);
+          elements.surface.style.setProperty("--reference-shadow-blur", `${config.shadowBlur}px`);
+          elements.surface.style.setProperty("--reference-shadow-spread", `${config.shadowSpread}px`);
+          elements.surface.style.setProperty("--reference-shadow-color", config.shadowColor);
+          elements.surface.style.setProperty("--reference-tint-color", hexToRgb(config.tintColor));
+          elements.surface.style.setProperty("--reference-tint-opacity", (config.tintOpacity / 100).toFixed(3));
+        }
         window.requestAnimationFrame(clampSurfacePosition);
       }
 
@@ -942,6 +1129,35 @@
         }, { forceRefresh: true });
       }
 
+      function drawDataUrlMap(canvas, url) {
+        const image = new Image();
+        const generation = previewGeneration;
+        image.addEventListener("load", () => {
+          if (generation !== previewGeneration) {
+            return;
+          }
+          canvas.width = image.naturalWidth;
+          canvas.height = image.naturalHeight;
+          const context = canvas.getContext("2d", { alpha: true });
+          context.clearRect(0, 0, canvas.width, canvas.height);
+          context.drawImage(image, 0, 0);
+        }, { once: true });
+        image.src = url;
+      }
+
+      function renderReferenceBaseline() {
+        updateSurfaceAppearance();
+        opticalEngine.unregister(elements.surface);
+        const config = currentReferenceConfig();
+        const result = referenceBaseline.rebuildFilter(elements.surface, elements.referenceSvgDefs, config);
+        previewGeneration += 1;
+        if (result) {
+          drawDataUrlMap(elements.displacementCanvas, result.dispUrl);
+          drawDataUrlMap(elements.normalCanvas, result.specUrl);
+        }
+        return { config, result };
+      }
+
       function drawMap(canvas, bytes, width, height) {
         canvas.width = width;
         canvas.height = height;
@@ -973,6 +1189,20 @@
       }
 
       function updateReadout(config = currentConfig()) {
+        if (elements.rendererSelect.value === "reference") {
+          const referenceConfig = currentReferenceConfig();
+          const width = elements.surface.offsetWidth;
+          const height = elements.surface.offsetHeight;
+          const clampedBezel = Math.min(referenceConfig.bezelWidth, referenceConfig.radius - 1, Math.min(width, height) / 2 - 1);
+          elements.qualityValue.textContent = "REFERENCE";
+          elements.surfaceStateValue.textContent = "baseline";
+          elements.sizeValue.textContent = `${width} × ${height}`;
+          elements.bezelValue.textContent = `${clampedBezel.toFixed(1)}px`;
+          elements.mapValue.textContent = `${width} × ${height}`;
+          elements.cacheValue.textContent = "none";
+          elements.liveStatus.textContent = "Reference Baseline · convex_squircle";
+          return;
+        }
         const stats = opticalEngine.stats();
         const surfaceState = elements.surface.dataset.liquidGlassOptics || "unregistered";
         elements.qualityValue.textContent = stats.quality.toUpperCase();
@@ -988,6 +1218,12 @@
 
       function refresh() {
         window.clearTimeout(refreshTimer);
+        if (elements.rendererSelect.value === "reference") {
+          renderReferenceBaseline();
+          updateReadout();
+          return;
+        }
+        elements.referenceSvgDefs.replaceChildren();
         registerSurface();
         const config = currentConfig();
         renderMapPreviews(config);
@@ -1010,12 +1246,31 @@
         updateReadout();
       }
 
+      function updateRendererUi() {
+        const reference = elements.rendererSelect.value === "reference";
+        elements.productControls.hidden = reference;
+        elements.referenceControls.hidden = !reference;
+        elements.resetButton.textContent = reference ? "恢复参考默认值" : "恢复角色默认值";
+        elements.displacementLegend.textContent = reference ? "R = X · G = Y" : "R = X · G = Y · B = rim";
+        elements.secondaryMapTitle.textContent = reference ? "Specular 图" : "法线 / rim 图";
+        elements.secondaryMapLegend.textContent = reference ? "灰度 + Alpha" : "R = normal X · G = normal Y";
+        elements.normalCanvas.setAttribute("aria-label", reference ? "当前参考参数生成的 specular 贴图" : "当前参数生成的法线和边缘贴图");
+        if (!reference) {
+          elements.surface.dataset.renderer = "product";
+        }
+        scheduleRefresh();
+      }
+
       elements.presetSelect.addEventListener("change", () => {
         if (elements.presetSelect.value !== "custom") {
           applyPreset(elements.presetSelect.value);
         }
       });
       elements.resetButton.addEventListener("click", () => {
+        if (elements.rendererSelect.value === "reference") {
+          applyReferenceDefaults();
+          return;
+        }
         const preset = elements.presetSelect.value === "custom" ? elements.roleSelect.value : elements.presetSelect.value;
         elements.presetSelect.value = preset;
         applyPreset(preset);
@@ -1028,6 +1283,14 @@
         });
         control.addEventListener("change", scheduleRefresh);
       });
+      document.querySelectorAll("[data-reference-control]").forEach((control) => {
+        control.addEventListener("input", () => {
+          updateReferenceOutputs();
+          scheduleRefresh();
+        });
+        control.addEventListener("change", scheduleRefresh);
+      });
+      elements.rendererSelect.addEventListener("change", updateRendererUi);
       rangeSpecs.tint.input.addEventListener("input", () => {
         formatRange("tint");
         updateSurfaceAppearance();
@@ -1070,8 +1333,10 @@
       new ResizeObserver(scheduleRefresh).observe(elements.stage);
 
       applyPreset("focus");
+      applyReferenceDefaults();
       opticalEngine.activate(opticalEngine.detectQuality());
       updateLight();
+      updateRendererUi();
       refresh();
       window.addEventListener("beforeunload", () => opticalEngine.destroy(), { once: true });
     })();

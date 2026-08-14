@@ -90,9 +90,9 @@ The standalone Liquid Glass tuning and geometry diagnostic page is available at:
 http://localhost:4173/liquid-glass-lab.html
 ```
 
-The lab reuses the production geometry and filter engine, does not call application APIs, and does not persist parameter changes.
+The lab can switch between the production geometry/filter engine and an isolated, source-attributed Reference Baseline ported from `archisvaze/liquid-glass`. It does not call application APIs or persist parameter changes.
 
-该实验页直接复用生产几何与滤镜引擎，不调用应用 API，也不会持久化参数改动。
+该实验页可在生产几何/滤镜引擎与隔离的 `archisvaze/liquid-glass` Reference Baseline 逐行移植之间切换；它不调用应用 API，也不会持久化参数改动。
 
 Run the complete model, SQLite, API, and integration regression suite with:
 

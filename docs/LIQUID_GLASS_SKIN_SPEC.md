@@ -410,6 +410,6 @@ page background            被采样的环境内容
 ### 13.17 独立 Liquid Glass Lab
 
 - `liquid-glass-lab.html` 是由现有静态服务器直接提供的独立开发页，不进入主应用导航，不读取或写入词典、界面偏好、`data/`、Web Storage 或任何 `/api/` 端点。
-- Lab 必须加载并复用生产 `liquid-glass-geometry.js` 与 `liquid-glass-engine.js`；不得复制 `feGaussianBlur`、三路 displacement、RGB 重组或 specular 合成管线。这样实验页观察到的 Q3/Q1 状态、Worker 生成、LRU 资源和安全 bezel 与产品实现属于同一条执行路径。
-- 首版可调范围限定为生产引擎已经支持的角色、有效边模型、表面宽高与圆角、贴图上限、请求 bezel、厚度、IOR、最大位移、光学内模糊、饱和度、tint、specular 强度及统一光源角度/强度。RGB 三路色散比例继续使用生产固定值，不为实验页单独扩张公共参数接口。
-- 舞台提供连续色场、高对比网格、色带和大号文字四种折射参照，并同步显示实际表面尺寸、Q3/Q1 状态、统一 effective bezel/guard、贴图尺寸、会话缓存占用，以及缩小后的位移图和法线/rim 图。预览卡片使用明确的中性示例文字且可在舞台范围内拖动；拖动只更新合帧后的 transform，不重建几何资源。窄屏时实际几何宽度按舞台净宽收束，避免可见表面与引擎测量不一致。
+- Lab 提供互相隔离的两条渲染路径。`Product Engine` 继续复用生产 `liquid-glass-geometry.js`、Worker、`liquid-glass-engine.js`、动态 SVG registry 与会话 LRU；`Reference Baseline` 由独立 `liquid-glass-reference-baseline.js` 按来源项目当前 SVG 示例逐行移植凸 squircle 截面、Snell profile、单路位移图、specular 图与 primitive 合成顺序，不调用或修改生产几何、RGB 重组、角色注册和缓存。
+- Product 可调范围保持为生产引擎已支持的角色、有效边模型、表面宽高与圆角、贴图上限、请求 bezel、厚度、IOR、最大位移、光学内模糊、饱和度、tint、specular 强度及统一光源角度/强度。Reference 保留来源项目的独立参数语义和 `300×200` 源默认几何，以及 `60px` 圆角、`80` 厚度、`60px` bezel、`3.0` IOR、`1.0` scale、`0.3px` blur、`0.5` specular opacity 与 `4` specular saturation；Lab 的初始展示宽度单独提高为 `420px` 以容纳示例文字，重置仍使用该展示值，并保留内阴影、tint 与外阴影调节。
+- 舞台提供连续色场、高对比网格、色带和大号文字四种折射参照，并随当前路径显示生产位移/法线-rim 图或参考位移/specular 图。预览卡片使用明确的中性示例文字且可在舞台范围内拖动；拖动只更新合帧后的 transform，不重建几何资源。窄屏时实际几何宽度按舞台净宽收束，避免可见表面与滤镜测量不一致。

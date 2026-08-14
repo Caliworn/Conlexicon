@@ -6,6 +6,7 @@
 
 ### 改进
 
+- Liquid Glass Lab 新增隔离的 `Reference Baseline` 渲染路径：以独立模块逐行移植 `archisvaze/liquid-glass` 当前 SVG 示例的 convex-squircle/Snell profile、全尺寸单路位移图、specular 图和原始 filter primitive 顺序，并保留其源默认参数；Lab 初始展示宽度独立设为可容纳示例文字的 `420px`。Lab 可即时切换 Baseline 与现有 Product Engine，贴图预览和状态读数随路径切换；参考实现不调用或改写生产几何、Worker、RGB 重组、角色注册与 LRU。
 - 收束玻璃效果的样式与几何契约：删除 Lab 控件结构、精确 blur/bezel/tint/动画数值、旧滤镜与缓存标识符墓碑，以及将小圆角与宽 bezel、全宽 rim 误当长期不变量的断言；保留并改写为模块 API、主题分层、正式表面覆盖、辅助降级、单监听器、确定性贴图和字节预算回收等当前行为边界，避免后续光学算法修正被历史实现细节阻挡。
 - 新增独立静态 `liquid-glass-lab.html`：直接复用生产几何、Worker、动态 SVG filter 和会话 LRU，可调角色、有效边、尺寸、圆角、bezel、厚度、IOR、位移、光学模糊、饱和度、tint、specular 与统一光源；提供连续色场/网格/色带/文字背景、Q3/Q1 与 effective bezel 状态、缓存统计及位移/法线贴图预览。预览卡片使用中性示例文字并支持舞台内合帧拖动，不再借用词典词条或展示 IPA/词性标签；实验页不接入产品导航、应用 API、词典数据或参数持久化，窄屏几何按舞台实际净宽收束。
 - 校正液态玻璃 Q3 的正式光学主线：资源就绪表面现在只消费按实际几何生成的动态 URL filter，不再叠加角色级 `13–30px` 普通 blur；导航、抽屉、移动栏、当前词条、浮层、结构化 tooltip、modal 与词汇网络改用独立低透明中性 tint，并移除组件假渐变、固定方向彩色/明暗边、CSS radial/conic 假光、默认高光和 settle。当前方向性表现只来自 SVG 内的几何折射、RGB 色散与静态环境 specular；局部指针光照暂停至坐标模型另行设计。产品背景新增两层极弱固定交叉纤维参照，Q1 普通 blur、Q0 实色降级、micro 控件与 Q2 定义保持不变。
