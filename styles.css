@@ -1260,7 +1260,7 @@ label span {
 
 .dictionary-panel :where(.tool-button, .utility-button, .nav-collapse-button):active:not(:disabled) {
   box-shadow: var(--material-navigation-control-pressed-shadow);
-  transform: translateY(1px);
+  transform: none;
 }
 
 .tool-icon {

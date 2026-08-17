@@ -28,6 +28,7 @@
 
 ### 修复
 
+- 修复经典与层叠玻璃按住导航底部按钮时临时出现滚动条的问题：工具目的地、皮肤、主题、语言和收起按钮不再通过 `translateY` 扩大工具列表或导航容器的视觉溢出区，pressed 反馈继续由主题背景与阴影表达；液态玻璃行为不变。
 - 修复 Liquid Glass Lab 浅色主题的通用 surface 阴影覆盖 Reference Baseline 来源外阴影的问题；Reference 现在在明暗场景下都使用来源项目的 `0 4px var(--reference-outer-shadow-blur) rgba(0,0,0,.18)`，不再混入 Product/Lab 的大面积投影。
 - 移除 Liquid Glass Lab 的 SDF Baseline 上无来源的 tint、`1px` inset 边界与外阴影，使该路径默认只展示来源光学贴图经 Lab `backdrop-filter` 适配后的结果；Reference 和 Product 外观不变，减少透明度与强制颜色降级继续关闭光学伪元素。
 - 修正三处共享辅助交互缺口：皮肤选择器键盘焦点环改用合法的焦点颜色 token；减少动态模式进一步关闭形态表、词根折叠箭头、质量问题提示和 toast 的空间位移 transition；Liquid Glass Lab 在减少透明度或强制颜色启用时不再只做 CSS 遮蔽，而会停止两条 Baseline 的 SVG/贴图及三条路径的诊断贴图生成，并让 Product Engine 实时切换至 Q0 实色降级。
