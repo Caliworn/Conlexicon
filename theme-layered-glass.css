@@ -69,6 +69,16 @@ body[data-ui-skin="layered-glass"] {
   --material-navigation-control-pressed-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), inset 0 -1px 0 rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.12);
   --material-navigation-action-background: rgba(255, 255, 255, 0.13);
   --material-navigation-action-border: rgba(255, 255, 255, 0.21);
+  --layered-navigation-row-background: rgba(255, 255, 255, 0.05);
+  --layered-navigation-row-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --layered-navigation-row-hover-background: rgba(255, 255, 255, 0.11);
+  --layered-navigation-row-hover-border: rgba(255, 255, 255, 0.15);
+  --layered-navigation-row-hover-shadow: 0 4px 12px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  --layered-navigation-row-active-background: color-mix(in srgb, var(--ui-accent) 20%, var(--material-navigation-control-hover-background));
+  --layered-navigation-row-active-border: color-mix(in srgb, var(--ui-accent) 64%, var(--material-navigation-control-border));
+  --layered-navigation-row-active-shadow: 0 2px 6px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  --layered-navigation-utility-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+  --layered-navigation-utility-hover-shadow: 0 3px 8px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.32), inset 0 -1px 0 rgba(0, 0, 0, 0.12);
   --material-list-item-background: rgba(250, 252, 251, 0.86);
   --material-list-item-secondary-color: inherit;
   --material-list-item-secondary-opacity: 0.76;
@@ -161,6 +171,16 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --material-navigation-control-pressed-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(0, 0, 0, 0.32), 0 2px 7px rgba(0, 0, 0, 0.22);
   --material-navigation-action-background: rgba(255, 255, 255, 0.11);
   --material-navigation-action-border: rgba(255, 255, 255, 0.17);
+  --layered-navigation-row-background: rgba(255, 255, 255, 0.04);
+  --layered-navigation-row-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --layered-navigation-row-hover-background: rgba(255, 255, 255, 0.085);
+  --layered-navigation-row-hover-border: rgba(255, 255, 255, 0.13);
+  --layered-navigation-row-hover-shadow: 0 4px 12px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  --layered-navigation-row-active-background: color-mix(in srgb, var(--ui-accent) 14%, var(--material-navigation-control-hover-background));
+  --layered-navigation-row-active-border: color-mix(in srgb, var(--ui-accent) 56%, var(--material-navigation-control-border));
+  --layered-navigation-row-active-shadow: 0 2px 6px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.17);
+  --layered-navigation-utility-shadow: 0 2px 6px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(0, 0, 0, 0.18);
+  --layered-navigation-utility-hover-shadow: 0 3px 9px rgba(0, 0, 0, 0.23), inset 0 1px 0 rgba(255, 255, 255, 0.26), inset 0 -1px 0 rgba(0, 0, 0, 0.2);
   --material-list-item-background: rgba(30, 42, 46, 0.86);
   --material-list-item-secondary-color: var(--ui-text-muted);
   --material-list-item-secondary-opacity: 1;
@@ -212,6 +232,26 @@ body[data-ui-skin="layered-glass"] .dictionary-panel {
   box-shadow: var(--material-navigation-shadow);
 }
 
+body[data-ui-skin="layered-glass"] .dictionary-panel .tool-button {
+  border-color: transparent;
+  background: var(--layered-navigation-row-background);
+  box-shadow: var(--layered-navigation-row-shadow);
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+body[data-ui-skin="layered-glass"] .dictionary-panel .tool-button:hover:not(.active):not(:disabled) {
+  border-color: var(--layered-navigation-row-hover-border);
+  background: var(--layered-navigation-row-hover-background);
+  box-shadow: var(--layered-navigation-row-hover-shadow);
+}
+
+body[data-ui-skin="layered-glass"] .dictionary-panel .tool-button:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: -2px;
+}
+
 body[data-ui-skin="layered-glass"] .dictionary-panel :where(.utility-button, .nav-collapse-button) {
   border-color: var(--material-navigation-action-border);
   background: var(--material-navigation-action-background);
@@ -224,13 +264,33 @@ body[data-ui-skin="layered-glass"] .dictionary-panel :where(.utility-button, .na
 }
 
 body[data-ui-skin="layered-glass"] .dictionary-panel .tool-button.active {
-  border-color: color-mix(in srgb, var(--ui-accent) 64%, var(--material-navigation-control-border));
-  background: color-mix(in srgb, var(--ui-accent) 20%, var(--material-navigation-control-hover-background));
+  border-color: var(--layered-navigation-row-active-border);
+  background: var(--layered-navigation-row-active-background);
+  box-shadow: var(--layered-navigation-row-active-shadow);
 }
 
-body.dark-theme[data-ui-skin="layered-glass"] .dictionary-panel .tool-button.active {
-  border-color: color-mix(in srgb, var(--ui-accent) 56%, var(--material-navigation-control-border));
-  background: color-mix(in srgb, var(--ui-accent) 14%, var(--material-navigation-control-hover-background));
+body[data-ui-skin="layered-glass"] .dictionary-panel .tool-button:active:not(:disabled) {
+  box-shadow: var(--material-navigation-control-pressed-shadow);
+  transform: translateY(1px);
+}
+
+body[data-ui-skin="layered-glass"] .dictionary-panel .utility-actions .utility-button {
+  border-color: color-mix(in srgb, var(--material-navigation-action-border) 72%, transparent);
+  box-shadow: var(--layered-navigation-utility-shadow);
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+body[data-ui-skin="layered-glass"] .dictionary-panel .utility-actions .utility-button:hover:not(:disabled),
+body[data-ui-skin="layered-glass"] .dictionary-panel .utility-actions .skin-toggle-button[aria-expanded="true"] {
+  box-shadow: var(--layered-navigation-utility-hover-shadow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-ui-skin="layered-glass"] .dictionary-panel :where(.tool-button, .utility-button) {
+    transition: none;
+  }
 }
 
 @property --layered-glass-light-opacity {
@@ -478,10 +538,31 @@ body[data-ui-skin="layered-glass"] [data-layered-glass-pointer="active"] {
     -webkit-backdrop-filter: none;
   }
 
+  body[data-ui-skin="layered-glass"] .dictionary-panel .tool-button,
+  body[data-ui-skin="layered-glass"] .dictionary-panel .tool-button:hover:not(.active):not(:disabled) {
+    border-color: ButtonText;
+    background: ButtonFace;
+    box-shadow: none;
+    color: ButtonText;
+    transform: none;
+  }
+
+  body[data-ui-skin="layered-glass"] .dictionary-panel .utility-actions .utility-button,
+  body[data-ui-skin="layered-glass"] .dictionary-panel .utility-actions .utility-button:hover:not(:disabled),
+  body[data-ui-skin="layered-glass"] .dictionary-panel .utility-actions .skin-toggle-button[aria-expanded="true"] {
+    border-color: ButtonText;
+    background: ButtonFace;
+    box-shadow: none;
+    color: ButtonText;
+    transform: none;
+  }
+
   body[data-ui-skin="layered-glass"] .dictionary-panel .tool-button.active,
   body.dark-theme[data-ui-skin="layered-glass"] .dictionary-panel .tool-button.active {
     border-color: Highlight;
     background: Canvas;
+    box-shadow: none;
     color: CanvasText;
+    transform: none;
   }
 }
