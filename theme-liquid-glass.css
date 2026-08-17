@@ -67,6 +67,7 @@ body[data-ui-skin="liquid-glass"] {
   --material-navigation-control-shadow: none;
   --material-navigation-control-hover-shadow: none;
   --material-navigation-control-pressed-shadow: none;
+  --material-navigation-control-pressed-transform: none;
   --material-navigation-action-background: rgba(255, 255, 255, 0.075);
   --material-navigation-action-border: rgba(255, 255, 255, 0.14);
   --liquid-glass-navigation-active-background: rgba(110, 231, 217, 0.16);
@@ -280,7 +281,6 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel :where(
   .utility-button,
   .nav-collapse-button
 ):active:not(:disabled) {
-  transform: none;
   box-shadow: none;
 }
 

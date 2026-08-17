@@ -1087,12 +1087,10 @@ label span {
 .primary-button:active:not(:disabled),
 .danger-button:active:not(:disabled) {
   box-shadow: var(--material-action-pressed-shadow);
-  transform: translateY(1px);
 }
 
 .secondary-button:active:not(:disabled) {
   box-shadow: var(--material-control-pressed-shadow);
-  transform: translateY(1px);
 }
 
 :is(.primary-button, .secondary-button, .danger-button, .danger-ghost, .icon-button):focus-visible {
@@ -1260,7 +1258,7 @@ label span {
 
 .dictionary-panel :where(.tool-button, .utility-button, .nav-collapse-button):active:not(:disabled) {
   box-shadow: var(--material-navigation-control-pressed-shadow);
-  transform: none;
+  transform: var(--material-navigation-control-pressed-transform);
 }
 
 .tool-icon {

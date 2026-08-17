@@ -69,6 +69,7 @@
   --material-navigation-control-shadow: none;
   --material-navigation-control-hover-shadow: none;
   --material-navigation-control-pressed-shadow: none;
+  --material-navigation-control-pressed-transform: scale(0.985);
   --material-navigation-action-background: rgba(255, 255, 255, 0.12);
   --material-navigation-action-border: rgba(255, 255, 255, 0.18);
   --material-list-item-background: #ffffff;
