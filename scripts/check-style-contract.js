@@ -193,6 +193,23 @@ assert(
 );
 const liquidGlassStyleBlocks = [...liquidGlass.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
   .map((match) => ({ selector: match[1].trim(), declarations: match[2] }));
+const liquidGlassNavigationRowRules = liquidGlassStyleBlocks.filter(({ selector }) => (
+  selector.includes('.dictionary-panel') && selector.includes('.tool-button')
+));
+assert(
+  liquidGlassNavigationRowRules.some(({ selector, declarations }) => (
+    selector.endsWith('.dictionary-panel .tool-button')
+      && /background:\s*transparent;/.test(declarations)
+      && /box-shadow:\s*none;/.test(declarations)
+  ))
+    && liquidGlassNavigationRowRules.every(({ declarations }) => !/backdrop-filter\s*:/.test(declarations))
+    && liquidGlassNavigationRowRules.some(({ selector, declarations }) => (
+      selector.endsWith('.dictionary-panel .tool-button.active')
+        && /background:\s*var\(--liquid-glass-navigation-active-background\);/.test(declarations)
+        && !/(?:linear|radial|conic)-gradient\(/.test(declarations)
+    )),
+  "Liquid Glass navigation must remain one optical surface with flat rows and a non-optical active state",
+);
 const repeatedSurfaceSelectorPattern = /(?:^|[\s,>+~])(?:\.entry-card|\.analysis-card|\.table-row|td|th)(?:$|[\s,:.#\[>+~])/i;
 assert.deepEqual(
   liquidGlassStyleBlocks

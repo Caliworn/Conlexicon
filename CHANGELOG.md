@@ -6,6 +6,9 @@
 
 ### 改进
 
+- 收束液态玻璃工具导航的内部层级：桌面展开栏、rail 与移动抽屉继续共用唯一 continuous Q3 表面，普通工具行改为透明平面列表，hover 使用低透明状态底，active 使用无独立折射、无固定渐变和无外阴影的单色胶囊；底部皮肤、主题和语言命令合并为一个静态组合控件，导航行 pressed 不再位移。改动不增加滤镜、表面注册、监听器或动画帧，减少动态、减少透明度和强制颜色路径同步保留。
+- Liquid Glass Lab 的场景选择器新增参考 demo 使用的五张本地背景图：室内、花丛、森林栈桥、浅水岩石和草地人物。图片按选择加载，可在相同拖动位置和参数下观察大块明暗面、细密纹理、强色彩边界及人物轮廓的折射；素材保持 Lab 研究专用并单独记录来源与参考仓库未声明许可证的边界，不进入产品皮肤。
+- Liquid Glass Lab 的 SDF 面板新增受控比较快捷方式：可一键恢复来源默认、隔离纯折射，并比较 Q128/Q1024、`depth: 30`、线性/球顶梯度和 `radius: 20/100`；每个实验预设都从相同默认值重建，纯折射系列统一关闭 glow、edge highlight 与 specular，避免要求人工逐项复原参数或把残留状态误当算法差异。
 - Liquid Glass Lab 新增隔离的 `SDF Baseline`：改编 MIT 许可 `PallavAg/liquid-glass-web-react` 的四象限圆角矩形 SDF、edge falloff、线性/球顶位移梯度、RGB 三路色散和 B 通道镜面合成，并保留来源的二值 Alpha 轮廓与方形贴图质量以供真实对照。三条路径共享背景、尺寸、圆角、拖动和读数；新基线不接入生产 Worker、角色 registry 或 LRU。新增第三方许可文本和研究记录，明确 Apple 仅公开设计/API、最初 Reference 来源未声明许可证，以及未经人工 Lab 验收的结果不得进入 Product Engine。
 - Liquid Glass Lab 新增隔离的 `Reference Baseline` 渲染路径：以独立模块逐行移植 `archisvaze/liquid-glass` 当前 SVG 示例的 convex-squircle/Snell profile、全尺寸单路位移图、specular 图和原始 filter primitive 顺序，并保留其源默认参数；Lab 初始展示宽度独立设为可容纳示例文字的 `420px`。Lab 可即时切换 Baseline 与现有 Product Engine，贴图预览和状态读数随路径切换；参考实现不调用或改写生产几何、Worker、RGB 重组、角色注册与 LRU。
 - 收束玻璃效果的样式与几何契约：删除 Lab 控件结构、精确 blur/bezel/tint/动画数值、旧滤镜与缓存标识符墓碑，以及将小圆角与宽 bezel、全宽 rim 误当长期不变量的断言；保留并改写为模块 API、主题分层、正式表面覆盖、辅助降级、单监听器、确定性贴图和字节预算回收等当前行为边界，避免后续光学算法修正被历史实现细节阻挡。

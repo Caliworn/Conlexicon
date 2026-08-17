@@ -50,7 +50,7 @@
 
 ### 4.3 连续导航
 
-桌面导航、移动应用栏和移动抽屉使用深色半透明连续玻璃。Q3 对单实例连续表面使用受限分辨率的几何折射，在动态 URL filter 内先执行 `3px` 光学模糊，再叠加角色级中性 tint；Q1 独立保留普通背景模糊、低对比反射和厚度阴影，以控制大面积合成成本。
+桌面导航、移动应用栏和移动抽屉使用深色半透明连续玻璃。Q3 对单实例连续表面使用受限分辨率的几何折射，在动态 URL filter 内先执行 `3px` 光学模糊，再叠加角色级中性 tint；Q1 独立保留普通背景模糊、低对比反射和厚度阴影，以控制大面积合成成本。工具导航内部是同一玻璃上的平面列表行：idle 透明，hover 使用低透明中性状态底，active 使用无独立折射、无固定渐变和无外阴影的选择胶囊。展开栏、rail 和移动抽屉共享这一状态语言，不把每个工具项注册成玻璃表面。
 
 ### 4.4 聚焦对象
 
@@ -64,7 +64,7 @@
 
 ### 4.6 控件
 
-按钮、输入框和 select 使用微型玻璃体积：静止时有上缘高光和下缘暗边，hover 增强镜面，pressed 收紧外阴影并增加内压感。控件不独立启用 backdrop blur，避免大量小合成层。
+一般按钮、输入框和 select 使用微型玻璃体积：静止时有上缘高光和下缘暗边，hover 增强镜面，pressed 收紧外阴影并增加内压感。工具导航行是连续导航表面的内容，不使用该逐控件体积；底部皮肤、主题和语言命令复用一个无 backdrop filter 的静态组合控件，收起导航按钮作为独立命令保留轻量边界。控件均不独立启用 backdrop blur，避免大量小合成层。
 
 ## 5. LQ-1 token-only 基线
 
@@ -412,6 +412,13 @@ page background            被采样的环境内容
 - `liquid-glass-lab.html` 是由现有静态服务器直接提供的独立开发页，不进入主应用导航，不读取或写入词典、界面偏好、`data/`、Web Storage 或任何 `/api/` 端点。
 - Lab 提供互相隔离的三条渲染路径。`Product Engine` 继续复用生产 `liquid-glass-geometry.js`、Worker、`liquid-glass-engine.js`、动态 SVG registry 与会话 LRU；`Reference Baseline` 由独立 `liquid-glass-reference-baseline.js` 按最初来源项目当前 SVG 示例复现凸 squircle 截面、Snell profile、单路位移图、specular 图与 primitive 合成顺序；`SDF Baseline` 由独立 `liquid-glass-sdf-baseline.js` 改编 MIT 许可的 PallavAg 实现，以圆角矩形 SDF 计算边界/falloff、线性或球顶梯度计算位移，并使用 RGB 三路色散、B 通道镜面和二值 Alpha 轮廓。SDF 默认不附加无来源的 tint、边界或外阴影。两条 Baseline 均不调用或修改生产几何、角色注册和缓存。
 - Product 可调范围保持为生产引擎已支持的角色、有效边模型、表面宽高与圆角、贴图上限、请求 bezel、厚度、IOR、最大位移、光学内模糊、饱和度、tint、specular 强度及统一光源角度/强度。Reference 保留最初来源的独立参数语义。SDF 保留来源的 strength、chromatic aberration、blur、depth、curvature、splay、glow、edge highlight、specular、angle 和固定方形 quality 语义；两条 Baseline 的 Lab 初始几何均为可容纳示例文字的 `420×200px`、`60px` 圆角。
-- 舞台提供连续色场、高对比网格、色带和大号文字四种折射参照，并随当前路径显示生产位移/法线-rim 图、Reference 位移/specular 图或 SDF RGBA 位移/B 通道镜面图。预览卡片使用明确的中性示例文字且可在舞台范围内拖动；拖动只更新合帧后的 transform，不重建几何资源。窄屏时实际几何宽度按舞台净宽收束，避免可见表面与滤镜测量不一致。
+- 舞台提供连续色场、高对比网格、色带和大号文字四种诊断参照，并提供最初参考 demo 使用的室内、花丛、森林栈桥、浅水岩石和草地人物五张本地背景图；图片仅在选中时加载，不进入产品皮肤。舞台随当前路径显示生产位移/法线-rim 图、Reference 位移/specular 图或 SDF RGBA 位移/B 通道镜面图。预览卡片使用明确的中性示例文字且可在舞台范围内拖动；拖动只更新合帧后的 transform，不重建几何资源。窄屏时实际几何宽度按舞台净宽收束，避免可见表面与滤镜测量不一致。
 - Lab 的 `color-scheme` 必须跟随自身明暗主题，而不是同时声明两种模式。系统减少透明度时三条渲染路径统一关闭 backdrop filter、Baseline 伪元素与透明底色，并使用当前 Lab 主题的实色 panel/text token；只有强制颜色模式使用 `Canvas` / `CanvasText` 系统色。减少透明度或强制颜色启用期间，两条 Baseline 不再构建 SVG filter/贴图，Product Engine 重新探测为 Q0，全部诊断贴图停止生成；偏好解除后按当前参数恢复。
 - 第三方来源、许可、已纠正的 SDF 认识和人工对照问题单独记录在 `docs/LIQUID_GLASS_RESEARCH.md`；研究结论未经人工验收不得倒灌为生产契约。
+
+### 13.18 连续导航内部层级收束
+
+- `.dictionary-panel` 继续作为唯一的 `continuous` Q3 导航表面，保留现有右侧暴露边模型、角色 tint、Q1/Q0 降级和运行期资源生命周期；工具行、active 状态和底部工具组均不注册 backdrop surface，也不增加滤镜、监听器或动画帧。
+- 工具行删除常态固定渐变、边框层级和多层内外阴影，改为透明 idle、低透明 hover 与单色 active 胶囊；active 只以状态 tint 和单色图标强调表达当前目的地。pressed 不再位移或模拟被压入独立玻璃，键盘焦点使用独立的内侧焦点环。
+- 皮肤、主题和语言命令复用现有 `.utility-actions` DOM 形成一个静态组合控件，内部单元透明且只在 hover、展开或 pressed 时显示状态底；收起按钮保持独立小型命令。展开、rail 和移动抽屉继续使用相同 DOM 与导航协议，经典和层叠玻璃样式不受影响。
+- 减少动态关闭导航状态 transition；减少透明度、无 backdrop filter 和强制颜色继续沿现有 Q0/Q1 路径工作。样式契约只保护“单一光学容器、平面工具行、active 无组件假渐变和导航行无逐项 backdrop filter”的结构边界，不冻结具体透明度、间距、圆角或时长。

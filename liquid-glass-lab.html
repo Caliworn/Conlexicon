@@ -189,6 +189,18 @@
       background: radial-gradient(circle, rgba(175, 90, 222, 0.84), rgba(175, 90, 222, 0) 68%);
     }
 
+    .lab-photo {
+      position: absolute;
+      inset: 0;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: cover;
+    }
+
+    .lab-photo[hidden] {
+      display: none;
+    }
+
     .lab-grid {
       position: absolute;
       inset: 0;
@@ -246,6 +258,11 @@
     .lab-stage[data-scene="bands"] .lab-backdrop::before,
     .lab-stage[data-scene="bands"] .lab-backdrop::after {
       opacity: 0.34;
+    }
+
+    .lab-stage[data-scene^="photo-"] .lab-backdrop::before,
+    .lab-stage[data-scene^="photo-"] .lab-backdrop::after {
+      opacity: 0;
     }
 
     .lab-surface {
@@ -511,6 +528,19 @@
       line-height: 1.45;
     }
 
+    .lab-compare-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px;
+    }
+
+    .lab-compare-grid button {
+      min-width: 0;
+      padding: 7px 9px;
+      font-size: 11px;
+      line-height: 1.25;
+    }
+
     .lab-renderer-controls[hidden] {
       display: none;
     }
@@ -624,10 +654,19 @@
           <div class="lab-toolbar-group">
             <label for="sceneSelect">背景参照</label>
             <select id="sceneSelect">
-              <option value="field">连续色场</option>
-              <option value="grid">高对比网格</option>
-              <option value="bands">色带</option>
-              <option value="type">大号文字</option>
+              <optgroup label="诊断场景">
+                <option value="field">连续色场</option>
+                <option value="grid">高对比网格</option>
+                <option value="bands">色带</option>
+                <option value="type">大号文字</option>
+              </optgroup>
+              <optgroup label="参考项目原图">
+                <option value="photo-interior">室内</option>
+                <option value="photo-flowers">花丛</option>
+                <option value="photo-forest">森林栈桥</option>
+                <option value="photo-water">浅水岩石</option>
+                <option value="photo-people">草地人物</option>
+              </optgroup>
             </select>
           </div>
           <div class="lab-toolbar-group">
@@ -637,6 +676,7 @@
 
         <div id="labStage" class="lab-stage" data-scene="field">
           <div class="lab-backdrop">
+            <div id="labPhoto" class="lab-photo" aria-hidden="true" hidden></div>
             <div class="lab-grid"></div>
             <div class="lab-bands"></div>
             <div class="lab-words" aria-hidden="true"><span>a</span><span>ɬ</span><span>ŋ</span><span>ə</span></div>
@@ -821,6 +861,21 @@
 
         <div id="sdfControls" class="lab-renderer-controls" hidden>
           <section class="lab-control-section">
+            <h3>Controlled Comparisons</h3>
+            <div class="lab-compare-grid">
+              <button type="button" data-sdf-preset="source">来源默认</button>
+              <button type="button" data-sdf-preset="optics">纯折射 · Q512</button>
+              <button type="button" data-sdf-preset="quality-low">低清边界 · Q128</button>
+              <button type="button" data-sdf-preset="quality-high">高精边界 · Q1024</button>
+              <button type="button" data-sdf-preset="depth-wide">宽边带 · D30</button>
+              <button type="button" data-sdf-preset="linear">线性坡度 · C0</button>
+              <button type="button" data-sdf-preset="dome">球顶坡度 · C1</button>
+              <button type="button" data-sdf-preset="radius-small">小圆角 · R20</button>
+              <button type="button" data-sdf-preset="radius-large">大圆角 · R100</button>
+            </div>
+            <p class="lab-status-note">每个预设都会先恢复同一组来源默认参数；除“来源默认”外均关闭 glow、edge highlight 与 specular，只修改按钮标注的单一变量。</p>
+          </section>
+          <section class="lab-control-section">
             <h3>SDF Glass Shape</h3>
             <label class="lab-field"><span class="lab-field-heading"><span>Width</span><output id="sdfWidthOutput" class="lab-field-value">420px</output></span><input id="sdfWidthInput" data-sdf-control type="range" min="200" max="700" value="420"></label>
             <label class="lab-field"><span class="lab-field-heading"><span>Height</span><output id="sdfHeightOutput" class="lab-field-value">200px</output></span><input id="sdfHeightInput" data-sdf-control type="range" min="100" max="480" value="200"></label>
@@ -875,6 +930,7 @@
       const elements = {
         root: document.documentElement,
         stage: document.querySelector("#labStage"),
+        photo: document.querySelector("#labPhoto"),
         surface: document.querySelector("#labSurface"),
         themeButton: document.querySelector("#themeButton"),
         rendererSelect: document.querySelector("#rendererSelect"),
@@ -905,6 +961,14 @@
         referenceShadowColorInput: document.querySelector("#referenceShadowColorInput"),
         referenceTintColorInput: document.querySelector("#referenceTintColorInput"),
       };
+
+      const photoScenes = Object.freeze({
+        "photo-interior": "assets/liquid-glass-lab/interior.jpg",
+        "photo-flowers": "assets/liquid-glass-lab/reference-1.jpg",
+        "photo-forest": "assets/liquid-glass-lab/reference-2.jpg",
+        "photo-water": "assets/liquid-glass-lab/reference-3.jpg",
+        "photo-people": "assets/liquid-glass-lab/reference-4.jpg",
+      });
 
       const rangeSpecs = {
         width: { input: "widthInput", output: "widthOutput", suffix: "px", digits: 0 },
@@ -981,6 +1045,23 @@
         modal: { role: "modal", width: 700, height: 390, radius: 8, edgeMode: "all", tintLight: 0.32, tintDark: 0.36 },
       };
 
+      const sdfOpticsOnly = Object.freeze({
+        glow: 0,
+        edgeHighlight: 0,
+        specular: 0,
+      });
+      const sdfComparisonPresets = Object.freeze({
+        source: {},
+        optics: { ...sdfOpticsOnly },
+        "quality-low": { ...sdfOpticsOnly, quality: 128 },
+        "quality-high": { ...sdfOpticsOnly, quality: 1024 },
+        "depth-wide": { ...sdfOpticsOnly, depth: 30 },
+        linear: { ...sdfOpticsOnly, curvature: 0 },
+        dome: { ...sdfOpticsOnly, curvature: 1 },
+        "radius-small": { ...sdfOpticsOnly, radius: 20 },
+        "radius-large": { ...sdfOpticsOnly, radius: 100 },
+      });
+
       const opticalEngine = engineApi.createEngine({
         workerUrl: "lib/liquid-glass-map-worker.js",
         maxBytes: 64 * 1024 * 1024,
@@ -1056,15 +1137,28 @@
         scheduleRefresh();
       }
 
-      function applySdfDefaults() {
-        Object.entries(sdfBaseline.LAB_DEFAULTS).forEach(([name, value]) => {
+      function applySdfValues(overrides = {}) {
+        const values = { ...sdfBaseline.LAB_DEFAULTS, ...overrides };
+        Object.entries(values).forEach(([name, value]) => {
           if (sdfRangeSpecs[name]) {
             sdfRangeSpecs[name].input.value = String(value);
           }
         });
-        elements.sdfQualitySelect.value = String(sdfBaseline.LAB_DEFAULTS.quality);
+        elements.sdfQualitySelect.value = String(values.quality);
         updateSdfOutputs();
         scheduleRefresh();
+      }
+
+      function applySdfDefaults() {
+        applySdfValues();
+      }
+
+      function applySdfComparisonPreset(name) {
+        const overrides = sdfComparisonPresets[name];
+        if (!overrides) {
+          return;
+        }
+        applySdfValues(overrides);
       }
 
       function applyPreset(name) {
@@ -1554,6 +1648,9 @@
         });
         control.addEventListener("change", scheduleRefresh);
       });
+      document.querySelectorAll("[data-sdf-preset]").forEach((button) => {
+        button.addEventListener("click", () => applySdfComparisonPreset(button.dataset.sdfPreset));
+      });
       elements.rendererSelect.addEventListener("change", updateRendererUi);
       rangeSpecs.tint.input.addEventListener("input", () => {
         formatRange("tint");
@@ -1567,9 +1664,15 @@
         formatRange("lightStrength");
         updateLight();
       });
-      elements.sceneSelect.addEventListener("change", () => {
-        elements.stage.dataset.scene = elements.sceneSelect.value;
-      });
+      function applyScene() {
+        const scene = elements.sceneSelect.value;
+        const photoUrl = photoScenes[scene];
+        elements.stage.dataset.scene = scene;
+        elements.photo.hidden = !photoUrl;
+        elements.photo.style.backgroundImage = photoUrl ? `url("${photoUrl}")` : "";
+      }
+
+      elements.sceneSelect.addEventListener("change", applyScene);
       elements.themeButton.addEventListener("click", () => {
         const nextTheme = elements.root.dataset.theme === "dark" ? "light" : "dark";
         elements.root.dataset.theme = nextTheme;
@@ -1605,6 +1708,7 @@
       applyPreset("focus");
       applyReferenceDefaults();
       applySdfDefaults();
+      applyScene();
       opticalEngine.activate(opticalEngine.detectQuality());
       updateLight();
       updateRendererUi();
