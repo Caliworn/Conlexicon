@@ -363,7 +363,7 @@ fieldset {
   align-content: center;
   padding: 28px;
   border: 1px dashed var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   background: var(--material-panel-background);
 }
 
@@ -455,7 +455,7 @@ fieldset {
   min-height: 38px;
   padding: 8px 13px;
   border: 1px solid color-mix(in srgb, var(--ui-accent) 55%, var(--ui-border));
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--material-panel-background) 94%, transparent);
   box-shadow: var(--material-panel-shadow);
   color: var(--ui-accent-hover);
@@ -589,7 +589,7 @@ fieldset {
   gap: 10px;
   overflow: auto;
   border: 1px solid var(--material-floating-border);
-  border-radius: 8px;
+  border-radius: var(--radius-floating);
   padding: 14px;
   background: var(--material-floating-background);
   box-shadow: var(--material-floating-shadow);
@@ -643,7 +643,7 @@ fieldset {
   gap: 14px;
   overflow: auto;
   border: 1px solid var(--material-floating-border);
-  border-radius: 8px;
+  border-radius: var(--radius-floating);
   padding: 14px;
   background: var(--material-floating-background);
   box-shadow: var(--material-floating-shadow);
@@ -850,7 +850,7 @@ fieldset {
   max-width: 100%;
   padding: 0 10px;
   border: 1px solid var(--ui-accent);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--ui-accent-soft);
   color: var(--ui-accent-hover);
   font-size: var(--active-filter-control-font-size);
@@ -881,7 +881,7 @@ fieldset {
   aspect-ratio: 1;
   flex: 0 0 auto;
   border: 1px solid color-mix(in srgb, var(--ui-accent) 48%, transparent);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   padding: 0;
   background: var(--material-control-background);
   color: var(--ui-accent-hover);
@@ -1044,7 +1044,7 @@ label span {
   max-width: 100%;
   min-height: 38px;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   padding: 0 14px;
   font-weight: 800;
   white-space: nowrap;
@@ -1149,7 +1149,7 @@ label span {
   width: 28px;
   height: 28px;
   border: 1px solid var(--material-control-border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--material-control-background);
   color: var(--ui-accent);
   font-weight: 950;
@@ -1208,7 +1208,7 @@ label span {
   min-height: 32px;
   padding: 5px 10px;
   border: 1px dashed var(--material-inset-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   background: var(--material-inset-background);
   color: var(--ui-text-muted);
   font-size: 0.78rem;
@@ -1232,8 +1232,15 @@ label span {
 .entry-card {
   width: 100%;
   border: 1px solid transparent;
-  border-radius: 8px;
   text-align: left;
+}
+
+.tool-button {
+  border-radius: var(--radius-control);
+}
+
+.entry-card {
+  border-radius: var(--radius-panel);
 }
 
 .tool-button {
@@ -1565,7 +1572,7 @@ label span {
   max-width: 100%;
   min-height: 32px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   padding: 0 10px;
   background: var(--ui-accent-soft);
   color: var(--ui-accent-hover);
@@ -1578,7 +1585,7 @@ label span {
   max-height: 180px;
   overflow: auto;
   border: 1px solid var(--material-floating-border);
-  border-radius: 8px;
+  border-radius: var(--radius-floating);
   padding: 6px;
   background: var(--material-floating-background);
   box-shadow: var(--material-floating-shadow);
@@ -1618,7 +1625,7 @@ label span {
   min-width: 120px;
   max-width: 100%;
   border: 1px solid var(--material-control-border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   padding: 10px 12px;
   background: var(--material-control-background);
   color: var(--ui-text);
@@ -1778,7 +1785,7 @@ button.pending-source:focus-visible {
   gap: 12px;
   padding: 14px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   background: color-mix(in srgb, var(--material-panel-background) 94%, var(--ui-canvas-bg));
 }
 
@@ -1819,7 +1826,7 @@ button.pending-source:focus-visible {
 .morphology-display-group {
   padding: 14px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   background: color-mix(in srgb, var(--material-panel-background) 92%, var(--ui-canvas-bg));
 }
 
@@ -2062,7 +2069,7 @@ button.pending-source:focus-visible {
   max-width: 100%;
   padding: 16px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   background: var(--material-panel-background);
   transition: border-color 140ms ease, opacity 140ms ease;
 }
@@ -2242,7 +2249,7 @@ button.pending-source:focus-visible {
   height: 28px;
   margin-left: 18px;
   border: 1px solid var(--material-control-border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0;
   background: var(--material-control-background);
   color: var(--ui-accent);
@@ -2499,7 +2506,7 @@ button.pending-source:focus-visible {
   max-width: 100%;
   min-width: 0;
   min-height: 24px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 3px 9px;
   background: var(--ui-accent-soft);
   color: var(--ui-accent-hover);
@@ -2703,7 +2710,7 @@ button.pending-source:focus-visible {
 .ipa-sandbox-output output {
   min-height: 40px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   padding: 10px 12px;
   background: var(--material-panel-background);
   color: var(--ui-text);
@@ -2717,7 +2724,7 @@ button.pending-source:focus-visible {
   gap: 12px;
   padding: 16px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   background: color-mix(in srgb, var(--material-panel-background) 90%, var(--ui-canvas-bg));
 }
 
@@ -2735,7 +2742,7 @@ button.pending-source:focus-visible {
   gap: 12px;
   padding: 14px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   background: var(--material-panel-background);
 }
 
@@ -2796,7 +2803,7 @@ button.pending-source:focus-visible {
   min-width: 38px;
   min-height: 34px;
   border: 1px solid var(--material-inset-border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   padding: 0 10px;
   background: var(--material-inset-background);
   color: var(--ui-text);
@@ -2816,7 +2823,7 @@ button.pending-source:focus-visible {
   max-width: 100%;
   padding: 16px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   background: color-mix(in srgb, var(--material-panel-background) 90%, var(--ui-canvas-bg));
 }
 
@@ -2936,7 +2943,7 @@ button.pending-source:focus-visible {
   min-height: 44px;
   padding: 10px 12px;
   border: 1px solid var(--material-control-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   background: var(--material-control-background);
   color: var(--ui-text);
   cursor: grab;
@@ -3016,7 +3023,7 @@ button.pending-source:focus-visible {
   min-width: 0;
   min-height: 66px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   padding: 11px 12px;
   background: var(--material-panel-background);
   color: var(--ui-text);
@@ -3123,7 +3130,7 @@ button.pending-source:focus-visible {
 .corpus-layer-card {
   padding: 16px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   background: color-mix(in srgb, var(--material-panel-background) 88%, var(--ui-canvas-bg));
 }
 
@@ -3159,7 +3166,7 @@ button.pending-source:focus-visible {
   width: 34px;
   height: 34px;
   border: 1px solid var(--material-control-border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   padding: 0;
   background: var(--material-control-background);
   color: var(--ui-text);
@@ -3209,7 +3216,7 @@ button.pending-source:focus-visible {
   align-items: center;
   min-height: 44px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   padding: 6px 8px 6px 11px;
   background: var(--material-panel-background);
 }
@@ -3230,7 +3237,7 @@ button.pending-source:focus-visible {
 .corpus-effective-table {
   display: grid;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   overflow: hidden;
 }
 
@@ -3262,7 +3269,7 @@ button.pending-source:focus-visible {
   gap: 10px;
   margin-bottom: 16px;
   border: 1px solid color-mix(in srgb, var(--ui-danger) 45%, var(--ui-border));
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   padding: 14px 16px;
   background: var(--ui-danger-soft);
   color: var(--ui-text);
@@ -3319,7 +3326,7 @@ button.pending-source:focus-visible {
 .analysis-page-tabs button,
 .analysis-subpage-tabs button {
   border: 1px solid var(--material-control-border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--material-control-background);
   color: var(--ui-text-muted);
   font: inherit;
@@ -3353,7 +3360,7 @@ button.pending-source:focus-visible {
   place-items: center;
   min-width: 22px;
   min-height: 22px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0 6px;
   background: var(--material-inset-background);
   color: var(--ui-text-muted);
@@ -3684,7 +3691,7 @@ button.analysis-composition-subset:hover strong {
   width: 100%;
   height: 10px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--material-inset-background);
 }
 
@@ -3897,7 +3904,7 @@ button.analysis-bar-label:hover,
 .analysis-bar-track {
   height: 9px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--material-inset-background);
 }
 
@@ -3989,7 +3996,7 @@ button.analysis-bar-label:hover,
   min-width: 0;
   padding: 10px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   background: color-mix(in srgb, var(--material-panel-background) 88%, var(--ui-canvas-bg));
 }
 
@@ -4004,7 +4011,7 @@ button.analysis-bar-label:hover,
 
 .analysis-issue-list li > span {
   min-width: 44px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 3px 7px;
   background: var(--material-inset-background);
   color: var(--ui-text-muted);
@@ -4072,7 +4079,7 @@ button.analysis-bar-label:hover,
   display: inline-flex;
   overflow: hidden;
   border: 1px solid var(--material-control-border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--material-control-background);
 }
 
@@ -4132,7 +4139,7 @@ button.analysis-bar-label:hover,
   min-height: 560px;
   height: 100%;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   padding: 18px;
   background: transparent;
   color: var(--ui-text);
@@ -4178,7 +4185,7 @@ button.analysis-bar-label:hover,
 .markdown-preview pre {
   overflow: auto;
   padding: 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   background: var(--material-inset-background);
 }
 
@@ -4210,7 +4217,7 @@ button.analysis-bar-label:hover,
   display: block;
   padding: 8px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   background: var(--material-panel-background);
   transition: border-color 140ms ease, opacity 140ms ease;
 }
@@ -4277,7 +4284,7 @@ textarea.ipa-single-line::-webkit-scrollbar {
   width: 40px;
   height: 40px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: var(--ui-danger-soft);
   color: var(--ui-danger);
   font-size: 1rem;
@@ -4347,7 +4354,7 @@ textarea.ipa-single-line::-webkit-scrollbar {
   gap: 4px;
   overflow: auto;
   border: 1px solid var(--material-floating-border);
-  border-radius: 8px;
+  border-radius: var(--radius-floating);
   padding: 6px;
   background: var(--material-floating-background);
   box-shadow: var(--material-floating-shadow);
@@ -4497,7 +4504,7 @@ textarea.ipa-single-line::-webkit-scrollbar {
   right: 7px;
   width: 10px;
   height: 3px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--ui-text-on-solid) 86%, transparent);
   content: "";
   transform: rotate(-5deg);
@@ -4617,7 +4624,7 @@ textarea.ipa-single-line::-webkit-scrollbar {
   min-height: 40px;
   padding: 6px 10px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   background: color-mix(in srgb, var(--material-panel-background) 92%, var(--ui-canvas-bg));
 }
 
@@ -4654,7 +4661,7 @@ textarea.ipa-single-line::-webkit-scrollbar {
   gap: 8px;
   padding: 10px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   background: color-mix(in srgb, var(--material-panel-background) 92%, var(--ui-canvas-bg));
 }
 
@@ -4699,7 +4706,7 @@ textarea.ipa-single-line::-webkit-scrollbar {
   margin-top: 14px;
   padding: 16px;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   background: color-mix(in srgb, var(--material-panel-background) 92%, var(--ui-canvas-bg));
   box-shadow: var(--material-floating-soft-shadow);
 }
@@ -4715,7 +4722,7 @@ textarea.ipa-single-line::-webkit-scrollbar {
   place-items: center;
   min-height: 180px;
   border: 1px dashed var(--ui-border);
-  border-radius: 8px;
+  border-radius: var(--radius-panel);
   color: var(--ui-text-muted);
   text-align: center;
   line-height: 1.6;
@@ -4818,7 +4825,7 @@ textarea.ipa-single-line::-webkit-scrollbar {
   z-index: var(--layer-toast);
   max-width: min(360px, calc(100vw - 44px));
   padding: 12px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-floating);
   background: var(--material-toast-background);
   color: var(--ui-text-on-solid);
   box-shadow: var(--material-floating-shadow);
@@ -5124,7 +5131,7 @@ textarea.ipa-single-line::-webkit-scrollbar {
   margin: -48px auto 14px;
   transform: translateX(0);
   border: 1px solid color-mix(in srgb, var(--ui-accent) 52%, var(--ui-border));
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 7px 12px;
   background: color-mix(in srgb, var(--material-panel-background) 92%, transparent);
   color: var(--ui-accent-hover);

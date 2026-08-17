@@ -12,7 +12,6 @@ body[data-ui-skin="layered-glass"] {
   --ui-accent-soft: rgba(211, 237, 231, 0.82);
   --ui-accent-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 16%, transparent);
   --ui-warning: #b87916;
-  --ui-warning-soft: rgba(255, 240, 209, 0.9);
   --ui-warning-tag-background: rgba(255, 240, 209, 0.9);
   --ui-warning-badge-background: rgba(255, 244, 215, 0.92);
   --ui-warning-badge-text: #805300;
@@ -85,7 +84,6 @@ body[data-ui-skin="layered-glass"] {
   --material-browser-filter: none;
   --material-tooltip-background: #10191d;
   --material-tooltip-text: #f8fbfa;
-  --material-tooltip-muted: rgba(248, 251, 250, 0.74);
   --material-tooltip-border: rgba(255, 255, 255, 0.18);
   --material-tooltip-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
   --material-rich-tooltip-background: rgba(247, 251, 250, 0.68);
@@ -95,7 +93,6 @@ body[data-ui-skin="layered-glass"] {
   --material-rich-tooltip-shadow: var(--material-floating-shadow);
   --material-rich-tooltip-filter: blur(18px) saturate(1.1);
   --material-toast-background: #172126;
-  --material-overlay-background: rgba(11, 24, 28, 0.38);
   --material-overlay-modal-background: rgba(9, 20, 24, 0.32);
   --material-overlay-strong-background: rgba(8, 18, 22, 0.38);
   --material-overlay-drawer-background: rgba(11, 24, 28, 0.36);
@@ -104,7 +101,6 @@ body[data-ui-skin="layered-glass"] {
   --material-network-node-shadow: drop-shadow(0 8px 12px rgba(24, 42, 45, 0.1));
   --material-network-node-hover-shadow: drop-shadow(0 12px 18px rgba(24, 42, 45, 0.18));
   --material-network-node-focus-shadow: drop-shadow(0 16px 24px rgba(36, 125, 115, 0.2));
-  --material-network-label-filter: blur(8px);
   --material-network-status-filter: blur(10px);
 }
 
@@ -121,7 +117,6 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --ui-accent-soft: rgba(23, 60, 57, 0.86);
   --ui-accent-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 18%, transparent);
   --ui-warning: #e4bd63;
-  --ui-warning-soft: rgba(63, 50, 24, 0.9);
   --ui-warning-tag-background: rgba(63, 50, 24, 0.9);
   --ui-warning-badge-background: rgba(63, 50, 24, 0.94);
   --ui-warning-badge-text: #ffd36f;
@@ -190,7 +185,6 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --material-rich-tooltip-shadow: var(--material-floating-shadow);
   --material-rich-tooltip-filter: blur(18px) saturate(1.1);
   --material-toast-background: #081115;
-  --material-overlay-background: rgba(0, 8, 11, 0.48);
   --material-overlay-modal-background: rgba(0, 7, 10, 0.38);
   --material-overlay-strong-background: rgba(0, 6, 9, 0.44);
   --material-overlay-drawer-background: rgba(0, 8, 11, 0.46);
@@ -523,7 +517,6 @@ body[data-ui-skin="layered-glass"] [data-layered-glass-pointer="active"] {
     --material-rich-tooltip-muted: CanvasText;
     --material-rich-tooltip-shadow: none;
     --material-rich-tooltip-filter: none;
-    --material-overlay-background: transparent;
     --material-overlay-modal-background: transparent;
     --material-overlay-strong-background: transparent;
     --material-overlay-drawer-background: transparent;

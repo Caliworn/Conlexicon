@@ -5,6 +5,7 @@ const path = require("node:path");
 
 const ROOT_DIR = path.resolve(__dirname, "..");
 const tokenPath = path.join(ROOT_DIR, "theme-tokens.css");
+const classicPath = path.join(ROOT_DIR, "theme-classic.css");
 const layeredGlassPath = path.join(ROOT_DIR, "theme-layered-glass.css");
 const liquidGlassPath = path.join(ROOT_DIR, "theme-liquid-glass.css");
 const liquidGlassGeometryPath = path.join(ROOT_DIR, "lib", "liquid-glass-geometry.js");
@@ -14,6 +15,7 @@ const stylesPath = path.join(ROOT_DIR, "styles.css");
 const indexPath = path.join(ROOT_DIR, "index.html");
 const appPath = path.join(ROOT_DIR, "app.js");
 const tokens = fs.readFileSync(tokenPath, "utf8");
+const classic = fs.readFileSync(classicPath, "utf8");
 const layeredGlass = fs.readFileSync(layeredGlassPath, "utf8");
 const liquidGlass = fs.readFileSync(liquidGlassPath, "utf8");
 const liquidGlassEngine = fs.readFileSync(liquidGlassEnginePath, "utf8");
@@ -85,27 +87,64 @@ function customPropertyMap(block) {
 }
 
 const tokenLinkPosition = index.indexOf('href="theme-tokens.css"');
+const classicLinkPosition = index.indexOf('href="theme-classic.css"');
 const layeredGlassLinkPosition = index.indexOf('href="theme-layered-glass.css"');
 const liquidGlassLinkPosition = index.indexOf('href="theme-liquid-glass.css"');
 const stylesLinkPosition = index.indexOf('href="styles.css"');
 assert(tokenLinkPosition >= 0, "index.html must load theme-tokens.css");
+assert(classicLinkPosition >= 0, "index.html must load theme-classic.css");
 assert(layeredGlassLinkPosition >= 0, "index.html must load theme-layered-glass.css");
 assert(liquidGlassLinkPosition >= 0, "index.html must load theme-liquid-glass.css");
 assert(stylesLinkPosition >= 0, "index.html must load styles.css");
 assert(
-  tokenLinkPosition < layeredGlassLinkPosition
+  tokenLinkPosition < classicLinkPosition
+    && classicLinkPosition < layeredGlassLinkPosition
     && layeredGlassLinkPosition < liquidGlassLinkPosition
     && liquidGlassLinkPosition < stylesLinkPosition,
-  "Skin stylesheets must load after base tokens and before component styles",
+  "Skin stylesheets must load shared tokens, Classic, Layered Glass, and Liquid Glass before component styles",
 );
 
 const skinTokenPattern = /--(?:ui|material|radius)-[a-z0-9-]+/g;
-const tokenDefinitions = new Set(
+const sharedTokenDefinitions = new Set(
   [...tokens.matchAll(/(--(?:ui|material|radius)-[a-z0-9-]+)\s*:/g)]
     .map((match) => match[1]),
 );
+const sharedRadiusTokens = [
+  "--radius-control",
+  "--radius-floating",
+  "--radius-mobile-control",
+  "--radius-panel",
+  "--radius-pill",
+];
+assert.deepEqual(
+  [...sharedTokenDefinitions].sort(),
+  sharedRadiusTokens,
+  "theme-tokens.css must contain only the shared component radius tokens",
+);
+assert(!/--(?:ui|material)-/.test(tokens), "Shared tokens must not contain skin-specific colors or materials");
+assert(
+  sharedRadiusTokens.every((tokenName) => styles.includes(`var(${tokenName})`)),
+  "Every shared radius token must have a component consumer",
+);
+
+const classicScope = 'body:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-glass"]))';
+const classicDarkScope = `body.dark-theme${classicScope.slice(4)}`;
+function scopedBlock(source, selector) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return source.match(new RegExp(`${escapedSelector}\\s*\\{([\\s\\S]*?)\\n\\}`));
+}
+
+const classicLightTheme = scopedBlock(classic, classicScope);
+const classicDarkTheme = scopedBlock(classic, classicDarkScope);
+assert(classicLightTheme, "Classic must define a light fallback scope");
+assert(classicDarkTheme, "Classic must define a dark fallback scope");
+assert(!/:root\b/.test(classic), "Classic skin values must not modify the shared root scope");
+const classicLightTokenValues = customPropertyMap(classicLightTheme[1]);
+const classicDarkTokenValues = customPropertyMap(classicDarkTheme[1]);
+const classicDefinitions = new Set(classicLightTokenValues.keys());
+const tokenDefinitions = new Set([...sharedTokenDefinitions, ...classicDefinitions]);
 const tokenReferences = new Set(
-  [...`${tokens}\n${layeredGlass}\n${liquidGlass}\n${styles}`.matchAll(/var\(\s*(--(?:ui|material|radius)-[a-z0-9-]+)/g)]
+  [...`${tokens}\n${classic}\n${layeredGlass}\n${liquidGlass}\n${styles}`.matchAll(/var\(\s*(--(?:ui|material|radius)-[a-z0-9-]+)/g)]
     .map((match) => match[1]),
 );
 const undefinedTokens = [...tokenReferences]
@@ -123,7 +162,7 @@ const unknownLayeredGlassTokens = [...layeredGlassDefinitions]
 assert.deepEqual(
   unknownLayeredGlassTokens,
   [],
-  `Layered Glass may only override base skin tokens: ${unknownLayeredGlassTokens.join(", ")}`,
+  `Layered Glass may only define standard skin tokens: ${unknownLayeredGlassTokens.join(", ")}`,
 );
 const liquidGlassDefinitions = new Set(
   [...liquidGlass.matchAll(/(--(?:ui|material|radius)-[a-z0-9-]+)\s*:/g)]
@@ -135,14 +174,45 @@ const unknownLiquidGlassTokens = [...liquidGlassDefinitions]
 assert.deepEqual(
   unknownLiquidGlassTokens,
   [],
-  `Liquid Glass may only override base skin tokens: ${unknownLiquidGlassTokens.join(", ")}`,
+  `Liquid Glass may only define standard skin tokens: ${unknownLiquidGlassTokens.join(", ")}`,
 );
-const classicDarkTheme = tokens.match(/body\.dark-theme\s*\{([\s\S]*?)\n\}/);
-assert(classicDarkTheme, "Base tokens must define a classic dark theme scope");
-const classicLightTheme = tokens.match(/:root\s*\{([\s\S]*?)\n\}/);
-assert(classicLightTheme, "Base tokens must define a classic light root scope");
-const classicLightTokenValues = customPropertyMap(classicLightTheme[1]);
-const classicDarkTokenValues = customPropertyMap(classicDarkTheme[1]);
+
+const layeredLightTheme = layeredGlass.match(/body\[data-ui-skin="layered-glass"\]\s*\{([\s\S]*?)\n\}/);
+const liquidLightTheme = liquidGlass.match(/body\[data-ui-skin="liquid-glass"\]\s*\{([\s\S]*?)\n\}/);
+assert(layeredLightTheme, "Layered Glass must define a light skin scope");
+assert(liquidLightTheme, "Liquid Glass must define a light skin scope");
+const layeredLightTokenValues = customPropertyMap(layeredLightTheme[1]);
+const liquidLightTokenValues = customPropertyMap(liquidLightTheme[1]);
+const requiredSkinTokens = [...classicDefinitions].sort();
+for (const [skinName, source, lightTokenValues] of [
+  ["Layered Glass", layeredGlass, layeredLightTokenValues],
+  ["Liquid Glass", liquidGlass, liquidLightTokenValues],
+]) {
+  const lightDefinitions = new Set(lightTokenValues.keys());
+  const missingTokens = requiredSkinTokens.filter((tokenName) => !lightDefinitions.has(tokenName));
+  assert.deepEqual(missingTokens, [], `${skinName} light scope is missing standard tokens: ${missingTokens.join(", ")}`);
+  const overriddenSharedTokens = sharedRadiusTokens.filter((tokenName) => source.includes(`${tokenName}:`));
+  assert.deepEqual(
+    overriddenSharedTokens,
+    [],
+    `${skinName} must not override shared radius tokens: ${overriddenSharedTokens.join(", ")}`,
+  );
+}
+assert.equal(
+  classicLightTokenValues.get("--material-navigation-control-pressed-transform"),
+  "scale(0.985)",
+  "Classic navigation controls must retain their scale press feedback",
+);
+assert.equal(
+  layeredLightTokenValues.get("--material-navigation-control-pressed-transform"),
+  "scale(0.985)",
+  "Layered Glass navigation controls must retain their scale press feedback",
+);
+assert.equal(
+  liquidLightTokenValues.get("--material-navigation-control-pressed-transform"),
+  "none",
+  "Liquid Glass navigation controls must not use scale press feedback",
+);
 for (const tokenName of [
   "--material-entry-detail-background",
   "--material-entry-detail-mobile-background",
@@ -537,19 +607,18 @@ assert(
 assert(
   styles.includes("background: var(--material-rich-tooltip-background);")
     && styles.includes("backdrop-filter: var(--material-rich-tooltip-filter);")
-    && /--material-rich-tooltip-filter:\s*none;/.test(tokens)
+    && /--material-rich-tooltip-filter:\s*none;/.test(classic)
     && app.includes('group.dataset.appTooltipVariant = "rich";'),
   "Structured tag tooltips must use a skin-scoped, degradable backdrop filter",
 );
 assert(
-  tokens.includes("--material-rich-tooltip-muted: var(--ui-text-muted);")
+  classic.includes("--material-rich-tooltip-muted: var(--ui-text-muted);")
     && layeredGlass.includes("--material-rich-tooltip-muted: var(--ui-text-muted);")
     && liquidGlass.includes("--material-rich-tooltip-muted: var(--ui-text-muted);")
     && layeredGlass.includes("--material-rich-tooltip-muted: CanvasText;")
     && liquidGlass.includes("--material-rich-tooltip-muted: CanvasText;")
     && styles.includes(".tag-tooltip-label {\n  color: var(--material-rich-tooltip-muted);")
     && /\.app-tooltip \.network-tooltip-content > span,[\s\S]*?color:\s*var\(--material-rich-tooltip-muted\);/.test(styles)
-    && !/\.network-tooltip-content[\s\S]*?color:\s*var\(--material-tooltip-muted\);/.test(styles)
     && /\.chip\.amber\s*\{[^}]*color:\s*var\(--ui-warning-badge-text\);/s.test(styles)
     && /\.chip\.part-chip\s*\{[^}]*color:\s*var\(--ui-warning-badge-text\);/s.test(styles)
     && /\.entry-quality-issue\.medium\s*\{[^}]*color:\s*var\(--ui-warning-badge-text\);/s.test(styles)
@@ -644,24 +713,24 @@ const componentTokenDefinitions = [...styles.matchAll(new RegExp(`(${skinTokenPa
 assert.deepEqual(
   componentTokenDefinitions,
   [],
-  `Skin tokens must be declared in theme-tokens.css: ${componentTokenDefinitions.join(", ")}`,
+  `Component styles must not declare skin tokens: ${componentTokenDefinitions.join(", ")}`,
 );
 
 assert(!/body\.dark-theme/.test(styles), "Component CSS must not contain theme branches");
 assert(
   !/(?:^|[\s:(,])#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla|oklch)\(/im.test(styles),
-  "Theme color literals belong in theme-tokens.css",
+  "Theme color literals belong in skin files",
 );
 assert(
   !/(?:backdrop-filter\s*:\s*blur\(|filter\s*:\s*drop-shadow\()/i.test(styles),
-  "Material blur and drop shadows belong in theme-tokens.css",
+  "Material blur and drop shadows belong in skin files",
 );
 
 for (const match of styles.matchAll(/box-shadow\s*:\s*([^;]+);/gi)) {
   const value = match[1].trim();
   assert(
     value === "none" || value.startsWith("var(") || /^inset\b.*var\(--ui-/.test(value),
-    `Material box shadow belongs in theme-tokens.css: ${value}`,
+    `Material box shadow belongs in skin files: ${value}`,
   );
 }
 
