@@ -228,7 +228,7 @@ liquidGlassEngine.deactivate();
 
 几何计算以到圆角矩形边界的有符号距离为基础，在完整 effective bezel 内使用与参考项目一致的 128 采样 convex-squircle 截面和 Snell 路径生成折射轮廓。外缘从 `1 / 128` 采样位置归一化，避免截面导数的奇点把有效折射压缩到最外数像素；轮廓必须连续衰减，外侧四分之一仍保持可见折射，中心边界归零。法线保持朝外用于环境 specular，位移则沿负法线从玻璃内侧取样，与参考实现的 `-normal × displacement` 方向一致，禁止把组件外侧背景整段拖入 rim。specular 使用同一完整 effective bezel，并按相同边缘进度连续衰减；不设置独立百分比限宽。四角按连续法线过渡，禁止使用与形状无关的随机波纹冒充液体。
 
-圆角矩形的最近边法线在内部 medial axis 上会发生方向切换。Q3 先按实际元素尺寸归一化四角半径，外轮廓与最外层法线严格服从组件自身圆角；进入宽 bezel 后，若相邻直边光学区域重叠，则按到两条直边的影响连续混合法线，避免在对角分界产生跳变。`effectiveBezel = min(requestedBezel, minDimension / 2 - guard)`，不再让最小视觉圆角钳制整条直边；`guard` 至少为 `2px` 或一个贴图采样间距。continuous/focus/floating/modal 请求 bezel 为 `44/46/36/52px`。液态皮肤不得覆盖正式组件的 `border-radius` 或定义私有表面圆角 token；导航保持原有贴边几何，内容、菜单、tooltip、modal 和网络面板继续消费共享 UI 圆角。Lab 的圆角滑杆是独立诊断输入，不受此约束。
+圆角矩形的最近边法线在内部 medial axis 上会发生方向切换。Q3 先按实际元素尺寸归一化四角半径，外轮廓与最外层法线严格服从组件自身圆角；进入宽 bezel 后，若相邻直边光学区域重叠，则按到两条直边的影响连续混合法线，避免在对角分界产生跳变。`effectiveBezel = min(requestedBezel, minDimension / 2 - guard)`，不再让最小视觉圆角钳制整条直边；`guard` 至少为 `2px` 或一个贴图采样间距。continuous/focus/floating/modal 请求 bezel 为 `44/46/36/52px`。液态皮肤通过标准角色圆角 token 定义正式组件轮廓，不为光学表面另设私有半径；导航保持原有贴边几何，内容、菜单、tooltip、modal 和网络面板继续消费对应角色。Lab 的圆角滑杆是独立诊断输入，不受此约束。
 
 连续附着表面不被错误建模为四边自由透镜：桌面导航和移动抽屉只激活右边，移动应用栏只激活下边；focus、floating 与 modal 使用完整四边模型。单边模型仍受元素短边与采样 guard 限制，但不受连接到应用边界的零圆角影响。若安全宽度不足 `4px`，该表面稳定使用 Q1 普通 blur，不生成畸形贴图；尺寸恢复后可由既有 `ResizeObserver` 重新进入 Q3。
 

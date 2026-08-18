@@ -1,6 +1,13 @@
 body:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-glass"])) {
   color-scheme: light;
 
+  /* Component geometry belongs to the active skin. */
+  --radius-control: 8px;
+  --radius-mobile-control: 10px;
+  --radius-panel: 8px;
+  --radius-floating: 8px;
+  --radius-pill: 999px;
+
   /* Semantic colors describe meaning, independent of component shape. */
   --ui-canvas-bg: #f4f6f2;
   --ui-text: #17202a;
@@ -146,4 +153,21 @@ body.dark-theme:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-gl
   --material-rich-tooltip-muted: var(--ui-text-muted);
   --material-rich-tooltip-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
   --material-overlay-panel-background: var(--material-floating-background);
+}
+
+/* Picker previews remain unscoped so every candidate renders under every active skin. */
+.skin-picker-preview.skin-picker-preview-classic::before {
+  position: absolute;
+  inset: 0 62% 0 0;
+  background: var(--material-navigation-background);
+  content: "";
+}
+
+.skin-picker-preview.skin-picker-preview-classic::after {
+  position: absolute;
+  inset: 5px 4px 4px 15px;
+  border: 1px solid var(--ui-border);
+  border-radius: 2px;
+  background: var(--material-panel-background);
+  content: "";
 }

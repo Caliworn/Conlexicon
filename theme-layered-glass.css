@@ -1,6 +1,12 @@
 body[data-ui-skin="layered-glass"] {
   color-scheme: light;
 
+  --radius-control: 8px;
+  --radius-mobile-control: 10px;
+  --radius-panel: 8px;
+  --radius-floating: 8px;
+  --radius-pill: 999px;
+
   --ui-canvas-bg: #eef2f1;
   --ui-text: #172126;
   --ui-text-muted: #5f6c72;
@@ -555,4 +561,35 @@ body[data-ui-skin="layered-glass"] [data-layered-glass-pointer="active"] {
     box-shadow: none;
     color: CanvasText;
   }
+}
+
+/* Picker previews remain unscoped so every candidate renders under every active skin. */
+.skin-picker-preview.skin-picker-preview-layered-glass {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ui-accent) 30%, transparent),
+    color-mix(in srgb, var(--ui-warning) 24%, transparent)
+  );
+}
+
+.skin-picker-preview.skin-picker-preview-layered-glass::before,
+.skin-picker-preview.skin-picker-preview-layered-glass::after {
+  position: absolute;
+  width: 17px;
+  height: 10px;
+  border: 1px solid color-mix(in srgb, var(--ui-text-on-solid) 72%, transparent);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--ui-text-on-solid) 30%, transparent);
+  box-shadow: var(--material-card-shadow);
+  content: "";
+}
+
+.skin-picker-preview.skin-picker-preview-layered-glass::before {
+  top: 3px;
+  left: 4px;
+}
+
+.skin-picker-preview.skin-picker-preview-layered-glass::after {
+  right: 3px;
+  bottom: 2px;
 }

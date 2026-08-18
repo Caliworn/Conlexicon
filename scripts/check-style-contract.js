@@ -4,7 +4,6 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const ROOT_DIR = path.resolve(__dirname, "..");
-const tokenPath = path.join(ROOT_DIR, "theme-tokens.css");
 const classicPath = path.join(ROOT_DIR, "theme-classic.css");
 const layeredGlassPath = path.join(ROOT_DIR, "theme-layered-glass.css");
 const liquidGlassPath = path.join(ROOT_DIR, "theme-liquid-glass.css");
@@ -14,7 +13,6 @@ const liquidGlassLabPath = path.join(ROOT_DIR, "liquid-glass-lab.html");
 const stylesPath = path.join(ROOT_DIR, "styles.css");
 const indexPath = path.join(ROOT_DIR, "index.html");
 const appPath = path.join(ROOT_DIR, "app.js");
-const tokens = fs.readFileSync(tokenPath, "utf8");
 const classic = fs.readFileSync(classicPath, "utf8");
 const layeredGlass = fs.readFileSync(layeredGlassPath, "utf8");
 const liquidGlass = fs.readFileSync(liquidGlassPath, "utf8");
@@ -86,45 +84,32 @@ function customPropertyMap(block) {
   );
 }
 
-const tokenLinkPosition = index.indexOf('href="theme-tokens.css"');
 const classicLinkPosition = index.indexOf('href="theme-classic.css"');
 const layeredGlassLinkPosition = index.indexOf('href="theme-layered-glass.css"');
 const liquidGlassLinkPosition = index.indexOf('href="theme-liquid-glass.css"');
 const stylesLinkPosition = index.indexOf('href="styles.css"');
-assert(tokenLinkPosition >= 0, "index.html must load theme-tokens.css");
 assert(classicLinkPosition >= 0, "index.html must load theme-classic.css");
 assert(layeredGlassLinkPosition >= 0, "index.html must load theme-layered-glass.css");
 assert(liquidGlassLinkPosition >= 0, "index.html must load theme-liquid-glass.css");
 assert(stylesLinkPosition >= 0, "index.html must load styles.css");
 assert(
-  tokenLinkPosition < classicLinkPosition
-    && classicLinkPosition < layeredGlassLinkPosition
+  classicLinkPosition < layeredGlassLinkPosition
     && layeredGlassLinkPosition < liquidGlassLinkPosition
     && liquidGlassLinkPosition < stylesLinkPosition,
-  "Skin stylesheets must load shared tokens, Classic, Layered Glass, and Liquid Glass before component styles",
+  "Skin stylesheets must load Classic, Layered Glass, and Liquid Glass before component styles",
 );
 
 const skinTokenPattern = /--(?:ui|material|radius)-[a-z0-9-]+/g;
-const sharedTokenDefinitions = new Set(
-  [...tokens.matchAll(/(--(?:ui|material|radius)-[a-z0-9-]+)\s*:/g)]
-    .map((match) => match[1]),
-);
-const sharedRadiusTokens = [
+const roleRadiusTokens = [
   "--radius-control",
   "--radius-floating",
   "--radius-mobile-control",
   "--radius-panel",
   "--radius-pill",
 ];
-assert.deepEqual(
-  [...sharedTokenDefinitions].sort(),
-  sharedRadiusTokens,
-  "theme-tokens.css must contain only the shared component radius tokens",
-);
-assert(!/--(?:ui|material)-/.test(tokens), "Shared tokens must not contain skin-specific colors or materials");
 assert(
-  sharedRadiusTokens.every((tokenName) => styles.includes(`var(${tokenName})`)),
-  "Every shared radius token must have a component consumer",
+  roleRadiusTokens.every((tokenName) => styles.includes(`var(${tokenName})`)),
+  "Every role-based radius token must have a component consumer",
 );
 
 const classicScope = 'body:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-glass"]))';
@@ -142,9 +127,9 @@ assert(!/:root\b/.test(classic), "Classic skin values must not modify the shared
 const classicLightTokenValues = customPropertyMap(classicLightTheme[1]);
 const classicDarkTokenValues = customPropertyMap(classicDarkTheme[1]);
 const classicDefinitions = new Set(classicLightTokenValues.keys());
-const tokenDefinitions = new Set([...sharedTokenDefinitions, ...classicDefinitions]);
+const tokenDefinitions = new Set(classicDefinitions);
 const tokenReferences = new Set(
-  [...`${tokens}\n${classic}\n${layeredGlass}\n${liquidGlass}\n${styles}`.matchAll(/var\(\s*(--(?:ui|material|radius)-[a-z0-9-]+)/g)]
+  [...`${classic}\n${layeredGlass}\n${liquidGlass}\n${styles}`.matchAll(/var\(\s*(--(?:ui|material|radius)-[a-z0-9-]+)/g)]
     .map((match) => match[1]),
 );
 const undefinedTokens = [...tokenReferences]
@@ -184,19 +169,13 @@ assert(liquidLightTheme, "Liquid Glass must define a light skin scope");
 const layeredLightTokenValues = customPropertyMap(layeredLightTheme[1]);
 const liquidLightTokenValues = customPropertyMap(liquidLightTheme[1]);
 const requiredSkinTokens = [...classicDefinitions].sort();
-for (const [skinName, source, lightTokenValues] of [
-  ["Layered Glass", layeredGlass, layeredLightTokenValues],
-  ["Liquid Glass", liquidGlass, liquidLightTokenValues],
+for (const [skinName, lightTokenValues] of [
+  ["Layered Glass", layeredLightTokenValues],
+  ["Liquid Glass", liquidLightTokenValues],
 ]) {
   const lightDefinitions = new Set(lightTokenValues.keys());
   const missingTokens = requiredSkinTokens.filter((tokenName) => !lightDefinitions.has(tokenName));
   assert.deepEqual(missingTokens, [], `${skinName} light scope is missing standard tokens: ${missingTokens.join(", ")}`);
-  const overriddenSharedTokens = sharedRadiusTokens.filter((tokenName) => source.includes(`${tokenName}:`));
-  assert.deepEqual(
-    overriddenSharedTokens,
-    [],
-    `${skinName} must not override shared radius tokens: ${overriddenSharedTokens.join(", ")}`,
-  );
 }
 assert.equal(
   classicLightTokenValues.get("--material-navigation-control-pressed-transform"),
@@ -525,6 +504,23 @@ assert(
     && index.includes('id="skinPickerMenu" role="menu"'),
   "The skin selector must expose a top-level menu controlled by its navigation trigger",
 );
+assert(
+  styles.includes(".skin-picker-preview {")
+    && !styles.includes(".skin-picker-preview-classic")
+    && !styles.includes(".skin-picker-preview-layered-glass")
+    && !styles.includes(".skin-picker-preview-liquid-glass"),
+  "Shared component styles must own only the skin preview frame",
+);
+for (const [skinName, source, previewClass] of [
+  ["Classic", classic, "classic"],
+  ["Layered Glass", layeredGlass, "layered-glass"],
+  ["Liquid Glass", liquidGlass, "liquid-glass"],
+]) {
+  assert(
+    source.includes(`.skin-picker-preview.skin-picker-preview-${previewClass}`),
+    `${skinName} must own its skin picker preview appearance`,
+  );
+}
 assert(
   numericLayer("--layer-drawer") < numericLayer("--layer-floating-menu")
     && numericLayer("--layer-floating-menu") < numericLayer("--layer-network-overlay"),

@@ -1,6 +1,12 @@
 body[data-ui-skin="liquid-glass"] {
   color-scheme: light;
 
+  --radius-control: 8px;
+  --radius-mobile-control: 10px;
+  --radius-panel: 8px;
+  --radius-floating: 8px;
+  --radius-pill: 999px;
+
   --ui-canvas-bg: #eaf0f2;
   --ui-text: #122026;
   --ui-text-muted: #596a72;
@@ -839,4 +845,39 @@ body.dark-theme[data-ui-skin="liquid-glass"] [data-liquid-glass-diagnostic-statu
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
+}
+
+/* Picker previews remain unscoped so every candidate renders under every active skin. */
+.skin-picker-preview.skin-picker-preview-liquid-glass {
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--ui-text-on-solid) 48%, transparent);
+  background:
+    radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--ui-accent) 54%, transparent), transparent 44%),
+    radial-gradient(circle at 88% 82%, color-mix(in srgb, var(--ui-warning) 42%, transparent), transparent 48%),
+    color-mix(in srgb, var(--material-navigation-background) 74%, transparent);
+}
+
+.skin-picker-preview.skin-picker-preview-liquid-glass::before {
+  position: absolute;
+  inset: 3px 4px;
+  border: 1px solid color-mix(in srgb, var(--ui-text-on-solid) 76%, transparent);
+  border-radius: 7px;
+  background:
+    linear-gradient(140deg, color-mix(in srgb, var(--ui-text-on-solid) 48%, transparent), transparent 42%),
+    color-mix(in srgb, var(--material-panel-background) 54%, transparent);
+  box-shadow: var(--material-card-shadow);
+  content: "";
+  transform: rotate(-5deg);
+}
+
+.skin-picker-preview.skin-picker-preview-liquid-glass::after {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  width: 10px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ui-text-on-solid) 86%, transparent);
+  content: "";
+  transform: rotate(-5deg);
 }
