@@ -19,7 +19,7 @@
 
 ### Web 实现
 
-- [`archisvaze/liquid-glass`](https://github.com/archisvaze/liquid-glass) 是现有 `Reference Baseline` 的算法来源，使用 convex-squircle/Snell profile、全尺寸位移图和独立 specular 图。研究时检查到仓库根目录没有 `LICENSE` 文件，因此它只能继续作为来源明确的隔离研究对照；在许可得到澄清前，不把其逐行实现并入 Product Engine，也不将其作为可安全再分发的第三方依赖结论。
+- [`archisvaze/liquid-glass`](https://github.com/archisvaze/liquid-glass) 是本机可选 `Reference Baseline` 的算法来源，使用 convex-squircle/Snell profile、全尺寸位移图和独立 specular 图。研究时检查到仓库根目录没有 `LICENSE` 文件，因此逐行对照模块只作为被 Git 忽略的本机研究材料存在，不随 Conlexicon 仓库分发；在许可得到澄清前，不把它并入 Product Engine 或视为可安全再分发的第三方依赖。
 - [Aave: Building Glass for the Web](https://aave.com/design/building-glass-for-the-web) 说明了 SDF、位移贴图和浏览器 SVG filter 的设计思路，是分析 SDF 家族的技术背景，不是本仓库复制的代码来源。
 - [`PallavAg/liquid-glass-web-react`](https://github.com/PallavAg/liquid-glass-web-react) 提供 MIT 许可的 SDF 位移贴图实现。本轮 `lib/liquid-glass-sdf-baseline.js` 改编其贴图数学和 filter 合成，版权与完整 MIT 文本见根目录 `THIRD_PARTY_NOTICES.md`。
 - [`samasante/liquid-glass`](https://github.com/samasante/liquid-glass) 和 [`rdev/liquid-glass-react`](https://github.com/rdev/liquid-glass-react) 用于交叉检查 SDF、色散、交互和浏览器兼容策略；本轮没有复制其代码。
@@ -28,11 +28,11 @@
 
 | 路径 | 形状/位移模型 | 合成 | 目的 |
 | --- | --- | --- | --- |
-| Reference Baseline | convex-squircle 截面、Snell profile、全尺寸圆角位移图 | 单路位移、独立 specular | 对照最初参考项目的可见边缘与折射宽度 |
+| Reference Baseline（本机可选） | convex-squircle 截面、Snell profile、全尺寸圆角位移图 | 单路位移、独立 specular | 对照最初参考项目的可见边缘与折射宽度 |
 | SDF Baseline | 圆角矩形 SDF 决定边界和内侧 falloff；线性/球顶梯度决定位移方向 | RGB 三路位移、B 通道镜面、Alpha 轮廓 | 检查解析边界、固定方形贴图和球顶梯度是否改善连续性 |
 | Product Engine | 生产 rounded-rect 几何、有效边、角色化 bezel 与法线/rim 图 | 光学模糊、RGB 重组、统一环境 specular、Worker/LRU | 验证最终组件角色、降级、资源生命周期与性能架构 |
 
-三条路径共享 Lab 的连续色场、高对比网格、色带、大号文字、卡片尺寸和拖动坐标。Lab 还本地保留最初参考 demo 使用的五张背景图，分别覆盖室内明暗边界、高饱和花丛、森林细密纹理、浅水岩石轮廓和人物轮廓；这些图片只在选中时加载，来源与未明确的许可边界记录在 `assets/liquid-glass-lab/README.md`，不得视为 Conlexicon 产品美术资产。SDF 来源实现原本过滤包含镜头的内容层；Lab 唯一有意的结构适配是把同一 map/filter 作用到卡片的 `backdrop-filter` 伪元素，使它能与另外两条路径观察同一实时背景。SDF Baseline 默认不叠加自行设计的 tint、边界或外阴影，避免装饰层污染轮廓、位移和镜面的观察。该适配意味着 Lab 能比较视觉结果，但不能据此宣称浏览器覆盖或性能与上游组件完全相同。
+三条路径在本机 Reference 文件存在时共享 Lab 的连续色场、高对比网格、色带、大号文字、卡片尺寸和拖动坐标。仓库分发具有 Unsplash 使用许可的室内背景；花丛、森林、浅水岩石和人物四张无许可参考图只作为被 Git 忽略的本机材料保留，来源边界记录在 `assets/liquid-glass-lab/README.md`，不得视为 Conlexicon 产品美术资产。SDF 来源实现原本过滤包含镜头的内容层；Lab 唯一有意的结构适配是把同一 map/filter 作用到卡片的 `backdrop-filter` 伪元素，使它能与另外两条路径观察同一实时背景。SDF Baseline 默认不叠加自行设计的 tint、边界或外阴影，避免装饰层污染轮廓、位移和镜面的观察。该适配意味着 Lab 能比较视觉结果，但不能据此宣称浏览器覆盖或性能与上游组件完全相同。
 
 ## 4. 已纠正的实现认识
 
