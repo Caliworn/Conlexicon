@@ -28,3 +28,29 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Liquid Glass Lab photos
+
+The following photographs are distributed only as optical test scenes for the
+standalone Liquid Glass Lab. Attribution is not required by the applicable
+licenses, but the original creators and source pages are recorded here.
+
+- `assets/liquid-glass-lab/diamond-valley-lake-poppies.jpg` — “Orange petaled
+  flowers” by Sergey Shmidt:
+  https://unsplash.com/photos/orange-petaled-flowers-koy6FlCCy5s
+- `assets/liquid-glass-lab/whangarei-falls-footbridge.jpg` — “Blue and brown
+  steel bridge” by Tim Swaan:
+  https://unsplash.com/photos/blue-and-brown-steel-bridge-eOpewngf68w
+- `assets/liquid-glass-lab/people-in-dry-grass-field.jpg` — “Three young people
+  walk through a dry grassy field” by Land O'Lakes, Inc.:
+  https://unsplash.com/photos/three-young-people-walk-through-a-dry-grassy-field-o8gGuhfjB2M
+
+These three photos are used under the Unsplash License:
+https://unsplash.com/license
+
+- `assets/liquid-glass-lab/turquoise-shallow-water-rocks.jpg` — “Rocks in Clear
+  Shallow Water” by Stephen Leonardi:
+  https://www.pexels.com/photo/rocks-in-clear-shallow-water-18353866/
+
+This photo is used under the Pexels License:
+https://www.pexels.com/license/

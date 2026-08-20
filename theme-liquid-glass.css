@@ -7,6 +7,14 @@ body[data-ui-skin="liquid-glass"] {
   --radius-floating: 8px;
   --radius-pill: 999px;
 
+  --liquid-glass-navigation-inset: 16px;
+  --liquid-glass-navigation-expanded-width: 288px;
+  --liquid-glass-navigation-rail-width: 72px;
+  --liquid-glass-navigation-radius: 24px;
+  --liquid-glass-navigation-rail-radius: 22px;
+  --liquid-glass-mobile-navigation-inset: 10px;
+  --liquid-glass-mobile-navigation-radius: 22px;
+
   --ui-canvas-bg: #eaf0f2;
   --ui-text: #122026;
   --ui-text-muted: #596a72;
@@ -59,26 +67,25 @@ body[data-ui-skin="liquid-glass"] {
   --material-mobile-bar-background: rgba(235, 246, 247, 0.42);
   --material-mobile-bar-shadow: 0 15px 36px rgba(12, 35, 43, 0.2);
   --material-mobile-bar-filter: blur(24px) saturate(1.2);
-  --material-navigation-background: rgba(19, 39, 49, 0.76);
-  --material-navigation-shadow: 0 28px 70px rgba(3, 17, 23, 0.38);
-  --material-navigation-filter: blur(30px) saturate(1.18) contrast(1.04);
-  --material-navigation-drawer-background: rgba(19, 39, 49, 0.84);
+  --material-navigation-background: rgba(238, 247, 247, 0.72);
+  --material-navigation-shadow: 0 20px 58px rgba(16, 43, 51, 0.22), 0 2px 10px rgba(16, 43, 51, 0.1);
+  --material-navigation-filter: blur(24px) saturate(1.14) contrast(1.02);
+  --material-navigation-drawer-background: rgba(232, 243, 243, 0.82);
   --material-navigation-drawer-filter: blur(24px) saturate(1.14);
-  --material-navigation-text: #f8fcfb;
-  --material-navigation-muted: #c2d7d6;
+  --material-navigation-text: #173038;
+  --material-navigation-muted: #526970;
   --material-navigation-control-background: transparent;
-  --material-navigation-control-hover-background: rgba(255, 255, 255, 0.09);
-  --material-navigation-control-border: rgba(255, 255, 255, 0.16);
+  --material-navigation-control-hover-background: rgba(25, 79, 78, 0.08);
+  --material-navigation-control-border: rgba(34, 92, 91, 0.15);
   --material-navigation-control-shadow: none;
   --material-navigation-control-hover-shadow: none;
   --material-navigation-control-pressed-shadow: none;
   --material-navigation-control-pressed-transform: none;
-  --material-navigation-action-background: rgba(255, 255, 255, 0.075);
-  --material-navigation-action-border: rgba(255, 255, 255, 0.14);
-  --liquid-glass-navigation-active-background: rgba(110, 231, 217, 0.16);
-  --liquid-glass-navigation-active-border: rgba(127, 237, 224, 0.3);
-  --liquid-glass-navigation-active-accent: #8be8dc;
-  --liquid-glass-navigation-utility-background: rgba(255, 255, 255, 0.055);
+  --material-navigation-action-background: rgba(255, 255, 255, 0.28);
+  --material-navigation-action-border: rgba(255, 255, 255, 0.56);
+  --liquid-glass-navigation-active-background: rgba(23, 124, 117, 0.14);
+  --liquid-glass-navigation-active-border: rgba(23, 124, 117, 0.22);
+  --liquid-glass-navigation-active-accent: #0d6f68;
   --material-list-item-background: rgba(248, 251, 252, 0.79);
   --material-list-item-secondary-color: inherit;
   --material-list-item-secondary-opacity: 0.77;
@@ -104,9 +111,9 @@ body[data-ui-skin="liquid-glass"] {
   --material-network-node-hover-shadow: drop-shadow(0 12px 18px rgba(24, 36, 48, 0.16));
   --material-network-node-focus-shadow: drop-shadow(0 16px 24px rgba(24, 121, 108, 0.17));
   --material-network-status-filter: blur(10px);
-  --liquid-glass-q3-navigation-tint: rgba(19, 39, 49, 0.52);
-  --liquid-glass-q3-navigation-drawer-tint: rgba(19, 39, 49, 0.62);
-  --liquid-glass-q3-mobile-bar-tint: rgba(235, 246, 247, 0.28);
+  --liquid-glass-q3-navigation-tint: rgba(242, 249, 248, 0.38);
+  --liquid-glass-q3-navigation-drawer-tint: rgba(236, 246, 246, 0.52);
+  --liquid-glass-q3-mobile-bar-tint: rgba(239, 248, 248, 0.34);
   --liquid-glass-q3-focus-tint: rgba(241, 249, 250, 0.3);
   --liquid-glass-q3-floating-tint: rgba(239, 248, 249, 0.28);
   --liquid-glass-q3-tooltip-tint: rgba(239, 248, 249, 0.36);
@@ -162,7 +169,7 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-mobile-bar-background: rgba(13, 26, 32, 0.46);
   --material-mobile-bar-shadow: 0 17px 42px rgba(0, 0, 0, 0.44);
   --material-navigation-background: rgba(7, 18, 24, 0.78);
-  --material-navigation-shadow: 0 30px 76px rgba(0, 0, 0, 0.62);
+  --material-navigation-shadow: 0 22px 64px rgba(0, 0, 0, 0.54), 0 3px 12px rgba(0, 0, 0, 0.28);
   --material-navigation-drawer-background: rgba(7, 18, 24, 0.86);
   --material-navigation-text: #f4fbf9;
   --material-navigation-muted: #a9c4c2;
@@ -177,7 +184,6 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --liquid-glass-navigation-active-background: rgba(82, 189, 176, 0.16);
   --liquid-glass-navigation-active-border: rgba(112, 220, 207, 0.25);
   --liquid-glass-navigation-active-accent: #75d7cb;
-  --liquid-glass-navigation-utility-background: rgba(255, 255, 255, 0.045);
   --material-list-item-background: rgba(26, 39, 45, 0.8);
   --material-list-item-secondary-color: var(--ui-text-muted);
   --material-list-item-secondary-opacity: 1;
@@ -192,8 +198,8 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-overlay-drawer-background: rgba(0, 7, 11, 0.41);
   --material-overlay-panel-background: rgba(13, 26, 32, 0.43);
   --material-overlay-panel-shadow: 0 42px 120px rgba(0, 0, 0, 0.68), 0 12px 34px rgba(0, 0, 0, 0.4);
-  --liquid-glass-q3-navigation-tint: rgba(7, 18, 24, 0.56);
-  --liquid-glass-q3-navigation-drawer-tint: rgba(7, 18, 24, 0.66);
+  --liquid-glass-q3-navigation-tint: rgba(7, 18, 24, 0.48);
+  --liquid-glass-q3-navigation-drawer-tint: rgba(7, 18, 24, 0.6);
   --liquid-glass-q3-mobile-bar-tint: rgba(13, 26, 32, 0.34);
   --liquid-glass-q3-focus-tint: rgba(18, 30, 36, 0.34);
   --liquid-glass-q3-floating-tint: rgba(16, 29, 35, 0.32);
@@ -218,8 +224,52 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
     linear-gradient(135deg, #0b1619 0%, #10141c 54%, #19150f 100%);
 }
 
+@media (min-width: 800px) {
+  body[data-ui-skin="liquid-glass"] .app-shell,
+  body[data-ui-skin="liquid-glass"] .app-shell[data-nav-state="rail"] {
+    --liquid-glass-navigation-width: var(--liquid-glass-navigation-expanded-width);
+
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body[data-ui-skin="liquid-glass"] .app-shell[data-nav-state="rail"] {
+    --liquid-glass-navigation-width: var(--liquid-glass-navigation-rail-width);
+  }
+
+  body[data-ui-skin="liquid-glass"] .dictionary-panel {
+    position: fixed;
+    inset:
+      var(--liquid-glass-navigation-inset)
+      auto
+      var(--liquid-glass-navigation-inset)
+      var(--liquid-glass-navigation-inset);
+    z-index: 20;
+    width: var(--liquid-glass-navigation-width);
+    height: auto;
+    padding: 18px;
+    border: 1px solid var(--material-navigation-action-border);
+    border-radius: var(--liquid-glass-navigation-radius);
+    overflow: hidden;
+    transition:
+      width 180ms cubic-bezier(0.22, 0.75, 0.25, 1),
+      padding 180ms cubic-bezier(0.22, 0.75, 0.25, 1),
+      border-radius 180ms cubic-bezier(0.22, 0.75, 0.25, 1);
+  }
+
+  body[data-ui-skin="liquid-glass"] .app-nav[data-nav-state="rail"] {
+    padding: 14px 10px;
+    border-radius: var(--liquid-glass-navigation-rail-radius);
+  }
+
+  body[data-ui-skin="liquid-glass"] .workspace {
+    grid-column: 1;
+    padding-left: calc(var(--liquid-glass-navigation-width) + var(--liquid-glass-navigation-inset) + 28px);
+    transition: padding-left 180ms cubic-bezier(0.22, 0.75, 0.25, 1);
+  }
+}
+
 body[data-ui-skin="liquid-glass"] .dictionary-panel {
-  border-right: 1px solid rgba(255, 255, 255, 0.16);
+  border-color: var(--material-navigation-action-border);
   box-shadow: var(--material-navigation-shadow);
 }
 
@@ -306,10 +356,11 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button:focus-visible {
 
 body[data-ui-skin="liquid-glass"] .dictionary-panel .utility-actions {
   gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--material-navigation-action-border);
-  border-radius: 12px;
-  background: var(--liquid-glass-navigation-utility-background);
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid var(--material-navigation-control-border);
+  border-radius: 0;
+  background: transparent;
 }
 
 body[data-ui-skin="liquid-glass"] .dictionary-panel .utility-actions .utility-button {
@@ -543,7 +594,41 @@ body.dark-theme[data-ui-skin="liquid-glass"] [data-liquid-glass-diagnostic-statu
   color: rgba(218, 248, 244, 0.72);
 }
 
+@media (max-width: 799.98px) {
+  body[data-ui-skin="liquid-glass"] .mobile-app-bar {
+    top: var(--liquid-glass-mobile-navigation-inset);
+    margin:
+      var(--liquid-glass-mobile-navigation-inset)
+      var(--liquid-glass-mobile-navigation-inset)
+      0;
+    min-height: 54px;
+    padding: 6px 10px;
+    border: 1px solid var(--material-floating-border);
+    border-radius: 20px;
+  }
+
+  body[data-ui-skin="liquid-glass"] .dictionary-panel,
+  body[data-ui-skin="liquid-glass"] .app-nav[data-nav-state="rail"],
+  body[data-ui-skin="liquid-glass"] .app-nav[data-nav-state="drawer"] {
+    inset:
+      var(--liquid-glass-mobile-navigation-inset)
+      auto
+      var(--liquid-glass-mobile-navigation-inset)
+      var(--liquid-glass-mobile-navigation-inset);
+    width: min(320px, calc(100vw - 20px));
+    height: auto;
+    padding: 18px;
+    border: 1px solid var(--material-navigation-action-border);
+    border-radius: var(--liquid-glass-mobile-navigation-radius);
+    overflow: hidden;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  body[data-ui-skin="liquid-glass"] :is(
+    .dictionary-panel,
+    .workspace
+  ),
   body[data-ui-skin="liquid-glass"] .dictionary-panel :where(
     .tool-button,
     .tool-icon,
@@ -569,9 +654,9 @@ body.dark-theme[data-ui-skin="liquid-glass"] [data-liquid-glass-diagnostic-statu
     --material-floating-filter: none;
     --material-mobile-bar-background: #eaf3f4;
     --material-mobile-bar-filter: none;
-    --material-navigation-background: #17303a;
+    --material-navigation-background: #eef6f5;
     --material-navigation-filter: none;
-    --material-navigation-drawer-background: #17303a;
+    --material-navigation-drawer-background: #e8f2f2;
     --material-navigation-drawer-filter: none;
     --material-list-item-background: #f8fbfb;
     --material-browser-background: #eaf1f3;
@@ -618,9 +703,9 @@ body.dark-theme[data-ui-skin="liquid-glass"] [data-liquid-glass-diagnostic-statu
     --material-floating-filter: none;
     --material-mobile-bar-background: #eaf3f4;
     --material-mobile-bar-filter: none;
-    --material-navigation-background: #17303a;
+    --material-navigation-background: #eef6f5;
     --material-navigation-filter: none;
-    --material-navigation-drawer-background: #17303a;
+    --material-navigation-drawer-background: #e8f2f2;
     --material-navigation-drawer-filter: none;
     --material-list-item-background: #f8fbfb;
     --material-browser-background: #eaf1f3;

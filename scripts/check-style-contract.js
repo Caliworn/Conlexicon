@@ -300,8 +300,27 @@ for (const definition of liquidGlassSurfaceDefinitions) {
 const liquidGlassContinuousDefinitions = liquidGlassSurfaceDefinitions.filter(({ role }) => role === "continuous");
 assert.deepEqual(
   new Map(liquidGlassContinuousDefinitions.map(({ selector, overrides }) => [selector, overrides?.edgeMode])),
-  new Map([[".dictionary-panel", "right"], [".mobile-app-bar", "bottom"]]),
-  "Attached continuous surfaces must sample only their exposed edge",
+  new Map([[".dictionary-panel", "all"], [".mobile-app-bar", "all"]]),
+  "Inset continuous navigation surfaces must sample all four exposed edges",
+);
+assert(
+  /@media \(min-width: 800px\) \{[\s\S]*?body\[data-ui-skin="liquid-glass"\] \.app-shell[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\);[\s\S]*?body\[data-ui-skin="liquid-glass"\] \.dictionary-panel\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?inset:[\s\S]*?border:\s*1px solid var\(--material-navigation-action-border\);[\s\S]*?border-radius:\s*var\(--liquid-glass-navigation-radius\);/.test(liquidGlass)
+    && /body\[data-ui-skin="liquid-glass"\] \.workspace\s*\{[^}]*padding-left:\s*calc\(var\(--liquid-glass-navigation-width\)/s.test(liquidGlass)
+    && !/body\[data-ui-skin="liquid-glass"\] \.dictionary-panel\s*\{[^}]*border-right:/s.test(liquidGlass),
+  "Liquid Glass desktop navigation must float as one inset card above a full-width canvas",
+);
+assert(
+  /@media \(max-width: 799\.98px\) \{[\s\S]*?body\[data-ui-skin="liquid-glass"\] \.mobile-app-bar\s*\{[\s\S]*?margin:[\s\S]*?border:\s*1px solid var\(--material-floating-border\);[\s\S]*?border-radius:/s.test(liquidGlass)
+    && /body\[data-ui-skin="liquid-glass"\] \.app-nav\[data-nav-state="drawer"\][\s\S]*?inset:[\s\S]*?border-radius:\s*var\(--liquid-glass-mobile-navigation-radius\);/s.test(liquidGlass),
+  "Liquid Glass compact navigation must keep both the app bar and drawer inset from viewport edges",
+);
+assert(
+  /\.dictionary-panel \.utility-actions\s*\{[^}]*border-top:\s*1px solid var\(--material-navigation-control-border\);[^}]*background:\s*transparent;/s.test(liquidGlass),
+  "Liquid Glass utility commands must use flat grouping inside the single navigation surface",
+);
+assert(
+  /handleResize\(entries\)[\s\S]*?releaseSurfaceResource\(record\);[\s\S]*?dataset\.liquidGlassOptics = "pending";[\s\S]*?this\.refresh\(entry\.target\);/.test(liquidGlassEngine),
+  "Resizing optical surfaces must stop using stale geometry until the settled map is ready",
 );
 const liquidGlassOpticalRoleRule = liquidGlassStyleBlocks.find(({ selector, declarations }) => (
   selector.includes('[data-liquid-glass-optics-quality="q3"]')

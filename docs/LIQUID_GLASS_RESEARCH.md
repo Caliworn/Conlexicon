@@ -32,7 +32,7 @@
 | SDF Baseline | 圆角矩形 SDF 决定边界和内侧 falloff；线性/球顶梯度决定位移方向 | RGB 三路位移、B 通道镜面、Alpha 轮廓 | 检查解析边界、固定方形贴图和球顶梯度是否改善连续性 |
 | Product Engine | 生产 rounded-rect 几何、有效边、角色化 bezel 与法线/rim 图 | 光学模糊、RGB 重组、统一环境 specular、Worker/LRU | 验证最终组件角色、降级、资源生命周期与性能架构 |
 
-三条路径在本机 Reference 文件存在时共享 Lab 的连续色场、高对比网格、色带、大号文字、卡片尺寸和拖动坐标。仓库分发具有 Unsplash 使用许可的室内背景；花丛、森林、浅水岩石和人物四张无许可参考图只作为被 Git 忽略的本机材料保留，来源边界记录在 `assets/liquid-glass-lab/README.md`，不得视为 Conlexicon 产品美术资产。SDF 来源实现原本过滤包含镜头的内容层；Lab 唯一有意的结构适配是把同一 map/filter 作用到卡片的 `backdrop-filter` 伪元素，使它能与另外两条路径观察同一实时背景。SDF Baseline 默认不叠加自行设计的 tint、边界或外阴影，避免装饰层污染轮廓、位移和镜面的观察。该适配意味着 Lab 能比较视觉结果，但不能据此宣称浏览器覆盖或性能与上游组件完全相同。
+三条路径在本机 Reference 文件存在时共享 Lab 的连续色场、高对比网格、色带、大号文字、卡片尺寸和拖动坐标。仓库分发五张仅供 Lab 光学对照的背景图：室内、Diamond Valley Lake 花丛、Whangarei Falls 栈桥和草地人物来自 Unsplash，浅水岩石来自 Pexels；逐张作者、原始页面和许可链接记录在 `assets/liquid-glass-lab/README.md`，这些图片不得视为 Conlexicon 产品美术资产。SDF 来源实现原本过滤包含镜头的内容层；Lab 唯一有意的结构适配是把同一 map/filter 作用到卡片的 `backdrop-filter` 伪元素，使它能与另外两条路径观察同一实时背景。SDF Baseline 默认不叠加自行设计的 tint、边界或外阴影，避免装饰层污染轮廓、位移和镜面的观察。该适配意味着 Lab 能比较视觉结果，但不能据此宣称浏览器覆盖或性能与上游组件完全相同。
 
 ## 4. 已纠正的实现认识
 
