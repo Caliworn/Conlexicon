@@ -90,9 +90,9 @@ The standalone Liquid Glass tuning and geometry diagnostic page is available at:
 http://localhost:4173/liquid-glass-lab.html
 ```
 
-The repository ships the production geometry/filter engine, an MIT-licensed SDF Baseline adapted from `PallavAg/liquid-glass-web-react`, and five licensed Lab backgrounds from Unsplash and Pexels. A developer's local workspace may additionally provide the ignored `archisvaze/liquid-glass` Reference Baseline; that source module is not distributed by this repository. Photo credits and license links are recorded in `assets/liquid-glass-lab/README.md`. The Lab does not call application APIs or persist parameter changes.
+The repository ships the production geometry/filter engine, an MIT-licensed SDF Baseline adapted from `PallavAg/liquid-glass-web-react`, and five licensed Lab backgrounds from Unsplash and Pexels. The Lab can compare rounded and adjustable superellipse outer corners across Product and SDF while keeping the local Reference Baseline on its source rounded outline. A developer's local workspace may additionally provide that ignored `archisvaze/liquid-glass` Reference Baseline; the source module is not distributed by this repository. Photo credits and license links are recorded in `assets/liquid-glass-lab/README.md`. The Lab does not call application APIs or persist parameter changes.
 
-仓库分发生产几何/滤镜引擎、改编自 MIT 许可 `PallavAg/liquid-glass-web-react` 的 SDF Baseline，以及五张来自 Unsplash 和 Pexels、具有明确许可的 Lab 背景图。开发者本机可以另外提供已被忽略的 `archisvaze/liquid-glass` Reference Baseline；该源码模块不随仓库分发。图片署名和许可链接记录在 `assets/liquid-glass-lab/README.md`。实验页不调用应用 API，也不会持久化参数改动。
+仓库分发生产几何/滤镜引擎、改编自 MIT 许可 `PallavAg/liquid-glass-web-react` 的 SDF Baseline，以及五张来自 Unsplash 和 Pexels、具有明确许可的 Lab 背景图。Lab 可在 Product 与 SDF 中共享比较传统圆角和可调指数的超椭圆外轮廓，本机 Reference Baseline 则保持来源的传统圆角。开发者本机可以另外提供该已被忽略的 `archisvaze/liquid-glass` Reference Baseline；源码模块不随仓库分发。图片署名和许可链接记录在 `assets/liquid-glass-lab/README.md`。实验页不调用应用 API，也不会持久化参数改动。
 
 Run the complete model, SQLite, API, and integration regression suite with:
 

@@ -14,6 +14,12 @@
 
 - Liquid Glass Lab 的诊断贴图预览不再被强制拉伸为固定 `2.2:1` 或使用像素化缩放；Product/Reference 贴图现在按实际表面比例显示，SDF 方形贴图保持方形，极端纵横比只限制最大展示尺寸而不改变比例。
 
+## 2026-08-21
+
+### 改进
+
+- Liquid Glass Lab 新增三条路径共享保留的外轮廓选择：Product 与 SDF 可在传统圆角和指数 `2–8` 的 superellipse 之间比较，并让 CSS 裁切与贴图几何保持一致；本机 Reference Baseline 继续使用来源传统圆角并明确提示不支持。该实验不接入主体皮肤，Reference 与 SDF 也不再作为主体光学后端。
+
 ## 2026-08-20
 
 ### 改进

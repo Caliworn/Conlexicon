@@ -313,6 +313,7 @@
       position: absolute;
       inset: 0;
       border-radius: inherit;
+      corner-shape: inherit;
       content: "";
       pointer-events: none;
     }
@@ -740,7 +741,18 @@
             <span class="lab-field-heading"><span>圆角</span><output id="radiusOutput" class="lab-field-value">60px</output></span>
             <input id="radiusInput" data-geometry-control type="range" min="2" max="100" step="1" value="60">
           </label>
-          <p class="lab-status-note">宽度、高度与圆角由三条渲染路径共同使用；切换路径或恢复模型默认值不会重置它们。</p>
+          <label class="lab-field" for="outerShapeSelect">
+            <span class="lab-field-heading"><span>外轮廓</span></span>
+            <select id="outerShapeSelect" data-shape-control>
+              <option value="round" selected>传统圆角</option>
+              <option value="superellipse">超椭圆角</option>
+            </select>
+          </label>
+          <label class="lab-field" for="cornerExponentInput">
+            <span class="lab-field-heading"><span>超椭圆指数</span><output id="cornerExponentOutput" class="lab-field-value">4.00</output></span>
+            <input id="cornerExponentInput" data-shape-control type="range" min="2" max="8" step="0.25" value="4" disabled>
+          </label>
+          <p id="outerShapeNote" class="lab-status-note">宽度、高度、圆角与外轮廓由三条路径共同保留；Reference Baseline 固定使用传统圆角。</p>
         </section>
 
         <div id="productControls" class="lab-renderer-controls" hidden>
@@ -968,6 +980,10 @@
         secondaryMapLegend: document.querySelector("#secondaryMapLegend"),
         referenceShadowColorInput: document.querySelector("#referenceShadowColorInput"),
         referenceTintColorInput: document.querySelector("#referenceTintColorInput"),
+        outerShapeSelect: document.querySelector("#outerShapeSelect"),
+        cornerExponentInput: document.querySelector("#cornerExponentInput"),
+        cornerExponentOutput: document.querySelector("#cornerExponentOutput"),
+        outerShapeNote: document.querySelector("#outerShapeNote"),
       };
 
       const photoScenes = Object.freeze({
@@ -1095,6 +1111,9 @@
       });
       const reducedTransparencyQuery = window.matchMedia("(prefers-reduced-transparency: reduce)");
       const forcedColorsQuery = window.matchMedia("(forced-colors: active)");
+      const supportsSuperellipse = Boolean(
+        window.CSS?.supports?.("corner-shape", "superellipse(2)"),
+      );
       let refreshTimer = 0;
       let previewGeneration = 0;
       let dragFrame = 0;
@@ -1109,6 +1128,29 @@
 
       function readGeometryNumber(name) {
         return Number(geometrySpecs[name].input.value);
+      }
+
+      function selectedOuterShape() {
+        return supportsSuperellipse && elements.outerShapeSelect.value === "superellipse"
+          ? "superellipse"
+          : "round";
+      }
+
+      function cornerExponent() {
+        return Number(elements.cornerExponentInput.value);
+      }
+
+      function updateShapeControls() {
+        const superellipseOption = elements.outerShapeSelect.querySelector('option[value="superellipse"]');
+        superellipseOption.disabled = !supportsSuperellipse;
+        if (!supportsSuperellipse) {
+          elements.outerShapeSelect.value = "round";
+        }
+        elements.cornerExponentInput.disabled = selectedOuterShape() !== "superellipse";
+        elements.cornerExponentOutput.value = cornerExponent().toFixed(2);
+        elements.outerShapeNote.textContent = supportsSuperellipse
+          ? "形状选择和指数跨路径保留；Reference Baseline 固定使用传统圆角，Product/SDF 的超椭圆是 Lab 实验扩展。"
+          : "当前浏览器不支持 CSS corner-shape；超椭圆实验已禁用，以免视觉裁切与光学贴图不一致。";
       }
 
       function formatGeometryRange(name) {
@@ -1257,6 +1299,8 @@
           width: bounds.width || readGeometryNumber("width"),
           height: bounds.height || readGeometryNumber("height"),
           radius: readGeometryNumber("radius"),
+          outerShape: selectedOuterShape(),
+          cornerExponent: cornerExponent(),
           bezel: readNumber("bezel"),
           thickness: readNumber("thickness"),
           ior: readNumber("ior"),
@@ -1303,6 +1347,8 @@
           width: readGeometryNumber("width"),
           height: readGeometryNumber("height"),
           radius: readGeometryNumber("radius"),
+          outerShape: selectedOuterShape(),
+          cornerExponent: cornerExponent(),
           strength: readSdfNumber("strength"),
           chromaticAberration: readSdfNumber("chromaticAberration"),
           blur: readSdfNumber("blur"),
@@ -1338,12 +1384,20 @@
         const width = Math.min(requestedWidth, availableWidth);
         const height = readGeometryNumber("height");
         const radius = readGeometryNumber("radius");
+        const actualOuterShape = reference ? "round" : selectedOuterShape();
         elements.surface.dataset.renderer = renderer;
         const tint = readNumber("tint");
         const light = elements.root.dataset.theme === "light";
         elements.surface.style.width = `${width}px`;
         elements.surface.style.height = `${height}px`;
         elements.surface.style.borderRadius = `${radius}px`;
+        elements.surface.style.setProperty(
+          "corner-shape",
+          actualOuterShape === "superellipse"
+            ? `superellipse(${Math.log2(cornerExponent()).toFixed(6)})`
+            : "round",
+        );
+        elements.surface.dataset.outerShape = actualOuterShape;
         elements.surface.style.background = reference || sdf ? "transparent" : light
           ? `rgba(235, 247, 249, ${tint})`
           : `rgba(12, 26, 32, ${tint})`;
@@ -1446,6 +1500,8 @@
           opticalBlur: readNumber("opticalBlur"),
           saturation: readNumber("saturation"),
           edgeMode: elements.edgeModeSelect.value,
+          outerShape: selectedOuterShape(),
+          cornerExponent: cornerExponent(),
         }, { forceRefresh: true });
       }
 
@@ -1564,7 +1620,9 @@
           elements.cacheValue.textContent = "none";
           elements.liveStatus.textContent = suppressed
             ? "Reference Baseline · optics disabled"
-            : "Reference Baseline · convex_squircle";
+            : selectedOuterShape() === "superellipse"
+            ? "Reference Baseline · rounded rectangle（共享超椭圆不支持）"
+            : "Reference Baseline · convex_squircle · rounded rectangle";
           return;
         }
         if (elements.rendererSelect.value === "sdf") {
@@ -1694,6 +1752,16 @@
         });
         control.addEventListener("change", scheduleRefresh);
       });
+      document.querySelectorAll("[data-shape-control]").forEach((control) => {
+        control.addEventListener("input", () => {
+          updateShapeControls();
+          scheduleRefresh();
+        });
+        control.addEventListener("change", () => {
+          updateShapeControls();
+          scheduleRefresh();
+        });
+      });
       document.querySelectorAll("[data-optic-control]").forEach((control) => {
         control.addEventListener("input", () => {
           elements.presetSelect.value = "custom";
@@ -1774,6 +1842,7 @@
       new ResizeObserver(scheduleRefresh).observe(elements.stage);
 
       syncGeometryBounds();
+      updateShapeControls();
       applyPreset("focus");
       applyReferenceDefaults();
       applySdfDefaults();
