@@ -307,6 +307,7 @@
     }
 
     .lab-surface[data-renderer="reference"]::before,
+    .lab-surface[data-renderer="sdf"][data-sdf-appearance="reference"]::before,
     .lab-surface[data-renderer="reference"]::after,
     .lab-surface[data-renderer="sdf"]::after {
       position: absolute;
@@ -316,7 +317,8 @@
       pointer-events: none;
     }
 
-    .lab-surface[data-renderer="reference"]::before {
+    .lab-surface[data-renderer="reference"]::before,
+    .lab-surface[data-renderer="sdf"][data-sdf-appearance="reference"]::before {
       z-index: 1;
       background-color: rgba(var(--reference-tint-color), var(--reference-tint-opacity));
       box-shadow: inset 0 0 var(--reference-shadow-blur) var(--reference-shadow-spread) var(--reference-shadow-color);
@@ -352,6 +354,11 @@
 
     :root[data-theme="light"] .lab-surface[data-renderer="sdf"] {
       box-shadow: none;
+    }
+
+    .lab-surface[data-renderer="sdf"][data-sdf-appearance="reference"],
+    :root[data-theme="light"] .lab-surface[data-renderer="sdf"][data-sdf-appearance="reference"] {
+      box-shadow: 0 4px var(--reference-outer-shadow-blur) rgba(0, 0, 0, 0.18);
     }
 
     .lab-surface[data-liquid-glass-optics="ready"] {
@@ -440,11 +447,12 @@
     .lab-map-canvas {
       display: block;
       width: 100%;
-      aspect-ratio: 2.2;
+      height: clamp(180px, 24vw, 320px);
       border: 1px solid var(--lab-border);
       border-radius: 10px;
       background: #7f7f7f;
-      image-rendering: pixelated;
+      object-fit: contain;
+      image-rendering: auto;
     }
 
     .lab-controls {
@@ -605,6 +613,7 @@
       }
 
       .lab-surface[data-renderer="reference"]::before,
+      .lab-surface[data-renderer="sdf"][data-sdf-appearance="reference"]::before,
       .lab-surface[data-renderer="reference"]::after,
       .lab-surface[data-renderer="sdf"]::after {
         content: none;
@@ -623,6 +632,7 @@
       }
 
       .lab-surface[data-renderer="reference"]::before,
+      .lab-surface[data-renderer="sdf"][data-sdf-appearance="reference"]::before,
       .lab-surface[data-renderer="reference"]::after,
       .lab-surface[data-renderer="sdf"]::after {
         content: none;
@@ -661,7 +671,7 @@
                 <option value="type">大号文字</option>
               </optgroup>
               <optgroup label="参考项目原图">
-                <option value="photo-interior">室内</option>
+                <option value="photo-interior" selected>室内</option>
                 <option value="photo-flowers">花丛</option>
                 <option value="photo-forest">森林栈桥</option>
                 <option value="photo-water">浅水岩石</option>
@@ -716,6 +726,23 @@
           <button id="resetButton" type="button">恢复参考默认值</button>
         </div>
 
+        <section class="lab-control-section">
+          <h3>共享表面几何</h3>
+          <label class="lab-field" for="widthInput">
+            <span class="lab-field-heading"><span>宽度</span><output id="widthOutput" class="lab-field-value">420px</output></span>
+            <input id="widthInput" data-geometry-control type="range" min="180" max="900" step="2" value="420">
+          </label>
+          <label class="lab-field" for="heightInput">
+            <span class="lab-field-heading"><span>高度</span><output id="heightOutput" class="lab-field-value">200px</output></span>
+            <input id="heightInput" data-geometry-control type="range" min="80" max="800" step="2" value="200">
+          </label>
+          <label class="lab-field" for="radiusInput">
+            <span class="lab-field-heading"><span>圆角</span><output id="radiusOutput" class="lab-field-value">60px</output></span>
+            <input id="radiusInput" data-geometry-control type="range" min="2" max="100" step="1" value="60">
+          </label>
+          <p class="lab-status-note">宽度、高度与圆角由三条渲染路径共同使用；切换路径或恢复模型默认值不会重置它们。</p>
+        </section>
+
         <div id="productControls" class="lab-renderer-controls" hidden>
         <section class="lab-control-section">
           <h3>角色与边界</h3>
@@ -762,19 +789,7 @@
         </section>
 
         <section class="lab-control-section">
-          <h3>表面几何</h3>
-          <label class="lab-field" for="widthInput">
-            <span class="lab-field-heading"><span>宽度</span><output id="widthOutput" class="lab-field-value">620px</output></span>
-            <input id="widthInput" data-optic-control type="range" min="180" max="900" step="2" value="620">
-          </label>
-          <label class="lab-field" for="heightInput">
-            <span class="lab-field-heading"><span>高度</span><output id="heightOutput" class="lab-field-value">280px</output></span>
-            <input id="heightInput" data-optic-control type="range" min="80" max="480" step="2" value="280">
-          </label>
-          <label class="lab-field" for="radiusInput">
-            <span class="lab-field-heading"><span>圆角</span><output id="radiusOutput" class="lab-field-value">8px</output></span>
-            <input id="radiusInput" data-optic-control type="range" min="0" max="120" step="1" value="8">
-          </label>
+          <h3>光学几何</h3>
           <label class="lab-field" for="bezelInput">
             <span class="lab-field-heading"><span>请求 bezel</span><output id="bezelOutput" class="lab-field-value">46px</output></span>
             <input id="bezelInput" data-optic-control type="range" min="2" max="72" step="1" value="46">
@@ -829,12 +844,6 @@
 
         <div id="referenceControls" class="lab-renderer-controls">
           <section class="lab-control-section">
-            <h3>Reference Glass Shape</h3>
-            <label class="lab-field"><span class="lab-field-heading"><span>Width</span><output id="referenceWidthOutput" class="lab-field-value">420px</output></span><input id="referenceWidthInput" data-reference-control type="range" min="200" max="700" value="420"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Height</span><output id="referenceHeightOutput" class="lab-field-value">200px</output></span><input id="referenceHeightInput" data-reference-control type="range" min="200" max="800" value="200"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Border Radius</span><output id="referenceRadiusOutput" class="lab-field-value">60px</output></span><input id="referenceRadiusInput" data-reference-control type="range" min="20" max="100" value="60"></label>
-          </section>
-          <section class="lab-control-section">
             <h3>Reference Refraction</h3>
             <label class="lab-field"><span class="lab-field-heading"><span>Glass Thickness</span><output id="referenceThicknessOutput" class="lab-field-value">80</output></span><input id="referenceThicknessInput" data-reference-control type="range" min="10" max="200" value="80"></label>
             <label class="lab-field"><span class="lab-field-heading"><span>Bezel Width</span><output id="referenceBezelOutput" class="lab-field-value">60px</output></span><input id="referenceBezelInput" data-reference-control type="range" min="2" max="60" value="60"></label>
@@ -863,6 +872,8 @@
           <section class="lab-control-section">
             <h3>Controlled Comparisons</h3>
             <div class="lab-compare-grid">
+              <button type="button" data-sdf-preset="reference-optics">Ref 趋近 · 光学</button>
+              <button type="button" data-sdf-preset="reference-appearance">Ref 趋近 · +外观</button>
               <button type="button" data-sdf-preset="source">来源默认</button>
               <button type="button" data-sdf-preset="optics">纯折射 · Q512</button>
               <button type="button" data-sdf-preset="quality-low">低清边界 · Q128</button>
@@ -873,13 +884,10 @@
               <button type="button" data-sdf-preset="radius-small">小圆角 · R20</button>
               <button type="button" data-sdf-preset="radius-large">大圆角 · R100</button>
             </div>
-            <p class="lab-status-note">每个预设都会先恢复同一组来源默认参数；除“来源默认”外均关闭 glow、edge highlight 与 specular，只修改按钮标注的单一变量。</p>
+            <p class="lab-status-note">两个“Ref 趋近”使用完全相同的 SDF 光学参数，第二项只补入当前 Reference 的 tint、内阴影和外阴影，用于区分算法与外观层差距；其中关闭 RGB 色散只为匹配没有分路的 Reference，不代表 Apple 系统材质没有色散。其余预设先恢复来源光学参数；纯折射系列关闭 glow、edge highlight 与 specular。圆角快捷方式会更新上方的共享圆角。</p>
           </section>
           <section class="lab-control-section">
-            <h3>SDF Glass Shape</h3>
-            <label class="lab-field"><span class="lab-field-heading"><span>Width</span><output id="sdfWidthOutput" class="lab-field-value">420px</output></span><input id="sdfWidthInput" data-sdf-control type="range" min="200" max="700" value="420"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Height</span><output id="sdfHeightOutput" class="lab-field-value">200px</output></span><input id="sdfHeightInput" data-sdf-control type="range" min="100" max="480" value="200"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Border Radius</span><output id="sdfRadiusOutput" class="lab-field-value">60px</output></span><input id="sdfRadiusInput" data-sdf-control type="range" min="0" max="120" value="60"></label>
+            <h3>SDF Map</h3>
             <label class="lab-field" for="sdfQualitySelect"><span class="lab-field-heading"><span>Square Map Quality</span></span><select id="sdfQualitySelect" data-sdf-control><option value="128">128</option><option value="256">256</option><option value="512" selected>512</option><option value="1024">1024</option></select></label>
           </section>
           <section class="lab-control-section">
@@ -970,10 +978,18 @@
         "photo-people": "assets/liquid-glass-lab/people-in-dry-grass-field.jpg",
       });
 
-      const rangeSpecs = {
+      const geometrySpecs = {
         width: { input: "widthInput", output: "widthOutput", suffix: "px", digits: 0 },
         height: { input: "heightInput", output: "heightOutput", suffix: "px", digits: 0 },
         radius: { input: "radiusInput", output: "radiusOutput", suffix: "px", digits: 0 },
+      };
+
+      Object.values(geometrySpecs).forEach((spec) => {
+        spec.input = document.getElementById(spec.input);
+        spec.output = document.getElementById(spec.output);
+      });
+
+      const rangeSpecs = {
         bezel: { input: "bezelInput", output: "bezelOutput", suffix: "px", digits: 0 },
         thickness: { input: "thicknessInput", output: "thicknessOutput", suffix: "px", digits: 0 },
         ior: { input: "iorInput", output: "iorOutput", suffix: "", digits: 2 },
@@ -992,9 +1008,6 @@
       });
 
       const referenceRangeSpecs = {
-        width: { input: "referenceWidthInput", output: "referenceWidthOutput", suffix: "px", digits: 0 },
-        height: { input: "referenceHeightInput", output: "referenceHeightOutput", suffix: "px", digits: 0 },
-        radius: { input: "referenceRadiusInput", output: "referenceRadiusOutput", suffix: "px", digits: 0 },
         glassThickness: { input: "referenceThicknessInput", output: "referenceThicknessOutput", suffix: "", digits: 0 },
         bezelWidth: { input: "referenceBezelInput", output: "referenceBezelOutput", suffix: "px", digits: 0 },
         ior: { input: "referenceIorInput", output: "referenceIorOutput", suffix: "", digits: 2 },
@@ -1014,9 +1027,6 @@
       });
 
       const sdfRangeSpecs = {
-        width: { input: "sdfWidthInput", output: "sdfWidthOutput", suffix: "px", digits: 0 },
-        height: { input: "sdfHeightInput", output: "sdfHeightOutput", suffix: "px", digits: 0 },
-        radius: { input: "sdfRadiusInput", output: "sdfRadiusOutput", suffix: "px", digits: 0 },
         strength: { input: "sdfStrengthInput", output: "sdfStrengthOutput", suffix: "", digits: 3 },
         chromaticAberration: { input: "sdfChromaticInput", output: "sdfChromaticOutput", suffix: "", digits: 2 },
         blur: { input: "sdfBlurInput", output: "sdfBlurOutput", suffix: "px", digits: 1 },
@@ -1039,10 +1049,10 @@
       });
 
       const presets = {
-        continuous: { role: "continuous", width: 720, height: 180, radius: 0, edgeMode: "right", tintLight: 0.52, tintDark: 0.56 },
-        focus: { role: "focus", width: 620, height: 280, radius: 8, edgeMode: "all", tintLight: 0.30, tintDark: 0.34 },
-        floating: { role: "floating", width: 430, height: 220, radius: 8, edgeMode: "all", tintLight: 0.28, tintDark: 0.32 },
-        modal: { role: "modal", width: 700, height: 390, radius: 8, edgeMode: "all", tintLight: 0.32, tintDark: 0.36 },
+        continuous: { role: "continuous", edgeMode: "right", tintLight: 0.52, tintDark: 0.56 },
+        focus: { role: "focus", edgeMode: "all", tintLight: 0.30, tintDark: 0.34 },
+        floating: { role: "floating", edgeMode: "all", tintLight: 0.28, tintDark: 0.32 },
+        modal: { role: "modal", edgeMode: "all", tintLight: 0.32, tintDark: 0.36 },
       };
 
       const sdfOpticsOnly = Object.freeze({
@@ -1050,16 +1060,33 @@
         edgeHighlight: 0,
         specular: 0,
       });
+      const sdfReferenceMatch = Object.freeze({
+        strength: 0.25,
+        chromaticAberration: 0,
+        blur: 0.3,
+        depth: 48,
+        curvature: 1,
+        splay: 0.25,
+        glow: 0,
+        edgeHighlight: 0.52,
+        edgeWidth: 2,
+        edgeExponent: 2,
+        specular: 1,
+        specularAngle: 45,
+        quality: 1024,
+      });
       const sdfComparisonPresets = Object.freeze({
-        source: {},
-        optics: { ...sdfOpticsOnly },
-        "quality-low": { ...sdfOpticsOnly, quality: 128 },
-        "quality-high": { ...sdfOpticsOnly, quality: 1024 },
-        "depth-wide": { ...sdfOpticsOnly, depth: 30 },
-        linear: { ...sdfOpticsOnly, curvature: 0 },
-        dome: { ...sdfOpticsOnly, curvature: 1 },
-        "radius-small": { ...sdfOpticsOnly, radius: 20 },
-        "radius-large": { ...sdfOpticsOnly, radius: 100 },
+        "reference-optics": { values: sdfReferenceMatch, referenceAppearance: false },
+        "reference-appearance": { values: sdfReferenceMatch, referenceAppearance: true },
+        source: { values: {}, referenceAppearance: false },
+        optics: { values: { ...sdfOpticsOnly }, referenceAppearance: false },
+        "quality-low": { values: { ...sdfOpticsOnly, quality: 128 }, referenceAppearance: false },
+        "quality-high": { values: { ...sdfOpticsOnly, quality: 1024 }, referenceAppearance: false },
+        "depth-wide": { values: { ...sdfOpticsOnly, depth: 30 }, referenceAppearance: false },
+        linear: { values: { ...sdfOpticsOnly, curvature: 0 }, referenceAppearance: false },
+        dome: { values: { ...sdfOpticsOnly, curvature: 1 }, referenceAppearance: false },
+        "radius-small": { values: { ...sdfOpticsOnly, radius: 20 }, referenceAppearance: false },
+        "radius-large": { values: { ...sdfOpticsOnly, radius: 100 }, referenceAppearance: false },
       });
 
       const opticalEngine = engineApi.createEngine({
@@ -1075,6 +1102,37 @@
       let dragPosition = { x: 0, y: 0 };
       let pendingDragPosition = null;
       let lastSdfResult = null;
+
+      function setGeometryValue(name, value) {
+        geometrySpecs[name].input.value = String(value);
+      }
+
+      function readGeometryNumber(name) {
+        return Number(geometrySpecs[name].input.value);
+      }
+
+      function formatGeometryRange(name) {
+        const spec = geometrySpecs[name];
+        const value = Number(spec.input.value);
+        const formatted = spec.digits === 0 ? String(Math.round(value)) : value.toFixed(spec.digits);
+        spec.output.value = `${formatted}${spec.suffix}`;
+      }
+
+      function updateGeometryOutputs() {
+        Object.keys(geometrySpecs).forEach(formatGeometryRange);
+      }
+
+      function syncGeometryBounds() {
+        const maximumRadius = Math.min(120, Math.floor(Math.min(
+          readGeometryNumber("width"),
+          readGeometryNumber("height"),
+        ) / 2));
+        geometrySpecs.radius.input.max = String(maximumRadius);
+        if (readGeometryNumber("radius") > maximumRadius) {
+          setGeometryValue("radius", maximumRadius);
+        }
+        updateGeometryOutputs();
+      }
 
       function setRangeValue(name, value) {
         rangeSpecs[name].input.value = String(value);
@@ -1137,13 +1195,18 @@
         scheduleRefresh();
       }
 
-      function applySdfValues(overrides = {}) {
+      function applySdfValues(overrides = {}, referenceAppearance = false) {
         const values = { ...sdfBaseline.LAB_DEFAULTS, ...overrides };
         Object.entries(values).forEach(([name, value]) => {
           if (sdfRangeSpecs[name]) {
             sdfRangeSpecs[name].input.value = String(value);
           }
         });
+        if (Object.prototype.hasOwnProperty.call(overrides, "radius")) {
+          setGeometryValue("radius", overrides.radius);
+          syncGeometryBounds();
+        }
+        elements.surface.dataset.sdfAppearance = referenceAppearance ? "reference" : "none";
         elements.sdfQualitySelect.value = String(values.quality);
         updateSdfOutputs();
         scheduleRefresh();
@@ -1154,11 +1217,11 @@
       }
 
       function applySdfComparisonPreset(name) {
-        const overrides = sdfComparisonPresets[name];
-        if (!overrides) {
+        const preset = sdfComparisonPresets[name];
+        if (!preset) {
           return;
         }
-        applySdfValues(overrides);
+        applySdfValues(preset.values, preset.referenceAppearance);
       }
 
       function applyPreset(name) {
@@ -1170,9 +1233,6 @@
         elements.roleSelect.value = preset.role;
         elements.edgeModeSelect.value = preset.edgeMode;
         elements.mapLimitSelect.value = String(defaults.maximumMapDimension);
-        setRangeValue("width", preset.width);
-        setRangeValue("height", preset.height);
-        setRangeValue("radius", preset.radius);
         setRangeValue("bezel", defaults.bezel);
         setRangeValue("thickness", defaults.thickness);
         setRangeValue("ior", defaults.ior);
@@ -1188,15 +1248,15 @@
       function currentConfig() {
         const bounds = elements.surface.getBoundingClientRect();
         const mapDimensions = geometry.mapDimensions(
-          bounds.width || readNumber("width"),
-          bounds.height || readNumber("height"),
+          bounds.width || readGeometryNumber("width"),
+          bounds.height || readGeometryNumber("height"),
           window.devicePixelRatio || 1,
           Number(elements.mapLimitSelect.value),
         );
         const normalized = geometry.normalizeSurfaceOptions({
-          width: bounds.width || readNumber("width"),
-          height: bounds.height || readNumber("height"),
-          radius: readNumber("radius"),
+          width: bounds.width || readGeometryNumber("width"),
+          height: bounds.height || readGeometryNumber("height"),
+          radius: readGeometryNumber("radius"),
           bezel: readNumber("bezel"),
           thickness: readNumber("thickness"),
           ior: readNumber("ior"),
@@ -1218,9 +1278,9 @@
       function currentReferenceConfig() {
         return {
           ...referenceBaseline.LAB_DEFAULTS,
-          width: readReferenceNumber("width"),
-          height: readReferenceNumber("height"),
-          radius: readReferenceNumber("radius"),
+          width: readGeometryNumber("width"),
+          height: readGeometryNumber("height"),
+          radius: readGeometryNumber("radius"),
           glassThickness: readReferenceNumber("glassThickness"),
           bezelWidth: readReferenceNumber("bezelWidth"),
           ior: readReferenceNumber("ior"),
@@ -1240,9 +1300,9 @@
       function currentSdfConfig() {
         return sdfBaseline.normalizeOptions({
           ...sdfBaseline.LAB_DEFAULTS,
-          width: readSdfNumber("width"),
-          height: readSdfNumber("height"),
-          radius: readSdfNumber("radius"),
+          width: readGeometryNumber("width"),
+          height: readGeometryNumber("height"),
+          radius: readGeometryNumber("radius"),
           strength: readSdfNumber("strength"),
           chromaticAberration: readSdfNumber("chromaticAberration"),
           blur: readSdfNumber("blur"),
@@ -1273,11 +1333,11 @@
         const reference = renderer === "reference";
         const sdf = renderer === "sdf";
         const config = reference ? currentReferenceConfig() : sdf ? currentSdfConfig() : null;
-        const requestedWidth = reference || sdf ? config.width : readNumber("width");
+        const requestedWidth = readGeometryNumber("width");
         const availableWidth = Math.max(120, elements.stage.clientWidth - 40);
         const width = Math.min(requestedWidth, availableWidth);
-        const height = reference || sdf ? config.height : readNumber("height");
-        const radius = reference || sdf ? config.radius : readNumber("radius");
+        const height = readGeometryNumber("height");
+        const radius = readGeometryNumber("radius");
         elements.surface.dataset.renderer = renderer;
         const tint = readNumber("tint");
         const light = elements.root.dataset.theme === "light";
@@ -1288,13 +1348,14 @@
           ? `rgba(235, 247, 249, ${tint})`
           : `rgba(12, 26, 32, ${tint})`;
         elements.surface.style.setProperty("--lab-fallback-blur", `${readNumber("opticalBlur")}px`);
-        if (reference) {
-          elements.surface.style.setProperty("--reference-outer-shadow-blur", `${config.outerShadowBlur}px`);
-          elements.surface.style.setProperty("--reference-shadow-blur", `${config.shadowBlur}px`);
-          elements.surface.style.setProperty("--reference-shadow-spread", `${config.shadowSpread}px`);
-          elements.surface.style.setProperty("--reference-shadow-color", config.shadowColor);
-          elements.surface.style.setProperty("--reference-tint-color", hexToRgb(config.tintColor));
-          elements.surface.style.setProperty("--reference-tint-opacity", (config.tintOpacity / 100).toFixed(3));
+        if (reference || (sdf && elements.surface.dataset.sdfAppearance === "reference")) {
+          const appearanceConfig = reference ? config : currentReferenceConfig();
+          elements.surface.style.setProperty("--reference-outer-shadow-blur", `${appearanceConfig.outerShadowBlur}px`);
+          elements.surface.style.setProperty("--reference-shadow-blur", `${appearanceConfig.shadowBlur}px`);
+          elements.surface.style.setProperty("--reference-shadow-spread", `${appearanceConfig.shadowSpread}px`);
+          elements.surface.style.setProperty("--reference-shadow-color", appearanceConfig.shadowColor);
+          elements.surface.style.setProperty("--reference-tint-color", hexToRgb(appearanceConfig.tintColor));
+          elements.surface.style.setProperty("--reference-tint-opacity", (appearanceConfig.tintOpacity / 100).toFixed(3));
         }
         window.requestAnimationFrame(clampSurfacePosition);
       }
@@ -1626,6 +1687,13 @@
         elements.presetSelect.value = preset;
         applyPreset(preset);
       });
+      document.querySelectorAll("[data-geometry-control]").forEach((control) => {
+        control.addEventListener("input", () => {
+          syncGeometryBounds();
+          scheduleRefresh();
+        });
+        control.addEventListener("change", scheduleRefresh);
+      });
       document.querySelectorAll("[data-optic-control]").forEach((control) => {
         control.addEventListener("input", () => {
           elements.presetSelect.value = "custom";
@@ -1705,6 +1773,7 @@
       });
       new ResizeObserver(scheduleRefresh).observe(elements.stage);
 
+      syncGeometryBounds();
       applyPreset("focus");
       applyReferenceDefaults();
       applySdfDefaults();

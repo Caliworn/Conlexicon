@@ -4,6 +4,16 @@
 
 ## New
 
+### 改进
+
+- Liquid Glass Lab 的默认背景参照改为室内照片，打开实验页即可直接观察真实明暗边界和细节经过玻璃表面的折射。
+- Liquid Glass Lab 将宽度、高度和圆角提升为三条渲染路径共用的表面几何参数；切换 Product Engine、Reference Baseline 与 SDF Baseline，以及恢复任一模型默认值时均保持当前几何，SDF 圆角比较快捷方式同步操作共享圆角。
+- Liquid Glass Lab 的 SDF Controlled Comparisons 新增“Ref 趋近 · 光学”和“Ref 趋近 · +外观”临时快捷方式：两者共享同一组趋近 Reference 的高质量、宽边带、强位移 SDF 参数，并仅为对齐单路 Reference 关闭 RGB 色散；后者只额外复用当前 Reference tint 与内外阴影，便于直接分辨算法和外观包装各自造成的视觉差距。
+
+### 修复
+
+- Liquid Glass Lab 的诊断贴图预览不再被强制拉伸为固定 `2.2:1` 或使用像素化缩放；Product/Reference 贴图现在按实际表面比例显示，SDF 方形贴图保持方形，极端纵横比只限制最大展示尺寸而不改变比例。
+
 ## 2026-08-20
 
 ### 改进

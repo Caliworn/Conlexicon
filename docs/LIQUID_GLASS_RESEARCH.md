@@ -32,7 +32,7 @@
 | SDF Baseline | 圆角矩形 SDF 决定边界和内侧 falloff；线性/球顶梯度决定位移方向 | RGB 三路位移、B 通道镜面、Alpha 轮廓 | 检查解析边界、固定方形贴图和球顶梯度是否改善连续性 |
 | Product Engine | 生产 rounded-rect 几何、有效边、角色化 bezel 与法线/rim 图 | 光学模糊、RGB 重组、统一环境 specular、Worker/LRU | 验证最终组件角色、降级、资源生命周期与性能架构 |
 
-三条路径在本机 Reference 文件存在时共享 Lab 的连续色场、高对比网格、色带、大号文字、卡片尺寸和拖动坐标。仓库分发五张仅供 Lab 光学对照的背景图：室内、Diamond Valley Lake 花丛、Whangarei Falls 栈桥和草地人物来自 Unsplash，浅水岩石来自 Pexels；逐张作者、原始页面和许可链接记录在 `assets/liquid-glass-lab/README.md`，这些图片不得视为 Conlexicon 产品美术资产。SDF 来源实现原本过滤包含镜头的内容层；Lab 唯一有意的结构适配是把同一 map/filter 作用到卡片的 `backdrop-filter` 伪元素，使它能与另外两条路径观察同一实时背景。SDF Baseline 默认不叠加自行设计的 tint、边界或外阴影，避免装饰层污染轮廓、位移和镜面的观察。该适配意味着 Lab 能比较视觉结果，但不能据此宣称浏览器覆盖或性能与上游组件完全相同。
+三条路径在本机 Reference 文件存在时共享 Lab 的连续色场、高对比网格、色带、大号文字、拖动坐标，以及唯一一组宽度、高度和圆角控件；切换渲染路径或恢复模型默认值不会改变当前表面几何。仓库分发五张仅供 Lab 光学对照的背景图：室内、Diamond Valley Lake 花丛、Whangarei Falls 栈桥和草地人物来自 Unsplash，浅水岩石来自 Pexels；逐张作者、原始页面和许可链接记录在 `assets/liquid-glass-lab/README.md`，这些图片不得视为 Conlexicon 产品美术资产。SDF 来源实现原本过滤包含镜头的内容层；Lab 唯一有意的结构适配是把同一 map/filter 作用到卡片的 `backdrop-filter` 伪元素，使它能与另外两条路径观察同一实时背景。SDF Baseline 默认不叠加自行设计的 tint、边界或外阴影，避免装饰层污染轮廓、位移和镜面的观察。该适配意味着 Lab 能比较视觉结果，但不能据此宣称浏览器覆盖或性能与上游组件完全相同。
 
 ## 4. 已纠正的实现认识
 
@@ -44,7 +44,7 @@
 
 ## 5. 本轮验收问题
 
-以下项目只记录为人工对照问题，不预写视觉结论。SDF 面板提供临时的 Controlled Comparisons 快捷按钮；每个按钮都从来源默认值重新开始，纯折射系列统一关闭 glow、edge highlight 和 specular，防止残留手工参数破坏单变量比较：
+以下项目只记录为人工对照问题，不预写视觉结论。SDF 面板提供临时的 Controlled Comparisons 快捷按钮；单变量按钮都从来源默认值重新开始，纯折射系列统一关闭 glow、edge highlight 和 specular，防止残留手工参数破坏比较。“Ref 趋近 · 光学”和“Ref 趋近 · +外观”使用同一组候选 SDF 光学参数，后者只额外复用当前 Reference 的 tint、内阴影和外阴影，以直接隔离算法与外观包装的贡献。趋近预设关闭 RGB 色散只是为了匹配没有分路的 Reference，不能据此推断 Apple 系统材质没有色散；Apple 的公开设计与 API 未披露底层 RGB 光学实现：
 
 1. 在网格和文字场景中，SDF 的边缘有效宽度是否比 Product 更连续，四角是否仍出现阶梯或斜缝。
 2. `quality` 从 `128` 到 `1024` 时，角部锯齿、拖动稳定性和生成耗时各自如何变化。
