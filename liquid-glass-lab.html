@@ -1307,6 +1307,7 @@
       function updateShapeControls() {
         const global = selectedShapeModel() === "global-superellipse";
         const reference = elements.rendererSelect.value === "reference";
+        const product = elements.rendererSelect.value === "product";
         if (!supportsSuperellipse && !global) {
           elements.cornerExponentInput.value = "2";
         }
@@ -1321,6 +1322,11 @@
           elements.outerShapeNote.textContent = "角部模型保留直边；指数 2 为传统圆角，2 以上为超椭圆角。";
         } else {
           elements.outerShapeNote.textContent = "当前浏览器不支持 CSS corner-shape；角部模型指数已锁定为 2。全局超椭圆仍可通过匹配的 clip-path 与贴图比较。";
+        }
+        if (product) {
+          elements.secondaryMapLegend.textContent = global
+            ? "R = normal X · G = normal Y · A = shape"
+            : "R = normal X · G = normal Y";
         }
       }
 
@@ -2057,7 +2063,7 @@
       function drawMap(canvas, bytes, width, height) {
         canvas.width = width;
         canvas.height = height;
-        const context = canvas.getContext("2d", { alpha: false });
+        const context = canvas.getContext("2d", { alpha: true });
         const image = context.createImageData(width, height);
         image.data.set(bytes);
         context.putImageData(image, 0, 0);

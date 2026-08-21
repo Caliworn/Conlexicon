@@ -345,9 +345,19 @@ const liquidGlassOpticalRoleRule = liquidGlassStyleBlocks.find(({ selector, decl
 ));
 assert(liquidGlassOpticalRoleRule, "Q3 must apply generated optics only to ready runtime roles");
 assert(
-  liquidGlassOpticalRoleRule.declarations.includes("background: var(--liquid-glass-q3-surface-tint);")
+  liquidGlassOpticalRoleRule.declarations.includes("background: var(--liquid-glass-surface-tint);")
     && !/blur\(/.test(liquidGlassOpticalRoleRule.declarations),
   "Q3 must use a low-alpha role tint and generated optics without the Q1 material blur",
+);
+const liquidGlassQ1RuntimeRule = liquidGlassStyleBlocks.find(({ selector, declarations }) => (
+  selector.includes('[data-liquid-glass-optics="pending"]')
+    && selector.includes('[data-liquid-glass-optics="fallback"]')
+    && declarations.includes("background: var(--liquid-glass-surface-tint);")
+    && declarations.includes("backdrop-filter: var(--liquid-glass-surface-q1-filter);")
+));
+assert(
+  liquidGlassQ1RuntimeRule,
+  "Q1 pending and fallback surfaces must consume one semantic tint/filter interface",
 );
 for (const role of ["continuous", "focus", "floating", "modal"]) {
   const defaults = liquidGlassEngineApi.ROLE_DEFAULTS[role];
@@ -357,18 +367,18 @@ for (const role of ["continuous", "focus", "floating", "modal"]) {
     `Q1 ${role} blur and saturation must match the Q3 role parameters`,
   );
 }
-for (const [materialToken, q3TintToken] of [
-  ["--material-entry-detail-background", "--liquid-glass-q3-focus-tint"],
-  ["--material-floating-background", "--liquid-glass-q3-floating-tint"],
-  ["--material-mobile-bar-background", "--liquid-glass-q3-mobile-bar-tint"],
-  ["--material-navigation-background", "--liquid-glass-q3-navigation-tint"],
-  ["--material-navigation-drawer-background", "--liquid-glass-q3-navigation-drawer-tint"],
-  ["--material-rich-tooltip-background", "--liquid-glass-q3-tooltip-tint"],
-  ["--material-overlay-panel-background", "--liquid-glass-q3-modal-tint"],
+for (const [materialToken, surfaceTintToken] of [
+  ["--material-entry-detail-background", "--liquid-glass-focus-surface-tint"],
+  ["--material-floating-background", "--liquid-glass-floating-surface-tint"],
+  ["--material-mobile-bar-background", "--liquid-glass-mobile-bar-surface-tint"],
+  ["--material-navigation-background", "--liquid-glass-navigation-surface-tint"],
+  ["--material-navigation-drawer-background", "--liquid-glass-navigation-drawer-surface-tint"],
+  ["--material-rich-tooltip-background", "--liquid-glass-tooltip-surface-tint"],
+  ["--material-overlay-panel-background", "--liquid-glass-modal-surface-tint"],
 ]) {
   assert(
-    liquidGlass.includes(`${materialToken}: var(${q3TintToken});`),
-    `${materialToken} must share its role tint between Q1 and Q3`,
+    liquidGlass.includes(`${materialToken}: var(${surfaceTintToken});`),
+    `${materialToken} must consume a quality-neutral Liquid Glass surface tint`,
   );
 }
 assert(

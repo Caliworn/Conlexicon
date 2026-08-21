@@ -6,6 +6,7 @@ const sdfBaseline = require("../lib/liquid-glass-sdf-baseline");
 const {
   ByteBudgetLru,
   LiquidGlassEngine,
+  buildResourceKey,
   lightFacingMatrixValues,
   normalizeLightVector,
 } = require("../lib/liquid-glass-engine");
@@ -155,6 +156,16 @@ assert.equal(
   keyWithMovedLight,
   "The unified light vector must update filter matrices without regenerating geometry maps",
 );
+assert.equal(
+  buildResourceKey({ ...options, opticalBlur: 4, saturation: 1.09, role: "focus" }),
+  buildResourceKey({ ...options, opticalBlur: 4, saturation: 1.09, role: "diagnostic" }),
+  "Equivalent resolved optical output must share one engine resource key across semantic roles",
+);
+assert.notEqual(
+  buildResourceKey({ ...options, opticalBlur: 4, saturation: 1.09 }),
+  buildResourceKey({ ...options, opticalBlur: 5.5, saturation: 1.12 }),
+  "Different filter output parameters must not share an engine resource key",
+);
 
 const superellipseOptions = geometry.normalizeSurfaceOptions({
   ...options,
@@ -255,6 +266,27 @@ assert.notEqual(
   geometry.buildCacheKey(globalEllipseOptions),
   geometry.buildCacheKey(globalSquircleOptions),
   "Different global superellipse exponents must not share Product cache entries",
+);
+const globalSquircleMaps = geometry.generateSurfaceMaps(globalSquircleOptions);
+const globalCornerOffset = 3;
+const globalCenterOffset = (
+  Math.floor(globalSquircleMaps.height / 2) * globalSquircleMaps.width
+  + Math.floor(globalSquircleMaps.width / 2)
+) * 4 + 3;
+assert.equal(
+  globalSquircleMaps.displacement[globalCornerOffset],
+  255,
+  "The displacement map must keep opaque neutral RGB outside the global outline",
+);
+assert.equal(
+  globalSquircleMaps.specular[globalCornerOffset],
+  0,
+  "The lighting map alpha must exclude the rectangular corner outside a global superellipse",
+);
+assert.equal(
+  globalSquircleMaps.specular[globalCenterOffset],
+  255,
+  "The lighting map alpha must retain the global superellipse interior",
 );
 
 const mapsA = geometry.generateSurfaceMaps(options);
@@ -500,5 +532,78 @@ function qualityEngine({ url = true, assisted = false } = {}) {
 assert.equal(qualityEngine().detectQuality(), "q3", "Full URL-filter support must select Q3");
 assert.equal(qualityEngine({ url: false }).detectQuality(), "q1", "Missing URL-filter support must select ordinary blur Q1");
 assert.equal(qualityEngine({ assisted: true }).detectQuality(), "q0", "Assisted display modes must select solid Q0");
+
+function resizeLifecycleElement(width, height) {
+  const size = { width, height };
+  return {
+    size,
+    dataset: {},
+    style: { removeProperty() {} },
+    removeAttribute() {},
+    getBoundingClientRect() {
+      return { width: this.size.width, height: this.size.height };
+    },
+  };
+}
+
+const resizeTimers = new Map();
+let nextResizeTimer = 1;
+const resizeWindow = {
+  setTimeout(callback) {
+    const id = nextResizeTimer;
+    nextResizeTimer += 1;
+    resizeTimers.set(id, callback);
+    return id;
+  },
+  clearTimeout(id) {
+    resizeTimers.delete(id);
+  },
+};
+const resizeEngine = new LiquidGlassEngine({ window: resizeWindow, document: {} });
+const resizeElement = resizeLifecycleElement(320, 180);
+const resizeRecord = {
+  element: resizeElement,
+  role: "floating",
+  overrides: {},
+  generation: 0,
+  cacheKey: "floating-cache-key",
+  resource: {},
+  observedSize: { width: 320, height: 180 },
+};
+resizeEngine.active = true;
+resizeEngine.quality = "q3";
+resizeEngine.surfaces.set(resizeElement, resizeRecord);
+let resizeRefreshes = 0;
+resizeEngine.refresh = () => {
+  resizeRefreshes += 1;
+};
+resizeEngine.handleResize([{ target: resizeElement }]);
+assert.equal(resizeRefreshes, 0, "The first ResizeObserver report must not duplicate an eager surface refresh");
+assert.equal(resizeTimers.size, 0, "An unchanged initial observation must not create an 80ms pending timer");
+assert(resizeRecord.resource, "An unchanged observation must retain the current optical resource");
+resizeEngine.handleResize([{
+  target: resizeElement,
+  borderBoxSize: [{ inlineSize: 320.1, blockSize: 180.1 }],
+}]);
+assert.equal(resizeRefreshes, 0, "Subpixel observer noise must not invalidate a quantized geometry cache entry");
+
+resizeElement.size = { width: 0, height: 0 };
+resizeEngine.handleResize([{ target: resizeElement }]);
+assert.equal(resizeRefreshes, 0, "Hiding a surface must not schedule unusable zero-size geometry");
+assert.equal(resizeTimers.size, 0, "Hiding a surface must not leave a delayed refresh behind");
+assert.equal(resizeRecord.resource, null, "Hidden surfaces must release their active cache reference");
+
+resizeElement.size = { width: 320, height: 180 };
+resizeEngine.handleResize([{ target: resizeElement }]);
+assert.equal(resizeRefreshes, 1, "Revealing a surface must query the session cache immediately");
+assert.equal(resizeTimers.size, 0, "A visibility transition must bypass the resize debounce");
+
+resizeElement.size = { width: 340, height: 180 };
+resizeEngine.handleResize([{ target: resizeElement }]);
+assert.equal(resizeRefreshes, 1, "A genuine visible resize must remain debounced");
+assert.equal(resizeTimers.size, 1, "A genuine visible resize must retain one coalescing timer");
+const [resizeCallback] = resizeTimers.values();
+resizeCallback();
+assert.equal(resizeRefreshes, 2, "The coalesced visible resize must refresh exactly once");
 
 console.log("Liquid Glass geometry, deterministic map, and byte-budget cache checks passed.");

@@ -6,6 +6,7 @@
 
 ### 改进
 
+- 收束液态玻璃 Q1/Q3 表面语义：将此前误以 `q3` 命名、实际已由两级共享的 navigation、drawer、mobile-bar、focus、floating、tooltip 与 modal tint 改为质量无关的 surface tint；全部正式表面统一映射 `--liquid-glass-surface-tint` 与 `--liquid-glass-surface-q1-filter`，运行期 `pending/fallback` 由单一 Q1 规则消费，Q3 ready 只替换动态光学 filter。边框和阴影继续作为两级共用组件材质常驻，不新增 DOM、表面覆盖或搜索栏特例。
 - 重做液态玻璃 Q1 基线：continuous、focus、floating 与 modal 现在分别复用同角色 Q3 的 tint、`3/4/5.5/7px` 模糊、饱和度、边框和阴影参数，仅省略几何位移、RGB 色散与环境镜面；等待、尺寸变化和能力不足时不再跳到一套明显更厚、更浑浊的旧材质。Liquid Glass Lab 同步加入真实 Q3/Q1 质量切换，保留当前几何、预设和外观角色，Q1 停止贴图生成并可从隔离探针读取正式 Q1 外观。
 - 液态玻璃浅色主题的全部正式 backdrop 表面统一采用与 Neutral Lab 相同的低对比深青边界 `rgba(9, 48, 57, 0.18)`，替代各角色原有的高透明白边；规则同时覆盖 Q1 等待与 Q3 ready 状态，但不改变暗色边界、micro 控件或导航内部按钮，避免光学资源就绪时出现边框跳变。
 - Liquid Glass Lab 的 Product 外观对照新增与光学预设独立的 `Neutral Lab / Product Q3` 来源轴：正式模式通过隔离的桌面与移动样式探针加载当前 `theme-liquid-glass.css` 和 `styles.css`，直接镜像 Navigation、drawer、mobile bar、查看/编辑 Focus、floating、rich/quality tooltip、toast、modal 与 network 的真实计算 tint、边框、完整阴影和前景色，不在 Lab 复制主题数值。共享几何、padding、背景场景及 modal/network 遮罩保持不变；正式来源下 tint 滑杆锁定，外观切换不重建贴图或改变缓存键，探针失败则明确退回 Neutral Lab。
@@ -20,8 +21,13 @@
 
 ### 修复
 
+- Liquid Glass Lab 的 Product 全局超椭圆现在由 normal/rim 贴图 Alpha 携带真实 Lamé 外轮廓，并在 SVG filter 内对 RGB 折射与 specular 的最终合成结果执行 `in` 裁切；矩形 `feGaussianBlur` 输入不再向四角输出额外模糊，也不增加 CSS mask 合成层。局部超椭圆继续使用原生边框轮廓，bezel 与主体默认圆角路径不受影响。
 - Liquid Glass Lab 的诊断贴图预览不再被强制拉伸为固定 `2.2:1` 或使用像素化缩放；Product/Reference 贴图现在按实际表面比例显示，SDF 方形贴图保持方形，极端纵横比只限制最大展示尺寸而不改变比例。
 - 重写 Product Engine 的宽边带方向场：精确 rounded-rect/superellipse 外轮廓继续决定边界和 rim，位移图与 normal/rim 图改为共享从真实边界法线平滑过渡到四边全支撑有理势场的连续方向，光学带外写入中性法线，不再由硬截断 edge influence 形成斜向分区；贴图生成同时复用 256 点折射 LUT，避免逐像素重复执行 Snell 幂运算。
+
+### 性能
+
+- 修复 Q3 临时表面的缓存生命周期：引擎记录注册时的真实 border-box 尺寸并忽略 ResizeObserver 首次同尺寸回报，避免右键菜单等显式浮层发生“立即生成后又失效、80ms 后再次领取”的重复路径；长期隐藏的筛选与搜索范围菜单从 `0×0` 恢复时立即查询会话 LRU，缓存命中不再等待 resize 防抖。只有两个非零尺寸之间的真实变化继续使用 80ms 合并，隐藏表面仍释放引用并作为 LRU 淘汰候选；资源键改为只描述最终光学输出，参数等价的不同角色不再重复占用贴图与滤镜。
 
 ## 2026-08-21
 
