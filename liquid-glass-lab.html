@@ -69,6 +69,11 @@
       border-color: var(--lab-accent);
     }
 
+    .lab-compare-grid button[aria-pressed="true"] {
+      border-color: var(--lab-accent);
+      background: var(--lab-accent-soft);
+    }
+
     button:focus-visible,
     select:focus-visible,
     input:focus-visible {
@@ -398,6 +403,29 @@
       backdrop-filter: blur(var(--lab-fallback-blur, 5px)) saturate(1.08);
     }
 
+    @media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
+      .lab-surface[data-renderer="product"][data-product-optics="off"] {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
+
+      .lab-surface[data-renderer="product"][data-product-tint="off"] {
+        background: transparent !important;
+      }
+
+      .lab-surface[data-renderer="product"][data-product-border="off"] {
+        border-color: transparent !important;
+      }
+
+      .lab-surface[data-renderer="product"][data-product-border="off"] .lab-global-shape-outline {
+        opacity: 0;
+      }
+
+      .lab-surface[data-renderer="product"][data-product-shadow="off"] {
+        box-shadow: none !important;
+      }
+    }
+
     .lab-surface-kicker {
       margin: 0 0 8px;
       font-size: 11px;
@@ -576,6 +604,26 @@
       line-height: 1.25;
     }
 
+    .lab-layer-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 7px 12px;
+      margin-top: 10px;
+    }
+
+    .lab-layer-toggle {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--lab-muted);
+      font-size: 11px;
+    }
+
+    .lab-layer-toggle input {
+      margin: 0;
+      accent-color: var(--lab-accent);
+    }
+
     .lab-renderer-controls[hidden] {
       display: none;
     }
@@ -683,9 +731,9 @@
           <div class="lab-toolbar-group">
             <label for="rendererSelect">渲染路径</label>
             <select id="rendererSelect">
-              <option value="reference" selected>Reference Baseline</option>
+              <option value="reference">Reference Baseline</option>
               <option value="sdf">SDF Baseline</option>
-              <option value="product">Product Engine</option>
+              <option value="product" selected>Product Engine</option>
             </select>
           </div>
           <div class="lab-toolbar-group">
@@ -718,7 +766,7 @@
             <div class="lab-bands"></div>
             <div class="lab-words" aria-hidden="true"><span>a</span><span>ɬ</span><span>ŋ</span><span>ə</span></div>
           </div>
-          <article id="labSurface" class="lab-surface" data-renderer="reference" aria-label="可拖动液态玻璃示例卡片">
+          <article id="labSurface" class="lab-surface" data-renderer="product" aria-label="可拖动液态玻璃示例卡片">
             <svg id="globalShapeOutline" class="lab-global-shape-outline" aria-hidden="true" focusable="false">
               <path id="globalShapeOutlinePath"></path>
             </svg>
@@ -753,7 +801,7 @@
       <aside class="lab-controls" aria-label="液态玻璃参数">
         <div class="lab-controls-header">
           <h2>参数</h2>
-          <button id="resetButton" type="button">恢复参考默认值</button>
+          <button id="resetButton" type="button">恢复角色默认值</button>
         </div>
 
         <section class="lab-control-section">
@@ -784,7 +832,7 @@
           <p id="outerShapeNote" class="lab-status-note">角部模型保留直边；指数 2 为传统圆角，2 以上为超椭圆角。</p>
         </section>
 
-        <div id="productControls" class="lab-renderer-controls" hidden>
+        <div id="productControls" class="lab-renderer-controls">
         <section class="lab-control-section">
           <h3>预设与贴图</h3>
           <div class="lab-select-grid">
@@ -810,6 +858,23 @@
               </select>
             </label>
           </div>
+        </section>
+
+        <section class="lab-control-section">
+          <h3>Product 外观对照</h3>
+          <div class="lab-compare-grid">
+            <button type="button" data-product-comparison="full">完整合成</button>
+            <button type="button" data-product-comparison="optics">仅光学</button>
+            <button type="button" data-product-comparison="optics-tint">光学＋tint</button>
+            <button type="button" data-product-comparison="appearance">仅外观层</button>
+          </div>
+          <div class="lab-layer-grid" aria-label="Product 外观层开关">
+            <label class="lab-layer-toggle"><input type="checkbox" data-product-layer="optics" checked>动态光学</label>
+            <label class="lab-layer-toggle"><input type="checkbox" data-product-layer="tint" checked>中性 tint</label>
+            <label class="lab-layer-toggle"><input type="checkbox" data-product-layer="border" checked>1px 边框</label>
+            <label class="lab-layer-toggle"><input type="checkbox" data-product-layer="shadow" checked>外部阴影</label>
+          </div>
+          <p class="lab-status-note">这些开关只旁路最终外观层，不重建贴图或清空缓存，便于在完全相同的几何与背景下判断光学、tint、边框和阴影各自的影响。</p>
         </section>
 
         <section class="lab-control-section">
@@ -866,7 +931,7 @@
         </section>
         </div>
 
-        <div id="referenceControls" class="lab-renderer-controls">
+        <div id="referenceControls" class="lab-renderer-controls" hidden>
           <section class="lab-control-section">
             <h3>Reference Refraction</h3>
             <label class="lab-field"><span class="lab-field-heading"><span>Glass Thickness</span><output id="referenceThicknessOutput" class="lab-field-value">80</output></span><input id="referenceThicknessInput" data-reference-control type="range" min="10" max="200" value="80"></label>
@@ -1077,6 +1142,14 @@
       });
 
       const PRODUCT_LAB_ROLE = "diagnostic";
+      const productLayerInputs = [...document.querySelectorAll("[data-product-layer]")];
+      const productComparisonButtons = [...document.querySelectorAll("[data-product-comparison]")];
+      const productComparisonStates = Object.freeze({
+        full: Object.freeze({ optics: true, tint: true, border: true, shadow: true }),
+        optics: Object.freeze({ optics: true, tint: false, border: false, shadow: false }),
+        "optics-tint": Object.freeze({ optics: true, tint: true, border: false, shadow: false }),
+        appearance: Object.freeze({ optics: false, tint: true, border: true, shadow: true }),
+      });
       const presets = {
         continuous: { tintLight: 0.52, tintDark: 0.56 },
         focus: { tintLight: 0.30, tintDark: 0.34 },
@@ -1477,6 +1550,27 @@
         window.requestAnimationFrame(clampSurfacePosition);
       }
 
+      function updateProductLayerState(activeComparison = "") {
+        productLayerInputs.forEach((input) => {
+          elements.surface.dataset[`product${input.dataset.productLayer[0].toUpperCase()}${input.dataset.productLayer.slice(1)}`]
+            = input.checked ? "on" : "off";
+        });
+        productComparisonButtons.forEach((button) => {
+          button.setAttribute("aria-pressed", String(button.dataset.productComparison === activeComparison));
+        });
+      }
+
+      function applyProductComparison(name) {
+        const state = productComparisonStates[name];
+        if (!state) {
+          return;
+        }
+        productLayerInputs.forEach((input) => {
+          input.checked = state[input.dataset.productLayer];
+        });
+        updateProductLayerState(name);
+      }
+
       function surfaceDragLimits() {
         return {
           x: Math.max(0, (elements.stage.clientWidth - elements.surface.offsetWidth) / 2),
@@ -1852,6 +1946,12 @@
       document.querySelectorAll("[data-sdf-preset]").forEach((button) => {
         button.addEventListener("click", () => applySdfComparisonPreset(button.dataset.sdfPreset));
       });
+      productComparisonButtons.forEach((button) => {
+        button.addEventListener("click", () => applyProductComparison(button.dataset.productComparison));
+      });
+      productLayerInputs.forEach((input) => {
+        input.addEventListener("change", () => updateProductLayerState());
+      });
       elements.rendererSelect.addEventListener("change", updateRendererUi);
       rangeSpecs.tint.input.addEventListener("input", () => {
         formatRange("tint");
@@ -1909,6 +2009,7 @@
       syncGeometryBounds();
       updateShapeControls();
       applyPreset("focus");
+      applyProductComparison("full");
       applyReferenceDefaults();
       applySdfDefaults();
       applyScene();

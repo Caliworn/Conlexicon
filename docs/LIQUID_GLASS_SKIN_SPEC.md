@@ -322,7 +322,7 @@ page background            被采样的环境内容
 #### LQ-4：几何与滤镜引擎（已完成）
 
 - 建立纯几何计算、Worker 贴图生成、动态 SVG filter registry、LRU 和完整清理。
-- 使用开发诊断表面验证长宽比、四角圆角、浅/深背景、文字边缘和 RGB rim。
+- 使用独立 Lab 的 Product 表面验证长宽比、四角圆角、浅/深背景、文字边缘和 RGB rim。
 - 先接入一个独立测试表面，不立刻替换全部现有消费者；LQ-1–LQ-3 继续承担产品路径。
 
 #### LQ-5：正式表面迁移（已完成）
@@ -388,8 +388,8 @@ page background            被采样的环境内容
 - 新增专用 Worker，优先通过 `OffscreenCanvas` 将位移图和高光图编码为 PNG Blob；不支持 Worker 或离屏画布时，由可取消的分块主线程 renderer 后备，不执行单次大贴图同步循环。
 - 新增内部 `LiquidGlassEngine`，提供角色化注册、`ResizeObserver` 尺寸合并、动态 SVG `feImage` / `feDisplacementMap` / specular 合成、按字节预算的引用计数 LRU、generation token 和完整停用清理。没有注册表面时 renderer/Worker 保持懒加载。
 - `app.js` 只在现有 appearance 生命周期中启停引擎并响应辅助媒体变化；没有新增公共 API、偏好字段、全局 DOM 扫描或业务组件光学参数。
-- `?liquid-glass-diagnostics=1` 提供仅供开发验收的独立表面。它不会在普通界面出现，也不迁移 LQ-1–LQ-3 的正式消费者；LQ-5 才开始产品表面迁移。
-- Chromium 明暗主题实测均进入 Q3，诊断表面生成一个几何动态 filter、两个 blob `feImage` 资源并呈现沿圆角法线弯折的网格/色域背景；前景文字保持清晰。换回经典皮肤后诊断节点、动态 filter、blob 引用和质量 data attribute 全部清除。
+- LQ-4 最初使用 `?liquid-glass-diagnostics=1` 挂载主体内临时验收表面；正式表面迁移和独立 Lab 完成后，该入口、DOM 生命周期及专属样式均已删除，生产引擎不再创建开发 UI。
+- LQ-4 当时在 Chromium 明暗主题下确认 Q3 可生成一个几何动态 filter 与两个 blob `feImage`；当前同类几何、资源和清理验收统一由独立 Lab Product 路径及正式表面承担。
 - 自动检查覆盖中心中性位移、相对边方向、圆角连续、非法参数钳制、确定性贴图、缓存键和引用保护下的字节淘汰；完整 `node scripts/check-all.js` 已通过。
 
 ### 13.15 LQ-5 实施记录
@@ -409,10 +409,10 @@ page background            被采样的环境内容
 
 ### 13.17 独立 Liquid Glass Lab
 
-- `liquid-glass-lab.html` 是由现有静态服务器直接提供的独立开发页，不进入主应用导航，不读取或写入词典、界面偏好、`data/`、Web Storage 或任何 `/api/` 端点。
+- `liquid-glass-lab.html` 是由现有静态服务器直接提供的独立开发页，默认打开 Product Engine 的 Focus 参数；它不进入主应用导航，不读取或写入词典、界面偏好、`data/`、Web Storage 或任何 `/api/` 端点。
 - 仓库分发互相隔离的 `Product Engine` 与 `SDF Baseline`：前者继续复用生产 `liquid-glass-geometry.js`、Worker、`liquid-glass-engine.js`、动态 SVG registry 与会话 LRU；后者改编 MIT 许可的 PallavAg 实现，以圆角矩形 SDF 计算边界/falloff、线性/球顶梯度计算位移，并使用 RGB 三路色散、B 通道镜面和二值 Alpha 轮廓。开发者本机可另外保留被 Git 忽略的 `liquid-glass-reference-baseline.js`，按最初参考项目复现凸 squircle 截面、Snell profile、单路位移图、specular 图与 primitive 合成顺序。SDF 默认不附加无来源的 tint、边界或外阴影；两条 Baseline 均不调用或修改生产几何、角色注册和缓存。
 - Lab 以唯一一组表面宽度、高度、圆角、外轮廓模型和超椭圆指数驱动 Product、Reference 与 SDF，初始几何为可容纳示例文字的 `420×200px`、`60px` 圆角和指数 `4`。角部模型保留直边：指数 `2` 规范化到 Round 快速路径并复用其缓存和贴图字节，更大的值启用 Product/SDF 超椭圆角；全局模型使用整张表面的 Lamé 隐式轮廓，指数 `2` 为椭圆且 Product/SDF 不消费 radius。Product/SDF 的 CSS 裁切与贴图必须匹配；全局轮廓的 Product 光学带使用解析梯度和一阶欧氏 signed-distance 近似，保持单遍生成，不调用逐角最近点迭代。圆角上限只取共享短边的一半，不设额外固定封顶；Product/SDF 全局模型禁用但保留当前 radius；Reference 继续使用并允许调整来源圆角。浏览器不支持 `corner-shape` 时仅将角部模型锁定为 Round，全局模型继续使用生成的 polygon clip；Reference 始终保持来源传统圆角并提示差异。切换路径和恢复模型默认值均不改写共享几何。Product 的角色命名只用于装载 continuous/focus/floating/modal 参数预设，实际 Lab 表面固定注册为不参与产品表面映射的 `diagnostic` 角色；手动调参后恢复默认值回到最近使用的预设。其余可调范围保持贴图上限、请求 bezel、厚度、IOR、最大位移、光学内模糊、饱和度、tint、specular 强度及统一光源角度/强度；正式表面与 Lab Product 均只生成完整四边轮廓，不再提供已失去产品消费者的单边模式。Reference 保留最初来源的独立光学参数语义。SDF 保留来源的 strength、chromatic aberration、blur、depth、curvature、splay、glow、edge highlight、specular、angle 和固定方形 quality 语义；SDF 小/大圆角快捷比较显式修改同一共享圆角。
-- 舞台提供连续色场、高对比网格、色带和大号文字四种诊断参照；仓库分发五张具有明确 Unsplash 或 Pexels 使用许可的 Lab 背景，逐张作者、原始页面和许可记录见 `assets/liquid-glass-lab/README.md`。图片只在选中时加载，不进入产品皮肤。舞台随当前路径显示生产位移/法线-rim 图、本机 Reference 位移/specular 图或 SDF RGBA 位移/B 通道镜面图。预览卡片使用明确的中性示例文字且可在舞台范围内拖动；拖动只更新合帧后的 transform，不重建几何资源。窄屏时实际几何宽度按舞台净宽收束，避免可见表面与滤镜测量不一致。
+- 舞台提供连续色场、高对比网格、色带和大号文字四种诊断参照；仓库分发五张具有明确 Unsplash 或 Pexels 使用许可的 Lab 背景，逐张作者、原始页面和许可记录见 `assets/liquid-glass-lab/README.md`。图片只在选中时加载，不进入产品皮肤。舞台随当前路径显示生产位移/法线-rim 图、本机 Reference 位移/specular 图或 SDF RGBA 位移/B 通道镜面图。Product 可通过快捷状态或独立开关旁路动态光学、中性 tint、边框和外部阴影；这些外观切换不重新注册表面、不重建贴图也不清空缓存。预览卡片使用明确的中性示例文字且可在舞台范围内拖动；拖动只更新合帧后的 transform，不重建几何资源。窄屏时实际几何宽度按舞台净宽收束，避免可见表面与滤镜测量不一致。
 - Lab 的 `color-scheme` 必须跟随自身明暗主题，而不是同时声明两种模式。系统减少透明度时三条渲染路径统一关闭 backdrop filter、Baseline 伪元素与透明底色，并使用当前 Lab 主题的实色 panel/text token；只有强制颜色模式使用 `Canvas` / `CanvasText` 系统色。减少透明度或强制颜色启用期间，两条 Baseline 不再构建 SVG filter/贴图，Product Engine 重新探测为 Q0，全部诊断贴图停止生成；偏好解除后按当前参数恢复。
 - 第三方来源、许可、已纠正的 SDF 认识和人工对照问题单独记录在 `docs/LIQUID_GLASS_RESEARCH.md`；研究结论未经人工验收不得倒灌为生产契约。
 

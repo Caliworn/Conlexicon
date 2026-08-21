@@ -6,6 +6,8 @@
 
 ### 改进
 
+- Liquid Glass Lab 默认打开 Product Engine 及其 Focus 参数，不再先进入本机可选的 Reference Baseline；初始预览表面、控制面板和重置按钮状态同步，Reference 与 SDF 仍可从渲染路径下拉框切换。
+- 删除已被独立 Liquid Glass Lab 取代的主体 `?liquid-glass-diagnostics=1` 旧诊断表面及其引擎生命周期和皮肤样式；Lab 的 Product 路径新增“完整合成、仅光学、光学＋tint、仅外观层”快捷对照，并可独立旁路动态光学、中性 tint、1px 边框和外部阴影。外观切换不重建贴图或清空缓存，后续可以在相同几何与背景下定位正式角色包装对光学观感的影响。
 - 删除已经失去主体消费者的单边光学模式：Product 几何、缓存、正式表面注册和 Lab 不再提供“仅右边/仅下边”，所有液态玻璃表面统一按完整外轮廓生成四边折射与法线贴图。
 - 清理 Liquid Glass Lab 重复的“引擎角色”字段：continuous/focus/floating/modal 仅作为参数预设，Product 实验表面统一注册为独立 `diagnostic` 角色；Custom 状态恢复默认值时回到最近一次预设，不再让角色和展开后的参数产生两套互相覆盖的控制入口。
 - Liquid Glass Lab 的默认背景参照改为室内照片，打开实验页即可直接观察真实明暗边界和细节经过玻璃表面的折射。

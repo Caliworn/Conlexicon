@@ -466,134 +466,6 @@ body[data-ui-skin="liquid-glass"] .network-panel {
   }
 }
 
-body[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-stage {
-  position: fixed;
-  right: 24px;
-  bottom: 24px;
-  z-index: 10000;
-  width: min(440px, calc(100vw - 32px));
-  height: 278px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.56);
-  border-radius: 34px;
-  background:
-    linear-gradient(125deg, rgba(45, 204, 193, 0.86), rgba(45, 204, 193, 0.08) 42%, transparent 60%),
-    linear-gradient(315deg, rgba(188, 112, 231, 0.78), rgba(188, 112, 231, 0.08) 44%, transparent 64%),
-    #dce7e9;
-  box-shadow: 0 30px 90px rgba(5, 24, 31, 0.34);
-  contain: layout paint style;
-  pointer-events: none;
-}
-
-body[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-grid {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(20, 57, 65, 0.2) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(20, 57, 65, 0.2) 1px, transparent 1px),
-    repeating-linear-gradient(135deg, transparent 0 26px, rgba(255, 255, 255, 0.5) 27px 29px, transparent 30px 54px);
-  background-size: 28px 28px, 28px 28px, auto;
-}
-
-body[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-orb {
-  position: absolute;
-  width: 116px;
-  height: 116px;
-  border-radius: 50%;
-  box-shadow: inset 0 0 0 12px rgba(255, 255, 255, 0.3);
-}
-
-body[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-orb-cool {
-  top: 16px;
-  right: 18px;
-  background: #18a99f;
-}
-
-body[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-orb-warm {
-  bottom: -34px;
-  left: 20px;
-  background: #e1a83c;
-}
-
-body[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-surface {
-  position: absolute;
-  inset: 46px 52px 48px 48px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  gap: 8px;
-  overflow: hidden;
-  padding: 24px 26px;
-  border: 1px solid rgba(255, 255, 255, 0.76);
-  border-radius: 30px 46px 34px 42px;
-  background: rgba(242, 251, 251, 0.24);
-  color: #10242b;
-  box-shadow:
-    0 24px 60px rgba(6, 29, 37, 0.3),
-    inset 0 2px 1px rgba(255, 255, 255, 0.92),
-    inset 0 -2px 2px rgba(29, 75, 84, 0.2);
-  backdrop-filter: var(--liquid-glass-optical-filter, none);
-  -webkit-backdrop-filter: var(--liquid-glass-optical-filter, none);
-}
-
-body[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-surface::after {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.52), transparent 36% 66%, rgba(104, 234, 222, 0.18));
-  content: "";
-  pointer-events: none;
-}
-
-body[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-surface > * {
-  position: relative;
-  z-index: 1;
-}
-
-body[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-surface strong {
-  max-width: 240px;
-  font-size: 1.24rem;
-  line-height: 1.1;
-}
-
-body[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-kicker,
-body[data-ui-skin="liquid-glass"] [data-liquid-glass-diagnostic-status] {
-  font-size: 0.7rem;
-  font-weight: 750;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-body[data-ui-skin="liquid-glass"] [data-liquid-glass-diagnostic-status] {
-  color: rgba(17, 59, 66, 0.72);
-  letter-spacing: 0.04em;
-}
-
-body.dark-theme[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-stage {
-  border-color: rgba(230, 255, 251, 0.2);
-  background:
-    linear-gradient(125deg, rgba(24, 142, 134, 0.9), rgba(24, 142, 134, 0.05) 44%, transparent 62%),
-    linear-gradient(315deg, rgba(122, 67, 184, 0.84), rgba(122, 67, 184, 0.06) 46%, transparent 66%),
-    #101b22;
-}
-
-body.dark-theme[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-grid {
-  background-image:
-    linear-gradient(rgba(214, 249, 244, 0.14) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(214, 249, 244, 0.14) 1px, transparent 1px),
-    repeating-linear-gradient(135deg, transparent 0 26px, rgba(255, 255, 255, 0.16) 27px 29px, transparent 30px 54px);
-}
-
-body.dark-theme[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-surface {
-  border-color: rgba(233, 255, 252, 0.26);
-  background: rgba(10, 25, 31, 0.26);
-  color: #f0fbf9;
-}
-
-body.dark-theme[data-ui-skin="liquid-glass"] [data-liquid-glass-diagnostic-status] {
-  color: rgba(218, 248, 244, 0.72);
-}
-
 @media (max-width: 799.98px) {
   body[data-ui-skin="liquid-glass"] .mobile-app-bar {
     top: var(--liquid-glass-mobile-navigation-inset);
@@ -682,10 +554,6 @@ body.dark-theme[data-ui-skin="liquid-glass"] [data-liquid-glass-diagnostic-statu
     --material-overlay-panel-background: #102027;
   }
 
-  body[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-surface {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -778,15 +646,6 @@ body.dark-theme[data-ui-skin="liquid-glass"] [data-liquid-glass-diagnostic-statu
     -webkit-backdrop-filter: none;
   }
 
-  body[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-stage {
-    background: var(--ui-canvas-bg);
-  }
-
-  body[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-surface {
-    background: var(--material-floating-background);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
 }
 
 @media (forced-colors: active) {
@@ -876,19 +735,6 @@ body.dark-theme[data-ui-skin="liquid-glass"] [data-liquid-glass-diagnostic-statu
     color: ButtonText;
   }
 
-  body[data-ui-skin="liquid-glass"] .liquid-glass-diagnostic-stage {
-    border-color: CanvasText;
-    background: Canvas;
-    box-shadow: none;
-  }
-
-  body[data-ui-skin="liquid-glass"] :is(
-    .liquid-glass-diagnostic-grid,
-    .liquid-glass-diagnostic-orb
-  ) {
-    display: none;
-  }
-
   body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {
     border-color: Highlight;
     background: Canvas;
@@ -918,8 +764,7 @@ body.dark-theme[data-ui-skin="liquid-glass"] [data-liquid-glass-diagnostic-statu
     .entry-quality-issue-tooltip,
     .toast,
     .modal-panel,
-    .network-panel,
-    .liquid-glass-diagnostic-surface
+    .network-panel
   ) {
     box-shadow: none;
     backdrop-filter: none;
