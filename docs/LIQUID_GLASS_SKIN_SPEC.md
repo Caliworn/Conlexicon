@@ -228,7 +228,7 @@ liquidGlassEngine.deactivate();
 
 几何计算以到圆角矩形边界的有符号距离为基础，在完整 effective bezel 内使用与参考项目一致的 128 采样 convex-squircle 截面和 Snell 路径生成折射轮廓。外缘从 `1 / 128` 采样位置归一化，避免截面导数的奇点把有效折射压缩到最外数像素；轮廓必须连续衰减，外侧四分之一仍保持可见折射，中心边界归零。法线保持朝外用于环境 specular，位移则沿负法线从玻璃内侧取样，与参考实现的 `-normal × displacement` 方向一致，禁止把组件外侧背景整段拖入 rim。specular 使用同一完整 effective bezel，并按相同边缘进度连续衰减；不设置独立百分比限宽。四角按连续法线过渡，禁止使用与形状无关的随机波纹冒充液体。
 
-圆角矩形的最近边法线在内部 medial axis 上会发生方向切换。Q3 先按实际元素尺寸归一化四角半径，外轮廓与最外层法线严格服从组件自身圆角；进入宽 bezel 后，若相邻直边光学区域重叠，则按到两条直边的影响连续混合法线，避免在对角分界产生跳变。`effectiveBezel = min(requestedBezel, minDimension / 2 - guard)`，不再让最小视觉圆角钳制整条直边；`guard` 至少为 `2px` 或一个贴图采样间距。continuous/focus/floating/modal 请求 bezel 为 `44/46/36/52px`。内容、菜单、tooltip、modal 和网络面板继续消费对应角色圆角；导航卡片使用液态皮肤私有的结构圆角，因为它表达的是跨展开、rail 和移动抽屉状态的导航容器，而不是共享 panel。Lab 的圆角滑杆仍是独立诊断输入，不受此约束。
+圆角矩形的最近边法线在内部 medial axis 上会发生方向切换，分别截断水平/垂直影响也会留下可见的激活线。Q3 因此把“外轮廓距离”和“光学方向”分离：先按实际元素尺寸归一化四角半径，以精确 signed distance 决定 inside、edge distance 与 rim；最外层继续服从真实边界法线，随后用 quintic smootherstep 过渡到由四条边共同贡献、全支撑且解析连续的有理势场法线。位移图和 normal/rim 图必须消费同一个方向场，光学带外法线归零；不得再以硬截断 influence、最近边分区或贴图后模糊遮盖接缝。`effectiveBezel = min(requestedBezel, minDimension / 2 - guard)`，不让最小视觉圆角钳制整条直边；`guard` 至少为 `2px` 或一个贴图采样间距。continuous/focus/floating/modal 请求 bezel 为 `44/46/36/52px`。内容、菜单、tooltip、modal 和网络面板继续消费对应角色圆角；导航卡片使用液态皮肤私有的结构圆角，因为它表达的是跨展开、rail 和移动抽屉状态的导航容器，而不是共享 panel。Lab 的圆角滑杆仍是独立诊断输入，不受此约束。
 
 桌面导航、rail、移动应用栏和移动抽屉现在都从视口边缘内缩，四条边均暴露于连续背景，因此与 focus、floating、modal 一样使用完整四边模型。若安全宽度不足 `4px`，表面稳定使用 Q1 普通 blur，不生成畸形贴图；尺寸变化期间立即解除旧几何滤镜并显示 Q1 材质，`ResizeObserver` 合并变化后再以稳定尺寸进入 Q3，禁止拉伸旧贴图伪装过渡。
 
@@ -297,8 +297,8 @@ page background            被采样的环境内容
 ### 13.9 生成、缓存和尺寸生命周期
 
 - Worker 接收纯数值参数并返回 `ImageBitmap`、Blob 或可被 SVG `feImage` 使用的资源；不得把 DOM 传入 Worker。
-- 缓存键至少包含量化后的宽高、圆角、统一 `effectiveBezel`、有效边模型、厚度、IOR、最大位移和角色。请求 bezel 若收束为相同有效几何应共享资源；宽高默认按约 `4px` 量化，圆角和 bezel 使用更细粒度，不能让小 tooltip 因过度量化明显变形。缓存只存在于当前页面内存，皮肤停用或页面关闭即清空，不使用持久化版本字段。
-- 贴图分辨率按视觉尺寸和设备像素比决定，并设角色级上限；高 DPI 不需要无限增长。优先保证 rim 的采样密度，中心可以低频表示。
+- 缓存键至少包含量化后的宽高、圆角、统一 `effectiveBezel`、厚度、IOR、最大位移和角色。请求 bezel 若收束为相同有效几何应共享资源；宽高默认按约 `4px` 量化，圆角和 bezel 使用更细粒度，不能让小 tooltip 因过度量化明显变形。缓存只存在于当前页面内存，皮肤停用或页面关闭即清空，不使用持久化版本字段。
+- 贴图分辨率按视觉尺寸和设备像素比决定，并设角色级上限；高 DPI 不需要无限增长。优先保证 rim 的采样密度，中心可以低频表示。每次资源生成只建立一份有界高密度折射轮廓 LUT，并在逐像素循环中插值，避免为两张贴图重复执行 convex-squircle/Snell 幂运算；几何与贴图生成仍为单遍 `O(mapWidth × mapHeight)`，不增加贴图后模糊或临时全图缓冲。
 - 使用按字节预算的 LRU，而不是只按元素数量缓存；资源被淘汰或皮肤停用时撤销 object URL 并移除无消费者的 filter。
 - `ResizeObserver` 只观察已注册表面。尺寸开始变化时立即释放活动滤镜引用并回到 Q1，连续 resize 只合并请求，尺寸稳定后再生成精确贴图；旧任务通过 generation token 丢弃。
 - 隐藏表面不生成高分辨率资源。打开或等待精确资源时继续使用对应组件的 Q1 普通材质 blur，生成成功后原子切换为内含角色化光学模糊的动态 URL filter；失败同样保留普通 blur，不得闪白或短暂丢失边界。
@@ -411,7 +411,7 @@ page background            被采样的环境内容
 
 - `liquid-glass-lab.html` 是由现有静态服务器直接提供的独立开发页，不进入主应用导航，不读取或写入词典、界面偏好、`data/`、Web Storage 或任何 `/api/` 端点。
 - 仓库分发互相隔离的 `Product Engine` 与 `SDF Baseline`：前者继续复用生产 `liquid-glass-geometry.js`、Worker、`liquid-glass-engine.js`、动态 SVG registry 与会话 LRU；后者改编 MIT 许可的 PallavAg 实现，以圆角矩形 SDF 计算边界/falloff、线性/球顶梯度计算位移，并使用 RGB 三路色散、B 通道镜面和二值 Alpha 轮廓。开发者本机可另外保留被 Git 忽略的 `liquid-glass-reference-baseline.js`，按最初参考项目复现凸 squircle 截面、Snell profile、单路位移图、specular 图与 primitive 合成顺序。SDF 默认不附加无来源的 tint、边界或外阴影；两条 Baseline 均不调用或修改生产几何、角色注册和缓存。
-- Lab 以唯一一组表面宽度、高度、圆角和外轮廓控件驱动 Product、Reference 与 SDF，初始几何为可容纳示例文字的 `420×200px`、`60px` 圆角；外轮廓可选传统圆角或指数 `2–8`、默认 `4` 的 superellipse。Product 与 SDF 必须让 CSS 裁切和贴图使用相同轮廓，Product 缓存按启用的形状与指数隔离；bezel 和 SDF depth 不得因半径或指数缩窄。浏览器不支持 `corner-shape` 时禁用 superellipse，Reference 则始终保持来源传统圆角并显式提示差异。切换路径和恢复模型默认值均不改写共享几何。Product 的其余可调范围保持为生产引擎已支持的角色、有效边模型、贴图上限、请求 bezel、厚度、IOR、最大位移、光学内模糊、饱和度、tint、specular 强度及统一光源角度/强度。Reference 保留最初来源的独立光学参数语义。SDF 保留来源的 strength、chromatic aberration、blur、depth、curvature、splay、glow、edge highlight、specular、angle 和固定方形 quality 语义；SDF 小/大圆角快捷比较显式修改同一共享圆角。
+- Lab 以唯一一组表面宽度、高度、圆角、外轮廓模型和超椭圆指数驱动 Product、Reference 与 SDF，初始几何为可容纳示例文字的 `420×200px`、`60px` 圆角和指数 `4`。角部模型保留直边：指数 `2` 规范化到 Round 快速路径并复用其缓存和贴图字节，更大的值启用 Product/SDF 超椭圆角；全局模型使用整张表面的 Lamé 隐式轮廓，指数 `2` 为椭圆且 Product/SDF 不消费 radius。Product/SDF 的 CSS 裁切与贴图必须匹配；全局轮廓的 Product 光学带使用解析梯度和一阶欧氏 signed-distance 近似，保持单遍生成，不调用逐角最近点迭代。圆角上限只取共享短边的一半，不设额外固定封顶；Product/SDF 全局模型禁用但保留当前 radius；Reference 继续使用并允许调整来源圆角。浏览器不支持 `corner-shape` 时仅将角部模型锁定为 Round，全局模型继续使用生成的 polygon clip；Reference 始终保持来源传统圆角并提示差异。切换路径和恢复模型默认值均不改写共享几何。Product 的角色命名只用于装载 continuous/focus/floating/modal 参数预设，实际 Lab 表面固定注册为不参与产品表面映射的 `diagnostic` 角色；手动调参后恢复默认值回到最近使用的预设。其余可调范围保持贴图上限、请求 bezel、厚度、IOR、最大位移、光学内模糊、饱和度、tint、specular 强度及统一光源角度/强度；正式表面与 Lab Product 均只生成完整四边轮廓，不再提供已失去产品消费者的单边模式。Reference 保留最初来源的独立光学参数语义。SDF 保留来源的 strength、chromatic aberration、blur、depth、curvature、splay、glow、edge highlight、specular、angle 和固定方形 quality 语义；SDF 小/大圆角快捷比较显式修改同一共享圆角。
 - 舞台提供连续色场、高对比网格、色带和大号文字四种诊断参照；仓库分发五张具有明确 Unsplash 或 Pexels 使用许可的 Lab 背景，逐张作者、原始页面和许可记录见 `assets/liquid-glass-lab/README.md`。图片只在选中时加载，不进入产品皮肤。舞台随当前路径显示生产位移/法线-rim 图、本机 Reference 位移/specular 图或 SDF RGBA 位移/B 通道镜面图。预览卡片使用明确的中性示例文字且可在舞台范围内拖动；拖动只更新合帧后的 transform，不重建几何资源。窄屏时实际几何宽度按舞台净宽收束，避免可见表面与滤镜测量不一致。
 - Lab 的 `color-scheme` 必须跟随自身明暗主题，而不是同时声明两种模式。系统减少透明度时三条渲染路径统一关闭 backdrop filter、Baseline 伪元素与透明底色，并使用当前 Lab 主题的实色 panel/text token；只有强制颜色模式使用 `Canvas` / `CanvasText` 系统色。减少透明度或强制颜色启用期间，两条 Baseline 不再构建 SVG filter/贴图，Product Engine 重新探测为 Q0，全部诊断贴图停止生成；偏好解除后按当前参数恢复。
 - 第三方来源、许可、已纠正的 SDF 认识和人工对照问题单独记录在 `docs/LIQUID_GLASS_RESEARCH.md`；研究结论未经人工验收不得倒灌为生产契约。

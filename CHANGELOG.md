@@ -6,13 +6,17 @@
 
 ### 改进
 
+- 删除已经失去主体消费者的单边光学模式：Product 几何、缓存、正式表面注册和 Lab 不再提供“仅右边/仅下边”，所有液态玻璃表面统一按完整外轮廓生成四边折射与法线贴图。
+- 清理 Liquid Glass Lab 重复的“引擎角色”字段：continuous/focus/floating/modal 仅作为参数预设，Product 实验表面统一注册为独立 `diagnostic` 角色；Custom 状态恢复默认值时回到最近一次预设，不再让角色和展开后的参数产生两套互相覆盖的控制入口。
 - Liquid Glass Lab 的默认背景参照改为室内照片，打开实验页即可直接观察真实明暗边界和细节经过玻璃表面的折射。
 - Liquid Glass Lab 将宽度、高度和圆角提升为三条渲染路径共用的表面几何参数；切换 Product Engine、Reference Baseline 与 SDF Baseline，以及恢复任一模型默认值时均保持当前几何，SDF 圆角比较快捷方式同步操作共享圆角。
 - Liquid Glass Lab 的 SDF Controlled Comparisons 新增“Ref 趋近 · 光学”和“Ref 趋近 · +外观”临时快捷方式：两者共享同一组趋近 Reference 的高质量、宽边带、强位移 SDF 参数，并仅为对齐单路 Reference 关闭 RGB 色散；后者只额外复用当前 Reference tint 与内外阴影，便于直接分辨算法和外观包装各自造成的视觉差距。
+- Liquid Glass Lab 新增共享外轮廓模型选择：Product 与 SDF 可比较“直边＋超椭圆角”和由整张表面 Lamé 方程定义的全局超椭圆，Reference 继续保持来源传统圆角；角部模型在指数 `2` 时复用 Round 快速路径，全局模型在指数 `2` 时为椭圆。圆角半径滑杆同时删除 `120px` 人为封顶，改为随共享宽高收束到短边一半；Product/SDF 全局模型不消费 radius，但会保留其值供切回角部模型。
 
 ### 修复
 
 - Liquid Glass Lab 的诊断贴图预览不再被强制拉伸为固定 `2.2:1` 或使用像素化缩放；Product/Reference 贴图现在按实际表面比例显示，SDF 方形贴图保持方形，极端纵横比只限制最大展示尺寸而不改变比例。
+- 重写 Product Engine 的宽边带方向场：精确 rounded-rect/superellipse 外轮廓继续决定边界和 rim，位移图与 normal/rim 图改为共享从真实边界法线平滑过渡到四边全支撑有理势场的连续方向，光学带外写入中性法线，不再由硬截断 edge influence 形成斜向分区；贴图生成同时复用 256 点折射 LUT，避免逐像素重复执行 Snell 幂运算。
 
 ## 2026-08-21
 

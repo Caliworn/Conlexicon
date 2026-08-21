@@ -314,8 +314,34 @@
       inset: 0;
       border-radius: inherit;
       corner-shape: inherit;
+      clip-path: inherit;
       content: "";
       pointer-events: none;
+    }
+
+    .lab-surface[data-outer-shape="global-superellipse"] {
+      border-color: transparent;
+    }
+
+    .lab-global-shape-outline {
+      position: absolute;
+      z-index: 1;
+      inset: 0;
+      display: none;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    .lab-surface[data-outer-shape="global-superellipse"] .lab-global-shape-outline {
+      display: block;
+    }
+
+    .lab-global-shape-outline path {
+      fill: none;
+      stroke: var(--lab-border);
+      vector-effect: non-scaling-stroke;
     }
 
     .lab-surface[data-renderer="reference"]::before,
@@ -693,6 +719,9 @@
             <div class="lab-words" aria-hidden="true"><span>a</span><span>ɬ</span><span>ŋ</span><span>ə</span></div>
           </div>
           <article id="labSurface" class="lab-surface" data-renderer="reference" aria-label="可拖动液态玻璃示例卡片">
+            <svg id="globalShapeOutline" class="lab-global-shape-outline" aria-hidden="true" focusable="false">
+              <path id="globalShapeOutlinePath"></path>
+            </svg>
             <div class="lab-surface-content">
               <p class="lab-surface-kicker">Neutral preview text</p>
               <h2>Sample</h2>
@@ -729,6 +758,13 @@
 
         <section class="lab-control-section">
           <h3>共享表面几何</h3>
+          <label class="lab-field" for="outerShapeSelect">
+            <span class="lab-field-heading"><span>外轮廓模型</span></span>
+            <select id="outerShapeSelect" data-shape-control>
+              <option value="corner">直边＋超椭圆角</option>
+              <option value="global-superellipse">全局超椭圆</option>
+            </select>
+          </label>
           <label class="lab-field" for="widthInput">
             <span class="lab-field-heading"><span>宽度</span><output id="widthOutput" class="lab-field-value">420px</output></span>
             <input id="widthInput" data-geometry-control type="range" min="180" max="900" step="2" value="420">
@@ -739,25 +775,18 @@
           </label>
           <label class="lab-field" for="radiusInput">
             <span class="lab-field-heading"><span>圆角</span><output id="radiusOutput" class="lab-field-value">60px</output></span>
-            <input id="radiusInput" data-geometry-control type="range" min="2" max="100" step="1" value="60">
-          </label>
-          <label class="lab-field" for="outerShapeSelect">
-            <span class="lab-field-heading"><span>外轮廓</span></span>
-            <select id="outerShapeSelect" data-shape-control>
-              <option value="round" selected>传统圆角</option>
-              <option value="superellipse">超椭圆角</option>
-            </select>
+            <input id="radiusInput" data-geometry-control type="range" min="2" max="400" step="1" value="60">
           </label>
           <label class="lab-field" for="cornerExponentInput">
             <span class="lab-field-heading"><span>超椭圆指数</span><output id="cornerExponentOutput" class="lab-field-value">4.00</output></span>
-            <input id="cornerExponentInput" data-shape-control type="range" min="2" max="8" step="0.25" value="4" disabled>
+            <input id="cornerExponentInput" data-shape-control type="range" min="2" max="8" step="0.25" value="4">
           </label>
-          <p id="outerShapeNote" class="lab-status-note">宽度、高度、圆角与外轮廓由三条路径共同保留；Reference Baseline 固定使用传统圆角。</p>
+          <p id="outerShapeNote" class="lab-status-note">角部模型保留直边；指数 2 为传统圆角，2 以上为超椭圆角。</p>
         </section>
 
         <div id="productControls" class="lab-renderer-controls" hidden>
         <section class="lab-control-section">
-          <h3>角色与边界</h3>
+          <h3>预设与贴图</h3>
           <div class="lab-select-grid">
             <label class="lab-field" for="presetSelect">
               <span class="lab-field-heading"><span>预设</span></span>
@@ -767,23 +796,6 @@
                 <option value="floating">Floating</option>
                 <option value="modal">Modal</option>
                 <option value="custom">Custom</option>
-              </select>
-            </label>
-            <label class="lab-field" for="roleSelect">
-              <span class="lab-field-heading"><span>引擎角色</span></span>
-              <select id="roleSelect" data-optic-control>
-                <option value="focus">Focus</option>
-                <option value="continuous">Continuous</option>
-                <option value="floating">Floating</option>
-                <option value="modal">Modal</option>
-              </select>
-            </label>
-            <label class="lab-field" for="edgeModeSelect">
-              <span class="lab-field-heading"><span>有效边</span></span>
-              <select id="edgeModeSelect" data-optic-control>
-                <option value="all">四边</option>
-                <option value="right">仅右边</option>
-                <option value="bottom">仅下边</option>
               </select>
             </label>
             <label class="lab-field" for="mapLimitSelect">
@@ -952,12 +964,12 @@
         stage: document.querySelector("#labStage"),
         photo: document.querySelector("#labPhoto"),
         surface: document.querySelector("#labSurface"),
+        globalShapeOutline: document.querySelector("#globalShapeOutline"),
+        globalShapeOutlinePath: document.querySelector("#globalShapeOutlinePath"),
         themeButton: document.querySelector("#themeButton"),
         rendererSelect: document.querySelector("#rendererSelect"),
         sceneSelect: document.querySelector("#sceneSelect"),
         presetSelect: document.querySelector("#presetSelect"),
-        roleSelect: document.querySelector("#roleSelect"),
-        edgeModeSelect: document.querySelector("#edgeModeSelect"),
         mapLimitSelect: document.querySelector("#mapLimitSelect"),
         resetButton: document.querySelector("#resetButton"),
         liveStatus: document.querySelector("#liveStatus"),
@@ -1064,12 +1076,14 @@
         spec.output = document.getElementById(spec.output);
       });
 
+      const PRODUCT_LAB_ROLE = "diagnostic";
       const presets = {
-        continuous: { role: "continuous", edgeMode: "right", tintLight: 0.52, tintDark: 0.56 },
-        focus: { role: "focus", edgeMode: "all", tintLight: 0.30, tintDark: 0.34 },
-        floating: { role: "floating", edgeMode: "all", tintLight: 0.28, tintDark: 0.32 },
-        modal: { role: "modal", edgeMode: "all", tintLight: 0.32, tintDark: 0.36 },
+        continuous: { tintLight: 0.52, tintDark: 0.56 },
+        focus: { tintLight: 0.30, tintDark: 0.34 },
+        floating: { tintLight: 0.28, tintDark: 0.32 },
+        modal: { tintLight: 0.32, tintDark: 0.36 },
       };
+      let lastProductPreset = "focus";
 
       const sdfOpticsOnly = Object.freeze({
         glow: 0,
@@ -1130,10 +1144,17 @@
         return Number(geometrySpecs[name].input.value);
       }
 
+      function selectedShapeModel() {
+        return elements.outerShapeSelect.value === "global-superellipse"
+          ? "global-superellipse"
+          : "corner";
+      }
+
       function selectedOuterShape() {
-        return supportsSuperellipse && elements.outerShapeSelect.value === "superellipse"
-          ? "superellipse"
-          : "round";
+        if (selectedShapeModel() === "global-superellipse") {
+          return "global-superellipse";
+        }
+        return supportsSuperellipse && cornerExponent() > 2 ? "superellipse" : "round";
       }
 
       function cornerExponent() {
@@ -1141,16 +1162,23 @@
       }
 
       function updateShapeControls() {
-        const superellipseOption = elements.outerShapeSelect.querySelector('option[value="superellipse"]');
-        superellipseOption.disabled = !supportsSuperellipse;
-        if (!supportsSuperellipse) {
-          elements.outerShapeSelect.value = "round";
+        const global = selectedShapeModel() === "global-superellipse";
+        const reference = elements.rendererSelect.value === "reference";
+        if (!supportsSuperellipse && !global) {
+          elements.cornerExponentInput.value = "2";
         }
-        elements.cornerExponentInput.disabled = selectedOuterShape() !== "superellipse";
+        elements.cornerExponentInput.disabled = !supportsSuperellipse && !global;
+        geometrySpecs.radius.input.disabled = global && !reference;
         elements.cornerExponentOutput.value = cornerExponent().toFixed(2);
-        elements.outerShapeNote.textContent = supportsSuperellipse
-          ? "形状选择和指数跨路径保留；Reference Baseline 固定使用传统圆角，Product/SDF 的超椭圆是 Lab 实验扩展。"
-          : "当前浏览器不支持 CSS corner-shape；超椭圆实验已禁用，以免视觉裁切与光学贴图不一致。";
+        if (reference) {
+          elements.outerShapeNote.textContent = "Reference Baseline 始终使用来源传统圆角；共享轮廓选择会保留，但不修改该基准。";
+        } else if (global) {
+          elements.outerShapeNote.textContent = "全局超椭圆使用整张表面的 Lamé 曲线；传统圆角半径不参与该模型。";
+        } else if (supportsSuperellipse) {
+          elements.outerShapeNote.textContent = "角部模型保留直边；指数 2 为传统圆角，2 以上为超椭圆角。";
+        } else {
+          elements.outerShapeNote.textContent = "当前浏览器不支持 CSS corner-shape；角部模型指数已锁定为 2。全局超椭圆仍可通过匹配的 clip-path 与贴图比较。";
+        }
       }
 
       function formatGeometryRange(name) {
@@ -1165,10 +1193,10 @@
       }
 
       function syncGeometryBounds() {
-        const maximumRadius = Math.min(120, Math.floor(Math.min(
+        const maximumRadius = Math.floor(Math.min(
           readGeometryNumber("width"),
           readGeometryNumber("height"),
-        ) / 2));
+        ) / 2);
         geometrySpecs.radius.input.max = String(maximumRadius);
         if (readGeometryNumber("radius") > maximumRadius) {
           setGeometryValue("radius", maximumRadius);
@@ -1271,9 +1299,8 @@
         if (!preset) {
           return;
         }
-        const defaults = engineApi.ROLE_DEFAULTS[preset.role];
-        elements.roleSelect.value = preset.role;
-        elements.edgeModeSelect.value = preset.edgeMode;
+        const defaults = engineApi.ROLE_DEFAULTS[name];
+        lastProductPreset = name;
         elements.mapLimitSelect.value = String(defaults.maximumMapDimension);
         setRangeValue("bezel", defaults.bezel);
         setRangeValue("thickness", defaults.thickness);
@@ -1306,13 +1333,12 @@
           ior: readNumber("ior"),
           maxDisplacement: readNumber("maxDisplacement"),
           specularStrength: readNumber("specularStrength"),
-          edgeMode: elements.edgeModeSelect.value,
           mapWidth: mapDimensions.width,
           mapHeight: mapDimensions.height,
         });
         return {
           ...normalized,
-          role: elements.roleSelect.value,
+          role: PRODUCT_LAB_ROLE,
           maximumMapDimension: Number(elements.mapLimitSelect.value),
           opticalBlur: readNumber("opticalBlur"),
           saturation: readNumber("saturation"),
@@ -1374,6 +1400,31 @@
         return `${r}, ${g}, ${b}`;
       }
 
+      function globalSuperellipseOutline(width, height, exponent, sampleCount = 128) {
+        const clipPoints = [];
+        const pathPoints = [];
+        for (let index = 0; index < sampleCount; index += 1) {
+          const angle = index / sampleCount * Math.PI * 2;
+          const cosine = Math.cos(angle);
+          const sine = Math.sin(angle);
+          const normalizedX = Math.sign(cosine) * Math.pow(Math.abs(cosine), 2 / exponent);
+          const normalizedY = Math.sign(sine) * Math.pow(Math.abs(sine), 2 / exponent);
+          const percentX = 50 + normalizedX * 50;
+          const percentY = 50 + normalizedY * 50;
+          clipPoints.push(`${percentX.toFixed(4)}% ${percentY.toFixed(4)}%`);
+          pathPoints.push([
+            width / 2 + normalizedX * width / 2,
+            height / 2 + normalizedY * height / 2,
+          ]);
+        }
+        return {
+          clipPath: `polygon(${clipPoints.join(", ")})`,
+          path: `${pathPoints.map(([x, y], index) => (
+            `${index === 0 ? "M" : "L"}${x.toFixed(3)} ${y.toFixed(3)}`
+          )).join(" ")} Z`,
+        };
+      }
+
       function updateSurfaceAppearance() {
         const renderer = elements.rendererSelect.value;
         const reference = renderer === "reference";
@@ -1385,18 +1436,30 @@
         const height = readGeometryNumber("height");
         const radius = readGeometryNumber("radius");
         const actualOuterShape = reference ? "round" : selectedOuterShape();
+        const global = actualOuterShape === "global-superellipse";
         elements.surface.dataset.renderer = renderer;
         const tint = readNumber("tint");
         const light = elements.root.dataset.theme === "light";
         elements.surface.style.width = `${width}px`;
         elements.surface.style.height = `${height}px`;
-        elements.surface.style.borderRadius = `${radius}px`;
+        elements.surface.style.borderRadius = global ? "0" : `${radius}px`;
         elements.surface.style.setProperty(
           "corner-shape",
           actualOuterShape === "superellipse"
             ? `superellipse(${Math.log2(cornerExponent()).toFixed(6)})`
             : "round",
         );
+        if (global) {
+          const outline = globalSuperellipseOutline(width, height, cornerExponent());
+          elements.surface.style.clipPath = outline.clipPath;
+          elements.surface.style.webkitClipPath = outline.clipPath;
+          elements.globalShapeOutline.setAttribute("viewBox", `0 0 ${width} ${height}`);
+          elements.globalShapeOutlinePath.setAttribute("d", outline.path);
+        } else {
+          elements.surface.style.clipPath = "none";
+          elements.surface.style.webkitClipPath = "none";
+          elements.globalShapeOutlinePath.removeAttribute("d");
+        }
         elements.surface.dataset.outerShape = actualOuterShape;
         elements.surface.style.background = reference || sdf ? "transparent" : light
           ? `rgba(235, 247, 249, ${tint})`
@@ -1490,7 +1553,7 @@
       function registerSurface() {
         updateSurfaceAppearance();
         opticalEngine.unregister(elements.surface);
-        opticalEngine.register(elements.surface, elements.roleSelect.value, {
+        opticalEngine.register(elements.surface, PRODUCT_LAB_ROLE, {
           bezel: readNumber("bezel"),
           thickness: readNumber("thickness"),
           ior: readNumber("ior"),
@@ -1499,7 +1562,6 @@
           maximumMapDimension: Number(elements.mapLimitSelect.value),
           opticalBlur: readNumber("opticalBlur"),
           saturation: readNumber("saturation"),
-          edgeMode: elements.edgeModeSelect.value,
           outerShape: selectedOuterShape(),
           cornerExponent: cornerExponent(),
         }, { forceRefresh: true });
@@ -1655,7 +1717,7 @@
         elements.liveStatus.textContent = suppressed
           ? "Q0 · transparency disabled"
           : config.q3Eligible
-          ? `${surfaceState} · ${elements.roleSelect.value}`
+          ? `${surfaceState} · ${PRODUCT_LAB_ROLE}`
           : "Q1 fallback · safe bezel 不足";
       }
 
@@ -1724,6 +1786,7 @@
           elements.secondaryMapLegend.textContent = "R = normal X · G = normal Y";
           elements.normalCanvas.setAttribute("aria-label", "当前参数生成的法线和边缘贴图");
         }
+        updateShapeControls();
         scheduleRefresh();
       }
 
@@ -1741,7 +1804,9 @@
           applySdfDefaults();
           return;
         }
-        const preset = elements.presetSelect.value === "custom" ? elements.roleSelect.value : elements.presetSelect.value;
+        const preset = elements.presetSelect.value === "custom"
+          ? lastProductPreset
+          : elements.presetSelect.value;
         elements.presetSelect.value = preset;
         applyPreset(preset);
       });

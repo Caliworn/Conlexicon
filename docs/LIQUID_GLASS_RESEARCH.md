@@ -29,10 +29,10 @@
 | 路径 | 形状/位移模型 | 合成 | 目的 |
 | --- | --- | --- | --- |
 | Reference Baseline（本机可选） | convex-squircle 截面、Snell profile、全尺寸圆角位移图 | 单路位移、独立 specular | 对照最初参考项目的可见边缘与折射宽度 |
-| SDF Baseline | 来源圆角矩形 SDF，另有 Lab-only superellipse 边界扩展；线性/球顶梯度决定位移方向 | RGB 三路位移、B 通道镜面、Alpha 轮廓 | 检查解析边界、固定方形贴图和球顶梯度是否改善连续性 |
-| Product Engine | 生产 rounded-rect 几何，另有默认关闭的 Lab-only superellipse 分支；有效边、独立 bezel 与法线/rim 图 | 光学模糊、RGB 重组、统一环境 specular、Worker/LRU | 验证最终组件角色、降级、资源生命周期与性能架构 |
+| SDF Baseline | 来源圆角矩形 SDF，另有 Lab-only 超椭圆角与全局 Lamé 轮廓扩展；线性/球顶梯度决定位移方向 | RGB 三路位移、B 通道镜面、Alpha 轮廓 | 检查解析边界、固定方形贴图和球顶梯度是否改善连续性 |
+| Product Engine | 精确 rounded-rect 外轮廓、Lab-only 超椭圆角/全局 Lamé 分支、独立 bezel 与连续全支撑光学方向场 | 光学模糊、RGB 重组、统一环境 specular、Worker/LRU | 验证最终组件角色、降级、资源生命周期与性能架构 |
 
-三条路径在本机 Reference 文件存在时共享 Lab 的连续色场、高对比网格、色带、大号文字、拖动坐标，以及唯一一组宽度、高度、圆角和外轮廓选择；超椭圆指数 `2–8` 只在该实验轮廓下生效，`4` 对应常用 squircle。Product 与 SDF 同步改变 CSS 裁切和贴图几何；Reference 为保护逐行来源基准始终使用传统圆角，并在状态区显式报告差异。切换渲染路径或恢复模型默认值不会改变共享选择。仓库分发五张仅供 Lab 光学对照的背景图：室内、Diamond Valley Lake 花丛、Whangarei Falls 栈桥和草地人物来自 Unsplash，浅水岩石来自 Pexels；逐张作者、原始页面和许可链接记录在 `assets/liquid-glass-lab/README.md`，这些图片不得视为 Conlexicon 产品美术资产。SDF 来源实现原本过滤包含镜头的内容层；Lab 唯一有意的结构适配是把同一 map/filter 作用到卡片的 `backdrop-filter` 伪元素，使它能与另外两条路径观察同一实时背景。SDF Baseline 默认不叠加自行设计的 tint、边界或外阴影，避免装饰层污染轮廓、位移和镜面的观察。该适配意味着 Lab 能比较视觉结果，但不能据此宣称浏览器覆盖或性能与上游组件完全相同。
+三条路径在本机 Reference 文件存在时共享 Lab 的连续色场、高对比网格、色带、大号文字、拖动坐标，以及唯一一组宽度、高度、圆角、外轮廓模型和超椭圆指数。角部模型保留直边：指数范围 `2–8`、默认 `4`，`2` 复用传统圆角快速路径，更大的值启用 Product/SDF 超椭圆角；全局模型直接以 `|x/a|^n + |y/b|^n = 1` 定义整张表面，`n=2` 为椭圆且 Product/SDF 不消费 radius。Product 与 SDF 同步改变 CSS clip/corner shape 和贴图几何；Reference 为保护逐行来源基准始终使用传统圆角，并显式报告差异。圆角滑杆上限只由共享短边的一半决定；Product/SDF 全局模型会保留但禁用该值，Reference 仍可调整其来源圆角。切换渲染路径或恢复模型默认值不会改变共享选择。仓库分发五张仅供 Lab 光学对照的背景图：室内、Diamond Valley Lake 花丛、Whangarei Falls 栈桥和草地人物来自 Unsplash，浅水岩石来自 Pexels；逐张作者、原始页面和许可链接记录在 `assets/liquid-glass-lab/README.md`，这些图片不得视为 Conlexicon 产品美术资产。SDF 来源实现原本过滤包含镜头的内容层；Lab 唯一有意的结构适配是把同一 map/filter 作用到卡片的 `backdrop-filter` 伪元素，使它能与另外两条路径观察同一实时背景。SDF Baseline 默认不叠加自行设计的 tint、边界或外阴影，避免装饰层污染轮廓、位移和镜面的观察。该适配意味着 Lab 能比较视觉结果，但不能据此宣称浏览器覆盖或性能与上游组件完全相同。
 
 ## 4. 已纠正的实现认识
 
@@ -40,9 +40,16 @@
 - 上游 Alpha 轮廓是像素中心的二值 `0/255`，不是 fractional coverage 或 MSAA。SDF Baseline 原样保留这一点；若 Lab 仍出现角部锯齿，应先把它认定为贴图分辨率、拉伸和二值遮罩共同产生的可测现象，而不是擅自增加抗锯齿后再称为“原实现”。
 - 固定 `quality × quality` 方形贴图会被拉伸到非方形镜头。提高 quality 能减少量化但增加同步生成成本；它不自动解决低质量二值轮廓的所有闪烁。
 - `depth` 是 SDF edge band 宽度；它与 CSS border radius 不需要数值相等，但必须受短边和半径视觉关系约束。极宽 depth、极小 radius 或低 quality 的组合最容易暴露角部轮廓与位移方向的脱节。
-- Lab 的 superellipse 是局部角部曲线实验，不是 Apple 未公开的 Continuous Corners 模型；它让 Product 与 SDF 在同一 CSS 外轮廓下比较曲率，但不改变 Reference 来源算法。
-- Product 当前 normal/rim 图按最近边及水平/垂直 influence 划分，形成四块明显的法线区域和角部对角接缝；诊断贴图已经确认这不是圆角半径本身造成的现象。后续应独立重写连续角部场，而不是用 SDF 或 Reference 主体接线绕过它。
+- Lab 明确区分“直边＋超椭圆角”和“全局超椭圆”：前者对应 CSS `border-radius + corner-shape` 的角部语义，后者以整张表面的 Lamé 方程定义且没有数学上的真正直边；两者都不是 Apple 未公开的 Continuous Corners 模型，也不改变 Reference 来源算法。
+- Product 曾用最近边法线和两条硬截断的水平/垂直 influence 组成宽边带方向场；值虽经混合，激活边界的导数仍不连续，因此位移图会在特定 bezel 下出现轻微斜带，normal/rim 图则形成明显的梯形分区。当前实现保留精确外轮廓距离，在最外层以真实边界法线相切，再用 quintic smootherstep 过渡到四边始终参与的有理势场；两张贴图共享该连续法线，光学带外写入中性法线，不再保留无意义的中心分区。
 - Apple 的系统材质会基于背景和系统设置自适应。静态 tint、固定镜面或单一折射算法只能复现部分视觉线索，不能被描述为 Apple 内部模型的等价实现。
+
+### Product Engine 来源边界
+
+- 多表面角色注册、Worker/分块后备、动态 SVG filter registry、按字节 LRU、ResizeObserver 生命周期、Q3/Q1/Q0 降级和对象 URL 回收是 Conlexicon 为自身 DOM 应用编写的产品架构，不来自 Reference、SDF 项目或 Apple 私有实现。
+- convex-squircle 截面、Snell 折射和完整 bezel 内的衰减语义参考 `archisvaze/liquid-glass` 后独立实现；Product 不复制其全尺寸单路贴图、`bezel <= radius - 1` 约束或 primitive 顺序。
+- rounded-rect 有符号距离、Lab-only 超椭圆角/全局 Lamé 轮廓、连续四边势场、双贴图通道、RGB 三路重组、normal/rim 环境镜面和本轮 256 点折射 LUT 属于 Product 自身实现。SDF Baseline 的 MIT 代码只存在于隔离 Lab，不参与正式 Product 贴图生成。
+- Apple 资料只提供材质层级、轮廓、可读性和交互目标；Apple 没有公开可供本项目移植的底层 Liquid Glass shader 或光学模型。
 
 ## 5. 本轮验收问题
 

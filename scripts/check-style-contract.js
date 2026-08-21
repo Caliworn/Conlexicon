@@ -299,9 +299,9 @@ for (const definition of liquidGlassSurfaceDefinitions) {
 }
 const liquidGlassContinuousDefinitions = liquidGlassSurfaceDefinitions.filter(({ role }) => role === "continuous");
 assert.deepEqual(
-  new Map(liquidGlassContinuousDefinitions.map(({ selector, overrides }) => [selector, overrides?.edgeMode])),
-  new Map([[".dictionary-panel", "all"], [".mobile-app-bar", "all"]]),
-  "Inset continuous navigation surfaces must sample all four exposed edges",
+  new Set(liquidGlassContinuousDefinitions.map(({ selector }) => selector)),
+  new Set([".dictionary-panel", ".mobile-app-bar"]),
+  "Inset continuous navigation surfaces must remain registered as complete optical surfaces",
 );
 assert(
   /@media \(min-width: 800px\) \{[\s\S]*?body\[data-ui-skin="liquid-glass"\] \.app-shell[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\);[\s\S]*?body\[data-ui-skin="liquid-glass"\] \.dictionary-panel\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?inset:[\s\S]*?border:\s*1px solid var\(--material-navigation-action-border\);[\s\S]*?border-radius:\s*var\(--liquid-glass-navigation-radius\);/.test(liquidGlass)

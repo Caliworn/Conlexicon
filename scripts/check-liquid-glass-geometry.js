@@ -80,35 +80,39 @@ assert(
   "The middle of the requested bezel must remain optically active instead of being hard-clipped",
 );
 
-const rightEdge = geometry.normalizeSurfaceOptions({
-  width: 240,
-  height: 20,
-  radii: [0, 0, 0, 0],
+const continuousFieldOptions = geometry.normalizeSurfaceOptions({
+  width: 194,
+  height: 146,
+  radii: [24, 24, 24, 24],
   bezel: 30,
-  edgeMode: "right",
-  mapWidth: 240,
-  mapHeight: 20,
+  mapWidth: 194,
+  mapHeight: 146,
 });
-assert(
-  rightEdge.effectiveBezel > 0 && rightEdge.effectiveBezel < rightEdge.height / 2,
-  "A single exposed edge must fit within the surface dimension",
+const formerActivationX = continuousFieldOptions.bezel;
+const formerActivationY = continuousFieldOptions.bezel / 2;
+const continuityStep = 0.25;
+const normalBefore = geometry.sampleSurface(
+  formerActivationX - continuityStep,
+  formerActivationY,
+  continuousFieldOptions,
 );
-assert.equal(geometry.sampleSurface(239, 10, rightEdge).normalX, 1, "Right-edge optics must face only right");
-assert(geometry.sampleSurface(239, 10, rightEdge).displacementX < 0, "Right-edge refraction must sample back into the surface");
-assert.equal(geometry.sampleSurface(120, 1, rightEdge).rim, 0, "Inactive top edges must not receive an optical rim");
-
-const bottomEdge = geometry.normalizeSurfaceOptions({
-  width: 240,
-  height: 40,
-  radii: [0, 0, 0, 0],
-  bezel: 30,
-  edgeMode: "bottom",
-  mapWidth: 240,
-  mapHeight: 40,
-});
-assert.equal(geometry.sampleSurface(120, 39, bottomEdge).normalY, 1, "Bottom-edge optics must face only down");
-assert(geometry.sampleSurface(120, 39, bottomEdge).displacementY < 0, "Bottom-edge refraction must sample back into the surface");
-assert.equal(geometry.sampleSurface(239, 20, bottomEdge).rim, 0, "Inactive right edges must not receive an optical rim");
+const normalAt = geometry.sampleSurface(
+  formerActivationX,
+  formerActivationY,
+  continuousFieldOptions,
+);
+const normalAfter = geometry.sampleSurface(
+  formerActivationX + continuityStep,
+  formerActivationY,
+  continuousFieldOptions,
+);
+assert(
+  Math.hypot(
+    normalBefore.normalX - 2 * normalAt.normalX + normalAfter.normalX,
+    normalBefore.normalY - 2 * normalAt.normalY + normalAfter.normalY,
+  ) < 0.002,
+  "The full-support optical field must remain smooth across the wide-bezel interior",
+);
 
 const tinySurface = geometry.normalizeSurfaceOptions({
   width: 80,
@@ -144,7 +148,6 @@ const keyA = geometry.buildCacheKey(options);
 const keyB = geometry.buildCacheKey({ ...options });
 const keyC = geometry.buildCacheKey({ ...options, width: options.width + 8 });
 const keyWithMovedLight = geometry.buildCacheKey({ ...options, lightX: 0.92, lightY: 0.38 });
-const keyWithRightEdge = geometry.buildCacheKey({ ...options, edgeMode: "right" });
 assert.equal(keyA, keyB, "Equivalent geometry must produce a stable cache key");
 assert.notEqual(keyA, keyC, "Materially different geometry must not share a cache key");
 assert.equal(
@@ -152,7 +155,6 @@ assert.equal(
   keyWithMovedLight,
   "The unified light vector must update filter matrices without regenerating geometry maps",
 );
-assert.notEqual(keyA, keyWithRightEdge, "Different active-edge models must not share a geometry cache entry");
 
 const superellipseOptions = geometry.normalizeSurfaceOptions({
   ...options,
@@ -164,11 +166,22 @@ const superellipseExponentOptions = geometry.normalizeSurfaceOptions({
   outerShape: "superellipse",
   cornerExponent: 8,
 });
+const exponentTwoOptions = geometry.normalizeSurfaceOptions({
+  ...options,
+  outerShape: "superellipse",
+  cornerExponent: 2,
+});
 assert.equal(options.outerShape, "round", "Product geometry must keep rounded rectangles as its default");
+assert.equal(exponentTwoOptions.outerShape, "round", "Exponent two must use the Product round fast path");
 assert.equal(
   keyA,
   geometry.buildCacheKey({ ...options, outerShape: "round", cornerExponent: 8 }),
   "The inactive superellipse exponent must not change the established Product round cache key",
+);
+assert.equal(
+  keyA,
+  geometry.buildCacheKey({ ...options, outerShape: "superellipse", cornerExponent: 2 }),
+  "Exponent two must reuse the established Product round cache entry",
 );
 assert.equal(superellipseOptions.cornerExponent, 4, "Product superellipse exponents must be normalized");
 assert.equal(
@@ -207,17 +220,120 @@ const squircleTop = geometry.sampleSurface(options.width / 2, 1, superellipseOpt
 assert.equal(squircleTop.normalX, 0, "The Product squircle top edge must remain horizontally tangent");
 assert.equal(squircleTop.normalY, -1, "The Product squircle top edge must retain its outward normal");
 
+const globalEllipseOptions = geometry.normalizeSurfaceOptions({
+  ...options,
+  outerShape: "global-superellipse",
+  cornerExponent: 2,
+});
+const globalSquircleOptions = geometry.normalizeSurfaceOptions({
+  ...options,
+  outerShape: "global-superellipse",
+  cornerExponent: 4,
+});
+assert.equal(
+  globalEllipseOptions.outerShape,
+  "global-superellipse",
+  "Exponent two must remain a global ellipse instead of normalizing to a rounded rectangle",
+);
+const ellipseBoundary = geometry.sampleSurface(
+  options.width / 2 + options.width / 2 / Math.SQRT2,
+  options.height / 2 - options.height / 2 / Math.SQRT2,
+  globalEllipseOptions,
+);
+almostEqual(ellipseBoundary.rim, 1, 1e-6, "The Product global ellipse must follow the Lamé boundary");
+assert.equal(
+  geometry.sampleSurface(1, 1, globalEllipseOptions).rim,
+  0,
+  "A global ellipse must exclude the rectangular map corner",
+);
+assert.equal(
+  geometry.buildCacheKey(globalSquircleOptions),
+  geometry.buildCacheKey({ ...globalSquircleOptions, radius: 2 }),
+  "Global superellipse cache identity must ignore the inactive rounded-corner radius",
+);
+assert.notEqual(
+  geometry.buildCacheKey(globalEllipseOptions),
+  geometry.buildCacheKey(globalSquircleOptions),
+  "Different global superellipse exponents must not share Product cache entries",
+);
+
 const mapsA = geometry.generateSurfaceMaps(options);
 const mapsB = geometry.generateSurfaceMaps(options);
+const exponentTwoMaps = geometry.generateSurfaceMaps({
+  ...options,
+  outerShape: "superellipse",
+  cornerExponent: 2,
+});
 assert.equal(mapsA.displacement.length, options.mapWidth * options.mapHeight * 4);
 assert.equal(mapsA.specular.length, options.mapWidth * options.mapHeight * 4);
 assert.equal(mapsA.byteLength, mapsA.displacement.byteLength + mapsA.specular.byteLength);
 assert.deepEqual(mapsA.displacement, mapsB.displacement, "Displacement generation must be deterministic");
 assert.deepEqual(mapsA.specular, mapsB.specular, "Specular generation must be deterministic");
+assert.deepEqual(
+  mapsA.displacement,
+  exponentTwoMaps.displacement,
+  "Exponent two must preserve the Product round displacement bytes",
+);
+assert.deepEqual(
+  mapsA.specular,
+  exponentTwoMaps.specular,
+  "Exponent two must preserve the Product round normal/rim bytes",
+);
 assert(
   mapsA.specular.some((value) => value > 0),
   "The generated lighting map must not be empty",
 );
+
+const continuousMaps = geometry.generateSurfaceMaps(continuousFieldOptions);
+const centerMapOffset = (
+  Math.floor(continuousMaps.height / 2) * continuousMaps.width
+  + Math.floor(continuousMaps.width / 2)
+) * 4;
+assert.deepEqual(
+  Array.from(continuousMaps.displacement.slice(centerMapOffset, centerMapOffset + 4)),
+  [128, 128, 0, 255],
+  "The displacement map must be neutral outside the active optical bezel",
+);
+assert.deepEqual(
+  Array.from(continuousMaps.specular.slice(centerMapOffset, centerMapOffset + 4)),
+  [128, 128, 0, 255],
+  "The normal/rim map must not retain meaningless direction partitions outside the optical bezel",
+);
+
+for (let offset = 0; offset < continuousMaps.displacement.length; offset += 4) {
+  const rim = continuousMaps.displacement[offset + 2];
+  const displacementX = continuousMaps.displacement[offset] - 128;
+  const displacementY = continuousMaps.displacement[offset + 1] - 128;
+  const normalX = continuousMaps.specular[offset] - 128;
+  const normalY = continuousMaps.specular[offset + 1] - 128;
+  const displacementLength = Math.hypot(displacementX, displacementY);
+  const normalLength = Math.hypot(normalX, normalY);
+  if (rim < 8 || displacementLength < 8 || normalLength < 32) {
+    continue;
+  }
+  const alignment = (displacementX * normalX + displacementY * normalY)
+    / (displacementLength * normalLength);
+  assert(
+    alignment < -0.97,
+    "Displacement and specular maps must encode opposite directions from one shared optical field",
+  );
+}
+
+for (const [mapX, mapY] of [[4, 73], [30, 15], [97, 4], [164, 15]]) {
+  const surfaceX = (mapX + 0.5) / continuousMaps.width * continuousFieldOptions.width;
+  const surfaceY = (mapY + 0.5) / continuousMaps.height * continuousFieldOptions.height;
+  const expected = geometry.sampleSurface(surfaceX, surfaceY, continuousFieldOptions);
+  const offset = (mapY * continuousMaps.width + mapX) * 4;
+  const expectedRed = Math.round(128 + expected.displacementX
+    / continuousFieldOptions.maxDisplacement * 127);
+  const expectedGreen = Math.round(128 + expected.displacementY
+    / continuousFieldOptions.maxDisplacement * 127);
+  assert(
+    Math.abs(continuousMaps.displacement[offset] - expectedRed) <= 1
+      && Math.abs(continuousMaps.displacement[offset + 1] - expectedGreen) <= 1,
+    "The generated refraction lookup must remain visually equivalent to the analytic profile",
+  );
+}
 
 const sdfOptions = {
   width: 200,
@@ -234,6 +350,11 @@ const sdfExplicitRound = sdfBaseline.computeDisplacementMap({
   outerShape: "round",
   cornerExponent: 8,
 });
+const sdfExponentTwo = sdfBaseline.computeDisplacementMap({
+  ...sdfOptions,
+  outerShape: "superellipse",
+  cornerExponent: 2,
+});
 assert.equal(sdfMapA.width, 128, "The SDF baseline must preserve its requested square map quality");
 assert.equal(sdfMapA.height, 128, "The SDF baseline map must remain square like the upstream renderer");
 assert.equal(sdfMapA.pixels.length, 128 * 128 * 4, "The SDF baseline must emit a complete RGBA map");
@@ -242,6 +363,11 @@ assert.deepEqual(
   sdfMapA.pixels,
   sdfExplicitRound.pixels,
   "The inactive exponent must not alter the source-compatible SDF round output",
+);
+assert.deepEqual(
+  sdfMapA.pixels,
+  sdfExponentTwo.pixels,
+  "Exponent two must use the source-compatible SDF round fast path",
 );
 assert(
   sdfMapA.pixels.every((value, index) => index % 4 !== 3 || value === 0 || value === 255),
@@ -280,6 +406,40 @@ const squircleCoverage = sdfSquircle.pixels.reduce(
   0,
 );
 assert(squircleCoverage > roundCoverage, "A squircle with the same radius must retain more corner area than a rounded rectangle");
+
+const sdfGlobalEllipse = sdfBaseline.computeDisplacementMap({
+  ...sdfOptions,
+  outerShape: "global-superellipse",
+  cornerExponent: 2,
+});
+const sdfGlobalSquircle = sdfBaseline.computeDisplacementMap({
+  ...sdfOptions,
+  outerShape: "global-superellipse",
+  cornerExponent: 4,
+});
+assert.equal(
+  sdfBaseline.normalizeOptions({
+    ...sdfOptions,
+    outerShape: "global-superellipse",
+    cornerExponent: 2,
+  }).outerShape,
+  "global-superellipse",
+  "The SDF Lab extension must preserve a global ellipse at exponent two",
+);
+assert.equal(sdfPixel(sdfGlobalEllipse, 0, 0)[3], 0, "The global SDF ellipse must exclude the map corner");
+assert.equal(sdfPixel(sdfGlobalEllipse, 64, 64)[3], 255, "The global SDF ellipse must include its center");
+const globalEllipseCoverage = sdfGlobalEllipse.pixels.reduce(
+  (total, value, index) => total + (index % 4 === 3 && value === 255 ? 1 : 0),
+  0,
+);
+const globalSquircleCoverage = sdfGlobalSquircle.pixels.reduce(
+  (total, value, index) => total + (index % 4 === 3 && value === 255 ? 1 : 0),
+  0,
+);
+assert(
+  globalSquircleCoverage > globalEllipseCoverage,
+  "Increasing the global superellipse exponent must expand the exact Lamé outline toward the box",
+);
 
 assert.equal(sdfPixel(sdfMapA, 0, 0)[3], 0, "The rounded SDF corner must stay outside the binary shape mask");
 assert.equal(sdfPixel(sdfMapA, 64, 64)[3], 255, "The SDF center must stay inside the binary shape mask");
