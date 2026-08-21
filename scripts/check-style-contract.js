@@ -71,6 +71,22 @@ assert(
   !/(?:fetch\s*\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB|\/api\/)/.test(liquidGlassLab),
   "The standalone lab must not access product data, APIs, or persistent browser storage",
 );
+assert(
+  liquidGlassLab.includes('new URL("theme-liquid-glass.css", window.location.href)')
+    && liquidGlassLab.includes('new URL("styles.css", window.location.href)')
+    && liquidGlassLab.includes("getComputedStyle(fixture)")
+    && liquidGlassLab.includes('createAppearanceProbe("desktop"')
+    && liquidGlassLab.includes('createAppearanceProbe("mobile"'),
+  "Product Q1/Q3 appearance comparisons must derive from isolated formal desktop and mobile computed styles",
+);
+assert(
+  liquidGlassLab.includes('id="productQualitySelect"')
+    && liquidGlassLab.includes('<option value="q3" selected>')
+    && liquidGlassLab.includes('<option value="q1">')
+    && liquidGlassLab.includes("activateRequestedProductQuality()")
+    && liquidGlassLab.includes('stats.quality !== "q3"'),
+  "The Product lab must switch between real Q3 optics and Q1 without generating diagnostic maps for Q1",
+);
 
 function numericLayer(name) {
   const match = styles.match(new RegExp(`${name}:\\s*(\\d+)`));
@@ -332,6 +348,32 @@ assert(
   liquidGlassOpticalRoleRule.declarations.includes("background: var(--liquid-glass-q3-surface-tint);")
     && !/blur\(/.test(liquidGlassOpticalRoleRule.declarations),
   "Q3 must use a low-alpha role tint and generated optics without the Q1 material blur",
+);
+for (const role of ["continuous", "focus", "floating", "modal"]) {
+  const defaults = liquidGlassEngineApi.ROLE_DEFAULTS[role];
+  const expectedFilter = `--liquid-glass-q1-${role}-filter: blur(${defaults.opticalBlur}px) saturate(${defaults.saturation});`;
+  assert(
+    liquidGlass.includes(expectedFilter),
+    `Q1 ${role} blur and saturation must match the Q3 role parameters`,
+  );
+}
+for (const [materialToken, q3TintToken] of [
+  ["--material-entry-detail-background", "--liquid-glass-q3-focus-tint"],
+  ["--material-floating-background", "--liquid-glass-q3-floating-tint"],
+  ["--material-mobile-bar-background", "--liquid-glass-q3-mobile-bar-tint"],
+  ["--material-navigation-background", "--liquid-glass-q3-navigation-tint"],
+  ["--material-navigation-drawer-background", "--liquid-glass-q3-navigation-drawer-tint"],
+  ["--material-rich-tooltip-background", "--liquid-glass-q3-tooltip-tint"],
+  ["--material-overlay-panel-background", "--liquid-glass-q3-modal-tint"],
+]) {
+  assert(
+    liquidGlass.includes(`${materialToken}: var(${q3TintToken});`),
+    `${materialToken} must share its role tint between Q1 and Q3`,
+  );
+}
+assert(
+  /:is\(\.modal-panel, \.network-panel\)\s*\{[^}]*backdrop-filter:\s*var\(--liquid-glass-q1-modal-filter\);/s.test(liquidGlass),
+  "Q1 modal and network surfaces must consume the modal role blur instead of the floating filter",
 );
 for (const role of new Set(
   liquidGlassSurfaceDefinitions.filter(({ sampleBackdrop }) => sampleBackdrop).map(({ role }) => role),

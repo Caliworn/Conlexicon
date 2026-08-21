@@ -8,7 +8,7 @@
 - 用户可见名称：`液态玻璃 / Liquid Glass`。
 - 内部 ID：`liquid-glass`。
 - 经典皮肤继续作为默认与未知值回退；`layered-glass` 继续保持已经冻结的层叠玻璃边界。
-- LQ-2 的固定噪声滤镜与 LQ-3 的五层指针光场只保留为历史阶段记录；LQ-6 已从产品源码移除两条旧视觉路径。Q3 就绪表面只使用动态 URL filter，在滤镜内部先按角色模糊背景采样，再执行几何折射、RGB 色散和静态环境 specular；不叠加 Q1 的角色级普通 blur。等待或生成失败退回 LQ-1 普通 blur，辅助模式继续使用实色材质。Q2 定义保持不变，其必要性等待单独讨论。
+- LQ-2 的固定噪声滤镜与 LQ-3 的五层指针光场只保留为历史阶段记录；LQ-6 已从产品源码移除两条旧视觉路径。Q3 就绪表面只使用动态 URL filter，在滤镜内部先按角色模糊背景采样，再执行几何折射、RGB 色散和静态环境 specular；不叠加外部 Q1 blur。等待或生成失败退回 Q1：沿用同角色 Q3 的 tint、光学模糊、饱和度、边框和阴影参数，但不生成贴图，也不执行位移、RGB 色散或 specular。辅助模式继续使用实色材质。Q2 定义保持不变，其必要性等待单独讨论。
 
 ## 2. 设计目标
 
@@ -50,11 +50,11 @@
 
 ### 4.3 连续导航
 
-桌面导航、移动应用栏和移动抽屉使用深色半透明连续玻璃。Q3 对单实例连续表面使用受限分辨率的几何折射，在动态 URL filter 内先执行 `3px` 光学模糊，再叠加角色级中性 tint；Q1 独立保留普通背景模糊、低对比反射和厚度阴影，以控制大面积合成成本。工具导航内部是同一玻璃上的平面列表行：idle 透明，hover 使用低透明中性状态底，active 使用无独立折射、无固定渐变和无外阴影的选择胶囊。展开栏、rail 和移动抽屉共享这一状态语言，不把每个工具项注册成玻璃表面。
+桌面导航、移动应用栏和移动抽屉使用半透明连续玻璃。Q3 对单实例连续表面使用受限分辨率的几何折射，在动态 URL filter 内先执行 `3px` 光学模糊，再叠加角色级中性 tint；Q1 使用相同的 continuous tint、`3px` blur、`1.06×` 饱和度、边框和阴影，只省略贴图与方向性光学。工具导航内部是同一玻璃上的平面列表行：idle 透明，hover 使用低透明中性状态底，active 使用无独立折射、无固定渐变和无外阴影的选择胶囊。展开栏、rail 和移动抽屉共享这一状态语言，不把每个工具项注册成玻璃表面。
 
 ### 4.4 聚焦对象
 
-当前词条详情外壳和当前主编辑表单 `#entryForm` 外壳是内容层中的单实例例外；两者不会同时显示。Q3 使用中性 tint、`4px` 滤镜内光学模糊和沿真实圆角法线变化的几何折射，不叠加外部角色级普通 blur 或组件假渐变；详情分区和表单字段继续保持高不透明度和无独立 blur。
+当前词条详情外壳和当前主编辑表单 `#entryForm` 外壳是内容层中的单实例例外；两者不会同时显示。Q3 使用中性 tint、`4px` 滤镜内光学模糊和沿真实圆角法线变化的几何折射，不叠加外部角色级普通 blur 或组件假渐变；Q1 使用同一 tint、`4px` blur 与 `1.09×` 饱和度。详情分区和表单字段继续保持高不透明度和无独立 blur。
 
 ### 4.5 临时浮层
 
@@ -72,13 +72,13 @@ LQ-1 使用现有 token 契约，不增加组件 DOM，也不加入专用运行�
 
 - `theme-liquid-glass.css` 只在 `body[data-ui-skin="liquid-glass"]` 下覆盖明暗材质。
 - 画布提供连续环境色场。
-- navigation、navigation-drawer、mobile-bar、floating、overlay-panel 和 entry-detail 使用不同透明度、blur 与阴影层级。
+- navigation、navigation-drawer、mobile-bar、floating、overlay-panel 和 entry-detail 按 continuous/focus/floating/modal 角色消费与 Q3 一致的 tint、blur、饱和度、边框与阴影；Q1 不包含任何贴图或方向性光学。
 - control 使用静态多层反射，但不使用 blur。
 - panel、list-item、browser 和 inset 不执行 backdrop blur。
 - 不支持 blur、减少透明度和强制高对比时提供同层级实色降级。
 - 选择皮肤只改变外观和偏好，不重绘业务页面或影响未保存编辑。
 
-LQ-1 的作用是验证色彩、层级、透明度、可读性和运行期边界，为真实折射建立稳定基线；它不是最终效果。
+LQ-1 是与 Q3 外观参数对齐的普通玻璃基线：continuous 为 `3px / 1.06×`、focus 为 `4px / 1.09×`、floating 为 `5.5px / 1.12×`、modal 为 `7px / 1.08×`。它用于没有动态 URL filter 时保留一致的层级和可读性，但不伪造折射率、bezel、位移、色散或镜面效果。
 
 ## 6. LQ-2 静态光学引擎（历史，已由 LQ-6 移除）
 
@@ -312,7 +312,7 @@ page background            被采样的环境内容
 | --- | --- | --- |
 | Q3 完整光学 | URL backdrop filter、Worker/Canvas 和正常透明度可用 | 仅动态 URL filter：角色化光学模糊、几何折射、RGB rim 色散、静态环境 specular 与中性 tint |
 | Q2 缓存光学 | 生成受限但存在相同几何缓存资源 | 复用量化尺寸的几何贴图与统一光源合成，保留真实位移 |
-| Q1 基线玻璃 | URL filter、Canvas 或贴图生成不可用，或单个表面安全 bezel 小于 `4px` | LQ-1 普通 blur 和稳定材质边界，无固定 SVG filter 或 CSS 彩色 rim |
+| Q1 基线玻璃 | URL filter、Canvas 或贴图生成不可用，或单个表面安全 bezel 小于 `4px` | 与 Q3 同角色的 tint、blur、饱和度、边框和阴影；无贴图、位移、RGB 色散、specular 或 CSS 彩色 rim |
 | Q0 辅助实色 | 减少透明度、强制高对比或 backdrop filter 不可用 | 实色材质、系统色和明确边界，无折射/色散 |
 
 能力检测只决定可用上限，不依据设备名称或用户代理猜测性能。若运行期出现持续长任务、资源生成失败或显存压力，可以按表面从 Q3 降到 Q2/Q1，但必须记录可诊断原因，不能静默让同类浮层随机呈现不同材质。
@@ -340,6 +340,7 @@ page background            被采样的环境内容
 #### 第一优先级光学校正（已完成）
 
 - Q3 `ready` 表面只消费动态 URL filter，不再串接角色级普通 blur；URL 内部在 RGB 位移前执行角色化光学模糊，Q1 与 Q0 保持独立降级路径。
+- 浅色主题下所有正式 backdrop 表面的外边界统一使用低对比深青描边，并在 Q1 等待与 Q3 ready 间保持不变；暗色主题继续使用各角色现有亮边，micro 控件和导航内部状态不继承该外壳规则。
 - 正式表面基础材质改为纯色末层 tint，并为 Q3 建立角色化中性 tint；删除固定方向彩色/明暗边、radial/conic 假光、默认高光和 settle。
 - 暂停液态玻璃局部指针调度，保留引擎默认环境光及内部 `setLightVector()` 能力；动态光源必须在坐标模型复评后另行设计。
 - 产品背景只保留连续低饱和色场，不绘制交叉纤维等人为参照；诊断网格继续用于观察折射。照片不是验收折射的必要输入，micro 控件和 Q2 定义未改动。
@@ -412,7 +413,7 @@ page background            被采样的环境内容
 - `liquid-glass-lab.html` 是由现有静态服务器直接提供的独立开发页，默认打开 Product Engine 的 Focus 参数；它不进入主应用导航，不读取或写入词典、界面偏好、`data/`、Web Storage 或任何 `/api/` 端点。
 - 仓库分发互相隔离的 `Product Engine` 与 `SDF Baseline`：前者继续复用生产 `liquid-glass-geometry.js`、Worker、`liquid-glass-engine.js`、动态 SVG registry 与会话 LRU；后者改编 MIT 许可的 PallavAg 实现，以圆角矩形 SDF 计算边界/falloff、线性/球顶梯度计算位移，并使用 RGB 三路色散、B 通道镜面和二值 Alpha 轮廓。开发者本机可另外保留被 Git 忽略的 `liquid-glass-reference-baseline.js`，按最初参考项目复现凸 squircle 截面、Snell profile、单路位移图、specular 图与 primitive 合成顺序。SDF 默认不附加无来源的 tint、边界或外阴影；两条 Baseline 均不调用或修改生产几何、角色注册和缓存。
 - Lab 以唯一一组表面宽度、高度、圆角、外轮廓模型和超椭圆指数驱动 Product、Reference 与 SDF，初始几何为可容纳示例文字的 `420×200px`、`60px` 圆角和指数 `4`。角部模型保留直边：指数 `2` 规范化到 Round 快速路径并复用其缓存和贴图字节，更大的值启用 Product/SDF 超椭圆角；全局模型使用整张表面的 Lamé 隐式轮廓，指数 `2` 为椭圆且 Product/SDF 不消费 radius。Product/SDF 的 CSS 裁切与贴图必须匹配；全局轮廓的 Product 光学带使用解析梯度和一阶欧氏 signed-distance 近似，保持单遍生成，不调用逐角最近点迭代。圆角上限只取共享短边的一半，不设额外固定封顶；Product/SDF 全局模型禁用但保留当前 radius；Reference 继续使用并允许调整来源圆角。浏览器不支持 `corner-shape` 时仅将角部模型锁定为 Round，全局模型继续使用生成的 polygon clip；Reference 始终保持来源传统圆角并提示差异。切换路径和恢复模型默认值均不改写共享几何。Product 的角色命名只用于装载 continuous/focus/floating/modal 参数预设，实际 Lab 表面固定注册为不参与产品表面映射的 `diagnostic` 角色；手动调参后恢复默认值回到最近使用的预设。其余可调范围保持贴图上限、请求 bezel、厚度、IOR、最大位移、光学内模糊、饱和度、tint、specular 强度及统一光源角度/强度；正式表面与 Lab Product 均只生成完整四边轮廓，不再提供已失去产品消费者的单边模式。Reference 保留最初来源的独立光学参数语义。SDF 保留来源的 strength、chromatic aberration、blur、depth、curvature、splay、glow、edge highlight、specular、angle 和固定方形 quality 语义；SDF 小/大圆角快捷比较显式修改同一共享圆角。
-- 舞台提供连续色场、高对比网格、色带和大号文字四种诊断参照；仓库分发五张具有明确 Unsplash 或 Pexels 使用许可的 Lab 背景，逐张作者、原始页面和许可记录见 `assets/liquid-glass-lab/README.md`。图片只在选中时加载，不进入产品皮肤。舞台随当前路径显示生产位移/法线-rim 图、本机 Reference 位移/specular 图或 SDF RGBA 位移/B 通道镜面图。Product 可通过快捷状态或独立开关旁路动态光学、中性 tint、边框和外部阴影；这些外观切换不重新注册表面、不重建贴图也不清空缓存。预览卡片使用明确的中性示例文字且可在舞台范围内拖动；拖动只更新合帧后的 transform，不重建几何资源。窄屏时实际几何宽度按舞台净宽收束，避免可见表面与滤镜测量不一致。
+- 舞台提供连续色场、高对比网格、色带和大号文字四种诊断参照；仓库分发五张具有明确 Unsplash 或 Pexels 使用许可的 Lab 背景，逐张作者、原始页面和许可记录见 `assets/liquid-glass-lab/README.md`。图片只在选中时加载，不进入产品皮肤。舞台随当前路径显示生产位移/法线-rim 图、本机 Reference 位移/specular 图或 SDF RGBA 位移/B 通道镜面图。Product 可在 Q3 完整光学与 Q1 普通玻璃间切换，切换时保留共享几何、当前参数预设和外观选择；Q1 不生成诊断贴图。Product 默认保留 Neutral Lab 外观；可选 Product role 来源通过 1024px/480px 隔离样式探针加载正式主题和共享组件 CSS，按当前 Q1/Q3 状态及真实桌面/移动 fixture 镜像 Navigation、drawer、mobile bar、查看/编辑 Focus、floating、rich/quality tooltip、toast、modal 与 network 的计算 tint、边框、完整阴影和前景色，不维护第二份主题值。外观来源和角色不改写光学预设；快捷状态或独立开关只旁路最终层。共享宽高、圆角、padding、背景场景及 modal/network 环境遮罩不随外观来源变化；正式样式不可用时明确恢复 Neutral Lab。预览卡片使用中性示例文字且可在舞台范围内拖动；拖动只更新合帧后的 transform，不重建几何资源。窄屏时实际几何宽度按舞台净宽收束，避免可见表面与滤镜测量不一致。
 - Lab 的 `color-scheme` 必须跟随自身明暗主题，而不是同时声明两种模式。系统减少透明度时三条渲染路径统一关闭 backdrop filter、Baseline 伪元素与透明底色，并使用当前 Lab 主题的实色 panel/text token；只有强制颜色模式使用 `Canvas` / `CanvasText` 系统色。减少透明度或强制颜色启用期间，两条 Baseline 不再构建 SVG filter/贴图，Product Engine 重新探测为 Q0，全部诊断贴图停止生成；偏好解除后按当前参数恢复。
 - 第三方来源、许可、已纠正的 SDF 认识和人工对照问题单独记录在 `docs/LIQUID_GLASS_RESEARCH.md`；研究结论未经人工验收不得倒灌为生产契约。
 

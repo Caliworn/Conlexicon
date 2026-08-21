@@ -6,6 +6,9 @@
 
 ### 改进
 
+- 重做液态玻璃 Q1 基线：continuous、focus、floating 与 modal 现在分别复用同角色 Q3 的 tint、`3/4/5.5/7px` 模糊、饱和度、边框和阴影参数，仅省略几何位移、RGB 色散与环境镜面；等待、尺寸变化和能力不足时不再跳到一套明显更厚、更浑浊的旧材质。Liquid Glass Lab 同步加入真实 Q3/Q1 质量切换，保留当前几何、预设和外观角色，Q1 停止贴图生成并可从隔离探针读取正式 Q1 外观。
+- 液态玻璃浅色主题的全部正式 backdrop 表面统一采用与 Neutral Lab 相同的低对比深青边界 `rgba(9, 48, 57, 0.18)`，替代各角色原有的高透明白边；规则同时覆盖 Q1 等待与 Q3 ready 状态，但不改变暗色边界、micro 控件或导航内部按钮，避免光学资源就绪时出现边框跳变。
+- Liquid Glass Lab 的 Product 外观对照新增与光学预设独立的 `Neutral Lab / Product Q3` 来源轴：正式模式通过隔离的桌面与移动样式探针加载当前 `theme-liquid-glass.css` 和 `styles.css`，直接镜像 Navigation、drawer、mobile bar、查看/编辑 Focus、floating、rich/quality tooltip、toast、modal 与 network 的真实计算 tint、边框、完整阴影和前景色，不在 Lab 复制主题数值。共享几何、padding、背景场景及 modal/network 遮罩保持不变；正式来源下 tint 滑杆锁定，外观切换不重建贴图或改变缓存键，探针失败则明确退回 Neutral Lab。
 - Liquid Glass Lab 默认打开 Product Engine 及其 Focus 参数，不再先进入本机可选的 Reference Baseline；初始预览表面、控制面板和重置按钮状态同步，Reference 与 SDF 仍可从渲染路径下拉框切换。
 - 删除已被独立 Liquid Glass Lab 取代的主体 `?liquid-glass-diagnostics=1` 旧诊断表面及其引擎生命周期和皮肤样式；Lab 的 Product 路径新增“完整合成、仅光学、光学＋tint、仅外观层”快捷对照，并可独立旁路动态光学、中性 tint、1px 边框和外部阴影。外观切换不重建贴图或清空缓存，后续可以在相同几何与背景下定位正式角色包装对光学观感的影响。
 - 删除已经失去主体消费者的单边光学模式：Product 几何、缓存、正式表面注册和 Lab 不再提供“仅右边/仅下边”，所有液态玻璃表面统一按完整外轮廓生成四边折射与法线贴图。
