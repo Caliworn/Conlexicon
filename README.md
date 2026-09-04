@@ -94,6 +94,10 @@ The repository ships the production geometry/filter engine, an MIT-licensed SDF 
 
 仓库分发生产几何/滤镜引擎、改编自 MIT 许可 `PallavAg/liquid-glass-web-react` 的 SDF Baseline，以及五张来自 Unsplash 和 Pexels、具有明确许可的 Lab 背景图。Lab 在各路径间共享宽度、高度、圆角、外轮廓模型和超椭圆指数：Product 与 SDF 可比较“直边＋超椭圆角”和整张表面的 Lamé 全局超椭圆，本机 Reference Baseline 保持来源传统圆角。Product 可在保留当前几何、光学预设和外观选择的同时切换 Q3 与 Q1；Q1 不生成贴图，直接展示同角色普通玻璃路径。Product 默认保留中性 Lab 外观，也可通过隔离样式探针镜像正式桌面或移动组件当前 Q1/Q3 计算得到的 tint、边框、完整阴影和前景色；各层可独立旁路，且不会重建贴图或清空会话缓存。圆角只受共享短边一半约束；Product/SDF 全局模型不消费圆角，但会保留其值供切回角部模型。开发者本机可以另外提供该已被忽略的 `archisvaze/liquid-glass` Reference Baseline；源码模块不随仓库分发。图片署名和许可链接记录在 `assets/liquid-glass-lab/README.md`。实验页不调用应用 API，也不会持久化参数改动。
 
+Q3 resources use exact normalized optical parameters and transform-independent layout sizes. Reopening identical geometry reuses the session cache; real layout resizing is coalesced, and late results cannot reactivate hidden or unregistered surfaces.
+
+Q3 资源使用规范化后的精确光学参数与不受 transform 影响的布局尺寸；相同几何重新打开时复用会话缓存，真实布局尺寸变化合并处理，迟到结果不能重新激活隐藏或已注销的表面。
+
 Run the complete model, SQLite, API, and integration regression suite with:
 
 完整的模型、SQLite、API 与集成回归统一通过以下命令运行：

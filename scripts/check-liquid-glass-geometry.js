@@ -166,6 +166,23 @@ assert.notEqual(
   buildResourceKey({ ...options, opticalBlur: 5.5, saturation: 1.12 }),
   "Different filter output parameters must not share an engine resource key",
 );
+for (const [name, change] of Object.entries({
+  width: { width: options.width + 0.1 },
+  radius: { radii: [48.1, 48, 48, 48] },
+  bezel: { bezel: options.bezel + 0.1 },
+  thickness: { thickness: options.thickness + 0.1 },
+  ior: { ior: options.ior + 0.001 },
+  displacement: { maxDisplacement: options.maxDisplacement + 0.01 },
+  specular: { specularStrength: options.specularStrength + 0.001 },
+})) {
+  assert.notEqual(keyA, geometry.buildCacheKey({ ...options, ...change }),
+    `Distinct effective ${name} values must not reuse the first request's output`);
+}
+const fractionalOptions = { ...options, width: 200.1 };
+const normalizedFractionalOptions = geometry.normalizeSurfaceOptions(fractionalOptions);
+assert.equal(geometry.buildCacheKey(fractionalOptions), geometry.buildCacheKey(normalizedFractionalOptions));
+assert.deepEqual(geometry.generateSurfaceMaps(fractionalOptions), geometry.generateSurfaceMaps(normalizedFractionalOptions),
+  "Raw and normalized requests with the same key must generate identical maps");
 
 const superellipseOptions = geometry.normalizeSurfaceOptions({
   ...options,
@@ -533,22 +550,41 @@ assert.equal(qualityEngine().detectQuality(), "q3", "Full URL-filter support mus
 assert.equal(qualityEngine({ url: false }).detectQuality(), "q1", "Missing URL-filter support must select ordinary blur Q1");
 assert.equal(qualityEngine({ assisted: true }).detectQuality(), "q0", "Assisted display modes must select solid Q0");
 
-function resizeLifecycleElement(width, height) {
-  const size = { width, height };
-  return {
-    size,
-    dataset: {},
-    style: { removeProperty() {} },
-    removeAttribute() {},
-    getBoundingClientRect() {
-      return { width: this.size.width, height: this.size.height };
-    },
-  };
+class SurfaceElement {
+  constructor(width, height) {
+    this.size = { width, height };
+    this.isConnected = true;
+    this.visibility = "visible";
+    this.dataset = {};
+    this.style = { setProperty() {}, removeProperty() {} };
+  }
+
+  removeAttribute(name) {
+    if (name === "data-liquid-glass-optics") delete this.dataset.liquidGlassOptics;
+  }
+
+  getClientRects() {
+    return this.isConnected && this.size.width && this.size.height ? [{}] : [];
+  }
+
+  getBoundingClientRect() {
+    throw new Error("Optical layout measurement must not read transformed bounds");
+  }
 }
 
 const resizeTimers = new Map();
 let nextResizeTimer = 1;
 const resizeWindow = {
+  Element: SurfaceElement,
+  getComputedStyle(element) {
+    return {
+      width: `${element.size.width}px`, height: `${element.size.height}px`,
+      boxSizing: "border-box", display: "block", visibility: element.visibility,
+      borderTopLeftRadius: "8px", borderTopRightRadius: "8px",
+      borderBottomLeftRadius: "8px", borderBottomRightRadius: "8px",
+      ...element.computedOverrides,
+    };
+  },
   setTimeout(callback) {
     const id = nextResizeTimer;
     nextResizeTimer += 1;
@@ -560,7 +596,7 @@ const resizeWindow = {
   },
 };
 const resizeEngine = new LiquidGlassEngine({ window: resizeWindow, document: {} });
-const resizeElement = resizeLifecycleElement(320, 180);
+const resizeElement = new SurfaceElement(320, 180);
 const resizeRecord = {
   element: resizeElement,
   role: "floating",
@@ -585,7 +621,7 @@ resizeEngine.handleResize([{
   target: resizeElement,
   borderBoxSize: [{ inlineSize: 320.1, blockSize: 180.1 }],
 }]);
-assert.equal(resizeRefreshes, 0, "Subpixel observer noise must not invalidate a quantized geometry cache entry");
+assert.equal(resizeRefreshes, 0, "Observer delivery precision must not override the shared layout measurement");
 
 resizeElement.size = { width: 0, height: 0 };
 resizeEngine.handleResize([{ target: resizeElement }]);
@@ -606,4 +642,115 @@ const [resizeCallback] = resizeTimers.values();
 resizeCallback();
 assert.equal(resizeRefreshes, 2, "The coalesced visible resize must refresh exactly once");
 
-console.log("Liquid Glass geometry, deterministic map, and byte-budget cache checks passed.");
+async function checkAsyncSurfaceLifecycle() {
+  function fixture() {
+    const engine = new LiquidGlassEngine({ window: resizeWindow, document: {} });
+    engine.active = true;
+    engine.quality = "q3";
+    engine.renderer = {};
+    const jobs = [];
+    engine.createResource = (key, parameters) => new Promise((resolve) => {
+      jobs.push({ key, parameters, resolve: () => resolve({ filterId: `fixture-${jobs.length}`, byteLength: 8 }) });
+    });
+    const element = new SurfaceElement(320.125, 180.25);
+    return { engine, element, jobs };
+  }
+  const flush = async () => { for (let i = 0; i < 12; i += 1) await Promise.resolve(); };
+
+  {
+    const { engine, element, jobs } = fixture();
+    engine.register(element);
+    assert.equal(jobs[0].parameters.width, 320.125);
+    assert.equal(jobs[0].parameters.height, 180.25);
+    engine.handleResize([{ target: element, borderBoxSize: [{ inlineSize: 320.125, blockSize: 180.25 }] }]);
+    assert.equal(engine.resizeTimers.size, 0, "Registration and initial observation must agree during transform animation");
+    assert.equal(jobs.length, 1);
+    element.size.width = 320.25;
+    engine.handleResize([{ target: element }]);
+    assert.equal(engine.resizeTimers.size, 1, "A real fractional layout change must invalidate exact-size resources");
+    const latest = engine.refresh(element);
+    assert.equal(engine.resizeTimers.size, 0, "An explicit refresh supersedes a scheduled resize refresh");
+    assert.equal(jobs.length, 2);
+    jobs[1].resolve(); await latest;
+    jobs[0].resolve(); await flush();
+    assert.equal(engine.surfaces.get(element).cacheKey, jobs[1].key, "Older geometry must not replace the newer result");
+    assert.equal(engine.cache.stats().retained, 1);
+    element.size.width += 10;
+    engine.handleResize([{ target: element }]);
+    assert.equal(engine.surfaces.get(element).resource, null, "Resizing a ready surface must release stale geometry immediately");
+    assert.equal(element.dataset.liquidGlassOptics, "pending");
+    assert.equal(engine.cache.stats().retained, 0);
+    engine.unregister(element);
+  }
+
+  for (const explicitRefresh of [true, false]) {
+    const { engine, element, jobs } = fixture();
+    engine.register(element);
+    element.visibility = "hidden";
+    if (explicitRefresh) await engine.refresh(element);
+    jobs[0].resolve(); await flush();
+    assert.notEqual(element.dataset.liquidGlassOptics, "ready", "A hidden surface must reject late completion even before observer delivery");
+    assert.equal(engine.cache.stats().retained, 0);
+    element.visibility = "visible";
+    await engine.refresh(element);
+    assert.equal(jobs.length, 1, "Reopening the same geometry must reuse the unretained cache resource");
+    assert.equal(element.dataset.liquidGlassOptics, "ready");
+    engine.unregister(element);
+  }
+
+  {
+    const { engine, element, jobs } = fixture();
+    engine.register(element);
+    element.size = { width: 0, height: 0 };
+    await engine.refresh(element);
+    jobs[0].resolve(); await flush();
+    assert.notEqual(element.dataset.liquidGlassOptics, "ready", "A no-box refresh must invalidate pending completion");
+    assert.equal(engine.cache.stats().retained, 0);
+    engine.unregister(element);
+  }
+
+  {
+    const { engine, element, jobs } = fixture();
+    engine.register(element);
+    engine.unregister(element);
+    engine.register(element);
+    jobs[0].resolve(); await flush();
+    assert.equal(jobs.length, 1, "Re-registration may join the same in-flight generation");
+    assert.equal(element.dataset.liquidGlassOptics, "ready");
+    assert.equal(engine.cache.entries.get(jobs[0].key).refCount, 1, "Only the current registration may retain the result");
+    engine.unregister(element);
+  }
+
+  {
+    const { engine, element, jobs } = fixture();
+    engine.register(element);
+    // A geometry change may precede the next ResizeObserver delivery.
+    element.size.width += 0.125;
+    jobs[0].resolve(); await flush();
+    assert.notEqual(element.dataset.liquidGlassOptics, "ready");
+    assert.equal(jobs.length, 2, "Commit must reject obsolete geometry and request the current geometry");
+    jobs[1].resolve(); await flush();
+    assert.equal(element.dataset.liquidGlassOptics, "ready");
+    engine.unregister(element);
+  }
+
+  {
+    const { engine, element } = fixture();
+    element.computedOverrides = {
+      boxSizing: "content-box", paddingLeft: "2.25px", paddingRight: "3.5px",
+      borderLeftWidth: "1px", borderRightWidth: "1px", writingMode: "vertical-rl",
+    };
+    const parameters = engine.surfaceOptions({ element, role: "floating", overrides: {} });
+    assert.equal(parameters.width, 327.875, "Content-box inputs must include padding and border on physical axes");
+    assert.equal(parameters.height, 180.25);
+    element.isConnected = false;
+    assert.equal(engine.surfaceOptions({ element, role: "floating", overrides: {} }), null);
+  }
+}
+
+checkAsyncSurfaceLifecycle().then(() => {
+  console.log("Liquid Glass geometry, deterministic map, and byte-budget cache checks passed.");
+}).catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

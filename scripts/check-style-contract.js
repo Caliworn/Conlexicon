@@ -334,10 +334,6 @@ assert(
   /\.dictionary-panel \.utility-actions\s*\{[^}]*border-top:\s*1px solid var\(--material-navigation-control-border\);[^}]*background:\s*transparent;/s.test(liquidGlass),
   "Liquid Glass utility commands must use flat grouping inside the single navigation surface",
 );
-assert(
-  /handleResize\(entries\)[\s\S]*?releaseSurfaceResource\(record\);[\s\S]*?dataset\.liquidGlassOptics = "pending";[\s\S]*?this\.refresh\(entry\.target\);/.test(liquidGlassEngine),
-  "Resizing optical surfaces must stop using stale geometry until the settled map is ready",
-);
 const liquidGlassOpticalRoleRule = liquidGlassStyleBlocks.find(({ selector, declarations }) => (
   selector.includes('[data-liquid-glass-optics-quality="q3"]')
     && selector.includes('[data-liquid-glass-optics="ready"]')

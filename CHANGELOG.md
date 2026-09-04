@@ -4,36 +4,70 @@
 
 ## New
 
+## 2026-09-05
+
+### 修复
+
+- 修复 Q3 尺寸、缓存身份与异步提交：注册、ResizeObserver 与贴图生成统一使用不受 transform 入场动画影响的布局 border-box，保留真实小数尺寸；资源键改用规范化后的精确光学参数，避免相邻尺寸复用首次请求的不同输出。隐藏、注销及参数失效统一取消表面领取资格，资源提交前复核当前注册、可见性与参数，旧任务不能重新激活隐藏面或覆盖新几何；相同参数继续共享在途任务与会话 LRU，真实 resize 保留 80ms 合并。
+
+## 2026-08-22
+
 ### 改进
 
 - 收束液态玻璃 Q1/Q3 表面语义：将此前误以 `q3` 命名、实际已由两级共享的 navigation、drawer、mobile-bar、focus、floating、tooltip 与 modal tint 改为质量无关的 surface tint；全部正式表面统一映射 `--liquid-glass-surface-tint` 与 `--liquid-glass-surface-q1-filter`，运行期 `pending/fallback` 由单一 Q1 规则消费，Q3 ready 只替换动态光学 filter。边框和阴影继续作为两级共用组件材质常驻，不新增 DOM、表面覆盖或搜索栏特例。
-- 重做液态玻璃 Q1 基线：continuous、focus、floating 与 modal 现在分别复用同角色 Q3 的 tint、`3/4/5.5/7px` 模糊、饱和度、边框和阴影参数，仅省略几何位移、RGB 色散与环境镜面；等待、尺寸变化和能力不足时不再跳到一套明显更厚、更浑浊的旧材质。Liquid Glass Lab 同步加入真实 Q3/Q1 质量切换，保留当前几何、预设和外观角色，Q1 停止贴图生成并可从隔离探针读取正式 Q1 外观。
-- 液态玻璃浅色主题的全部正式 backdrop 表面统一采用与 Neutral Lab 相同的低对比深青边界 `rgba(9, 48, 57, 0.18)`，替代各角色原有的高透明白边；规则同时覆盖 Q1 等待与 Q3 ready 状态，但不改变暗色边界、micro 控件或导航内部按钮，避免光学资源就绪时出现边框跳变。
-- Liquid Glass Lab 的 Product 外观对照新增与光学预设独立的 `Neutral Lab / Product Q3` 来源轴：正式模式通过隔离的桌面与移动样式探针加载当前 `theme-liquid-glass.css` 和 `styles.css`，直接镜像 Navigation、drawer、mobile bar、查看/编辑 Focus、floating、rich/quality tooltip、toast、modal 与 network 的真实计算 tint、边框、完整阴影和前景色，不在 Lab 复制主题数值。共享几何、padding、背景场景及 modal/network 遮罩保持不变；正式来源下 tint 滑杆锁定，外观切换不重建贴图或改变缓存键，探针失败则明确退回 Neutral Lab。
-- Liquid Glass Lab 默认打开 Product Engine 及其 Focus 参数，不再先进入本机可选的 Reference Baseline；初始预览表面、控制面板和重置按钮状态同步，Reference 与 SDF 仍可从渲染路径下拉框切换。
-- 删除已被独立 Liquid Glass Lab 取代的主体 `?liquid-glass-diagnostics=1` 旧诊断表面及其引擎生命周期和皮肤样式；Lab 的 Product 路径新增“完整合成、仅光学、光学＋tint、仅外观层”快捷对照，并可独立旁路动态光学、中性 tint、1px 边框和外部阴影。外观切换不重建贴图或清空缓存，后续可以在相同几何与背景下定位正式角色包装对光学观感的影响。
-- 删除已经失去主体消费者的单边光学模式：Product 几何、缓存、正式表面注册和 Lab 不再提供“仅右边/仅下边”，所有液态玻璃表面统一按完整外轮廓生成四边折射与法线贴图。
-- 清理 Liquid Glass Lab 重复的“引擎角色”字段：continuous/focus/floating/modal 仅作为参数预设，Product 实验表面统一注册为独立 `diagnostic` 角色；Custom 状态恢复默认值时回到最近一次预设，不再让角色和展开后的参数产生两套互相覆盖的控制入口。
-- Liquid Glass Lab 的默认背景参照改为室内照片，打开实验页即可直接观察真实明暗边界和细节经过玻璃表面的折射。
-- Liquid Glass Lab 将宽度、高度和圆角提升为三条渲染路径共用的表面几何参数；切换 Product Engine、Reference Baseline 与 SDF Baseline，以及恢复任一模型默认值时均保持当前几何，SDF 圆角比较快捷方式同步操作共享圆角。
-- Liquid Glass Lab 的 SDF Controlled Comparisons 新增“Ref 趋近 · 光学”和“Ref 趋近 · +外观”临时快捷方式：两者共享同一组趋近 Reference 的高质量、宽边带、强位移 SDF 参数，并仅为对齐单路 Reference 关闭 RGB 色散；后者只额外复用当前 Reference tint 与内外阴影，便于直接分辨算法和外观包装各自造成的视觉差距。
-- Liquid Glass Lab 新增共享外轮廓模型选择：Product 与 SDF 可比较“直边＋超椭圆角”和由整张表面 Lamé 方程定义的全局超椭圆，Reference 继续保持来源传统圆角；角部模型在指数 `2` 时复用 Round 快速路径，全局模型在指数 `2` 时为椭圆。圆角半径滑杆同时删除 `120px` 人为封顶，改为随共享宽高收束到短边一半；Product/SDF 全局模型不消费 radius，但会保留其值供切回角部模型。
 
 ### 修复
 
 - Liquid Glass Lab 的 Product 全局超椭圆现在由 normal/rim 贴图 Alpha 携带真实 Lamé 外轮廓，并在 SVG filter 内对 RGB 折射与 specular 的最终合成结果执行 `in` 裁切；矩形 `feGaussianBlur` 输入不再向四角输出额外模糊，也不增加 CSS mask 合成层。局部超椭圆继续使用原生边框轮廓，bezel 与主体默认圆角路径不受影响。
-- Liquid Glass Lab 的诊断贴图预览不再被强制拉伸为固定 `2.2:1` 或使用像素化缩放；Product/Reference 贴图现在按实际表面比例显示，SDF 方形贴图保持方形，极端纵横比只限制最大展示尺寸而不改变比例。
-- 重写 Product Engine 的宽边带方向场：精确 rounded-rect/superellipse 外轮廓继续决定边界和 rim，位移图与 normal/rim 图改为共享从真实边界法线平滑过渡到四边全支撑有理势场的连续方向，光学带外写入中性法线，不再由硬截断 edge influence 形成斜向分区；贴图生成同时复用 256 点折射 LUT，避免逐像素重复执行 Snell 幂运算。
 
 ### 性能
 
 - 修复 Q3 临时表面的缓存生命周期：引擎记录注册时的真实 border-box 尺寸并忽略 ResizeObserver 首次同尺寸回报，避免右键菜单等显式浮层发生“立即生成后又失效、80ms 后再次领取”的重复路径；长期隐藏的筛选与搜索范围菜单从 `0×0` 恢复时立即查询会话 LRU，缓存命中不再等待 resize 防抖。只有两个非零尺寸之间的真实变化继续使用 80ms 合并，隐藏表面仍释放引用并作为 LRU 淘汰候选；资源键改为只描述最终光学输出，参数等价的不同角色不再重复占用贴图与滤镜。
 
-## 2026-08-21
+## 2026-08-21 (5)
+
+### 改进
+
+- 重做液态玻璃 Q1 基线：continuous、focus、floating 与 modal 现在分别复用同角色 Q3 的 tint、`3/4/5.5/7px` 模糊、饱和度、边框和阴影参数，仅省略几何位移、RGB 色散与环境镜面；等待、尺寸变化和能力不足时不再跳到一套明显更厚、更浑浊的旧材质。Liquid Glass Lab 同步加入真实 Q3/Q1 质量切换，保留当前几何、预设和外观角色，Q1 停止贴图生成并可从隔离探针读取正式 Q1 外观。
+- 液态玻璃浅色主题的全部正式 backdrop 表面统一采用与 Neutral Lab 相同的低对比深青边界 `rgba(9, 48, 57, 0.18)`，替代各角色原有的高透明白边；规则同时覆盖 Q1 等待与 Q3 ready 状态，但不改变暗色边界、micro 控件或导航内部按钮，避免光学资源就绪时出现边框跳变。
+- Liquid Glass Lab 的 Product 外观对照新增与光学预设独立的 `Neutral Lab / Product Q3` 来源轴：正式模式通过隔离的桌面与移动样式探针加载当前 `theme-liquid-glass.css` 和 `styles.css`，直接镜像 Navigation、drawer、mobile bar、查看/编辑 Focus、floating、rich/quality tooltip、toast、modal 与 network 的真实计算 tint、边框、完整阴影和前景色，不在 Lab 复制主题数值。共享几何、padding、背景场景及 modal/network 遮罩保持不变；正式来源下 tint 滑杆锁定，外观切换不重建贴图或改变缓存键，探针失败则明确退回 Neutral Lab。
+
+## 2026-08-21 (4)
+
+### 改进
+
+- Liquid Glass Lab 默认打开 Product Engine 及其 Focus 参数，不再先进入本机可选的 Reference Baseline；初始预览表面、控制面板和重置按钮状态同步，Reference 与 SDF 仍可从渲染路径下拉框切换。
+- 删除已被独立 Liquid Glass Lab 取代的主体 `?liquid-glass-diagnostics=1` 旧诊断表面及其引擎生命周期和皮肤样式；Lab 的 Product 路径新增“完整合成、仅光学、光学＋tint、仅外观层”快捷对照，并可独立旁路动态光学、中性 tint、1px 边框和外部阴影。外观切换不重建贴图或清空缓存，后续可以在相同几何与背景下定位正式角色包装对光学观感的影响。
+
+## 2026-08-21 (3)
+
+### 改进
+
+- 删除已经失去主体消费者的单边光学模式：Product 几何、缓存、正式表面注册和 Lab 不再提供“仅右边/仅下边”，所有液态玻璃表面统一按完整外轮廓生成四边折射与法线贴图。
+- 清理 Liquid Glass Lab 重复的“引擎角色”字段：continuous/focus/floating/modal 仅作为参数预设，Product 实验表面统一注册为独立 `diagnostic` 角色；Custom 状态恢复默认值时回到最近一次预设，不再让角色和展开后的参数产生两套互相覆盖的控制入口。
+- Liquid Glass Lab 新增共享外轮廓模型选择：Product 与 SDF 可比较“直边＋超椭圆角”和由整张表面 Lamé 方程定义的全局超椭圆，Reference 继续保持来源传统圆角；角部模型在指数 `2` 时复用 Round 快速路径，全局模型在指数 `2` 时为椭圆。圆角半径滑杆同时删除 `120px` 人为封顶，改为随共享宽高收束到短边一半；Product/SDF 全局模型不消费 radius，但会保留其值供切回角部模型。
+
+### 修复
+
+- 重写 Product Engine 的宽边带方向场：精确 rounded-rect/superellipse 外轮廓继续决定边界和 rim，位移图与 normal/rim 图改为共享从真实边界法线平滑过渡到四边全支撑有理势场的连续方向，光学带外写入中性法线，不再由硬截断 edge influence 形成斜向分区；贴图生成同时复用 256 点折射 LUT，避免逐像素重复执行 Snell 幂运算。
+
+## 2026-08-21 (2)
 
 ### 改进
 
 - Liquid Glass Lab 新增三条路径共享保留的外轮廓选择：Product 与 SDF 可在传统圆角和指数 `2–8` 的 superellipse 之间比较，并让 CSS 裁切与贴图几何保持一致；本机 Reference Baseline 继续使用来源传统圆角并明确提示不支持。该实验不接入主体皮肤，Reference 与 SDF 也不再作为主体光学后端。
+
+## 2026-08-21
+
+### 改进
+
+- Liquid Glass Lab 的默认背景参照改为室内照片，打开实验页即可直接观察真实明暗边界和细节经过玻璃表面的折射。
+- Liquid Glass Lab 将宽度、高度和圆角提升为三条渲染路径共用的表面几何参数；切换 Product Engine、Reference Baseline 与 SDF Baseline，以及恢复任一模型默认值时均保持当前几何，SDF 圆角比较快捷方式同步操作共享圆角。
+- Liquid Glass Lab 的 SDF Controlled Comparisons 新增“Ref 趋近 · 光学”和“Ref 趋近 · +外观”临时快捷方式：两者共享同一组趋近 Reference 的高质量、宽边带、强位移 SDF 参数，并仅为对齐单路 Reference 关闭 RGB 色散；后者只额外复用当前 Reference tint 与内外阴影，便于直接分辨算法和外观包装各自造成的视觉差距。
+
+### 修复
+
+- Liquid Glass Lab 的诊断贴图预览不再被强制拉伸为固定 `2.2:1` 或使用像素化缩放；Product/Reference 贴图现在按实际表面比例显示，SDF 方形贴图保持方形，极端纵横比只限制最大展示尺寸而不改变比例。
 
 ## 2026-08-20
 
