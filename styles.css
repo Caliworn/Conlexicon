@@ -537,6 +537,211 @@ fieldset {
   backdrop-filter: none;
 }
 
+/* Optional workspace layout; skins opt in independently from its geometry. */
+.entry-mail-search-surface,
+.entry-mail-tools-surface,
+.entry-mail-search-icon,
+.entry-mail-root-icon,
+.entry-mail-clear {
+  display: none;
+}
+
+body[data-entry-layout="mail"] .entry-list-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 0 0 12px;
+}
+
+body[data-entry-layout="mail"] .entry-search-control,
+body[data-entry-layout="mail"] .entry-mail-tools {
+  position: relative;
+  z-index: 1;
+  border-radius: var(--radius-pill);
+  min-width: 0;
+}
+
+body[data-entry-layout="mail"] .entry-search-control {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-height: 44px;
+  width: 100%;
+}
+
+body[data-entry-layout="mail"] .entry-search-control > input {
+  width: 100%;
+  height: 44px;
+  padding-left: 38px;
+  padding-right: 42px;
+  border-radius: inherit;
+}
+
+body[data-entry-layout="mail"] .entry-search-control > input::-webkit-search-cancel-button {
+  display: none;
+}
+
+body[data-entry-layout="mail"] .entry-mail-search-icon {
+  display: block;
+  position: absolute;
+  left: 13px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  pointer-events: none;
+}
+
+body[data-entry-layout="mail"] .entry-mail-clear:not([hidden]) {
+  display: grid;
+  position: absolute;
+  right: 4px;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  place-items: center;
+  border-radius: var(--radius-pill);
+}
+
+body[data-entry-layout="mail"] .entry-mail-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px;
+  min-height: 48px;
+  gap: 4px;
+  width: 100%;
+}
+
+body[data-entry-layout="mail"] .entry-mail-primary-tools {
+  display: flex;
+  flex: 1 1 212px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  min-width: 0;
+}
+
+body[data-entry-layout="mail"] .entry-mail-root-actions:not([hidden]) {
+  display: flex;
+  justify-content: flex-end;
+  flex: 1 0 82px;
+  gap: 2px;
+}
+
+body[data-entry-layout="mail"] .entry-mail-tools.has-root-actions {
+  border-radius: min(var(--radius-pill), 24px);
+}
+
+body[data-entry-layout="mail"] .entry-mail-primary-tools > :is(.entry-mail-settings, .entry-filter-control, .entry-mail-sort) {
+  position: static;
+  flex: 0 0 40px;
+}
+
+body[data-entry-layout="mail"] .entry-mail-primary-tools > button,
+body[data-entry-layout="mail"] .entry-mail-primary-tools > div > button,
+body[data-entry-layout="mail"] .entry-mail-root-actions > button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  place-items: center;
+  border-radius: var(--radius-pill);
+}
+
+body[data-entry-layout="mail"] .entry-mail-tools .nav-icon,
+body[data-entry-layout="mail"] .entry-mail-clear .nav-icon {
+  display: block;
+  width: 19px;
+  height: 19px;
+  margin: 0;
+}
+
+body[data-entry-layout="mail"] #rootModeToggleButton > span,
+body[data-entry-layout="mail"] .entry-mail-root-actions > button > span {
+  display: none;
+}
+
+/* Menus mount directly under body, outside the sticky list's stacking context. */
+body[data-entry-layout="mail"] .entry-workspace-menu {
+  position: fixed;
+  z-index: var(--layer-floating-menu);
+  pointer-events: auto;
+  right: auto;
+  width: 340px;
+  max-width: calc(100vw - 24px);
+  max-height: min(520px, calc(100dvh - 24px));
+}
+
+body[data-entry-layout="mail"] .entry-workspace-menu.entry-sort-menu {
+  width: 248px;
+  padding: 6px;
+  gap: 2px;
+}
+
+body[data-entry-layout="mail"] .entry-sort-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: start;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 0.86rem;
+  font-weight: 500;
+  line-height: 1.4;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+body[data-entry-layout="mail"] .entry-sort-option:is(:hover, :focus-visible) {
+  background: var(--ui-accent-soft);
+}
+
+body[data-entry-layout="mail"] .entry-sort-option:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: -2px;
+}
+
+body[data-entry-layout="mail"] .entry-sort-option::after {
+  content: "";
+  width: 1em;
+}
+
+body[data-entry-layout="mail"] .entry-sort-option[aria-checked="true"]::after {
+  content: "✓";
+}
+
+body[data-entry-layout="mail"] .entry-card {
+  min-height: 104px;
+  padding: 12px;
+}
+
+body[data-entry-layout="mail"] .entry-card p {
+  -webkit-line-clamp: 2;
+}
+
+body[data-entry-layout="mail"] .entry-card:is(.compact-entry-card, .body-only-entry-card) {
+  min-height: 0;
+}
+
+body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
+  display: none;
+}
+
+@media (min-width: 800px) {
+  body[data-entry-layout="mail"] .content-grid[data-browser-state="expanded"] {
+    grid-template-columns: minmax(240px, 340px) minmax(320px, 1fr);
+  }
+}
+
 .entry-search-control {
   position: relative;
   display: grid;

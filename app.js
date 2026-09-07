@@ -3127,6 +3127,7 @@ function render(options = {}) {
   ensureValidAppState();
   if (state.activeView !== "editor") {
     setEntrySearchConfigOpen(false);
+    if (document.body.dataset.entryLayout === "mail") entryWorkspaceLayout?.closeMenus();
   }
   applyLocale();
   applyAppearance();
@@ -3403,6 +3404,8 @@ function applyLocale(root = document) {
   const nextLanguageLabel = currentLanguage === "zh" ? "English" : "中文";
   elements.languageToggleButton.removeAttribute("title");
   elements.languageToggleButton.setAttribute("aria-label", nextLanguageLabel);
+  elements.rootModeToggleButton.querySelector("span").textContent = rootMode ? t("normalMode") : t("rootMode");
+  entryWorkspaceLayout?.sync();
 }
 
 function skinOptionLabel(skinId) {
@@ -3568,6 +3571,8 @@ function syncToastLiquidGlassSurface() {
   liquidGlassOpticalEngine?.unregisterMappedSurface(elements.toast);
 }
 
+let entryWorkspaceLayout;
+
 function applyAppearance() {
   const darkThemeActive = currentTheme === "dark";
   document.body.classList.toggle("dark-theme", darkThemeActive);
@@ -3577,6 +3582,14 @@ function applyAppearance() {
     document.body.dataset.uiSkin = currentSkin;
   } else {
     delete document.body.dataset.uiSkin;
+  }
+  entryWorkspaceLayout ||= window.createEntryWorkspaceLayout(document, { onMenuOpen: hideAppTooltip });
+  if (entryWorkspaceLayout.apply(currentSkin)) {
+    // Density can change even when the mobile drawer width stays identical.
+    requestAnimationFrame(() => {
+      syncEntryVirtualListAfterBrowserLayoutChange({ widthChanged: true });
+      scheduleEntryBrowserLayoutRefresh();
+    });
   }
   if (!layeredGlassPointerEffectsEnabled()) {
     resetLayeredGlassPointerEffect(true);
@@ -4083,6 +4096,7 @@ function renderShellEntryBrowser() {
     elements.appShell.dataset.browserState = shellState.browserDrawerOpen ? "drawer" : "expanded";
     elements.contentGrid.dataset.browserState = "expanded";
     elements.entryBrowser.hidden = !canOpenDrawer || !shellState.browserDrawerOpen;
+    entryWorkspaceLayout?.syncVisibility();
     elements.entryBrowserToggleButton.hidden = true;
     elements.mobileEntryListButton.setAttribute("aria-expanded", String(shellState.browserDrawerOpen));
     elements.mobileEntryListButton.setAttribute("aria-label", t(shellState.browserDrawerOpen ? "closeEntryList" : "openEntryList"));
@@ -4105,6 +4119,7 @@ function renderShellEntryBrowser() {
   elements.appShell.dataset.browserState = browserState;
   elements.contentGrid.dataset.browserState = browserState;
   elements.entryBrowser.hidden = collapsed;
+  entryWorkspaceLayout?.syncVisibility();
   elements.entryBrowserToggleButton.hidden = !canToggle;
   elements.entryBrowserToggleButton.setAttribute("aria-expanded", String(!collapsed));
   const controlLabel = t(collapsed ? "expandEntryBrowser" : "collapseEntryBrowser");
@@ -4365,7 +4380,9 @@ function setEntrySearchConfigOpen(open) {
   elements.entrySearchConfigButton.setAttribute("aria-expanded", String(entrySearchConfigOpen));
   elements.entrySearchConfigMenu.hidden = !entrySearchConfigOpen;
   if (entrySearchConfigOpen) {
+    entryWorkspaceLayout?.close();
     setEntryFilterMenuOpen(false);
+    entryWorkspaceLayout?.positionMenu(elements.entrySearchConfigMenu, elements.entrySearchConfigButton);
   }
 }
 
@@ -4375,11 +4392,13 @@ function setEntryFilterMenuOpen(open) {
     return;
   }
   if (entryFilterMenuOpen) {
+    entryWorkspaceLayout?.close();
     setEntrySearchConfigOpen(false);
     elements.partFilter.value = currentEntryPartFilter();
   }
   elements.entryFilterButton.setAttribute("aria-expanded", String(entryFilterMenuOpen));
   elements.entryFilterMenu.hidden = !entryFilterMenuOpen;
+  if (entryFilterMenuOpen) entryWorkspaceLayout?.positionMenu(elements.entryFilterMenu, elements.entryFilterButton);
 }
 
 function currentFilterDisplayTitle(dictionary = activeDictionary()) {
@@ -4535,7 +4554,7 @@ function renderPartFilterControls(dictionary, usedParts = null) {
   const hasCurrentFilter = Boolean(activeFilter);
   elements.entryFilterButton.disabled = !dictionary;
   elements.entryFilterButton.classList.toggle("active", hasCurrentFilter);
-  elements.rootModeToggleButton.textContent = rootMode ? t("normalMode") : t("rootMode");
+  elements.rootModeToggleButton.querySelector("span").textContent = rootMode ? t("normalMode") : t("rootMode");
   elements.rootModeToggleButton.classList.toggle("active", rootMode);
   elements.rootModeToggleButton.hidden = Boolean(activeFilter);
   elements.expandAllRootsButton.hidden = !rootMode || Boolean(activeFilter);
@@ -4560,6 +4579,7 @@ function renderPartFilterControls(dictionary, usedParts = null) {
     && (hasRootSearch || !rootGroupsReady || (rootExpansionMode === "all" && !collapsedRootEntries.size));
   elements.collapseAllRootsButton.disabled = rootMode
     && (hasRootSearch || !rootGroupsReady || (rootExpansionMode === "manual" && !expandedRootEntries.size));
+  entryWorkspaceLayout?.sync();
 }
 
 function renderActiveFilterRefreshAvailability() {
@@ -16036,10 +16056,14 @@ document.addEventListener("pointerdown", (event) => {
     && !elements.skinToggleButton.contains(event.target)) {
     setSkinPickerOpen(false);
   }
-  if (entrySearchConfigOpen && !elements.entrySearchControl.contains(event.target)) {
+  if (entrySearchConfigOpen && (document.body.dataset.entryLayout === "mail"
+    ? !elements.entrySearchConfigButton.contains(event.target) && !elements.entrySearchConfigMenu.contains(event.target)
+    : !elements.entrySearchControl.contains(event.target))) {
     setEntrySearchConfigOpen(false);
   }
-  if (entryFilterMenuOpen && !elements.entryFilterControl.contains(event.target)) {
+  if (entryFilterMenuOpen && (document.body.dataset.entryLayout === "mail"
+    ? !elements.entryFilterButton.contains(event.target) && !elements.entryFilterMenu.contains(event.target)
+    : !elements.entryFilterControl.contains(event.target))) {
     setEntryFilterMenuOpen(false);
   }
 }, true);

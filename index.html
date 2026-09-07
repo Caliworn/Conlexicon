@@ -170,9 +170,12 @@
           <section class="content-grid" id="editorContentGrid" data-browser-state="expanded">
             <div class="entry-browser-slot" id="entryBrowserSlot">
               <section class="entry-browser view-browser" id="entryBrowser" data-i18n-aria-label="entryBrowser" aria-label="词条列表">
-              <div class="filter-row">
+            <div class="filter-row entry-list-toolbar">
                 <div class="entry-search-control" id="entrySearchControl">
+                  <div class="entry-mail-search-surface" aria-hidden="true"></div>
+                  <svg class="nav-icon entry-mail-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg>
                   <input id="searchInput" type="search" data-i18n-placeholder="searchPlaceholder" placeholder="搜索词形、释义、标签">
+                  <button class="secondary-button entry-mail-clear" id="entrySearchClearButton" type="button" hidden><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button>
                   <button class="secondary-button entry-search-config-button" id="entrySearchConfigButton" type="button" aria-controls="entrySearchConfigMenu" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="currentSearchSettings" aria-label="当前搜索设置">
                     <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M4 7h10M18 7h2M14 5v4M4 17h2M10 17h10M10 15v4M4 12h5M13 12h7M9 10v4"></path>
@@ -188,6 +191,17 @@
                     <div class="entry-search-config-fields" id="entrySearchConfigFields"></div>
                     <button class="secondary-button entry-search-default-button" id="entrySearchDefaultButton" type="button" data-i18n="restoreSearchDefaults">恢复词典默认值</button>
                   </div>
+                </div>
+                <div class="entry-mail-tools" id="entryMailTools" hidden>
+                  <div class="entry-mail-tools-surface" aria-hidden="true"></div>
+                  <div class="entry-mail-primary-tools" id="entryMailPrimaryTools">
+                  <div class="entry-mail-settings" id="entryMailSettings"></div>
+                  <div class="entry-mail-sort" id="entryMailSort">
+                    <button class="secondary-button" id="entrySortButton" type="button" aria-haspopup="menu" aria-controls="entrySortMenu" aria-expanded="false" data-app-tooltip="always"></button>
+                    <div class="entry-search-config-menu entry-sort-menu" id="entrySortMenu" role="menu" hidden></div>
+                  </div>
+                  </div>
+                  <div class="entry-mail-root-actions" id="entryMailRootActions" hidden></div>
                 </div>
                 <div class="entry-filter-control" id="entryFilterControl">
                   <button class="secondary-button entry-filter-button" id="entryFilterButton" type="button" aria-controls="entryFilterMenu" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="filterEntries" aria-label="筛选词条">
@@ -224,9 +238,9 @@
                   </svg>
                 </button>
                 <div class="root-mode-controls">
-                  <button class="secondary-button" id="rootModeToggleButton" type="button" data-i18n="rootMode">词根模式</button>
-                  <button class="secondary-button" id="expandAllRootsButton" type="button" data-i18n="expandAll" hidden>全部展开</button>
-                  <button class="secondary-button" id="collapseAllRootsButton" type="button" data-i18n="collapseAll" hidden>全部收起</button>
+                  <button class="secondary-button" id="rootModeToggleButton" type="button"><svg class="nav-icon entry-mail-root-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v7M5 20v-5h14v5M12 11v9"></path><circle cx="12" cy="4" r="2"></circle></svg><span data-i18n="rootMode">词根模式</span></button>
+                  <button class="secondary-button" id="expandAllRootsButton" type="button" hidden><svg class="nav-icon entry-mail-root-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 5 6 6 6-6M6 13l6 6 6-6"></path></svg><span data-i18n="expandAll">全部展开</span></button>
+                  <button class="secondary-button" id="collapseAllRootsButton" type="button" hidden><svg class="nav-icon entry-mail-root-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 11 6-6 6 6M6 19l6-6 6 6"></path></svg><span data-i18n="collapseAll">全部收起</span></button>
                   <div class="active-filter-toolbar filter-status-toolbar" id="activeFilterToolbar" hidden>
                     <svg class="filter-status-icon" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M4 5h16l-6 7v5l-4 2v-7L4 5z"></path>
@@ -1270,6 +1284,7 @@
     <script src="lib/query-page-cache.js"></script>
     <script src="lib/liquid-glass-geometry.js"></script>
     <script src="lib/liquid-glass-engine.js"></script>
+    <script src="lib/entry-workspace-layout.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

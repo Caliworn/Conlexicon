@@ -27,6 +27,11 @@ const app = fs.readFileSync(appPath, "utf8");
 const liquidGlassGeometryScriptPosition = index.indexOf('src="lib/liquid-glass-geometry.js"');
 const liquidGlassEngineScriptPosition = index.indexOf('src="lib/liquid-glass-engine.js"');
 const appScriptPosition = index.indexOf('src="app.js"');
+const workspaceLayoutScriptPosition = index.indexOf('src="lib/entry-workspace-layout.js"');
+assert(
+  workspaceLayoutScriptPosition >= 0 && workspaceLayoutScriptPosition < appScriptPosition,
+  "Workspace layout must load before app.js so skin initialization and rollback can restore control positions",
+);
 assert(
   liquidGlassGeometryScriptPosition >= 0
     && liquidGlassGeometryScriptPosition < liquidGlassEngineScriptPosition
@@ -316,8 +321,12 @@ for (const definition of liquidGlassSurfaceDefinitions) {
 const liquidGlassContinuousDefinitions = liquidGlassSurfaceDefinitions.filter(({ role }) => role === "continuous");
 assert.deepEqual(
   new Set(liquidGlassContinuousDefinitions.map(({ selector }) => selector)),
-  new Set([".dictionary-panel", ".mobile-app-bar"]),
-  "Inset continuous navigation surfaces must remain registered as complete optical surfaces",
+  new Set([".dictionary-panel", ".mobile-app-bar", ".entry-mail-search-surface", ".entry-mail-tools-surface"]),
+  "Continuous navigation and Mail search/tools backgrounds must remain independent optical surfaces",
+);
+assert(
+  ["entry-mail-search-surface", "entry-mail-tools-surface"].every((name) => index.includes(`<div class="${name}" aria-hidden="true"></div>`)),
+  "Mail optical surfaces must be decorative leaves, not backdrop-filter ancestors of popup menus",
 );
 assert(
   /@media \(min-width: 800px\) \{[\s\S]*?body\[data-ui-skin="liquid-glass"\] \.app-shell[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\);[\s\S]*?body\[data-ui-skin="liquid-glass"\] \.dictionary-panel\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?inset:[\s\S]*?border:\s*1px solid var\(--material-navigation-action-border\);[\s\S]*?border-radius:\s*var\(--liquid-glass-navigation-radius\);/.test(liquidGlass)

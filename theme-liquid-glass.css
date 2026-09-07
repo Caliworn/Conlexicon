@@ -394,6 +394,68 @@ body[data-ui-skin="liquid-glass"] :where(
   background-clip: padding-box;
 }
 
+/* Two independent decorative leaves; popup ancestors stay unfiltered. */
+body[data-ui-skin="liquid-glass"] :is(.entry-mail-search-surface, .entry-mail-tools-surface) {
+  --liquid-glass-surface-tint: var(--material-mobile-bar-background);
+  --liquid-glass-surface-q1-filter: var(--material-mobile-bar-filter);
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border: 1px solid var(--ui-border);
+  border-radius: inherit;
+  background: var(--liquid-glass-surface-tint);
+  box-shadow: var(--material-mobile-bar-shadow);
+  backdrop-filter: var(--liquid-glass-surface-q1-filter);
+  -webkit-backdrop-filter: var(--liquid-glass-surface-q1-filter);
+}
+
+body[data-ui-skin="liquid-glass"] #rootModeToggleButton[aria-pressed="true"] {
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent-hover);
+}
+
+/* Override material inputs on the toolbar controls only, not on the wrapper:
+   descendant floating menus retain their own controls and optical role. */
+body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
+  .entry-search-control > input,
+  .entry-search-control > button,
+  .entry-mail-primary-tools > button,
+  .entry-mail-root-actions > button,
+  .entry-mail-primary-tools > div > button,
+  .root-mode-controls button
+) {
+  --material-control-background: transparent;
+  --material-control-border: transparent;
+  --material-control-shadow: none;
+  --material-control-hover-shadow: none;
+  --material-control-pressed-shadow: none;
+  --material-action-hover-shadow: none;
+  --material-action-pressed-shadow: none;
+  --material-control-filter: none;
+}
+
+body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
+  .entry-search-control > button,
+  .entry-mail-primary-tools > button,
+  .entry-mail-root-actions > button,
+  .entry-mail-primary-tools > div > button,
+  .root-mode-controls button
+):hover:not(:disabled) {
+  --material-control-background: color-mix(in srgb, var(--ui-accent) 8%, transparent);
+}
+
+body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
+  .entry-search-control > button,
+  .entry-mail-primary-tools > button,
+  .entry-mail-root-actions > button,
+  .entry-mail-primary-tools > div > button,
+  .root-mode-controls button
+):active:not(:disabled) {
+  --material-control-background: var(--ui-accent-soft);
+}
+
 body[data-ui-skin="liquid-glass"] .dictionary-panel {
   --liquid-glass-surface-tint: var(--liquid-glass-navigation-surface-tint);
   --liquid-glass-surface-q1-filter: var(--liquid-glass-q1-continuous-filter);
@@ -525,6 +587,8 @@ body[data-ui-skin="liquid-glass"] :is(
 body[data-ui-skin="liquid-glass"]:not(.dark-theme) :is(
   .dictionary-panel,
   .mobile-app-bar,
+  .entry-mail-search-surface,
+  .entry-mail-tools-surface,
   .entry-display,
   #entryForm,
   .entry-search-config-menu,
