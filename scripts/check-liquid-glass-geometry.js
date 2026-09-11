@@ -610,8 +610,12 @@ resizeEngine.active = true;
 resizeEngine.quality = "q3";
 resizeEngine.surfaces.set(resizeElement, resizeRecord);
 let resizeRefreshes = 0;
-resizeEngine.refresh = () => {
+const originalRefresh = resizeEngine.refresh.bind(resizeEngine);
+resizeEngine.renderer = {};
+resizeEngine.createResource = () => new Promise(() => {});
+resizeEngine.refresh = (...args) => {
   resizeRefreshes += 1;
+  return originalRefresh(...args);
 };
 resizeEngine.handleResize([{ target: resizeElement }]);
 assert.equal(resizeRefreshes, 0, "The first ResizeObserver report must not duplicate an eager surface refresh");
@@ -625,22 +629,22 @@ assert.equal(resizeRefreshes, 0, "Observer delivery precision must not override 
 
 resizeElement.size = { width: 0, height: 0 };
 resizeEngine.handleResize([{ target: resizeElement }]);
-assert.equal(resizeRefreshes, 0, "Hiding a surface must not schedule unusable zero-size geometry");
+assert.equal(resizeRefreshes, 1, "Hiding a surface must pass through shared eligibility cleanup");
 assert.equal(resizeTimers.size, 0, "Hiding a surface must not leave a delayed refresh behind");
 assert.equal(resizeRecord.resource, null, "Hidden surfaces must release their active cache reference");
 
 resizeElement.size = { width: 320, height: 180 };
 resizeEngine.handleResize([{ target: resizeElement }]);
-assert.equal(resizeRefreshes, 1, "Revealing a surface must query the session cache immediately");
+assert.equal(resizeRefreshes, 2, "Revealing a surface must query the session cache immediately");
 assert.equal(resizeTimers.size, 0, "A visibility transition must bypass the resize debounce");
 
 resizeElement.size = { width: 340, height: 180 };
 resizeEngine.handleResize([{ target: resizeElement }]);
-assert.equal(resizeRefreshes, 1, "A genuine visible resize must remain debounced");
+assert.equal(resizeRefreshes, 3, "A genuine visible resize must check the cache before scheduling generation");
 assert.equal(resizeTimers.size, 1, "A genuine visible resize must retain one coalescing timer");
 const [resizeCallback] = resizeTimers.values();
 resizeCallback();
-assert.equal(resizeRefreshes, 2, "The coalesced visible resize must refresh exactly once");
+assert.equal(resizeRefreshes, 4, "The coalesced visible resize must refresh exactly once");
 
 async function checkAsyncSurfaceLifecycle() {
   function fixture() {
@@ -656,6 +660,109 @@ async function checkAsyncSurfaceLifecycle() {
     return { engine, element, jobs };
   }
   const flush = async () => { for (let i = 0; i < 12; i += 1) await Promise.resolve(); };
+
+  {
+    const { engine, element, jobs } = fixture();
+    const frames = [];
+    engine.window = { ...resizeWindow, requestAnimationFrame: (callback) => (frames.push(callback), frames.length) };
+    const ancestor = { contains: (candidate) => candidate === element };
+    element.parentElement = ancestor;
+    const observations = [];
+    engine.visibilityObserver = {
+      observe: (node, options) => observations.push({ node, options }),
+      disconnect() {},
+    };
+    element.visibility = "hidden";
+    engine.register(element);
+    assert.deepEqual(observations.map(({ node }) => node), [element, ancestor]);
+    observations.forEach(({ options }) => {
+      assert.equal(options.attributes, true);
+      assert.deepEqual(options.attributeFilter, ["hidden", "class", "style"]);
+      assert(!options.subtree && !options.childList, "Visibility tracking must not observe virtualized descendants or content churn");
+    });
+    assert.equal(jobs.length, 0);
+    element.visibility = "visible";
+    engine.queueReconcile(ancestor);
+    engine.queueReconcile(ancestor);
+    assert.equal(frames.length, 1, "Ancestor visibility mutations must coalesce");
+    frames.shift()();
+    assert.equal(jobs.length, 1, "Visibility restoration without resize must request optics");
+    jobs[0].resolve(); await flush();
+    assert.equal(element.dataset.liquidGlassOptics, "ready");
+    const generation = engine.surfaces.get(element).generation;
+    engine.queueReconcile(element);
+    frames.shift()();
+    assert.equal(engine.surfaces.get(element).generation, generation, "Engine style writes must not restart unchanged requests");
+    element.computedOverrides = { borderTopLeftRadius: "20px" };
+    element.getAnimations = () => [{ playState: "running", transitionProperty: "border-top-left-radius" }];
+    engine.queueReconcile(element);
+    frames.shift()();
+    assert.equal(jobs.length, 1, "A running corner transition must not generate every intermediate geometry");
+    element.getAnimations = () => [];
+    engine.onGeometryTransition({ target: element, propertyName: "border-top-left-radius" });
+    frames.shift()();
+    assert.equal(jobs.length, 2, "Radius-only transition completion must request the final shape without resize");
+    jobs[1].resolve(); await flush();
+    element.size.width += 10;
+    engine.handleResize([{ target: element }]);
+    assert.equal(engine.resizeTimers.size, 1);
+    engine.onGeometryTransition({ target: ancestor, propertyName: "padding-left" });
+    frames.shift()();
+    assert.equal(engine.resizeTimers.size, 0, "Geometry completion must flush the remaining resize debounce");
+    assert.equal(jobs.length, 3);
+    jobs[2].resolve(); await flush();
+    engine.onGeometryTransition({ target: element, propertyName: "opacity" });
+    engine.onGeometryTransition({ target: element, propertyName: "transform" });
+    assert.equal(frames.length, 0, "Pure visual transitions must not queue optical work");
+    element.visibility = "hidden";
+    engine.queueReconcile(ancestor);
+    frames.shift()();
+    assert.equal(engine.cache.stats().retained, 0, "Visibility loss without resize must release ownership");
+    engine.unregister(element);
+  }
+
+  {
+    const { engine, element, jobs } = fixture();
+    const writes = [];
+    element.style = {
+      setProperty: (_name, value) => writes.push(value),
+      removeProperty: () => writes.push("removed"),
+    };
+    engine.register(element);
+    jobs[0].resolve(); await flush();
+    const keyA = engine.surfaces.get(element).cacheKey;
+    element.size.width += 20;
+    const pendingB = engine.refresh(element);
+    jobs[1].resolve(); await pendingB;
+    const keyB = engine.surfaces.get(element).cacheKey;
+    writes.length = 0;
+    element.size.width -= 20;
+    engine.handleResize([{ target: element }]);
+    assert.equal(engine.surfaces.get(element).cacheKey, keyA, "Resize cache hits must attach synchronously");
+    assert.equal(element.dataset.liquidGlassOptics, "ready");
+    assert.equal(engine.resizeTimers.size, 0, "A cached size must bypass debounce");
+    assert(!writes.includes("removed"), "A cache hit must not clear the active filter");
+    assert.equal(engine.cache.entries.get(keyA).refCount, 1);
+    assert.equal(engine.cache.entries.get(keyB).refCount, 0);
+    assert.equal(jobs.length, 2, "A-B-A must not regenerate A");
+    writes.length = 0;
+    await engine.refresh(element);
+    assert.equal(writes.length, 0, "An identical resource refresh must not mutate the filter");
+    element.size.width += 40;
+    engine.handleResize([{ target: element }]);
+    assert.equal(engine.resizeTimers.size, 1);
+    element.size.width -= 40;
+    engine.handleResize([{ target: element }]);
+    assert.equal(engine.resizeTimers.size, 0, "Returning to cached geometry must cancel a pending resize");
+    assert.equal(element.dataset.liquidGlassOptics, "ready");
+    const sibling = new SurfaceElement(element.size.width, element.size.height);
+    engine.register(sibling);
+    assert.equal(sibling.dataset.liquidGlassOptics, "ready", "New registrations must also attach cache hits synchronously");
+    assert.equal(engine.cache.entries.get(keyA).refCount, 2);
+    engine.unregister(element);
+    engine.unregister(sibling);
+    assert.equal(engine.cache.stats().retained, 0);
+  }
 
   {
     const { engine, element, jobs } = fixture();

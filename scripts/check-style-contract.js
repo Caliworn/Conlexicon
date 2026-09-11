@@ -53,10 +53,6 @@ for (const methodName of [
 }
 assert.equal(typeof liquidGlassEngineApi.LiquidGlassEngine, "function", "Liquid Glass must expose its runtime engine");
 assert.equal(typeof liquidGlassEngineApi.ByteBudgetLru, "function", "Liquid Glass must expose its byte-budget cache");
-assert(
-  !liquidGlassEngine.includes("MutationObserver"),
-  "Liquid Glass must not scan virtualized content through a MutationObserver",
-);
 const liquidGlassLabInlineScripts = [...liquidGlassLab.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)]
   .map((match) => match[1].trim())
   .filter(Boolean);
@@ -468,13 +464,23 @@ for (const explicitSelector of [
 }
 const liquidGlassFocusDefinition = liquidGlassSurfaceDefinitions.find(({ role }) => role === "focus");
 assert(
-  liquidGlassFocusDefinition?.registration === "automatic"
+  liquidGlassFocusDefinition?.registration === "css"
+    && liquidGlassFocusDefinition.sampleBackdrop === false
     && liquidGlassFocusDefinition.selector.includes(".entry-display")
     && liquidGlassFocusDefinition.selector.includes("#entryForm")
     && liquidGlass.includes(':is(.entry-display, #entryForm)')
     && /:where\(#entryForm\)\s*\{[\s\S]*?background:\s*var\(--material-entry-detail-background\);[\s\S]*?backdrop-filter:\s*var\(--material-entry-detail-filter\);/.test(liquidGlass),
-  "Liquid Glass focus optics must cover both the current entry display and the primary entry form shell",
+  "Entry display and primary form must share focus Q1 material without runtime optical registration",
 );
+for (const selector of [".entry-display", "#entryForm"]) {
+  const element = { matches: (selectors) => selectors.split(",").map((item) => item.trim()).includes(selector) };
+  assert.equal(liquidGlassEngineApi.surfaceRoleDefinition(element, { includeCssOnly: true }), liquidGlassFocusDefinition);
+  assert.equal(
+    liquidGlassEngineApi.LiquidGlassEngine.prototype.registerMappedSurface.call({ active: true }, element),
+    false,
+    `${selector} must stay CSS-only even when explicitly requested through the mapped surface API`,
+  );
+}
 assert.deepEqual(
   liquidGlassStyleBlocks
     .filter(({ selector, declarations }) => (

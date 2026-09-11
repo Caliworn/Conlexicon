@@ -612,23 +612,23 @@ body[data-entry-layout="mail"] .entry-mail-tools {
   padding: 4px;
   min-height: 48px;
   gap: 4px;
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
+  align-self: center;
 }
 
 body[data-entry-layout="mail"] .entry-mail-primary-tools {
   display: flex;
-  flex: 1 1 212px;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 2px;
   min-width: 0;
 }
 
 body[data-entry-layout="mail"] .entry-mail-root-actions:not([hidden]) {
-  display: flex;
-  justify-content: flex-end;
-  flex: 1 0 82px;
-  gap: 2px;
+  display: contents;
 }
 
 body[data-entry-layout="mail"] .entry-mail-tools.has-root-actions {
