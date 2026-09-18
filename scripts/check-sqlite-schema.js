@@ -415,7 +415,7 @@ async function runSqliteSchemaCheck() {
     const roundtripDb = repository.openDictionaryDatabase(sourceDictionary.id);
     assert.equal(roundtripDb.prepare("SELECT COUNT(*) AS count FROM entries").get().count, 2);
     assert.equal(roundtripDb.prepare("SELECT COUNT(*) AS count FROM definitions").get().count, 2);
-    assert.equal(roundtripDb.prepare("SELECT source_key FROM entry_sources WHERE entry_id = 'entry-derived'").get().source_key, "root");
+    assert.equal(roundtripDb.prepare("SELECT target_entry_id FROM entry_sources WHERE entry_id = 'entry-derived'").get().target_entry_id, "entry-root");
     assert.equal(
       roundtripDb.prepare("SELECT etymology_description FROM entries WHERE id = 'entry-derived'").get().etymology_description,
       "derived from root",

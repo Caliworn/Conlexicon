@@ -8,11 +8,18 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 
 架构、API、迁移和专题设计文档见 [docs/README.md](docs/README.md)。
 
+Source-reference editing is still being corrected. Duplicate-target prevention is implemented in autocomplete, insertion, and saves; JSON import retains the first reference and reports duplicates removed. Creating an unbound source now creates and links it atomically, while new derived entries prefill an exact source-ID reference. Conflicts leave both sides unchanged. The agreed interaction contract and acceptance cases are recorded in [the API contract](docs/API_CONTRACT.md#词源与词根关系). Reference cards support dragging and Alt+arrow-key sorting; plain text stays in the input. Display, saves, and exports place references before plain text.
+
+来源引用编辑仍在修正中，已确定的交互规则和验收场景见 [来源契约](docs/API_CONTRACT.md#词源与词根关系)。已在补全、添加和保存层禁止重复引用同一目标 ID，JSON 导入保留首次引用并报告修复；同名不同 ID 和纯文本不合并。从纯文本创建来源时，创建和回填关联原子完成，冲突不留下半成品；新建衍生词预填精确来源 ID 并自动获得反向链接。来源卡片支持拖动及 Alt+方向键排序，纯文本始终留在输入框内；浏览、保存和导出统一为引用在前、纯文本在后。
+
 ## Features / 功能
 
+- Source references cannot target the entry itself; both saves and JSON imports reject self-references. Distinct entries with the same lemma remain valid sources.
+- 来源引用不能指向词条自身，保存及 JSON 导入均会拒绝自引用；同形但不同 ID 的词条仍可作为来源。
 - Multi-dictionary management: create, switch, import, export, configure, and delete dictionaries, with explicit confirmation before an imported dictionary ID overwrites an existing dictionary.
 - Per-dictionary SQLite persistence: entries and their structured subobjects, morphology template groups/tables/overrides, corpus data, settings, docs, and IPA rules are stored locally with each dictionary. Legacy JSON remains an explicit import/export and migration format.
 - Lexical entry editing with lemma, pronunciation, tags, multiple definitions, examples, notes, etymology, sources, and derived-entry backlinks.
+- Sources are explicit entry-ID references or unbound text. Selected entries appear as indivisible removable cards in both editors; plain text remains editable. Renaming preserves links; deleting a target preserves its source text without automatically linking to a namesake.
 - Explicit part-of-speech tags: only tags listed in the dictionary settings are treated as parts of speech for display and filtering; an empty list means the dictionary does not use parts of speech.
 - Display mode and edit mode: saved entries open in a clean reading view, with full editing and inline section editing available.
 - Responsive application shell with collapsible tool navigation, a collapsible entry list, and mobile drawer controls for navigation, entry browsing, and creating entries.
@@ -35,6 +42,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - 多词典管理：新建、切换、导入、导出、配置和删除词典；导入相同词典 ID 的词典前会明确确认是否覆盖。
 - 词典级 SQLite 保存：词条及其结构化子对象、形态模板组/子表/覆盖项、语料库、设置、语言文档和 IPA 规则都会随当前词典保存在本地。旧 JSON 仅作为显式导入、导出和迁移格式保留。
 - 词条编辑：支持词形、发音、标签、多条释义、例句、备注、词源、来源以及反向衍生链接。
+- 来源区分显式词条 ID 引用与未绑定纯文本：已绑定卡片位于输入框上方，只能整项移除；除删除按钮外整张卡片均可拖动，插入线显示目标间隙或边缘。纯文本在输入框内编辑，完整/局部编辑一致。改名不影响绑定，删除目标后保留文本，不会自动关联其他同名词条。旧 JSON 导入时仅精确 ID 或唯一词形匹配自动绑定，歧义保留文本并提示。
 - 显式词性标签：只有词典设置中列出的标签会被识别为词性，使一个词条可以拥有多个词性并用于显示和筛选；列表留空表示该词典不使用词性。
 - 查看模式与编辑模式：保存后的词条会进入整洁的阅读界面，也支持完整编辑和栏目局部编辑。
 - 响应式应用外壳：支持可收起工具导航、可收起词条列表，以及移动端用于导航、浏览词条和新建词条的抽屉控件。
@@ -67,6 +75,10 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 Conlexicon currently uses a small Node.js backend with no external npm dependencies. SQLite is the runtime storage backend.
 
 Conlexicon 目前使用一个小型 Node.js 后端，不需要安装额外 npm 依赖。运行时存储后端为 SQLite。
+
+Development schema changes do not run SQL migrations or bump schema versions. For the source-reference schema, export JSON with the old application first, keep a backup, then import into a clean database created by the current application; overwriting an old-schema database is not a schema upgrade.
+
+开发期 schema 变更不执行 SQL 迁移，也不更新 schema 版本号。此次来源引用结构需要先用旧应用导出 JSON 并备份，再导入由当前应用创建的新结构数据库；直接覆盖旧结构数据库不等于升级 schema。
 
 ```bash
 node server.js

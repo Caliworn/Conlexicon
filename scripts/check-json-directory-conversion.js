@@ -62,7 +62,7 @@ async function main() {
       id: "dict-migration-second",
       name: "Migration Second",
       language: "two",
-      entries: [{ lemma: "leaf", tags: ["v"], etymology: { sources: ["root"] } }],
+      entries: [{ lemma: "leaf", tags: ["v"], etymology: { sources: [{ entryId: "", text: "root" }] } }],
     });
     await writeJson(path.join(sourceDataDir, "dictionaries", `${first.id}.json`), first);
     await writeJson(path.join(sourceDataDir, "dictionaries", `${second.id}.json`), second);
@@ -98,7 +98,7 @@ async function main() {
     assert.equal(firstSnapshot.name, "Migration First");
     assert.equal(firstSnapshot.entries[0].lemma, "root");
     assert.equal(secondSnapshot.name, "Migration Second");
-    assert.deepEqual(secondSnapshot.entries[0].etymology.sources, ["root"]);
+    assert.deepEqual(secondSnapshot.entries[0].etymology.sources, [{ entryId: "", text: "root" }]);
 
     console.log("JSON directory conversion check passed.");
   } finally {

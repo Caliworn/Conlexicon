@@ -29,7 +29,7 @@ async function runSqliteLifecycleCheck() {
         {
           id: "entry-first-unresolved",
           lemma: "first-unresolved",
-          etymology: { sources: ["missing-root"] },
+          etymology: { sources: [{ entryId: "", text: "missing-root" }] },
         },
       ],
     }));
@@ -43,7 +43,7 @@ async function runSqliteLifecycleCheck() {
         {
           id: "entry-second-derived",
           lemma: "second-derived",
-          etymology: { sources: ["entry-second-root-a"] },
+          etymology: { sources: [{ entryId: "entry-second-root-a", text: "root" }] },
         },
       ],
     }));

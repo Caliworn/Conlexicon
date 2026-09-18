@@ -77,6 +77,8 @@ const entrySearchModel = window.ConlexiconEntrySearch;
 const searchNormalizationModel = window.ConlexiconSearchNormalization;
 const ENTRY_SEARCH_FIELD_KEYS = entrySearchModel.ENTRY_SEARCH_FIELD_KEYS;
 const qualityModel = window.ConlexiconQuality;
+const sourceReferenceModel = window.ConlexiconSourceReferences;
+const sourceInputReferences = new WeakMap();
 const QueryPageCache = window.ConlexiconQueryPageCache.QueryPageCache;
 const queryPageCache = new QueryPageCache({
   maxEntries: 4,
@@ -133,6 +135,7 @@ const expandedRootEntries = new Set();
 const collapsedRootEntries = new Set();
 let rootNavigationContextId = "";
 let entryDraft = null;
+const sourceCreationContexts = new WeakMap();
 const defaultAnalysisViewState = {
   page: "overview",
   subpageByPage: {
@@ -529,6 +532,14 @@ const i18n = {
     addDefinition: "添加释义",
     etymologyInfo: "来源与说明",
     sourceEntry: "来源词条",
+    sourceReferenceHint: "选择建议添加引用；纯文本保留在输入框，以逗号分隔。拖动卡片排序，或聚焦卡片后按 Alt+方向键。",
+    linkedSource: "词条引用",
+    unlinkedSource: "纯文本 · 点击编辑",
+    removeSource: "移除此来源",
+    duplicateSourceTarget: "已引用该词条，不能重复添加。",
+    selfSourceReference: "词条不能将自己作为来源。请移除此引用后保存。",
+    sourceBindingConflict: "原来源已变化或已删除，未创建词条。请返回原词条后重新发起。",
+    addSource: "输入或搜索来源",
     etymologyDescription: "说明",
     dictionarySettingsEyebrow: "当前词典",
     settingsNeedDictionary: "其他设置会保存到当前词典文件中。",
@@ -1127,6 +1138,14 @@ const i18n = {
     addDefinition: "Add Definition",
     etymologyInfo: "Source and Notes",
     sourceEntry: "Source Entry",
+    sourceReferenceHint: "Choose a suggestion to link an entry. Keep plain text here, separated by commas. Drag a card, or focus it and press Alt+arrow keys to reorder.",
+    linkedSource: "Linked entry",
+    unlinkedSource: "Plain text · click to edit",
+    removeSource: "Remove this source",
+    duplicateSourceTarget: "This entry is already referenced and cannot be added again.",
+    selfSourceReference: "An entry cannot reference itself as a source. Remove this reference before saving.",
+    sourceBindingConflict: "The original source changed or was deleted. No entry was created. Return to the original entry and try again.",
+    addSource: "Type or search for a source",
     etymologyDescription: "Description",
     dictionarySettingsEyebrow: "Current Dictionary",
     settingsNeedDictionary: "Settings are saved in the current dictionary file.",
@@ -2027,6 +2046,12 @@ const API_ERROR_TOAST_KEYS = {
   duplicate_entity_ids: "apiErrorDuplicateEntityIds",
   duplicate_entity_ids_scoped: "apiErrorDuplicateEntityIdsScoped",
   invalid_entry_payload: "apiErrorInvalidEntryPayload",
+  invalid_source_reference: "apiErrorInvalidEntryPayload",
+  invalid_source_target: "apiErrorEntryNotFound",
+  duplicate_source_target: "duplicateSourceTarget",
+  self_source_reference: "selfSourceReference",
+  source_binding_conflict: "sourceBindingConflict",
+  invalid_source_binding: "apiErrorInvalidEntryPayload",
   invalid_entry_updates_payload: "apiErrorInvalidEntryUpdatesPayload",
   entry_not_found: "apiErrorEntryNotFound",
   invalid_settings_payload: "apiErrorInvalidSettingsPayload",
@@ -2283,9 +2308,8 @@ function normalizeEntry(entry, usedIds = new Set()) {
     ? entry.definitions.map((definition) => normalizeDefinition(definition, usedIds))
     : [];
 
-  const sources = Array.isArray(entry.etymology?.sources)
-    ? entry.etymology.sources.map(String).map((item) => item.trim()).filter(Boolean)
-    : [];
+  // Previously stored duplicates must remain readable/removable; saves are validated by the server.
+  const sources = sourceReferenceModel.normalizeSourceReferences(entry.etymology?.sources || [], { allowDuplicateTargets: true });
 
   const morphologyState = morphologyModel.normalizeEntryMorphologyState(entry);
   return {
@@ -3387,6 +3411,12 @@ function applyLocale(root = document) {
   });
   root.querySelectorAll("[data-i18n-aria-label]").forEach((node) => {
     node.setAttribute("aria-label", t(node.dataset.i18nAriaLabel));
+  });
+  root.querySelectorAll("[data-source-reference-input]").forEach((node) => {
+    node.setAttribute("aria-description", t("sourceReferenceHint"));
+  });
+  root.querySelectorAll("[data-source-reference-remove-label]").forEach((node) => {
+    node.setAttribute("aria-label", `${t("removeSource")}: ${node.dataset.sourceReferenceRemoveLabel}`);
   });
   document.body.classList.toggle("english-locale", currentLanguage === "en");
   elements.brandEyebrow.hidden = currentLanguage === "en";
@@ -8739,8 +8769,8 @@ function renderEtymology(entry, showEmptySections = false, relationState = { sta
     sourceRow.className = "source-row";
     const resolvedSources = relationState.status === "success"
       ? relationState.relation.sources || []
-      : sources.map((sourceText) => ({ sourceText, matchedEntryId: "", matchedLemma: "" }));
-    resolvedSources.forEach((sourceRelation) => {
+      : sources.map((source) => ({ sourceText: sourceReferenceModel.sourceReferenceText(source, activeDictionary()?.entries || []), matchedEntryId: "", matchedLemma: "" }));
+    resolvedSources.forEach((sourceRelation, sourcePosition) => {
       const sourceName = sourceRelation.sourceText || "";
       if (relationState.status === "success" && sourceRelation.matchedEntryId) {
         const button = document.createElement("button");
@@ -8755,7 +8785,7 @@ function renderEtymology(entry, showEmptySections = false, relationState = { sta
         pending.className = "source-link pending-source";
         pending.textContent = sourceName;
         pending.setAttribute("aria-label", formatText("createSourceEntry", { source: sourceName }));
-        pending.addEventListener("click", () => beginSourceEntry(sourceName));
+        pending.addEventListener("click", () => beginSourceEntry(entry, sourcePosition));
         sourceRow.append(pending);
       } else {
         const loading = document.createElement("span");
@@ -8774,12 +8804,22 @@ function renderEtymology(entry, showEmptySections = false, relationState = { sta
   }
 }
 
-async function beginSourceEntry(sourceName) {
-  const lemma = String(sourceName || "").trim();
-  if (!lemma) {
+async function beginSourceEntry(owner, sourcePosition) {
+  const source = owner.etymology?.sources?.[sourcePosition];
+  const lemma = source?.text?.trim();
+  if (!lemma || source.entryId) {
     return false;
   }
-  return beginNewEntry({ lemma });
+  const context = {
+    dictionaryId: activeDictionary().id,
+    ownerEntryId: owner.id,
+    sourcePosition,
+    expectedUpdatedAt: owner.updatedAt,
+    expectedSources: owner.etymology.sources.map((item) => ({ ...item })),
+  };
+  const started = await beginNewEntry({ lemma });
+  if (started) sourceCreationContexts.set(entryDraft, context);
+  return started;
 }
 
 function renderDerivedEntries(entry, relationState = entryRelationStateForEntry(activeDictionary(), entry)) {
@@ -11852,7 +11892,7 @@ function fillEntryForm(entry) {
   elements.pronunciationInput.value = formEntry.pronunciation || "";
   elements.tagsInput.value = serializeTagList(formEntry.tags);
   elements.notesInput.value = formEntry.notes || "";
-  elements.sourceEntryInput.value = (formEntry.etymology?.sources || []).join("，");
+  setSourceInputReferences(elements.sourceEntryInput, formEntry.etymology?.sources || []);
   elements.etymologyDescriptionInput.value = formEntry.etymology?.description || "";
   renderDefinitionFormList(formEntry.definitions);
   renderEntryMorphologyControls(formEntry);
@@ -12161,9 +12201,8 @@ function entrySemanticSnapshot(entry = {}) {
       }))
       .filter((definition) => definition.meaning || definition.example || definition.note),
     etymology: {
-      sources: Array.isArray(entry.etymology?.sources)
-        ? entry.etymology.sources.map((source) => String(source || "").trim()).filter(Boolean)
-        : [],
+      sources: sourceReferenceModel.orderSourceReferences(entry.etymology?.sources || []).map((source) => source.entryId
+        ? { entryId: source.entryId } : { entryId: "", text: source.text.trim() }),
       description: String(entry.etymology?.description || "").trim(),
     },
     morphologyMode: morphologyState.morphologyMode,
@@ -12197,7 +12236,7 @@ function fullEntryFormCandidate(existing = selectedEntry()) {
     tags,
     definitions: collectDefinitions(),
     etymology: {
-      sources: splitSourceText(elements.sourceEntryInput.value),
+      sources: collectSourceInputReferences(elements.sourceEntryInput),
       description: elements.etymologyDescriptionInput.value.trim(),
     },
     morphologyMode: morphologyState.morphologyMode,
@@ -12231,27 +12270,30 @@ function completeSourceAtCursor(input = elements.sourceEntryInput) {
     return false;
   }
 
-  const match = sourceCompletionCandidates(prefix, dictionary)[0];
+  const match = sourceCompletionCandidates(prefix, dictionary, input)[0];
   if (!match) {
     return false;
   }
 
-  const replacement = `${segment.leading}${match.lemma}${segment.trailing}`;
-  const nextValue = `${value.slice(0, segment.start)}${replacement}${value.slice(segment.end)}`;
-  input.value = nextValue;
-  const nextCursor = segment.start + segment.leading.length + match.lemma.length;
-  input.setSelectionRange(nextCursor, nextCursor);
+  fillSourceSegment(match, input);
   return true;
 }
 
-function sourceCompletionCandidates(prefix, dictionary = activeDictionary()) {
+function sourceEditorEntryId(input) {
+  return input === elements.sourceEntryInput ? elements.entryId.value : selectedEntry()?.id || "";
+}
+
+function sourceCompletionCandidates(prefix, dictionary = activeDictionary(), input = elements.sourceEntryInput) {
   const normalizeSearch = entrySearchQueryOptions(dictionary).normalizeText;
   const normalizedPrefix = normalizeSearch(prefix);
   if (!dictionary || !normalizedPrefix) {
     return [];
   }
   const fuzzyEnabled = normalizeDictionarySettings(dictionary.settings).search.etymologyAutocomplete.fuzzy;
+  const selectedIds = new Set((sourceInputReferences.get(input)?.sources || []).map((source) => source.entryId).filter(Boolean));
+  selectedIds.add(sourceEditorEntryId(input));
   return dictionary.entries
+    .filter((entry) => !selectedIds.has(entry.id))
     .map((entry) => {
       const lemma = normalizeSearch(entry.lemma);
       let score = 0;
@@ -12274,7 +12316,7 @@ function sourceAutocompleteBoxForInput(input = elements.sourceEntryInput) {
   if (input === elements.sourceEntryInput) {
     return elements.sourceSuggestionBox;
   }
-  return input.closest("label")?.querySelector(".source-suggestions") || null;
+  return input.closest(".source-reference-field")?.querySelector(".source-suggestions") || null;
 }
 
 function cancelSourceSuggestionHide() {
@@ -12302,7 +12344,7 @@ function renderSourceAutocomplete(input = elements.sourceEntryInput) {
     return;
   }
   const segment = sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length);
-  const candidates = sourceCompletionCandidates(segment.prefix);
+  const candidates = sourceCompletionCandidates(segment.prefix, activeDictionary(), input);
   if (sourceSuggestionIndex >= candidates.length) {
     sourceSuggestionIndex = 0;
   }
@@ -12313,10 +12355,10 @@ function renderSourceAutocomplete(input = elements.sourceEntryInput) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = index === sourceSuggestionIndex ? "selected" : "";
-    button.textContent = entry.lemma;
+    button.textContent = sourceInputLabel({ entryId: entry.id, text: entry.lemma });
     button.addEventListener("mousedown", (event) => {
       event.preventDefault();
-      fillSourceSegment(entry.lemma, input);
+      fillSourceSegment(entry, input);
     });
     box.append(button);
   });
@@ -12324,17 +12366,174 @@ function renderSourceAutocomplete(input = elements.sourceEntryInput) {
 
 function selectedSourceCandidate(input = elements.sourceEntryInput) {
   const segment = sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length);
-  const candidates = sourceCompletionCandidates(segment.prefix);
+  const candidates = sourceCompletionCandidates(segment.prefix, activeDictionary(), input);
   return candidates[sourceSuggestionIndex] || candidates[0] || null;
 }
 
-function fillSourceSegment(value, input = elements.sourceEntryInput) {
+function sourceInputLabel(source) {
+  const entries = activeDictionary()?.entries || [];
+  const text = sourceReferenceModel.sourceReferenceText(source, entries);
+  return source.entryId && entries.filter((entry) => entry.lemma === text).length > 1
+    ? `${text} [${source.entryId}]` : text;
+}
+
+function setSourceInputReferences(input, sources) {
+  sourceInputReferences.set(input, { sources: sources.filter((source) => source.entryId).map((source) => ({ ...source })) });
+  input.value = sources.filter((source) => !source.entryId).map((source) => source.text).join("，");
+  input.removeAttribute("maxlength");
+  input.dataset.sourceReferenceInput = "true";
+  input.dataset.i18nAriaLabel = "sourceEntry";
+  input.dataset.i18nPlaceholder = "addSource";
+  input.setAttribute("aria-label", t("sourceEntry"));
+  input.setAttribute("aria-description", t("sourceReferenceHint"));
+  input.placeholder = t("addSource");
+  renderSourceReferenceTokens(input);
+}
+
+function collectSourceInputReferences(input) {
+  const state = sourceInputReferences.get(input) || { sources: [] };
+  const sources = state.sources.map((source) => ({ ...source }));
+  sources.push(...splitSourceText(input.value).map((text) => ({ entryId: "", text })));
+  return sources;
+}
+
+function renderSourceReferenceTokens(input) {
+  let tokens = input.parentElement.querySelector("[data-source-reference-tokens]");
+  if (!tokens) {
+    tokens = document.createElement("span");
+    tokens.dataset.sourceReferenceTokens = "true";
+    tokens.className = "source-reference-tokens";
+    input.before(tokens);
+    const hint = document.createElement("small");
+    hint.className = "source-reference-hint";
+    hint.dataset.i18n = "sourceReferenceHint";
+    hint.textContent = t("sourceReferenceHint");
+    input.parentElement.append(hint);
+  }
+  tokens.replaceChildren();
+  const state = sourceInputReferences.get(input);
+  let draggedIndex = null;
+  let insertionIndex = null;
+  const marker = document.createElement("span");
+  marker.className = "source-reference-insertion";
+  marker.hidden = true;
+  marker.setAttribute("aria-hidden", "true");
+  tokens.append(marker);
+  const move = (from, to) => {
+    if (from === to || to < 0 || to >= state.sources.length) return;
+    state.sources.splice(to, 0, state.sources.splice(from, 1)[0]);
+    renderSourceReferenceTokens(input);
+    input.parentElement.querySelectorAll(".source-reference-card")[to]?.focus();
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  const updateInsertion = (event) => {
+    const bounds = tokens.getBoundingClientRect();
+    let nearest = null;
+    [...tokens.querySelectorAll(".source-reference-card")].forEach((card, index) => {
+      const rect = card.getBoundingClientRect();
+      const dy = Math.max(rect.top - event.clientY, event.clientY - rect.bottom, 0);
+      [{ x: rect.left - 4, index }, { x: rect.right + 4, index: index + 1 }].forEach((edge) => {
+        const distance = Math.hypot(event.clientX - edge.x, dy);
+        if (!nearest || distance < nearest.distance) nearest = { ...edge, rect, distance };
+      });
+    });
+    if (!nearest) return;
+    insertionIndex = nearest.index;
+    marker.style.left = `${nearest.x - bounds.left}px`;
+    marker.style.top = `${nearest.rect.top - bounds.top}px`;
+    marker.style.height = `${nearest.rect.height}px`;
+    marker.hidden = false;
+  };
+  tokens.ondragover = (event) => {
+    if (draggedIndex === null) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    updateInsertion(event);
+  };
+  tokens.ondragenter = tokens.ondragover;
+  tokens.ondragleave = (event) => {
+    if (event.relatedTarget && tokens.contains(event.relatedTarget)) return;
+    marker.hidden = true;
+    insertionIndex = null;
+  };
+  tokens.ondrop = (event) => {
+    if (draggedIndex === null) return;
+    event.preventDefault();
+    updateInsertion(event);
+    marker.hidden = true;
+    if (insertionIndex !== null) move(draggedIndex, insertionIndex > draggedIndex ? insertionIndex - 1 : insertionIndex);
+    draggedIndex = null;
+    insertionIndex = null;
+    tokens.querySelectorAll(".dragging").forEach((item) => item.classList.remove("dragging"));
+  };
+  (state?.sources || []).forEach((source, index) => {
+    const token = document.createElement("span");
+    token.className = "source-reference-card";
+    token.tabIndex = 0;
+    token.draggable = true;
+    token.addEventListener("pointerdown", (event) => {
+      token.draggable = !event.target.closest("button");
+    });
+    token.addEventListener("dragstart", (event) => {
+      draggedIndex = index;
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("application/x-conlexicon-source", source.entryId);
+      token.classList.add("dragging");
+    });
+    token.addEventListener("dragend", () => {
+      draggedIndex = null;
+      insertionIndex = null;
+      marker.hidden = true;
+      tokens.querySelectorAll(".dragging").forEach((item) => item.classList.remove("dragging"));
+    });
+    token.addEventListener("keydown", (event) => {
+      if (event.target !== token) return;
+      if (!event.altKey || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+      event.preventDefault();
+      move(index, index + (["ArrowLeft", "ArrowUp"].includes(event.key) ? -1 : 1));
+    });
+    const label = document.createElement("span");
+    label.className = "source-reference-label";
+    label.textContent = sourceInputLabel(source);
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "source-reference-remove";
+    remove.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m4 4 8 8M12 4l-8 8" /></svg>';
+    remove.dataset.sourceReferenceRemoveLabel = label.textContent;
+    remove.setAttribute("aria-label", `${t("removeSource")}: ${label.textContent}`);
+    remove.addEventListener("click", () => {
+      state.sources.splice(index, 1);
+      renderSourceReferenceTokens(input);
+      input.focus();
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    token.append(label, remove);
+    tokens.append(token);
+  });
+}
+
+function fillSourceSegment(entry, input = elements.sourceEntryInput) {
+  const state = sourceInputReferences.get(input) || { sources: [] };
+  if (entry.id === sourceEditorEntryId(input)) {
+    showToast(t("selfSourceReference"));
+    renderSourceAutocomplete(input);
+    return;
+  }
+  if (state.sources.some((source) => source.entryId === entry.id)) {
+    showToast(t("duplicateSourceTarget"));
+    renderSourceAutocomplete(input);
+    return;
+  }
   const segment = sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length);
-  const replacement = `${segment.leading}${value}${segment.trailing}`;
-  input.value = `${input.value.slice(0, segment.start)}${replacement}${input.value.slice(segment.end)}`;
-  const nextCursor = segment.start + segment.leading.length + value.length;
+  const before = input.value.slice(0, segment.start);
+  const after = input.value.slice(segment.end);
+  const reference = { entryId: entry.id, text: entry.lemma || entry.id };
+  state.sources.push(reference);
+  sourceInputReferences.set(input, state);
+  input.value = before && after ? before + after.slice(1) : before + after.replace(/^[,，、]/, "");
+  renderSourceReferenceTokens(input);
   input.focus();
-  input.setSelectionRange(nextCursor, nextCursor);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
   renderSourceAutocomplete(input);
 }
 
@@ -12342,7 +12541,7 @@ function handleSourceAutocompleteKeydown(event) {
   const input = event.currentTarget;
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     const segment = sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length);
-    const candidates = sourceCompletionCandidates(segment.prefix);
+    const candidates = sourceCompletionCandidates(segment.prefix, activeDictionary(), input);
     if (!candidates.length) {
       return;
     }
@@ -12364,11 +12563,15 @@ function handleSourceAutocompleteKeydown(event) {
     return;
   }
 
-  event.preventDefault();
-  event.stopPropagation();
   const candidate = selectedSourceCandidate(input);
   if (candidate) {
-    fillSourceSegment(candidate.lemma, input);
+    event.preventDefault();
+    event.stopPropagation();
+    fillSourceSegment(candidate, input);
+  } else if (event.key === "Enter") {
+    event.preventDefault();
+    event.stopPropagation();
+    // Keep unmatched text in the input; Enter must not submit the whole form.
   }
 }
 
@@ -12376,6 +12579,12 @@ function bindSourceAutocompleteInput(input) {
   if (!input) {
     return;
   }
+  // The composite field is not a label: its buttons must never become a
+  // label's implicit control. Non-interactive space only focuses the input.
+  input.closest(".source-reference-field")?.addEventListener("click", (event) => {
+    if (event.target.closest("button, input, textarea, select, a, label")) return;
+    input.focus();
+  });
   liquidGlassOpticalEngine?.registerMappedSurface(sourceAutocompleteBoxForInput(input));
   input.addEventListener("keydown", handleSourceAutocompleteKeydown);
   input.addEventListener("input", () => {
@@ -14944,16 +15153,17 @@ async function openPartialEdit(section) {
     body.append(addButton);
   } else if (section === "etymology") {
     body.innerHTML = `
-      <label>
-        <span data-i18n="sourceEntry">${escapeHtml(t("sourceEntry"))}</span>
-        <input data-field="sources" maxlength="220" value="${escapeHtml((entry.etymology?.sources || []).join("，"))}">
+      <div class="source-reference-field">
+        <label for="partialSourceEntryInput" data-i18n="sourceEntry">${escapeHtml(t("sourceEntry"))}</label>
+        <input id="partialSourceEntryInput" data-field="sources">
         <div class="source-suggestions" data-source-suggestions hidden></div>
-      </label>
+      </div>
       <label>
         <span data-i18n="etymologyDescription">${escapeHtml(t("etymologyDescription"))}</span>
         <textarea data-field="description" rows="4">${escapeHtml(entry.etymology?.description || "")}</textarea>
       </label>
     `;
+    setSourceInputReferences(body.querySelector('[data-field="sources"]'), entry.etymology?.sources || []);
     bindSourceAutocompleteInput(body.querySelector('[data-field="sources"]'));
   } else if (section === "notes") {
     body.innerHTML = `
@@ -15089,7 +15299,7 @@ function partialEntryFormCandidate(entry = selectedEntry(), body = partialEditBo
     return {
       ...entry,
       etymology: {
-        sources: splitSourceText(body.querySelector('[data-field="sources"]').value),
+        sources: collectSourceInputReferences(body.querySelector('[data-field="sources"]')),
         description: body.querySelector('[data-field="description"]').value.trim(),
       },
     };
@@ -15230,7 +15440,7 @@ async function beginDerivedEntry(sourceEntry) {
   }
   const started = await beginNewEntry({
     etymology: {
-      sources: [sourceEntry.lemma],
+      sources: [{ entryId: sourceEntry.id, text: sourceEntry.lemma || sourceEntry.id }],
       description: "",
     },
   });
@@ -15312,17 +15522,28 @@ async function saveEntry(event) {
   };
 
   try {
+    const sourceContext = wasNewEntry && entryDraft ? sourceCreationContexts.get(entryDraft) : null;
+    if (sourceContext && sourceContext.dictionaryId !== dictionary.id) {
+      showToast(t("sourceBindingConflict"));
+      return false;
+    }
+    const payload = entryApiPayload(entry, { omitId: wasNewEntry });
     const saved = await api(
       wasNewEntry
-        ? `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`
+        ? `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries${sourceContext ? "/create-source" : ""}`
         : `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entryId)}`,
       {
         method: wasNewEntry ? "POST" : "PUT",
-        body: JSON.stringify(entryApiPayload(entry, { omitId: wasNewEntry })),
+        body: JSON.stringify(sourceContext ? { entry: payload, sourceBinding: sourceContext } : payload),
       },
     );
     const savedEntry = saved.entry;
     upsertEntryInDictionary(dictionary.id, savedEntry, { summary: saved.summary });
+    if (saved.ownerEntry) {
+      upsertEntryInDictionary(dictionary.id, saved.ownerEntry, { summary: saved.summary });
+      cacheSavedEntryDetail(dictionary.id, saved.ownerEntry);
+      updateEntrySummaryDtoAfterSave(activeDictionary(), saved.ownerEntry);
+    }
     state.selectedEntryId = savedEntry.id;
     cacheSavedEntryDetail(dictionary.id, savedEntry);
     updateEntrySummaryDtoAfterSave(activeDictionary(), savedEntry);

@@ -34,7 +34,7 @@ function qualityFixture() {
           meaning: "meaning",
           example: "\\gla a b\n\\glb A B",
         }],
-        sources: ["missing-root"],
+        sources: [{ entryId: "", text: "missing-root" }],
       }),
       completeEntry("entry-gloss-mismatch", {
         definitions: [{
@@ -45,9 +45,9 @@ function qualityFixture() {
       }),
       completeEntry("entry-near-tag-a", { tags: ["proper noun"] }),
       completeEntry("entry-near-tag-b", { tags: ["proper-noun"] }),
-      completeEntry("cycle-a", { sources: ["cycle-b"] }),
-      completeEntry("cycle-b", { sources: ["cycle-a"] }),
-      completeEntry("cycle-upstream", { sources: ["cycle-a"] }),
+      completeEntry("cycle-a", { sources: [{ entryId: "cycle-b", text: "cycle-b" }] }),
+      completeEntry("cycle-b", { sources: [{ entryId: "cycle-a", text: "cycle-a" }] }),
+      completeEntry("cycle-upstream", { sources: [{ entryId: "cycle-a", text: "cycle-a" }] }),
     ],
   };
 }

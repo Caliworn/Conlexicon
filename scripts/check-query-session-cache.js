@@ -274,7 +274,7 @@ async function checkRepositoryIntegration() {
           lemma: `derived-window-${String(index).padStart(3, "0")}`,
           tags: ["v"],
           definitions: [{ id: `def-derived-window-${index}`, meaning: `derived window ${index}` }],
-          etymology: { sources: ["root"], description: "cursor window fixture" },
+          etymology: { sources: [{ entryId: "entry-root", text: "root" }], description: "cursor window fixture" },
         })),
       ],
     });
@@ -575,7 +575,7 @@ async function checkRepositoryIntegration() {
     const routeEntry = await repository.getEntry(dictionary.id, "entry-route");
     await repository.saveEntry(dictionary.id, {
       ...routeEntry,
-      etymology: { ...(routeEntry.etymology || {}), sources: ["root"] },
+      etymology: { ...(routeEntry.etymology || {}), sources: [{ entryId: "entry-root", text: "root" }] },
     });
     assert.equal(
       repository.rootTopologyCache.generation(dictionary.id),

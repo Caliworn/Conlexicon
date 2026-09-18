@@ -380,11 +380,11 @@
                       <p class="eyebrow" data-i18n="etymology">词源</p>
                     </div>
                   </div>
-                  <label>
-                    <span data-i18n="sourceEntry">来源词条</span>
+                  <div class="source-reference-field">
+                    <label for="sourceEntryInput" data-i18n="sourceEntry">来源词条</label>
                     <input id="sourceEntryInput" maxlength="220">
                     <div class="source-suggestions" id="sourceSuggestionBox" hidden></div>
-                  </label>
+                  </div>
                   <label>
                     <span data-i18n="etymologyDescription">说明</span>
                     <textarea id="etymologyDescriptionInput" rows="3"></textarea>
@@ -1278,6 +1278,7 @@
     <script src="lib/morphology-model.js"></script>
     <script src="lib/entry-search-model.js"></script>
     <script src="lib/entry-query-model.js"></script>
+    <script src="lib/source-reference-model.js"></script>
     <script src="lib/entry-relations-model.js"></script>
     <script src="lib/ipa-model.js"></script>
     <script src="lib/quality-model.js"></script>

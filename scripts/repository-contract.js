@@ -202,7 +202,7 @@ async function checkAnalysisQueryContract(repository) {
         tags: ["n", "root"],
         definitions: [{ id: "def-analysis-alpha", meaning: "first", example: "alpha example" }],
         notes: "note",
-        etymology: { sources: ["beta", "gamma"] },
+        etymology: { sources: [{ entryId: "entry-analysis-beta", text: "beta" }, { entryId: "entry-analysis-gamma", text: "gamma" }] },
         createdAt: "2026-07-01T08:00:00.000Z",
         updatedAt: "2026-07-01T09:00:00.000Z",
       },
@@ -1025,13 +1025,13 @@ function checkModelNormalization() {
   const relationDictionary = {
     entries: [
       { id: "entry-root", lemma: "root" },
-      { id: "entry-derived-lemma", lemma: "derived lemma", etymology: { sources: ["root", "root"] } },
-      { id: "entry-derived-id", lemma: "derived id", etymology: { sources: ["entry-root"] } },
-      { id: "entry-derived-unresolved", lemma: "derived unresolved", etymology: { sources: ["missing-root"] } },
+      { id: "entry-derived-lemma", lemma: "derived lemma", etymology: { sources: [{ entryId: "entry-root", text: "root" }, { entryId: "entry-root", text: "root" }] } },
+      { id: "entry-derived-id", lemma: "derived id", etymology: { sources: [{ entryId: "entry-root", text: "root" }] } },
+      { id: "entry-derived-unresolved", lemma: "derived unresolved", etymology: { sources: [{ entryId: "", text: "missing-root" }] } },
     ],
   };
   const relationIndex = entryRelationsModel.buildEntryRelationIndex(relationDictionary, { normalizeText: testNormalize });
-  assert.equal(relationIndex.derivedBySourceKey.get("root").length, 1);
+  assert.equal(relationIndex.derivedBySourceKey.get("entry-root").length, 2);
   assert.deepEqual(
     entryRelationsModel.findDerivedEntries(relationDictionary.entries[0], relationDictionary, { index: relationIndex }).map((entry) => entry.id),
     ["entry-derived-id", "entry-derived-lemma"],
@@ -1078,7 +1078,7 @@ function checkModelNormalization() {
         pronunciation: "/ˈaˈb/",
         tags: ["proper noun", "tag-with-a-very-very-long-name"],
         definitions: [{ meaning: "a", example: "\\gla a b\n\\glb A\n\\ft test" }],
-        etymology: { sources: ["missing-root"] },
+        etymology: { sources: [{ entryId: "", text: "missing-root" }] },
       },
       {
         id: "entry-quality-b",
@@ -1367,7 +1367,7 @@ function checkModelNormalization() {
         lemma: "acar",
         tags: ["n"],
         definitions: [{ meaning: "root" }],
-        etymology: { sources: ["entry-source"], description: "source note" },
+        etymology: { sources: [{ entryId: "", text: "entry-source" }], description: "source note" },
       },
     ],
     settings: {
@@ -1381,7 +1381,7 @@ function checkModelNormalization() {
   assert.match(normalized.id, /^dict-/);
   assert.equal(normalized.entries[0].tags[0], "n");
   assert.equal(normalized.entries[0].definitions[0].meaning, "root");
-  assert.deepEqual(normalized.entries[0].etymology.sources, ["entry-source"]);
+  assert.deepEqual(normalized.entries[0].etymology.sources, [{ entryId: "", text: "entry-source" }]);
   assert.equal(normalized.entries[0].etymology.description, "source note");
   assert.equal(normalized.settings.entryListTagDisplayLimit, 10);
   assert.equal(normalized.settings.entryListPartDisplay, "chips");
@@ -1438,7 +1438,7 @@ function checkModelNormalization() {
   assert.equal(legacyConvertedImport.dictionary.entries[0].tags[0], "n");
   assert.equal(legacyConvertedImport.dictionary.entries[0].definitions[0].meaning, "root");
   assert.equal(legacyConvertedImport.dictionary.entries[0].etymology.description, "old source");
-  assert.deepEqual(legacyConvertedImport.dictionary.entries[0].etymology.sources, ["entry-source"]);
+  assert.deepEqual(legacyConvertedImport.dictionary.entries[0].etymology.sources, [{ entryId: "", text: "entry-source" }]);
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.entries[0], "partOfSpeech"), false);
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.entries[0], "meaning"), false);
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.entries[0], "roots"), false);
@@ -1629,7 +1629,7 @@ async function checkReadApiConsistency(repository) {
         pronunciation: "/alpha/",
         tags: ["n", "motion"],
         definitions: [{ id: "def-alpha", meaning: "mirror meaning", example: "alpha example", note: "alpha note" }],
-        etymology: { sources: ["root"], description: "source note" },
+        etymology: { sources: [{ entryId: "", text: "root" }], description: "source note" },
         notes: "entry note",
         createdAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-03T00:00:00.000Z",
@@ -1640,7 +1640,7 @@ async function checkReadApiConsistency(repository) {
         pronunciation: "/beta/",
         tags: ["v", "n", "derived"],
         definitions: [{ id: "def-beta", meaning: "movement" }],
-        etymology: { sources: ["alpha", "root"], description: "" },
+        etymology: { sources: [{ entryId: "entry-alpha", text: "alpha" }, { entryId: "", text: "root" }], description: "" },
         morphologyGroups: [{
           templateGroupId: "morph-n-group",
           overrides: { "mtable-n-main": { "0,0": "manual-beta-form" } },
@@ -2108,7 +2108,7 @@ async function runRepositoryContractTests(options = {}) {
       pronunciation: "/derived/",
       tags: ["v", "derived"],
       definitions: [{ meaning: "derived from root" }],
-      etymology: { sources: ["root"], description: "" },
+      etymology: { sources: [{ entryId: rootEntryId, text: "root" }], description: "" },
     });
     assert.equal(apiResult.statusCode, 201);
     assert.equal(apiResult.body.summary.rootCount, 4);

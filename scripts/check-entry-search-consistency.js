@@ -161,7 +161,7 @@ function searchConsistencyDictionary() {
         }],
         notes: "EntryNoteToken",
         etymology: {
-          sources: ["ProtoSourceToken"],
+          sources: [{ entryId: "", text: "ProtoSourceToken" }],
           description: "EtymologyDescriptionToken",
         },
         morphologyMode: "manual",
@@ -177,7 +177,7 @@ function searchConsistencyDictionary() {
         lemma: "BetaDerived",
         tags: ["v"],
         definitions: [{ id: "def-beta-derived", meaning: "CommonToken DerivedDefinition" }],
-        etymology: { sources: ["AlphaRoot"] },
+        etymology: { sources: [{ entryId: "entry-alpha-root", text: "AlphaRoot" }] },
         createdAt: "2026-01-02T00:00:00.000Z",
         updatedAt: "2026-01-02T00:00:00.000Z",
       },
@@ -199,7 +199,7 @@ function searchConsistencyDictionary() {
         ],
         notes: "EntryNoteMarker",
         etymology: {
-          sources: ["SourceRightMarker"],
+          sources: [{ entryId: "", text: "SourceRightMarker" }],
           description: "EtymologyLeftMarker",
         },
       },

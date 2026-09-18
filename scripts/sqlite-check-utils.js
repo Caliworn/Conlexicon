@@ -89,7 +89,7 @@ function sampleSqliteDictionary() {
         lemma: "derived",
         tags: ["v"],
         definitions: [{ id: "def-derived", meaning: "derived meaning" }],
-        etymology: { sources: ["root"], description: "derived from root" },
+        etymology: { sources: [{ entryId: "entry-root", text: "root" }], description: "derived from root" },
       },
     ],
   });

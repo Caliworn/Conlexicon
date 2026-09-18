@@ -136,7 +136,7 @@ entry_sources(
   entry_id TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
   position INTEGER NOT NULL,
   source_text TEXT NOT NULL,
-  source_key TEXT NOT NULL,
+  target_entry_id TEXT REFERENCES entries(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED,
   PRIMARY KEY(entry_id, position)
 )
 
@@ -273,7 +273,7 @@ idx_entries_lemma
 idx_entries_created_at
 idx_entries_updated_at
 idx_entry_tags_tag
-idx_entry_sources_source_key
+idx_entry_sources_target_entry_id
 idx_entry_search_values_field
 idx_definitions_entry_id
 idx_morphology_template_tables_group_id
@@ -360,7 +360,7 @@ GET /api/dictionaries/:id/entry-relations/:entryId
 
 - `root-groups` 需要 `total`、分页/窗口参数，并固定返回摘要 DTO。
 - “展开全部”使用前端全局状态意图；父级首窗返回每个窗口的组数和衍生词总数，用于完整高度估算，组内内容仍按可见范围懒加载，因此不要求所有父级结果同时驻留。
-- 关系解析以 lemma/source key 语义为准，并处理同名 lemma 的既有规则。
+- 关系解析只认显式目标 entry ID；同名 lemma 不产生隐式关系。未绑定来源保留文本，目标删除后外键置空并保留最后文本。
 - 未解析来源属于质量检查，不应塞进诊断修复。
 
 ### 7.5 数据分析 query
@@ -454,7 +454,7 @@ SQLite repository 的核心读写、schema、迁移脚本和 smoke 已经落地�
 4. 候选索引是否采用 FTS/ngram 由真实词典基准决定；语料 SQL 化留到语料升级阶段。
 5. 旧 JSON 仅维持导入、导出和离线目录迁移价值，不参与运行期查询与保存。
 
-当前状态摘要：`lib/sqlite-dictionary-repository.js` 已使用 `node:sqlite` 初始化 `.sqlite` 文件、`dictionary_meta`、`module_blobs`、词条 projection 表、静态逐值 `entry_search_values`、形态派生 `entry_morphology_search_values`、形态学结构化表和第一批索引；`entries.entry_json` 与 `entry_tags.normalized_tag` 均已移除。标签、词性和自动形态匹配按原始标签精确比较；词源 `source_key` 仍是暂时的宽松文本关系键。开发期不保存 schema 版本或 migration 表；下一个正式 release 才应引入带升级脚本的版本化迁移。`saveEntry()`、`deleteEntry()`、`patchEntries()`、metadata/settings/docs/corpus/morphology/IPA 模块保存都已改为 SQL 级写入。单条读取、列表读取、导出快照、词源关系、facets、形态模板 projection、词根分组以及 `/entries` 的严格与 fuzzy 搜索已从 SQL 表读取或组装；`queryRootGroups()` 的稳定关系拓扑按独立 relation generation 复用，搜索条件直接查询静态/形态 projection。`server.js` 运行期只使用 SQLite repository；旧 JSON runtime repository 已移除。
+当前状态摘要：`lib/sqlite-dictionary-repository.js` 已使用 `node:sqlite` 初始化 `.sqlite` 文件、`dictionary_meta`、`module_blobs`、词条 projection 表、静态逐值 `entry_search_values`、形态派生 `entry_morphology_search_values`、形态学结构化表和第一批索引；`entries.entry_json` 与 `entry_tags.normalized_tag` 均已移除。标签、词性和自动形态匹配按原始标签精确比较；词源通过 `target_entry_id` 显式引用目标，`source_text` 保留显示/搜索文本。开发期仅更新当前 schema，不更新版本号、不增加 migration 表或运行期升级链；旧数据库需经 JSON 在新结构数据库中重新导入。`saveEntry()`、`deleteEntry()`、`patchEntries()`、metadata/settings/docs/corpus/morphology/IPA 模块保存都已改为 SQL 级写入。单条读取、列表读取、导出快照、词源关系、facets、形态模板 projection、词根分组以及 `/entries` 的严格与 fuzzy 搜索已从 SQL 表读取或组装；`queryRootGroups()` 的稳定关系拓扑按独立 relation generation 复用，搜索条件直接查询静态/形态 projection。`server.js` 运行期只使用 SQLite repository；旧 JSON runtime repository 已移除。
 
 ### 8.1 SQLite repository 当前状态审计
 

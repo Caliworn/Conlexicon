@@ -27,6 +27,7 @@ const CHECK_GROUPS = [
     scripts: [
       "check-sqlite-schema.js",
       "check-sqlite-lifecycle.js",
+      "check-source-references.js",
       "check-sqlite-contract.js",
       "check-query-session-cache.js",
       "check-feature-result-session.js",

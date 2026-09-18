@@ -170,7 +170,7 @@ F5-1 repository 首版只提供：
 - `id / lemma / pronunciation`；
 - 有序 raw tags；
 - `definition id / position / meaning / example`；
-- `source text / key / position`；
+- `source text / target entry ID / position`（空目标 ID 为未绑定文本；运行期不按词形猜测关系）；
 - 稳定来源解析边和词条排序/搜索窗口能力。
 
 不读取词条备注、词源描述、形态配置、语料、语言文档或完整词典 snapshot。简单 presence 规则可以复用现有 EntryFilter 编译器，或由一次合并事实读取产生相同结果；选择由基准决定，但两条路径必须共享 fixture。
