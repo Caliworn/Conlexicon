@@ -38,7 +38,7 @@ Source-reference editing is still being corrected. Duplicate-target prevention i
 
 - Liquid Glass uses a Mail-style entry workspace: a compact summary list beside a wider detail view, with a full-width glass search field above a content-sized glass tool capsule bounded by the list width. Search settings live in the capsule; one sort icon reflects the current order and opens six labelled choices with keyboard navigation. Root expand/collapse actions follow the root-mode button, with New last. Classic and Layered Glass retain their existing layouts. Separate optical leaves keep popup sampling independent; unavailable optics use matching Q1 material, and accessibility modes use solid material.
 - The right-hand entry detail and full editor shells use Q1 permanently: the existing tint, border and shadow with 4px CSS blur and 1.09× saturation, without Q3 registration or optical maps. Other optical surfaces retain Q3.
-- Experimental: derived-entry cards inside the read-only detail view use compact Q3 optics (8px bezel, 4px maximum displacement, 1px blur), sharing the existing geometry cache. Full-editor cards, source links and list cards are unchanged.
+- Experimental: derived-entry cards in both the detail view and full editor use compact Q3 optics (8px bezel, 4px maximum displacement, 1px blur), sharing the existing geometry cache. Full-editor cards remain non-interactive; source links and list cards are unchanged.
 - Analysis main/subpage tabs and quality-category buttons join the compact Q3 experiment with the same optical parameters and shared cache; wrapping, counts and disabled behavior remain unchanged.
 
 - 多词典管理：新建、切换、导入、导出、配置和删除词典；导入相同词典 ID 的词典前会明确确认是否覆盖。
@@ -63,7 +63,7 @@ Source-reference editing is still being corrected. Duplicate-target prevention i
 
 - 仅液态玻璃采用 Mail 式词条工作区：较窄的摘要列表与更宽的详情区，上方搜索框撑满列表，下方玻璃工具胶囊按内容宽度伸缩且不超过列表。搜索设置在胶囊内；排序按钮按当前顺序显示六种图标状态，菜单保留六项文字和键盘选择。词根展开/收起紧邻词根模式按钮，新建始终排在末尾。经典与层叠玻璃保持原布局；独立滤镜叶节点不改变弹层采样关系，光学不可用时使用匹配的 Q1，辅助模式使用实色。
 - 液态玻璃的右侧词条详情与完整编辑外壳固定使用 Q1：保留原 tint、边框和阴影，采用 `4px` CSS blur 与 `1.09×` 饱和度，不注册 Q3 或生成光学贴图；其他光学表面保留 Q3。
-- 实验：查看态详情中的衍生卡片使用紧凑 Q3（8px bezel、4px 最大位移、1px 模糊），复用已有几何缓存。完整编辑态卡片、来源链接和词条列表不变。
+- 实验：查看态详情与完整编辑态的衍生卡片均使用紧凑 Q3（8px bezel、4px 最大位移、1px 模糊），复用已有几何缓存；完整编辑态卡片仍为只读，不新增跳转行为。来源链接和词条列表不变。
 - 数据分析主／子页签和质量检查分类按钮也纳入同参数的紧凑 Q3 实验，复用全局缓存；保留换行、计数和禁用行为。
 
 ## Keyboard Shortcuts / 快捷键

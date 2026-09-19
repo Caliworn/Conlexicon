@@ -313,10 +313,10 @@ assert(
 );
 assert(
   liquidGlassSurfaceDefinitions.some(({ role, selector, registration, sampleBackdrop }) => (
-    role === "relationship" && selector === "#displayDerived .derived-link"
+    role === "relationship" && selector === "#displayDerived .derived-link, #fullEditDerived .derived-link"
       && registration === "automatic" && sampleBackdrop
   )),
-  "Derived-card Q3 experiment must stay scoped to display relations, not generic buttons or editor cards",
+  "Derived-card Q3 must cover both relation views without registering generic editor controls",
 );
 assert(liquidGlassSurfaceDefinitions.length > 0, "Liquid Glass must define its formal surface registry");
 for (const definition of liquidGlassSurfaceDefinitions) {

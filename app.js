@@ -8837,6 +8837,7 @@ function renderFullEditDerivedEntries(entry) {
   const derived = relationState.status === "success" ? relationState.relation.derivedEntries || [] : [];
   elements.fullEditDerivedSection.hidden = !derived.length;
   renderDerivedEntryList(elements.fullEditDerived, derived, activeDictionary(), { interactive: false });
+  liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
 
 function renderDerivedEntryList(container, derived = [], dictionary = activeDictionary(), { interactive = true } = {}) {

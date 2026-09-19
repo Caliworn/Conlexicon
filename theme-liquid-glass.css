@@ -398,6 +398,14 @@ body[data-ui-skin="liquid-glass"] :where(
   background-clip: padding-box;
 }
 
+/* Stable text-entry material; toolbar-specific overrides remain authoritative. */
+body[data-ui-skin="liquid-glass"] :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+  --material-control-background: var(--material-entry-detail-section-background);
+  --material-control-border: var(--material-entry-detail-section-border);
+  --material-control-shadow: none;
+  --material-control-filter: none;
+}
+
 /* Two independent decorative leaves; popup ancestors stay unfiltered. */
 body[data-ui-skin="liquid-glass"] :is(.entry-mail-search-surface, .entry-mail-tools-surface) {
   --liquid-glass-surface-tint: var(--material-mobile-bar-background);
@@ -500,7 +508,7 @@ body[data-ui-skin="liquid-glass"] :is(
 }
 
 /* Experimental compact Q3 surface; generic controls remain CSS-only. */
-body[data-ui-skin="liquid-glass"] :where(#displayDerived .derived-link),
+body[data-ui-skin="liquid-glass"] :where(#displayDerived .derived-link, #fullEditDerived .derived-link),
 body[data-ui-skin="liquid-glass"] .analysis-page-tabs button,
 body[data-ui-skin="liquid-glass"] .analysis-subpage-tabs button {
   --liquid-glass-surface-tint: var(--material-floating-background);
@@ -527,14 +535,14 @@ body[data-ui-skin="liquid-glass"] :is(.analysis-page-tabs, .analysis-subpage-tab
 }
 
 @media (prefers-reduced-transparency: reduce), (forced-colors: active) {
-  body[data-ui-skin="liquid-glass"] :where(#displayDerived .derived-link),
+  body[data-ui-skin="liquid-glass"] :where(#displayDerived .derived-link, #fullEditDerived .derived-link),
   body[data-ui-skin="liquid-glass"] :is(.analysis-page-tabs, .analysis-subpage-tabs) button {
     --liquid-glass-surface-q1-filter: none;
   }
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  body[data-ui-skin="liquid-glass"] :where(#displayDerived .derived-link),
+  body[data-ui-skin="liquid-glass"] :where(#displayDerived .derived-link, #fullEditDerived .derived-link),
   body[data-ui-skin="liquid-glass"] :is(.analysis-page-tabs, .analysis-subpage-tabs) button {
     --liquid-glass-surface-q1-filter: none;
   }
@@ -654,7 +662,8 @@ body[data-ui-skin="liquid-glass"]:not(.dark-theme) :is(
 }
 
 /* Repeated content cards stay CSS-only: no backdrop surface or optical resource. */
-body[data-ui-skin="liquid-glass"] .entry-card {
+body[data-ui-skin="liquid-glass"] .entry-card,
+body[data-ui-skin="liquid-glass"] .tool-order-card {
   background: var(--material-list-item-background);
   border-color: var(--liquid-glass-list-card-border);
   box-shadow: var(--liquid-glass-list-card-shadow);

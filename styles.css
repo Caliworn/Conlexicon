@@ -1125,28 +1125,6 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
   color: var(--ui-text-on-solid);
 }
 
-.active-filter-toolbar .active-filter-exit-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--active-filter-control-height);
-  min-height: var(--active-filter-control-height);
-  flex: 0 0 auto;
-  border-color: color-mix(in srgb, var(--ui-danger) 58%, transparent);
-  padding: 0 12px;
-  background: var(--material-control-background);
-  color: var(--ui-danger);
-  font-size: var(--active-filter-control-font-size);
-  font-weight: 800;
-  line-height: 1;
-}
-
-.active-filter-toolbar .active-filter-exit-button:hover {
-  border-color: var(--ui-danger);
-  background: var(--ui-danger);
-  color: var(--ui-text-on-solid);
-}
-
 .filter-row input:disabled,
 .filter-row select:disabled {
   cursor: not-allowed;
@@ -1164,12 +1142,6 @@ body.english-locale .root-mode-controls .active-filter-icon-button {
   width: var(--active-filter-control-height);
   height: var(--active-filter-control-height);
   padding: 0;
-  font-size: var(--active-filter-control-font-size);
-  line-height: 1;
-}
-
-body.english-locale .root-mode-controls .active-filter-exit-button {
-  padding: 0 12px;
   font-size: var(--active-filter-control-font-size);
   line-height: 1;
 }
@@ -1328,13 +1300,13 @@ label span {
 
 .mobile-new-entry-button:is(:hover, :focus-visible):not(:disabled),
 .secondary-button.entry-list-new-button:is(:hover, :focus-visible),
-.active-filter-toolbar :is(.filter-clear-button, .active-filter-exit-button):is(:hover, :focus-visible) {
+.active-filter-toolbar .filter-clear-button:is(:hover, :focus-visible) {
   box-shadow: var(--material-action-hover-shadow);
 }
 
 .mobile-new-entry-button:active:not(:disabled),
 .secondary-button.entry-list-new-button:active:not(:disabled),
-.active-filter-toolbar :is(.filter-clear-button, .active-filter-exit-button):active:not(:disabled) {
+.active-filter-toolbar .filter-clear-button:active:not(:disabled) {
   box-shadow: var(--material-action-pressed-shadow);
 }
 
