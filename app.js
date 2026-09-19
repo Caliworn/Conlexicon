@@ -8826,6 +8826,8 @@ function renderDerivedEntries(entry, relationState = entryRelationStateForEntry(
   const derived = relationState.status === "success" ? relationState.relation.derivedEntries || [] : [];
   elements.displayDerivedSection.hidden = !derived.length;
   renderDerivedEntryList(elements.displayDerived, derived, activeDictionary(), { interactive: true });
+  // Relations can arrive after the main view render; reconcile replaced cards too.
+  liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
 
 function renderFullEditDerivedEntries(entry) {
@@ -9599,6 +9601,15 @@ function morphologySearchStrings(entry, dictionary = activeDictionary()) {
 }
 
 function renderAnalysis(dictionary = activeDictionary()) {
+  try {
+    renderAnalysisContent(dictionary);
+  } finally {
+    // Async query completion and tab switches both replace the navigation DOM.
+    liquidGlassOpticalEngine?.syncMappedSurfaces();
+  }
+}
+
+function renderAnalysisContent(dictionary) {
   if (!elements.analysisPanel) {
     return;
   }
@@ -10480,6 +10491,7 @@ function renderQuality(dictionary = activeDictionary()) {
   disconnectMasonryLayoutsWithin(elements.qualityPanel);
   if (!dictionary) {
     elements.qualityPanel.innerHTML = "";
+    liquidGlassOpticalEngine?.syncMappedSurfaces();
     return;
   }
 
@@ -10488,6 +10500,7 @@ function renderQuality(dictionary = activeDictionary()) {
   const report = getQualityViewReport(dictionary);
   elements.qualityPanel.innerHTML = renderQualityPage(report);
   setupQualityMasonryLayouts();
+  liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
 
 function getQualityViewReport(dictionary) {

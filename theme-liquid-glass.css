@@ -86,7 +86,9 @@ body[data-ui-skin="liquid-glass"] {
   --liquid-glass-navigation-active-background: rgba(23, 124, 117, 0.14);
   --liquid-glass-navigation-active-border: rgba(23, 124, 117, 0.22);
   --liquid-glass-navigation-active-accent: #0d6f68;
-  --material-list-item-background: rgba(248, 251, 252, 0.79);
+  --material-list-item-background: rgba(248, 251, 252, 0.62);
+  --liquid-glass-list-card-border: rgba(9, 48, 57, 0.14);
+  --liquid-glass-list-card-shadow: 0 3px 10px rgba(20, 43, 51, 0.06);
   --material-list-item-secondary-color: inherit;
   --material-list-item-secondary-opacity: 0.77;
   --material-browser-background: rgba(232, 241, 243, 0.66);
@@ -188,7 +190,9 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --liquid-glass-navigation-active-background: rgba(82, 189, 176, 0.16);
   --liquid-glass-navigation-active-border: rgba(112, 220, 207, 0.25);
   --liquid-glass-navigation-active-accent: #75d7cb;
-  --material-list-item-background: rgba(26, 39, 45, 0.8);
+  --material-list-item-background: rgba(26, 39, 45, 0.64);
+  --liquid-glass-list-card-border: rgba(229, 255, 251, 0.16);
+  --liquid-glass-list-card-shadow: 0 3px 10px rgba(0, 0, 0, 0.16);
   --material-list-item-secondary-color: var(--ui-text-muted);
   --material-list-item-secondary-opacity: 1;
   --material-browser-background: rgba(12, 23, 29, 0.68);
@@ -495,6 +499,47 @@ body[data-ui-skin="liquid-glass"] :is(
   --liquid-glass-surface-q1-filter: var(--liquid-glass-q1-floating-filter);
 }
 
+/* Experimental compact Q3 surface; generic controls remain CSS-only. */
+body[data-ui-skin="liquid-glass"] :where(#displayDerived .derived-link),
+body[data-ui-skin="liquid-glass"] .analysis-page-tabs button,
+body[data-ui-skin="liquid-glass"] .analysis-subpage-tabs button {
+  --liquid-glass-surface-tint: var(--material-floating-background);
+  --liquid-glass-surface-q1-filter: blur(1px) saturate(1.04);
+  background: var(--liquid-glass-surface-tint);
+  border-color: var(--material-floating-border);
+  box-shadow: var(--liquid-glass-list-card-shadow);
+  backdrop-filter: var(--liquid-glass-surface-q1-filter);
+  -webkit-backdrop-filter: var(--liquid-glass-surface-q1-filter);
+}
+
+body[data-ui-skin="liquid-glass"] :where(#displayDerived) button.derived-link:hover {
+  border-color: var(--ui-accent);
+}
+
+body[data-ui-skin="liquid-glass"] :is(.analysis-page-tabs, .analysis-subpage-tabs) button:hover:not(:disabled) {
+  border-color: var(--ui-accent);
+}
+
+body[data-ui-skin="liquid-glass"] :is(.analysis-page-tabs, .analysis-subpage-tabs) button.active {
+  --liquid-glass-surface-tint: color-mix(in srgb, var(--material-floating-background) 92%, var(--ui-accent));
+  border-color: var(--ui-accent);
+  color: var(--ui-accent-hover);
+}
+
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+  body[data-ui-skin="liquid-glass"] :where(#displayDerived .derived-link),
+  body[data-ui-skin="liquid-glass"] :is(.analysis-page-tabs, .analysis-subpage-tabs) button {
+    --liquid-glass-surface-q1-filter: none;
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  body[data-ui-skin="liquid-glass"] :where(#displayDerived .derived-link),
+  body[data-ui-skin="liquid-glass"] :is(.analysis-page-tabs, .analysis-subpage-tabs) button {
+    --liquid-glass-surface-q1-filter: none;
+  }
+}
+
 body[data-ui-skin="liquid-glass"] .toast {
   border: 1px solid var(--material-floating-border);
   background: var(--material-floating-background);
@@ -544,6 +589,7 @@ body[data-ui-skin="liquid-glass"] :is(
 @supports ((backdrop-filter: url("#liquid-glass-optical-probe")) or (-webkit-backdrop-filter: url("#liquid-glass-optical-probe"))) {
   body[data-ui-skin="liquid-glass"][data-liquid-glass-optics-quality="q3"] :is(
     [data-liquid-glass-role="continuous"][data-liquid-glass-optics="ready"],
+    [data-liquid-glass-role="relationship"][data-liquid-glass-optics="ready"],
     [data-liquid-glass-role="focus"][data-liquid-glass-optics="ready"],
     [data-liquid-glass-role="floating"][data-liquid-glass-optics="ready"],
     [data-liquid-glass-role="modal"][data-liquid-glass-optics="ready"]
@@ -605,6 +651,23 @@ body[data-ui-skin="liquid-glass"]:not(.dark-theme) :is(
   .network-panel
 ) {
   border-color: rgba(9, 48, 57, 0.18);
+}
+
+/* Repeated content cards stay CSS-only: no backdrop surface or optical resource. */
+body[data-ui-skin="liquid-glass"] .entry-card {
+  background: var(--material-list-item-background);
+  border-color: var(--liquid-glass-list-card-border);
+  box-shadow: var(--liquid-glass-list-card-shadow);
+}
+
+body[data-ui-skin="liquid-glass"] .entry-card:hover {
+  background: color-mix(in srgb, var(--material-list-item-background) 90%, var(--ui-canvas-bg));
+  border-color: var(--ui-accent);
+}
+
+body[data-ui-skin="liquid-glass"] .entry-card.active {
+  background: color-mix(in srgb, var(--material-list-item-background) 94%, var(--ui-accent));
+  border-color: var(--ui-accent);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -814,6 +877,8 @@ body[data-ui-skin="liquid-glass"]:not(.dark-theme) :is(
     --material-navigation-control-hover-shadow: none;
     --material-navigation-control-pressed-shadow: none;
     --material-list-item-background: Canvas;
+    --liquid-glass-list-card-border: CanvasText;
+    --liquid-glass-list-card-shadow: none;
     --material-browser-background: Canvas;
     --material-rich-tooltip-background: Canvas;
     --material-rich-tooltip-border: CanvasText;
@@ -826,6 +891,17 @@ body[data-ui-skin="liquid-glass"]:not(.dark-theme) :is(
     --material-overlay-drawer-background: transparent;
     --material-overlay-panel-background: Canvas;
     --material-overlay-panel-shadow: none;
+  }
+
+  body[data-ui-skin="liquid-glass"] .entry-card:is(:hover, .active) {
+    background: Canvas;
+    border-color: Highlight;
+  }
+
+  body[data-ui-skin="liquid-glass"] :is(.analysis-page-tabs, .analysis-subpage-tabs) button.active {
+    --liquid-glass-surface-tint: Canvas;
+    color: Highlight;
+    border-color: Highlight;
   }
 
   body[data-ui-skin="liquid-glass"] .dictionary-panel {

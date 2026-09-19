@@ -304,6 +304,20 @@ assert(
   "Liquid Glass refraction must be a progressive enhancement behind a URL-filter support query",
 );
 const liquidGlassSurfaceDefinitions = liquidGlassEngineApi.SURFACE_ROLE_DEFINITIONS;
+assert(
+  liquidGlassSurfaceDefinitions.some(({ role, selector, registration, sampleBackdrop }) => (
+    role === "relationship" && selector === ".analysis-page-tabs button, .analysis-subpage-tabs button"
+      && registration === "automatic" && sampleBackdrop
+  )),
+  "Compact Q3 tab experiment must cover analysis and the shared quality-category navigation",
+);
+assert(
+  liquidGlassSurfaceDefinitions.some(({ role, selector, registration, sampleBackdrop }) => (
+    role === "relationship" && selector === "#displayDerived .derived-link"
+      && registration === "automatic" && sampleBackdrop
+  )),
+  "Derived-card Q3 experiment must stay scoped to display relations, not generic buttons or editor cards",
+);
 assert(liquidGlassSurfaceDefinitions.length > 0, "Liquid Glass must define its formal surface registry");
 for (const definition of liquidGlassSurfaceDefinitions) {
   assert(
