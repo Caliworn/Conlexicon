@@ -4990,28 +4990,67 @@ function renderVirtualListWindow(virtualList) {
   const overscan = Math.max(500, viewportHeight);
   const start = virtualListIndexAt(offsets, Math.max(0, container.scrollTop - overscan));
   const end = Math.min(items.length, virtualListIndexAt(offsets, container.scrollTop + viewportHeight + overscan) + 1);
-  const fragment = document.createDocumentFragment();
+  const previousRows = virtualList.updateItem
+    ? new Map([...container.querySelectorAll(":scope > .virtual-list-row")].map((row) => [row.dataset.virtualKey, row]))
+    : new Map();
+  const oldDisclosureButtons = container === elements.entryList
+    ? new Set(container.querySelectorAll(".content-disclosure-button"))
+    : new Set();
+  const nextNodes = [];
   const topSpacer = document.createElement("div");
   topSpacer.className = "virtual-list-spacer";
   topSpacer.style.height = `${offsets[start]}px`;
-  fragment.append(topSpacer);
+  nextNodes.push(topSpacer);
   for (let index = start; index < end; index += 1) {
     const item = items[index];
-    const row = document.createElement("div");
+    let row = previousRows.get(item.key);
+    if (!row || !virtualList.updateItem(row.firstElementChild, item.value)) {
+      row = document.createElement("div");
+      row.append(virtualList.renderItem(item.value));
+    }
     row.className = "virtual-list-row";
     row.dataset.virtualKey = item.key;
     if (item.sizeCacheKey) {
       row.dataset.virtualSizeKey = item.sizeCacheKey;
+    } else {
+      delete row.dataset.virtualSizeKey;
     }
-    row.append(virtualList.renderItem(item.value));
-    fragment.append(row);
+    nextNodes.push(row);
   }
   const bottomSpacer = document.createElement("div");
   bottomSpacer.className = "virtual-list-spacer";
   bottomSpacer.style.height = `${Math.max(0, offsets[offsets.length - 1] - offsets[end])}px`;
-  fragment.append(bottomSpacer);
+  nextNodes.push(bottomSpacer);
   virtualList.resizeObserver?.disconnect();
-  container.replaceChildren(fragment);
+  // Leave retained roots connected: detaching them would cancel CSS transitions
+  // and keyboard focus even if the same button object were inserted again.
+  if (virtualList.updateItem) {
+    const retained = new Set(nextNodes);
+    [...container.children].forEach((node) => {
+      if (!retained.has(node)) node.remove();
+    });
+    let cursor = container.firstElementChild;
+    nextNodes.forEach((node) => {
+      if (node === cursor) {
+        cursor = cursor.nextElementSibling;
+      } else if (node.parentElement === container && container.moveBefore) {
+        container.moveBefore(node, cursor);
+      } else {
+        container.insertBefore(node, cursor);
+      }
+    });
+  } else {
+    container.replaceChildren(...nextNodes);
+  }
+  if (container === elements.entryList) {
+    const nextButtons = new Set(container.querySelectorAll(".content-disclosure-button"));
+    oldDisclosureButtons.forEach((button) => {
+      if (!nextButtons.has(button)) liquidGlassOpticalEngine?.unregisterMappedSurface(button);
+    });
+    nextButtons.forEach((button) => {
+      if (!oldDisclosureButtons.has(button)) liquidGlassOpticalEngine?.registerMappedSurface(button);
+    });
+  }
   container.querySelectorAll(".virtual-list-row").forEach((row) => virtualList.resizeObserver?.observe(row));
   virtualList.onRangeChange?.({
     start,
@@ -5048,8 +5087,14 @@ function renderVirtualList(container, virtualList, items, options) {
   virtualList.pendingSizeUpdates.clear();
   container.classList.add("virtualized-list");
   const resetScroll = virtualList.resetToken !== options.resetToken;
+  if (resetScroll) {
+    container.querySelectorAll(".virtual-list-row").forEach((row) => {
+      delete row.dataset.virtualKey;
+    });
+  }
   virtualList.resetToken = options.resetToken;
   virtualList.renderItem = options.renderItem;
+  virtualList.updateItem = options.updateItem || null;
   virtualList.onRangeChange = typeof options.onRangeChange === "function" ? options.onRangeChange : null;
   const previousSizeCacheKeys = virtualList.sizeCacheKeys;
   const nextSizeCacheKeys = new Map();
@@ -5119,6 +5164,10 @@ function renderVirtualListEmpty(container, virtualList, content) {
   virtualList.sizeCacheKeys.clear();
   virtualList.offsets = [0];
   container.classList.remove("virtualized-list");
+  if (container === elements.entryList) {
+    container.querySelectorAll(".content-disclosure-button").forEach((button) =>
+      liquidGlassOpticalEngine?.unregisterMappedSurface(button));
+  }
   container.replaceChildren(content);
 }
 
@@ -5563,6 +5612,7 @@ function renderRootModeGroups(groups = [], options = {}) {
         settingsSizeSignature,
       })
       : entryCardSizeCacheKey(row.entry, { role: "derived", rootId: row.rootId, settingsSizeSignature }),
+    updateItem: updateRootModeRow,
     renderItem: (row) => row.kind === "window-placeholder"
       ? renderQueryWindowPlaceholder(row)
       : renderRootModeRow(row),
@@ -6867,6 +6917,26 @@ function startEntryFacetsApiCheck(dictionary) {
     });
 }
 
+function updateRootModeRow(wrapper, row) {
+  if (row.kind !== "root" || !wrapper?.classList.contains("root-entry-group")
+    || wrapper.dataset.rootId !== row.group.root.id) return false;
+  const toggle = wrapper.querySelector(".root-toggle-button");
+  if (Boolean(toggle) !== Boolean(row.group.derivedCount)) return false;
+  const { group, expanded } = row;
+  if (expanded && !rootGroupDerivedState(activeDictionary(), group.root.id)) {
+    startRootGroupDerivedLoad(activeDictionary(), group.root.id);
+  }
+  // Refresh entry data while keeping the connected disclosure node and its Q3 resource.
+  wrapper.firstElementChild.replaceWith(createEntryCard(group.root, { root: true, rootId: group.root.id }));
+  if (toggle) {
+    toggle.disabled = rootSearchExpandsGroups() && rootGroupMatchedDerivedCount(group) > 0;
+    toggle.classList.toggle("expanded", expanded);
+    toggle.setAttribute("aria-label", expanded ? t("collapse") : t("expand"));
+    toggle.setAttribute("aria-expanded", String(expanded));
+  }
+  return true;
+}
+
 function renderRootModeRow(row) {
   if (row.kind === "truncation") {
     return renderEntryQueryTruncationNotice(row);
@@ -6903,11 +6973,12 @@ function renderRootModeRow(row) {
     const toggle = document.createElement("button");
     const searchAutoExpanded = rootSearchExpandsGroups() && rootGroupMatchedDerivedCount(group) > 0;
     toggle.type = "button";
-    toggle.className = `root-toggle-button${expanded ? " expanded" : ""}`;
+    toggle.className = `content-disclosure-button root-toggle-button${expanded ? " expanded" : ""}`;
     toggle.disabled = searchAutoExpanded;
     toggle.dataset.appTooltip = "always";
     toggle.setAttribute("aria-label", expanded ? t("collapse") : t("expand"));
-    toggle.innerHTML = '<span class="chevron-icon" aria-hidden="true"></span>';
+    toggle.setAttribute("aria-expanded", String(expanded));
+    toggle.innerHTML = '<svg class="content-disclosure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>';
     toggle.addEventListener("click", (event) => {
       event.stopPropagation();
       rootNavigationContextId = group.root.id;
@@ -11842,6 +11913,7 @@ function renderDictionaryManager() {
 
   if (!state.dictionaries.length) {
     elements.dictionaryManagerList.append(emptyState(t("noDictionary"), t("emptyDictionaryBody")));
+    liquidGlassOpticalEngine?.syncMappedSurfaces();
     return;
   }
 
@@ -11881,6 +11953,7 @@ function renderDictionaryManager() {
     card.querySelector('[data-action="export"]').addEventListener("click", () => exportDictionary(dictionary.id));
     elements.dictionaryManagerList.append(card);
   });
+  liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
 
 function fillEntryForm(entry) {
@@ -11974,6 +12047,7 @@ function renderMorphologyEntryControls(host, entry = {}, { full = false } = {}) 
     <p class="field-help" data-i18n="morphologyOverrideHelp">${escapeHtml(t("morphologyOverrideHelp"))}</p>
     <div class="entry-morphology-group-list">${groups.map(({ templateGroup, entryGroup }, index) => renderEntryMorphologyGroupEditor(templateGroup, entryGroup, previewEntry, state.morphologyMode, index, groups.length)).join("")}</div>
   `;
+  liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
 
 function renderEntryMorphologyGroupEditor(templateGroup, entryGroup, entry, mode, index = 0, total = 1) {
@@ -14488,10 +14562,12 @@ function renderMorphologyTablesConfig(dictionary) {
   }
   elements.morphologyTableList.innerHTML = "";
   if (!dictionary) {
+    liquidGlassOpticalEngine?.syncMappedSurfaces();
     return;
   }
   const groups = normalizeMorphology(dictionary.morphology).templateGroups;
   groups.forEach((group, index) => elements.morphologyTableList.append(createMorphologyGroupEditor(group, index)));
+  liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
 
 function createMorphologyGroupEditor(group, index) {
@@ -14564,8 +14640,8 @@ function createMorphologyTableEditor(table) {
         <div>
           <div class="morphology-card-title-row">
             <input data-field="title" value="${escapeHtml(table.title)}" data-i18n-aria-label="tableName" aria-label="${escapeHtml(t("tableName"))}">
-            <button class="morphology-table-toggle${expanded ? " is-expanded" : ""}" type="button" data-action="toggle-morphology-table" data-app-tooltip="always" aria-expanded="${expanded}" data-i18n-aria-label="${toggleLabelKey}" aria-label="${escapeHtml(t(toggleLabelKey))}">
-              <svg class="morphology-table-toggle-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"></path></svg>
+            <button class="content-disclosure-button morphology-table-toggle${expanded ? " is-expanded" : ""}" type="button" data-action="toggle-morphology-table" data-app-tooltip="always" aria-expanded="${expanded}" data-i18n-aria-label="${toggleLabelKey}" aria-label="${escapeHtml(t(toggleLabelKey))}">
+              <svg class="content-disclosure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
             </button>
           </div>
         </div>
@@ -15197,6 +15273,7 @@ async function openPartialEdit(section) {
   }
 
   body.querySelector("input, textarea")?.focus();
+  liquidGlassOpticalEngine?.syncMappedSurfaces();
   return true;
 }
 
@@ -15412,6 +15489,7 @@ function cancelPartialEdit() {
   partialEditHost?.classList.remove("partial-editing");
   partialEditHost = null;
   partialEditSection = "";
+  liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
 
 function createEntryDraft(overrides = {}) {
@@ -17230,6 +17308,7 @@ elements.morphologyTableList.addEventListener("click", (event) => {
     removeGroupButton.closest(".morphology-group-card")?.querySelectorAll(".morphology-config-card")
       .forEach((tableCard) => expandedMorphologyTables.delete(tableCard.dataset.templateTableId));
     removeGroupButton.closest(".morphology-group-card")?.remove();
+    liquidGlassOpticalEngine?.syncMappedSurfaces();
     return;
   }
 
@@ -17257,6 +17336,7 @@ elements.morphologyTableList.addEventListener("click", (event) => {
   if (removeButton) {
     expandedMorphologyTables.delete(removeButton.closest(".morphology-config-card").dataset.templateTableId);
     removeButton.closest(".morphology-config-card").remove();
+    liquidGlassOpticalEngine?.syncMappedSurfaces();
     return;
   }
   const resizeButton = event.target.closest('[data-action="resize-morphology-table"]');

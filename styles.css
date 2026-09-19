@@ -2192,28 +2192,42 @@ button.pending-source:focus-visible {
   max-width: 320px;
 }
 
-.morphology-table-toggle {
+.content-disclosure-button {
   display: inline-grid;
   flex: 0 0 auto;
   place-items: center;
   width: 30px;
   height: 30px;
   padding: 0;
-  border: 1px solid var(--material-control-border);
-  border-radius: 7px;
-  background: var(--material-control-background);
+  border: 1px solid var(--material-inset-border);
+  border-radius: var(--radius-control);
+  background: var(--material-inset-background);
   color: var(--ui-text-muted);
 }
 
-.morphology-table-toggle:hover,
-.morphology-table-toggle:focus-visible {
+.content-disclosure-button:hover:not(:disabled) {
   border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
   color: var(--ui-accent);
 }
 
-.morphology-table-toggle-icon {
-  width: 17px;
-  height: 17px;
+.content-disclosure-button:active:not(:disabled) {
+  background: color-mix(in srgb, var(--ui-accent-soft) 85%, var(--ui-accent));
+}
+
+.content-disclosure-button:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+.content-disclosure-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.content-disclosure-icon {
+  width: 18px;
+  height: 18px;
   fill: none;
   stroke: currentColor;
   stroke-linecap: round;
@@ -2223,7 +2237,7 @@ button.pending-source:focus-visible {
   transition: transform 160ms ease;
 }
 
-.morphology-table-toggle.is-expanded .morphology-table-toggle-icon {
+.content-disclosure-button[aria-expanded="true"] .content-disclosure-icon {
   transform: rotate(0deg);
 }
 
@@ -2499,42 +2513,7 @@ button.pending-source:focus-visible {
 }
 
 .root-toggle-button {
-  display: inline-grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
   margin-left: 18px;
-  border: 1px solid var(--material-control-border);
-  border-radius: var(--radius-pill);
-  padding: 0;
-  background: var(--material-control-background);
-  color: var(--ui-accent);
-  cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease;
-}
-
-.root-toggle-button:hover:not(:disabled) {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-}
-
-.root-toggle-button:disabled {
-  color: var(--ui-text-muted);
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.root-toggle-button .chevron-icon {
-  width: 8px;
-  height: 8px;
-  border-right: 2px solid currentColor;
-  border-bottom: 2px solid currentColor;
-  transform: rotate(-45deg);
-  transition: transform 120ms ease;
-}
-
-.root-toggle-button.expanded .chevron-icon {
-  transform: rotate(45deg);
 }
 
 .root-derived-list {
@@ -5762,10 +5741,10 @@ textarea.ipa-single-line::-webkit-scrollbar {
   .app-shell,
   .dictionary-panel,
   .nav-collapse-icon,
+  .nav-collapse-arrow,
   .content-grid,
   .entry-browser-toggle-icon,
-  .morphology-table-toggle-icon,
-  .root-toggle-button .chevron-icon,
+  .content-disclosure-icon,
   .entry-quality-issue-tooltip,
   .toast,
   .theme-toggle-glyph {

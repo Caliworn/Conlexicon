@@ -18,6 +18,75 @@ function almostEqual(actual, expected, epsilon, message) {
   );
 }
 
+// Evaluate the actual generated RGB recombination nodes in premultiplied RGBA.
+// A translucent backdrop root must not become darker merely by splitting RGB.
+{
+  const makeNode = (name) => ({
+    name, attrs: {}, children: [],
+    setAttribute(key, value) { this.attrs[key] = value; },
+    append(...nodes) { this.children.push(...nodes); },
+  });
+  const host = makeNode("defs");
+  const engine = new LiquidGlassEngine({
+    document: { createElementNS: (_, name) => makeNode(name), querySelector: () => host },
+  });
+  const { filterElement } = engine.createFilter("alpha-test", ["map", "rim"], {
+    width: 120, height: 38, maxDisplacement: 4, opticalBlur: 1,
+    saturation: 1, specularStrength: 0.48,
+  });
+  const start = filterElement.children.findIndex((node) => node.attrs.result === "opticalRedChannel");
+  const end = filterElement.children.findIndex((node) => node.attrs.result === "opticalColor");
+  const nodes = filterElement.children.slice(start, end + 1);
+  const clamp = (value) => Math.max(0, Math.min(1, value));
+  const evaluate = (samples) => {
+    const results = Object.fromEntries(["Red", "Green", "Blue"].map((channel, index) => [
+      `opticalRefracted${channel}`, samples[index],
+    ]));
+    for (const { name, attrs } of nodes) {
+      const input = results[attrs.in];
+      let output;
+      if (name === "feColorMatrix") {
+        if (attrs.type === "saturate") {
+          assert.equal(Number(attrs.values), 1);
+          output = input;
+        } else {
+          const matrix = attrs.values.split(" ").map(Number);
+          const straight = input.slice(0, 3).map((v) => input[3] ? v / input[3] : 0);
+          const vector = [...straight, input[3], 1];
+          const rgba = Array.from({ length: 4 }, (_, row) => clamp(
+            vector.reduce((sum, v, column) => sum + v * matrix[row * 5 + column], 0),
+          ));
+          output = [...rgba.slice(0, 3).map((v) => v * rgba[3]), rgba[3]];
+        }
+      } else if (name === "feBlend") {
+        assert.equal(attrs.mode, "screen");
+        const other = results[attrs.in2];
+        output = input.map((v, index) => v + other[index] - v * other[index]);
+      } else {
+        assert.equal(name, "feComposite");
+        assert.equal(attrs.operator, "in");
+        output = input.map((v) => v * results[attrs.in2][3]);
+      }
+      results[attrs.result] = output;
+    }
+    return results.opticalColor;
+  };
+  for (const alpha of [0, 0.1, 0.3, 0.56, 1]) {
+    for (const color of [[1, 1, 1], [0.06, 0.1, 0.12], [0.8, 0.45, 0.2]]) {
+      const pixel = [...color.map((v) => v * alpha), alpha];
+      evaluate([pixel, pixel, pixel]).forEach((value, channel) => {
+        almostEqual(value, pixel[channel], 1e-12,
+          `RGB reconstruction must preserve channel ${channel} at alpha ${alpha}`);
+      });
+    }
+  }
+  const colored = evaluate([[0.2, 0, 0, 0.25], [0, 0.3, 0, 0.5], [0, 0, 0.3, 0.75]]);
+  [0.4, 0.3, 0.2, 0.5].forEach((expected, channel) => {
+    almostEqual(colored[channel], expected, 1e-12,
+      "Chromatic offsets retain each sampled color with baseline green coverage");
+  });
+}
+
 const options = geometry.normalizeSurfaceOptions({
   width: 200,
   height: 100,

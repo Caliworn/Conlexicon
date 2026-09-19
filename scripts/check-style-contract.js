@@ -305,6 +305,17 @@ assert(
 );
 const liquidGlassSurfaceDefinitions = liquidGlassEngineApi.SURFACE_ROLE_DEFINITIONS;
 assert(
+  liquidGlassSurfaceDefinitions.some(({ selector, registration, sampleBackdrop }) => (
+    selector === ".content-disclosure-button" && registration === "automatic" && sampleBackdrop
+  )),
+  "Content disclosure controls must share one Q3 registration boundary",
+);
+assert(
+  app.includes('toggle.setAttribute("aria-expanded", String(expanded))')
+    && styles.includes('.content-disclosure-button[aria-expanded="true"] .content-disclosure-icon'),
+  "Disclosure direction must follow the accessible expanded state",
+);
+assert(
   liquidGlassSurfaceDefinitions.some(({ role, selector, registration, sampleBackdrop }) => (
     role === "relationship" && selector === ".analysis-page-tabs button, .analysis-subpage-tabs button"
       && registration === "automatic" && sampleBackdrop
@@ -469,7 +480,7 @@ for (const explicitSelector of [
   ".entry-quality-issue-tooltip",
   ".toast",
 ]) {
-  const definition = liquidGlassSurfaceDefinitions.find(({ selector }) => selector.includes(explicitSelector));
+  const definition = liquidGlassSurfaceDefinitions.find(({ selector }) => selector.split(", ").includes(explicitSelector));
   assert.equal(
     definition?.registration,
     "explicit",
