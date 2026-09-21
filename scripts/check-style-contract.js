@@ -143,7 +143,153 @@ assert(classicDarkTheme, "Classic must define a dark fallback scope");
 assert(!/:root\b/.test(classic), "Classic skin values must not modify the shared root scope");
 const classicLightTokenValues = customPropertyMap(classicLightTheme[1]);
 const classicDarkTokenValues = customPropertyMap(classicDarkTheme[1]);
+// Palette resolution checks all three skins without requiring browser fixtures.
+// This is not a substitute for computed-style/visual acceptance.
+const controlProperties = (block) => Object.fromEntries(
+  [...block.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)].map((match) => [match[1], match[2].trim()]),
+);
+const controlDefaults = scopedBlock(styles, ":where([data-control-tone][data-control-emphasis])");
+assert(controlDefaults, "Semantic control defaults must be opt-in and lower-specificity than tone/emphasis recipes");
+for (const [source, lightSelector, darkSelector] of [
+  [classic, classicScope, classicDarkScope],
+  [layeredGlass, 'body[data-ui-skin="layered-glass"]', 'body.dark-theme[data-ui-skin="layered-glass"]'],
+  [liquidGlass, 'body[data-ui-skin="liquid-glass"]', 'body.dark-theme[data-ui-skin="liquid-glass"]'],
+]) {
+  for (const dark of [false, true]) {
+    const skin = {
+      ...controlProperties(scopedBlock(source, lightSelector)[1]),
+      ...(dark ? controlProperties(scopedBlock(source, darkSelector)[1]) : {}),
+    };
+    for (const tone of ["neutral", "accent", "danger"]) {
+      const toneBlock = tone === "neutral" ? "" : scopedBlock(styles, `[data-control-tone="${tone}"]`)?.[1];
+      assert(toneBlock !== undefined, `Missing control tone: ${tone}`);
+      for (const emphasis of ["plain", "outline", "tinted", "solid"]) {
+        const emphasisBlock = scopedBlock(styles, `[data-control-emphasis="${emphasis}"]`);
+        assert(emphasisBlock, `Missing control emphasis: ${emphasis}`);
+        const values = { ...skin, ...controlProperties(controlDefaults[1]),
+          ...controlProperties(toneBlock), ...controlProperties(emphasisBlock[1]) };
+        const resolve = (name, depth = 0) => {
+          assert(depth < 20 && values[name] !== undefined, `Unresolved semantic control alias: ${name}`);
+          return values[name].replace(/var\((--[a-z0-9-]+)\)/g, (_, token) => resolve(token, depth + 1));
+        };
+        const colorToken = tone === "neutral" ? "--ui-text" : `--ui-${tone}`;
+        assert.equal(resolve("--control-color"), resolve(emphasis === "solid"
+          ? "--control-tone-on-solid" : colorToken));
+        assert.equal(resolve("--control-border"), emphasis === "outline" ? resolve(colorToken) : "transparent");
+        const background = { plain: null, outline: "--material-panel-background",
+          tinted: "--control-tone-tint", solid: "--control-tone-solid" }[emphasis];
+        assert.equal(resolve("--control-background"), background ? resolve(background) : "transparent");
+        assert.equal(resolve("--control-pressed-color"), resolve("--control-hover-color"));
+        if (emphasis === "solid") {
+          assert.equal(resolve("--control-disabled-background"), resolve("--material-inset-background"),
+            "Disabled solid actions neutralize the fill as well as the text");
+          assert.equal(resolve("--control-disabled-color"), resolve("--ui-text"),
+            "Disabled solid actions retain readable foreground instead of muted text on accent fill");
+        }
+        if (tone === "danger" && emphasis !== "solid") {
+          assert.equal(resolve("--control-hover-color"), resolve("--ui-danger"), "Danger interactions retain danger ink");
+          assert.equal(resolve("--control-hover-background"), resolve("--ui-danger-soft"));
+        }
+      }
+    }
+  }
+}
+const currentDictionaryState = scopedBlock(styles, ".current-dictionary-button[data-control-tone]:disabled");
+assert(currentDictionaryState, "Current dictionary is a selected status, not an unavailable action");
+const currentDictionaryPaint = controlProperties(currentDictionaryState[1]);
+assert.equal(currentDictionaryPaint["--control-disabled-background"], "var(--control-background)");
+assert.equal(currentDictionaryPaint["--control-disabled-color"], "var(--control-color)",
+  "Current status must retain its solid foreground/fill pair");
+const mailControlPaint = liquidGlass.match(
+  /body\[data-ui-skin="liquid-glass"\] \.entry-list-toolbar :where\(([\s\S]*?)\)\s*\{([^}]+)\}/,
+);
+assert(mailControlPaint, "Mail controls must consume their shared outer glass material");
+assert(mailControlPaint[1].includes(".entry-mail-primary-tools > button"),
+  "Mail ownership must include the new-entry quick action");
+const mailControlProperties = controlProperties(mailControlPaint[2]);
+assert.equal(mailControlProperties["--control-background"], "transparent",
+  "Semantic controls inside Mail must not paint an independent panel block");
+assert(mailControlProperties["--control-hover-background"].includes("--control-tone-color"),
+  "Mail hover tint must follow the control tone");
+for (const match of `${app}\n${index}`.matchAll(/<button\b([^>]*data-control-tone="([^"]+)"[^>]*)>/g)) {
+  assert(["neutral", "accent", "danger"].includes(match[2]), "Controls must use a supported semantic tone");
+  assert(/data-control-emphasis="(plain|outline|tinted|solid)"/.test(match[1]), "Semantic controls need an explicit emphasis");
+}
+for (const match of `${app}\n${index}`.matchAll(/<button\b([^>]*class="([^"]+)"[^>]*)>/g)) {
+  const [, attributes, classList] = match;
+  const classes = new Set(classList.split(/\s+/));
+  let expected;
+  if (classes.has("primary-button")) expected = ["accent", "solid"];
+  else if (classes.has("danger-button")) expected = ["danger", "solid"];
+  else if (classes.has("additive-button")) expected = ["accent", "outline"];
+  else if (classes.has("icon-danger-button")
+    || (classes.has("danger-ghost") && !attributes.includes('id="confirmAlternateButton"'))) {
+    expected = ["danger", "tinted"];
+  }
+  if (!expected) continue;
+  assert(attributes.includes(`data-control-tone="${expected[0]}"`)
+    && attributes.includes(`data-control-emphasis="${expected[1]}"`),
+  `Migrated button family must explicitly declare its semantic paint: ${classList}`);
+}
+// Execute the real prompt setup functions: a reused danger dialog must reset to
+// accent for an ordinary confirmation or an edit-switch Save action.
+{
+  const vm = require("node:vm");
+  const acceptClasses = new Set();
+  const accept = {
+    dataset: {},
+    classList: {
+      toggle(name, enabled) { enabled ? acceptClasses.add(name) : acceptClasses.delete(name); },
+      add(name) { acceptClasses.add(name); },
+      remove(name) { acceptClasses.delete(name); },
+    },
+    focus() {},
+  };
+  const context = vm.createContext({
+    confirmDialogResolver: null, confirmDialogResults: null,
+    closeConfirmDialog() {}, t: (key) => key, liquidGlassOpticalEngine: null,
+    elements: { confirmAcceptButton: accept, confirmDialogTitle: {}, confirmDialogMessage: {},
+      confirmCancelButton: {}, confirmAlternateButton: {}, confirmDialog: {} },
+  });
+  vm.runInContext(app.slice(app.indexOf("function appConfirm("), app.indexOf("const API_ERROR_TOAST_KEYS")), context);
+  for (const [call, tone] of [
+    ['appConfirm("delete", { danger: true })', "danger"],
+    ['appConfirm("confirm")', "accent"],
+    ['appConfirm("delete", { danger: true })', "danger"],
+    ['appEditSwitchPrompt("save")', "accent"],
+  ]) {
+    vm.runInContext(call, context);
+    assert.equal(accept.dataset.controlTone, tone, "Reused dialog must update its semantic tone");
+    assert.equal(accept.dataset.controlEmphasis, "solid");
+    assert.equal(acceptClasses.has("danger-button"), tone === "danger");
+    assert.equal(acceptClasses.has("primary-button"), tone === "accent");
+  }
+}
 const classicDefinitions = new Set(classicLightTokenValues.keys());
+for (const marker of [
+  'id="mobileNewEntryButton"', 'id="entryListNewEntryButton"', 'id="addIpaMappingButton"',
+  'id="activeFilterRefreshButton"', 'id="activeFilterCycleButton"',
+  'data-action="add-corpus-attribute"', 'data-action="add-corpus-layer"', 'data-action="link-corpus-unit"',
+]) {
+  const opening = [...`${index}\n${app}`.matchAll(/<button\b[^>]*>/g)]
+    .find(([tag]) => tag.includes(marker))?.[0];
+  assert(opening?.includes('data-control-tone="accent"')
+    && opening.includes('data-control-emphasis="outline"'),
+  `Add/link and outlined quick actions must share the accent outline recipe: ${marker}`);
+}
+const opticalOutlineSelector = 'body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"][data-control-tone][data-control-emphasis="outline"]';
+const opticalOutline = controlProperties(scopedBlock(liquidGlass, opticalOutlineSelector)[1]);
+assert.equal(opticalOutline["--control-background"], "var(--material-floating-background)",
+  "Optical outlines use the translucent role material, not an opaque panel");
+assert(scopedBlock(liquidGlass, opticalOutlineSelector)[1].includes("border-color: var(--control-border)"),
+  "Optical outlines preserve semantic edges");
+for (const state of ["hover", "active"]) {
+  const block = scopedBlock(liquidGlass, opticalOutlineSelector + `:${state}:not(:disabled):not([aria-disabled="true"])`);
+  const paintState = state === "active" ? "pressed" : "hover";
+  assert(block?.[1].includes(`--liquid-glass-surface-tint: var(--control-${paintState}-background)`)
+    && block[1].includes(`border-color: var(--control-${paintState}-border)`),
+  "Optical outline interactions consume semantic state colors");
+}
 const tokenDefinitions = new Set(classicDefinitions);
 const tokenReferences = new Set(
   [...`${classic}\n${layeredGlass}\n${liquidGlass}\n${styles}`.matchAll(/var\(\s*(--(?:ui|material|radius)-[a-z0-9-]+)/g)]
@@ -305,8 +451,18 @@ assert(
 );
 const liquidGlassSurfaceDefinitions = liquidGlassEngineApi.SURFACE_ROLE_DEFINITIONS;
 assert(
+  liquidGlassSurfaceDefinitions.find(({ selector }) => selector === liquidGlassEngineApi.COMPACT_CONTROL_SELECTOR)?.excludeInsideBackdrop,
+  "Unified compact controls must exclude intended Q3 ancestors, independent of runtime readiness",
+);
+assert(
+  [...liquidGlass.matchAll(/--material-control-background:\s*([^;]+);/g)]
+    .every((match) => !match[1].includes("gradient(")),
+  "Ordinary controls excluded from nested Q3 must retain a neutral CSS fallback",
+);
+assert(
   liquidGlassSurfaceDefinitions.some(({ selector, registration, sampleBackdrop }) => (
-    selector === ".content-disclosure-button" && registration === "automatic" && sampleBackdrop
+    selector === liquidGlassEngineApi.COMPACT_CONTROL_SELECTOR
+      && selector.includes(".content-disclosure-button") && registration === "automatic" && sampleBackdrop
   )),
   "Content disclosure controls must share one Q3 registration boundary",
 );
@@ -451,7 +607,7 @@ assert(
   "Liquid Glass product backgrounds must not paint diagnostic grid textures",
 );
 for (const definition of liquidGlassSurfaceDefinitions) {
-  for (const selector of definition.selector.split(",").map((value) => value.trim())) {
+  for (const selector of (definition.role === "relationship" ? [] : definition.selector.split(",").map((value) => value.trim()))) {
     assert(
       liquidGlass.includes(selector),
       `Liquid Glass CSS must configure the ${definition.role} registry selector: ${selector}`,

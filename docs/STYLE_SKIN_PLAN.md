@@ -16,6 +16,54 @@
 
 布局间距、虚拟列表尺寸、网格轨道、响应式断点和 z-index 不属于皮肤，不迁入共享 token。`uiTheme` 仍只表达 light/dark，`uiSkin` 的公开取值和持久化协议不因文件拆分改变。
 
+### 控件颜色语义接口（2026-09-20）
+
+共享组件可显式声明 `data-control-tone="neutral|accent|danger"` 与
+`data-control-emphasis="plain|outline|tinted|solid"`。两个属性一起使用，未声明的组件继续走原有样式。
+这只是颜色与强调接口，不是 Q3 注册接口，也不改变尺寸、布局、阴影、按压变换或业务行为。
+
+| emphasis | 默认底色 / 边框 | 用途 |
+| --- | --- | --- |
+| plain | 透明 / 透明 | 低强调操作 |
+| outline | 同皮肤 panel 中性底 / tone 色 | 描边操作 |
+| tinted | tone 弱底 / 初始透明边框 | 弱有色底操作 |
+| solid | tone 实色 / 初始透明边框 | 高强调操作 |
+
+局部 `--control-tone-*` 从当前皮肤的 `--ui-*` / `--material-*` 取值；
+`--control-background`、`--control-border`、`--control-color` 及 hover/pressed 对应变量是组件消费端。
+别名在控件本身声明，避免在 body 声明后绑定浅色值。无需新增一套同义全局颜色 token。
+neutral 使用中性文字、inset 弱底；accent 和 danger 分别使用现有强调/危险色、soft 弱底及实色前景。
+
+hover 沿本身 tone 变化，outline 出现弱有色底，tinted 保持弱底并强化边框；
+pressed 初始复用 hover 配方，接口允许以后独立调整，但本批不设计新色阶。
+focus-visible 使用独立金色焦点环。disabled/aria-disabled 控件关闭接口的 hover/pressed；
+一般控件使用 muted，solid 则将底色与文字成对切到 inset 中性底和 ui-text，避免灰字压在强有色底上。
+词典“当前”是选中状态展示，保留本身的 solid 底色/前景配对及默认光标，不套用不可用操作的弱化。
+aria-disabled 仅影响外观，业务仍需自行阻止激活。
+此版本没有新增 selected/checked 协议：它们仍由组件现有状态与无障碍属性控制。
+
+接口试点为删除层（danger/tinted）和解除关联（danger/outline），保留其 34px 尺寸及既有交互。
+第一批已扩展到删除词条/词典/语料块/单元、移除释义/形态组/形态表/标准化规则和 IPA 规则
+（danger/tinted），添加释义/可选字段/标准化规则（accent/outline），现有主操作
+（accent/solid），以及重写全部发音和危险确认（danger/solid）。
+完整编辑、局部编辑和动态模板均声明属性；共享确认按钮每次打开都同步 tone/emphasis，
+普通确认与编辑切换保存会恢复 accent。放弃更改的 alternate 按钮仍留在后续批次。
+添加类使用标准 outline 中性底和强调色边框，IPA 批量入口使用标准 solid 配方，不再单设同色边框。
+IPA 规则删除保留默认中性边框，以局部变量接入。原 class 继续承担布局、阴影及既有注册边界；
+additive-button 仍用于原有光学排除，不再定义透明底或专属交互配色。
+旧 danger 类暂时保留以维持现有 Q3 排除状态，不表示 tone 将来决定光学资格。
+2026-09-21：添加 IPA 映射、语料属性、语料层、关联单元，以及移动/列表新建、
+筛选刷新/切换按钮已迁移 accent/outline；图标新建和筛选操作不再采用 hover 实色填充。
+已注册为 relationship 的语义 outline 使用 floating 中性透视底，并消费 control 边框与
+hover/pressed tint；不会新增光学注册，父 Q3 排除边界不变。
+Mail 搜索/工具外壳的内部控件同时映射旧 material 与新 control 配色接口：
+默认透明、hover/pressed 沿自身 tone 轻染色，共享外壳玻璃，不绘制独立面板底。
+这些映射只覆盖既有直接控件位置，不作用于 body 级挂载的菜单。
+其他按钮尚未迁移；Q3 的其他强调档与未迁移语义控件（例如红色清除筛选）的颜色覆盖仍待单独处理，
+不能据此宣称整个语义接口已与 Q3 完整兼容。
+高密度 solid 玻璃不在本批内。语法、颜色别名矩阵与完整检查可自动验证，
+浏览器计算样式、视觉及辅助模式验收仍需另行完成。
+
 ## 3. S0 基线与边界
 
 S0-1 曾把原 `:root` 和 `body.dark-theme` 主题值集中迁入 `theme-tokens.css`；S0-2/S0-3 再将语义颜色和材质角色接入组件。三套皮肤成熟后，颜色、材质和圆角均由各自皮肤完整拥有，失去职责的共享文件及其根级启动浅色默认已经删除。加载顺序固定为经典、层叠玻璃、液态玻璃、组件样式。

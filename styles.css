@@ -100,16 +100,15 @@ body.mobile-drawer-open {
   opacity: 0.45;
 }
 
-.mobile-new-entry-button {
-  border-color: color-mix(in srgb, var(--ui-accent) 58%, transparent);
+.mobile-app-bar-button:not(.mobile-new-entry-button):is(:hover, :focus-visible):not(:disabled) {
+  background: var(--ui-accent-soft);
+  border-color: var(--ui-accent);
   color: var(--ui-accent-hover);
 }
 
-.mobile-new-entry-button:hover:not(:disabled),
-.mobile-new-entry-button:focus-visible:not(:disabled) {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent);
-  color: var(--ui-text-on-solid);
+.mobile-app-bar-button:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
 }
 
 .mobile-app-bar-title {
@@ -970,13 +969,10 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
   min-height: 40px;
   max-height: 40px;
   box-sizing: border-box;
-  border-color: color-mix(in srgb, var(--ui-accent) 58%, transparent);
   padding: 0;
   align-items: center;
   justify-items: center;
   place-items: center;
-  background: var(--material-control-background);
-  color: var(--ui-accent-hover);
   line-height: 1;
   aspect-ratio: 1;
 }
@@ -988,13 +984,6 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
   height: 20px;
   margin: 0;
   transform: translateZ(0);
-}
-
-.secondary-button.entry-list-new-button:hover,
-.secondary-button.entry-list-new-button:focus-visible {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent);
-  color: var(--ui-text-on-solid);
 }
 
 .root-mode-controls {
@@ -1108,7 +1097,7 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
   stroke-linejoin: round;
 }
 
-.active-filter-toolbar .active-filter-icon-button:hover {
+.active-filter-toolbar .active-filter-icon-button:where(:not([data-control-tone])):hover {
   background: var(--ui-accent);
   color: var(--ui-text-on-solid);
 }
@@ -1228,14 +1217,109 @@ label span {
   white-space: nowrap;
 }
 
+/* Opt-in semantic paint. Geometry, shadows and optical eligibility remain separate.
+   Resolve aliases on the control, so each skin/theme supplies its current colors. */
+:where([data-control-tone][data-control-emphasis]) {
+  --control-tone-color: var(--ui-text);
+  --control-tone-hover-color: var(--ui-text);
+  --control-tone-tint: var(--material-inset-background);
+  --control-tone-solid: var(--ui-text);
+  --control-tone-solid-hover: var(--ui-text);
+  --control-tone-on-solid: var(--ui-canvas-bg);
+  --control-background: transparent;
+  --control-border: transparent;
+  --control-color: var(--control-tone-color);
+  --control-hover-background: var(--control-tone-tint);
+  --control-hover-border: var(--control-tone-color);
+  --control-hover-color: var(--control-tone-hover-color);
+  --control-pressed-background: var(--control-hover-background);
+  --control-pressed-border: var(--control-hover-border);
+  --control-pressed-color: var(--control-hover-color);
+  --control-disabled-background: var(--control-background);
+  --control-disabled-border: var(--control-border);
+  --control-disabled-color: var(--ui-text-muted);
+}
+
+[data-control-tone][data-control-emphasis] {
+  background: var(--control-background);
+  border-color: var(--control-border);
+  color: var(--control-color);
+}
+
+[data-control-tone="accent"] {
+  --control-tone-color: var(--ui-accent);
+  --control-tone-hover-color: var(--ui-accent-hover);
+  --control-tone-tint: var(--ui-accent-soft);
+  --control-tone-solid: var(--ui-accent);
+  --control-tone-solid-hover: var(--ui-accent-hover);
+  --control-tone-on-solid: var(--ui-text-on-solid);
+}
+
+[data-control-tone="danger"] {
+  --control-tone-color: var(--ui-danger);
+  --control-tone-hover-color: var(--ui-danger);
+  --control-tone-tint: var(--ui-danger-soft);
+  --control-tone-solid: var(--ui-danger);
+  --control-tone-solid-hover: var(--ui-danger);
+  --control-tone-on-solid: var(--ui-text-on-solid);
+}
+
+[data-control-emphasis="plain"] {
+  --control-background: transparent;
+  --control-border: transparent;
+  --control-hover-border: transparent;
+}
+
+[data-control-emphasis="outline"] {
+  --control-background: var(--material-panel-background);
+  --control-border: var(--control-tone-color);
+}
+
+[data-control-emphasis="tinted"] {
+  --control-background: var(--control-tone-tint);
+}
+
+[data-control-emphasis="solid"] {
+  --control-background: var(--control-tone-solid);
+  --control-color: var(--control-tone-on-solid);
+  --control-hover-background: var(--control-tone-solid-hover);
+  --control-hover-border: transparent;
+  --control-hover-color: var(--control-tone-on-solid);
+  --control-disabled-background: var(--material-inset-background);
+  --control-disabled-border: var(--ui-border);
+  --control-disabled-color: var(--ui-text);
+}
+
+[data-control-tone][data-control-emphasis]:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--control-hover-background);
+  border-color: var(--control-hover-border);
+  color: var(--control-hover-color);
+}
+
+[data-control-tone][data-control-emphasis]:active:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--control-pressed-background);
+  border-color: var(--control-pressed-border);
+  color: var(--control-pressed-color);
+}
+
+[data-control-tone][data-control-emphasis]:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+[data-control-tone][data-control-emphasis]:is(:disabled, [aria-disabled="true"]) {
+  cursor: not-allowed;
+  background: var(--control-disabled-background);
+  border-color: var(--control-disabled-border);
+  color: var(--control-disabled-color);
+  box-shadow: none;
+}
+
 .primary-button {
-  background: var(--ui-accent);
   box-shadow: var(--material-action-shadow);
-  color: var(--ui-text-on-solid);
 }
 
 .primary-button:hover {
-  background: var(--ui-accent-hover);
   box-shadow: var(--material-action-hover-shadow);
 }
 
@@ -1253,9 +1337,7 @@ label span {
 }
 
 .danger-button {
-  background: var(--ui-danger);
   box-shadow: var(--material-action-shadow);
-  color: var(--ui-text-on-solid);
 }
 
 .danger-button:hover {
@@ -1281,31 +1363,15 @@ label span {
   cursor: not-allowed;
 }
 
-.ipa-batch-safe {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent);
-  color: var(--ui-text-on-solid);
-}
-
-.ipa-batch-danger {
-  border-color: var(--ui-danger);
-  background: var(--ui-danger);
-  color: var(--ui-text-on-solid);
-}
-
-.danger-ghost {
+.danger-ghost:not([data-control-tone]) {
   background: var(--ui-danger-soft);
   color: var(--ui-danger);
 }
 
-.mobile-new-entry-button:is(:hover, :focus-visible):not(:disabled),
-.secondary-button.entry-list-new-button:is(:hover, :focus-visible),
 .active-filter-toolbar .filter-clear-button:is(:hover, :focus-visible) {
   box-shadow: var(--material-action-hover-shadow);
 }
 
-.mobile-new-entry-button:active:not(:disabled),
-.secondary-button.entry-list-new-button:active:not(:disabled),
 .active-filter-toolbar .filter-clear-button:active:not(:disabled) {
   box-shadow: var(--material-action-pressed-shadow);
 }
@@ -1435,6 +1501,11 @@ label span {
 
 .dictionary-panel :where(.utility-button, .nav-collapse-button) {
   box-shadow: var(--material-navigation-control-shadow);
+}
+
+.dictionary-panel .nav-collapse-button:is(:hover, :focus-visible):not(:disabled) {
+  background: var(--material-navigation-control-hover-background);
+  border-color: var(--material-navigation-control-border);
 }
 
 .dictionary-panel :where(.tool-button, .utility-button, .nav-collapse-button):hover:not(:disabled) {
@@ -2864,13 +2935,12 @@ button.pending-source:focus-visible {
   gap: 8px;
 }
 
-.current-dictionary-button:disabled {
+.current-dictionary-button[data-control-tone]:disabled {
+  --control-disabled-background: var(--control-background);
+  --control-disabled-border: var(--control-border);
+  --control-disabled-color: var(--control-color);
   cursor: default;
   opacity: 1;
-}
-
-.current-dictionary-button:disabled:hover {
-  background: var(--ui-accent);
 }
 
 .editor-panel {
@@ -2997,19 +3067,6 @@ button.pending-source:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.additive-button {
-  border-color: var(--ui-accent);
-  color: var(--ui-accent);
-  background: transparent;
-}
-
-.additive-button:hover,
-.additive-button:focus-visible {
-  border-color: var(--ui-accent-hover);
-  color: var(--ui-accent-hover);
-  background: var(--ui-accent-soft);
 }
 
 .form-grid {
@@ -3416,6 +3473,15 @@ button.pending-source:focus-visible {
 
 .corpus-icon-button.danger {
   color: var(--ui-danger);
+}
+
+.corpus-icon-button[data-control-emphasis] {
+  min-height: 0;
+}
+
+.corpus-icon-button .nav-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .corpus-attribute-editor,
@@ -4514,20 +4580,15 @@ textarea.ipa-single-line::-webkit-scrollbar {
 }
 
 .icon-danger-button {
+  --control-border: var(--ui-border);
   display: inline-grid;
   place-items: center;
   width: 40px;
   height: 40px;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-control);
-  background: var(--ui-danger-soft);
-  color: var(--ui-danger);
   font-size: 1rem;
   font-weight: 900;
-}
-
-.icon-danger-button:hover {
-  border-color: var(--ui-danger);
 }
 
 .field-help {

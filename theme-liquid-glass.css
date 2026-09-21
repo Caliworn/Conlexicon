@@ -48,11 +48,11 @@ body[data-ui-skin="liquid-glass"] {
   --material-entry-detail-mobile-filter: var(--liquid-glass-q1-focus-filter);
   --material-entry-detail-section-background: rgba(249, 252, 252, 0.9);
   --material-entry-detail-section-border: rgba(65, 99, 108, 0.18);
-  --material-control-background: linear-gradient(145deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.16) 48%, rgba(133, 219, 212, 0.12)), rgba(246, 251, 251, 0.58);
+  --material-control-background: rgba(246, 251, 251, 0.58);
   --material-control-border: rgba(255, 255, 255, 0.78);
-  --material-control-shadow: 0 6px 14px rgba(17, 43, 51, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.98), inset 0 2px 1px rgba(255, 255, 255, 0.24), inset 0 -1px 1px rgba(40, 84, 92, 0.16);
-  --material-control-hover-shadow: 0 10px 22px rgba(17, 43, 51, 0.16), inset 0 1px 0 rgba(255, 255, 255, 1), inset 0 3px 2px rgba(255, 255, 255, 0.38), inset 0 -1px 1px rgba(40, 84, 92, 0.18);
-  --material-control-pressed-shadow: 0 2px 6px rgba(17, 43, 51, 0.12), inset 0 1px 1px rgba(255, 255, 255, 0.7), inset 0 3px 8px rgba(32, 76, 84, 0.12), inset 0 -1px 1px rgba(40, 84, 92, 0.22);
+  --material-control-shadow: none;
+  --material-control-hover-shadow: none;
+  --material-control-pressed-shadow: none;
   --material-action-shadow: 0 8px 20px rgba(9, 44, 45, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.44), inset 0 -1px 1px rgba(0, 0, 0, 0.16);
   --material-action-hover-shadow: 0 12px 26px rgba(9, 44, 45, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.62), inset 0 -1px 1px rgba(0, 0, 0, 0.18);
   --material-action-pressed-shadow: 0 3px 8px rgba(9, 44, 45, 0.22), inset 0 2px 5px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.28);
@@ -158,11 +158,11 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-entry-detail-shadow: 0 30px 78px rgba(0, 0, 0, 0.48), 0 5px 18px rgba(0, 0, 0, 0.28);
   --material-entry-detail-section-background: rgba(24, 36, 42, 0.9);
   --material-entry-detail-section-border: rgba(221, 248, 244, 0.15);
-  --material-control-background: linear-gradient(145deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.025) 50%, rgba(54, 195, 185, 0.07)), rgba(29, 43, 49, 0.62);
+  --material-control-background: rgba(29, 43, 49, 0.62);
   --material-control-border: rgba(229, 255, 251, 0.2);
-  --material-control-shadow: 0 7px 17px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 2px 1px rgba(255, 255, 255, 0.05), inset 0 -1px 1px rgba(0, 0, 0, 0.32);
-  --material-control-hover-shadow: 0 11px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.38), inset 0 2px 1px rgba(255, 255, 255, 0.09), inset 0 -1px 1px rgba(0, 0, 0, 0.36);
-  --material-control-pressed-shadow: 0 3px 8px rgba(0, 0, 0, 0.32), inset 0 3px 8px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  --material-control-shadow: none;
+  --material-control-hover-shadow: none;
+  --material-control-pressed-shadow: none;
   --material-action-shadow: 0 9px 22px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 -1px 1px rgba(0, 0, 0, 0.28);
   --material-action-hover-shadow: 0 13px 28px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.44), inset 0 -1px 1px rgba(0, 0, 0, 0.3);
   --material-action-pressed-shadow: 0 4px 9px rgba(0, 0, 0, 0.4), inset 0 3px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.2);
@@ -180,7 +180,7 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-navigation-text: #f4fbf9;
   --material-navigation-muted: #a9c4c2;
   --material-navigation-control-background: transparent;
-  --material-navigation-control-hover-background: rgba(255, 255, 255, 0.07);
+  --material-navigation-control-hover-background: rgba(255, 255, 255, 0.14);
   --material-navigation-control-border: rgba(255, 255, 255, 0.14);
   --material-navigation-control-shadow: none;
   --material-navigation-control-hover-shadow: none;
@@ -329,7 +329,7 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel :where(.utility-button, .nav
     color 160ms ease;
 }
 
-body[data-ui-skin="liquid-glass"] .dictionary-panel :where(.utility-button, .nav-collapse-button):hover:not(:disabled) {
+body[data-ui-skin="liquid-glass"] .dictionary-panel :where(.utility-button, .nav-collapse-button):is(:hover, :focus-visible):not(:disabled) {
   border-color: var(--material-navigation-control-border);
   background: var(--material-navigation-control-hover-background);
   box-shadow: none;
@@ -440,6 +440,9 @@ body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
 ) {
   --material-control-background: transparent;
   --material-control-border: transparent;
+  --control-background: transparent;
+  --control-hover-background: color-mix(in srgb, var(--control-tone-color, var(--ui-accent)) 8%, transparent);
+  --control-pressed-background: var(--control-tone-tint, var(--ui-accent-soft));
   --material-control-shadow: none;
   --material-control-hover-shadow: none;
   --material-control-pressed-shadow: none;
@@ -507,15 +510,14 @@ body[data-ui-skin="liquid-glass"] :is(
   --liquid-glass-surface-q1-filter: var(--liquid-glass-q1-floating-filter);
 }
 
-/* Experimental compact Q3 surface; generic controls remain CSS-only. */
-body[data-ui-skin="liquid-glass"] :where(:is(#cancelEditButton, #clearEntryButton, #autoIpaButton, .inline-partial-edit-form [data-action="cancel-partial-edit"], .inline-partial-edit-form [data-action="partial-auto-ipa"], #entryForm [data-action="toggle-entry-morphology-mode"], .inline-partial-edit-form [data-action="toggle-entry-morphology-mode"], #dictionaryManagerList [data-action="config"], #dictionaryManagerList [data-action="export"], #dictionaryManagerList [data-action="activate"], .file-trigger:has(> #importInput), .analysis-quality-view-button, #tagOrderInfoButton, #morphologySyntaxButton, #ipaSyllableHelpButton, [data-action="quality-filter-info"]):not(:where(.modal-panel *, .network-panel *, .dictionary-panel *, .mobile-app-bar *, .entry-search-config-menu *, .entry-filter-menu *, .source-suggestions *, .skin-picker-menu *, .entry-context-menu *, .app-tooltip *, .toast *))),
-body[data-ui-skin="liquid-glass"] .content-disclosure-button,
-body[data-ui-skin="liquid-glass"] :where(#editEntryButton, #openLexicalNetworkButton, #focusEntryListButton, #entryBrowserToggleButton, #backToEditorButton, #backToEditorFromAnalysisButton, #backToEditorFromQualityButton, #backToEditorFromSettingsButton, #backToEditorFromDocsButton, #backToEditorFromCorpusButton, #backToEditorFromMorphologyFunctionsButton, #backToEditorFromMorphologyTablesButton, #backToEditorFromIpaButton, #docsModeControl, #corpusModeControl),
-body[data-ui-skin="liquid-glass"] :where(#displayDerived .derived-link, #fullEditDerived .derived-link),
-body[data-ui-skin="liquid-glass"] .analysis-page-tabs button,
-body[data-ui-skin="liquid-glass"] .analysis-subpage-tabs button {
+/* Experimental compact surfaces share one registry-owned material boundary. */
+body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"] {
   --liquid-glass-surface-tint: var(--material-floating-background);
   --liquid-glass-surface-q1-filter: blur(1px) saturate(1.04);
+  --material-control-background: var(--liquid-glass-surface-tint);
+  --material-control-shadow: var(--liquid-glass-list-card-shadow);
+  --material-control-hover-shadow: var(--liquid-glass-list-card-shadow);
+  --material-control-pressed-shadow: var(--liquid-glass-list-card-shadow);
   background: var(--liquid-glass-surface-tint);
   border-color: var(--material-floating-border);
   box-shadow: var(--liquid-glass-list-card-shadow);
@@ -523,86 +525,57 @@ body[data-ui-skin="liquid-glass"] .analysis-subpage-tabs button {
   -webkit-backdrop-filter: var(--liquid-glass-surface-q1-filter);
 }
 
-/* Shared button states must not restore the embossed control material. */
-body[data-ui-skin="liquid-glass"] :where(:is(#cancelEditButton, #clearEntryButton, #autoIpaButton, .inline-partial-edit-form [data-action="cancel-partial-edit"], .inline-partial-edit-form [data-action="partial-auto-ipa"], #entryForm [data-action="toggle-entry-morphology-mode"], .inline-partial-edit-form [data-action="toggle-entry-morphology-mode"], #dictionaryManagerList [data-action="config"], #dictionaryManagerList [data-action="export"], #dictionaryManagerList [data-action="activate"], .file-trigger:has(> #importInput), .analysis-quality-view-button, #tagOrderInfoButton, #morphologySyntaxButton, #ipaSyllableHelpButton, [data-action="quality-filter-info"]):not(:where(.modal-panel *, .network-panel *, .dictionary-panel *, .mobile-app-bar *, .entry-search-config-menu *, .entry-filter-menu *, .source-suggestions *, .skin-picker-menu *, .entry-context-menu *, .app-tooltip *, .toast *))) {
-  --material-control-background: var(--liquid-glass-surface-tint);
-  --material-control-shadow: var(--liquid-glass-list-card-shadow);
-  --material-control-hover-shadow: var(--liquid-glass-list-card-shadow);
-  --material-control-pressed-shadow: var(--liquid-glass-list-card-shadow);
-}
-
-body[data-ui-skin="liquid-glass"] :where(:is(#cancelEditButton, #clearEntryButton, #autoIpaButton, .inline-partial-edit-form [data-action="cancel-partial-edit"], .inline-partial-edit-form [data-action="partial-auto-ipa"], #entryForm [data-action="toggle-entry-morphology-mode"], .inline-partial-edit-form [data-action="toggle-entry-morphology-mode"], #dictionaryManagerList [data-action="config"], #dictionaryManagerList [data-action="export"], #dictionaryManagerList [data-action="activate"], .file-trigger:has(> #importInput), .analysis-quality-view-button, #tagOrderInfoButton, #morphologySyntaxButton, #ipaSyllableHelpButton, [data-action="quality-filter-info"]):not(:where(.modal-panel *, .network-panel *, .dictionary-panel *, .mobile-app-bar *, .entry-search-config-menu *, .entry-filter-menu *, .source-suggestions *, .skin-picker-menu *, .entry-context-menu *, .app-tooltip *, .toast *))):hover:not(:disabled):not(:has(> input:disabled)) {
+body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:where(button, label):hover:not(:disabled):not(:has(> input:disabled)) {
   --liquid-glass-surface-tint: color-mix(in srgb, var(--material-floating-background) 92%, var(--ui-accent));
   border-color: var(--ui-accent);
 }
 
-body[data-ui-skin="liquid-glass"] :where(:is(#cancelEditButton, #clearEntryButton, #autoIpaButton, .inline-partial-edit-form [data-action="cancel-partial-edit"], .inline-partial-edit-form [data-action="partial-auto-ipa"], #entryForm [data-action="toggle-entry-morphology-mode"], .inline-partial-edit-form [data-action="toggle-entry-morphology-mode"], #dictionaryManagerList [data-action="config"], #dictionaryManagerList [data-action="export"], #dictionaryManagerList [data-action="activate"], .file-trigger:has(> #importInput), .analysis-quality-view-button, #tagOrderInfoButton, #morphologySyntaxButton, #ipaSyllableHelpButton, [data-action="quality-filter-info"]):not(:where(.modal-panel *, .network-panel *, .dictionary-panel *, .mobile-app-bar *, .entry-search-config-menu *, .entry-filter-menu *, .source-suggestions *, .skin-picker-menu *, .entry-context-menu *, .app-tooltip *, .toast *))):focus-visible,
-body[data-ui-skin="liquid-glass"] :where(:is(#cancelEditButton, #clearEntryButton, #autoIpaButton, .inline-partial-edit-form [data-action="cancel-partial-edit"], .inline-partial-edit-form [data-action="partial-auto-ipa"], #entryForm [data-action="toggle-entry-morphology-mode"], .inline-partial-edit-form [data-action="toggle-entry-morphology-mode"], #dictionaryManagerList [data-action="config"], #dictionaryManagerList [data-action="export"], #dictionaryManagerList [data-action="activate"], .file-trigger:has(> #importInput), .analysis-quality-view-button, #tagOrderInfoButton, #morphologySyntaxButton, #ipaSyllableHelpButton, [data-action="quality-filter-info"]):not(:where(.modal-panel *, .network-panel *, .dictionary-panel *, .mobile-app-bar *, .entry-search-config-menu *, .entry-filter-menu *, .source-suggestions *, .skin-picker-menu *, .entry-context-menu *, .app-tooltip *, .toast *))):has(> input:focus-visible) {
+body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:where(button, label):active:not(:disabled):not(:has(> input:disabled)) {
+  --liquid-glass-surface-tint: color-mix(in srgb, var(--material-floating-background) 85%, var(--ui-accent));
+}
+
+body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:focus-visible,
+body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:has(> input:focus-visible) {
   outline: 2px solid var(--ui-focus);
   outline-offset: 2px;
 }
 
-body[data-ui-skin="liquid-glass"] .content-disclosure-button:hover:not(:disabled) {
-  --liquid-glass-surface-tint: color-mix(in srgb, var(--material-floating-background) 92%, var(--ui-accent));
-  background: var(--liquid-glass-surface-tint);
-  border-color: var(--ui-accent);
-}
-
-body[data-ui-skin="liquid-glass"] .content-disclosure-button:active:not(:disabled) {
-  --liquid-glass-surface-tint: color-mix(in srgb, var(--material-floating-background) 85%, var(--ui-accent));
-  background: var(--liquid-glass-surface-tint);
-}
-
-body[data-ui-skin="liquid-glass"] :where(#editEntryButton, #openLexicalNetworkButton, #focusEntryListButton, #entryBrowserToggleButton, #backToEditorButton, #backToEditorFromAnalysisButton, #backToEditorFromQualityButton, #backToEditorFromSettingsButton, #backToEditorFromDocsButton, #backToEditorFromCorpusButton, #backToEditorFromMorphologyFunctionsButton, #backToEditorFromMorphologyTablesButton, #backToEditorFromIpaButton, #docsModeControl, #corpusModeControl) {
-  --material-control-background: var(--liquid-glass-surface-tint);
-  --material-control-shadow: var(--liquid-glass-list-card-shadow);
-  --material-control-hover-shadow: var(--liquid-glass-list-card-shadow);
-  --material-control-pressed-shadow: var(--liquid-glass-list-card-shadow);
-}
-
-body[data-ui-skin="liquid-glass"] :where(#editEntryButton, #openLexicalNetworkButton, #focusEntryListButton, #entryBrowserToggleButton, #backToEditorButton, #backToEditorFromAnalysisButton, #backToEditorFromQualityButton, #backToEditorFromSettingsButton, #backToEditorFromDocsButton, #backToEditorFromCorpusButton, #backToEditorFromMorphologyFunctionsButton, #backToEditorFromMorphologyTablesButton, #backToEditorFromIpaButton):hover:not(:disabled) {
-  --liquid-glass-surface-tint: color-mix(in srgb, var(--material-floating-background) 92%, var(--ui-accent));
-  border-color: var(--ui-accent);
-}
-
-body[data-ui-skin="liquid-glass"] :where(#displayDerived) button.derived-link:hover {
-  border-color: var(--ui-accent);
-}
-
-body[data-ui-skin="liquid-glass"] :is(.analysis-page-tabs, .analysis-subpage-tabs) button:hover:not(:disabled) {
-  border-color: var(--ui-accent);
-}
-
-body[data-ui-skin="liquid-glass"] :is(.analysis-page-tabs, .analysis-subpage-tabs) button.active {
+body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:is(.analysis-page-tabs button, .analysis-subpage-tabs button).active,
+body[data-ui-skin="liquid-glass"] .gloss-style-toggle[data-liquid-glass-role="relationship"]:has(input:checked) {
   --liquid-glass-surface-tint: color-mix(in srgb, var(--material-floating-background) 92%, var(--ui-accent));
   border-color: var(--ui-accent);
   color: var(--ui-accent-hover);
 }
 
+/* Outline controls keep semantic edges while the optical role supplies neutral
+   translucent material. Other emphases retain their existing optical behavior. */
+body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"][data-control-tone][data-control-emphasis="outline"] {
+  --control-background: var(--material-floating-background);
+  --control-hover-background: color-mix(in srgb, var(--material-floating-background) 92%, var(--control-tone-color));
+  --control-hover-border: var(--control-tone-color);
+  --control-pressed-background: color-mix(in srgb, var(--material-floating-background) 85%, var(--control-tone-color));
+  --liquid-glass-surface-tint: var(--control-background);
+  border-color: var(--control-border);
+}
+
+body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"][data-control-tone][data-control-emphasis="outline"]:hover:not(:disabled):not([aria-disabled="true"]) {
+  --liquid-glass-surface-tint: var(--control-hover-background);
+  border-color: var(--control-hover-border);
+}
+
+body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"][data-control-tone][data-control-emphasis="outline"]:active:not(:disabled):not([aria-disabled="true"]) {
+  --liquid-glass-surface-tint: var(--control-pressed-background);
+  border-color: var(--control-pressed-border);
+}
+
 @media (prefers-reduced-transparency: reduce), (forced-colors: active) {
-  body[data-ui-skin="liquid-glass"] :where(:is(#cancelEditButton, #clearEntryButton, #autoIpaButton, .inline-partial-edit-form [data-action="cancel-partial-edit"], .inline-partial-edit-form [data-action="partial-auto-ipa"], #entryForm [data-action="toggle-entry-morphology-mode"], .inline-partial-edit-form [data-action="toggle-entry-morphology-mode"], #dictionaryManagerList [data-action="config"], #dictionaryManagerList [data-action="export"], #dictionaryManagerList [data-action="activate"], .file-trigger:has(> #importInput), .analysis-quality-view-button, #tagOrderInfoButton, #morphologySyntaxButton, #ipaSyllableHelpButton, [data-action="quality-filter-info"]):not(:where(.modal-panel *, .network-panel *, .dictionary-panel *, .mobile-app-bar *, .entry-search-config-menu *, .entry-filter-menu *, .source-suggestions *, .skin-picker-menu *, .entry-context-menu *, .app-tooltip *, .toast *))) {
-    --liquid-glass-surface-q1-filter: none;
-  }
-  body[data-ui-skin="liquid-glass"] .content-disclosure-button {
-    --liquid-glass-surface-q1-filter: none;
-  }
-  body[data-ui-skin="liquid-glass"] :where(#editEntryButton, #openLexicalNetworkButton, #focusEntryListButton, #entryBrowserToggleButton, #backToEditorButton, #backToEditorFromAnalysisButton, #backToEditorFromQualityButton, #backToEditorFromSettingsButton, #backToEditorFromDocsButton, #backToEditorFromCorpusButton, #backToEditorFromMorphologyFunctionsButton, #backToEditorFromMorphologyTablesButton, #backToEditorFromIpaButton, #docsModeControl, #corpusModeControl),
-  body[data-ui-skin="liquid-glass"] :where(#displayDerived .derived-link, #fullEditDerived .derived-link),
-  body[data-ui-skin="liquid-glass"] :is(.analysis-page-tabs, .analysis-subpage-tabs) button {
+  body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"] {
     --liquid-glass-surface-q1-filter: none;
   }
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  body[data-ui-skin="liquid-glass"] :where(:is(#cancelEditButton, #clearEntryButton, #autoIpaButton, .inline-partial-edit-form [data-action="cancel-partial-edit"], .inline-partial-edit-form [data-action="partial-auto-ipa"], #entryForm [data-action="toggle-entry-morphology-mode"], .inline-partial-edit-form [data-action="toggle-entry-morphology-mode"], #dictionaryManagerList [data-action="config"], #dictionaryManagerList [data-action="export"], #dictionaryManagerList [data-action="activate"], .file-trigger:has(> #importInput), .analysis-quality-view-button, #tagOrderInfoButton, #morphologySyntaxButton, #ipaSyllableHelpButton, [data-action="quality-filter-info"]):not(:where(.modal-panel *, .network-panel *, .dictionary-panel *, .mobile-app-bar *, .entry-search-config-menu *, .entry-filter-menu *, .source-suggestions *, .skin-picker-menu *, .entry-context-menu *, .app-tooltip *, .toast *))) {
-    --liquid-glass-surface-q1-filter: none;
-  }
-  body[data-ui-skin="liquid-glass"] .content-disclosure-button {
-    --liquid-glass-surface-q1-filter: none;
-  }
-  body[data-ui-skin="liquid-glass"] :where(#editEntryButton, #openLexicalNetworkButton, #focusEntryListButton, #entryBrowserToggleButton, #backToEditorButton, #backToEditorFromAnalysisButton, #backToEditorFromQualityButton, #backToEditorFromSettingsButton, #backToEditorFromDocsButton, #backToEditorFromCorpusButton, #backToEditorFromMorphologyFunctionsButton, #backToEditorFromMorphologyTablesButton, #backToEditorFromIpaButton, #docsModeControl, #corpusModeControl),
-  body[data-ui-skin="liquid-glass"] :where(#displayDerived .derived-link, #fullEditDerived .derived-link),
-  body[data-ui-skin="liquid-glass"] :is(.analysis-page-tabs, .analysis-subpage-tabs) button {
+  body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"] {
     --liquid-glass-surface-q1-filter: none;
   }
 }

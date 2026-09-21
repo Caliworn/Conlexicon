@@ -41,8 +41,9 @@ Source-reference editing is still being corrected. Duplicate-target prevention i
 - Experimental: derived-entry cards in both the detail view and full editor use compact Q3 optics (8px bezel, 4px maximum displacement, 1px blur), sharing the existing geometry cache. Full-editor cards remain non-interactive; source links and list cards are unchanged.
 - Analysis main/subpage tabs and quality-category buttons join the compact Q3 experiment with the same optical parameters and shared cache; wrapping, counts and disabled behavior remain unchanged.
 - Compact Q3 also covers entry detail actions, the entry-list toggle and page-level return buttons. Document/corpus mode controls each use one optical shell, retaining their selected states; source references remain unchanged.
-- Selected edit cancel/clear, dictionary management/import, automatic IPA/morphology-mode, quality-result and information-help actions also use compact Q3. Buttons inside Q3 panels and menus are excluded; save and destructive operations retain their existing materials.
+- Compact Q3 controls are selected by shared component classes, not individual action IDs: secondary, information, disclosure, corpus-icon and gloss-style controls join automatically, including dynamically inserted controls. Intended Q3 ancestors (including Mail shells) exclude nested optics regardless of pending/fallback state; Q1 detail shells allow them. Primary, danger and additive controls retain their separate designs. Excluded ordinary controls use a neutral, non-gradient CSS material. Global Q1/Q0 fallback still applies.
 - Root and morphology-table disclosure controls share a 30px rounded button, SVG arrow and keyboard focus treatment. Liquid Glass uses compact Q3 with lifecycle handling for virtual-list recycling and table removal; other skins use their neutral material tokens.
+- Controls can opt into a shared tone (neutral/accent/danger) and emphasis (plain/outline/tinted/solid) interface backed by each skin's colors. Deletion/removal actions, outlined additions and existing solid primary/danger actions now consume it, including dynamic editors and reused confirmation dialogs. Optical registration and the pending Q3 border/state-color cleanup are unchanged.
 
 - 多词典管理：新建、切换、导入、导出、配置和删除词典；导入相同词典 ID 的词典前会明确确认是否覆盖。
 - 词典级 SQLite 保存：词条及其结构化子对象、形态模板组/子表/覆盖项、语料库、设置、语言文档和 IPA 规则都会随当前词典保存在本地。旧 JSON 仅作为显式导入、导出和迁移格式保留。
@@ -69,8 +70,9 @@ Source-reference editing is still being corrected. Duplicate-target prevention i
 - 实验：查看态详情与完整编辑态的衍生卡片均使用紧凑 Q3（8px bezel、4px 最大位移、1px 模糊），复用已有几何缓存；完整编辑态卡片仍为只读，不新增跳转行为。来源链接和词条列表不变。
 - 数据分析主／子页签和质量检查分类按钮也纳入同参数的紧凑 Q3 实验，复用全局缓存；保留换行、计数和禁用行为。
 - 紧凑 Q3 同时覆盖详情操作、词条列表开关及各页返回按钮；文档／语料模式控件各使用一个光学外壳，保留选中状态。来源引用不变。
-- 编辑取消／清空、词典管理／导入、自动 IPA／形态模式切换、质量结果与信息说明入口也使用紧凑 Q3；排除 Q3 面板和菜单内按钮，保存及危险操作保留原材质。
+- 紧凑 Q3 按共享组件类统一选择，不再逐操作登记 ID：次级按钮、信息、内容折叠、语料图标和文字样式控件自动接入，覆盖动态新增控件。按父表面的 Q3 定义排除嵌套折射（包括 Mail 外壳），不随 pending/fallback 状态改变；Q1 详情外壳允许内部接入。主操作、危险及 additive 控件保持专属设计；被排除的普通控件使用无渐变的中性 CSS 材质，全局 Q1/Q0 降级仍然有效。
 - 词根与形态表的内容级折叠按钮统一为 30px 圆角按钮、SVG 箭头和键盘焦点反馈；液态皮肤使用紧凑 Q3，处理虚拟列表回收和表格删除时的表面生命周期，其他皮肤使用各自的中性材质 token。
+- 控件可显式使用三套皮肤通用的 tone（中性／强调／危险）与 emphasis（无底／描边／弱有色底／实色）接口，由各皮肤已有颜色提供配色；删除／移除、描边添加及现有实色主操作／危险操作已迁移，覆盖动态编辑器和复用确认弹窗。不改变光学注册，Q3 边框及状态色覆盖问题仍待单独处理。
 
 ## Keyboard Shortcuts / 快捷键
 

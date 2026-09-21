@@ -9,7 +9,53 @@ const {
   buildResourceKey,
   lightFacingMatrixValues,
   normalizeLightVector,
+  COMPACT_CONTROL_SELECTOR,
+  SURFACE_ROLE_DEFINITIONS,
+  surfaceRoleDefinition,
 } = require("../lib/liquid-glass-engine");
+
+// Ownership is structural, not dependent on a parent's transient optical state.
+{
+  const compact = SURFACE_ROLE_DEFINITIONS.find((item) => item.selector === COMPACT_CONTROL_SELECTOR);
+  const owner = (selector) => ({
+    isConnected: true,
+    matches: (query) => query.split(", ").includes(selector),
+    dataset: {},
+  });
+  const button = {
+    isConnected: true, parentElement: null, dataset: {},
+    matches: (query) => query.startsWith(COMPACT_CONTROL_SELECTOR),
+    querySelectorAll: () => [],
+  };
+  assert.equal(surfaceRoleDefinition(button), compact);
+  for (const selector of [".modal-panel", ".network-panel", ".dictionary-panel",
+    ".entry-mail-tools", ".entry-search-control", ".entry-search-config-menu"]) {
+    button.parentElement = owner(selector);
+    for (const state of ["pending", "ready", "fallback"]) {
+      button.parentElement.dataset.liquidGlassOptics = state;
+      assert.equal(surfaceRoleDefinition(button), null, selector + " owns its nested controls in " + state);
+    }
+  }
+  button.parentElement = owner(".entry-display");
+  assert.equal(surfaceRoleDefinition(button), compact, "Q1 content shells allow compact Q3 children");
+  const engine = new LiquidGlassEngine();
+  const addition = { type: "childList", target: {}, addedNodes: [button], removedNodes: [] };
+  assert.equal(engine.mappingChanged([addition]), true, "New eligible controls need registration");
+  engine.surfaces.set(button, { mapped: true, registration: "automatic", role: compact.role });
+  assert.equal(engine.mappingChanged([addition]), false, "Already registered controls do not trigger another sync");
+  button.parentElement = owner(".modal-panel");
+  assert.equal(engine.mappingChanged([addition]), true, "Moving into Q3 releases the child surface");
+  engine.surfaces.clear();
+  assert.equal(engine.mappingChanged([addition]), false, "New Q3-nested controls stay CSS-only");
+  button.parentElement = null;
+  assert.equal(engine.mappingChanged([addition]), true, "Moving out of Q3 makes a control eligible again");
+  engine.surfaces.set(button, { mapped: true, registration: "automatic", role: compact.role });
+  button.isConnected = false;
+  assert.equal(engine.mappingChanged([{ ...addition, addedNodes: [], removedNodes: [button] }]), true,
+    "Removed controls release resources");
+  assert.equal(engine.mappingChanged([{ type: "childList", target: {}, addedNodes: [{}], removedNodes: [] }]),
+    false, "Text changes do not schedule registry scans");
+}
 
 function almostEqual(actual, expected, epsilon, message) {
   assert(

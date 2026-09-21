@@ -45,7 +45,7 @@
               <path d="M4 6h.01M4 12h.01M4 18h.01"></path>
             </svg>
           </button>
-          <button class="mobile-app-bar-button mobile-new-entry-button" id="mobileNewEntryButton" type="button" data-app-tooltip="always" data-i18n-aria-label="newEntry" aria-label="新建词条">
+          <button class="mobile-app-bar-button mobile-new-entry-button" data-control-tone="accent" data-control-emphasis="outline" id="mobileNewEntryButton" type="button" data-app-tooltip="always" data-i18n-aria-label="newEntry" aria-label="新建词条">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 5v14M5 12h14"></path>
             </svg>
@@ -150,7 +150,7 @@
               </div>
             </div>
             <div class="top-actions">
-              <button class="primary-button" id="newEntryButton" type="button" data-i18n="newEntry">新建词条</button>
+              <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="newEntryButton" type="button" data-i18n="newEntry">新建词条</button>
             </div>
           </section>
 
@@ -164,7 +164,7 @@
             <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
             <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
             <p data-i18n="emptyDictionaryBody">词条编辑器会在存在当前词典后显示。进入词典管理即可新建、导入或切换词典。</p>
-            <button class="primary-button" id="emptyCreateDictionaryButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+            <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="emptyCreateDictionaryButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
           </section>
 
           <section class="content-grid" id="editorContentGrid" data-browser-state="expanded">
@@ -220,7 +220,7 @@
                       <button class="secondary-button" id="entryFilterResetButton" type="button" data-i18n="resetFilter">重置</button>
                       <span></span>
                       <button class="secondary-button" id="entryFilterCancelButton" type="button" data-i18n="cancel">取消</button>
-                      <button class="primary-button" id="entryFilterApplyButton" type="button" data-i18n="applyFilter">应用</button>
+                      <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="entryFilterApplyButton" type="button" data-i18n="applyFilter">应用</button>
                     </div>
                   </div>
                 </div>
@@ -232,7 +232,7 @@
                   <option value="createdAsc" data-i18n="sortCreatedAsc">创建时间正序</option>
                   <option value="createdDesc" data-i18n="sortCreatedDesc">创建时间倒序</option>
                 </select>
-                <button class="secondary-button entry-list-new-button" id="entryListNewEntryButton" type="button" data-app-tooltip="always" data-i18n-aria-label="quickNewEntryTooltip" aria-label="新建词条">
+                <button class="secondary-button entry-list-new-button" data-control-tone="accent" data-control-emphasis="outline" id="entryListNewEntryButton" type="button" data-app-tooltip="always" data-i18n-aria-label="quickNewEntryTooltip" aria-label="新建词条">
                   <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M12 5v14M5 12h14"></path>
                   </svg>
@@ -246,13 +246,13 @@
                       <path d="M4 5h16l-6 7v5l-4 2v-7L4 5z"></path>
                     </svg>
                     <span class="active-filter-label" id="activeFilterLabel" data-app-tooltip="overflow" data-app-tooltip-wrap="true" tabindex="0"></span>
-                    <button class="secondary-button active-filter-icon-button" id="activeFilterRefreshButton" type="button" data-app-tooltip="always" data-i18n-aria-label="refreshActiveFilter">
+                    <button class="secondary-button active-filter-icon-button" data-control-tone="accent" data-control-emphasis="outline" id="activeFilterRefreshButton" type="button" data-app-tooltip="always" data-i18n-aria-label="refreshActiveFilter">
                       <svg class="active-filter-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M20 6v5h-5"></path>
                         <path d="M19 11a7 7 0 1 0-2.05 4.95"></path>
                       </svg>
                     </button>
-                    <button class="secondary-button active-filter-icon-button" id="activeFilterCycleButton" type="button" data-app-tooltip="always" data-i18n-aria-label="cycleActiveFilter" hidden>
+                    <button class="secondary-button active-filter-icon-button" data-control-tone="accent" data-control-emphasis="outline" id="activeFilterCycleButton" type="button" data-app-tooltip="always" data-i18n-aria-label="cycleActiveFilter" hidden>
                       <svg class="active-filter-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M8 7h11m0 0-3-3m3 3-3 3"></path>
                         <path d="M16 17H5m0 0 3 3m-3-3 3-3"></path>
@@ -341,7 +341,7 @@
                     <p class="eyebrow" id="entryMode">新建</p>
                     <h3 id="entryFormTitle">词条</h3>
                   </div>
-                  <button class="danger-ghost" id="deleteEntryButton" type="button" data-i18n="delete">删除</button>
+                  <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" id="deleteEntryButton" type="button" data-i18n="delete">删除</button>
                 </div>
 
                 <label>
@@ -369,7 +369,7 @@
                     <div>
                       <p class="eyebrow" data-i18n="definitions">释义</p>
                     </div>
-                    <button class="secondary-button additive-button" id="addDefinitionButton" type="button" data-i18n="addDefinition">添加释义</button>
+                    <button class="secondary-button additive-button" data-control-tone="accent" data-control-emphasis="outline" id="addDefinitionButton" type="button" data-i18n="addDefinition">添加释义</button>
                   </div>
                   <div class="definition-form-list" id="definitionFormList"></div>
                 </section>
@@ -419,7 +419,7 @@
                 <div class="form-actions">
                   <button class="secondary-button" id="cancelEditButton" type="button" data-i18n="cancel">取消</button>
                   <button class="secondary-button" id="clearEntryButton" type="button" data-i18n="clear">清空</button>
-                  <button class="primary-button" type="submit" data-i18n="saveEntry">保存词条</button>
+                  <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" type="submit" data-i18n="saveEntry">保存词条</button>
                 </div>
               </form>
               <div class="content-update-overlay entry-detail-update-overlay" id="entryDetailUpdateOverlay" role="status" aria-live="polite" hidden>
@@ -437,7 +437,7 @@
             </div>
             <div class="top-actions">
               <button class="secondary-button" id="backToEditorButton" type="button" data-i18n="backToEditor">返回编辑器</button>
-              <button class="primary-button" id="addDictionaryButton" type="button" data-i18n="newDictionary">新建词典</button>
+              <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="addDictionaryButton" type="button" data-i18n="newDictionary">新建词典</button>
               <label class="secondary-button file-trigger">
                 <span data-i18n="importJson">导入 JSON</span>
                 <input id="importInput" type="file" accept="application/json,.json">
@@ -462,7 +462,7 @@
                     <p class="eyebrow" id="dictionaryMode">配置</p>
                     <h3 id="dictionaryFormTitle">词典资料</h3>
                   </div>
-                  <button class="danger-ghost" id="deleteDictionaryButton" type="button" data-i18n="deleteDictionary">删除词典</button>
+                  <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" id="deleteDictionaryButton" type="button" data-i18n="deleteDictionary">删除词典</button>
                 </div>
                 <label>
                   <span data-i18n="name">名称</span>
@@ -477,7 +477,7 @@
                   <textarea id="dictionaryDescriptionInput" rows="4"></textarea>
                 </label>
                 <div class="form-actions">
-                  <button class="primary-button" type="submit" data-i18n="saveConfig">保存配置</button>
+                  <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" type="submit" data-i18n="saveConfig">保存配置</button>
                 </div>
               </form>
             </section>
@@ -499,7 +499,7 @@
             <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
             <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
             <p data-i18n="analysisNeedDictionary">数据分析会根据当前词典中的词条、标签、词源、IPA 和形态学配置实时生成。</p>
-            <button class="primary-button" id="analysisOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+            <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="analysisOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
           </section>
 
           <section class="analysis-panel" id="analysisPanel"></section>
@@ -520,7 +520,7 @@
             <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
             <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
             <p data-i18n="qualityNeedDictionary">质量检查会根据当前词典中的词条、标签、词源、IPA 和 Glossed 例句实时生成。</p>
-            <button class="primary-button" id="qualityOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+            <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="qualityOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
           </section>
 
           <section class="analysis-panel" id="qualityPanel"></section>
@@ -541,7 +541,7 @@
             <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
             <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
             <p data-i18n="settingsNeedDictionary">其他设置会保存到当前词典文件中。</p>
-            <button class="primary-button" id="settingsOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+            <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="settingsOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
           </section>
 
           <section class="editor-panel tool-config-panel" id="settingsPanel">
@@ -839,7 +839,7 @@
                 </div>
                 <p class="muted-text" data-i18n="searchCustomRulesHelp">将每行变体统一匹配为一个标准形式。规则按最长变体优先，且不会递归套用。</p>
                 <div class="search-normalization-rule-list" id="searchNormalizationRuleList"></div>
-                <button class="secondary-button additive-button" id="addSearchNormalizationRuleButton" type="button" data-i18n="addSearchNormalizationRule">添加规则</button>
+                <button class="secondary-button additive-button" data-control-tone="accent" data-control-emphasis="outline" id="addSearchNormalizationRuleButton" type="button" data-i18n="addSearchNormalizationRule">添加规则</button>
                 <div class="subsection-title">
                   <h3 data-i18n="etymologyAutocomplete">词源自动补全</h3>
                 </div>
@@ -919,7 +919,7 @@
                 <p class="field-help" data-i18n="ipaKeyboardHelp">以空格、逗号或换行分隔。新词典默认包含 ˈ 和 ˌ。</p>
               </section>
               <div class="form-actions">
-                <button class="primary-button" type="submit" data-i18n="saveConfig">保存配置</button>
+                <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" type="submit" data-i18n="saveConfig">保存配置</button>
               </div>
             </form>
           </section>
@@ -938,7 +938,7 @@
                 <button type="button" data-doc-mode="preview" data-i18n="previewMode">查看</button>
               </div>
               <button class="secondary-button" id="backToEditorFromDocsButton" type="button" data-i18n="backToEditor">返回编辑器</button>
-              <button class="primary-button" id="saveDocsButton" type="button" data-i18n="saveDocs">保存文档</button>
+              <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="saveDocsButton" type="button" data-i18n="saveDocs">保存文档</button>
             </div>
           </section>
 
@@ -946,7 +946,7 @@
             <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
             <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
             <p data-i18n="docsNeedDictionary">语言文档会保存到当前词典文件中。</p>
-            <button class="primary-button" id="docsOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+            <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="docsOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
           </section>
 
           <section class="docs-panel" id="docsPanel">
@@ -965,7 +965,7 @@
             </div>
             <div class="top-actions">
               <button class="secondary-button" id="backToEditorFromCorpusButton" type="button" data-i18n="backToEditor">返回编辑器</button>
-              <button class="primary-button" id="saveCorpusButton" type="button" data-i18n="saveCorpus">保存语料库</button>
+              <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="saveCorpusButton" type="button" data-i18n="saveCorpus">保存语料库</button>
             </div>
           </section>
 
@@ -973,7 +973,7 @@
             <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
             <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
             <p data-i18n="corpusNeedDictionary">语料库会保存到当前词典文件中。</p>
-            <button class="primary-button" id="corpusOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+            <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="corpusOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
           </section>
 
           <section class="corpus-integrity-panel" id="corpusIntegrityPanel" hidden>
@@ -990,7 +990,7 @@
                 <button class="active" type="button" data-corpus-mode="blocks" data-i18n="corpusBlocks">块</button>
                 <button type="button" data-corpus-mode="units" data-i18n="corpusUnits">单元</button>
               </div>
-              <button class="primary-button" id="newCorpusItemButton" type="button" data-i18n="newCorpusBlock">新建块</button>
+              <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="newCorpusItemButton" type="button" data-i18n="newCorpusBlock">新建块</button>
             </div>
             <div class="corpus-layout">
               <aside class="corpus-browser">
@@ -1017,7 +1017,7 @@
             <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
             <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
             <p data-i18n="morphologyNeedDictionary">自动形态学配置会保存到当前词典文件中。</p>
-            <button class="primary-button" id="morphologyFunctionsOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+            <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="morphologyFunctionsOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
           </section>
 
           <section class="editor-panel tool-config-panel" id="morphologyFunctionsPanel">
@@ -1041,7 +1041,7 @@
                 <p class="field-help" data-i18n="morphologyFunctionObjectsHelp">为 leftV/rightV 配置它们会识别的对象。多个对象用逗号分隔。</p>
               </section>
               <div class="form-actions">
-                <button class="primary-button" type="submit" data-i18n="saveConfig">保存配置</button>
+                <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" type="submit" data-i18n="saveConfig">保存配置</button>
               </div>
             </form>
           </section>
@@ -1065,17 +1065,17 @@
             <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
             <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
             <p data-i18n="morphologyNeedDictionary">自动形态学配置会保存到当前词典文件中。</p>
-            <button class="primary-button" id="morphologyTablesOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+            <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="morphologyTablesOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
           </section>
 
           <section class="editor-panel tool-config-panel" id="morphologyTablesPanel">
             <form id="morphologyTablesForm" autocomplete="off">
               <div class="morphology-table-toolbar">
-                <button class="primary-button" id="addMorphologyTableGroupButton" type="button" data-i18n="addMorphologyTableGroup">新建表格组</button>
+                <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="addMorphologyTableGroupButton" type="button" data-i18n="addMorphologyTableGroup">新建表格组</button>
               </div>
               <div class="morphology-table-list" id="morphologyTableList"></div>
               <div class="form-actions">
-                <button class="primary-button" type="submit" data-i18n="saveConfig">保存配置</button>
+                <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" type="submit" data-i18n="saveConfig">保存配置</button>
               </div>
             </form>
           </section>
@@ -1089,8 +1089,8 @@
             </div>
             <div class="top-actions">
               <button class="secondary-button" id="backToEditorFromIpaButton" type="button" data-i18n="backToEditor">返回编辑器</button>
-              <button class="primary-button ipa-batch-safe" id="batchIpaMissingButton" type="button" data-i18n="batchIpaMissing">补全空发音</button>
-              <button class="danger-button ipa-batch-danger" id="batchIpaAllButton" type="button" data-i18n="batchIpaAll">重写全部发音</button>
+              <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="batchIpaMissingButton" type="button" data-i18n="batchIpaMissing">补全空发音</button>
+              <button class="danger-button" data-control-tone="danger" data-control-emphasis="solid" id="batchIpaAllButton" type="button" data-i18n="batchIpaAll">重写全部发音</button>
             </div>
           </section>
 
@@ -1098,7 +1098,7 @@
             <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
             <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
             <p data-i18n="ipaNeedDictionary">自动 IPA 标注规则会保存到当前词典文件中。</p>
-            <button class="primary-button" id="ipaOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+            <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="ipaOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
           </section>
 
           <section class="editor-panel ipa-layout tool-config-panel" id="ipaPanel">
@@ -1110,7 +1110,7 @@
                     <p class="eyebrow" data-i18n="orthographyModule">正写法识别</p>
                     <h3 data-i18n="mappingRules">映射规则</h3>
                   </div>
-                  <button class="secondary-button" id="addIpaMappingButton" type="button" data-i18n="addMapping">添加映射</button>
+                  <button class="secondary-button" data-control-tone="accent" data-control-emphasis="outline" id="addIpaMappingButton" type="button" data-i18n="addMapping">添加映射</button>
                 </div>
                 <p class="field-help" data-i18n="mappingRuleHelp">规则从上到下匹配；输入与前后条件始终只读取原始词形，生成结果不会被后续规则再次读取。较前规则消耗的字符不会再参与后续匹配，可拖动规则调整优先级。输出中写入 ˈ 或以 ' 开头，可将该音节标为重读并覆盖默认重音。</p>
                 <div class="ipa-rule-header" aria-hidden="true">
@@ -1176,7 +1176,7 @@
               </section>
 
               <div class="form-actions">
-                <button class="primary-button" type="submit" data-i18n="saveConfig">保存配置</button>
+                <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" type="submit" data-i18n="saveConfig">保存配置</button>
               </div>
               </form>
             </div>
@@ -1263,7 +1263,7 @@
         <div class="form-actions confirm-actions">
           <button class="secondary-button" id="confirmCancelButton" type="button" data-i18n="cancel">取消</button>
           <button class="danger-ghost" id="confirmAlternateButton" type="button" hidden>放弃更改</button>
-          <button class="primary-button" id="confirmAcceptButton" type="button" data-i18n="confirm">确认</button>
+          <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="confirmAcceptButton" type="button" data-i18n="confirm">确认</button>
         </div>
       </article>
     </section>

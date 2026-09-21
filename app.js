@@ -793,7 +793,6 @@ const i18n = {
     orthographyStressModule: "正写法重音映射",
     mappingRules: "映射规则",
     addMapping: "添加映射",
-    addStressMapping: "添加重音映射",
     mappingRuleHelp: "规则从上到下匹配；输入与前后条件始终只读取原始词形，生成结果不会被后续规则再次读取。较前规则消耗的字符不会再参与后续匹配，可拖动规则调整优先级。输出中写入 ˈ 或以 ' 开头，可将该音节标为重读并覆盖默认重音。",
     stressMappingHelp: "输出中写入 ˈ 或以 ' 开头，可将该音节标为重读并覆盖默认重音。",
     syllabification: "音节划分",
@@ -873,7 +872,7 @@ const i18n = {
     linkedUnits: "关联单元",
     chooseUnit: "选择单元",
     linkUnit: "关联单元",
-    unlink: "解除链接",
+    unlink: "解除关联",
     moveUp: "上移",
     moveDown: "下移",
     deleteCorpusBlock: "删除块",
@@ -1402,7 +1401,6 @@ const i18n = {
     orthographyStressModule: "Orthographic Stress",
     mappingRules: "Mapping Rules",
     addMapping: "Add Mapping",
-    addStressMapping: "Add Stress Mapping",
     mappingRuleHelp: "Rules are tried from top to bottom. Inputs and contexts always read the original lemma; generated output is never fed into later rules. Characters consumed by an earlier rule are unavailable to later rules. Drag rules to change priority. Put ˈ in the output, or start it with ', to mark that syllable as stressed and override default stress.",
     stressMappingHelp: "Put ˈ in the output, or start it with ', to mark that syllable as stressed and override default stress.",
     syllabification: "Syllabification",
@@ -2005,6 +2003,8 @@ function appConfirm(message, options = {}) {
     confirmDialogResults = { cancel: false, alternate: false, accept: true };
     elements.confirmAcceptButton.classList.toggle("danger-button", Boolean(options.danger));
     elements.confirmAcceptButton.classList.toggle("primary-button", !options.danger);
+    elements.confirmAcceptButton.dataset.controlTone = options.danger ? "danger" : "accent";
+    elements.confirmAcceptButton.dataset.controlEmphasis = "solid";
     elements.confirmDialog.hidden = false;
     liquidGlassOpticalEngine?.registerMappedSurface(elements.confirmDialog.querySelector(".modal-panel"));
     elements.confirmAcceptButton.focus();
@@ -2027,6 +2027,8 @@ function appEditSwitchPrompt(message) {
     elements.confirmAcceptButton.textContent = t("editSwitchSave");
     elements.confirmAcceptButton.classList.remove("danger-button");
     elements.confirmAcceptButton.classList.add("primary-button");
+    elements.confirmAcceptButton.dataset.controlTone = "accent";
+    elements.confirmAcceptButton.dataset.controlEmphasis = "solid";
     elements.confirmDialog.hidden = false;
     liquidGlassOpticalEngine?.registerMappedSurface(elements.confirmDialog.querySelector(".modal-panel"));
     elements.confirmAcceptButton.focus();
@@ -11913,7 +11915,6 @@ function renderDictionaryManager() {
 
   if (!state.dictionaries.length) {
     elements.dictionaryManagerList.append(emptyState(t("noDictionary"), t("emptyDictionaryBody")));
-    liquidGlassOpticalEngine?.syncMappedSurfaces();
     return;
   }
 
@@ -11932,7 +11933,7 @@ function renderDictionaryManager() {
         <button class="secondary-button" type="button" data-action="config">${escapeHtml(t("config"))}</button>
         <button class="secondary-button" type="button" data-action="export">${escapeHtml(t("exportJson"))}</button>
         ${isActive
-          ? `<button class="primary-button current-dictionary-button" type="button" aria-current="true" disabled>${escapeHtml(t("current"))}</button>`
+          ? `<button class="primary-button current-dictionary-button" data-control-tone="accent" data-control-emphasis="solid" type="button" aria-current="true" disabled>${escapeHtml(t("current"))}</button>`
           : `<button class="secondary-button" type="button" data-action="activate">${escapeHtml(t("setCurrent"))}</button>`}
       </div>
     `;
@@ -11953,7 +11954,6 @@ function renderDictionaryManager() {
     card.querySelector('[data-action="export"]').addEventListener("click", () => exportDictionary(dictionary.id));
     elements.dictionaryManagerList.append(card);
   });
-  liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
 
 function fillEntryForm(entry) {
@@ -12042,12 +12042,11 @@ function renderMorphologyEntryControls(host, entry = {}, { full = false } = {}) 
     ${state.morphologyMode === "manual" ? `
       <div class="entry-morphology-add-row">
         <select data-field="addMorphologyGroup">${availableGroups.map((group) => `<option value="${escapeHtml(group.id)}">${escapeHtml(group.name)}</option>`).join("")}</select>
-        <button class="primary-button" type="button" data-action="add-entry-morphology-group" data-i18n="addEntryMorphologyGroup">${escapeHtml(t("addEntryMorphologyGroup"))}</button>
+        <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" type="button" data-action="add-entry-morphology-group" data-i18n="addEntryMorphologyGroup">${escapeHtml(t("addEntryMorphologyGroup"))}</button>
       </div>` : ""}
     <p class="field-help" data-i18n="morphologyOverrideHelp">${escapeHtml(t("morphologyOverrideHelp"))}</p>
     <div class="entry-morphology-group-list">${groups.map(({ templateGroup, entryGroup }, index) => renderEntryMorphologyGroupEditor(templateGroup, entryGroup, previewEntry, state.morphologyMode, index, groups.length)).join("")}</div>
   `;
-  liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
 
 function renderEntryMorphologyGroupEditor(templateGroup, entryGroup, entry, mode, index = 0, total = 1) {
@@ -12061,7 +12060,7 @@ function renderEntryMorphologyGroupEditor(templateGroup, entryGroup, entry, mode
           <strong>${escapeHtml(templateGroup.name)}</strong>
           <span class="field-help" data-i18n="${modeLabelKey}">${escapeHtml(t(modeLabelKey))}</span>
         </div>
-        ${mode === "manual" ? `<div class="panel-actions"><button class="secondary-button" type="button" data-action="move-entry-morphology-group-up" data-i18n="moveUp" ${index === 0 ? "disabled" : ""}>${escapeHtml(t("moveUp"))}</button><button class="secondary-button" type="button" data-action="move-entry-morphology-group-down" data-i18n="moveDown" ${index === total - 1 ? "disabled" : ""}>${escapeHtml(t("moveDown"))}</button><button class="danger-ghost" type="button" data-action="remove-entry-morphology-group" data-i18n="removeEntryMorphologyGroup">${escapeHtml(t("removeEntryMorphologyGroup"))}</button></div>` : ""}
+        ${mode === "manual" ? `<div class="panel-actions"><button class="secondary-button" type="button" data-action="move-entry-morphology-group-up" data-i18n="moveUp" ${index === 0 ? "disabled" : ""}>${escapeHtml(t("moveUp"))}</button><button class="secondary-button" type="button" data-action="move-entry-morphology-group-down" data-i18n="moveDown" ${index === total - 1 ? "disabled" : ""}>${escapeHtml(t("moveDown"))}</button><button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="remove-entry-morphology-group" data-i18n="removeEntryMorphologyGroup">${escapeHtml(t("removeEntryMorphologyGroup"))}</button></div>` : ""}
       </div>
       <div class="entry-morphology-group-fields">
         <label><span data-i18n="entryMorphologyGroupTitle">${escapeHtml(t("entryMorphologyGroupTitle"))}</span><input data-field="entryMorphologyTitle" value="${escapeHtml(group.title || "")}" data-i18n-placeholder="useTemplateGroupTitle" placeholder="${escapeHtml(t("useTemplateGroupTitle"))}"></label>
@@ -12181,7 +12180,7 @@ function definitionOptionalFieldHtml(field, labelKey, value) {
 }
 
 function definitionOptionalActionHtml(field, labelKey) {
-  return `<button class="secondary-button additive-button" type="button" data-action="add-definition-optional" data-optional-definition-field="${field}" data-i18n="${escapeHtml(labelKey)}">${escapeHtml(t(labelKey))}</button>`;
+  return `<button class="secondary-button additive-button" data-control-tone="accent" data-control-emphasis="outline" type="button" data-action="add-definition-optional" data-optional-definition-field="${field}" data-i18n="${escapeHtml(labelKey)}">${escapeHtml(t(labelKey))}</button>`;
 }
 
 function definitionOptionalFieldsHtml(definition = {}) {
@@ -12209,7 +12208,7 @@ function definitionFormCardHtml(definition, index, removeAction) {
   return `
     <div class="definition-form-header">
       <strong><span data-i18n="definitions">${escapeHtml(t("definitions"))}</span> ${index + 1}</strong>
-      <button class="danger-ghost" type="button" data-action="${removeAction}" data-i18n="removeDefinition">${escapeHtml(t("removeDefinition"))}</button>
+      <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="${removeAction}" data-i18n="removeDefinition">${escapeHtml(t("removeDefinition"))}</button>
     </div>
     <label>
       <span data-i18n="meaning">${escapeHtml(t("meaning"))}</span>
@@ -12794,7 +12793,7 @@ function createSearchNormalizationRuleCard(rule = {}) {
       <span data-i18n="searchVariants">${escapeHtml(t("searchVariants"))}</span>
       <textarea data-search-rule-variants>${escapeHtml((rule.variants || []).join("\n"))}</textarea>
     </label>
-    <button class="danger-ghost" type="button" data-action="remove-search-normalization-rule" data-i18n="removeSearchNormalizationRule">${escapeHtml(t("removeSearchNormalizationRule"))}</button>
+    <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="remove-search-normalization-rule" data-i18n="removeSearchNormalizationRule">${escapeHtml(t("removeSearchNormalizationRule"))}</button>
   `;
   return card;
 }
@@ -13053,7 +13052,7 @@ function createIpaRuleCard(rule = normalizeIpaRule()) {
       <textarea class="ipa-single-line" rows="1" data-field="to" data-i18n-aria-label="ruleTo" data-i18n-placeholder="ruleTo" aria-label="${escapeHtml(t("ruleTo"))}" placeholder="${escapeHtml(t("ruleTo"))}">${escapeHtml(rule.to)}</textarea>
       <textarea class="ipa-single-line" rows="1" data-field="before" data-i18n-aria-label="ruleBefore" data-i18n-placeholder="ruleBefore" aria-label="${escapeHtml(t("ruleBefore"))}" placeholder="${escapeHtml(t("ruleBefore"))}">${escapeHtml(rule.before)}</textarea>
       <textarea class="ipa-single-line" rows="1" data-field="after" data-i18n-aria-label="ruleAfter" data-i18n-placeholder="ruleAfter" aria-label="${escapeHtml(t("ruleAfter"))}" placeholder="${escapeHtml(t("ruleAfter"))}">${escapeHtml(rule.after)}</textarea>
-      <button class="icon-danger-button" type="button" data-action="remove-ipa-rule" data-app-tooltip="always" data-i18n-aria-label="removeRule" aria-label="${escapeHtml(t("removeRule"))}">🗑</button>
+      <button class="icon-danger-button" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="remove-ipa-rule" data-app-tooltip="always" data-i18n-aria-label="removeRule" aria-label="${escapeHtml(t("removeRule"))}">🗑</button>
     </div>
   `;
   return card;
@@ -14186,7 +14185,7 @@ function renderCorpusAttributeEditor(attributes = {}) {
   return `
     <div class="corpus-attribute-editor" data-corpus-attributes>
       <div class="corpus-attribute-rows">${rows}</div>
-      <button class="secondary-button" type="button" data-action="add-corpus-attribute" data-i18n="addAttribute">${escapeHtml(t("addAttribute"))}</button>
+      <button class="secondary-button" data-control-tone="accent" data-control-emphasis="outline" type="button" data-action="add-corpus-attribute" data-i18n="addAttribute">${escapeHtml(t("addAttribute"))}</button>
     </div>
   `;
 }
@@ -14220,7 +14219,7 @@ function renderCorpusBlockEditor(block, corpus) {
     <form class="corpus-form" data-corpus-kind="block" data-corpus-id="${escapeHtml(block.id)}" autocomplete="off">
       <div class="form-heading compact-heading">
         <div><p class="eyebrow" data-i18n="corpusBlock">${escapeHtml(t("corpusBlock"))}</p><h3 data-corpus-block-title-preview>${escapeHtml(block.title || t("corpusBlockFallback"))}</h3></div>
-        <button class="danger-ghost" type="button" data-action="delete-corpus-block" data-i18n="deleteCorpusBlock">${escapeHtml(t("deleteCorpusBlock"))}</button>
+        <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="delete-corpus-block" data-i18n="deleteCorpusBlock">${escapeHtml(t("deleteCorpusBlock"))}</button>
       </div>
       <label><span data-i18n="corpusBlockTitle">${escapeHtml(t("corpusBlockTitle"))}</span><input data-field="title" maxlength="160" value="${escapeHtml(block.title)}"></label>
       <label><span data-i18n="corpusTags">${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(serializeTagList(block.tags))}"><small class="field-help" data-i18n="corpusTagsHelp">${escapeHtml(t("corpusTagsHelp"))}</small></label>
@@ -14236,7 +14235,7 @@ function renderCorpusBlockEditor(block, corpus) {
       <section class="corpus-subsection">
         <div class="form-heading compact-heading">
           <div><h3 data-i18n="corpusLayers">${escapeHtml(t("corpusLayers"))}</h3></div>
-          <button class="secondary-button" type="button" data-action="add-corpus-layer" data-i18n="addLayer">${escapeHtml(t("addLayer"))}</button>
+          <button class="secondary-button" data-control-tone="accent" data-control-emphasis="outline" type="button" data-action="add-corpus-layer" data-i18n="addLayer">${escapeHtml(t("addLayer"))}</button>
         </div>
         <div class="corpus-layer-list">
           ${block.layers.map((layer, index) => renderCorpusLayerEditor(block, layer, index, corpus)).join("")}
@@ -14254,7 +14253,9 @@ function renderCorpusLayerEditor(block, layer, index, corpus) {
         <div class="corpus-order-actions">
           <button class="corpus-icon-button" type="button" data-action="move-corpus-layer-up" data-app-tooltip="always" data-i18n-aria-label="moveUp" aria-label="${escapeHtml(t("moveUp"))}" ${index === 0 ? "disabled" : ""}>↑</button>
           <button class="corpus-icon-button" type="button" data-action="move-corpus-layer-down" data-app-tooltip="always" data-i18n-aria-label="moveDown" aria-label="${escapeHtml(t("moveDown"))}" ${index === block.layers.length - 1 ? "disabled" : ""}>↓</button>
-          <button class="corpus-icon-button danger" type="button" data-action="delete-corpus-layer" data-app-tooltip="always" data-i18n-aria-label="deleteCorpusLayer" aria-label="${escapeHtml(t("deleteCorpusLayer"))}">×</button>
+          <button class="corpus-icon-button danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="delete-corpus-layer" data-app-tooltip="always" data-i18n-aria-label="deleteCorpusLayer" aria-label="${escapeHtml(t("deleteCorpusLayer"))}">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"></path></svg>
+          </button>
         </div>
       </div>
       <div class="form-grid">
@@ -14282,7 +14283,9 @@ function renderCorpusLinkedUnits(unitIds, ownerKey, corpus) {
         <div class="corpus-order-actions">
           <button class="corpus-icon-button" type="button" data-action="move-corpus-unit-up" data-app-tooltip="always" data-i18n-aria-label="moveUp" aria-label="${escapeHtml(t("moveUp"))}" ${index === 0 ? "disabled" : ""}>↑</button>
           <button class="corpus-icon-button" type="button" data-action="move-corpus-unit-down" data-app-tooltip="always" data-i18n-aria-label="moveDown" aria-label="${escapeHtml(t("moveDown"))}" ${index === unitIds.length - 1 ? "disabled" : ""}>↓</button>
-          <button class="corpus-icon-button danger" type="button" data-action="unlink-corpus-unit" data-app-tooltip="always" data-i18n-aria-label="unlink" aria-label="${escapeHtml(t("unlink"))}">×</button>
+          <button class="corpus-icon-button danger" data-control-tone="danger" data-control-emphasis="outline" type="button" data-action="unlink-corpus-unit" data-app-tooltip="always" data-i18n-aria-label="unlink" aria-label="${escapeHtml(t("unlink"))}">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 13-1 1a4 4 0 0 1-6-6l3-3a4 4 0 0 1 6 0M14 11l1-1a4 4 0 0 1 6 6l-3 3a4 4 0 0 1-6 0M3 21l3-3M18 6l3-3"></path></svg>
+          </button>
         </div>
       </li>
     `;
@@ -14296,7 +14299,7 @@ function renderCorpusLinkedUnits(unitIds, ownerKey, corpus) {
           <option value="" data-i18n="chooseUnit">${escapeHtml(t("chooseUnit"))}</option>
           ${availableUnits.map((unit) => `<option value="${escapeHtml(unit.id)}">${escapeHtml(corpusUnitLabel(unit))}</option>`).join("")}
         </select>
-        <button class="secondary-button" type="button" data-action="link-corpus-unit" data-i18n="linkUnit" ${availableUnits.length ? "" : "disabled"}>${escapeHtml(t("linkUnit"))}</button>
+        <button class="secondary-button" data-control-tone="accent" data-control-emphasis="outline" type="button" data-action="link-corpus-unit" data-i18n="linkUnit" ${availableUnits.length ? "" : "disabled"}>${escapeHtml(t("linkUnit"))}</button>
       </div>
       <p class="field-help" data-i18n="corpusLinkMovesUnit">${escapeHtml(t("corpusLinkMovesUnit"))}</p>
     </div>
@@ -14310,7 +14313,7 @@ function renderCorpusUnitEditor(unit, corpus) {
     <form class="corpus-form" data-corpus-kind="unit" data-corpus-id="${escapeHtml(unit.id)}" autocomplete="off">
       <div class="form-heading compact-heading">
         <div><p class="eyebrow" data-i18n="corpusUnit">${escapeHtml(t("corpusUnit"))}</p><div class="corpus-rendered-heading">${renderCorpusUnitNameHtml(unit, "content")}</div></div>
-        <button class="danger-ghost" type="button" data-action="delete-corpus-unit" data-i18n="deleteCorpusUnit">${escapeHtml(t("deleteCorpusUnit"))}</button>
+        <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="delete-corpus-unit" data-i18n="deleteCorpusUnit">${escapeHtml(t("deleteCorpusUnit"))}</button>
       </div>
       <label><span data-i18n="corpusUnitContent">${escapeHtml(t("corpusUnitContent"))}</span><textarea data-field="content" rows="6">${escapeHtml(unit.content)}</textarea></label>
       <label><span data-i18n="corpusParent">${escapeHtml(t("corpusParent"))}</span>
@@ -14562,12 +14565,10 @@ function renderMorphologyTablesConfig(dictionary) {
   }
   elements.morphologyTableList.innerHTML = "";
   if (!dictionary) {
-    liquidGlassOpticalEngine?.syncMappedSurfaces();
     return;
   }
   const groups = normalizeMorphology(dictionary.morphology).templateGroups;
   groups.forEach((group, index) => elements.morphologyTableList.append(createMorphologyGroupEditor(group, index)));
-  liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
 
 function createMorphologyGroupEditor(group, index) {
@@ -14603,12 +14604,12 @@ function createMorphologyGroupEditor(group, index) {
         <textarea data-field="notes" rows="3">${escapeHtml(group.notes || "")}</textarea>
       </label>
       <div class="morphology-group-delete-action">
-        <button class="danger-ghost" type="button" data-action="remove-morphology-group" data-i18n="removeMorphologyTableGroup">${escapeHtml(t("removeMorphologyTableGroup"))}</button>
+        <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="remove-morphology-group" data-i18n="removeMorphologyTableGroup">${escapeHtml(t("removeMorphologyTableGroup"))}</button>
       </div>
     </div>
     <div class="morphology-group-table-toolbar">
       <span data-i18n="morphologyTables">${escapeHtml(t("morphologyTables"))}</span>
-      <button class="primary-button" type="button" data-action="add-morphology-table" data-i18n="addMorphologyTable">${escapeHtml(t("addMorphologyTable"))}</button>
+      <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" type="button" data-action="add-morphology-table" data-i18n="addMorphologyTable">${escapeHtml(t("addMorphologyTable"))}</button>
     </div>
     <div class="morphology-group-table-list"></div>
   `;
@@ -14647,7 +14648,7 @@ function createMorphologyTableEditor(table) {
         </div>
       </div>
       <div class="panel-actions">
-        <button class="danger-ghost" type="button" data-action="remove-morphology-table" data-i18n="removeTable">${escapeHtml(t("removeTable"))}</button>
+        <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="remove-morphology-table" data-i18n="removeTable">${escapeHtml(t("removeTable"))}</button>
       </div>
     </div>
     <div class="morphology-card-body" ${expanded ? "" : "hidden"}>
@@ -15201,7 +15202,7 @@ async function openPartialEdit(section) {
     </div>
     <div class="partial-edit-body"></div>
     <div class="form-actions">
-      <button class="primary-button" type="submit" data-i18n="save">${escapeHtml(t("save"))}</button>
+      <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" type="submit" data-i18n="save">${escapeHtml(t("save"))}</button>
     </div>
   `;
   host.append(form);
@@ -15237,6 +15238,8 @@ async function openPartialEdit(section) {
     const addButton = document.createElement("button");
     addButton.type = "button";
     addButton.className = "secondary-button additive-button";
+    addButton.dataset.controlTone = "accent";
+    addButton.dataset.controlEmphasis = "outline";
     addButton.dataset.action = "add-partial-definition";
     addButton.dataset.i18n = "addDefinition";
     addButton.textContent = t("addDefinition");
@@ -15273,7 +15276,6 @@ async function openPartialEdit(section) {
   }
 
   body.querySelector("input, textarea")?.focus();
-  liquidGlassOpticalEngine?.syncMappedSurfaces();
   return true;
 }
 
@@ -15489,7 +15491,6 @@ function cancelPartialEdit() {
   partialEditHost?.classList.remove("partial-editing");
   partialEditHost = null;
   partialEditSection = "";
-  liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
 
 function createEntryDraft(overrides = {}) {
