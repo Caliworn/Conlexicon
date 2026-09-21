@@ -1097,23 +1097,6 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
   stroke-linejoin: round;
 }
 
-.active-filter-toolbar .active-filter-icon-button:where(:not([data-control-tone])):hover {
-  background: var(--ui-accent);
-  color: var(--ui-text-on-solid);
-}
-
-.active-filter-toolbar .filter-clear-button {
-  border-color: color-mix(in srgb, var(--ui-danger) 48%, transparent);
-  color: var(--ui-danger);
-}
-
-.active-filter-toolbar .filter-clear-button:hover,
-.active-filter-toolbar .filter-clear-button:focus-visible {
-  border-color: var(--ui-danger);
-  background: var(--ui-danger);
-  color: var(--ui-text-on-solid);
-}
-
 .filter-row input:disabled,
 .filter-row select:disabled {
   cursor: not-allowed;
@@ -1219,13 +1202,7 @@ label span {
 
 /* Opt-in semantic paint. Geometry, shadows and optical eligibility remain separate.
    Resolve aliases on the control, so each skin/theme supplies its current colors. */
-:where([data-control-tone][data-control-emphasis]) {
-  --control-tone-color: var(--ui-text);
-  --control-tone-hover-color: var(--ui-text);
-  --control-tone-tint: var(--material-inset-background);
-  --control-tone-solid: var(--ui-text);
-  --control-tone-solid-hover: var(--ui-text);
-  --control-tone-on-solid: var(--ui-canvas-bg);
+:where([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]) {
   --control-background: transparent;
   --control-border: transparent;
   --control-color: var(--control-tone-color);
@@ -1240,10 +1217,19 @@ label span {
   --control-disabled-color: var(--ui-text-muted);
 }
 
-[data-control-tone][data-control-emphasis] {
+:is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]) {
   background: var(--control-background);
   border-color: var(--control-border);
   color: var(--control-color);
+}
+
+[data-control-tone="neutral"] {
+  --control-tone-color: var(--ui-text);
+  --control-tone-hover-color: var(--ui-text);
+  --control-background: var(--material-panel-background);
+  --control-border: var(--ui-border);
+  --control-hover-background: var(--material-inset-background);
+  --control-hover-border: var(--ui-border-strong);
 }
 
 [data-control-tone="accent"] {
@@ -1262,12 +1248,6 @@ label span {
   --control-tone-solid: var(--ui-danger);
   --control-tone-solid-hover: var(--ui-danger);
   --control-tone-on-solid: var(--ui-text-on-solid);
-}
-
-[data-control-emphasis="plain"] {
-  --control-background: transparent;
-  --control-border: transparent;
-  --control-hover-border: transparent;
 }
 
 [data-control-emphasis="outline"] {
@@ -1290,24 +1270,24 @@ label span {
   --control-disabled-color: var(--ui-text);
 }
 
-[data-control-tone][data-control-emphasis]:hover:not(:disabled):not([aria-disabled="true"]) {
+:is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]):hover:not(:disabled):not([aria-disabled="true"]) {
   background: var(--control-hover-background);
   border-color: var(--control-hover-border);
   color: var(--control-hover-color);
 }
 
-[data-control-tone][data-control-emphasis]:active:not(:disabled):not([aria-disabled="true"]) {
+:is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]):active:not(:disabled):not([aria-disabled="true"]) {
   background: var(--control-pressed-background);
   border-color: var(--control-pressed-border);
   color: var(--control-pressed-color);
 }
 
-[data-control-tone][data-control-emphasis]:focus-visible {
+:is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]):focus-visible {
   outline: 2px solid var(--ui-focus);
   outline-offset: 2px;
 }
 
-[data-control-tone][data-control-emphasis]:is(:disabled, [aria-disabled="true"]) {
+:is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]):is(:disabled, [aria-disabled="true"]) {
   cursor: not-allowed;
   background: var(--control-disabled-background);
   border-color: var(--control-disabled-border);
@@ -1361,19 +1341,6 @@ label span {
 :is(.primary-button, .secondary-button, .danger-button):disabled {
   box-shadow: none;
   cursor: not-allowed;
-}
-
-.danger-ghost:not([data-control-tone]) {
-  background: var(--ui-danger-soft);
-  color: var(--ui-danger);
-}
-
-.active-filter-toolbar .filter-clear-button:is(:hover, :focus-visible) {
-  box-shadow: var(--material-action-hover-shadow);
-}
-
-.active-filter-toolbar .filter-clear-button:active:not(:disabled) {
-  box-shadow: var(--material-action-pressed-shadow);
 }
 
 .icon-button {
@@ -2793,11 +2760,12 @@ button.pending-source:focus-visible {
   color: var(--ui-accent-hover);
 }
 
-.entry-context-menu button.danger {
-  margin-top: 5px;
+.entry-context-menu-separator {
+  margin: 5px 0;
   border-top: 1px solid var(--ui-border);
-  border-radius: 0 0 7px 7px;
-  padding-top: 5px;
+}
+
+.entry-context-menu button.danger {
   color: var(--ui-danger);
 }
 

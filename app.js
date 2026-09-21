@@ -7226,6 +7226,12 @@ function showEntryContextMenu(event, entry, options = {}) {
     },
   ];
   actions.forEach((action) => {
+    if (action.danger) {
+      const separator = document.createElement("div");
+      separator.className = "entry-context-menu-separator";
+      separator.setAttribute("role", "separator");
+      menu.append(separator);
+    }
     const button = document.createElement("button");
     button.type = "button";
     button.dataset.entryContextAction = action.key;
@@ -14195,7 +14201,7 @@ function renderCorpusAttributeRow(key = "", value = "") {
     <div class="corpus-attribute-row">
       <input data-field="attribute-key" data-i18n-aria-label="attributeName" data-i18n-placeholder="attributeName" aria-label="${escapeHtml(t("attributeName"))}" placeholder="${escapeHtml(t("attributeName"))}" value="${escapeHtml(key)}">
       <input data-field="attribute-value" data-i18n-aria-label="attributeValue" data-i18n-placeholder="attributeValue" aria-label="${escapeHtml(t("attributeValue"))}" placeholder="${escapeHtml(t("attributeValue"))}" value="${escapeHtml(value)}">
-      <button class="corpus-icon-button danger" type="button" data-action="remove-corpus-attribute" data-app-tooltip="always" data-i18n-aria-label="removeAttribute" aria-label="${escapeHtml(t("removeAttribute"))}">×</button>
+      <button class="corpus-icon-button danger" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="remove-corpus-attribute" data-app-tooltip="always" data-i18n-aria-label="removeAttribute" aria-label="${escapeHtml(t("removeAttribute"))}">×</button>
     </div>
   `;
 }

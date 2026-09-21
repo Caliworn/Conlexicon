@@ -18,21 +18,26 @@
 
 ### 控件颜色语义接口（2026-09-20）
 
-共享组件可显式声明 `data-control-tone="neutral|accent|danger"` 与
-`data-control-emphasis="plain|outline|tinted|solid"`。两个属性一起使用，未声明的组件继续走原有样式。
+共享组件通过 `data-control-tone` 声明语义：
+neutral 使用唯一中性配方，必须省略 `data-control-emphasis`；
+accent 与 danger 必须明确选择 outline、tinted 或 solid。契约按上述七种有效声明校验，
+不将所有字段的笛卡尔积视为有效接口。新增配方需有明确用途与状态验证，不以是否已经迁移消费者作为唯一依据。
+本批仅提供 neutral 与 accent/tinted 配方，不批量迁移按钮。未声明的组件继续走原有样式，包括菜单及文字操作的无底外观。
 这只是颜色与强调接口，不是 Q3 注册接口，也不改变尺寸、布局、阴影、按压变换或业务行为。
 
 | emphasis | 默认底色 / 边框 | 用途 |
 | --- | --- | --- |
-| plain | 透明 / 透明 | 低强调操作 |
 | outline | 同皮肤 panel 中性底 / tone 色 | 描边操作 |
-| tinted | tone 弱底 / 初始透明边框 | 弱有色底操作 |
+| tinted | tone 弱底 / 初始透明边框 | 弱强调／危险操作 |
 | solid | tone 实色 / 初始透明边框 | 高强调操作 |
 
 局部 `--control-tone-*` 从当前皮肤的 `--ui-*` / `--material-*` 取值；
 `--control-background`、`--control-border`、`--control-color` 及 hover/pressed 对应变量是组件消费端。
 别名在控件本身声明，避免在 body 声明后绑定浅色值。无需新增一套同义全局颜色 token。
-neutral 使用中性文字、inset 弱底；accent 和 danger 分别使用现有强调/危险色、soft 弱底及实色前景。
+accent 和 danger 分别使用现有强调/危险色、soft 交互底及实色前景。
+neutral 使用 panel 中性底、ui-border 细边框及 ui-text；hover/pressed 使用 inset 中性底与 ui-border-strong，
+不引入强调色。不存在 neutral 的 outline/tinted/solid 分档。Q3 专属配色适配目前仍仅覆盖有色 outline，
+新增配方不等于新增光学资格或完成对应 Q3 配方。
 
 hover 沿本身 tone 变化，outline 出现弱有色底，tinted 保持弱底并强化边框；
 pressed 初始复用 hover 配方，接口允许以后独立调整，但本批不设计新色阶。
@@ -47,10 +52,13 @@ aria-disabled 仅影响外观，业务仍需自行阻止激活。
 （danger/tinted），添加释义/可选字段/标准化规则（accent/outline），现有主操作
 （accent/solid），以及重写全部发音和危险确认（danger/solid）。
 完整编辑、局部编辑和动态模板均声明属性；共享确认按钮每次打开都同步 tone/emphasis，
-普通确认与编辑切换保存会恢复 accent。放弃更改的 alternate 按钮仍留在后续批次。
+普通确认与编辑切换保存会恢复 accent。放弃更改的 alternate 按钮固定使用 danger/tinted，
+与语料删除属性一致；清除筛选使用 danger/outline，保留其既有 Q3 资格与语义描边反馈。
 添加类使用标准 outline 中性底和强调色边框，IPA 批量入口使用标准 solid 配方，不再单设同色边框。
 IPA 规则删除保留默认中性边框，以局部变量接入。原 class 继续承担布局、阴影及既有注册边界；
-additive-button 仍用于原有光学排除，不再定义透明底或专属交互配色。
+additive-button 不再定义透明底或专属交互配色；其 accent/outline 控件可进入紧凑 Q3，
+danger 类的 danger/outline 控件同样放行，其他强调档仍排除。该例外覆盖完整／局部添加释义、
+添加可选字段、搜索标准化添加规则及语料解除关联，仍遵守 Q3 父表面内不重复折射的边界。
 旧 danger 类暂时保留以维持现有 Q3 排除状态，不表示 tone 将来决定光学资格。
 2026-09-21：添加 IPA 映射、语料属性、语料层、关联单元，以及移动/列表新建、
 筛选刷新/切换按钮已迁移 accent/outline；图标新建和筛选操作不再采用 hover 实色填充。
@@ -59,7 +67,7 @@ hover/pressed tint；不会新增光学注册，父 Q3 排除边界不变。
 Mail 搜索/工具外壳的内部控件同时映射旧 material 与新 control 配色接口：
 默认透明、hover/pressed 沿自身 tone 轻染色，共享外壳玻璃，不绘制独立面板底。
 这些映射只覆盖既有直接控件位置，不作用于 body 级挂载的菜单。
-其他按钮尚未迁移；Q3 的其他强调档与未迁移语义控件（例如红色清除筛选）的颜色覆盖仍待单独处理，
+其他按钮尚未迁移；Q3 的其他强调档与未迁移语义控件的颜色覆盖仍待单独处理，
 不能据此宣称整个语义接口已与 Q3 完整兼容。
 高密度 solid 玻璃不在本批内。语法、颜色别名矩阵与完整检查可自动验证，
 浏览器计算样式、视觉及辅助模式验收仍需另行完成。

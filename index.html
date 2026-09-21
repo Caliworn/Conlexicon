@@ -258,7 +258,7 @@
                         <path d="M16 17H5m0 0 3 3m-3-3 3-3"></path>
                       </svg>
                     </button>
-                    <button class="secondary-button active-filter-icon-button filter-clear-button" id="activeFilterExitButton" type="button" data-app-tooltip="always" data-i18n-aria-label="clearFilter" aria-label="清除筛选">
+                    <button class="secondary-button active-filter-icon-button filter-clear-button" data-control-tone="danger" data-control-emphasis="outline" id="activeFilterExitButton" type="button" data-app-tooltip="always" data-i18n-aria-label="clearFilter" aria-label="清除筛选">
                       <svg class="active-filter-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M6 6l12 12M18 6 6 18"></path>
                       </svg>
@@ -1262,7 +1262,7 @@
         <p class="confirm-dialog-message" id="confirmDialogMessage"></p>
         <div class="form-actions confirm-actions">
           <button class="secondary-button" id="confirmCancelButton" type="button" data-i18n="cancel">取消</button>
-          <button class="danger-ghost" id="confirmAlternateButton" type="button" hidden>放弃更改</button>
+          <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" id="confirmAlternateButton" type="button" hidden>放弃更改</button>
           <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="confirmAcceptButton" type="button" data-i18n="confirm">确认</button>
         </div>
       </article>

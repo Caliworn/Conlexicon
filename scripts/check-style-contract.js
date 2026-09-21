@@ -148,8 +148,17 @@ const classicDarkTokenValues = customPropertyMap(classicDarkTheme[1]);
 const controlProperties = (block) => Object.fromEntries(
   [...block.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)].map((match) => [match[1], match[2].trim()]),
 );
-const controlDefaults = scopedBlock(styles, ":where([data-control-tone][data-control-emphasis])");
+const controlDefaults = scopedBlock(styles, ':where([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis])');
 assert(controlDefaults, "Semantic control defaults must be opt-in and lower-specificity than tone/emphasis recipes");
+// Only explicitly supported recipes are public; tone and emphasis are
+// not independent enums whose Cartesian product is automatically supported.
+const controlRecipes = [
+  ["neutral", undefined],
+  ["accent", "outline"], ["accent", "tinted"], ["accent", "solid"],
+  ["danger", "outline"], ["danger", "tinted"], ["danger", "solid"],
+];
+const supportsControlRecipe = (tone, emphasis) =>
+  controlRecipes.some(([t, e]) => t === tone && e === emphasis);
 for (const [source, lightSelector, darkSelector] of [
   [classic, classicScope, classicDarkScope],
   [layeredGlass, 'body[data-ui-skin="layered-glass"]', 'body.dark-theme[data-ui-skin="layered-glass"]'],
@@ -160,11 +169,10 @@ for (const [source, lightSelector, darkSelector] of [
       ...controlProperties(scopedBlock(source, lightSelector)[1]),
       ...(dark ? controlProperties(scopedBlock(source, darkSelector)[1]) : {}),
     };
-    for (const tone of ["neutral", "accent", "danger"]) {
-      const toneBlock = tone === "neutral" ? "" : scopedBlock(styles, `[data-control-tone="${tone}"]`)?.[1];
+    for (const [tone, emphasis] of controlRecipes) {
+      const toneBlock = scopedBlock(styles, `[data-control-tone="${tone}"]`)?.[1];
       assert(toneBlock !== undefined, `Missing control tone: ${tone}`);
-      for (const emphasis of ["plain", "outline", "tinted", "solid"]) {
-        const emphasisBlock = scopedBlock(styles, `[data-control-emphasis="${emphasis}"]`);
+        const emphasisBlock = emphasis === undefined ? ["", ""] : scopedBlock(styles, `[data-control-emphasis="${emphasis}"]`);
         assert(emphasisBlock, `Missing control emphasis: ${emphasis}`);
         const values = { ...skin, ...controlProperties(controlDefaults[1]),
           ...controlProperties(toneBlock), ...controlProperties(emphasisBlock[1]) };
@@ -175,10 +183,16 @@ for (const [source, lightSelector, darkSelector] of [
         const colorToken = tone === "neutral" ? "--ui-text" : `--ui-${tone}`;
         assert.equal(resolve("--control-color"), resolve(emphasis === "solid"
           ? "--control-tone-on-solid" : colorToken));
-        assert.equal(resolve("--control-border"), emphasis === "outline" ? resolve(colorToken) : "transparent");
-        const background = { plain: null, outline: "--material-panel-background",
+        assert.equal(resolve("--control-border"), tone === "neutral" ? resolve("--ui-border")
+          : emphasis === "outline" ? resolve(colorToken) : "transparent");
+        const background = { outline: "--material-panel-background",
           tinted: "--control-tone-tint", solid: "--control-tone-solid" }[emphasis];
-        assert.equal(resolve("--control-background"), background ? resolve(background) : "transparent");
+        assert.equal(resolve("--control-background"), resolve(tone === "neutral" ? "--material-panel-background" : background));
+        if (tone === "neutral") {
+          assert.equal(resolve("--control-hover-background"), resolve("--material-inset-background"));
+          assert.equal(resolve("--control-hover-border"), resolve("--ui-border-strong"));
+          assert.equal(resolve("--control-hover-color"), resolve("--ui-text"));
+        }
         assert.equal(resolve("--control-pressed-color"), resolve("--control-hover-color"));
         if (emphasis === "solid") {
           assert.equal(resolve("--control-disabled-background"), resolve("--material-inset-background"),
@@ -190,7 +204,6 @@ for (const [source, lightSelector, darkSelector] of [
           assert.equal(resolve("--control-hover-color"), resolve("--ui-danger"), "Danger interactions retain danger ink");
           assert.equal(resolve("--control-hover-background"), resolve("--ui-danger-soft"));
         }
-      }
     }
   }
 }
@@ -211,9 +224,19 @@ assert.equal(mailControlProperties["--control-background"], "transparent",
   "Semantic controls inside Mail must not paint an independent panel block");
 assert(mailControlProperties["--control-hover-background"].includes("--control-tone-color"),
   "Mail hover tint must follow the control tone");
-for (const match of `${app}\n${index}`.matchAll(/<button\b([^>]*data-control-tone="([^"]+)"[^>]*)>/g)) {
-  assert(["neutral", "accent", "danger"].includes(match[2]), "Controls must use a supported semantic tone");
-  assert(/data-control-emphasis="(plain|outline|tinted|solid)"/.test(match[1]), "Semantic controls need an explicit emphasis");
+for (const match of `${app}\n${index}`.matchAll(/<[^>]+\bdata-control-(?:tone|emphasis)="[^"]*"[^>]*>/g)) {
+  const tone = match[0].match(/data-control-tone="([^"]+)"/)?.[1];
+  const emphasis = match[0].match(/data-control-emphasis="([^"]+)"/)?.[1];
+  assert(supportsControlRecipe(tone, emphasis),
+    `Controls must use a supported semantic recipe: ${tone}/${emphasis}`);
+}
+for (const emphasis of ["plain", "outline", "tinted", "solid", ""]) {
+  assert(!supportsControlRecipe("neutral", emphasis), "Neutral has one recipe and must omit emphasis");
+}
+assert(!supportsControlRecipe("accent", undefined) && !supportsControlRecipe("danger", undefined),
+  "Colored controls require an explicit supported emphasis");
+for (const match of app.matchAll(/([\w.]+)\.dataset\.controlTone = "(\w+)";\s*\1\.dataset\.controlEmphasis = "(\w+)";/g)) {
+  assert(supportsControlRecipe(match[2], match[3]), "Dynamic controls must use supported semantic recipes");
 }
 for (const match of `${app}\n${index}`.matchAll(/<button\b([^>]*class="([^"]+)"[^>]*)>/g)) {
   const [, attributes, classList] = match;
@@ -222,8 +245,7 @@ for (const match of `${app}\n${index}`.matchAll(/<button\b([^>]*class="([^"]+)"[
   if (classes.has("primary-button")) expected = ["accent", "solid"];
   else if (classes.has("danger-button")) expected = ["danger", "solid"];
   else if (classes.has("additive-button")) expected = ["accent", "outline"];
-  else if (classes.has("icon-danger-button")
-    || (classes.has("danger-ghost") && !attributes.includes('id="confirmAlternateButton"'))) {
+  else if (classes.has("icon-danger-button") || classes.has("danger-ghost")) {
     expected = ["danger", "tinted"];
   }
   if (!expected) continue;
@@ -261,6 +283,8 @@ for (const match of `${app}\n${index}`.matchAll(/<button\b([^>]*class="([^"]+)"[
     vm.runInContext(call, context);
     assert.equal(accept.dataset.controlTone, tone, "Reused dialog must update its semantic tone");
     assert.equal(accept.dataset.controlEmphasis, "solid");
+    assert(supportsControlRecipe(accept.dataset.controlTone, accept.dataset.controlEmphasis),
+      "Reused prompts must resolve to a supported recipe");
     assert.equal(acceptClasses.has("danger-button"), tone === "danger");
     assert.equal(acceptClasses.has("primary-button"), tone === "accent");
   }
@@ -276,6 +300,17 @@ for (const marker of [
   assert(opening?.includes('data-control-tone="accent"')
     && opening.includes('data-control-emphasis="outline"'),
   `Add/link and outlined quick actions must share the accent outline recipe: ${marker}`);
+}
+for (const [marker, emphasis] of [
+  ['data-action="remove-corpus-attribute"', "tinted"],
+  ['id="activeFilterExitButton"', "outline"],
+  ['id="confirmAlternateButton"', "tinted"],
+]) {
+  const opening = [...`${index}\n${app}`.matchAll(/<button\b[^>]*>/g)]
+    .find(([tag]) => tag.includes(marker))?.[0];
+  assert(opening?.includes('data-control-tone="danger"')
+    && opening.includes(`data-control-emphasis="${emphasis}"`),
+  `Destructive/removal controls must declare their semantic recipe: ${marker}`);
 }
 const opticalOutlineSelector = 'body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"][data-control-tone][data-control-emphasis="outline"]';
 const opticalOutline = controlProperties(scopedBlock(liquidGlass, opticalOutlineSelector)[1]);
@@ -450,6 +485,11 @@ assert(
   "Liquid Glass refraction must be a progressive enhancement behind a URL-filter support query",
 );
 const liquidGlassSurfaceDefinitions = liquidGlassEngineApi.SURFACE_ROLE_DEFINITIONS;
+for (const [legacyClass, tone] of [["additive-button", "accent"], ["danger", "danger"]]) {
+  assert(liquidGlassEngineApi.COMPACT_CONTROL_SELECTOR.includes(
+    `.${legacyClass}:not([data-control-tone="${tone}"][data-control-emphasis="outline"])`,
+  ), "Legacy additive/danger optical exceptions must be limited to supported semantic outlines");
+}
 assert(
   liquidGlassSurfaceDefinitions.find(({ selector }) => selector === liquidGlassEngineApi.COMPACT_CONTROL_SELECTOR)?.excludeInsideBackdrop,
   "Unified compact controls must exclude intended Q3 ancestors, independent of runtime readiness",
