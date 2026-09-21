@@ -1215,12 +1215,15 @@ label span {
   --control-disabled-background: var(--control-background);
   --control-disabled-border: var(--control-border);
   --control-disabled-color: var(--ui-text-muted);
+  --control-current-background: var(--control-background);
+  --control-current-border: var(--control-border);
+  --control-current-color: var(--control-color);
 }
 
 :is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]) {
-  background: var(--control-background);
-  border-color: var(--control-border);
-  color: var(--control-color);
+  background: var(--control-current-background);
+  border-color: var(--control-current-border);
+  color: var(--control-current-color);
 }
 
 [data-control-tone="neutral"] {
@@ -1271,15 +1274,15 @@ label span {
 }
 
 :is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]):hover:not(:disabled):not([aria-disabled="true"]) {
-  background: var(--control-hover-background);
-  border-color: var(--control-hover-border);
-  color: var(--control-hover-color);
+  --control-current-background: var(--control-hover-background);
+  --control-current-border: var(--control-hover-border);
+  --control-current-color: var(--control-hover-color);
 }
 
 :is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]):active:not(:disabled):not([aria-disabled="true"]) {
-  background: var(--control-pressed-background);
-  border-color: var(--control-pressed-border);
-  color: var(--control-pressed-color);
+  --control-current-background: var(--control-pressed-background);
+  --control-current-border: var(--control-pressed-border);
+  --control-current-color: var(--control-pressed-color);
 }
 
 :is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]):focus-visible {
@@ -1289,9 +1292,9 @@ label span {
 
 :is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]):is(:disabled, [aria-disabled="true"]) {
   cursor: not-allowed;
-  background: var(--control-disabled-background);
-  border-color: var(--control-disabled-border);
-  color: var(--control-disabled-color);
+  --control-current-background: var(--control-disabled-background);
+  --control-current-border: var(--control-disabled-border);
+  --control-current-color: var(--control-disabled-color);
   box-shadow: none;
 }
 
@@ -1312,8 +1315,11 @@ label span {
 }
 
 .secondary-button:hover {
-  border-color: var(--ui-border-strong);
   box-shadow: var(--material-control-hover-shadow);
+}
+
+.secondary-button:where(:not([data-control-tone])):hover {
+  border-color: var(--ui-border-strong);
 }
 
 .danger-button {
@@ -1365,11 +1371,6 @@ label span {
   color: var(--ui-accent);
   font-weight: 950;
   line-height: 1;
-}
-
-.info-button:hover {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
 }
 
 .tool-list,
@@ -3434,16 +3435,7 @@ button.pending-source:focus-visible {
   font-weight: 900;
 }
 
-.corpus-icon-button:hover:not(:disabled) {
-  border-color: var(--ui-accent);
-  color: var(--ui-accent-hover);
-}
-
-.corpus-icon-button.danger {
-  color: var(--ui-danger);
-}
-
-.corpus-icon-button[data-control-emphasis] {
+.corpus-icon-button[data-control-tone] {
   min-height: 0;
 }
 
@@ -4870,13 +4862,27 @@ textarea.ipa-single-line::-webkit-scrollbar {
 }
 
 .file-trigger {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
 .file-trigger input {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.file-trigger:has(input:focus-visible) {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
 }
 
 .dialog-actions > div {

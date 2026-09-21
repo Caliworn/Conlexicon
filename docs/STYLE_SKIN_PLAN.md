@@ -32,20 +32,30 @@ accent 与 danger 必须明确选择 outline、tinted 或 solid。契约按上�
 | solid | tone 实色 / 初始透明边框 | 高强调操作 |
 
 局部 `--control-tone-*` 从当前皮肤的 `--ui-*` / `--material-*` 取值；
-`--control-background`、`--control-border`、`--control-color` 及 hover/pressed 对应变量是组件消费端。
+`--control-background`、`--control-border`、`--control-color` 及 hover/pressed/disabled 对应变量是皮肤配方输入。
+共享状态规则解析为 `--control-current-background/border/color`，普通绘制与已适配 Q3 都消费解析结果，
+不由光学层再写一套状态切换。优先级为 disabled、pressed、hover、default；focus-visible 独立叠加焦点环。
 别名在控件本身声明，避免在 body 声明后绑定浅色值。无需新增一套同义全局颜色 token。
 accent 和 danger 分别使用现有强调/危险色、soft 交互底及实色前景。
 neutral 使用 panel 中性底、ui-border 细边框及 ui-text；hover/pressed 使用 inset 中性底与 ui-border-strong，
-不引入强调色。不存在 neutral 的 outline/tinted/solid 分档。Q3 专属配色适配目前仍仅覆盖有色 outline，
+不引入强调色。不存在 neutral 的 outline/tinted/solid 分档。Q3 专属配色适配覆盖 neutral 与有色 outline，
 新增配方不等于新增光学资格或完成对应 Q3 配方。
 
 hover 沿本身 tone 变化，outline 出现弱有色底，tinted 保持弱底并强化边框；
-pressed 初始复用 hover 配方，接口允许以后独立调整，但本批不设计新色阶。
+普通材质 pressed 初始复用 hover；液态 neutral/outline 使用浮层中性玻璃底，
+hover/pressed 分别混入 18%/28% 自身 tone 色，中性按钮保持中性。只改变 CSS 材质，不重建光学贴图。
 focus-visible 使用独立金色焦点环。disabled/aria-disabled 控件关闭接口的 hover/pressed；
 一般控件使用 muted，solid 则将底色与文字成对切到 inset 中性底和 ui-text，避免灰字压在强有色底上。
 词典“当前”是选中状态展示，保留本身的 solid 底色/前景配对及默认光标，不套用不可用操作的弱化。
 aria-disabled 仅影响外观，业务仍需自行阻止激活。
 此版本没有新增 selected/checked 协议：它们仍由组件现有状态与无障碍属性控制。
+首批将语料层／单元上下移动按钮接入 neutral，删除语料图标按钮重复的 hover/危险文字规则；
+普通操作现已扩展到词条查看／编辑／定位、完整与局部取消和自动 IPA、各页返回、
+词典配置／导出／设为当前／导入、分析重试／更多／查看质量、四类信息说明、
+手动形态组排序／应用尺寸、标签排序应用，以及网络／信息／确认弹窗和搜索／筛选面板内的普通操作。
+文件导入保留原生 input 和 label，隐藏输入仍可键盘聚焦，外层显示焦点环。
+迁移只选择配方，不扩大光学注册；面板内仍共享父 Q3。第 2 类特殊控件不在本批。
+禁用排序操作仍无 hover。B/I/SC、页签选中态与其他未迁移控件保留原实现，后续再映射组合状态。
 
 接口试点为删除层（danger/tinted）和解除关联（danger/outline），保留其 34px 尺寸及既有交互。
 第一批已扩展到删除词条/词典/语料块/单元、移除释义/形态组/形态表/标准化规则和 IPA 规则

@@ -290,6 +290,32 @@ for (const match of `${app}\n${index}`.matchAll(/<button\b([^>]*class="([^"]+)"[
   }
 }
 const classicDefinitions = new Set(classicLightTokenValues.keys());
+// Ordinary commands share neutral paint even inside optical parents; registration
+// remains the engine's responsibility, not an implication of semantic attributes.
+const ordinaryCommandIds = new Set([
+  "focusEntryListButton", "openLexicalNetworkButton", "editEntryButton", "autoIpaButton",
+  "cancelEditButton", "applyTagSortOrderButton", "closeLexicalNetworkButton",
+  "closeInfoDialogButton", "confirmCancelButton", "entrySearchDefaultButton",
+  "entryFilterResetButton", "entryFilterCancelButton",
+]);
+const ordinaryActions = new Set([
+  "config", "export", "activate", "move-entry-morphology-group-up",
+  "move-entry-morphology-group-down", "resize-morphology-table", "cancel-partial-edit", "partial-auto-ipa",
+]);
+for (const [tag] of `${index}\n${app}`.matchAll(/<(?:button|label)\b[^>]*>/g)) {
+  const id = tag.match(/\bid="([^"]+)"/)?.[1] || "";
+  const action = tag.match(/data-action="([^"]+)"/)?.[1];
+  if (ordinaryCommandIds.has(id) || /^backToEditor.*Button$/.test(id)
+    || ordinaryActions.has(action) || /\b(?:info-button|file-trigger|analysis-quality-view-button)\b/.test(tag)
+    || /\bdata-analysis-(?:[\w-]*retry|tag-sets-more)\b/.test(tag)) {
+    assert(tag.includes('data-control-tone="neutral"') && !tag.includes("data-control-emphasis="),
+      `Ordinary commands must use the single neutral recipe: ${id || action || tag}`);
+  }
+}
+assert(scopedBlock(styles, ".file-trigger:has(input:focus-visible)")?.[1].includes("outline:"),
+  "The native import input must expose keyboard focus on its visible trigger");
+assert(!scopedBlock(styles, ".file-trigger input")?.[1].includes("display: none"),
+  "The import input must stay in native keyboard navigation");
 for (const marker of [
   'id="mobileNewEntryButton"', 'id="entryListNewEntryButton"', 'id="addIpaMappingButton"',
   'id="activeFilterRefreshButton"', 'id="activeFilterCycleButton"',
@@ -312,18 +338,28 @@ for (const [marker, emphasis] of [
     && opening.includes(`data-control-emphasis="${emphasis}"`),
   `Destructive/removal controls must declare their semantic recipe: ${marker}`);
 }
-const opticalOutlineSelector = 'body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"][data-control-tone][data-control-emphasis="outline"]';
+const opticalOutlineSelector = 'body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis="outline"])';
 const opticalOutline = controlProperties(scopedBlock(liquidGlass, opticalOutlineSelector)[1]);
 assert.equal(opticalOutline["--control-background"], "var(--material-floating-background)",
   "Optical outlines use the translucent role material, not an opaque panel");
-assert(scopedBlock(liquidGlass, opticalOutlineSelector)[1].includes("border-color: var(--control-border)"),
+assert(scopedBlock(liquidGlass, opticalOutlineSelector)[1].includes("border-color: var(--control-current-border)"),
   "Optical outlines preserve semantic edges");
-for (const state of ["hover", "active"]) {
-  const block = scopedBlock(liquidGlass, opticalOutlineSelector + `:${state}:not(:disabled):not([aria-disabled="true"])`);
-  const paintState = state === "active" ? "pressed" : "hover";
-  assert(block?.[1].includes(`--liquid-glass-surface-tint: var(--control-${paintState}-background)`)
-    && block[1].includes(`border-color: var(--control-${paintState}-border)`),
-  "Optical outline interactions consume semantic state colors");
+assert.equal(opticalOutline["--liquid-glass-surface-tint"], "var(--control-current-background)",
+  "Optical paint must consume the shared resolved state, including disabled");
+const semanticPaintSelector = ':is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis])';
+for (const [suffix, state] of [
+  [":hover:not(:disabled):not([aria-disabled=\"true\"])", "hover"],
+  [":active:not(:disabled):not([aria-disabled=\"true\"])", "pressed"],
+  [":is(:disabled, [aria-disabled=\"true\"])", "disabled"],
+]) {
+  const block = controlProperties(scopedBlock(styles, semanticPaintSelector + suffix)[1]);
+  for (const property of ["background", "border", "color"]) {
+    assert.equal(block[`--control-current-${property}`], `var(--control-${state}-${property})`,
+      "Shared state resolver must choose all three paint channels");
+  }
+}
+for (const match of app.matchAll(/<button\b[^>]*class="corpus-icon-button[^"]*"[^>]*>/g)) {
+  assert(match[0].includes("data-control-tone="), "Corpus icon actions must use semantic interaction paint");
 }
 const tokenDefinitions = new Set(classicDefinitions);
 const tokenReferences = new Set(

@@ -8,6 +8,10 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 
 架构、API、迁移和专题设计文档见 [docs/README.md](docs/README.md)。
 
+Full-entry editing provides Cancel and Save. Use New Entry for a blank draft through the existing unsaved-edit handling; there is no direct Clear action that silently discards the current draft.
+
+完整词条编辑保留取消与保存；需要空白草稿时使用“新建词条”，通过既有未保存编辑流程处理当前内容，不再提供直接丢弃草稿的“清空”入口。
+
 Source-reference editing is still being corrected. Duplicate-target prevention is implemented in autocomplete, insertion, and saves; JSON import retains the first reference and reports duplicates removed. Creating an unbound source now creates and links it atomically, while new derived entries prefill an exact source-ID reference. Conflicts leave both sides unchanged. The agreed interaction contract and acceptance cases are recorded in [the API contract](docs/API_CONTRACT.md#词源与词根关系). Reference cards support dragging and Alt+arrow-key sorting; plain text stays in the input. Display, saves, and exports place references before plain text.
 
 来源引用编辑仍在修正中，已确定的交互规则和验收场景见 [来源契约](docs/API_CONTRACT.md#词源与词根关系)。已在补全、添加和保存层禁止重复引用同一目标 ID，JSON 导入保留首次引用并报告修复；同名不同 ID 和纯文本不合并。从纯文本创建来源时，创建和回填关联原子完成，冲突不留下半成品；新建衍生词预填精确来源 ID 并自动获得反向链接。来源卡片支持拖动及 Alt+方向键排序，纯文本始终留在输入框内；浏览、保存和导出统一为引用在前、纯文本在后。
@@ -43,7 +47,7 @@ Source-reference editing is still being corrected. Duplicate-target prevention i
 - Compact Q3 also covers entry detail actions, the entry-list toggle and page-level return buttons. Document/corpus mode controls each use one optical shell, retaining their selected states; source references remain unchanged.
 - Compact Q3 controls are selected by shared component classes, not individual action IDs: secondary, information, disclosure, corpus-icon and gloss-style controls join automatically, including dynamically inserted controls. Intended Q3 ancestors (including Mail shells) exclude nested optics regardless of pending/fallback state; Q1 detail shells allow them. Primary, danger and additive controls retain their separate designs. Excluded ordinary controls use a neutral, non-gradient CSS material. Global Q1/Q0 fallback still applies.
 - Root and morphology-table disclosure controls share a 30px rounded button, SVG arrow and keyboard focus treatment. Liquid Glass uses compact Q3 with lifecycle handling for virtual-list recycling and table removal; other skins use their neutral material tokens.
-- Controls can opt into one neutral recipe (tone alone, without emphasis), or accent/danger with an explicit outline, tinted or solid emphasis. Recipes use each skin's colors and have state validation; neutral and accent/tinted are available without a bulk consumer migration. Existing unconverted menu/text actions keep their appearance. Semantic recipes do not themselves determine Q3 eligibility; optical color adaptation currently covers colored outlines.
+- Controls can opt into one neutral recipe (tone alone, without emphasis), or accent/danger with an explicit outline, tinted or solid emphasis. A shared resolver selects default, hover, pressed and disabled paint; Liquid Glass neutral/outline controls consume the same resolved state with skin-specific tint strength. Corpus layer/unit reorder buttons are the first neutral consumers. Existing unconverted menu/text and selected/checked controls keep their appearance. Semantic recipes do not themselves determine Q3 eligibility; tinted/solid optical adaptation remains pending.
 
 - 多词典管理：新建、切换、导入、导出、配置和删除词典；导入相同词典 ID 的词典前会明确确认是否覆盖。
 - 词典级 SQLite 保存：词条及其结构化子对象、形态模板组/子表/覆盖项、语料库、设置、语言文档和 IPA 规则都会随当前词典保存在本地。旧 JSON 仅作为显式导入、导出和迁移格式保留。

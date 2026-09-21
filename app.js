@@ -689,7 +689,6 @@ const i18n = {
     cancel: "取消",
     confirm: "确认",
     confirmTitle: "确认操作",
-    clear: "清空",
     saveEntry: "保存词条",
     dictionaryManagerEyebrow: "多个词典",
     dictionaryManager: "词典管理",
@@ -1294,7 +1293,6 @@ const i18n = {
     cancel: "Cancel",
     confirm: "Confirm",
     confirmTitle: "Confirm Action",
-    clear: "Clear",
     saveEntry: "Save Entry",
     dictionaryManagerEyebrow: "Multi Dictionary",
     dictionaryManager: "Dictionary Manager",
@@ -1654,7 +1652,6 @@ const elements = {
   etymologyDescriptionInput: document.querySelector("#etymologyDescriptionInput"),
   notesInput: document.querySelector("#notesInput"),
   deleteEntryButton: document.querySelector("#deleteEntryButton"),
-  clearEntryButton: document.querySelector("#clearEntryButton"),
   cancelEditButton: document.querySelector("#cancelEditButton"),
   dictionaryForm: document.querySelector("#dictionaryForm"),
   dictionaryId: document.querySelector("#dictionaryId"),
@@ -10368,7 +10365,7 @@ function renderAnalysisIpaCompareQueryPage(queryState) {
     body = `<div class="empty-state">
       <strong>${escapeHtml(aText("无法完成 IPA 自动生成检查", "Could not complete IPA auto checks"))}</strong>
       <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
-      <button type="button" class="secondary-button" data-analysis-ipa-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-ipa-retry>${escapeHtml(aText("重试", "Retry"))}</button>
     </div>`;
   } else {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在检查 IPA 自动生成结果", "Checking generated IPA"))}</strong></div>`;
@@ -10388,7 +10385,7 @@ function renderAnalysisIpaDistributionQueryPage(queryState, subpage) {
     body = `<div class="empty-state">
       <strong>${escapeHtml(aText("无法加载 IPA 分布", "Could not load IPA distribution"))}</strong>
       <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
-      <button type="button" class="secondary-button" data-analysis-ipa-distribution-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-ipa-distribution-retry>${escapeHtml(aText("重试", "Retry"))}</button>
     </div>`;
   } else {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载 IPA 分布", "Loading IPA distribution"))}</strong></div>`;
@@ -10408,7 +10405,7 @@ function renderAnalysisMorphologyQueryPage(queryState, subpage) {
     body = `<div class="empty-state">
       <strong>${escapeHtml(aText("无法加载形态分析", "Could not load morphology analysis"))}</strong>
       <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
-      <button type="button" class="secondary-button" data-analysis-morphology-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-morphology-retry>${escapeHtml(aText("重试", "Retry"))}</button>
     </div>`;
   } else {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载形态分析", "Loading morphology analysis"))}</strong></div>`;
@@ -10428,7 +10425,7 @@ function renderAnalysisActivityQueryPage(queryState, subpage) {
     body = `<div class="empty-state">
       <strong>${escapeHtml(aText("无法加载编辑日期", "Could not load editing dates"))}</strong>
       <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
-      <button type="button" class="secondary-button" data-analysis-activity-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-activity-retry>${escapeHtml(aText("重试", "Retry"))}</button>
     </div>`;
   } else {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载编辑日期", "Loading editing dates"))}</strong></div>`;
@@ -10457,7 +10454,7 @@ function renderAnalysisRootFamiliesQueryPage(queryState) {
     body = `<div class="empty-state">
       <strong>${escapeHtml(aText("无法加载词根家族", "Could not load root families"))}</strong>
       <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
-      <button type="button" class="secondary-button" data-analysis-root-families-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-root-families-retry>${escapeHtml(aText("重试", "Retry"))}</button>
     </div>`;
   } else {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载词根家族", "Loading root families"))}</strong></div>`;
@@ -10544,7 +10541,7 @@ function renderAnalysisOverviewQueryPage(queryState) {
     body = `<div class="empty-state">
       <strong>${escapeHtml(aText("无法加载数据分析", "Could not load analysis"))}</strong>
       <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
-      <button type="button" class="secondary-button" data-analysis-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-retry>${escapeHtml(aText("重试", "Retry"))}</button>
     </div>`;
   } else {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载数据分析", "Loading analysis"))}</strong></div>`;
@@ -11013,7 +11010,7 @@ function analysisTagSetList(widget, queryKey) {
     ${rows.length
       ? `<div class="analysis-tag-set-list">${list}</div>`
       : `<p class="muted-text">${escapeHtml(aText("暂无组合", "No combinations yet"))}</p>`}
-    ${remaining > 0 ? `<button type="button" class="secondary-button analysis-tag-set-more" data-analysis-tag-sets-more>${escapeHtml(
+    ${remaining > 0 ? `<button type="button" class="secondary-button analysis-tag-set-more" data-control-tone="neutral" data-analysis-tag-sets-more>${escapeHtml(
       aText("再显示 {count} 项", "Show {count} more").replace("{count}", Math.min(100, remaining)),
     )}</button>` : ""}
   `;
@@ -11042,7 +11039,7 @@ function renderAnalysisTagsQueryPage(queryState) {
     body = `<div class="empty-state">
       <strong>${escapeHtml(aText("无法加载标签统计", "Could not load tag statistics"))}</strong>
       <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
-      <button type="button" class="secondary-button" data-analysis-tags-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-tags-retry>${escapeHtml(aText("重试", "Retry"))}</button>
     </div>`;
   } else {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载标签统计", "Loading tag statistics"))}</strong></div>`;
@@ -11106,7 +11103,7 @@ function renderAnalysisOrthographyQueryPage(queryState) {
     body = `<div class="empty-state">
       <strong>${escapeHtml(aText("无法加载正写法统计", "Could not load orthography statistics"))}</strong>
       <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
-      <button type="button" class="secondary-button" data-analysis-orthography-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-orthography-retry>${escapeHtml(aText("重试", "Retry"))}</button>
     </div>`;
   } else {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载正写法统计", "Loading orthography statistics"))}</strong></div>`;
@@ -11375,8 +11372,8 @@ function renderQualityFilterBar(report, subpage) {
     <section class="analysis-quality-current" aria-label="${escapeHtml(aText("质量检查筛选", "Quality filters"))}">
       <strong>${escapeHtml(t("qualityCurrentCategory"))}: ${escapeHtml(label)}</strong>
       <span>${escapeHtml(count)} ${escapeHtml(t("qualityEntryCount"))}</span>
-      <button class="secondary-button analysis-quality-view-button" type="button"${attrs} ${attrs ? "" : "disabled"}>${escapeHtml(t("viewQualityEntries"))}</button>
-      <button class="info-button" type="button" data-action="quality-filter-info" data-app-tooltip="always" aria-label="${escapeHtml(t("qualityFilterInfo"))}">i</button>
+      <button class="secondary-button analysis-quality-view-button" data-control-tone="neutral" type="button"${attrs} ${attrs ? "" : "disabled"}>${escapeHtml(t("viewQualityEntries"))}</button>
+      <button class="info-button" type="button" data-control-tone="neutral" data-action="quality-filter-info" data-app-tooltip="always" aria-label="${escapeHtml(t("qualityFilterInfo"))}">i</button>
     </section>
   `;
 }
@@ -11936,11 +11933,11 @@ function renderDictionaryManager() {
       </div>
       <p>${escapeHtml(dictionary.description || t("noDescription"))}</p>
       <div class="card-actions">
-        <button class="secondary-button" type="button" data-action="config">${escapeHtml(t("config"))}</button>
-        <button class="secondary-button" type="button" data-action="export">${escapeHtml(t("exportJson"))}</button>
+        <button class="secondary-button" type="button" data-control-tone="neutral" data-action="config">${escapeHtml(t("config"))}</button>
+        <button class="secondary-button" type="button" data-control-tone="neutral" data-action="export">${escapeHtml(t("exportJson"))}</button>
         ${isActive
           ? `<button class="primary-button current-dictionary-button" data-control-tone="accent" data-control-emphasis="solid" type="button" aria-current="true" disabled>${escapeHtml(t("current"))}</button>`
-          : `<button class="secondary-button" type="button" data-action="activate">${escapeHtml(t("setCurrent"))}</button>`}
+          : `<button class="secondary-button" type="button" data-control-tone="neutral" data-action="activate">${escapeHtml(t("setCurrent"))}</button>`}
       </div>
     `;
     card.querySelector('[data-action="config"]').addEventListener("click", async () => {
@@ -12066,7 +12063,7 @@ function renderEntryMorphologyGroupEditor(templateGroup, entryGroup, entry, mode
           <strong>${escapeHtml(templateGroup.name)}</strong>
           <span class="field-help" data-i18n="${modeLabelKey}">${escapeHtml(t(modeLabelKey))}</span>
         </div>
-        ${mode === "manual" ? `<div class="panel-actions"><button class="secondary-button" type="button" data-action="move-entry-morphology-group-up" data-i18n="moveUp" ${index === 0 ? "disabled" : ""}>${escapeHtml(t("moveUp"))}</button><button class="secondary-button" type="button" data-action="move-entry-morphology-group-down" data-i18n="moveDown" ${index === total - 1 ? "disabled" : ""}>${escapeHtml(t("moveDown"))}</button><button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="remove-entry-morphology-group" data-i18n="removeEntryMorphologyGroup">${escapeHtml(t("removeEntryMorphologyGroup"))}</button></div>` : ""}
+        ${mode === "manual" ? `<div class="panel-actions"><button class="secondary-button" type="button" data-control-tone="neutral" data-action="move-entry-morphology-group-up" data-i18n="moveUp" ${index === 0 ? "disabled" : ""}>${escapeHtml(t("moveUp"))}</button><button class="secondary-button" type="button" data-control-tone="neutral" data-action="move-entry-morphology-group-down" data-i18n="moveDown" ${index === total - 1 ? "disabled" : ""}>${escapeHtml(t("moveDown"))}</button><button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="remove-entry-morphology-group" data-i18n="removeEntryMorphologyGroup">${escapeHtml(t("removeEntryMorphologyGroup"))}</button></div>` : ""}
       </div>
       <div class="entry-morphology-group-fields">
         <label><span data-i18n="entryMorphologyGroupTitle">${escapeHtml(t("entryMorphologyGroupTitle"))}</span><input data-field="entryMorphologyTitle" value="${escapeHtml(group.title || "")}" data-i18n-placeholder="useTemplateGroupTitle" placeholder="${escapeHtml(t("useTemplateGroupTitle"))}"></label>
@@ -14257,8 +14254,8 @@ function renderCorpusLayerEditor(block, layer, index, corpus) {
       <div class="corpus-layer-header">
         <div><p class="eyebrow"><span data-i18n="corpusLayer">${escapeHtml(t("corpusLayer"))}</span> ${index + 1}</p><strong data-corpus-layer-name-preview>${escapeHtml(layer.name || t("corpusLayerFallback"))}</strong></div>
         <div class="corpus-order-actions">
-          <button class="corpus-icon-button" type="button" data-action="move-corpus-layer-up" data-app-tooltip="always" data-i18n-aria-label="moveUp" aria-label="${escapeHtml(t("moveUp"))}" ${index === 0 ? "disabled" : ""}>↑</button>
-          <button class="corpus-icon-button" type="button" data-action="move-corpus-layer-down" data-app-tooltip="always" data-i18n-aria-label="moveDown" aria-label="${escapeHtml(t("moveDown"))}" ${index === block.layers.length - 1 ? "disabled" : ""}>↓</button>
+          <button class="corpus-icon-button" data-control-tone="neutral" type="button" data-action="move-corpus-layer-up" data-app-tooltip="always" data-i18n-aria-label="moveUp" aria-label="${escapeHtml(t("moveUp"))}" ${index === 0 ? "disabled" : ""}>↑</button>
+          <button class="corpus-icon-button" data-control-tone="neutral" type="button" data-action="move-corpus-layer-down" data-app-tooltip="always" data-i18n-aria-label="moveDown" aria-label="${escapeHtml(t("moveDown"))}" ${index === block.layers.length - 1 ? "disabled" : ""}>↓</button>
           <button class="corpus-icon-button danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="delete-corpus-layer" data-app-tooltip="always" data-i18n-aria-label="deleteCorpusLayer" aria-label="${escapeHtml(t("deleteCorpusLayer"))}">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"></path></svg>
           </button>
@@ -14287,8 +14284,8 @@ function renderCorpusLinkedUnits(unitIds, ownerKey, corpus) {
       <li data-linked-unit-id="${escapeHtml(unitId)}">
         <div class="corpus-unit-name-host${unit ? "" : " missing"}">${unit ? renderCorpusUnitNameHtml(unit, "card") : escapeHtml(unitId)}</div>
         <div class="corpus-order-actions">
-          <button class="corpus-icon-button" type="button" data-action="move-corpus-unit-up" data-app-tooltip="always" data-i18n-aria-label="moveUp" aria-label="${escapeHtml(t("moveUp"))}" ${index === 0 ? "disabled" : ""}>↑</button>
-          <button class="corpus-icon-button" type="button" data-action="move-corpus-unit-down" data-app-tooltip="always" data-i18n-aria-label="moveDown" aria-label="${escapeHtml(t("moveDown"))}" ${index === unitIds.length - 1 ? "disabled" : ""}>↓</button>
+          <button class="corpus-icon-button" data-control-tone="neutral" type="button" data-action="move-corpus-unit-up" data-app-tooltip="always" data-i18n-aria-label="moveUp" aria-label="${escapeHtml(t("moveUp"))}" ${index === 0 ? "disabled" : ""}>↑</button>
+          <button class="corpus-icon-button" data-control-tone="neutral" type="button" data-action="move-corpus-unit-down" data-app-tooltip="always" data-i18n-aria-label="moveDown" aria-label="${escapeHtml(t("moveDown"))}" ${index === unitIds.length - 1 ? "disabled" : ""}>↓</button>
           <button class="corpus-icon-button danger" data-control-tone="danger" data-control-emphasis="outline" type="button" data-action="unlink-corpus-unit" data-app-tooltip="always" data-i18n-aria-label="unlink" aria-label="${escapeHtml(t("unlink"))}">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 13-1 1a4 4 0 0 1-6-6l3-3a4 4 0 0 1 6 0M14 11l1-1a4 4 0 0 1 6 6l-3 3a4 4 0 0 1-6 0M3 21l3-3M18 6l3-3"></path></svg>
           </button>
@@ -14662,7 +14659,7 @@ function createMorphologyTableEditor(table) {
         <label><span data-i18n="rowCount">${escapeHtml(t("rowCount"))}</span><input data-field="rows" type="number" min="1" value="${table.rowCount}"></label>
         <label><span data-i18n="columnCount">${escapeHtml(t("columnCount"))}</span><input data-field="cols" type="number" min="1" value="${table.columnCount}"></label>
       </div>
-      <button class="secondary-button" type="button" data-action="resize-morphology-table" data-i18n="applySize">${escapeHtml(t("applySize"))}</button>
+      <button class="secondary-button" type="button" data-control-tone="neutral" data-action="resize-morphology-table" data-i18n="applySize">${escapeHtml(t("applySize"))}</button>
       <div class="morphology-edit-scroll">${renderMorphologyRuleInputs(table)}</div>
     </div>
   `;
@@ -15204,7 +15201,7 @@ async function openPartialEdit(section) {
         <p class="eyebrow" data-i18n="partialEdit">${escapeHtml(t("partialEdit"))}</p>
         <h3 data-i18n="${titleKey}">${escapeHtml(partialEditTitle(section))}</h3>
       </div>
-      <button class="secondary-button" type="button" data-action="cancel-partial-edit" data-i18n="cancel">${escapeHtml(t("cancel"))}</button>
+      <button class="secondary-button" type="button" data-control-tone="neutral" data-action="cancel-partial-edit" data-i18n="cancel">${escapeHtml(t("cancel"))}</button>
     </div>
     <div class="partial-edit-body"></div>
     <div class="form-actions">
@@ -15224,7 +15221,7 @@ async function openPartialEdit(section) {
         <span data-i18n="pronunciation">${escapeHtml(t("pronunciation"))}</span>
         <div class="inline-field-action">
           <textarea class="ipa-single-line" rows="1" data-field="pronunciation" maxlength="120">${escapeHtml(entry.pronunciation)}</textarea>
-          <button class="secondary-button" type="button" data-action="partial-auto-ipa" data-i18n="autoIpa">${escapeHtml(t("autoIpa"))}</button>
+          <button class="secondary-button" type="button" data-control-tone="neutral" data-action="partial-auto-ipa" data-i18n="autoIpa">${escapeHtml(t("autoIpa"))}</button>
         </div>
       </label>
       <div class="ipa-keyboard partial-ipa-keyboard"></div>
@@ -15568,15 +15565,6 @@ function cancelEntryEdit() {
   entryDraft = null;
   editorMode = "display";
   render();
-}
-
-function clearEntryForm() {
-  state.selectedEntryId = "";
-  entryDraft = createEntryDraft();
-  editorMode = "edit";
-  fillEntryForm(null);
-  renderEntries();
-  elements.lemmaInput.focus();
 }
 
 async function saveEntry(event) {
@@ -16927,7 +16915,6 @@ elements.lexicalNetworkOverlay.addEventListener("click", (event) => {
 });
 elements.autoIpaButton.addEventListener("click", () => applyAutoIpa());
 elements.cancelEditButton.addEventListener("click", cancelEntryEdit);
-elements.clearEntryButton.addEventListener("click", clearEntryForm);
 elements.deleteEntryButton.addEventListener("click", deleteSelectedEntry);
 elements.entryForm.addEventListener("submit", saveEntry);
 elements.dictionaryForm.addEventListener("submit", saveDictionary);

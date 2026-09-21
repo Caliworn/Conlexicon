@@ -189,7 +189,7 @@
                       <span data-i18n="searchFieldFuzzy">模糊匹配</span>
                     </div>
                     <div class="entry-search-config-fields" id="entrySearchConfigFields"></div>
-                    <button class="secondary-button entry-search-default-button" id="entrySearchDefaultButton" type="button" data-i18n="restoreSearchDefaults">恢复词典默认值</button>
+                    <button class="secondary-button entry-search-default-button" id="entrySearchDefaultButton" data-control-tone="neutral" type="button" data-i18n="restoreSearchDefaults">恢复词典默认值</button>
                   </div>
                 </div>
                 <div class="entry-mail-tools" id="entryMailTools" hidden>
@@ -217,9 +217,9 @@
                       </select>
                     </label>
                     <div class="entry-filter-menu-actions">
-                      <button class="secondary-button" id="entryFilterResetButton" type="button" data-i18n="resetFilter">重置</button>
+                      <button class="secondary-button" id="entryFilterResetButton" data-control-tone="neutral" type="button" data-i18n="resetFilter">重置</button>
                       <span></span>
-                      <button class="secondary-button" id="entryFilterCancelButton" type="button" data-i18n="cancel">取消</button>
+                      <button class="secondary-button" id="entryFilterCancelButton" data-control-tone="neutral" type="button" data-i18n="cancel">取消</button>
                       <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="entryFilterApplyButton" type="button" data-i18n="applyFilter">应用</button>
                     </div>
                   </div>
@@ -287,14 +287,14 @@
                     <div class="chip-row" id="displayTags"></div>
                   </div>
                   <div class="entry-display-actions">
-                    <button class="secondary-button entry-list-focus-button" id="focusEntryListButton" type="button" data-app-tooltip="always" data-i18n-aria-label="focusCurrentEntryInList" aria-label="在词条列表中定位当前词条">
+                    <button class="secondary-button entry-list-focus-button" id="focusEntryListButton" data-control-tone="neutral" type="button" data-app-tooltip="always" data-i18n-aria-label="focusCurrentEntryInList" aria-label="在词条列表中定位当前词条">
                       <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
                         <circle cx="12" cy="12" r="3"></circle>
                         <path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path>
                       </svg>
                     </button>
-                    <button class="secondary-button" id="openLexicalNetworkButton" type="button" data-i18n="lexicalNetwork">词汇网络</button>
-                    <button class="secondary-button" id="editEntryButton" type="button" data-i18n="editEntry">编辑词条</button>
+                    <button class="secondary-button" id="openLexicalNetworkButton" data-control-tone="neutral" type="button" data-i18n="lexicalNetwork">词汇网络</button>
+                    <button class="secondary-button" id="editEntryButton" data-control-tone="neutral" type="button" data-i18n="editEntry">编辑词条</button>
                   </div>
                 </div>
 
@@ -353,7 +353,7 @@
                   <span data-i18n="pronunciation">发音</span>
                   <div class="inline-field-action">
                     <textarea class="ipa-single-line" id="pronunciationInput" name="pronunciation" rows="1" maxlength="120"></textarea>
-                    <button class="secondary-button" id="autoIpaButton" type="button" data-i18n="autoIpa">自动 IPA</button>
+                    <button class="secondary-button" id="autoIpaButton" data-control-tone="neutral" type="button" data-i18n="autoIpa">自动 IPA</button>
                   </div>
                 </label>
                 <div class="ipa-keyboard" id="ipaKeyboard" data-i18n-aria-label="ipaKeyboardSettings" aria-label="IPA 虚拟键盘"></div>
@@ -417,8 +417,7 @@
                 </section>
 
                 <div class="form-actions">
-                  <button class="secondary-button" id="cancelEditButton" type="button" data-i18n="cancel">取消</button>
-                  <button class="secondary-button" id="clearEntryButton" type="button" data-i18n="clear">清空</button>
+                  <button class="secondary-button" id="cancelEditButton" data-control-tone="neutral" type="button" data-i18n="cancel">取消</button>
                   <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" type="submit" data-i18n="saveEntry">保存词条</button>
                 </div>
               </form>
@@ -436,11 +435,11 @@
               <h2 data-i18n="dictionaryManager">词典管理</h2>
             </div>
             <div class="top-actions">
-              <button class="secondary-button" id="backToEditorButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+              <button class="secondary-button" id="backToEditorButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
               <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="addDictionaryButton" type="button" data-i18n="newDictionary">新建词典</button>
-              <label class="secondary-button file-trigger">
+              <label class="secondary-button file-trigger" data-control-tone="neutral">
                 <span data-i18n="importJson">导入 JSON</span>
-                <input id="importInput" type="file" accept="application/json,.json">
+                <input id="importInput" type="file" accept="application/json,.json" data-i18n-aria-label="importJson" aria-label="导入 JSON">
               </label>
             </div>
           </section>
@@ -491,7 +490,7 @@
               <h2 data-i18n="analysis">数据分析</h2>
             </div>
             <div class="top-actions">
-              <button class="secondary-button" id="backToEditorFromAnalysisButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+              <button class="secondary-button" id="backToEditorFromAnalysisButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
             </div>
           </section>
 
@@ -512,7 +511,7 @@
               <h2 data-i18n="qualityCheck">质量检查</h2>
             </div>
             <div class="top-actions">
-              <button class="secondary-button" id="backToEditorFromQualityButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+              <button class="secondary-button" id="backToEditorFromQualityButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
             </div>
           </section>
 
@@ -533,7 +532,7 @@
               <h2 data-i18n="otherSettings">其他设置</h2>
             </div>
             <div class="top-actions">
-              <button class="secondary-button" id="backToEditorFromSettingsButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+              <button class="secondary-button" id="backToEditorFromSettingsButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
             </div>
           </section>
 
@@ -708,13 +707,13 @@
                 </label>
                 <div class="subsection-title tag-order-heading">
                   <h3 data-i18n="tagOrderSettings">自动整理标签顺序</h3>
-                  <button class="info-button" id="tagOrderInfoButton" type="button" data-app-tooltip="always" data-i18n-aria-label="tagOrderInfo" aria-label="标签排序逻辑">i</button>
+                  <button class="info-button" id="tagOrderInfoButton" data-control-tone="neutral" type="button" data-app-tooltip="always" data-i18n-aria-label="tagOrderInfo" aria-label="标签排序逻辑">i</button>
                 </div>
                 <label>
                   <span data-i18n="tagOrderHelp">按此顺序整理每个词条的标签；未列出的标签保留在末尾。请填写标签本身，不要填写显示替换文本。</span>
                   <div class="inline-field-action tag-order-control">
                     <input id="tagSortOrderInput" type="text">
-                    <button class="secondary-button" id="applyTagSortOrderButton" type="button" data-i18n="applyTags">应用</button>
+                    <button class="secondary-button" id="applyTagSortOrderButton" data-control-tone="neutral" type="button" data-i18n="applyTags">应用</button>
                   </div>
                 </label>
                 <div class="subsection-title">
@@ -937,7 +936,7 @@
                 <button type="button" data-doc-mode="edit" data-i18n="editMode">编辑</button>
                 <button type="button" data-doc-mode="preview" data-i18n="previewMode">查看</button>
               </div>
-              <button class="secondary-button" id="backToEditorFromDocsButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+              <button class="secondary-button" id="backToEditorFromDocsButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
               <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="saveDocsButton" type="button" data-i18n="saveDocs">保存文档</button>
             </div>
           </section>
@@ -964,7 +963,7 @@
               <h2 data-i18n="corpus">语料库</h2>
             </div>
             <div class="top-actions">
-              <button class="secondary-button" id="backToEditorFromCorpusButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+              <button class="secondary-button" id="backToEditorFromCorpusButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
               <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="saveCorpusButton" type="button" data-i18n="saveCorpus">保存语料库</button>
             </div>
           </section>
@@ -1009,7 +1008,7 @@
               <h2 data-i18n="morphologyFunctions">形态函数</h2>
             </div>
             <div class="top-actions">
-              <button class="secondary-button" id="backToEditorFromMorphologyFunctionsButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+              <button class="secondary-button" id="backToEditorFromMorphologyFunctionsButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
             </div>
           </section>
 
@@ -1053,11 +1052,11 @@
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
               <div class="heading-line morphology-page-title">
                 <h2 data-i18n="morphologyTables">形态表格</h2>
-                <button class="info-button" id="morphologySyntaxButton" type="button" data-app-tooltip="always" data-i18n-aria-label="morphologySyntaxInfo" aria-label="形态语法">i</button>
+                <button class="info-button" id="morphologySyntaxButton" data-control-tone="neutral" type="button" data-app-tooltip="always" data-i18n-aria-label="morphologySyntaxInfo" aria-label="形态语法">i</button>
               </div>
             </div>
             <div class="top-actions">
-              <button class="secondary-button" id="backToEditorFromMorphologyTablesButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+              <button class="secondary-button" id="backToEditorFromMorphologyTablesButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
             </div>
           </section>
 
@@ -1088,7 +1087,7 @@
               <h2 data-i18n="ipaConfig">自动 IPA 标注</h2>
             </div>
             <div class="top-actions">
-              <button class="secondary-button" id="backToEditorFromIpaButton" type="button" data-i18n="backToEditor">返回编辑器</button>
+              <button class="secondary-button" id="backToEditorFromIpaButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
               <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="batchIpaMissingButton" type="button" data-i18n="batchIpaMissing">补全空发音</button>
               <button class="danger-button" data-control-tone="danger" data-control-emphasis="solid" id="batchIpaAllButton" type="button" data-i18n="batchIpaAll">重写全部发音</button>
             </div>
@@ -1130,7 +1129,7 @@
                     <p class="eyebrow" data-i18n="syllabification">音节划分</p>
                     <div class="heading-line">
                       <h3 data-i18n="syllableRules">音节规则</h3>
-                      <button class="info-button" id="ipaSyllableHelpButton" type="button" data-app-tooltip="always" data-i18n-aria-label="ipaSyllableHelpInfo" aria-label="音节划分逻辑">i</button>
+                      <button class="info-button" id="ipaSyllableHelpButton" data-control-tone="neutral" type="button" data-app-tooltip="always" data-i18n-aria-label="ipaSyllableHelpInfo" aria-label="音节划分逻辑">i</button>
                     </div>
                   </div>
                 </div>
@@ -1216,7 +1215,7 @@
             <p class="eyebrow" data-i18n="lexicalNetwork">词汇网络</p>
             <h2 id="networkTitle"></h2>
           </div>
-          <button class="secondary-button" id="closeLexicalNetworkButton" type="button" data-i18n="closeNetwork">关闭网络</button>
+          <button class="secondary-button" id="closeLexicalNetworkButton" data-control-tone="neutral" type="button" data-i18n="closeNetwork">关闭网络</button>
         </div>
         <div class="network-summary-bar" role="group" data-i18n-aria-label="networkRelationSummary" aria-label="网络关系统计">
           <div class="network-summary-item source">
@@ -1248,7 +1247,7 @@
       <article class="modal-panel info-panel" role="dialog" aria-modal="true" aria-labelledby="infoDialogTitle">
         <div class="modal-header">
           <h2 id="infoDialogTitle"></h2>
-          <button class="secondary-button" id="closeInfoDialogButton" type="button" data-i18n="close">关闭</button>
+          <button class="secondary-button" id="closeInfoDialogButton" data-control-tone="neutral" type="button" data-i18n="close">关闭</button>
         </div>
         <div class="info-dialog-body" id="infoDialogBody"></div>
       </article>
@@ -1261,7 +1260,7 @@
         </div>
         <p class="confirm-dialog-message" id="confirmDialogMessage"></p>
         <div class="form-actions confirm-actions">
-          <button class="secondary-button" id="confirmCancelButton" type="button" data-i18n="cancel">取消</button>
+          <button class="secondary-button" id="confirmCancelButton" data-control-tone="neutral" type="button" data-i18n="cancel">取消</button>
           <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" id="confirmAlternateButton" type="button" hidden>放弃更改</button>
           <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="confirmAcceptButton" type="button" data-i18n="confirm">确认</button>
         </div>

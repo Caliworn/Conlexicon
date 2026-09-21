@@ -525,12 +525,12 @@ body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"] {
   -webkit-backdrop-filter: var(--liquid-glass-surface-q1-filter);
 }
 
-body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:where(button, label):hover:not(:disabled):not(:has(> input:disabled)) {
+body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:where(button, label):not([data-control-tone]):hover:not(:disabled):not(:has(> input:disabled)) {
   --liquid-glass-surface-tint: color-mix(in srgb, var(--material-floating-background) 92%, var(--ui-accent));
   border-color: var(--ui-accent);
 }
 
-body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:where(button, label):active:not(:disabled):not(:has(> input:disabled)) {
+body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:where(button, label):not([data-control-tone]):active:not(:disabled):not(:has(> input:disabled)) {
   --liquid-glass-surface-tint: color-mix(in srgb, var(--material-floating-background) 85%, var(--ui-accent));
 }
 
@@ -547,25 +547,15 @@ body[data-ui-skin="liquid-glass"] .gloss-style-toggle[data-liquid-glass-role="re
   color: var(--ui-accent-hover);
 }
 
-/* Outline controls keep semantic edges while the optical role supplies neutral
-   translucent material. Other emphases retain their existing optical behavior. */
-body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"][data-control-tone][data-control-emphasis="outline"] {
+/* The skin defines optical recipes; the shared state resolver chooses the paint.
+   Neutral and colored outlines are supported, tinted/solid optics remain separate. */
+body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis="outline"]) {
   --control-background: var(--material-floating-background);
-  --control-hover-background: color-mix(in srgb, var(--material-floating-background) 92%, var(--control-tone-color));
-  --control-hover-border: var(--control-tone-color);
-  --control-pressed-background: color-mix(in srgb, var(--material-floating-background) 85%, var(--control-tone-color));
-  --liquid-glass-surface-tint: var(--control-background);
-  border-color: var(--control-border);
-}
-
-body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"][data-control-tone][data-control-emphasis="outline"]:hover:not(:disabled):not([aria-disabled="true"]) {
-  --liquid-glass-surface-tint: var(--control-hover-background);
-  border-color: var(--control-hover-border);
-}
-
-body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"][data-control-tone][data-control-emphasis="outline"]:active:not(:disabled):not([aria-disabled="true"]) {
-  --liquid-glass-surface-tint: var(--control-pressed-background);
-  border-color: var(--control-pressed-border);
+  --control-hover-background: color-mix(in srgb, var(--material-floating-background) 82%, var(--control-tone-color));
+  --control-pressed-background: color-mix(in srgb, var(--material-floating-background) 72%, var(--control-tone-color));
+  --liquid-glass-surface-tint: var(--control-current-background);
+  border-color: var(--control-current-border);
+  color: var(--control-current-color);
 }
 
 @media (prefers-reduced-transparency: reduce), (forced-colors: active) {
