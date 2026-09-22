@@ -775,13 +775,6 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
   margin: 0;
 }
 
-.secondary-button.entry-search-config-button.active,
-.secondary-button.entry-search-config-button[aria-expanded="true"] {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent-hover);
-}
-
 .entry-search-config-menu {
   position: absolute;
   top: calc(100% + 8px);
@@ -827,13 +820,6 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
   height: 18px;
   margin: 0;
   flex: 0 0 auto;
-}
-
-.secondary-button.entry-filter-button.active,
-.secondary-button.entry-filter-button[aria-expanded="true"] {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent-hover);
 }
 
 .entry-filter-menu {
@@ -1186,6 +1172,57 @@ label span {
   overflow-wrap: anywhere;
 }
 
+/* Selection is a persistent state; native/ARIA state remains the sole source. */
+[data-control-selection][data-control-tone="neutral"] {
+  --control-selected-background: var(--ui-accent-soft);
+  --control-selected-border: var(--ui-accent);
+  --control-selected-color: var(--ui-accent-hover);
+  --control-selected-shadow: var(--control-shadow);
+  --control-selected-hover-background: color-mix(in srgb, var(--ui-accent-soft) 90%, var(--ui-accent));
+  --control-selected-pressed-background: color-mix(in srgb, var(--ui-accent-soft) 80%, var(--ui-accent));
+  --control-selected-disabled-background: var(--ui-accent-soft);
+  --control-selected-disabled-border: var(--ui-accent);
+  --control-selected-disabled-color: var(--ui-text-muted);
+}
+
+[data-control-selection][data-control-tone="neutral"]:is([aria-selected="true"], [aria-checked="true"], :has(> input:checked)) {
+  --control-current-background: var(--control-selected-background);
+  --control-current-border: var(--control-selected-border);
+  --control-current-color: var(--control-selected-color);
+  --control-current-shadow: var(--control-selected-shadow);
+}
+
+[data-control-selection][data-control-tone="neutral"]:is([aria-selected="true"], [aria-checked="true"], :has(> input:checked)):hover:not(:disabled):not([aria-disabled="true"]):not(:has(> input:disabled)) {
+  --control-current-background: var(--control-selected-hover-background);
+  --control-current-border: var(--control-selected-border);
+  --control-current-color: var(--control-selected-color);
+  --control-current-shadow: var(--control-selected-shadow);
+}
+
+[data-control-selection][data-control-tone="neutral"]:is([aria-selected="true"], [aria-checked="true"], :has(> input:checked)):active:not(:disabled):not([aria-disabled="true"]):not(:has(> input:disabled)) {
+  --control-current-background: var(--control-selected-pressed-background);
+  --control-current-border: var(--control-selected-border);
+  --control-current-color: var(--control-selected-color);
+  --control-current-shadow: var(--control-selected-shadow);
+}
+
+[data-control-selection][data-control-tone="neutral"]:has(> input:focus-visible) { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
+
+[data-control-selection][data-control-tone="neutral"]:is(:disabled, [aria-disabled="true"], :has(> input:disabled)) {
+  --control-current-background: var(--control-disabled-background);
+  --control-current-border: var(--control-disabled-border);
+  --control-current-color: var(--control-disabled-color);
+  --control-current-shadow: none;
+  cursor: not-allowed;
+}
+
+[data-control-selection][data-control-tone="neutral"]:is([aria-selected="true"], [aria-checked="true"], :has(> input:checked)):is(:disabled, [aria-disabled="true"], :has(> input:disabled)) {
+  --control-current-background: var(--control-selected-disabled-background);
+  --control-current-border: var(--control-selected-disabled-border);
+  --control-current-color: var(--control-selected-disabled-color);
+  --control-current-shadow: none;
+}
+
 .primary-button,
 .secondary-button,
 .danger-button,
@@ -1215,15 +1252,21 @@ label span {
   --control-disabled-background: var(--control-background);
   --control-disabled-border: var(--control-border);
   --control-disabled-color: var(--ui-text-muted);
+  --control-shadow: none;
+  --control-hover-shadow: var(--control-shadow);
+  --control-pressed-shadow: var(--control-hover-shadow);
+  --control-disabled-shadow: none;
   --control-current-background: var(--control-background);
   --control-current-border: var(--control-border);
   --control-current-color: var(--control-color);
+  --control-current-shadow: var(--control-shadow);
 }
 
 :is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]) {
   background: var(--control-current-background);
   border-color: var(--control-current-border);
   color: var(--control-current-color);
+  box-shadow: var(--control-current-shadow);
 }
 
 [data-control-tone="neutral"] {
@@ -1233,6 +1276,8 @@ label span {
   --control-border: var(--ui-border);
   --control-hover-background: var(--material-inset-background);
   --control-hover-border: var(--ui-border-strong);
+  --control-open-background: color-mix(in srgb, var(--material-panel-background) 70%, var(--material-inset-background));
+  --control-pressed-background: color-mix(in srgb, var(--material-inset-background) 90%, var(--ui-text));
 }
 
 [data-control-tone="accent"] {
@@ -1256,6 +1301,7 @@ label span {
 [data-control-emphasis="outline"] {
   --control-background: var(--material-panel-background);
   --control-border: var(--control-tone-color);
+  --control-pressed-background: color-mix(in srgb, var(--control-tone-tint) 90%, var(--control-tone-color));
 }
 
 [data-control-emphasis="tinted"] {
@@ -1273,16 +1319,40 @@ label span {
   --control-disabled-color: var(--ui-text);
 }
 
-:is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]):hover:not(:disabled):not([aria-disabled="true"]) {
+/* Effective configuration is ink/edge; an open popup adds a persistent fill.
+   Hover, pressed and disabled below still take precedence. */
+:where(.entry-search-config-button, .entry-filter-button)[data-control-tone].active {
+  --control-context-border: var(--ui-accent);
+  --control-color: var(--ui-accent-hover);
+  --control-border: var(--ui-accent);
+  --control-hover-color: var(--ui-accent-hover);
+  --control-hover-border: var(--ui-accent);
+}
+
+.entry-mail-clear[data-control-tone="neutral"] {
+  --control-background: transparent;
+  --control-border: transparent;
+  --control-hover-border: transparent;
+  --control-hover-background: color-mix(in srgb, var(--ui-text) 18%, transparent);
+  --control-pressed-background: color-mix(in srgb, var(--ui-text) 28%, transparent);
+}
+
+:where(.entry-search-config-button, .entry-filter-button, #entrySortButton)[data-control-tone][aria-expanded="true"]:not(:disabled):not([aria-disabled="true"]) {
+  --control-current-background: var(--control-open-background);
+}
+
+:is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]):hover:not(:disabled):not([aria-disabled="true"]):not(:has(> input:disabled)) {
   --control-current-background: var(--control-hover-background);
   --control-current-border: var(--control-hover-border);
   --control-current-color: var(--control-hover-color);
+  --control-current-shadow: var(--control-hover-shadow);
 }
 
-:is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]):active:not(:disabled):not([aria-disabled="true"]) {
+:is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]):active:not(:disabled):not([aria-disabled="true"]):not(:has(> input:disabled)) {
   --control-current-background: var(--control-pressed-background);
   --control-current-border: var(--control-pressed-border);
   --control-current-color: var(--control-pressed-color);
+  --control-current-shadow: var(--control-pressed-shadow);
 }
 
 :is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]):focus-visible {
@@ -1295,18 +1365,20 @@ label span {
   --control-current-background: var(--control-disabled-background);
   --control-current-border: var(--control-disabled-border);
   --control-current-color: var(--control-disabled-color);
-  box-shadow: none;
+  --control-current-shadow: var(--control-disabled-shadow);
 }
 
-.primary-button {
-  box-shadow: var(--material-action-shadow);
-}
-
-.primary-button:hover {
-  box-shadow: var(--material-action-hover-shadow);
+.primary-button,
+.danger-button {
+  --control-shadow: var(--material-action-shadow);
+  --control-hover-shadow: var(--material-action-hover-shadow);
+  --control-pressed-shadow: var(--material-action-pressed-shadow);
 }
 
 .secondary-button {
+  --control-shadow: var(--material-control-shadow);
+  --control-hover-shadow: var(--material-control-hover-shadow);
+  --control-pressed-shadow: var(--material-control-pressed-shadow);
   background: var(--material-control-background);
   color: var(--ui-text);
   border-color: var(--material-control-border);
@@ -1314,28 +1386,12 @@ label span {
   backdrop-filter: var(--material-control-filter);
 }
 
-.secondary-button:hover {
+.secondary-button:where(:not([data-control-tone])):hover:not(:disabled):not([aria-disabled="true"]) {
   box-shadow: var(--material-control-hover-shadow);
-}
-
-.secondary-button:where(:not([data-control-tone])):hover {
   border-color: var(--ui-border-strong);
 }
 
-.danger-button {
-  box-shadow: var(--material-action-shadow);
-}
-
-.danger-button:hover {
-  box-shadow: var(--material-action-hover-shadow);
-}
-
-.primary-button:active:not(:disabled),
-.danger-button:active:not(:disabled) {
-  box-shadow: var(--material-action-pressed-shadow);
-}
-
-.secondary-button:active:not(:disabled) {
+.secondary-button:where(:not([data-control-tone])):active:not(:disabled):not([aria-disabled="true"]) {
   box-shadow: var(--material-control-pressed-shadow);
 }
 
@@ -3072,9 +3128,11 @@ button.pending-source:focus-visible {
   font-weight: 900;
 }
 
-.ipa-key:hover {
-  border-color: var(--ui-accent);
-  color: var(--ui-accent-hover);
+.ipa-key[data-control-tone="neutral"] {
+  --control-background: var(--material-inset-background);
+  --control-border: var(--material-inset-border);
+  --control-hover-background: color-mix(in srgb, var(--material-inset-background) 90%, var(--ui-text));
+  --control-pressed-background: color-mix(in srgb, var(--material-inset-background) 80%, var(--ui-text));
 }
 
 .settings-section {
@@ -3167,12 +3225,6 @@ button.pending-source:focus-visible {
   background: var(--material-control-background);
   color: var(--ui-text);
   cursor: pointer;
-}
-
-.gloss-style-toggle:has(input:checked) {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent-hover);
 }
 
 .gloss-style-toggle input {
@@ -3602,13 +3654,6 @@ button.pending-source:focus-visible {
   gap: 7px;
   padding: 7px 10px;
   font-size: 0.78rem;
-}
-
-.analysis-page-tabs button.active,
-.analysis-subpage-tabs button.active {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent-hover);
 }
 
 .analysis-subpage-tabs button:disabled {
@@ -4356,11 +4401,6 @@ button.analysis-bar-label:hover,
 
 .segmented-control button:last-child {
   border-right: 0;
-}
-
-.segmented-control button.active {
-  background: var(--ui-accent);
-  color: var(--ui-text-on-solid);
 }
 
 .docs-panel {

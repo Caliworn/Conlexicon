@@ -175,8 +175,8 @@
                   <div class="entry-mail-search-surface" aria-hidden="true"></div>
                   <svg class="nav-icon entry-mail-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg>
                   <input id="searchInput" type="search" data-i18n-placeholder="searchPlaceholder" placeholder="搜索词形、释义、标签">
-                  <button class="secondary-button entry-mail-clear" id="entrySearchClearButton" type="button" hidden><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button>
-                  <button class="secondary-button entry-search-config-button" id="entrySearchConfigButton" type="button" aria-controls="entrySearchConfigMenu" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="currentSearchSettings" aria-label="当前搜索设置">
+                  <button class="secondary-button entry-mail-clear" id="entrySearchClearButton" data-control-tone="neutral" type="button" hidden><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button>
+                  <button class="secondary-button entry-search-config-button" id="entrySearchConfigButton" data-control-tone="neutral" type="button" aria-controls="entrySearchConfigMenu" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="currentSearchSettings" aria-label="当前搜索设置">
                     <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M4 7h10M18 7h2M14 5v4M4 17h2M10 17h10M10 15v4M4 12h5M13 12h7M9 10v4"></path>
                     </svg>
@@ -197,14 +197,14 @@
                   <div class="entry-mail-primary-tools" id="entryMailPrimaryTools">
                   <div class="entry-mail-settings" id="entryMailSettings"></div>
                   <div class="entry-mail-sort" id="entryMailSort">
-                    <button class="secondary-button" id="entrySortButton" type="button" aria-haspopup="menu" aria-controls="entrySortMenu" aria-expanded="false" data-app-tooltip="always"></button>
+                    <button class="secondary-button" id="entrySortButton" data-control-tone="neutral" type="button" aria-haspopup="menu" aria-controls="entrySortMenu" aria-expanded="false" data-app-tooltip="always"></button>
                     <div class="entry-search-config-menu entry-sort-menu" id="entrySortMenu" role="menu" hidden></div>
                   </div>
                   </div>
                   <div class="entry-mail-root-actions" id="entryMailRootActions" hidden></div>
                 </div>
                 <div class="entry-filter-control" id="entryFilterControl">
-                  <button class="secondary-button entry-filter-button" id="entryFilterButton" type="button" aria-controls="entryFilterMenu" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="filterEntries" aria-label="筛选词条">
+                  <button class="secondary-button entry-filter-button" id="entryFilterButton" data-control-tone="neutral" type="button" aria-controls="entryFilterMenu" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="filterEntries" aria-label="筛选词条">
                     <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M4 5h16l-6 7v5l-4 2v-7L4 5z"></path>
                     </svg>
@@ -239,8 +239,8 @@
                 </button>
                 <div class="root-mode-controls">
                   <button class="secondary-button" id="rootModeToggleButton" type="button"><svg class="nav-icon entry-mail-root-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v7M5 20v-5h14v5M12 11v9"></path><circle cx="12" cy="4" r="2"></circle></svg><span data-i18n="rootMode">词根模式</span></button>
-                  <button class="secondary-button" id="expandAllRootsButton" type="button" hidden><svg class="nav-icon entry-mail-root-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 5 6 6 6-6M6 13l6 6 6-6"></path></svg><span data-i18n="expandAll">全部展开</span></button>
-                  <button class="secondary-button" id="collapseAllRootsButton" type="button" hidden><svg class="nav-icon entry-mail-root-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 11 6-6 6 6M6 19l6-6 6 6"></path></svg><span data-i18n="collapseAll">全部收起</span></button>
+                  <button class="secondary-button" id="expandAllRootsButton" data-control-tone="neutral" type="button" hidden><svg class="nav-icon entry-mail-root-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 5 6 6 6-6M6 13l6 6 6-6"></path></svg><span data-i18n="expandAll">全部展开</span></button>
+                  <button class="secondary-button" id="collapseAllRootsButton" data-control-tone="neutral" type="button" hidden><svg class="nav-icon entry-mail-root-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 11 6-6 6 6M6 19l6-6 6 6"></path></svg><span data-i18n="collapseAll">全部收起</span></button>
                   <div class="active-filter-toolbar filter-status-toolbar" id="activeFilterToolbar" hidden>
                     <svg class="filter-status-icon" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M4 5h16l-6 7v5l-4 2v-7L4 5z"></path>
@@ -601,8 +601,8 @@
                       <option value="medium" data-i18n="fontSizeMedium">中</option>
                       <option value="large" data-i18n="fontSizeLarge">大</option>
                     </select>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input name="gloss-gla-bold" type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input name="gloss-gla-italic" type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
+                    <label class="gloss-style-toggle" data-control-tone="neutral" data-control-selection data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input name="gloss-gla-bold" type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
+                    <label class="gloss-style-toggle" data-control-tone="neutral" data-control-selection data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input name="gloss-gla-italic" type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
                     <span class="gloss-style-toggle-placeholder" aria-hidden="true"></span>
                   </div>
                   <div class="gloss-style-row" data-gloss-style="glb">
@@ -617,9 +617,9 @@
                       <option value="medium" data-i18n="fontSizeMedium">中</option>
                       <option value="large" data-i18n="fontSizeLarge">大</option>
                     </select>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input name="gloss-glb-bold" type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input name="gloss-glb-italic" type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
-                    <label class="gloss-style-toggle smallcaps-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleSmallCaps"><input id="glbSmallCapsInput" type="checkbox" data-gloss-style-smallcaps><span aria-hidden="true">SC</span></label>
+                    <label class="gloss-style-toggle" data-control-tone="neutral" data-control-selection data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input name="gloss-glb-bold" type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
+                    <label class="gloss-style-toggle" data-control-tone="neutral" data-control-selection data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input name="gloss-glb-italic" type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
+                    <label class="gloss-style-toggle smallcaps-toggle" data-control-tone="neutral" data-control-selection data-app-tooltip="always" data-i18n-aria-label="glossStyleSmallCaps"><input id="glbSmallCapsInput" type="checkbox" data-gloss-style-smallcaps><span aria-hidden="true">SC</span></label>
                   </div>
                   <div class="gloss-style-row" data-gloss-style="glc">
                     <code>\glc</code>
@@ -633,8 +633,8 @@
                       <option value="medium" data-i18n="fontSizeMedium">中</option>
                       <option value="large" data-i18n="fontSizeLarge">大</option>
                     </select>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input name="gloss-glc-bold" type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input name="gloss-glc-italic" type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
+                    <label class="gloss-style-toggle" data-control-tone="neutral" data-control-selection data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input name="gloss-glc-bold" type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
+                    <label class="gloss-style-toggle" data-control-tone="neutral" data-control-selection data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input name="gloss-glc-italic" type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
                     <span class="gloss-style-toggle-placeholder" aria-hidden="true"></span>
                   </div>
                   <div class="gloss-style-row" data-gloss-style="ft">
@@ -649,8 +649,8 @@
                       <option value="medium" data-i18n="fontSizeMedium">中</option>
                       <option value="large" data-i18n="fontSizeLarge">大</option>
                     </select>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input name="gloss-ft-bold" type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
-                    <label class="gloss-style-toggle" data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input name="gloss-ft-italic" type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
+                    <label class="gloss-style-toggle" data-control-tone="neutral" data-control-selection data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input name="gloss-ft-bold" type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
+                    <label class="gloss-style-toggle" data-control-tone="neutral" data-control-selection data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input name="gloss-ft-italic" type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
                     <span class="gloss-style-toggle-placeholder" aria-hidden="true"></span>
                   </div>
                 </div>
@@ -931,10 +931,10 @@
               <h2 data-i18n="languageDocs">语言文档</h2>
             </div>
             <div class="top-actions">
-              <div class="segmented-control" id="docsModeControl" data-i18n-aria-label="docsModeLabel" aria-label="文档模式">
-                <button class="active" type="button" data-doc-mode="split" data-i18n="splitMode">分栏</button>
-                <button type="button" data-doc-mode="edit" data-i18n="editMode">编辑</button>
-                <button type="button" data-doc-mode="preview" data-i18n="previewMode">查看</button>
+              <div class="segmented-control" id="docsModeControl" role="radiogroup" data-i18n-aria-label="docsModeLabel" aria-label="文档模式">
+                <button class="active" data-control-tone="neutral" data-control-selection role="radio" aria-checked="true" tabindex="0" type="button" data-doc-mode="split" data-i18n="splitMode">分栏</button>
+                <button data-control-tone="neutral" data-control-selection role="radio" aria-checked="false" tabindex="-1" type="button" data-doc-mode="edit" data-i18n="editMode">编辑</button>
+                <button data-control-tone="neutral" data-control-selection role="radio" aria-checked="false" tabindex="-1" type="button" data-doc-mode="preview" data-i18n="previewMode">查看</button>
               </div>
               <button class="secondary-button" id="backToEditorFromDocsButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
               <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="saveDocsButton" type="button" data-i18n="saveDocs">保存文档</button>
@@ -985,9 +985,9 @@
 
           <section class="corpus-panel" id="corpusPanel">
             <div class="corpus-toolbar">
-              <div class="segmented-control" id="corpusModeControl" data-i18n-aria-label="corpusModeLabel" aria-label="语料类型">
-                <button class="active" type="button" data-corpus-mode="blocks" data-i18n="corpusBlocks">块</button>
-                <button type="button" data-corpus-mode="units" data-i18n="corpusUnits">单元</button>
+              <div class="segmented-control" id="corpusModeControl" role="radiogroup" data-i18n-aria-label="corpusModeLabel" aria-label="语料类型">
+                <button class="active" data-control-tone="neutral" data-control-selection role="radio" aria-checked="true" tabindex="0" type="button" data-corpus-mode="blocks" data-i18n="corpusBlocks">块</button>
+                <button data-control-tone="neutral" data-control-selection role="radio" aria-checked="false" tabindex="-1" type="button" data-corpus-mode="units" data-i18n="corpusUnits">单元</button>
               </div>
               <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="newCorpusItemButton" type="button" data-i18n="newCorpusBlock">新建块</button>
             </div>

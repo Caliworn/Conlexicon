@@ -133,7 +133,7 @@ const classicScope = 'body:not(:is([data-ui-skin="layered-glass"], [data-ui-skin
 const classicDarkScope = `body.dark-theme${classicScope.slice(4)}`;
 function scopedBlock(source, selector) {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return source.match(new RegExp(`${escapedSelector}\\s*\\{([\\s\\S]*?)\\n\\}`));
+  return source.match(new RegExp(`(?:^|\\n)[ \\t]*${escapedSelector}\\s*\\{([\\s\\S]*?)\\n\\}`));
 }
 
 const classicLightTheme = scopedBlock(classic, classicScope);
@@ -290,15 +290,53 @@ for (const match of `${app}\n${index}`.matchAll(/<button\b([^>]*class="([^"]+)"[
   }
 }
 const classicDefinitions = new Set(classicLightTokenValues.keys());
+// Selection keyboard behavior is tested independently of layout or data loading.
+{
+  const vm = require("node:vm");
+  const context = vm.createContext({});
+  vm.runInContext(app.slice(app.indexOf("function handleSelectionKeydown("),
+    app.indexOf('document.addEventListener("keydown", handleSelectionKeydown)')), context);
+  for (const role of ["tab", "radio"]) {
+    let focused = -1;
+    let clicked = -1;
+    const items = [0, 1, 2].map((i) => ({
+      disabled: i === 1, tabIndex: i === 0 ? 0 : -1,
+      getAttribute(name) { return name === "role" ? role : null; },
+      focus() { focused = i; }, click() { clicked = i; },
+      closest() { return group; },
+    }));
+    const group = { querySelectorAll() { return items; } };
+    let prevented = false;
+    context.handleSelectionKeydown({ key: "ArrowRight",
+      target: { closest() { return items[0]; } }, preventDefault() { prevented = true; } });
+    assert(prevented && focused === 2, "Selection arrows skip disabled items");
+    assert.equal(clicked, role === "radio" ? 2 : -1, "Tabs use manual activation; radios activate with arrows");
+    context.handleSelectionKeydown({ key: "Home",
+      target: { closest() { return items[2]; } }, preventDefault() {} });
+    assert.equal(focused, 0, "Home returns to first enabled item");
+  }
+}
+const selectedSelector = '[data-control-selection][data-control-tone="neutral"]';
+const selectedRecipe = controlProperties(scopedBlock(styles, selectedSelector)[1]);
+assert.notEqual(selectedRecipe["--control-selected-background"], selectedRecipe["--control-selected-hover-background"]);
+assert.notEqual(selectedRecipe["--control-selected-hover-background"], selectedRecipe["--control-selected-pressed-background"]);
+const disabledSelection = scopedBlock(styles, selectedSelector
+  + ':is([aria-selected="true"], [aria-checked="true"], :has(> input:checked)):is(:disabled, [aria-disabled="true"], :has(> input:disabled))');
+assert(disabledSelection?.[1].includes("--control-current-shadow: none")
+  && disabledSelection[1].includes("--control-selected-disabled-background"),
+  "Disabled selection retains selection paint but no interactive shadow");
 // Ordinary commands share neutral paint even inside optical parents; registration
 // remains the engine's responsibility, not an implication of semantic attributes.
 const ordinaryCommandIds = new Set([
+  "entrySearchClearButton", "entrySearchConfigButton", "entrySortButton", "entryFilterButton",
+  "expandAllRootsButton", "collapseAllRootsButton",
   "focusEntryListButton", "openLexicalNetworkButton", "editEntryButton", "autoIpaButton",
   "cancelEditButton", "applyTagSortOrderButton", "closeLexicalNetworkButton",
   "closeInfoDialogButton", "confirmCancelButton", "entrySearchDefaultButton",
   "entryFilterResetButton", "entryFilterCancelButton",
 ]);
 const ordinaryActions = new Set([
+  "toggle-entry-morphology-mode",
   "config", "export", "activate", "move-entry-morphology-group-up",
   "move-entry-morphology-group-down", "resize-morphology-table", "cancel-partial-edit", "partial-auto-ipa",
 ]);
@@ -314,6 +352,15 @@ for (const [tag] of `${index}\n${app}`.matchAll(/<(?:button|label)\b[^>]*>/g)) {
 }
 assert(scopedBlock(styles, ".file-trigger:has(input:focus-visible)")?.[1].includes("outline:"),
   "The native import input must expose keyboard focus on its visible trigger");
+assert.equal([...app.matchAll(/button\.className = "ipa-key";\s*button\.dataset\.controlTone = "neutral";/g)].length, 2,
+  "Full and partial IPA keyboards must share the neutral state resolver");
+const popupStateSelector = ':where(.entry-search-config-button, .entry-filter-button, #entrySortButton)[data-control-tone][aria-expanded="true"]:not(:disabled):not([aria-disabled="true"])';
+assert(scopedBlock(styles, popupStateSelector)?.[1].includes("--control-current-background: var(--control-open-background"),
+  "Popup expansion must map to persistent paint without changing command semantics");
+const effectiveConfig = controlProperties(scopedBlock(styles,
+  ':where(.entry-search-config-button, .entry-filter-button)[data-control-tone].active')[1]);
+assert.equal(effectiveConfig["--control-color"], "var(--ui-accent-hover)",
+  "Effective filter/custom search settings retain an independent persistent indicator");
 assert(!scopedBlock(styles, ".file-trigger input")?.[1].includes("display: none"),
   "The import input must stay in native keyboard navigation");
 for (const marker of [
@@ -348,16 +395,29 @@ assert.equal(opticalOutline["--liquid-glass-surface-tint"], "var(--control-curre
   "Optical paint must consume the shared resolved state, including disabled");
 const semanticPaintSelector = ':is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis])';
 for (const [suffix, state] of [
-  [":hover:not(:disabled):not([aria-disabled=\"true\"])", "hover"],
-  [":active:not(:disabled):not([aria-disabled=\"true\"])", "pressed"],
+  [":hover:not(:disabled):not([aria-disabled=\"true\"]):not(:has(> input:disabled))", "hover"],
+  [":active:not(:disabled):not([aria-disabled=\"true\"]):not(:has(> input:disabled))", "pressed"],
   [":is(:disabled, [aria-disabled=\"true\"])", "disabled"],
 ]) {
   const block = controlProperties(scopedBlock(styles, semanticPaintSelector + suffix)[1]);
-  for (const property of ["background", "border", "color"]) {
+  for (const property of ["background", "border", "color", "shadow"]) {
     assert.equal(block[`--control-current-${property}`], `var(--control-${state}-${property})`,
       "Shared state resolver must choose all three paint channels");
   }
 }
+const neutralRecipe = controlProperties(scopedBlock(styles, '[data-control-tone="neutral"]')[1]);
+assert(neutralRecipe["--control-open-background"] && neutralRecipe["--control-pressed-background"],
+  "Neutral material must explicitly distinguish popup-open and pressed fills");
+assert.notEqual(neutralRecipe["--control-open-background"], neutralRecipe["--control-hover-background"]);
+assert.notEqual(neutralRecipe["--control-pressed-background"], neutralRecipe["--control-hover-background"]);
+assert(controlProperties(scopedBlock(styles, '[data-control-emphasis="outline"]')[1])["--control-pressed-background"],
+  "Ordinary outlines need an explicit pressed recipe");
+assert.equal(controlProperties(controlDefaults[1])["--control-disabled-shadow"], "none",
+  "Both native and ARIA-disabled semantic controls resolve to no shadow");
+assert(scopedBlock(styles, semanticPaintSelector)[1].includes("box-shadow: var(--control-current-shadow)"),
+  "Ordinary semantic controls must paint the resolved shadow");
+assert(scopedBlock(liquidGlass, opticalOutlineSelector)[1].includes("box-shadow: var(--control-current-shadow)"),
+  "Optical surfaces must honor disabled and interaction shadow resolution");
 for (const match of app.matchAll(/<button\b[^>]*class="corpus-icon-button[^"]*"[^>]*>/g)) {
   assert(match[0].includes("data-control-tone="), "Corpus icon actions must use semantic interaction paint");
 }

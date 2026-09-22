@@ -23,7 +23,7 @@ neutral 使用唯一中性配方，必须省略 `data-control-emphasis`；
 accent 与 danger 必须明确选择 outline、tinted 或 solid。契约按上述七种有效声明校验，
 不将所有字段的笛卡尔积视为有效接口。新增配方需有明确用途与状态验证，不以是否已经迁移消费者作为唯一依据。
 本批仅提供 neutral 与 accent/tinted 配方，不批量迁移按钮。未声明的组件继续走原有样式，包括菜单及文字操作的无底外观。
-这只是颜色与强调接口，不是 Q3 注册接口，也不改变尺寸、布局、阴影、按压变换或业务行为。
+这是颜色、强调与交互阴影接口，不是 Q3 注册接口，不改变尺寸、布局、按压变换或业务行为。
 
 | emphasis | 默认底色 / 边框 | 用途 |
 | --- | --- | --- |
@@ -33,7 +33,7 @@ accent 与 danger 必须明确选择 outline、tinted 或 solid。契约按上�
 
 局部 `--control-tone-*` 从当前皮肤的 `--ui-*` / `--material-*` 取值；
 `--control-background`、`--control-border`、`--control-color` 及 hover/pressed/disabled 对应变量是皮肤配方输入。
-共享状态规则解析为 `--control-current-background/border/color`，普通绘制与已适配 Q3 都消费解析结果，
+共享状态规则解析为 `--control-current-background/border/color/shadow`，普通绘制与已适配 Q3 都消费解析结果，
 不由光学层再写一套状态切换。优先级为 disabled、pressed、hover、default；focus-visible 独立叠加焦点环。
 别名在控件本身声明，避免在 body 声明后绑定浅色值。无需新增一套同义全局颜色 token。
 accent 和 danger 分别使用现有强调/危险色、soft 交互底及实色前景。
@@ -42,20 +42,32 @@ neutral 使用 panel 中性底、ui-border 细边框及 ui-text；hover/pressed 
 新增配方不等于新增光学资格或完成对应 Q3 配方。
 
 hover 沿本身 tone 变化，outline 出现弱有色底，tinted 保持弱底并强化边框；
-普通材质 pressed 初始复用 hover；液态 neutral/outline 使用浮层中性玻璃底，
+普通 neutral 的展开底为 panel/inset 混合，hover 使用 inset，pressed 向中性文字色轻染；
+普通 outline 的 pressed 在 tone 弱底上进一步轻染本身语义色。液态 neutral/outline 使用浮层中性玻璃底，
 hover/pressed 分别混入 18%/28% 自身 tone 色，中性按钮保持中性。只改变 CSS 材质，不重建光学贴图。
 focus-visible 使用独立金色焦点环。disabled/aria-disabled 控件关闭接口的 hover/pressed；
 一般控件使用 muted，solid 则将底色与文字成对切到 inset 中性底和 ui-text，避免灰字压在强有色底上。
 词典“当前”是选中状态展示，保留本身的 solid 底色/前景配对及默认光标，不套用不可用操作的弱化。
 aria-disabled 仅影响外观，业务仍需自行阻止激活。
-此版本没有新增 selected/checked 协议：它们仍由组件现有状态与无障碍属性控制。
+选中控件通过静态 `data-control-selection` 选择配方（不是状态副本），状态只来自原生 checked、
+aria-checked 或 aria-selected。selected/selected-hover/selected-pressed/selected-disabled 四组配方
+仍输出到 current 的背景、边框、文字和阴影；禁用保留选中标识并停止交互，焦点环独立叠加。
+首批覆盖 B/I/SC、文档／语料互斥模式、分析／质量页签。B/I/SC 保留 checkbox；
+分段控件为 radiogroup/radio，方向键切换；页签为 tablist/tab/tabpanel，左右/Home/End 移焦，
+Enter/Space 手动激活，跳过禁用项，重绘后恢复焦点。质量分组属于同一 tablist。
+主题、词根模式、导航、菜单及列表当前项不在这批。光学范围与单外壳分段布局不变。
 首批将语料层／单元上下移动按钮接入 neutral，删除语料图标按钮重复的 hover/危险文字规则；
 普通操作现已扩展到词条查看／编辑／定位、完整与局部取消和自动 IPA、各页返回、
 词典配置／导出／设为当前／导入、分析重试／更多／查看质量、四类信息说明、
 手动形态组排序／应用尺寸、标签排序应用，以及网络／信息／确认弹窗和搜索／筛选面板内的普通操作。
 文件导入保留原生 input 和 label，隐藏输入仍可键盘聚焦，外层显示焦点环。
-迁移只选择配方，不扩大光学注册；面板内仍共享父 Q3。第 2 类特殊控件不在本批。
-禁用排序操作仍无 hover。B/I/SC、页签选中态与其他未迁移控件保留原实现，后续再映射组合状态。
+迁移只选择配方，不扩大光学注册；面板内仍共享父 Q3。
+第 2 类已接入：搜索清除保持无底无独立边框；搜索设置、排序、筛选和展开／收起命令在 Mail
+共享透明外壳，配置生效（现有 active）用强调色文字／边框，弹层展开（aria-expanded）使用持续底色，
+hover／pressed 覆盖展开底色，禁用时不显示展开反馈。排序不新增 selected 状态。
+手动／自动形态按钮仍是动作命令；完整与局部 IPA 键盘使用 neutral 状态出口及独立中性键帽配方，
+保留几何和插入行为，不新增折射。
+禁用排序操作仍无 hover。B/I/SC 与页签旧选中配色已被组合状态配方替代，其余未迁移控件保持原实现。
 
 接口试点为删除层（danger/tinted）和解除关联（danger/outline），保留其 34px 尺寸及既有交互。
 第一批已扩展到删除词条/词典/语料块/单元、移除释义/形态组/形态表/标准化规则和 IPA 规则
@@ -65,7 +77,7 @@ aria-disabled 仅影响外观，业务仍需自行阻止激活。
 普通确认与编辑切换保存会恢复 accent。放弃更改的 alternate 按钮固定使用 danger/tinted，
 与语料删除属性一致；清除筛选使用 danger/outline，保留其既有 Q3 资格与语义描边反馈。
 添加类使用标准 outline 中性底和强调色边框，IPA 批量入口使用标准 solid 配方，不再单设同色边框。
-IPA 规则删除保留默认中性边框，以局部变量接入。原 class 继续承担布局、阴影及既有注册边界；
+IPA 规则删除保留默认中性边框，以局部变量接入。原 class 继续承担布局、阴影配方映射及既有注册边界；
 additive-button 不再定义透明底或专属交互配色；其 accent/outline 控件可进入紧凑 Q3，
 danger 类的 danger/outline 控件同样放行，其他强调档仍排除。该例外覆盖完整／局部添加释义、
 添加可选字段、搜索标准化添加规则及语料解除关联，仍遵守 Q3 父表面内不重复折射的边界。

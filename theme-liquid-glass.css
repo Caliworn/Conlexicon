@@ -431,6 +431,13 @@ body[data-ui-skin="liquid-glass"] #rootModeToggleButton[aria-pressed="true"] {
 /* Override material inputs on the toolbar controls only, not on the wrapper:
    descendant floating menus retain their own controls and optical role. */
 body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
+  #entrySearchConfigButton, #entrySortButton, #entryFilterButton,
+  #expandAllRootsButton, #collapseAllRootsButton
+)[data-control-tone="neutral"] {
+  --control-border: var(--control-context-border, transparent);
+}
+
+body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
   .entry-search-control > input,
   .entry-search-control > button,
   .entry-mail-primary-tools > button,
@@ -441,8 +448,9 @@ body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
   --material-control-background: transparent;
   --material-control-border: transparent;
   --control-background: transparent;
-  --control-hover-background: color-mix(in srgb, var(--control-tone-color, var(--ui-accent)) 8%, transparent);
-  --control-pressed-background: var(--control-tone-tint, var(--ui-accent-soft));
+  --control-hover-background: color-mix(in srgb, var(--control-tone-color, var(--ui-accent)) 18%, transparent);
+  --control-pressed-background: color-mix(in srgb, var(--control-tone-color, var(--ui-accent)) 28%, transparent);
+  --control-open-background: color-mix(in srgb, var(--control-tone-color, var(--ui-accent)) 10%, transparent);
   --material-control-shadow: none;
   --material-control-hover-shadow: none;
   --material-control-pressed-shadow: none;
@@ -457,7 +465,7 @@ body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
   .entry-mail-root-actions > button,
   .entry-mail-primary-tools > div > button,
   .root-mode-controls button
-):hover:not(:disabled) {
+):where(:not([data-control-tone])):hover:not(:disabled) {
   --material-control-background: color-mix(in srgb, var(--ui-accent) 8%, transparent);
 }
 
@@ -467,7 +475,7 @@ body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
   .entry-mail-root-actions > button,
   .entry-mail-primary-tools > div > button,
   .root-mode-controls button
-):active:not(:disabled) {
+):where(:not([data-control-tone])):active:not(:disabled) {
   --material-control-background: var(--ui-accent-soft);
 }
 
@@ -540,22 +548,27 @@ body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:has(> 
   outline-offset: 2px;
 }
 
-body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:is(.analysis-page-tabs button, .analysis-subpage-tabs button).active,
-body[data-ui-skin="liquid-glass"] .gloss-style-toggle[data-liquid-glass-role="relationship"]:has(input:checked) {
-  --liquid-glass-surface-tint: color-mix(in srgb, var(--material-floating-background) 92%, var(--ui-accent));
-  border-color: var(--ui-accent);
-  color: var(--ui-accent-hover);
+body[data-ui-skin="liquid-glass"] [data-control-selection] {
+  --control-selected-background: color-mix(in srgb, var(--material-floating-background) 84%, var(--ui-accent));
+  --control-selected-hover-background: color-mix(in srgb, var(--material-floating-background) 74%, var(--ui-accent));
+  --control-selected-pressed-background: color-mix(in srgb, var(--material-floating-background) 64%, var(--ui-accent));
+  --control-selected-disabled-background: var(--control-selected-background);
 }
 
 /* The skin defines optical recipes; the shared state resolver chooses the paint.
    Neutral and colored outlines are supported, tinted/solid optics remain separate. */
 body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis="outline"]) {
+  --control-shadow: var(--material-control-shadow);
+  --control-hover-shadow: var(--material-control-hover-shadow);
+  --control-pressed-shadow: var(--material-control-pressed-shadow);
+  --control-open-background: color-mix(in srgb, var(--material-floating-background) 90%, var(--control-tone-color));
   --control-background: var(--material-floating-background);
   --control-hover-background: color-mix(in srgb, var(--material-floating-background) 82%, var(--control-tone-color));
   --control-pressed-background: color-mix(in srgb, var(--material-floating-background) 72%, var(--control-tone-color));
   --liquid-glass-surface-tint: var(--control-current-background);
   border-color: var(--control-current-border);
   color: var(--control-current-color);
+  box-shadow: var(--control-current-shadow);
 }
 
 @media (prefers-reduced-transparency: reduce), (forced-colors: active) {

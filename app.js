@@ -9678,10 +9678,12 @@ function morphologySearchStrings(entry, dictionary = activeDictionary()) {
 }
 
 function renderAnalysis(dictionary = activeDictionary()) {
+  const focusedTab = elements.analysisPanel?.contains(document.activeElement) ? document.activeElement.id : "";
   try {
     renderAnalysisContent(dictionary);
   } finally {
     // Async query completion and tab switches both replace the navigation DOM.
+    synchronizePageTabs(elements.analysisPanel, focusedTab);
     liquidGlassOpticalEngine?.syncMappedSurfaces();
   }
 }
@@ -10565,6 +10567,7 @@ function renderQuality(dictionary = activeDictionary()) {
   if (!elements.qualityPanel) {
     return;
   }
+  const focusedTab = elements.qualityPanel.contains(document.activeElement) ? document.activeElement.id : "";
   disconnectMasonryLayoutsWithin(elements.qualityPanel);
   if (!dictionary) {
     elements.qualityPanel.innerHTML = "";
@@ -10576,6 +10579,7 @@ function renderQuality(dictionary = activeDictionary()) {
   analysisFilterCounter = 0;
   const report = getQualityViewReport(dictionary);
   elements.qualityPanel.innerHTML = renderQualityPage(report);
+  synchronizePageTabs(elements.qualityPanel, focusedTab);
   setupQualityMasonryLayouts();
   liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
@@ -10615,6 +10619,70 @@ function qualityReportCacheKey(dictionary) {
     })),
   });
 }
+
+// Tabs activate manually: arrows move focus, Enter/Space retain native click.
+// Re-rendered selected content is associated with its primary and nested tabs.
+function synchronizePageTabs(host, focusedId = "") {
+  if (!host) return;
+  const primary = host.querySelector(".analysis-page-tabs");
+  const qualityGroups = host.querySelector(".quality-subpage-tab-groups");
+  const secondary = qualityGroups || host.querySelector(".analysis-subpage-tabs");
+  const body = host.querySelector(".analysis-page-body");
+  if (!body) return;
+  let primaryPanel = body;
+  if (primary && secondary) {
+    primaryPanel = document.createElement("div");
+    secondary.before(primaryPanel);
+    primaryPanel.append(secondary, body);
+  }
+  for (const [nav, panel, kind] of [[primary, primaryPanel, "main"], [secondary, body, "sub"]]) {
+    if (!nav) continue;
+    nav.setAttribute("role", "tablist");
+    nav.setAttribute("aria-label", aText(kind === "main" ? "分析页面" : "分类", kind === "main" ? "Analysis pages" : "Categories"));
+    if (nav === qualityGroups) nav.querySelectorAll("nav").forEach((node) => node.setAttribute("role", "presentation"));
+    panel.id = `${host.id}-${kind}-panel`;
+    panel.setAttribute("role", "tabpanel");
+    panel.tabIndex = 0;
+    nav.querySelectorAll("button").forEach((button) => {
+      const key = button.dataset.analysisPage || button.dataset.analysisSubpage || button.dataset.qualitySubpage;
+      button.id = `${host.id}-${kind}-${key}`;
+      button.dataset.controlTone = "neutral";
+      button.dataset.controlSelection = "";
+      button.setAttribute("role", "tab");
+      button.setAttribute("aria-selected", String(button.classList.contains("active")));
+      button.setAttribute("aria-controls", panel.id);
+      button.tabIndex = button.classList.contains("active") ? 0 : -1;
+      if (button.classList.contains("active")) panel.setAttribute("aria-labelledby", button.id);
+    });
+  }
+  if (focusedId) {
+    const target = document.getElementById(focusedId);
+    if (target && host.contains(target) && target.matches('[role="tab"]:not(:disabled)')) {
+      target.closest('[role="tablist"]').querySelectorAll('[role="tab"]').forEach((tab) => { tab.tabIndex = tab === target ? 0 : -1; });
+      target.focus({ preventScroll: true });
+    }
+  }
+}
+
+function handleSelectionKeydown(event) {
+  const item = event.target.closest('[role="tab"], [role="radio"]');
+  const group = item?.closest('[role="tablist"], [role="radiogroup"]');
+  const radio = item?.getAttribute("role") === "radio";
+  const key = radio && event.key === "ArrowDown" ? "ArrowRight"
+    : radio && event.key === "ArrowUp" ? "ArrowLeft" : event.key;
+  if (!group || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(key)) return;
+  const items = [...group.querySelectorAll('[role="tab"], [role="radio"]')]
+    .filter((node) => !node.disabled && node.getAttribute("aria-disabled") !== "true");
+  const index = items.indexOf(item);
+  if (index < 0) return;
+  event.preventDefault();
+  const next = key === "Home" ? 0 : key === "End" ? items.length - 1
+    : (index + (key === "ArrowRight" ? 1 : -1) + items.length) % items.length;
+  items.forEach((node, i) => { node.tabIndex = i === next ? 0 : -1; });
+  items[next].focus();
+  if (item.getAttribute("role") === "radio") items[next].click();
+}
+document.addEventListener("keydown", handleSelectionKeydown);
 
 function analysisPageNav(activePage) {
   const pages = [
@@ -12040,7 +12108,7 @@ function renderMorphologyEntryControls(host, entry = {}, { full = false } = {}) 
   host.innerHTML = `
     <div class="entry-morphology-mode-row" data-morphology-mode="${escapeHtml(state.morphologyMode)}">
       <strong data-i18n="${modeLabelKey}">${escapeHtml(t(modeLabelKey))}</strong>
-      <button class="secondary-button" type="button" data-action="toggle-entry-morphology-mode" data-i18n="${modeActionKey}">${escapeHtml(t(modeActionKey))}</button>
+      <button class="secondary-button" data-control-tone="neutral" type="button" data-action="toggle-entry-morphology-mode" data-i18n="${modeActionKey}">${escapeHtml(t(modeActionKey))}</button>
     </div>
     ${state.morphologyMode === "manual" ? `
       <div class="entry-morphology-add-row">
@@ -12988,6 +13056,7 @@ function renderIpaKeyboard(dictionary = activeDictionary()) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "ipa-key";
+    button.dataset.controlTone = "neutral";
     button.textContent = symbol;
     button.setAttribute("aria-label", formatText("insertSymbol", { symbol }));
     button.addEventListener("click", () => insertPronunciationSymbol(symbol));
@@ -13006,6 +13075,7 @@ function renderPartialIpaKeyboard(dictionary = activeDictionary()) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "ipa-key";
+    button.dataset.controlTone = "neutral";
     button.textContent = symbol;
     button.setAttribute("aria-label", formatText("insertSymbol", { symbol }));
     button.addEventListener("click", () => insertSymbolIntoInput(symbol, input));
@@ -13502,6 +13572,8 @@ function renderLanguageDocs(dictionary) {
   elements.docsPanel.dataset.mode = docsViewMode;
   elements.docsModeControl.querySelectorAll("[data-doc-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.docMode === docsViewMode);
+    button.setAttribute("aria-checked", String(button.dataset.docMode === docsViewMode));
+    button.tabIndex = button.dataset.docMode === docsViewMode ? 0 : -1;
   });
 
   if (document.activeElement !== elements.docsMarkdownInput && elements.docsMarkdownInput.value !== markdown) {
@@ -13981,6 +14053,8 @@ function renderCorpus(dictionary = activeDictionary()) {
   elements.corpusSearchInput.value = viewState.query;
   elements.corpusModeControl.querySelectorAll("[data-corpus-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.corpusMode === viewState.mode);
+    button.setAttribute("aria-checked", String(button.dataset.corpusMode === viewState.mode));
+    button.tabIndex = button.dataset.corpusMode === viewState.mode ? 0 : -1;
   });
   elements.newCorpusItemButton.textContent = t(viewState.mode === "blocks" ? "newCorpusBlock" : "newCorpusUnit");
   renderCorpusIntegrity(corpus);
