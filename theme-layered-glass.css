@@ -250,14 +250,10 @@ body[data-ui-skin="layered-glass"] .dictionary-panel .tool-button:focus-visible 
 }
 
 body[data-ui-skin="layered-glass"] .dictionary-panel :where(.utility-button, .nav-collapse-button) {
-  border-color: var(--material-navigation-action-border);
-  background: var(--material-navigation-action-background);
-  color: var(--material-navigation-text);
-}
-
-body[data-ui-skin="layered-glass"] .dictionary-panel :where(.utility-button, .nav-collapse-button):hover:not(:active):not(:disabled) {
-  border-color: var(--material-navigation-control-border);
-  background: var(--material-navigation-control-hover-background);
+  border-color: var(--control-current-border);
+  background: var(--control-current-background);
+  color: var(--control-current-color);
+  box-shadow: var(--control-current-shadow);
 }
 
 body[data-ui-skin="layered-glass"] .dictionary-panel .tool-button.active {
@@ -271,20 +267,12 @@ body[data-ui-skin="layered-glass"] .dictionary-panel .tool-button:active:not(:di
 }
 
 body[data-ui-skin="layered-glass"] .dictionary-panel .utility-actions .utility-button {
-  border-color: color-mix(in srgb, var(--material-navigation-action-border) 72%, transparent);
-  box-shadow: var(--layered-navigation-utility-shadow);
+  --control-border: color-mix(in srgb, var(--material-navigation-action-border) 72%, transparent);
+  --control-shadow: var(--layered-navigation-utility-shadow);
+  --control-hover-shadow: var(--layered-navigation-utility-hover-shadow);
   transition:
     background-color 140ms ease,
     border-color 140ms ease;
-}
-
-body[data-ui-skin="layered-glass"] .dictionary-panel .utility-actions .utility-button:hover:not(:active):not(:disabled),
-body[data-ui-skin="layered-glass"] .dictionary-panel .utility-actions .skin-toggle-button[aria-expanded="true"] {
-  box-shadow: var(--layered-navigation-utility-hover-shadow);
-}
-
-body[data-ui-skin="layered-glass"] .dictionary-panel .utility-actions .utility-button:active:not(:disabled) {
-  box-shadow: var(--material-navigation-control-pressed-shadow);
 }
 
 @media (prefers-reduced-motion: reduce) {

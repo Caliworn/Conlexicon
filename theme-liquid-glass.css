@@ -319,20 +319,14 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button:is(:hover, .act
 }
 
 body[data-ui-skin="liquid-glass"] .dictionary-panel :where(.utility-button, .nav-collapse-button) {
-  border-color: var(--material-navigation-action-border);
-  background: var(--material-navigation-action-background);
-  box-shadow: none;
-  color: var(--material-navigation-text);
+  border-color: var(--control-current-border);
+  background: var(--control-current-background);
+  box-shadow: var(--control-current-shadow);
+  color: var(--control-current-color);
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
     color 160ms ease;
-}
-
-body[data-ui-skin="liquid-glass"] .dictionary-panel :where(.utility-button, .nav-collapse-button):is(:hover, :focus-visible):not(:disabled) {
-  border-color: var(--material-navigation-control-border);
-  background: var(--material-navigation-control-hover-background);
-  box-shadow: none;
 }
 
 body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {
@@ -345,11 +339,7 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active .tool-ic
   color: var(--liquid-glass-navigation-active-accent);
 }
 
-body[data-ui-skin="liquid-glass"] .dictionary-panel :where(
-  .tool-button,
-  .utility-button,
-  .nav-collapse-button
-):active:not(:disabled) {
+body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button:active:not(:disabled) {
   box-shadow: none;
 }
 
@@ -373,19 +363,12 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel .utility-actions {
 
 body[data-ui-skin="liquid-glass"] .dictionary-panel .utility-actions .utility-button {
   min-height: 44px;
-  border-color: transparent;
+  --control-border: transparent;
+  --control-hover-border: transparent;
+  --control-selected-border: transparent;
   border-radius: 8px;
-  background: transparent;
-}
-
-body[data-ui-skin="liquid-glass"] .dictionary-panel .utility-actions .utility-button:hover:not(:disabled),
-body[data-ui-skin="liquid-glass"] .dictionary-panel .utility-actions .skin-toggle-button[aria-expanded="true"] {
-  border-color: transparent;
-  background: var(--material-navigation-control-hover-background);
-}
-
-body[data-ui-skin="liquid-glass"] .dictionary-panel .utility-actions .utility-button:active:not(:disabled) {
-  background: var(--liquid-glass-navigation-active-background);
+  --control-background: transparent;
+  --control-pressed-background: var(--liquid-glass-navigation-active-background);
 }
 
 body[data-ui-skin="liquid-glass"] :where(
@@ -423,16 +406,17 @@ body[data-ui-skin="liquid-glass"] :is(.entry-mail-search-surface, .entry-mail-to
   -webkit-backdrop-filter: var(--liquid-glass-surface-q1-filter);
 }
 
-body[data-ui-skin="liquid-glass"] #rootModeToggleButton[aria-pressed="true"] {
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent-hover);
+body[data-ui-skin="liquid-glass"] .entry-list-toolbar #rootModeToggleButton {
+  --control-selected-background: var(--ui-accent-soft);
+  --control-selected-hover-background: color-mix(in srgb, var(--ui-accent-soft) 90%, var(--ui-accent));
+  --control-selected-pressed-background: color-mix(in srgb, var(--ui-accent-soft) 80%, var(--ui-accent));
 }
 
 /* Override material inputs on the toolbar controls only, not on the wrapper:
    descendant floating menus retain their own controls and optical role. */
 body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
   #entrySearchConfigButton, #entrySortButton, #entryFilterButton,
-  #expandAllRootsButton, #collapseAllRootsButton
+  #expandAllRootsButton, #collapseAllRootsButton, #rootModeToggleButton
 )[data-control-tone="neutral"] {
   --control-border: var(--control-context-border, transparent);
 }

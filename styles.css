@@ -100,10 +100,17 @@ body.mobile-drawer-open {
   opacity: 0.45;
 }
 
-.mobile-app-bar-button:not(.mobile-new-entry-button):is(:hover, :focus-visible):not(:disabled) {
-  background: var(--ui-accent-soft);
-  border-color: var(--ui-accent);
-  color: var(--ui-accent-hover);
+.mobile-app-bar-button[data-control-tone="neutral"] {
+  --control-background: var(--material-control-background);
+  --control-border: var(--material-control-border);
+  --control-shadow: var(--material-control-shadow);
+  --control-hover-shadow: var(--material-control-hover-shadow);
+  --control-pressed-shadow: var(--material-control-pressed-shadow);
+  --control-hover-background: var(--ui-accent-soft);
+  --control-hover-border: var(--ui-accent);
+  --control-hover-color: var(--ui-accent-hover);
+  --control-open-background: var(--ui-accent-soft);
+  --control-pressed-background: color-mix(in srgb, var(--ui-accent-soft) 85%, var(--ui-accent));
 }
 
 .mobile-app-bar-button:focus-visible {
@@ -980,12 +987,6 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
   flex-wrap: wrap;
 }
 
-.root-mode-controls .secondary-button.active {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent-hover);
-}
-
 .root-mode-controls .secondary-button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
@@ -1185,25 +1186,25 @@ label span {
   --control-selected-disabled-color: var(--ui-text-muted);
 }
 
-[data-control-selection][data-control-tone="neutral"]:is([aria-selected="true"], [aria-checked="true"], :has(> input:checked)) {
+[data-control-selection][data-control-tone="neutral"]:is([aria-selected="true"], [aria-checked="true"], [aria-pressed="true"], :has(> input:checked)) {
   --control-current-background: var(--control-selected-background);
   --control-current-border: var(--control-selected-border);
   --control-current-color: var(--control-selected-color);
   --control-current-shadow: var(--control-selected-shadow);
 }
 
-[data-control-selection][data-control-tone="neutral"]:is([aria-selected="true"], [aria-checked="true"], :has(> input:checked)):hover:not(:disabled):not([aria-disabled="true"]):not(:has(> input:disabled)) {
+[data-control-selection][data-control-tone="neutral"]:is([aria-selected="true"], [aria-checked="true"], [aria-pressed="true"], :has(> input:checked)):hover:not(:disabled):not([aria-disabled="true"]):not(:has(> input:disabled)) {
   --control-current-background: var(--control-selected-hover-background);
   --control-current-border: var(--control-selected-border);
   --control-current-color: var(--control-selected-color);
-  --control-current-shadow: var(--control-selected-shadow);
+  --control-current-shadow: var(--control-selected-hover-shadow, var(--control-selected-shadow));
 }
 
-[data-control-selection][data-control-tone="neutral"]:is([aria-selected="true"], [aria-checked="true"], :has(> input:checked)):active:not(:disabled):not([aria-disabled="true"]):not(:has(> input:disabled)) {
+[data-control-selection][data-control-tone="neutral"]:is([aria-selected="true"], [aria-checked="true"], [aria-pressed="true"], :has(> input:checked)):active:not(:disabled):not([aria-disabled="true"]):not(:has(> input:disabled)) {
   --control-current-background: var(--control-selected-pressed-background);
   --control-current-border: var(--control-selected-border);
   --control-current-color: var(--control-selected-color);
-  --control-current-shadow: var(--control-selected-shadow);
+  --control-current-shadow: var(--control-selected-pressed-shadow, var(--control-selected-shadow));
 }
 
 [data-control-selection][data-control-tone="neutral"]:has(> input:focus-visible) { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
@@ -1216,7 +1217,7 @@ label span {
   cursor: not-allowed;
 }
 
-[data-control-selection][data-control-tone="neutral"]:is([aria-selected="true"], [aria-checked="true"], :has(> input:checked)):is(:disabled, [aria-disabled="true"], :has(> input:disabled)) {
+[data-control-selection][data-control-tone="neutral"]:is([aria-selected="true"], [aria-checked="true"], [aria-pressed="true"], :has(> input:checked)):is(:disabled, [aria-disabled="true"], :has(> input:disabled)) {
   --control-current-background: var(--control-selected-disabled-background);
   --control-current-border: var(--control-selected-disabled-border);
   --control-current-color: var(--control-selected-disabled-color);
@@ -1337,8 +1338,10 @@ label span {
   --control-pressed-background: color-mix(in srgb, var(--ui-text) 28%, transparent);
 }
 
-:where(.entry-search-config-button, .entry-filter-button, #entrySortButton)[data-control-tone][aria-expanded="true"]:not(:disabled):not([aria-disabled="true"]) {
+:where(.entry-search-config-button, .entry-filter-button, #entrySortButton, [data-control-disclosure])[data-control-tone][aria-expanded="true"]:not(:disabled):not([aria-disabled="true"]) {
   --control-current-background: var(--control-open-background);
+  --control-current-border: var(--control-open-border, var(--control-border));
+  --control-current-shadow: var(--control-open-shadow, var(--control-shadow));
 }
 
 :is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]):hover:not(:disabled):not([aria-disabled="true"]):not(:has(> input:disabled)) {
@@ -1523,22 +1526,43 @@ label span {
   color: var(--material-navigation-text);
 }
 
-.dictionary-panel :where(.utility-button, .nav-collapse-button) {
-  box-shadow: var(--material-navigation-control-shadow);
+.dictionary-panel :is(.utility-button, .nav-collapse-button)[data-control-tone="neutral"] {
+  --control-background: var(--material-navigation-action-background);
+  --control-border: var(--material-navigation-action-border);
+  --control-color: var(--material-navigation-text);
+  --control-hover-background: var(--material-navigation-control-hover-background);
+  --control-hover-border: var(--material-navigation-control-border);
+  --control-hover-color: var(--material-navigation-text);
+  --control-pressed-background: var(--material-navigation-control-hover-background);
+  --control-open-background: var(--material-navigation-control-hover-background);
+  --control-shadow: var(--material-navigation-control-shadow);
+  --control-hover-shadow: var(--material-navigation-control-hover-shadow);
+  --control-pressed-shadow: var(--material-navigation-control-pressed-shadow);
+  --control-open-shadow: var(--control-hover-shadow);
+  --control-open-border: var(--control-hover-border);
+  --control-selected-background: var(--material-navigation-control-hover-background);
+  --control-selected-border: var(--material-navigation-control-border);
+  --control-selected-color: var(--material-navigation-text);
+  --control-selected-shadow: var(--control-shadow);
+  --control-selected-hover-shadow: var(--control-hover-shadow);
+  --control-selected-pressed-shadow: var(--control-pressed-shadow);
+  --control-selected-hover-background: color-mix(in srgb, var(--material-navigation-control-hover-background) 90%, var(--material-navigation-text));
+  --control-selected-pressed-background: color-mix(in srgb, var(--material-navigation-control-hover-background) 80%, var(--material-navigation-text));
+  --control-selected-disabled-background: var(--material-navigation-control-hover-background);
+  --control-selected-disabled-border: var(--material-navigation-control-border);
+  --control-selected-disabled-color: var(--material-navigation-muted);
 }
 
-.dictionary-panel .nav-collapse-button:is(:hover, :focus-visible):not(:disabled) {
-  background: var(--material-navigation-control-hover-background);
-  border-color: var(--material-navigation-control-border);
-}
-
-.dictionary-panel :where(.tool-button, .utility-button, .nav-collapse-button):hover:not(:disabled) {
+.dictionary-panel .tool-button:hover:not(:disabled) {
   box-shadow: var(--material-navigation-control-hover-shadow);
 }
 
 .dictionary-panel :where(.tool-button, .utility-button, .nav-collapse-button):active:not(:disabled) {
-  box-shadow: var(--material-navigation-control-pressed-shadow);
   transform: var(--material-navigation-control-pressed-transform);
+}
+
+.dictionary-panel .tool-button:active:not(:disabled) {
+  box-shadow: var(--material-navigation-control-pressed-shadow);
 }
 
 .tool-icon {
@@ -2300,14 +2324,10 @@ button.pending-source:focus-visible {
   color: var(--ui-text-muted);
 }
 
-.content-disclosure-button:hover:not(:disabled) {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent);
-}
-
-.content-disclosure-button:active:not(:disabled) {
-  background: color-mix(in srgb, var(--ui-accent-soft) 85%, var(--ui-accent));
+.content-disclosure-button[data-control-tone="neutral"] {
+  --control-background: var(--material-inset-background);
+  --control-border: var(--material-inset-border);
+  --control-color: var(--ui-text-muted);
 }
 
 .content-disclosure-button:focus-visible {
@@ -4390,17 +4410,32 @@ button.analysis-bar-label:hover,
 }
 
 .segmented-control button {
+  position: relative;
   min-height: 38px;
   border: 0;
-  border-right: 1px solid var(--ui-border);
   padding: 0 12px;
   background: transparent;
   color: var(--ui-text-muted);
   font-weight: 900;
 }
 
-.segmented-control button:last-child {
-  border-right: 0;
+.segmented-control > button[data-control-tone="neutral"] {
+  --control-background: transparent;
+}
+
+/* Structural separators do not consume the button's selected/hover border. */
+.segmented-control > button:not(:last-child) {
+  padding-inline-end: 13px;
+}
+
+.segmented-control > button:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  width: 1px;
+  background: var(--ui-border);
+  pointer-events: none;
 }
 
 .docs-panel {
@@ -4634,11 +4669,6 @@ textarea.ipa-single-line::-webkit-scrollbar {
 
 .skin-toggle-button {
   grid-column: 1 / -1;
-}
-
-.skin-toggle-button[aria-expanded="true"] {
-  border-color: var(--material-navigation-control-border);
-  background: var(--material-navigation-control-hover-background);
 }
 
 .skin-picker-menu {

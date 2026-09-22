@@ -1,3 +1,17 @@
+/* Utility commands retain the classic control surface within the dark navigation. */
+body:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-glass"])) .dictionary-panel .utility-button {
+  --control-background: var(--material-control-background);
+  --control-border: var(--material-control-border);
+  --control-color: var(--ui-text);
+  --control-hover-background: var(--material-control-background);
+  --control-hover-border: var(--ui-border-strong);
+  --control-hover-color: var(--ui-text);
+  --control-open-background: color-mix(in srgb, var(--material-control-background) 85%, var(--ui-text));
+  --control-pressed-background: color-mix(in srgb, var(--material-control-background) 75%, var(--ui-text));
+  --control-selected-disabled-background: var(--material-navigation-control-hover-background);
+  --control-selected-disabled-color: var(--material-navigation-muted);
+}
+
 body:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-glass"])) {
   color-scheme: light;
 

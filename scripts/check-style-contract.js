@@ -318,16 +318,27 @@ const classicDefinitions = new Set(classicLightTokenValues.keys());
 }
 const selectedSelector = '[data-control-selection][data-control-tone="neutral"]';
 const selectedRecipe = controlProperties(scopedBlock(styles, selectedSelector)[1]);
+const segmentedBase = controlProperties(scopedBlock(styles,
+  '.segmented-control > button[data-control-tone="neutral"]')[1]);
+assert.equal(segmentedBase["--control-background"], "transparent",
+  "Unselected segments expose their shared shell rather than adding a panel fill");
+const segmentedSeparator = scopedBlock(styles,
+  '.segmented-control > button:not(:last-child)::after')?.[1] || "";
+assert(segmentedSeparator.includes("background: var(--ui-border)")
+  && segmentedSeparator.includes("pointer-events: none"),
+  "Segment separators use structural neutral paint independent of control selection");
 assert.notEqual(selectedRecipe["--control-selected-background"], selectedRecipe["--control-selected-hover-background"]);
 assert.notEqual(selectedRecipe["--control-selected-hover-background"], selectedRecipe["--control-selected-pressed-background"]);
 const disabledSelection = scopedBlock(styles, selectedSelector
-  + ':is([aria-selected="true"], [aria-checked="true"], :has(> input:checked)):is(:disabled, [aria-disabled="true"], :has(> input:disabled))');
+  + ':is([aria-selected="true"], [aria-checked="true"], [aria-pressed="true"], :has(> input:checked)):is(:disabled, [aria-disabled="true"], :has(> input:disabled))');
 assert(disabledSelection?.[1].includes("--control-current-shadow: none")
   && disabledSelection[1].includes("--control-selected-disabled-background"),
   "Disabled selection retains selection paint but no interactive shadow");
 // Ordinary commands share neutral paint even inside optical parents; registration
 // remains the engine's responsibility, not an implication of semantic attributes.
 const ordinaryCommandIds = new Set([
+  "mobileNavButton", "mobileEntryListButton", "navCollapseButton", "entryBrowserToggleButton",
+  "skinToggleButton", "themeToggleButton", "languageToggleButton", "rootModeToggleButton",
   "entrySearchClearButton", "entrySearchConfigButton", "entrySortButton", "entryFilterButton",
   "expandAllRootsButton", "collapseAllRootsButton",
   "focusEntryListButton", "openLexicalNetworkButton", "editEntryButton", "autoIpaButton",
@@ -336,6 +347,7 @@ const ordinaryCommandIds = new Set([
   "entryFilterResetButton", "entryFilterCancelButton",
 ]);
 const ordinaryActions = new Set([
+  "toggle-morphology-table",
   "toggle-entry-morphology-mode",
   "config", "export", "activate", "move-entry-morphology-group-up",
   "move-entry-morphology-group-down", "resize-morphology-table", "cancel-partial-edit", "partial-auto-ipa",
@@ -354,9 +366,31 @@ assert(scopedBlock(styles, ".file-trigger:has(input:focus-visible)")?.[1].includ
   "The native import input must expose keyboard focus on its visible trigger");
 assert.equal([...app.matchAll(/button\.className = "ipa-key";\s*button\.dataset\.controlTone = "neutral";/g)].length, 2,
   "Full and partial IPA keyboards must share the neutral state resolver");
-const popupStateSelector = ':where(.entry-search-config-button, .entry-filter-button, #entrySortButton)[data-control-tone][aria-expanded="true"]:not(:disabled):not([aria-disabled="true"])';
+const popupStateSelector = ':where(.entry-search-config-button, .entry-filter-button, #entrySortButton, [data-control-disclosure])[data-control-tone][aria-expanded="true"]:not(:disabled):not([aria-disabled="true"])';
 assert(scopedBlock(styles, popupStateSelector)?.[1].includes("--control-current-background: var(--control-open-background"),
   "Popup expansion must map to persistent paint without changing command semantics");
+for (const id of ["mobileNavButton", "mobileEntryListButton", "navCollapseButton",
+  "entryBrowserToggleButton", "skinToggleButton"]) {
+  const markup = index.match(new RegExp('<button[^>]*id="' + id + '"[^>]*>'))?.[0] || "";
+  assert(markup.includes("data-control-disclosure") && markup.includes("aria-expanded="),
+    id + " must resolve disclosure paint from its existing expanded state");
+}
+for (const id of ["rootModeToggleButton"]) {
+  const markup = index.match(new RegExp('<button[^>]*id="' + id + '"[^>]*>'))?.[0] || "";
+  assert(markup.includes("data-control-selection") && markup.includes("aria-pressed="),
+    id + " must opt into the shared toggle selection resolver");
+}
+assert(app.includes('elements.rootModeToggleButton.setAttribute("aria-pressed", String(rootMode));')
+  && app.includes('elements.rootModeToggleButton.querySelector("span").textContent = t("rootMode");'),
+  "Root mode uses a stable setting name and application-owned pressed state in every layout");
+assert(app.includes('toggle.dataset.controlTone = "neutral";')
+  && app.includes('toggle.dataset.controlDisclosure = "";'),
+  "Virtual root disclosures must use the same neutral expanded recipe as morphology disclosures");
+const navigationRecipe = controlProperties(scopedBlock(styles,
+  '.dictionary-panel :is(.utility-button, .nav-collapse-button)[data-control-tone="neutral"]')[1]);
+assert.equal(navigationRecipe["--control-hover-background"], "var(--material-navigation-control-hover-background)");
+assert.equal(navigationRecipe["--control-hover-shadow"], "var(--material-navigation-control-hover-shadow)");
+assert.equal(navigationRecipe["--control-pressed-shadow"], "var(--material-navigation-control-pressed-shadow)");
 const effectiveConfig = controlProperties(scopedBlock(styles,
   ':where(.entry-search-config-button, .entry-filter-button)[data-control-tone].active')[1]);
 assert.equal(effectiveConfig["--control-color"], "var(--ui-accent-hover)",

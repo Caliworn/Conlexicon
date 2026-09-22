@@ -437,7 +437,6 @@ const i18n = {
     allParts: "全部词性",
     noPart: "无词性",
     rootMode: "词根模式",
-    normalMode: "普通模式",
     expandAll: "全部展开",
     collapseAll: "全部收起",
     activeFilterMode: "筛选",
@@ -1041,7 +1040,6 @@ const i18n = {
     allParts: "All Parts",
     noPart: "No Part",
     rootMode: "Root Mode",
-    normalMode: "Normal Mode",
     expandAll: "Expand All",
     collapseAll: "Collapse All",
     activeFilterMode: "Filter",
@@ -3433,7 +3431,8 @@ function applyLocale(root = document) {
   const nextLanguageLabel = currentLanguage === "zh" ? "English" : "中文";
   elements.languageToggleButton.removeAttribute("title");
   elements.languageToggleButton.setAttribute("aria-label", nextLanguageLabel);
-  elements.rootModeToggleButton.querySelector("span").textContent = rootMode ? t("normalMode") : t("rootMode");
+  elements.rootModeToggleButton.querySelector("span").textContent = t("rootMode");
+  elements.rootModeToggleButton.setAttribute("aria-pressed", String(rootMode));
   entryWorkspaceLayout?.sync();
 }
 
@@ -4583,8 +4582,8 @@ function renderPartFilterControls(dictionary, usedParts = null) {
   const hasCurrentFilter = Boolean(activeFilter);
   elements.entryFilterButton.disabled = !dictionary;
   elements.entryFilterButton.classList.toggle("active", hasCurrentFilter);
-  elements.rootModeToggleButton.querySelector("span").textContent = rootMode ? t("normalMode") : t("rootMode");
-  elements.rootModeToggleButton.classList.toggle("active", rootMode);
+  elements.rootModeToggleButton.querySelector("span").textContent = t("rootMode");
+  elements.rootModeToggleButton.setAttribute("aria-pressed", String(rootMode));
   elements.rootModeToggleButton.hidden = Boolean(activeFilter);
   elements.expandAllRootsButton.hidden = !rootMode || Boolean(activeFilter);
   elements.collapseAllRootsButton.hidden = !rootMode || Boolean(activeFilter);
@@ -6974,6 +6973,8 @@ function renderRootModeRow(row) {
     toggle.type = "button";
     toggle.className = `content-disclosure-button root-toggle-button${expanded ? " expanded" : ""}`;
     toggle.disabled = searchAutoExpanded;
+    toggle.dataset.controlTone = "neutral";
+    toggle.dataset.controlDisclosure = "";
     toggle.dataset.appTooltip = "always";
     toggle.setAttribute("aria-label", expanded ? t("collapse") : t("expand"));
     toggle.setAttribute("aria-expanded", String(expanded));
@@ -14718,7 +14719,7 @@ function createMorphologyTableEditor(table) {
         <div>
           <div class="morphology-card-title-row">
             <input data-field="title" value="${escapeHtml(table.title)}" data-i18n-aria-label="tableName" aria-label="${escapeHtml(t("tableName"))}">
-            <button class="content-disclosure-button morphology-table-toggle${expanded ? " is-expanded" : ""}" type="button" data-action="toggle-morphology-table" data-app-tooltip="always" aria-expanded="${expanded}" data-i18n-aria-label="${toggleLabelKey}" aria-label="${escapeHtml(t(toggleLabelKey))}">
+            <button class="content-disclosure-button morphology-table-toggle${expanded ? " is-expanded" : ""}" data-control-tone="neutral" data-control-disclosure type="button" data-action="toggle-morphology-table" data-app-tooltip="always" aria-expanded="${expanded}" data-i18n-aria-label="${toggleLabelKey}" aria-label="${escapeHtml(t(toggleLabelKey))}">
               <svg class="content-disclosure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
             </button>
           </div>

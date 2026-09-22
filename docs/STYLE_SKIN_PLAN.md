@@ -50,12 +50,21 @@ focus-visible 使用独立金色焦点环。disabled/aria-disabled 控件关闭�
 词典“当前”是选中状态展示，保留本身的 solid 底色/前景配对及默认光标，不套用不可用操作的弱化。
 aria-disabled 仅影响外观，业务仍需自行阻止激活。
 选中控件通过静态 `data-control-selection` 选择配方（不是状态副本），状态只来自原生 checked、
-aria-checked 或 aria-selected。selected/selected-hover/selected-pressed/selected-disabled 四组配方
+aria-checked、aria-selected 或 aria-pressed。selected/selected-hover/selected-pressed/selected-disabled 四组配方
 仍输出到 current 的背景、边框、文字和阴影；禁用保留选中标识并停止交互，焦点环独立叠加。
 首批覆盖 B/I/SC、文档／语料互斥模式、分析／质量页签。B/I/SC 保留 checkbox；
 分段控件为 radiogroup/radio，方向键切换；页签为 tablist/tab/tabpanel，左右/Home/End 移焦，
 Enter/Space 手动激活，跳过禁用项，重绘后恢复焦点。质量分组属于同一 tablist。
-主题、词根模式、导航、菜单及列表当前项不在这批。光学范围与单外壳分段布局不变。
+词根模式通过 aria-pressed 接入选中配方，设置名保持恒定；词根状态由应用更新，
+不再由 Mail 布局创建或移除。语言切换仍为目标语言命令，不添加 pressed。
+主题保留固定名称和 aria-pressed，但用太阳／月亮表达当前状态，不启用常驻选中底；仍复用导航的普通交互配方。
+内容折叠、整个列表、导航展开与皮肤菜单使用静态 data-control-disclosure 标记，
+直接读取已有 aria-expanded；箭头和布局仍由原组件负责。展开配方解析背景、边框与阴影，
+hover/pressed/disabled 优先，展开不等于选中。
+导航收起与 utility 控件复用 current 出口，但以导航 token 提供局部配方；
+经典 utility 保留普通控件底，层叠保留 utility 阴影，液态保留透明 utility 行；
+移动导航/列表按钮保留顶栏材质。导航目的地、菜单项及列表当前项暂不迁移。
+光学范围与单外壳分段布局不变。
 首批将语料层／单元上下移动按钮接入 neutral，删除语料图标按钮重复的 hover/危险文字规则；
 普通操作现已扩展到词条查看／编辑／定位、完整与局部取消和自动 IPA、各页返回、
 词典配置／导出／设为当前／导入、分析重试／更多／查看质量、四类信息说明、

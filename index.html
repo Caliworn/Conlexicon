@@ -32,14 +32,14 @@
     </svg>
     <div class="app-shell" id="appShell" data-nav-state="expanded" data-browser-state="expanded" data-nav-drawer="closed" data-browser-drawer="closed">
       <header class="mobile-app-bar" id="mobileAppBar">
-        <button class="mobile-app-bar-button" id="mobileNavButton" type="button" aria-controls="appNav" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="openToolNavigation" aria-label="打开工具导航">
+        <button class="mobile-app-bar-button" id="mobileNavButton" data-control-tone="neutral" data-control-disclosure type="button" aria-controls="appNav" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="openToolNavigation" aria-label="打开工具导航">
           <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
             <path d="M4 7h16M4 12h16M4 17h16"></path>
           </svg>
         </button>
         <span class="mobile-app-bar-title" id="mobileCurrentViewLabel">词条编辑</span>
         <div class="mobile-app-bar-actions">
-          <button class="mobile-app-bar-button" id="mobileEntryListButton" type="button" aria-controls="entryBrowser" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="openEntryList" aria-label="打开词条列表">
+          <button class="mobile-app-bar-button" id="mobileEntryListButton" data-control-tone="neutral" data-control-disclosure type="button" aria-controls="entryBrowser" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="openEntryList" aria-label="打开词条列表">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M8 6h12M8 12h12M8 18h12"></path>
               <path d="M4 6h.01M4 12h.01M4 18h.01"></path>
@@ -59,7 +59,7 @@
             <h1 data-i18n="appTitle">构典</h1>
           </div>
           <div class="brand-actions">
-            <button class="icon-button nav-collapse-button" id="navCollapseButton" type="button" aria-controls="appNav" aria-expanded="true" aria-label="收起工具导航">
+            <button class="icon-button nav-collapse-button" id="navCollapseButton" data-control-tone="neutral" data-control-disclosure type="button" aria-controls="appNav" aria-expanded="true" aria-label="收起工具导航">
               <svg class="nav-icon nav-collapse-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <rect x="3" y="4" width="18" height="16" rx="2"></rect>
                 <path d="M9 4v16"></path>
@@ -113,11 +113,11 @@
         </nav>
 
         <div class="panel-actions utility-actions">
-          <button class="secondary-button utility-button skin-toggle-button" id="skinToggleButton" type="button" aria-haspopup="menu" aria-controls="skinPickerMenu" aria-expanded="false" aria-label="选择皮肤，当前：经典皮肤">
+          <button class="secondary-button utility-button skin-toggle-button" id="skinToggleButton" data-control-tone="neutral" data-control-disclosure type="button" aria-haspopup="menu" aria-controls="skinPickerMenu" aria-expanded="false" aria-label="选择皮肤，当前：经典皮肤">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 1.89l.58 3.47A1 1 0 0 0 3.85 10H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.82l.58-3.47a2 2 0 0 0-1.34-2.25Z"></path></svg>
             <span class="utility-label" id="skinToggleLabel">经典皮肤</span>
           </button>
-          <button class="secondary-button utility-button theme-toggle-button" id="themeToggleButton" type="button" data-theme-state="light" aria-pressed="false" aria-label="暗黑模式">
+          <button class="secondary-button utility-button theme-toggle-button" id="themeToggleButton" data-control-tone="neutral" type="button" data-theme-state="light" aria-pressed="false" aria-label="暗黑模式">
             <svg class="nav-icon theme-toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
               <g class="theme-toggle-glyph theme-toggle-sun">
                 <circle cx="12" cy="12" r="4"></circle>
@@ -129,7 +129,7 @@
             </svg>
             <span class="utility-label" id="themeToggleLabel">暗黑模式</span>
           </button>
-          <button class="secondary-button utility-button language-toggle" id="languageToggleButton" type="button" aria-label="English">EN</button>
+          <button class="secondary-button utility-button language-toggle" id="languageToggleButton" data-control-tone="neutral" type="button" aria-label="English">EN</button>
         </div>
       </aside>
 
@@ -142,7 +142,7 @@
               <p class="eyebrow" id="dictionaryMeta">0 个词条</p>
               <div class="dictionary-title-row">
                 <h2 id="dictionaryTitle">词典</h2>
-                <button class="secondary-button entry-browser-toggle" id="entryBrowserToggleButton" type="button" data-app-tooltip="always" aria-controls="entryBrowser" aria-expanded="true" aria-label="收起词条列表">
+                <button class="secondary-button entry-browser-toggle" id="entryBrowserToggleButton" data-control-tone="neutral" data-control-disclosure type="button" data-app-tooltip="always" aria-controls="entryBrowser" aria-expanded="true" aria-label="收起词条列表">
                   <svg class="nav-icon entry-browser-toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="m6 9 6 6 6-6"></path>
                   </svg>
@@ -238,7 +238,7 @@
                   </svg>
                 </button>
                 <div class="root-mode-controls">
-                  <button class="secondary-button" id="rootModeToggleButton" type="button"><svg class="nav-icon entry-mail-root-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v7M5 20v-5h14v5M12 11v9"></path><circle cx="12" cy="4" r="2"></circle></svg><span data-i18n="rootMode">词根模式</span></button>
+                  <button class="secondary-button" id="rootModeToggleButton" data-control-tone="neutral" data-control-selection aria-pressed="false" type="button"><svg class="nav-icon entry-mail-root-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v7M5 20v-5h14v5M12 11v9"></path><circle cx="12" cy="4" r="2"></circle></svg><span data-i18n="rootMode">词根模式</span></button>
                   <button class="secondary-button" id="expandAllRootsButton" data-control-tone="neutral" type="button" hidden><svg class="nav-icon entry-mail-root-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 5 6 6 6-6M6 13l6 6 6-6"></path></svg><span data-i18n="expandAll">全部展开</span></button>
                   <button class="secondary-button" id="collapseAllRootsButton" data-control-tone="neutral" type="button" hidden><svg class="nav-icon entry-mail-root-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 11 6-6 6 6M6 19l6-6 6 6"></path></svg><span data-i18n="collapseAll">全部收起</span></button>
                   <div class="active-filter-toolbar filter-status-toolbar" id="activeFilterToolbar" hidden>
