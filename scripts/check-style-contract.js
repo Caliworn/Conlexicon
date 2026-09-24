@@ -421,6 +421,13 @@ for (const [marker, emphasis] of [
 }
 const opticalOutlineSelector = 'body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis="outline"])';
 const opticalOutline = controlProperties(scopedBlock(liquidGlass, opticalOutlineSelector)[1]);
+const coloredGlassShadows = controlProperties(scopedBlock(liquidGlass,
+  'body[data-ui-skin="liquid-glass"] :is([data-control-emphasis="tinted"], [data-control-emphasis="solid"])')[1]);
+for (const state of ["", "hover-", "pressed-"]) {
+  assert.equal(coloredGlassShadows[`--control-${state}shadow`],
+    `var(--material-control-${state}shadow)`,
+    "Colored glass must resolve neutral control shadows even when nested optics are excluded");
+}
 assert.equal(opticalOutline["--control-background"], "var(--material-floating-background)",
   "Optical outlines use the translucent role material, not an opaque panel");
 assert(scopedBlock(liquidGlass, opticalOutlineSelector)[1].includes("border-color: var(--control-current-border)"),
