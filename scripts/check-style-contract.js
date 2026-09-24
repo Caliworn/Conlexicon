@@ -615,10 +615,16 @@ assert(
   "Liquid Glass refraction must be a progressive enhancement behind a URL-filter support query",
 );
 const liquidGlassSurfaceDefinitions = liquidGlassEngineApi.SURFACE_ROLE_DEFINITIONS;
-for (const [legacyClass, tone] of [["additive-button", "accent"], ["danger", "danger"]]) {
+for (const emphasis of ["outline", "tinted", "solid"]) {
   assert(liquidGlassEngineApi.COMPACT_CONTROL_SELECTOR.includes(
-    `.${legacyClass}:not([data-control-tone="${tone}"][data-control-emphasis="outline"])`,
-  ), "Legacy additive/danger optical exceptions must be limited to supported semantic outlines");
+    `[data-control-emphasis="${emphasis}"]`,
+  ), "Every supported colored recipe must participate in semantic optical eligibility");
+}
+for (const emphasis of ["tinted", "solid"]) {
+  const recipe = controlProperties(scopedBlock(liquidGlass,
+    `body[data-ui-skin="liquid-glass"] [data-control-emphasis="${emphasis}"]`)[1]);
+  assert(recipe["--control-background"] && recipe["--control-hover-background"]
+    && recipe["--control-pressed-background"], "Colored glass needs explicit default, hover and pressed paint");
 }
 assert(
   liquidGlassSurfaceDefinitions.find(({ selector }) => selector === liquidGlassEngineApi.COMPACT_CONTROL_SELECTOR)?.excludeInsideBackdrop,

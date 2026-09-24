@@ -22,7 +22,7 @@
 neutral 使用唯一中性配方，必须省略 `data-control-emphasis`；
 accent 与 danger 必须明确选择 outline、tinted 或 solid。契约按上述七种有效声明校验，
 不将所有字段的笛卡尔积视为有效接口。新增配方需有明确用途与状态验证，不以是否已经迁移消费者作为唯一依据。
-本批仅提供 neutral 与 accent/tinted 配方，不批量迁移按钮。未声明的组件继续走原有样式，包括菜单及文字操作的无底外观。
+七种配方共用状态出口；未声明的组件继续走原有样式，包括菜单及文字操作的无底外观。
 这是颜色、强调与交互阴影接口，不是 Q3 注册接口，不改变尺寸、布局、按压变换或业务行为。
 
 | emphasis | 默认底色 / 边框 | 用途 |
@@ -38,8 +38,8 @@ accent 与 danger 必须明确选择 outline、tinted 或 solid。契约按上�
 别名在控件本身声明，避免在 body 声明后绑定浅色值。无需新增一套同义全局颜色 token。
 accent 和 danger 分别使用现有强调/危险色、soft 交互底及实色前景。
 neutral 使用 panel 中性底、ui-border 细边框及 ui-text；hover/pressed 使用 inset 中性底与 ui-border-strong，
-不引入强调色。不存在 neutral 的 outline/tinted/solid 分档。Q3 专属配色适配覆盖 neutral 与有色 outline，
-新增配方不等于新增光学资格或完成对应 Q3 配方。
+不引入强调色。不存在 neutral 的 outline/tinted/solid 分档。液态配色适配覆盖全部七种配方；
+按钮／label 按有效语义取得 compact 光学资格，仍受父 Q3 排除边界约束。
 
 hover 沿本身 tone 变化，outline 出现弱有色底，tinted 保持弱底并强化边框；
 普通 neutral 的展开底为 panel/inset 混合，hover 使用 inset，pressed 向中性文字色轻染；
@@ -87,10 +87,10 @@ hover／pressed 覆盖展开底色，禁用时不显示展开反馈。排序不�
 与语料删除属性一致；清除筛选使用 danger/outline，保留其既有 Q3 资格与语义描边反馈。
 添加类使用标准 outline 中性底和强调色边框，IPA 批量入口使用标准 solid 配方，不再单设同色边框。
 IPA 规则删除保留默认中性边框，以局部变量接入。原 class 继续承担布局、阴影配方映射及既有注册边界；
-additive-button 不再定义透明底或专属交互配色；其 accent/outline 控件可进入紧凑 Q3，
-danger 类的 danger/outline 控件同样放行，其他强调档仍排除。该例外覆盖完整／局部添加释义、
-添加可选字段、搜索标准化添加规则及语料解除关联，仍遵守 Q3 父表面内不重复折射的边界。
-旧 danger 类暂时保留以维持现有 Q3 排除状态，不表示 tone 将来决定光学资格。
+additive-button 不再定义透明底或专属交互配色；primary/danger 等旧布局类不再决定光学资格。
+有效的 neutral、accent/danger outline/tinted/solid 按钮与 label 自动注册，仍遵守 Q3 父表面内
+不重复折射的边界；Q1 详情与编辑外壳允许子控件 Q3。当前词典状态可分配光学资源，
+但保留 disabled 语义、无交互反馈和本身有色材质，不套普通禁用弱化。
 2026-09-21：添加 IPA 映射、语料属性、语料层、关联单元，以及移动/列表新建、
 筛选刷新/切换按钮已迁移 accent/outline；图标新建和筛选操作不再采用 hover 实色填充。
 已注册为 relationship 的语义 outline 使用 floating 中性透视底，并消费 control 边框与
@@ -98,10 +98,12 @@ hover/pressed tint；不会新增光学注册，父 Q3 排除边界不变。
 Mail 搜索/工具外壳的内部控件同时映射旧 material 与新 control 配色接口：
 默认透明、hover/pressed 沿自身 tone 轻染色，共享外壳玻璃，不绘制独立面板底。
 这些映射只覆盖既有直接控件位置，不作用于 body 级挂载的菜单。
-其他按钮尚未迁移；Q3 的其他强调档与未迁移语义控件的颜色覆盖仍待单独处理，
-不能据此宣称整个语义接口已与 Q3 完整兼容。
-高密度 solid 玻璃不在本批内。语法、颜色别名矩阵与完整检查可自动验证，
-浏览器计算样式、视觉及辅助模式验收仍需另行完成。
+2026-09-24：tinted 采用中性浮层底混入语义色，solid 采用高密度有色透射底；
+明暗分别校准前景及深色底，hover/pressed 仅改变材质，不修改 compact 光学参数或缓存键。
+语义属性变化纳入注册监听；Q3 父级 pending/fallback 不会给子控件临时光学资格。
+文档／语料分段选中块复用 solid 材质，整组仍是唯一 Q3 外壳。
+减少透明度／无 blur 时 solid 使用不透明底，强制高对比使用系统色。
+语法、样式契约与完整检查可自动验证；浏览器计算样式、视觉及辅助模式验收仍需另行完成。
 
 ## 3. S0 基线与边界
 

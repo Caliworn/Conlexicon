@@ -539,8 +539,7 @@ body[data-ui-skin="liquid-glass"] [data-control-selection] {
   --control-selected-disabled-background: var(--control-selected-background);
 }
 
-/* The skin defines optical recipes; the shared state resolver chooses the paint.
-   Neutral and colored outlines are supported, tinted/solid optics remain separate. */
+/* The skin defines optical recipes; the shared state resolver chooses the paint. */
 body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis="outline"]) {
   --control-shadow: var(--material-control-shadow);
   --control-hover-shadow: var(--material-control-hover-shadow);
@@ -555,6 +554,90 @@ body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:is([da
   box-shadow: var(--control-current-shadow);
 }
 
+/* Shared colored recipes also paint controls inside an optical owner, without
+   granting those descendants a second backdrop surface. */
+body[data-ui-skin="liquid-glass"] :is(button, label)[data-control-tone] {
+  --control-glass-solid-ink: color-mix(in srgb, var(--control-tone-solid, var(--ui-accent)) 80%, black);
+  --control-glass-solid-background: color-mix(in srgb, var(--control-glass-solid-ink) 90%, transparent);
+  --control-glass-solid-hover: color-mix(in srgb, var(--control-glass-solid-ink) 95%, transparent);
+  --control-glass-solid-pressed: var(--control-glass-solid-ink);
+  --control-glass-solid-color: var(--ui-text-on-solid);
+}
+
+body[data-ui-skin="liquid-glass"] [data-control-emphasis="tinted"] {
+  --control-color: color-mix(in srgb, var(--control-tone-color) 80%, black);
+  --control-hover-color: var(--control-color);
+  --control-background: color-mix(in srgb, var(--material-floating-background) 78%, var(--control-tone-color));
+  --control-hover-background: color-mix(in srgb, var(--material-floating-background) 68%, var(--control-tone-color));
+  --control-pressed-background: color-mix(in srgb, var(--material-floating-background) 58%, var(--control-tone-color));
+  --control-border: color-mix(in srgb, var(--control-tone-color) 40%, var(--ui-border));
+  --control-hover-border: color-mix(in srgb, var(--control-tone-color) 65%, var(--ui-border));
+  --control-disabled-background: var(--material-inset-background);
+  --control-disabled-border: var(--ui-border);
+}
+
+body.dark-theme[data-ui-skin="liquid-glass"] :is(button, label)[data-control-tone] {
+  --control-glass-solid-ink: color-mix(in srgb, var(--control-tone-solid, var(--ui-accent)) 55%, black);
+}
+
+body.dark-theme[data-ui-skin="liquid-glass"] [data-control-emphasis="tinted"] {
+  --control-color: var(--control-tone-color);
+}
+
+body[data-ui-skin="liquid-glass"] [data-control-emphasis="solid"] {
+  --control-background: var(--control-glass-solid-background);
+  --control-hover-background: var(--control-glass-solid-hover);
+  --control-pressed-background: var(--control-glass-solid-pressed);
+  --control-color: var(--control-glass-solid-color);
+  --control-hover-color: var(--control-glass-solid-color);
+  --control-border: var(--control-glass-solid-ink);
+  --control-hover-border: var(--control-glass-solid-ink);
+}
+
+body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:is([data-control-emphasis="tinted"], [data-control-emphasis="solid"]) {
+  --liquid-glass-surface-tint: var(--control-current-background);
+  --control-shadow: var(--material-control-shadow);
+  --control-hover-shadow: var(--material-control-hover-shadow);
+  --control-pressed-shadow: var(--material-control-pressed-shadow);
+  border-color: var(--control-current-border);
+  color: var(--control-current-color);
+  box-shadow: var(--control-current-shadow);
+}
+
+body[data-ui-skin="liquid-glass"] .segmented-control > button[data-control-selection] {
+  --control-selected-background: var(--control-glass-solid-background);
+  --control-selected-hover-background: var(--control-glass-solid-hover);
+  --control-selected-pressed-background: var(--control-glass-solid-pressed);
+  --control-selected-color: var(--control-glass-solid-color);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  body[data-ui-skin="liquid-glass"] :is(button, label)[data-control-tone] {
+    --control-glass-solid-background: var(--control-glass-solid-ink);
+    --control-glass-solid-hover: color-mix(in srgb, var(--control-glass-solid-ink) 90%, black);
+  }
+}
+
+@media (forced-colors: active) {
+  body[data-ui-skin="liquid-glass"] [data-control-emphasis="tinted"] {
+    --control-background: ButtonFace;
+    --control-hover-background: ButtonFace;
+    --control-pressed-background: ButtonFace;
+    --control-border: ButtonText;
+    --control-hover-border: ButtonText;
+  }
+  body[data-ui-skin="liquid-glass"] [data-control-emphasis="tinted"],
+  body.dark-theme[data-ui-skin="liquid-glass"] [data-control-emphasis="tinted"] {
+    --control-color: ButtonText;
+  }
+  body[data-ui-skin="liquid-glass"] :is(button, label)[data-control-tone] {
+    --control-glass-solid-background: Highlight;
+    --control-glass-solid-hover: Highlight;
+    --control-glass-solid-pressed: Highlight;
+    --control-glass-solid-color: HighlightText;
+  }
+}
+
 @media (prefers-reduced-transparency: reduce), (forced-colors: active) {
   body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"] {
     --liquid-glass-surface-q1-filter: none;
@@ -562,6 +645,10 @@ body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:is([da
 }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  body[data-ui-skin="liquid-glass"] :is(button, label)[data-control-tone] {
+    --control-glass-solid-background: var(--control-glass-solid-ink);
+    --control-glass-solid-hover: color-mix(in srgb, var(--control-glass-solid-ink) 90%, black);
+  }
   body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"] {
     --liquid-glass-surface-q1-filter: none;
   }

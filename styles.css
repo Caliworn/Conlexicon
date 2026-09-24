@@ -4421,6 +4421,10 @@ button.analysis-bar-label:hover,
 
 .segmented-control > button[data-control-tone="neutral"] {
   --control-background: transparent;
+  --control-selected-background: var(--ui-accent);
+  --control-selected-hover-background: var(--ui-accent-hover);
+  --control-selected-pressed-background: color-mix(in srgb, var(--ui-accent-hover) 90%, black);
+  --control-selected-color: var(--ui-text-on-solid);
 }
 
 /* Structural separators do not consume the button's selected/hover border. */
