@@ -34,6 +34,7 @@ const CHECK_GROUPS = [
       "check-entry-search-consistency.js",
       "check-json-directory-conversion.js",
       "check-morphology-acceptance.js",
+      "check-generated-dictionaries.js",
       "check-default-repository.js",
     ],
   },

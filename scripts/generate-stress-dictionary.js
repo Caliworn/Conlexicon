@@ -198,18 +198,18 @@ function stressMorphologyGroups(index, partOfSpeech) {
   }];
 }
 
-function makeSources(index, lemmas) {
+function makeSources(index, entries) {
   if (index < 8 || !chance(0.2)) {
     return [];
   }
   if (chance(0.08)) {
-    return [`unrecorded-source-${Math.floor(index / 37)}`];
+    return [{ entryId: "", text: `unrecorded-source-${Math.floor(index / 37)}` }];
   }
-  const sources = [lemmas[Math.floor(random() * Math.max(1, index - 1))]];
+  const sources = [entries[Math.floor(random() * entries.length)]];
   if (chance(0.18)) {
-    sources.push(lemmas[Math.floor(random() * Math.max(1, index - 1))]);
+    sources.push(entries[Math.floor(random() * entries.length)]);
   }
-  return Array.from(new Set(sources.filter(Boolean)));
+  return Array.from(new Set(sources)).map((entry) => ({ entryId: entry.id, text: entry.lemma }));
 }
 
 function formatEntryCount(entryCount) {
@@ -220,12 +220,10 @@ function buildDictionary(entryCount = DEFAULT_ENTRY_COUNT) {
   entryCount = parseEntryCount(entryCount);
   random = mulberry32(0xC0DEC0DE);
   const usedLemmas = new Set();
-  const lemmas = [];
   const entries = [];
 
   for (let index = 1; index <= entryCount; index += 1) {
     const lemma = makeLemma(index, usedLemmas);
-    lemmas.push(lemma);
     const partOfSpeech = pick(partsOfSpeech);
     const entry = {
       id: deterministicId("entry", 1, index),
@@ -234,7 +232,7 @@ function buildDictionary(entryCount = DEFAULT_ENTRY_COUNT) {
       tags: chance(0.035) ? [] : makeTags(partOfSpeech),
       definitions: chance(0.045) ? [{ id: deterministicId("def", 1, index), meaning: "", example: "", note: "" }] : makeDefinitions(index, lemma, partOfSpeech),
       etymology: {
-        sources: makeSources(index, lemmas),
+        sources: makeSources(index, entries),
         description: chance(0.12) ? `Synthetic derivation note ${index}` : "",
       },
       notes: chance(0.12) ? `Stress-test entry ${index}; generated with deterministic seed.` : "",

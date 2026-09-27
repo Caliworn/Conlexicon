@@ -146,7 +146,7 @@ function buildMorphologyTestDictionary() {
         pronunciation: "/ˈmi.re/",
         tags: ["v"],
         definitions: [definition(2, "to see")],
-        etymology: { sources: ["tala"], description: "Derived for source-link testing." },
+        etymology: { sources: [{ entryId: fixtureId("entry", 1), text: "tala" }], description: "Derived for source-link testing." },
         notes: "",
         morphologyMode: "auto",
         morphologyGroups: [],
