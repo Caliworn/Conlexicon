@@ -9,7 +9,9 @@
 
 ## 1. 仓库与当前状态
 
-- 2026-09-29：已完成[后端来源自动补全设计](docs/SOURCE_AUTOCOMPLETE_PLAN.md)，尚未实装。下一步按共享排序纯函数 → 复用 lemma projection、返回词条 summary 的只读候选 API → 异步 controller 与键盘契约 → 候选单行渲染与卡片标签切换顺序实施。补全不引入 cursor、翻页或会话缓存；本轮不移除前端完整快照，也不以未加载快照作为验收项。共享祖先的词根分组正确性问题另立审计修复任务，不因本设计而视为已处理。
+- 2026-09-29：已完成[后端来源自动补全设计](docs/SOURCE_AUTOCOMPLETE_PLAN.md)。第 1–2 步已完成：`lib/entry-search-model.js` 新增共享排序纯函数 `rankLemmaCandidates()`；`POST /api/dictionaries/:id/source-candidates/query` 已由 repository `querySourceCandidates()` 实装并写入 API 契约，分别由 `scripts/check-source-candidate-ranking.js` 与 `scripts/check-source-candidates.js` 覆盖。第 3 步已完成：完整编辑与词源局部编辑的补全改由逐输入框 controller 调用该端点（约 100ms 防抖、旧列表立即失效、IME 与 Enter／Tab／Esc 契约、单行候选及首条释义冲突回退），旧的前端候选函数已删除；浏览器已验证键盘、失效列表、IME 模拟、局部编辑与液态玻璃暗色显示。第 4 步已完成：来源卡片改用 summary（已存来源取自 `entry-relations` 缓存并在关系数据到达后补全，新选来源取自候选项），同一输入框内同形卡片按词性与释义内联区分，`sourceInputLabel()` 已删除。补充：补全列表统一为单一当前项，指针与键盘共用 `aria-selected` 高亮并由 `setSourceCompletionActive()` 更新，去除独立 `:hover` 高亮；词汇网络、来源卡片、浏览态来源链接及两处衍生词卡片统一使用 `entrySummaryTooltipHtml()` 浮层，多义项设置改为全局的“词条悬浮卡片的多义项显示”（字段名不变），浏览态同形来源沿用卡片的内联区分，完整编辑态衍生词卡片可聚焦查看浮层但不跳转；浏览器已验证新选／已存卡片、完整与局部编辑及 tooltip。浏览视图的词源回退文本仍在关系数据加载前读取快照，不在本计划范围。第 5 步已完成：README、CHANGELOG 已更新；30k 基准为 3 字符以上中位数约 50ms、单字母约 86ms（排序改用共享 `Intl.Collator`），100ms 防抖保留。界面验收已覆盖中文、经典浅色与液态玻璃暗色、键盘与模拟指针交互，尚未逐项检查英文界面、层叠玻璃、320／480／768／1024 宽度及真实输入法与真实鼠标悬停，留待统一视觉审查。
+
+- 待视觉审查（2026-09-30 记录，暂不单独修复）：暗色主题只调亮 `--ui-accent`，未覆盖 `--ui-text-on-solid`，实色强调底上的白字对比度在经典／层叠玻璃暗色约 2.86:1、液态玻璃暗色估算约 4.5:1（其实色配方压暗底色）。受影响的有 `data-control-emphasis="solid"` 的强调／危险按钮与 `.segmented-control` 选中项；改用深色文字可达约 5.8–7.3:1。来源补全选中行已单独改为浅色调高亮，不在此列。补全不引入 cursor、翻页或会话缓存；本轮不移除前端完整快照，也不以未加载快照作为验收项。共享祖先的词根分组正确性问题另立审计修复任务，不因本设计而视为已处理。
 
 - 2026-09-24：液态 tinted／solid 已接入语义化 compact 资格入口，保留原光学参数、父 Q3 排除与几何缓存；当前词典状态保留有色展示，文档／语料分段选中复用 solid。自动检查通过；后续由用户验收明暗／辅助模式的可读性、染色强度与分段选中效果，不把当前调参视为视觉定稿。
 

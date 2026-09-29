@@ -112,8 +112,10 @@ const viewScrollMemory = {
   docsPreview: 0,
   analysisPage: 0,
 };
-let sourceSuggestionIndex = 0;
-let sourceSuggestionHideTimer = 0;
+const sourceCompletionControllers = new WeakMap();
+const SOURCE_COMPLETION_DEBOUNCE_MS = 100;
+const SOURCE_COMPLETION_LOADING_DELAY_MS = 200;
+let lastPointerPosition = "";
 let networkEntryId = "";
 let networkOpen = false;
 let networkPreviousFocusId = "";
@@ -532,6 +534,10 @@ const i18n = {
     etymologyInfo: "来源与说明",
     sourceEntry: "来源词条",
     sourceReferenceHint: "选择建议添加引用；纯文本保留在输入框，以逗号分隔。拖动卡片排序，或聚焦卡片后按 Alt+方向键。",
+    sourceCandidatesLoading: "正在查找…",
+    sourceCandidatesMore: "共 {total} 项，继续输入以缩小范围",
+    sourceCandidatesFailed: "候选加载失败",
+    sourceCandidatesRetry: "重试",
     linkedSource: "词条引用",
     unlinkedSource: "纯文本 · 点击编辑",
     removeSource: "移除此来源",
@@ -674,7 +680,7 @@ const i18n = {
     displaySettings: "显示",
     polysemyDisplay: "多义项显示",
     entryListPolysemyDisplay: "词条列表的多义项显示",
-    networkPolysemyDisplay: "词汇网络悬浮卡片的多义项显示",
+    networkPolysemyDisplay: "词条悬浮卡片的多义项显示",
     emptyEntrySections: "空栏目",
     showEmptyEntrySections: "在词条浏览界面显示空栏目",
     entrySectionOrder: "词条栏目排序",
@@ -1135,6 +1141,10 @@ const i18n = {
     etymologyInfo: "Source and Notes",
     sourceEntry: "Source Entry",
     sourceReferenceHint: "Choose a suggestion to link an entry. Keep plain text here, separated by commas. Drag a card, or focus it and press Alt+arrow keys to reorder.",
+    sourceCandidatesLoading: "Searching…",
+    sourceCandidatesMore: "{total} matches. Keep typing to narrow them down.",
+    sourceCandidatesFailed: "Couldn't load suggestions",
+    sourceCandidatesRetry: "Retry",
     linkedSource: "Linked entry",
     unlinkedSource: "Plain text · click to edit",
     removeSource: "Remove this source",
@@ -1277,7 +1287,7 @@ const i18n = {
     displaySettings: "Display",
     polysemyDisplay: "Polysemy Display",
     entryListPolysemyDisplay: "Entry list polysemy display",
-    networkPolysemyDisplay: "Lexical network hover-card polysemy display",
+    networkPolysemyDisplay: "Entry hover-card polysemy display",
     emptyEntrySections: "Empty Sections",
     showEmptyEntrySections: "Show empty sections in the entry view",
     entrySectionOrder: "Entry Section Order",
@@ -8847,13 +8857,30 @@ function renderEtymology(entry, showEmptySections = false, relationState = { sta
     const resolvedSources = relationState.status === "success"
       ? relationState.relation.sources || []
       : sources.map((source) => ({ sourceText: sourceReferenceModel.sourceReferenceText(source, activeDictionary()?.entries || []), matchedEntryId: "", matchedLemma: "" }));
+    const boundSources = resolvedSources.filter((sourceRelation) => sourceRelation.matchedEntry);
     resolvedSources.forEach((sourceRelation, sourcePosition) => {
       const sourceName = sourceRelation.sourceText || "";
       if (relationState.status === "success" && sourceRelation.matchedEntryId) {
+        const summary = sourceRelation.matchedEntry;
+        const lemma = sourceRelation.matchedLemma || sourceName;
+        const detail = summaryHomographDetail(summary, boundSources
+          .filter((peer) => peer !== sourceRelation && peer.matchedLemma === sourceRelation.matchedLemma)
+          .map((peer) => peer.matchedEntry));
+        const accessibleName = [lemma, detail?.spoken].filter(Boolean).join(" ");
         const button = document.createElement("button");
         button.className = "source-link";
         button.type = "button";
-        button.textContent = sourceRelation.matchedLemma || sourceName;
+        button.textContent = lemma;
+        if (detail) {
+          const detailText = document.createElement("span");
+          detailText.className = "source-reference-detail";
+          detailText.textContent = detail.visible;
+          button.append(" ", detailText);
+          button.setAttribute("aria-label", accessibleName);
+        }
+        if (summary) {
+          applyEntrySummaryTooltip(button, summary, accessibleName);
+        }
         button.addEventListener("click", () => switchToEntry(sourceRelation.matchedEntryId));
         sourceRow.append(button);
       } else if (relationState.status === "success") {
@@ -8930,8 +8957,11 @@ function renderDerivedEntryList(container, derived = [], dictionary = activeDict
       <strong>${escapeHtml(derivedEntry.lemma)}</strong>
       ${partText ? `<span>${escapeHtml(partText)}</span>` : ""}
     `;
+    applyEntrySummaryTooltip(card, derivedEntry, [derivedEntry.lemma, partText].filter(Boolean).join(" "));
     if (interactive) {
       card.addEventListener("click", () => switchToEntry(derivedEntry.id));
+    } else {
+      card.tabIndex = 0;
     }
     container.append(card);
   });
@@ -9236,7 +9266,9 @@ function networkTruncatedLabel(value, width, fontSize = 16) {
   return text.length > limit ? `${text.slice(0, Math.max(1, limit - 1))}…` : text;
 }
 
-function networkNodeTooltipHtml(entry) {
+// The single entry hover card shared by the lexical network, source links,
+// source cards and derived-entry cards.
+function entrySummaryTooltipHtml(entry) {
   const partText = entryPartText(entry);
   const settings = normalizeDictionarySettings(activeDictionary()?.settings);
   return `
@@ -9278,7 +9310,7 @@ function updateLexicalNetworkNodeElement(group, node, position) {
   group.dataset.appTooltip = "always";
   group.dataset.appTooltipWrap = "true";
   group.dataset.appTooltipVariant = "rich";
-  group.dataset.appTooltipHtml = networkNodeTooltipHtml(node.entry);
+  group.dataset.appTooltipHtml = entrySummaryTooltipHtml(node.entry);
   const pronunciationText = String(node.entry.pronunciation || "");
   const partText = entryPartText(node.entry);
   group.setAttribute("aria-label", [node.entry.lemma, pronunciationText, partText].filter(Boolean).join(", "));
@@ -9505,6 +9537,11 @@ function refreshEntryRelationConsumers(entryId, key) {
   if (networkOpen && networkEntryId === entryId) {
     renderLexicalNetwork();
   }
+  [elements.sourceEntryInput, document.querySelector("#partialSourceEntryInput")].forEach((input) => {
+    if (input && sourceInputReferences.has(input) && sourceEditorEntryId(input) === entryId) {
+      hydrateSourceSummaries(input);
+    }
+  });
 }
 
 function fetchEntryRelation(dictionary, entry, key) {
@@ -12415,60 +12452,8 @@ function fullEntryFormIsDirty() {
     : !entriesHaveSameSemantics(candidate, createEntryDraft());
 }
 
-function completeSourceAtCursor(input = elements.sourceEntryInput) {
-  const dictionary = activeDictionary();
-  if (!dictionary) {
-    return false;
-  }
-
-  const value = input.value;
-  const segment = sourceSegmentAtCursor(value, input.selectionStart ?? value.length);
-  const prefix = segment.prefix;
-
-  if (!prefix) {
-    return false;
-  }
-
-  const match = sourceCompletionCandidates(prefix, dictionary, input)[0];
-  if (!match) {
-    return false;
-  }
-
-  fillSourceSegment(match, input);
-  return true;
-}
-
 function sourceEditorEntryId(input) {
   return input === elements.sourceEntryInput ? elements.entryId.value : selectedEntry()?.id || "";
-}
-
-function sourceCompletionCandidates(prefix, dictionary = activeDictionary(), input = elements.sourceEntryInput) {
-  const normalizeSearch = entrySearchQueryOptions(dictionary).normalizeText;
-  const normalizedPrefix = normalizeSearch(prefix);
-  if (!dictionary || !normalizedPrefix) {
-    return [];
-  }
-  const fuzzyEnabled = normalizeDictionarySettings(dictionary.settings).search.etymologyAutocomplete.fuzzy;
-  const selectedIds = new Set((sourceInputReferences.get(input)?.sources || []).map((source) => source.entryId).filter(Boolean));
-  selectedIds.add(sourceEditorEntryId(input));
-  return dictionary.entries
-    .filter((entry) => !selectedIds.has(entry.id))
-    .map((entry) => {
-      const lemma = normalizeSearch(entry.lemma);
-      let score = 0;
-      if (lemma.startsWith(normalizedPrefix)) {
-        score = 1000 - Math.abs(lemma.length - normalizedPrefix.length);
-      } else if (fuzzyEnabled && lemma.includes(normalizedPrefix)) {
-        score = 700 - lemma.indexOf(normalizedPrefix);
-      } else if (fuzzyEnabled) {
-        score = entrySearchModel.fuzzyScore(entry.lemma, prefix, { normalizeText: normalizeSearch });
-      }
-      return { entry, score };
-    })
-    .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score || a.entry.lemma.localeCompare(b.entry.lemma, "zh-CN"))
-    .slice(0, 6)
-    .map((item) => item.entry);
 }
 
 function sourceAutocompleteBoxForInput(input = elements.sourceEntryInput) {
@@ -12478,66 +12463,320 @@ function sourceAutocompleteBoxForInput(input = elements.sourceEntryInput) {
   return input.closest(".source-reference-field")?.querySelector(".source-suggestions") || null;
 }
 
-function cancelSourceSuggestionHide() {
-  if (sourceSuggestionHideTimer) {
-    clearTimeout(sourceSuggestionHideTimer);
-    sourceSuggestionHideTimer = 0;
+function sourceSummaryMeanings(summary) {
+  return (summary.definitionPreviews || []).map((definition) => definition.meaning.trim()).filter(Boolean);
+}
+
+// Homographs whose first meanings collide show the first meaning no peer
+// shares, then the pronunciation; IDs are never shown to disambiguate.
+function sourceSummaryGloss(summary, peers = []) {
+  const meanings = sourceSummaryMeanings(summary);
+  const rivals = peers.filter((peer) => peer !== summary && peer.lemma === summary.lemma
+    && sourceSummaryMeanings(peer)[0] === meanings[0]);
+  if (!rivals.length) {
+    return meanings[0] || "";
   }
+  const rivalMeanings = new Set(rivals.flatMap(sourceSummaryMeanings));
+  return meanings.find((meaning) => !rivalMeanings.has(meaning)) || summary.pronunciation || meanings[0] || "";
 }
 
-function scheduleSourceSuggestionHide(input = elements.sourceEntryInput) {
-  cancelSourceSuggestionHide();
-  sourceSuggestionHideTimer = window.setTimeout(() => {
-    sourceSuggestionHideTimer = 0;
-    const box = sourceAutocompleteBoxForInput(input);
-    if (box && document.activeElement !== input && !box.contains(document.activeElement)) {
-      box.hidden = true;
+function sourceSummaryParts(summary) {
+  return serializeTagList((summary.parts || []).map((part) => tagIdentityText(activeTagDisplayIdentity(part))));
+}
+
+function sourceCompletionController(input) {
+  let controller = sourceCompletionControllers.get(input);
+  if (!controller) {
+    controller = {
+      requestKey: "",
+      dismissedKey: "",
+      sequence: 0,
+      abort: null,
+      debounceTimer: 0,
+      loadingTimer: 0,
+      candidates: [],
+      total: 0,
+      stale: true,
+      loading: false,
+      error: null,
+      activeIndex: -1,
+      composing: false,
+    };
+    sourceCompletionControllers.set(input, controller);
+  }
+  return controller;
+}
+
+function sourceCompletionRequest(input) {
+  const dictionaryId = activeDictionary()?.id || "";
+  const segment = sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length);
+  const excludeEntryIds = (sourceInputReferences.get(input)?.sources || [])
+    .map((source) => source.entryId)
+    .filter(Boolean);
+  const body = { q: segment.prefix, ownerEntryId: sourceEditorEntryId(input), excludeEntryIds };
+  // Reordering cards does not change the exclusion set, so it must not requery.
+  const key = JSON.stringify([dictionaryId, segment.start, body.q, body.ownerEntryId, [...excludeEntryIds].sort()]);
+  return { dictionaryId, body, key };
+}
+
+function stopSourceCompletionRequest(controller) {
+  clearTimeout(controller.debounceTimer);
+  clearTimeout(controller.loadingTimer);
+  controller.abort?.abort();
+  controller.abort = null;
+  controller.loading = false;
+  controller.sequence += 1;
+}
+
+function resetSourceCompletion(input) {
+  const controller = sourceCompletionController(input);
+  stopSourceCompletionRequest(controller);
+  Object.assign(controller, {
+    requestKey: "",
+    dismissedKey: "",
+    candidates: [],
+    total: 0,
+    stale: true,
+    error: null,
+    activeIndex: -1,
+  });
+  renderSourceCompletion(input);
+}
+
+function refreshSourceCompletion(input) {
+  const controller = sourceCompletionController(input);
+  if (controller.composing) {
+    return;
+  }
+  const request = sourceCompletionRequest(input);
+  if (request.key !== controller.requestKey) {
+    // The previous list stays visible only as a placeholder: it can no
+    // longer be confirmed from the moment the query or exclusions change.
+    stopSourceCompletionRequest(controller);
+    controller.requestKey = request.key;
+    controller.stale = true;
+    controller.error = null;
+    controller.activeIndex = -1;
+    if (request.body.q && request.dictionaryId) {
+      controller.debounceTimer = window.setTimeout(
+        () => fetchSourceCompletion(input, request),
+        SOURCE_COMPLETION_DEBOUNCE_MS,
+      );
+    } else {
+      controller.candidates = [];
+      controller.total = 0;
     }
-  }, 120);
+  }
+  renderSourceCompletion(input);
 }
 
-function renderSourceAutocomplete(input = elements.sourceEntryInput) {
-  cancelSourceSuggestionHide();
+async function fetchSourceCompletion(input, request) {
+  const controller = sourceCompletionController(input);
+  if (!input.isConnected || controller.requestKey !== request.key) {
+    return;
+  }
+  const sequence = ++controller.sequence;
+  const abort = new AbortController();
+  controller.abort = abort;
+  controller.error = null;
+  controller.loadingTimer = window.setTimeout(() => {
+    if (controller.sequence === sequence) {
+      controller.loading = true;
+      renderSourceCompletion(input);
+    }
+  }, SOURCE_COMPLETION_LOADING_DELAY_MS);
+  let result = null;
+  let failure = null;
+  try {
+    result = await api(`/api/dictionaries/${encodeURIComponent(request.dictionaryId)}/source-candidates/query`, {
+      method: "POST",
+      body: JSON.stringify(request.body),
+      signal: abort.signal,
+    });
+  } catch (error) {
+    failure = error;
+  }
+  if (controller.sequence !== sequence || controller.requestKey !== request.key || !input.isConnected) {
+    return;
+  }
+  clearTimeout(controller.loadingTimer);
+  controller.loading = false;
+  controller.abort = null;
+  if (failure) {
+    controller.candidates = [];
+    controller.total = 0;
+    controller.error = failure;
+    console.error("Source candidates API unavailable.", failure);
+  } else {
+    controller.candidates = result.items;
+    controller.total = result.total;
+    controller.stale = false;
+  }
+  renderSourceCompletion(input);
+}
+
+function retrySourceCompletion(input) {
+  const controller = sourceCompletionController(input);
+  controller.requestKey = "";
+  refreshSourceCompletion(input);
+  input.focus();
+}
+
+function renderSourceCompletion(input) {
   const box = sourceAutocompleteBoxForInput(input);
   if (!box) {
     return;
   }
-  const segment = sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length);
-  const candidates = sourceCompletionCandidates(segment.prefix, activeDictionary(), input);
-  if (sourceSuggestionIndex >= candidates.length) {
-    sourceSuggestionIndex = 0;
-  }
-  box.innerHTML = "";
-  box.hidden = !candidates.length || document.activeElement !== input;
+  const controller = sourceCompletionController(input);
+  const field = input.closest(".source-reference-field");
+  const focused = Boolean(field?.contains(document.activeElement));
+  const hasQuery = Boolean(sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length).prefix);
+  const open = focused && hasQuery && controller.requestKey !== controller.dismissedKey
+    && Boolean(controller.candidates.length || controller.error || controller.loading);
+  const listId = `${input.id}Suggestions`;
+  box.hidden = !open;
+  box.classList.toggle("is-stale", controller.stale);
+  input.setAttribute("aria-expanded", String(open));
+  input.setAttribute("aria-controls", listId);
 
-  candidates.forEach((entry, index) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = index === sourceSuggestionIndex ? "selected" : "";
-    button.textContent = sourceInputLabel({ entryId: entry.id, text: entry.lemma });
-    button.addEventListener("mousedown", (event) => {
-      event.preventDefault();
-      fillSourceSegment(entry, input);
-    });
-    box.append(button);
+  const list = document.createElement("div");
+  list.id = listId;
+  list.className = "source-suggestion-list";
+  list.setAttribute("role", "listbox");
+  list.setAttribute("aria-label", t("sourceEntry"));
+  controller.candidates.forEach((summary, index) => {
+    const option = document.createElement("div");
+    option.id = `${listId}-${index}`;
+    option.className = "source-suggestion";
+    option.dataset.index = String(index);
+    option.setAttribute("role", "option");
+    option.setAttribute("aria-selected", "false");
+    const lemma = document.createElement("span");
+    lemma.className = "source-suggestion-lemma";
+    lemma.textContent = summary.lemma || summary.id;
+    const parts = document.createElement("span");
+    parts.className = "source-suggestion-part";
+    parts.textContent = sourceSummaryParts(summary);
+    const gloss = document.createElement("span");
+    gloss.className = "source-suggestion-gloss";
+    gloss.textContent = sourceSummaryGloss(summary, controller.candidates);
+    option.append(lemma, parts, gloss);
+    list.append(option);
   });
+
+  const status = document.createElement("div");
+  status.className = "source-suggestion-status";
+  if (controller.error) {
+    status.textContent = t("sourceCandidatesFailed");
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "secondary-button";
+    retry.dataset.controlTone = "neutral";
+    retry.textContent = t("sourceCandidatesRetry");
+    retry.addEventListener("click", () => retrySourceCompletion(input));
+    status.append(retry);
+  } else if (controller.loading) {
+    status.textContent = t("sourceCandidatesLoading");
+  } else if (!controller.stale && controller.total > controller.candidates.length) {
+    status.textContent = formatText("sourceCandidatesMore", { total: controller.total });
+  }
+  status.hidden = !status.childNodes.length;
+  box.replaceChildren(list, status);
+  setSourceCompletionActive(input, controller.activeIndex, { scroll: true });
 }
 
-function selectedSourceCandidate(input = elements.sourceEntryInput) {
-  const segment = sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length);
-  const candidates = sourceCompletionCandidates(segment.prefix, activeDictionary(), input);
-  return candidates[sourceSuggestionIndex] || candidates[0] || null;
+// The single current option shared by pointer and keyboard: aria-selected is
+// both its only highlight and what Enter confirms.
+function setSourceCompletionActive(input, index, { scroll = false } = {}) {
+  const controller = sourceCompletionController(input);
+  const open = input.getAttribute("aria-expanded") === "true";
+  controller.activeIndex = open && !controller.stale ? index : -1;
+  let activeOption = null;
+  sourceAutocompleteBoxForInput(input).querySelectorAll('[role="option"]').forEach((option, optionIndex) => {
+    const active = optionIndex === controller.activeIndex;
+    option.setAttribute("aria-selected", String(active));
+    if (active) {
+      activeOption = option;
+    }
+  });
+  if (activeOption) {
+    input.setAttribute("aria-activedescendant", activeOption.id);
+    if (scroll) {
+      activeOption.scrollIntoView({ block: "nearest" });
+    }
+  } else {
+    input.removeAttribute("aria-activedescendant");
+  }
 }
 
-function sourceInputLabel(source) {
-  const entries = activeDictionary()?.entries || [];
-  const text = sourceReferenceModel.sourceReferenceText(source, entries);
-  return source.entryId && entries.filter((entry) => entry.lemma === text).length > 1
-    ? `${text} [${source.entryId}]` : text;
+function confirmSourceCompletion(input, index) {
+  const controller = sourceCompletionController(input);
+  const summary = controller.candidates[index];
+  if (controller.stale || !summary || sourceCompletionRequest(input).key !== controller.requestKey) {
+    return;
+  }
+  fillSourceSegment(summary, input);
+}
+
+const SOURCE_CARD_GLOSS_LENGTH = 12;
+
+function applyEntrySummaryTooltip(element, summary, label) {
+  element.dataset.appTooltip = "always";
+  element.dataset.appTooltipWrap = "true";
+  element.dataset.appTooltipVariant = "rich";
+  element.dataset.appTooltipLabel = label;
+  element.dataset.appTooltipHtml = entrySummaryTooltipHtml(summary);
+}
+
+// Homographs among the sources shown together get "part gloss" detail; they
+// are compared only with each other, never with unselected dictionary entries.
+function summaryHomographDetail(summary, peers) {
+  if (!summary || !peers.length) {
+    return null;
+  }
+  const parts = sourceSummaryParts(summary);
+  const gloss = Array.from(sourceSummaryGloss(summary, [summary, ...peers]));
+  const shortGloss = gloss.length > SOURCE_CARD_GLOSS_LENGTH
+    ? `${gloss.slice(0, SOURCE_CARD_GLOSS_LENGTH).join("")}…`
+    : gloss.join("");
+  return {
+    visible: [parts, shortGloss].filter(Boolean).join(" "),
+    spoken: [parts, gloss.join("")].filter(Boolean).join(" "),
+  };
+}
+
+function sourceCardDetail(source, state) {
+  const peers = state.sources
+    .filter((peer) => peer !== source && peer.text === source.text)
+    .map((peer) => state.summaries.get(peer.entryId))
+    .filter(Boolean);
+  return summaryHomographDetail(state.summaries.get(source.entryId), peers);
+}
+
+// Saved entries reuse the relation DTO already loaded for the detail view.
+function hydrateSourceSummaries(input) {
+  const state = sourceInputReferences.get(input);
+  const ownerEntryId = sourceEditorEntryId(input);
+  if (!state || !ownerEntryId) {
+    return;
+  }
+  const relationState = entryRelationStateForEntry(activeDictionary(), { id: ownerEntryId });
+  if (relationState.status !== "success") {
+    return;
+  }
+  relationState.relation.sources.forEach((relationSource) => {
+    if (relationSource.matchedEntry && !state.summaries.has(relationSource.matchedEntryId)) {
+      state.summaries.set(relationSource.matchedEntryId, relationSource.matchedEntry);
+    }
+  });
+  renderSourceReferenceTokens(input);
 }
 
 function setSourceInputReferences(input, sources) {
-  sourceInputReferences.set(input, { sources: sources.filter((source) => source.entryId).map((source) => ({ ...source })) });
+  sourceInputReferences.set(input, {
+    sources: sources.filter((source) => source.entryId).map((source) => ({ ...source })),
+    summaries: new Map(),
+  });
   input.value = sources.filter((source) => !source.entryId).map((source) => source.text).join("，");
   input.removeAttribute("maxlength");
   input.dataset.sourceReferenceInput = "true";
@@ -12547,6 +12786,8 @@ function setSourceInputReferences(input, sources) {
   input.setAttribute("aria-description", t("sourceReferenceHint"));
   input.placeholder = t("addSource");
   renderSourceReferenceTokens(input);
+  resetSourceCompletion(input);
+  hydrateSourceSummaries(input);
 }
 
 function collectSourceInputReferences(input) {
@@ -12651,15 +12892,29 @@ function renderSourceReferenceTokens(input) {
       event.preventDefault();
       move(index, index + (["ArrowLeft", "ArrowUp"].includes(event.key) ? -1 : 1));
     });
+    const summary = state.summaries.get(source.entryId);
+    const lemma = summary?.lemma || source.text;
+    const detail = sourceCardDetail(source, state);
+    const accessibleName = [lemma, detail?.spoken].filter(Boolean).join(" ");
     const label = document.createElement("span");
     label.className = "source-reference-label";
-    label.textContent = sourceInputLabel(source);
+    label.textContent = lemma;
+    if (detail) {
+      const detailText = document.createElement("span");
+      detailText.className = "source-reference-detail";
+      detailText.textContent = detail.visible;
+      label.append(" ", detailText);
+    }
+    token.setAttribute("aria-label", accessibleName);
+    if (summary) {
+      applyEntrySummaryTooltip(token, summary, accessibleName);
+    }
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "source-reference-remove";
     remove.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m4 4 8 8M12 4l-8 8" /></svg>';
-    remove.dataset.sourceReferenceRemoveLabel = label.textContent;
-    remove.setAttribute("aria-label", `${t("removeSource")}: ${label.textContent}`);
+    remove.dataset.sourceReferenceRemoveLabel = accessibleName;
+    remove.setAttribute("aria-label", `${t("removeSource")}: ${accessibleName}`);
     remove.addEventListener("click", () => {
       state.sources.splice(index, 1);
       renderSourceReferenceTokens(input);
@@ -12672,15 +12927,13 @@ function renderSourceReferenceTokens(input) {
 }
 
 function fillSourceSegment(entry, input = elements.sourceEntryInput) {
-  const state = sourceInputReferences.get(input) || { sources: [] };
+  const state = sourceInputReferences.get(input);
   if (entry.id === sourceEditorEntryId(input)) {
     showToast(t("selfSourceReference"));
-    renderSourceAutocomplete(input);
     return;
   }
   if (state.sources.some((source) => source.entryId === entry.id)) {
     showToast(t("duplicateSourceTarget"));
-    renderSourceAutocomplete(input);
     return;
   }
   const segment = sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length);
@@ -12688,49 +12941,48 @@ function fillSourceSegment(entry, input = elements.sourceEntryInput) {
   const after = input.value.slice(segment.end);
   const reference = { entryId: entry.id, text: entry.lemma || entry.id };
   state.sources.push(reference);
-  sourceInputReferences.set(input, state);
+  state.summaries.set(entry.id, entry);
   input.value = before && after ? before + after.slice(1) : before + after.replace(/^[,，、]/, "");
   renderSourceReferenceTokens(input);
   input.focus();
   input.dispatchEvent(new Event("input", { bubbles: true }));
-  renderSourceAutocomplete(input);
 }
 
 function handleSourceAutocompleteKeydown(event) {
   const input = event.currentTarget;
+  if (event.isComposing || event.keyCode === 229) {
+    return;
+  }
+  const controller = sourceCompletionController(input);
+  const open = input.getAttribute("aria-expanded") === "true";
+  const usable = open && !controller.stale ? controller.candidates : [];
   if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-    const segment = sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length);
-    const candidates = sourceCompletionCandidates(segment.prefix, activeDictionary(), input);
-    if (!candidates.length) {
+    if (!usable.length) {
       return;
     }
     event.preventDefault();
-    sourceSuggestionIndex =
-      event.key === "ArrowDown"
-        ? (sourceSuggestionIndex + 1) % candidates.length
-        : (sourceSuggestionIndex - 1 + candidates.length) % candidates.length;
-    renderSourceAutocomplete(input);
+    const last = usable.length - 1;
+    const next = event.key === "ArrowDown"
+      ? Math.min(last, controller.activeIndex + 1)
+      : controller.activeIndex < 0 ? last : Math.max(0, controller.activeIndex - 1);
+    setSourceCompletionActive(input, next, { scroll: true });
     return;
   }
-
-  if (event.key !== "Tab" && event.key !== "Enter") {
-    return;
-  }
-
-  const segment = sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length);
-  if (!segment.prefix) {
-    return;
-  }
-
-  const candidate = selectedSourceCandidate(input);
-  if (candidate) {
+  if (event.key === "Enter" && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+    // Enter never submits the entry form; it only confirms an explicit choice.
     event.preventDefault();
     event.stopPropagation();
-    fillSourceSegment(candidate, input);
-  } else if (event.key === "Enter") {
+    if (usable[controller.activeIndex]) {
+      confirmSourceCompletion(input, controller.activeIndex);
+    }
+    return;
+  }
+  if (event.key === "Escape" && open) {
     event.preventDefault();
     event.stopPropagation();
-    // Keep unmatched text in the input; Enter must not submit the whole form.
+    controller.dismissedKey = controller.requestKey;
+    controller.activeIndex = -1;
+    renderSourceCompletion(input);
   }
 }
 
@@ -12738,24 +12990,54 @@ function bindSourceAutocompleteInput(input) {
   if (!input) {
     return;
   }
+  const field = input.closest(".source-reference-field");
   // The composite field is not a label: its buttons must never become a
   // label's implicit control. Non-interactive space only focuses the input.
-  input.closest(".source-reference-field")?.addEventListener("click", (event) => {
-    if (event.target.closest("button, input, textarea, select, a, label")) return;
+  field?.addEventListener("click", (event) => {
+    if (event.target.closest("button, input, textarea, select, a, label, [role='option']")) return;
     input.focus();
   });
-  liquidGlassOpticalEngine?.registerMappedSurface(sourceAutocompleteBoxForInput(input));
+  field?.addEventListener("focusout", (event) => {
+    if (field.contains(event.relatedTarget)) return;
+    sourceCompletionController(input).activeIndex = -1;
+    renderSourceCompletion(input);
+  });
+  const box = sourceAutocompleteBoxForInput(input);
+  liquidGlassOpticalEngine?.registerMappedSurface(box);
+  // Only real pointer movement changes the current option, so a list that
+  // opens or re-renders under a resting pointer never preselects anything.
+  box.addEventListener("pointermove", (event) => {
+    const option = event.target.closest('[role="option"]');
+    const moved = `${event.clientX},${event.clientY}` !== lastPointerPosition;
+    if (option && moved && event.pointerType !== "touch") {
+      setSourceCompletionActive(input, Number(option.dataset.index));
+    }
+  });
+  // Keep focus in the input; a click (mouse or touch) confirms like Enter.
+  box.addEventListener("pointerdown", (event) => {
+    if (event.target.closest('[role="option"]')) event.preventDefault();
+  });
+  box.addEventListener("click", (event) => {
+    const option = event.target.closest('[role="option"]');
+    if (option) confirmSourceCompletion(input, Number(option.dataset.index));
+  });
+  input.setAttribute("role", "combobox");
+  input.setAttribute("aria-autocomplete", "list");
+  input.setAttribute("aria-expanded", "false");
   input.addEventListener("keydown", handleSourceAutocompleteKeydown);
-  input.addEventListener("input", () => {
-    sourceSuggestionIndex = 0;
-    renderSourceAutocomplete(input);
+  input.addEventListener("keyup", (event) => {
+    if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) refreshSourceCompletion(input);
   });
-  input.addEventListener("click", () => {
-    sourceSuggestionIndex = 0;
-    renderSourceAutocomplete(input);
+  input.addEventListener("input", () => refreshSourceCompletion(input));
+  input.addEventListener("click", () => refreshSourceCompletion(input));
+  input.addEventListener("focus", () => refreshSourceCompletion(input));
+  input.addEventListener("compositionstart", () => {
+    sourceCompletionController(input).composing = true;
   });
-  input.addEventListener("focus", () => renderSourceAutocomplete(input));
-  input.addEventListener("blur", () => scheduleSourceSuggestionHide(input));
+  input.addEventListener("compositionend", () => {
+    sourceCompletionController(input).composing = false;
+    refreshSourceCompletion(input);
+  });
 }
 
 function sourceSegmentAtCursor(value, cursor) {
@@ -16749,6 +17031,10 @@ document.addEventListener("visibilitychange", () => {
   liquidGlassOpticalEngine?.setEnabled(currentSkin === "liquid-glass");
   syncToastLiquidGlassSurface();
 }));
+// Runs after element handlers, so they can compare against the previous position.
+document.addEventListener("pointermove", (event) => {
+  lastPointerPosition = `${event.clientX},${event.clientY}`;
+});
 document.addEventListener("focusin", (event) => {
   if (skinPickerOpen
     && !elements.skinPickerMenu.contains(event.target)

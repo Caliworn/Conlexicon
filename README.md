@@ -24,6 +24,7 @@ Source-reference editing is still being corrected. Duplicate-target prevention i
 - Per-dictionary SQLite persistence: entries and their structured subobjects, morphology template groups/tables/overrides, corpus data, settings, docs, and IPA rules are stored locally with each dictionary. Legacy JSON remains an explicit import/export and migration format.
 - Lexical entry editing with lemma, pronunciation, tags, multiple definitions, examples, notes, etymology, sources, and derived-entry backlinks.
 - Sources are explicit entry-ID references or unbound text. Selected entries appear as indivisible removable cards in both editors; plain text remains editable. Renaming preserves links; deleting a target preserves its source text without automatically linking to a namesake.
+- Source suggestions come from the server's lemma search, using the same normalization and matching as the entry list. Each suggestion is one line with its part of speech and first meaning (a different meaning when homographs share the first), up to 50 at a time with a total count. Mouse and keyboard share one current suggestion, and nothing is preselected. Homograph cards in the same field show a short part-of-speech and meaning hint instead of an ID. Source links, source cards, derived-entry cards and lexical-network nodes share one entry hover card, whose meanings follow the Entry hover-card polysemy display setting.
 - Explicit part-of-speech tags: only tags listed in the dictionary settings are treated as parts of speech for display and filtering; an empty list means the dictionary does not use parts of speech.
 - Display mode and edit mode: saved entries open in a clean reading view, with full editing and inline section editing available.
 - Responsive application shell with collapsible tool navigation, a collapsible entry list, and mobile drawer controls for navigation, entry browsing, and creating entries.
@@ -53,6 +54,7 @@ Source-reference editing is still being corrected. Duplicate-target prevention i
 - 词典级 SQLite 保存：词条及其结构化子对象、形态模板组/子表/覆盖项、语料库、设置、语言文档和 IPA 规则都会随当前词典保存在本地。旧 JSON 仅作为显式导入、导出和迁移格式保留。
 - 词条编辑：支持词形、发音、标签、多条释义、例句、备注、词源、来源以及反向衍生链接。
 - 来源区分显式词条 ID 引用与未绑定纯文本：已绑定卡片位于输入框上方，只能整项移除；除删除按钮外整张卡片均可拖动，插入线显示目标间隙或边缘。纯文本在输入框内编辑，完整/局部编辑一致。改名不影响绑定，删除目标后保留文本，不会自动关联其他同名词条。旧 JSON 导入时仅精确 ID 或唯一词形匹配自动绑定，歧义保留文本并提示。
+- 来源补全候选由服务端词形搜索提供，与词条列表使用相同的规范化和匹配规则。每个候选单行显示词性与首条释义（同形且首条释义相同时改用第一条不同的释义），每次最多 50 项并提示总数；鼠标与键盘共用同一个当前项，打开时不预选。同一输入框内的同形卡片以简短的“词性 释义”区分，不显示 ID。来源链接、来源卡片、衍生词卡片与词汇网络节点共用同一词条悬浮卡片，释义条数由“词条悬浮卡片的多义项显示”设置控制。
 - 显式词性标签：只有词典设置中列出的标签会被识别为词性，使一个词条可以拥有多个词性并用于显示和筛选；列表留空表示该词典不使用词性。
 - 查看模式与编辑模式：保存后的词条会进入整洁的阅读界面，也支持完整编辑和栏目局部编辑。
 - 响应式应用外壳：支持可收起工具导航、可收起词条列表，以及移动端用于导航、浏览词条和新建词条的抽屉控件。
@@ -82,9 +84,11 @@ Source-reference editing is still being corrected. Duplicate-target prevention i
 
 - `Ctrl`/`Cmd` + `S`: save the active edit form or module when saving is available.
 - `Ctrl`/`Cmd` + `Enter`: create a new entry when focus is not inside an input, textarea, select, or other editable field. If an unsaved edit is active, Conlexicon uses the existing save / discard / cancel confirmation flow before opening the new entry draft.
+- In a source field: `↑`/`↓` move the current suggestion; `Enter` links it, and with no current suggestion keeps the text and never submits the form; `Tab` only moves focus; `Esc` closes the suggestions and keeps the text.
 
 - `Ctrl`/`Cmd` + `S`：在当前表单或模块支持保存时执行保存。
 - `Ctrl`/`Cmd` + `Enter`：当焦点不在输入框、文本框、下拉框或其他可编辑区域内时新建词条；如果当前有未保存编辑，会沿用现有的“保存 / 放弃 / 取消”确认流程，再进入新词条草稿。
+- 来源输入框内：`↑`/`↓` 移动当前候选；`Enter` 绑定当前候选，没有当前候选时保留文本且不提交表单；`Tab` 只移动焦点；`Esc` 关闭候选并保留文本。
 
 ## Run Locally / 本地运行
 

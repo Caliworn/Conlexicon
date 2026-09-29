@@ -85,6 +85,7 @@
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/dictionaries/:id/facets` | 读取活跃标签身份快照、词性和标签统计 | `{ generation, identities, collisionGroups, parts, tags, noPartOfSpeechCount }` | 尊重当前词典的词性标签设置和标签显示替换。前端标签显示消歧和词性筛选选项只消费该 API 的成功结果；加载、失败或后端不可用时不扫描完整词典快照重算。 |
 | `GET` | `/api/dictionaries/:id/entry-relations/:entryId` | 读取词源/衍生/同根关系 | `{ entryId, sources, derivedEntries, rootGroup }` | SQLite 路径复用稳定词根拓扑的反向索引，并按需读取关系 DTO；同名 lemma 暂按排序后的第一条匹配，后续可由诊断模块报告歧义。 |
+| `POST` | `/api/dictionaries/:id/source-candidates/query` | 来源补全候选（只读） | `{ items, total, limit }`，其中 `items` 固定为词条摘要 DTO | 请求体 `{ q, ownerEntryId?, excludeEntryIds?, limit? }`。复用 lemma 搜索 projection、查询规范化和共享 matcher，由 `settings.search.etymologyAutocomplete.fuzzy` 决定是否启用 fuzzy；不使用 cursor，详见[输入、补全与唯一性](#输入补全与唯一性)。 |
 | `GET` | `/api/dictionaries/:id/root-groups` | 读取词根模式分组 | `{ items, pageInfo, searchSummary }` | 支持 `q`、`fields`、`fuzzyFields`、`sort`、`cursor`、`windowOffset`、`limit`。前端词根模式正常路径以该 API 为准，并按窗口加载。 |
 | `GET` | `/api/dictionaries/:id/root-groups/location` | 定位词条所属的父级词根窗口 | `{ items, pageInfo, searchSummary, location }` | 必须传 `entryId`；可传 `preferredRootId` 消除多来源词条的父级歧义，其余参数沿用 `/root-groups` descriptor。 |
 | `GET` | `/api/dictionaries/:id/root-groups/:rootId/entries` | 按需读取单个词根组的全部衍生词 | `{ items }`，其中 `items` 固定为词条摘要 DTO | 支持与词根组查询相同的搜索、排序和字段参数，但不分页；折叠组不预载衍生词，展开后一次读取整组。 |
@@ -116,7 +117,7 @@
 - `fields`：逗号分隔的搜索字段白名单；当前支持 `lemma`、`pronunciation`、`tags`、`definitions`、`examples`、`notes`、`etymology`、`morphology`。为空或全部无效时搜索全部字段。
 - `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；仅对同时出现在 `fields` 中的字段生效。
 - 基础搜索逐个独立字段值匹配：一条释义、一个标签、一个来源或一段备注必须自行包含查询文本，查询不会跨多个值拼接命中；`notes` 中的词条备注、释义备注和每个词条形态组备注也分别作为独立值。多标签组合等条件应使用高级筛选。自由文本按当前词典的 `settings.search.normalization` 处理。SQLite 的严格及 fuzzy 查询均直接读取静态 `entry_search_values` 和按需读取形态 `entry_morphology_search_values`；fuzzy 通过连接级确定性函数复用共享搜索模型的评分语义。该路径支持 NFC、Unicode case folding 和自定义等价规则。结构键和词源关系键不套用该自由文本配置。
-- 词源自动补全目前仍在前端当前词典快照上运行，并由独立的 `settings.search.etymologyAutocomplete.fuzzy` 控制；它复用搜索 normalizer 和原有 JS fuzzy 排序，但尚未接入 `/entries` projection 与普通列表查询路径。
+- 词源自动补全由独立的 `settings.search.etymologyAutocomplete.fuzzy` 控制，候选通过复用 `/entries` projection 的后端端点获取（见[输入、补全与唯一性](#输入补全与唯一性)），不再扫描前端词典快照。
 
 #### `POST /api/dictionaries/:id/entries/filter-facts`
 
@@ -479,10 +480,22 @@ GET /api/dictionaries/:id/facets
 
 ##### 输入、补全与唯一性
 
-后端查询化与消歧展示的待实装方案见 [后端来源自动补全设计](SOURCE_AUTOCOMPLETE_PLAN.md)：候选端点复用 lemma 搜索 projection 与共享 matcher，返回固定上限候选和总数，不使用 cursor。候选项即现有词条 summary DTO，`/entry-relations` 不变。其中专用只读端点和 Enter／Tab 调整尚未实装，不能视为当前接口能力。
+设计见 [后端来源自动补全设计](SOURCE_AUTOCOMPLETE_PLAN.md)。后端候选端点与前端补全 controller（单行候选、旧列表立即失效、输入法处理及下述键盘行为）已实装；来源卡片同样改用词条 summary：已存来源取自 `entry-relations` 的 `matchedEntry`，新选来源取自候选项；同一输入框内有两张以上同形卡片时显示“词性 首条释义”区分信息（首条释义相同则改用第一条不同的释义，再无差异则用发音），悬停或聚焦卡片显示与词汇网络相同的词条摘要浮层（释义条数由“词条悬浮卡片的多义项显示”设置控制），界面不展示 ID，卡片标签不再读取前端快照。浏览态来源链接沿用同一浮层与同形区分规则；浏览态和完整编辑态的衍生词卡片也显示该浮层，完整编辑态卡片可聚焦但不跳转。
+
+`POST /api/dictionaries/:id/source-candidates/query` 只读，不创建词条、不保存草稿、不更新词典时间：
+
+- `q`（必填字符串）：光标所在分隔项的文本，去首尾空白后按词典 `settings.search.normalization` 规范化；为空时返回 `{ items: [], total: 0, limit }`，不枚举词典。
+- `ownerEntryId`（可选字符串）：已存词条自身，候选中排除；不存在时返回 404 `entry_not_found`。新建草稿传空串或省略。
+- `excludeEntryIds`（可选字符串数组）：当前草稿已选卡片的目标 ID，按精确 ID 排除；不存在的 ID 忽略。
+- `limit`（可选整数，1–50，默认 50）。超出上限的匹配只计入 `total`，由前端提示继续输入，不提供分页。
+- 匹配只读取 `entry_search_values` 中 `field = 'lemma'` 的记录：`etymologyAutocomplete.fuzzy` 开启时与 `/entries` 的 lemma fuzzy 查询使用同一 `conlexicon_fuzzy_match`，关闭时与 lemma 严格查询同为“包含”匹配。命中集合与只启用 lemma 字段的 `/entries` 相同。
+- 排序由共享 `rankLemmaCandidates()` 完成：完全相等、前缀（长度差小者优先）、包含（位置靠前、长度差小者优先）、其余 fuzzy（分数降序），同层按原始词形与精确 ID 稳定排序。`items` 顺序即排序结果。
+- `items` 为词条摘要 DTO（与 `/entries` 列表项及 `entry-relations` 的 `matchedEntry` 同构），不附加字段；`total` 为排除后的全部匹配数，同形不同 ID 分别计数。
+- 请求体不是对象、字段类型错误或 `limit` 越界返回 400 `invalid_source_candidate_query`；词典不存在返回 404 `dictionary_not_found`；请求体超限沿用 413 `request_body_too_large`。
 
 - 点击来源标题、卡片之间或输入区域空白，只能聚焦输入，不得删除、重排或转换来源。删除仅由明确的删除操作触发；不得把删除按钮隐式关联为整个区域的 label 控件。
 - 从补全中选定词条时，只消费光标所在的对应文本项，将该目标引用追加到卡片组末尾，其他文本项及已有卡片顺序不变。只输入词形或失焦不等于确认绑定。
+- 候选列表打开时不预选任何项，且只有一个当前项：真实的指针移动与方向键更新同一当前项（列表在静止指针下打开不预选，方向键从悬停项继续），它也是唯一的高亮。方向键到两端停止不循环；Enter 只确认明确选中且所在列表未过期的候选，没有选中项时保留纯文本，且在来源输入框内始终不提交整个表单；Tab 只移动焦点，不绑定候选；Esc 关闭列表但保留文本和词条草稿。输入内容、光标所在文本项或已选卡片变化后，旧列表立即失效，新结果到达前不能确认其中的项；输入法组字期间不查询、不拦截确认键。
 - 同一词条的来源列表内，同一非空目标 `entryId` 最多出现一次；不同 ID 的同形词条可以同时存在。候选应排除或禁用已选目标，添加操作和保存层均须再次校验，不能只依赖界面过滤。
 - 重复目标的运行期保存返回 HTTP 400 `duplicate_source_target` 并保持原数据。JSON 导入在旧字符串转换后按目标 ID 保留首次出现的位置，在 `report.repairs` 记录移除的重复引用；结构化 JSON 同样适用。不同 ID 的同形词条与纯文本不合并。此前已存储的重复引用允许读取、展示并手动移除，但在重复消除前不能重新保存；读取不静默写库清理。
 - 本轮不新增纯文本去重规则，也不把相同文本与引用视为同一身份；未绑定文本不能凭词形自动转成引用。
