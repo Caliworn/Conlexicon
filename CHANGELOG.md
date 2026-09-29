@@ -21,6 +21,11 @@
 
 - 30k 词条下来源候选查询中位数约 50ms（3 个字符以上），单字母约 86ms，均低于 100ms 输入防抖；候选排序改用共享 `Intl.Collator`，消除大量同分候选时逐次解析区域设置的开销。
 
+### 文档
+
+- 精简 `NEXT_IMPLEMENTATION_HANDOFF.md`：只保留接手入口、当前状态、进行中与待验收事项、待视觉审查、已知技术债和路线图。阶段 A 设计迁至 `docs/APP_SHELL_SPEC.md`，阶段 A+、C、D 计划分别迁至 `docs/TOUCH_FOCUS_A11Y_PLAN.md`、`docs/EXAMPLE_CORPUS_LINK_PLAN.md` 和 `docs/CORPUS_WORKSPACE_PLAN.md`（原文照录）；其余原内容含阶段 B 实施流水原样归档至 `docs/archive/HANDOFF_HISTORY.md` 并标注为非现行规范，拆分后逐行核对无遗漏。
+- `AGENTS.md` 移除已不再使用的 FastCtx 与特定工具命令约定，改为与工具无关的文件、Shell 规则；明确提交不添加 AI 署名、默认在当前分支提交、测试端口仅复用确认使用临时数据与当前代码的实例、无法完成的 UI 检查须逐项列出，并规定交接文档不累积实施流水。
+
 ## 2026-09-29
 
 ### 文档
