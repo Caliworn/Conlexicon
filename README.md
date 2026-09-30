@@ -1,220 +1,135 @@
 # Conlexicon / 构典
 
-Conlexicon is a local-first web dictionary and editor for constructed languages. It manages multiple dictionaries, supports rich lexical entries, and stores each active dictionary in its own SQLite file.
+Conlexicon is a local-first web dictionary and editor for constructed languages. It manages multiple dictionaries, supports rich lexical entries, and stores each dictionary in its own SQLite file.
 
-Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。它支持多词典管理、复杂词条编辑，并将每个正在使用的词典分别保存为独立的 SQLite 文件。
+Conlexicon 是一个面向人造语言的本地优先网页词典与编辑器。它支持多词典管理和复杂词条编辑，并将每个词典分别保存为独立的 SQLite 文件。
 
-See [docs/README.md](docs/README.md) for architecture, API, migration, and feature-design documentation.
+See [docs/README.md](docs/README.md) for architecture, API, migration, and feature-design documentation, and [CHANGELOG.md](CHANGELOG.md) for detailed changes.
 
-架构、API、迁移和专题设计文档见 [docs/README.md](docs/README.md)。
-
-Full-entry editing provides Cancel and Save. Use New Entry for a blank draft through the existing unsaved-edit handling; there is no direct Clear action that silently discards the current draft.
-
-完整词条编辑保留取消与保存；需要空白草稿时使用“新建词条”，通过既有未保存编辑流程处理当前内容，不再提供直接丢弃草稿的“清空”入口。
-
-Source-reference editing is still being corrected. Duplicate-target prevention is implemented in autocomplete, insertion, and saves; JSON import retains the first reference and reports duplicates removed. Creating an unbound source now creates and links it atomically, while new derived entries prefill an exact source-ID reference. Conflicts leave both sides unchanged. The agreed interaction contract and acceptance cases are recorded in [the API contract](docs/API_CONTRACT.md#词源与词根关系). Reference cards support dragging and Alt+arrow-key sorting; plain text stays in the input. Display, saves, and exports place references before plain text.
-
-来源引用编辑仍在修正中，已确定的交互规则和验收场景见 [来源契约](docs/API_CONTRACT.md#词源与词根关系)。已在补全、添加和保存层禁止重复引用同一目标 ID，JSON 导入保留首次引用并报告修复；同名不同 ID 和纯文本不合并。从纯文本创建来源时，创建和回填关联原子完成，冲突不留下半成品；新建衍生词预填精确来源 ID 并自动获得反向链接。来源卡片支持拖动及 Alt+方向键排序，纯文本始终留在输入框内；浏览、保存和导出统一为引用在前、纯文本在后。
+架构、API、迁移和专题设计文档见 [docs/README.md](docs/README.md)；详细变更见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## Features / 功能
 
-- Source references cannot target the entry itself; both saves and JSON imports reject self-references. Distinct entries with the same lemma remain valid sources.
-- 来源引用不能指向词条自身，保存及 JSON 导入均会拒绝自引用；同形但不同 ID 的词条仍可作为来源。
-- Multi-dictionary management: create, switch, import, export, configure, and delete dictionaries, with explicit confirmation before an imported dictionary ID overwrites an existing dictionary.
-- Per-dictionary SQLite persistence: entries and their structured subobjects, morphology template groups/tables/overrides, corpus data, settings, docs, and IPA rules are stored locally with each dictionary. Legacy JSON remains an explicit import/export and migration format.
-- Lexical entry editing with lemma, pronunciation, tags, multiple definitions, examples, notes, etymology, sources, and derived-entry backlinks.
-- Sources are explicit entry-ID references or unbound text. Selected entries appear as indivisible removable cards in both editors; plain text remains editable. Renaming preserves links; deleting a target preserves its source text without automatically linking to a namesake.
-- Source suggestions come from the server's lemma search, using the same normalization and matching as the entry list. Each suggestion is one line with its part of speech and first meaning (a different meaning when homographs share the first), up to 50 at a time with a total count. Mouse and keyboard share one current suggestion, and nothing is preselected. Homograph cards in the same field show a short part-of-speech and meaning hint instead of an ID. Source links, source cards, derived-entry cards and lexical-network nodes share one entry hover card, whose meanings follow the Entry hover-card polysemy display setting.
-- Explicit part-of-speech tags: only tags listed in the dictionary settings are treated as parts of speech for display and filtering; an empty list means the dictionary does not use parts of speech.
-- Display mode and edit mode: saved entries open in a clean reading view, with full editing and inline section editing available.
-- Responsive application shell with collapsible tool navigation, a collapsible entry list, and mobile drawer controls for navigation, entry browsing, and creating entries. New entries start from the entry-list toolbar's + button; while the list is collapsed on desktop, a + button appears beside the list toggle. Other pages return to the editor through the navigation instead of a separate back button.
-- Unified entry filtering: the list toolbar edits part-of-speech conditions, while analytics and quality checks replace the same current filter with structural or result-set conditions. Part-of-speech uses the standard EntryFilter query path, and coverage, IPA, morphology, and quality filters share one status bar with reversible variants where applicable. IPA auto-check and distribution filters use rebuildable server result sessions and retain the normal list search, sort, window, and location behavior. The runtime search-field panel shows exact unique matching-entry counts for each enabled field without issuing a separate statistics request.
-- Root mode entry browsing: derived entries can be nested under their roots, with expand/collapse controls and quick derived-entry creation.
-- Layered SVG lexical network for source and derived relationships, with keyed node refocusing, animated edges, hover details, and responsive horizontal/vertical layouts.
-- Auto IPA rules with mapping, syllabification, onset/coda clusters, complex phonemes, stress settings, sandbox testing, and batch generation.
-- Auto morphology with template groups, multiple subtables per group, automatic or manual per-entry group selection, rule syntax, function objects, overrides, generated forms, and searchable morphology output.
-- Markdown language documentation with split edit/preview, edit-only, and preview-only modes.
-- Per-dictionary corpus management with ordered blocks, speaker/modality layers, standalone units, inherited attributes, unique entity ID validation, single-parent link validation, and configurable gloss-based unit names with optional render objects.
-- Tabbed data analysis with a four-card, on-demand SQLite overview for lexicon size, data coverage, part-of-speech distribution, and editing activity; the Lexicon tag page asynchronously loads complete part-of-speech and non-part tag rankings, while root-family details reuse the stable topology used by root mode. IPA auto-generation checks reuse one cached outcome summary across match variants, while IPA unit, initial/final, and syllable distributions asynchronously share a separate cached summary.
-- Gloss rendering for `\gla`, `\glb`, `\glc`, and `\ft`, with independent render-object and alignment settings for corpus unit cards, unit content headings, and entry examples, plus per-object font, size, bold, italic, and `\glb` small-caps styles.
-- Per-dictionary UI/settings options, including explicitly configured part-of-speech tags, a shared tag-list separator style, per-field search/fuzzy controls, optional NFC and Unicode case folding, custom search equivalence rules, etymology autocomplete matching, label display replacement, highlighted tags, gloss rendering, polysemy display, save/discard/prompt handling for edits during navigation, corpus/docs auto-save, IPA keyboard symbols, and left navigation order.
-- SQLite-backed per-value search projections for static entry fields and generated morphology, with configurable strict/fuzzy matching and localized hit summaries. Large entry and root-mode results use versioned query windows while retaining one continuous native scrollbar.
-- Classic, Layered Glass, and Liquid Glass skins selected from an extensible skin menu, dark mode, and Chinese/English UI switching, with the global interface skin, theme, and language remembered in `data/index.json`. Layered Glass treats the mutually exclusive entry display and primary entry form as one focused workspace shell while keeping form fields and toasts stable and solid. Liquid Glass uses geometry-generated, size-aware RGB refraction and static environment normal/rim specular for navigation, floating surfaces including visible toasts, modals, and the lexical network. Its tool navigation is one inset floating optical card above the full-width canvas: destinations remain flat rows, the active destination uses a non-optical capsule, and utility commands use a separator rather than another nested card. Expanded, rail, mobile app-bar, and drawer forms expose and refract all four rounded edges. Ready Q3 surfaces use a single dynamic optical filter that applies role-aware blur before refraction over a neutral tint; Q1 now uses the same per-role tint, blur, saturation, border, and shadow parameters while omitting displacement, RGB dispersion, and specular. Each skin owns the role-based UI radii that define its visible outlines, while exact outline metrics and one continuous four-edge optical field prevent diagonal map partitions without narrowing straight-edge optics. Micro controls keep lightweight CSS volume, while pending, resizing, too-small, or unsupported optics use Q1 and accessibility modes use solid materials.
+- **Dictionaries**: create, switch, import, export, configure, and delete dictionaries. Importing a dictionary whose ID already exists asks before overwriting.
+- **Storage**: each dictionary's entries, morphology templates, corpus, documentation, IPA rules, and settings live in its own SQLite file. Legacy JSON is only an explicit import, export, and migration format.
+- **Entries**: lemma, pronunciation, tags, multiple definitions, examples, notes, etymology, sources, and derived-entry backlinks. Saved entries open in a reading view, with full editing and inline section editing. Full editing offers Cancel and Save; start a blank draft with New Entry.
+- **Parts of speech**: only tags listed in the dictionary settings count as parts of speech, so an entry can have several; an empty list means the dictionary does not use them.
+- **Sources**: a source is either a reference to an entry or plain text. References appear as removable cards that can be reordered by dragging or with Alt+arrow keys, while plain text stays editable in the input. Renaming a target keeps the link; deleting it keeps the text without relinking to a namesake. An entry cannot cite itself or the same target twice. Unbound text can be turned into a new entry and linked in one step, and a new derived entry starts with its source already linked.
+- **Source suggestions**: suggestions come from the server's lemma search with the same matching rules as the entry list, one line each with part of speech and a short meaning, up to 50 at a time. Homographs are told apart by part of speech and meaning, never by ID. Source links, source cards, derived-entry cards, and lexical-network nodes share one entry hover card.
+- **Browsing and filtering**: large lists and root mode load in windows behind one continuous scrollbar. Search supports per-field strict or fuzzy matching, optional NFC and case folding, and custom equivalence rules. Part-of-speech, analysis, and quality-check filters share one filter bar and keep the current search, sort, and position.
+- **Root mode**: derived entries are grouped under their roots, with per-group and global expand/collapse and quick derived-entry creation.
+- **Lexical network**: a layered SVG view of sources and derived entries, with animated refocusing, hover details, keyboard support, and a vertical layout on narrow screens.
+- **Auto IPA**: mapping, syllabification, onset/coda clusters, complex phonemes, stress settings, a sandbox, and batch generation.
+- **Auto morphology**: template groups with multiple tables, automatic or manual group selection per entry, rule syntax, function objects, overrides, and searchable generated forms.
+- **Language documentation**: Markdown with split, edit-only, and preview-only modes.
+- **Corpus**: ordered blocks, speaker/modality layers, standalone units, inherited attributes, ID and parent-link validation, and gloss-based unit names.
+- **Gloss rendering**: `\gla`, `\glb`, `\glc`, and `\ft`, with separate settings for corpus unit cards, unit headings, and entry examples, plus per-line font, size, bold, italic, and `\glb` small caps.
+- **Data analysis**: an on-demand overview of lexicon size, coverage, parts of speech, and editing activity, plus tag and tag-set rankings, root families, orthography, IPA checks and distributions, and morphology statistics. Most figures open the matching entries. Quality checks have their own page, grouped by priority and module.
+- **Settings**: per-dictionary options for parts of speech, tag separators and display replacements, search defaults, gloss rendering, polysemy display, how unsaved edits are handled when navigating, auto-save, IPA keyboard symbols, and navigation order.
+- **Appearance**: Classic, Layered Glass, and Liquid Glass skins, light and dark themes, and Chinese or English UI; the global skin, theme, and language are remembered in `data/index.json`. Liquid Glass is still being tuned and falls back to plain materials when its optics are unavailable or accessibility modes are on.
+- **Layout**: a responsive shell with collapsible navigation and entry list, and mobile drawers. New entries start from the entry-list toolbar's + button (also shown beside the list toggle when the list is collapsed); other pages return to the editor through the navigation.
 
-- Liquid Glass uses a Mail-style entry workspace: a compact summary list beside a wider detail view, with a full-width glass search field above a content-sized glass tool capsule bounded by the list width. Search settings live in the capsule; one sort icon reflects the current order and opens six labelled choices with keyboard navigation. Root expand/collapse actions follow the root-mode button, with New last. Classic and Layered Glass retain their existing layouts. Separate optical leaves keep popup sampling independent; unavailable optics use matching Q1 material, and accessibility modes use solid material.
-- The right-hand entry detail and full editor shells use Q1 permanently: the existing tint, border and shadow with 4px CSS blur and 1.09× saturation, without Q3 registration or optical maps. Other optical surfaces retain Q3.
-- Experimental: derived-entry cards in both the detail view and full editor use compact Q3 optics (8px bezel, 4px maximum displacement, 1px blur), sharing the existing geometry cache. Full-editor cards remain non-interactive; source links and list cards are unchanged.
-- Analysis main/subpage tabs and quality-category buttons join the compact Q3 experiment with the same optical parameters and shared cache; wrapping, counts and disabled behavior remain unchanged.
-- Compact Q3 also covers entry detail actions and the entry-list toggle. Document/corpus mode controls each use one optical shell, retaining their selected states; source references remain unchanged.
-- Compact Q3 buttons/labels are selected by supported semantic recipes, not individual action IDs or legacy primary/danger classes. Neutral and accent/danger outline, tinted and solid controls join automatically, including dynamic consumers and the current-dictionary status. Intended Q3 ancestors (including Mail shells) exclude nested optics regardless of pending/fallback state; Q1 detail shells allow them. Nested controls retain semantic paint without a second optical surface. Global Q1/Q0 fallback still applies.
-- Root and morphology-table disclosure controls share a 30px rounded button, SVG arrow and keyboard focus treatment. Liquid Glass uses compact Q3 with lifecycle handling for virtual-list recycling and table removal; other skins use their neutral material tokens. Disclosures, list/navigation toggles and the skin-menu trigger now share expanded-state paint. Navigation commands retain skin-specific materials; theme and root mode use stable setting labels and pressed semantics in every layout. Root mode uses selected paint; theme uses the sun/moon icon without a persistent selected fill. Language switching remains a command.
-- Controls use neutral (tone alone), or accent/danger with outline, tinted or solid emphasis. The shared resolver handles default, hover, pressed and disabled paint. Liquid Glass tinted uses a light colored glass fill; solid uses a dense colored fill with contrasting text, sharing unchanged compact optics and geometry caches. Current-dictionary status preserves its colored identity without hover/pressed feedback. Document/corpus segments reuse solid selection paint within their single optical shell; other selected controls retain their recipes. Colors and interaction states do not enter geometry cache keys. Visual and accessibility acceptance remains pending.
-
-- 多词典管理：新建、切换、导入、导出、配置和删除词典；导入相同词典 ID 的词典前会明确确认是否覆盖。
-- 词典级 SQLite 保存：词条及其结构化子对象、形态模板组/子表/覆盖项、语料库、设置、语言文档和 IPA 规则都会随当前词典保存在本地。旧 JSON 仅作为显式导入、导出和迁移格式保留。
-- 词条编辑：支持词形、发音、标签、多条释义、例句、备注、词源、来源以及反向衍生链接。
-- 来源区分显式词条 ID 引用与未绑定纯文本：已绑定卡片位于输入框上方，只能整项移除；除删除按钮外整张卡片均可拖动，插入线显示目标间隙或边缘。纯文本在输入框内编辑，完整/局部编辑一致。改名不影响绑定，删除目标后保留文本，不会自动关联其他同名词条。旧 JSON 导入时仅精确 ID 或唯一词形匹配自动绑定，歧义保留文本并提示。
-- 来源补全候选由服务端词形搜索提供，与词条列表使用相同的规范化和匹配规则。每个候选单行显示词性与首条释义（同形且首条释义相同时改用第一条不同的释义），每次最多 50 项并提示总数；鼠标与键盘共用同一个当前项，打开时不预选。同一输入框内的同形卡片以简短的“词性 释义”区分，不显示 ID。来源链接、来源卡片、衍生词卡片与词汇网络节点共用同一词条悬浮卡片，释义条数由“词条悬浮卡片的多义项显示”设置控制。
-- 显式词性标签：只有词典设置中列出的标签会被识别为词性，使一个词条可以拥有多个词性并用于显示和筛选；列表留空表示该词典不使用词性。
-- 查看模式与编辑模式：保存后的词条会进入整洁的阅读界面，也支持完整编辑和栏目局部编辑。
-- 响应式应用外壳：支持可收起工具导航、可收起词条列表，以及移动端用于导航、浏览词条和新建词条的抽屉控件。新建词条从词条列表工具栏的“+”开始；桌面端收起词条列表时，列表开关旁会出现“+”。其他页面通过导航返回词条编辑，不再单独设置返回按钮。
-- 统一词条筛选：列表控制栏通过同一个“筛选”入口选择词性，数据分析与质量检查产生的条件或结果集也使用同一当前筛选状态栏；清除或替换筛选不会恢复旧搜索、排序或视图快照。标签、字段有无、来源数量和日期等稳定条件可继续叠加自由文本搜索，并复用普通词条列表的窗口加载与定位。IPA 自动检查以及音位、首尾音、音节数分布使用可重建的服务端结果会话，同样保留列表搜索、排序、窗口与定位行为。循环条件按候选摘要自动更新，不会因当前搜索暂时无命中而错误隐藏；列表的运行期搜索字段面板会显示每个已启用字段的准确唯一命中词条数，不另发统计请求。
-- 词根模式浏览：衍生词可以嵌套显示在词根下方，支持单组展开/收起、全局展开、全局模式下的单组收起例外，以及快速创建衍生词；父级窗口淘汰只释放数据，不丢失展开意图。
-- 词汇网络：以分层 SVG 展示来源、当前焦点与衍生关系；关联节点会在切换焦点时连续移动并更新连线，同时支持悬浮信息、键盘操作和窄屏纵向布局。
-- 自动 IPA：支持映射、音节划分、音节首/尾辅音簇、复杂音位、重音设置、沙盒测试和批量生成。
-- 自动形态学：支持模板组及组内多个形态表格、词条级自动匹配或手动选择形态组、规则语法、函数识别对象、词条覆盖项、生成形式和搜索生成结果。
-- Markdown 语言文档：支持左右分栏编辑预览、纯编辑和纯查看模式。
-- 词典级语料库：支持有序语料块、发言人/模态语料层、独立语料单元、属性继承、实体 ID 唯一性检查、单父级链接检查，以及带可选渲染对象的 Gloss 单元名渲染。
-- 分标签页数据分析：总览按需异步读取 SQLite 轻量 widget，以四张卡片展示词汇规模、资料覆盖、词性分布和编辑活动；“词汇 > 标签”异步读取完整词性分布、明确排除词性标签的其他标签分布，以及按非空完整原始标签集合聚合的标签集合分布。单标签集合表示词条仅有该标签，点击任一集合都会精确筛选同一标签集合，不包含带额外标签的词条；无标签词条不作为空集合混入排行。词根家族详情打开后按需读取并复用词根模式的稳定拓扑。IPA 自动生成检查按需异步加载，并由一份互斥 outcome 摘要提供一致、宽松不一致和严格不一致三类视图；IPA 音位、首尾音和音节数分布共享另一份按需 summary，音位频率会同时显示出现次数与贡献词条数。正写法字符和双字符频率采用相同的双单位显示。形态分析异步展示模板组分配、自动/手动模式及活跃/休眠覆写，统计项可直接进入词条结果窗口。质量检查拥有独立页面，支持按优先度和检查模块查看问题。
-- Gloss 渲染：语料单元卡片、单元内容名称和词条例句可分别配置渲染对象与对齐，并支持 `\gla`、`\glb`、`\glc`、`\ft` 独立配置字体、字号、粗体和斜体，以及 `\glb` small caps。
-- 词典级界面设置：包括显式词性标签、统一的标签列表分隔符、新会话默认使用的逐字段搜索/模糊匹配、可选 NFC 与 Unicode 大小写折叠、自定义搜索等价规则、词源自动补全、标签显示替换、红色高亮标签、gloss 渲染、多义项显示、导航时保存/放弃/提示编辑、语料库/文档自动保存、IPA 虚拟键盘符号和左侧导航栏排序。词条列表搜索框旁可在不改写默认值的情况下，按当前运行期临时调整搜索字段和每个字段的 fuzzy 状态。
-- SQLite 逐值搜索投射：静态词条字段和自动生成形态均支持可配置的严格/模糊搜索及本地化命中摘要；词根模式和词汇网络复用仅在关系变化时失效、带双向定位索引的稳定拓扑。大型词条列表与词根模式结果通过版本化查询窗口加载，同时保持一条连续的原生滚动条。切换查询或词条详情时会先保留当前内容，旧详情会立即停止响应交互；读取超过 200ms 后再以统一遮罩标明正在更新，避免快速本地读取产生闪烁。
-- 通过可扩展皮肤菜单选择经典、层叠玻璃或液态玻璃皮肤，并支持暗黑模式和中英界面切换；全局界面皮肤、主题和语言会记忆在 `data/index.json` 中。层叠玻璃将互斥显示的词条查看态与主编辑表单作为同一个聚焦工作区外壳，同时让表单字段和 toast 保持稳定实色。液态玻璃为导航、包含可见 toast 的浮层、modal 与词汇网络生成按实际尺寸适配的 RGB 几何折射，并以静态环境光合成法线/rim 镜面；工具导航是一张悬浮在全宽画布上的内嵌连续光学卡片，内部使用平面目的地行、非光学 active 胶囊和分隔线工具组，不再堆叠装饰性玻璃卡片。展开、窄栏、移动顶栏和抽屉形态均暴露并折射四条圆角边。Q3 就绪表面使用单一动态光学 filter，在折射前按角色模糊背景采样并叠加中性 tint；Q1 现在沿用同角色 Q3 的 tint、模糊、饱和度、边框和阴影参数，只省略位移、RGB 色散与镜面。每套皮肤分别拥有定义可见轮廓的角色化 UI 圆角；精确轮廓距离与连续四边光学场共同避免贴图斜向分区，同时不压窄直边折射。微型控件保留轻量 CSS 体积；光学等待、尺寸变化、表面过小或能力不可用时进入 Q1，辅助模式使用实色材质。
-
-- 仅液态玻璃采用 Mail 式词条工作区：较窄的摘要列表与更宽的详情区，上方搜索框撑满列表，下方玻璃工具胶囊按内容宽度伸缩且不超过列表。搜索设置在胶囊内；排序按钮按当前顺序显示六种图标状态，菜单保留六项文字和键盘选择。词根展开/收起紧邻词根模式按钮，新建始终排在末尾。经典与层叠玻璃保持原布局；独立滤镜叶节点不改变弹层采样关系，光学不可用时使用匹配的 Q1，辅助模式使用实色。
-- 液态玻璃的右侧词条详情与完整编辑外壳固定使用 Q1：保留原 tint、边框和阴影，采用 `4px` CSS blur 与 `1.09×` 饱和度，不注册 Q3 或生成光学贴图；其他光学表面保留 Q3。
-- 实验：查看态详情与完整编辑态的衍生卡片均使用紧凑 Q3（8px bezel、4px 最大位移、1px 模糊），复用已有几何缓存；完整编辑态卡片仍为只读，不新增跳转行为。来源链接和词条列表不变。
-- 数据分析主／子页签和质量检查分类按钮也纳入同参数的紧凑 Q3 实验，复用全局缓存；保留换行、计数和禁用行为。页签支持左右键、Home/End 移焦及 Enter/Space 手动激活；文档／语料分段选择支持方向键切换。它们与 B/I/SC 共用选中、选中悬浮、选中按下及选中禁用配方，不增加折射表面。
-- 紧凑 Q3 同时覆盖详情操作和词条列表开关；文档／语料模式控件各使用一个光学外壳，保留选中状态。来源引用不变。
-- 紧凑 Q3 按共享组件类统一选择，不再逐操作登记 ID：次级按钮、信息、内容折叠、语料图标和文字样式控件自动接入，覆盖动态新增控件。按父表面的 Q3 定义排除嵌套折射（包括 Mail 外壳），不随 pending/fallback 状态改变；Q1 详情外壳允许内部接入。主操作、危险及 additive 控件保持专属设计；被排除的普通控件使用无渐变的中性 CSS 材质，全局 Q1/Q0 降级仍然有效。
-- 词根与形态表的内容级折叠按钮统一为 30px 圆角按钮、SVG 箭头和键盘焦点反馈；液态皮肤使用紧凑 Q3，处理虚拟列表回收和表格删除时的表面生命周期，其他皮肤使用各自的中性材质 token。
-- 控件可显式使用三套皮肤通用的 tone（中性／强调／危险）与 emphasis（无底／描边／弱有色底／实色）接口，由各皮肤已有颜色提供配色；删除／移除、描边添加及现有实色主操作／危险操作已迁移，覆盖动态编辑器和复用确认弹窗。不改变光学注册，Q3 边框及状态色覆盖问题仍待单独处理。
+- **词典**：新建、切换、导入、导出、配置和删除词典；导入与现有词典 ID 相同的词典前会确认是否覆盖。
+- **存储**：每个词典的词条、形态模板、语料库、语言文档、IPA 规则和设置都保存在各自的 SQLite 文件中；旧 JSON 只作为显式导入、导出和迁移格式。
+- **词条**：词形、发音、标签、多条释义、例句、备注、词源、来源和反向衍生链接。保存后的词条进入阅读视图，可完整编辑或按栏目局部编辑；完整编辑提供取消与保存，需要空白草稿时使用“新建词条”。
+- **词性**：只有词典设置中列出的标签才算词性，因此一个词条可以有多个词性；列表留空表示该词典不使用词性。
+- **来源**：来源分为词条引用和纯文本。引用显示为可移除的卡片，可拖动或用 Alt+方向键排序；纯文本留在输入框内编辑。目标改名时链接不变，目标删除后保留文本，不会自动关联同名词条。词条不能引用自身，也不能重复引用同一目标。未绑定的文本可一步创建为新词条并完成链接，新建衍生词时来源已预先链接。
+- **来源补全**：候选来自服务端词形搜索，与词条列表使用相同的匹配规则；每项单行显示词性和简短释义，每次最多 50 项。同形词以词性和释义区分，不显示 ID。来源链接、来源卡片、衍生词卡片和词汇网络节点共用同一词条悬浮卡片。
+- **浏览与筛选**：大型列表和词根模式分窗加载，保持一条连续滚动条。搜索支持逐字段严格或模糊匹配、可选 NFC 与大小写折叠，以及自定义等价规则。词性、数据分析和质量检查产生的筛选共用一个筛选栏，并保留当前搜索、排序和位置。
+- **词根模式**：衍生词按词根分组显示，支持单组和全局展开／收起，以及快速新建衍生词。
+- **词汇网络**：以分层 SVG 展示来源与衍生关系，切换焦点时连续过渡，支持悬浮详情、键盘操作和窄屏纵向布局。
+- **自动 IPA**：映射、音节划分、音节首／尾辅音簇、复杂音位、重音设置、沙盒测试和批量生成。
+- **自动形态学**：模板组及组内多个表格、词条级自动或手动选择形态组、规则语法、函数识别对象、覆盖项，以及可搜索的生成形式。
+- **语言文档**：Markdown，支持分栏、纯编辑和纯预览模式。
+- **语料库**：有序语料块、发言人／模态语料层、独立语料单元、属性继承、ID 与父级链接校验，以及基于 Gloss 的单元名。
+- **Gloss 渲染**：支持 `\gla`、`\glb`、`\glc`、`\ft`；语料单元卡片、单元标题和词条例句分别设置，并可逐行配置字体、字号、粗体、斜体以及 `\glb` small caps。
+- **数据分析**：按需加载的总览（词汇规模、资料覆盖、词性分布、编辑活动），以及标签与标签集合排行、词根家族、正写法、IPA 检查与分布、形态统计；多数统计项可直接打开对应词条。质量检查有独立页面，按优先度和检查模块分组。
+- **设置**：词典级的词性、标签分隔符与显示替换、默认搜索方式、Gloss 渲染、多义项显示、导航时未保存编辑的处理方式、自动保存、IPA 键盘符号和导航排序。
+- **外观**：经典、层叠玻璃和液态玻璃三套皮肤，浅色与深色主题，中英文界面；全局皮肤、主题和语言记忆在 `data/index.json` 中。液态玻璃仍在调校中，光学效果不可用或开启辅助模式时会退回普通材质。
+- **布局**：响应式外壳，导航和词条列表均可收起，移动端使用抽屉。新建词条从词条列表工具栏的“+”开始（列表收起时列表开关旁也会显示“+”）；其他页面通过导航返回词条编辑。
 
 ## Keyboard Shortcuts / 快捷键
 
 - `Ctrl`/`Cmd` + `S`: save the active edit form or module when saving is available.
-- `Ctrl`/`Cmd` + `Enter`: create a new entry when focus is not inside an input, textarea, select, or other editable field. If an unsaved edit is active, Conlexicon uses the existing save / discard / cancel confirmation flow before opening the new entry draft.
+- `Ctrl`/`Cmd` + `Enter`: create a new entry when focus is not in an editable field. Unsaved edits go through the usual save / discard / cancel prompt first.
 - In a source field: `↑`/`↓` move the current suggestion; `Enter` links it, and with no current suggestion keeps the text and never submits the form; `Tab` only moves focus; `Esc` closes the suggestions and keeps the text.
 
 - `Ctrl`/`Cmd` + `S`：在当前表单或模块支持保存时执行保存。
-- `Ctrl`/`Cmd` + `Enter`：当焦点不在输入框、文本框、下拉框或其他可编辑区域内时新建词条；如果当前有未保存编辑，会沿用现有的“保存 / 放弃 / 取消”确认流程，再进入新词条草稿。
+- `Ctrl`/`Cmd` + `Enter`：焦点不在可编辑区域时新建词条；有未保存编辑时先走“保存 / 放弃 / 取消”确认。
 - 来源输入框内：`↑`/`↓` 移动当前候选；`Enter` 绑定当前候选，没有当前候选时保留文本且不提交表单；`Tab` 只移动焦点；`Esc` 关闭候选并保留文本。
 
 ## Run Locally / 本地运行
 
-Conlexicon currently uses a small Node.js backend with no external npm dependencies. SQLite is the runtime storage backend.
+Conlexicon uses a small Node.js backend with no npm dependencies. SQLite is the runtime storage.
 
-Conlexicon 目前使用一个小型 Node.js 后端，不需要安装额外 npm 依赖。运行时存储后端为 SQLite。
-
-Development schema changes do not run SQL migrations or bump schema versions. For the source-reference schema, export JSON with the old application first, keep a backup, then import into a clean database created by the current application; overwriting an old-schema database is not a schema upgrade.
-
-开发期 schema 变更不执行 SQL 迁移，也不更新 schema 版本号。此次来源引用结构需要先用旧应用导出 JSON 并备份，再导入由当前应用创建的新结构数据库；直接覆盖旧结构数据库不等于升级 schema。
+Conlexicon 使用一个小型 Node.js 后端，不需要安装 npm 依赖；运行时存储为 SQLite。
 
 ```bash
 node server.js
 ```
 
-When testing or migrating manually, a separate data directory is still recommended:
+Then open `http://localhost:4173/`. For testing or manual migration, point the server at a separate data directory:
 
-测试或手动迁移时，仍建议配合单独的数据目录：
+然后打开 `http://localhost:4173/`。测试或手动迁移时，建议指定单独的数据目录：
 
 ```bash
 CONLEXICON_DATA_DIR=/tmp/conlexicon-sqlite node server.js
 ```
 
-Then open:
+Schema changes during development do not migrate existing databases. To move data from a database with an older schema, export JSON with the old version, keep a backup, and import it into a database created by the current version.
 
-然后打开：
+开发期 schema 变更不会迁移已有数据库。需要迁移旧结构数据库时，先用旧版本导出 JSON 并备份，再导入由当前版本创建的新数据库。
 
-```text
-http://localhost:4173/
-```
-
-The standalone Liquid Glass tuning and geometry diagnostic page is available at:
-
-独立的液态玻璃参数调试与几何诊断页位于：
-
-```text
-http://localhost:4173/liquid-glass-lab.html
-```
-
-The repository ships the production geometry/filter engine, an MIT-licensed SDF Baseline adapted from `PallavAg/liquid-glass-web-react`, and five licensed Lab backgrounds from Unsplash and Pexels. The Lab shares width, height, radius, outline model, and superellipse exponent across its renderers: Product and SDF can compare straight-sided superellipse corners with a whole-surface Lamé superellipse, while the local Reference Baseline keeps its source rounded outline. Product can switch between Q3 and Q1 while preserving the same geometry, optical preset, and appearance selection; Q1 skips map generation and shows the role-matched ordinary glass path. Product comparisons retain the neutral Lab appearance by default and can mirror the current computed Q1 or Q3 tint, border, complete shadow, and foreground color of formal desktop or mobile component fixtures through isolated style probes; each layer can be bypassed without rebuilding maps or clearing the session cache. Radius is bounded only by half the shared short side and is inactive, but preserved, for the Product/SDF global model; Reference continues to consume it for its fixed rounded outline. A developer's local workspace may additionally provide that ignored `archisvaze/liquid-glass` Reference Baseline; the source module is not distributed by this repository. Photo credits and license links are recorded in `assets/liquid-glass-lab/README.md`. The Lab does not call application APIs or persist parameter changes.
-
-仓库分发生产几何/滤镜引擎、改编自 MIT 许可 `PallavAg/liquid-glass-web-react` 的 SDF Baseline，以及五张来自 Unsplash 和 Pexels、具有明确许可的 Lab 背景图。Lab 在各路径间共享宽度、高度、圆角、外轮廓模型和超椭圆指数：Product 与 SDF 可比较“直边＋超椭圆角”和整张表面的 Lamé 全局超椭圆，本机 Reference Baseline 保持来源传统圆角。Product 可在保留当前几何、光学预设和外观选择的同时切换 Q3 与 Q1；Q1 不生成贴图，直接展示同角色普通玻璃路径。Product 默认保留中性 Lab 外观，也可通过隔离样式探针镜像正式桌面或移动组件当前 Q1/Q3 计算得到的 tint、边框、完整阴影和前景色；各层可独立旁路，且不会重建贴图或清空会话缓存。圆角只受共享短边一半约束；Product/SDF 全局模型不消费圆角，但会保留其值供切回角部模型。开发者本机可以另外提供该已被忽略的 `archisvaze/liquid-glass` Reference Baseline；源码模块不随仓库分发。图片署名和许可链接记录在 `assets/liquid-glass-lab/README.md`。实验页不调用应用 API，也不会持久化参数改动。
-
-Q3 resources use exact normalized optical parameters and transform-independent layout sizes. Reopening identical geometry reuses the session cache; real layout resizing is coalesced, and late results cannot reactivate hidden or unregistered surfaces.
-
-Q3 资源使用规范化后的精确光学参数与不受 transform 影响的布局尺寸；相同几何重新打开时复用会话缓存，真实布局尺寸变化合并处理，迟到结果不能重新激活隐藏或已注销的表面。
-
-Run the complete model, SQLite, API, and integration regression suite with:
-
-完整的模型、SQLite、API 与集成回归统一通过以下命令运行：
+### Checks / 检查
 
 ```bash
 node scripts/check-all.js
 ```
 
-For the focused frontend query-cache contract check, run:
+runs the complete model, SQLite, API, and integration suite. Focused checks and benchmarks live in `scripts/`, for example `check-query-page-cache.js`, `check-query-session-cache.js`, and `benchmark-query-session-cache.js --data /path/to/sqlite-data --query bdy --runs 5`.
 
-前端查询缓存的定向契约检查可通过以下命令运行：
+运行完整的模型、SQLite、API 与集成检查。定向检查和性能基准位于 `scripts/`，例如 `check-query-page-cache.js`、`check-query-session-cache.js` 和 `benchmark-query-session-cache.js --data /path/to/sqlite-data --query bdy --runs 5`。
 
-```bash
-node scripts/check-query-page-cache.js
-```
+### Liquid Glass Lab / 液态玻璃实验页
 
-For the backend runtime query-session cache and SQLite integration check, run:
+A standalone tuning and geometry diagnostic page is available at `http://localhost:4173/liquid-glass-lab.html`. It does not call application APIs or save parameter changes. The repository includes an MIT-licensed SDF Baseline adapted from `PallavAg/liquid-glass-web-react` and five licensed backgrounds from Unsplash and Pexels, credited in `assets/liquid-glass-lab/README.md`. A local `archisvaze/liquid-glass` Reference Baseline can be added by developers but is not distributed. See [the Liquid Glass specification](docs/LIQUID_GLASS_SKIN_SPEC.md) for details.
 
-后端运行时查询会话及 SQLite 接线可通过以下命令检查：
-
-```bash
-node scripts/check-query-session-cache.js
-```
-
-To compare cold and repeated hot query-session performance against an existing SQLite test data directory, run:
-
-如需使用现有 SQLite 测试词典比较查询会话的冷查询与重复热查询性能，可运行：
-
-```bash
-node scripts/benchmark-query-session-cache.js --data /path/to/sqlite-data --query bdy --runs 5
-```
+独立的参数调试与几何诊断页位于 `http://localhost:4173/liquid-glass-lab.html`，不调用应用 API，也不保存参数改动。仓库包含改编自 MIT 许可 `PallavAg/liquid-glass-web-react` 的 SDF Baseline，以及五张来自 Unsplash 和 Pexels、具有明确许可的背景图，署名见 `assets/liquid-glass-lab/README.md`。开发者可在本地另行提供 `archisvaze/liquid-glass` Reference Baseline，该模块不随仓库分发。详见[液态玻璃规范](docs/LIQUID_GLASS_SKIN_SPEC.md)。
 
 ## Data Storage / 数据存储
 
-Dictionary data is stored locally under:
-
-词典数据会保存在本地目录：
-
 ```text
-data/
-data/index.json
-data/dictionaries/*.sqlite
+data/index.json              dictionary index, active dictionary, UI language, theme, and skin
+data/dictionaries/*.sqlite   one file per dictionary: content and settings
 ```
 
-`data/index.json` stores the dictionary index, active dictionary ID, global interface language, global interface theme, and global interface skin. Per-dictionary content and settings are stored in `data/dictionaries/*.sqlite` by default.
+The `data/` directory is ignored by Git so personal dictionaries are never committed.
 
-`data/index.json` 保存词典索引、当前词典 ID、全局界面语言、全局界面主题和全局界面皮肤；默认情况下，各词典的内容与设置分别保存在 `data/dictionaries/*.sqlite` 中。
+`data/index.json` 保存词典索引、当前词典及全局界面语言、主题和皮肤；每个词典的内容与设置保存在 `data/dictionaries/*.sqlite`。`data/` 已被 Git 忽略，个人词库不会被提交。
 
-Legacy JSON dictionaries are not migrated automatically on startup. To reuse an old JSON dictionary, import the JSON file from the app's dictionary management UI.
+Legacy JSON dictionaries are not migrated on startup; import them from the dictionary management page. For bulk migration testing, use the explicit script with separate directories. It refuses a non-empty target and never modifies the source:
 
-旧 JSON 词典不会在启动时自动迁移。若要复用旧 JSON 词典，请在应用的词典管理界面导入对应 JSON 文件。
-
-For bulk migration testing, use the explicit JSON-to-SQLite migration script with separate source and target data directories:
-
-如需测试批量迁移，可使用显式的 JSON 到 SQLite 迁移脚本，并为源目录和目标目录指定不同位置：
+旧 JSON 词典不会在启动时自动迁移，请在词典管理页导入。测试批量迁移时可使用显式脚本，源目录和目标目录须分开；脚本拒绝写入非空目标目录，也不会修改源目录：
 
 ```bash
 node scripts/migrate-json-data-to-sqlite.js --from /path/to/json-data --to /path/to/sqlite-data
 ```
 
-The script refuses to write into a non-empty target directory and does not modify the source directory.
-
-该脚本会拒绝写入非空目标目录，并且不会修改源目录。
-
-The `data/` directory is intentionally ignored by Git so personal dictionaries are not committed to the repository.
-
-`data/` 目录已被 Git 忽略，用于避免把个人词库提交到仓库。
-
 ## Repository Contents / 仓库内容
 
 ```text
-index.html   Main UI / 主界面
-app.js       Frontend logic / 前端逻辑
-server.js    Local SQLite-backed HTTP server / 使用 SQLite 的本地 HTTP 服务
-styles.css   Application styling / 应用样式
+index.html     Main UI / 主界面
+app.js         Frontend logic / 前端逻辑
+styles.css     Base styles / 基础样式
+theme-*.css    Skins / 皮肤样式
+lib/           Models shared by frontend and backend, SQLite repository, API routes / 前后端共享模型、SQLite 仓储与 API 路由
+server.js      Local HTTP server / 本地 HTTP 服务
+scripts/       Checks, benchmarks, and migration tools / 检查、基准与迁移工具
+docs/          Technical documentation / 技术文档
 ```
 
 ## Notes / 说明
 
-This project is designed for local use first. If you plan to deploy it publicly, review the file persistence and import/export behavior before exposing it to untrusted users.
+This project is designed for local use. Before deploying it publicly, review file persistence and import/export behavior before exposing it to untrusted users.
 
-本项目优先面向本地使用。如果需要公开部署，请先检查文件保存、导入与导出逻辑，再暴露给不可信用户。
+本项目面向本地使用。如需公开部署，请先检查文件保存和导入导出逻辑，再向不可信用户开放。

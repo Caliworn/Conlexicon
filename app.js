@@ -137,6 +137,8 @@ const expandedRootEntries = new Set();
 const collapsedRootEntries = new Set();
 let rootNavigationContextId = "";
 let entryDraft = null;
+// Summaries for sources prefilled into an unsaved draft, which has no relation DTO yet.
+const entryDraftSourceSummaries = new WeakMap();
 const sourceCreationContexts = new WeakMap();
 const defaultAnalysisViewState = {
   page: "overview",
@@ -8677,6 +8679,7 @@ function renderDetail(options = {}) {
     entryDetailHasSettledContent = false;
     elements.entryDisplay.hidden = true;
     elements.entryForm.hidden = true;
+    stopSourceCompletionRequest(sourceCompletionController(elements.sourceEntryInput));
     return;
   }
 
@@ -8710,6 +8713,8 @@ function renderDetail(options = {}) {
   );
 
   elements.entryForm.hidden = true;
+  // Re-entering the editor refills the form, which resets the controller.
+  stopSourceCompletionRequest(sourceCompletionController(elements.sourceEntryInput));
   if (retainingStaleDetail) {
     elements.entryDisplay.hidden = false;
     return;
@@ -12478,7 +12483,7 @@ function sourceCompletionController(input) {
   if (!controller) {
     controller = {
       requestKey: "",
-      dismissedKey: "",
+      dismissedKey: null,
       sequence: 0,
       abort: null,
       debounceTimer: 0,
@@ -12517,12 +12522,22 @@ function stopSourceCompletionRequest(controller) {
   controller.sequence += 1;
 }
 
+// Drops pending work. A list that never arrived is forgotten, so the next
+// refresh fetches it again; a dismissed list stays dismissed.
+function interruptSourceCompletion(controller) {
+  stopSourceCompletionRequest(controller);
+  if (controller.stale && controller.requestKey !== controller.dismissedKey) {
+    controller.requestKey = "";
+  }
+}
+
 function resetSourceCompletion(input) {
   const controller = sourceCompletionController(input);
   stopSourceCompletionRequest(controller);
   Object.assign(controller, {
     requestKey: "",
-    dismissedKey: "",
+    dismissedKey: null,
+    composing: false,
     candidates: [],
     total: 0,
     stale: true,
@@ -12746,7 +12761,15 @@ function sourceCardDetail(source, state) {
 function hydrateSourceSummaries(input) {
   const state = sourceInputReferences.get(input);
   const ownerEntryId = sourceEditorEntryId(input);
-  if (!state || !ownerEntryId) {
+  if (!state) {
+    return;
+  }
+  if (!ownerEntryId) {
+    const seeded = input === elements.sourceEntryInput ? entryDraftSourceSummaries.get(entryDraft) : null;
+    if (seeded) {
+      seeded.forEach((summary, id) => state.summaries.set(id, summary));
+      renderSourceReferenceTokens(input);
+    }
     return;
   }
   const relationState = entryRelationStateForEntry(activeDictionary(), { id: ownerEntryId });
@@ -12971,6 +12994,7 @@ function handleSourceAutocompleteKeydown(event) {
     event.stopPropagation();
     controller.dismissedKey = controller.requestKey;
     controller.activeIndex = -1;
+    interruptSourceCompletion(controller);
     renderSourceCompletion(input);
   }
 }
@@ -12988,7 +13012,9 @@ function bindSourceAutocompleteInput(input) {
   });
   field?.addEventListener("focusout", (event) => {
     if (field.contains(event.relatedTarget)) return;
-    sourceCompletionController(input).activeIndex = -1;
+    const controller = sourceCompletionController(input);
+    controller.activeIndex = -1;
+    interruptSourceCompletion(controller);
     renderSourceCompletion(input);
   });
   const box = sourceAutocompleteBoxForInput(input);
@@ -13021,7 +13047,10 @@ function bindSourceAutocompleteInput(input) {
   input.addEventListener("click", () => refreshSourceCompletion(input));
   input.addEventListener("focus", () => refreshSourceCompletion(input));
   input.addEventListener("compositionstart", () => {
-    sourceCompletionController(input).composing = true;
+    const controller = sourceCompletionController(input);
+    controller.composing = true;
+    interruptSourceCompletion(controller);
+    renderSourceCompletion(input);
   });
   input.addEventListener("compositionend", () => {
     sourceCompletionController(input).composing = false;
@@ -15836,6 +15865,8 @@ function partialEditForm() {
 }
 
 function cancelPartialEdit() {
+  const partialSourceInput = partialEditHost?.querySelector("#partialSourceEntryInput");
+  if (partialSourceInput) resetSourceCompletion(partialSourceInput);
   partialEditHost?.querySelector(".inline-partial-edit-form")?.remove();
   partialEditHost?.classList.remove("partial-editing");
   partialEditHost = null;
@@ -15857,7 +15888,7 @@ function createEntryDraft(overrides = {}) {
   };
 }
 
-async function beginNewEntry(draft = null) {
+async function beginNewEntry(draft = null, { sourceSummaries = [] } = {}) {
   if (!activeDictionary()) {
     await showView("manager");
     showToast(t("createDictionaryFirstToast"));
@@ -15870,6 +15901,9 @@ async function beginNewEntry(draft = null) {
   cancelPartialEdit();
   state.selectedEntryId = "";
   entryDraft = createEntryDraft(draft || {});
+  if (sourceSummaries.length) {
+    entryDraftSourceSummaries.set(entryDraft, new Map(sourceSummaries.map((summary) => [summary.id, summary])));
+  }
   editorMode = "edit";
   render();
   elements.lemmaInput.focus();
@@ -15885,7 +15919,7 @@ async function beginDerivedEntry(sourceEntry) {
       sources: [{ entryId: sourceEntry.id, text: sourceEntry.lemma || sourceEntry.id }],
       description: "",
     },
-  });
+  }, { sourceSummaries: [sourceEntry] });
   if (!started) {
     return;
   }
