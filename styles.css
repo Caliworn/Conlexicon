@@ -334,7 +334,7 @@ body.english-locale .brand-row h1 {
   grid-template-columns: minmax(0, 1fr);
 }
 
-.secondary-button.entry-browser-toggle {
+.secondary-button:is(.entry-browser-toggle, .entry-collapsed-new-button) {
   position: relative;
   top: 2px;
   display: inline-grid;

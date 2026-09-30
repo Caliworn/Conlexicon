@@ -147,10 +147,12 @@
                     <path d="m6 9 6 6 6-6"></path>
                   </svg>
                 </button>
+                <button class="secondary-button entry-collapsed-new-button" data-control-tone="accent" data-control-emphasis="outline" id="collapsedNewEntryButton" type="button" data-app-tooltip="always" data-i18n-aria-label="newEntry" aria-label="新建词条" hidden>
+                  <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 5v14M5 12h14"></path>
+                  </svg>
+                </button>
               </div>
-            </div>
-            <div class="top-actions">
-              <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="newEntryButton" type="button" data-i18n="newEntry">新建词条</button>
             </div>
           </section>
 
@@ -435,7 +437,6 @@
               <h2 data-i18n="dictionaryManager">词典管理</h2>
             </div>
             <div class="top-actions">
-              <button class="secondary-button" id="backToEditorButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
               <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="addDictionaryButton" type="button" data-i18n="newDictionary">新建词典</button>
               <label class="secondary-button file-trigger" data-control-tone="neutral">
                 <span data-i18n="importJson">导入 JSON</span>
@@ -489,9 +490,6 @@
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
               <h2 data-i18n="analysis">数据分析</h2>
             </div>
-            <div class="top-actions">
-              <button class="secondary-button" id="backToEditorFromAnalysisButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
-            </div>
           </section>
 
           <section class="notice-panel" id="analysisNoDictionaryNotice" hidden>
@@ -510,9 +508,6 @@
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
               <h2 data-i18n="qualityCheck">质量检查</h2>
             </div>
-            <div class="top-actions">
-              <button class="secondary-button" id="backToEditorFromQualityButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
-            </div>
           </section>
 
           <section class="notice-panel" id="qualityNoDictionaryNotice" hidden>
@@ -530,9 +525,6 @@
             <div>
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
               <h2 data-i18n="otherSettings">其他设置</h2>
-            </div>
-            <div class="top-actions">
-              <button class="secondary-button" id="backToEditorFromSettingsButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
             </div>
           </section>
 
@@ -936,7 +928,6 @@
                 <button data-control-tone="neutral" data-control-selection role="radio" aria-checked="false" tabindex="-1" type="button" data-doc-mode="edit" data-i18n="editMode">编辑</button>
                 <button data-control-tone="neutral" data-control-selection role="radio" aria-checked="false" tabindex="-1" type="button" data-doc-mode="preview" data-i18n="previewMode">查看</button>
               </div>
-              <button class="secondary-button" id="backToEditorFromDocsButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
               <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="saveDocsButton" type="button" data-i18n="saveDocs">保存文档</button>
             </div>
           </section>
@@ -963,7 +954,6 @@
               <h2 data-i18n="corpus">语料库</h2>
             </div>
             <div class="top-actions">
-              <button class="secondary-button" id="backToEditorFromCorpusButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
               <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="saveCorpusButton" type="button" data-i18n="saveCorpus">保存语料库</button>
             </div>
           </section>
@@ -1006,9 +996,6 @@
             <div>
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
               <h2 data-i18n="morphologyFunctions">形态函数</h2>
-            </div>
-            <div class="top-actions">
-              <button class="secondary-button" id="backToEditorFromMorphologyFunctionsButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
             </div>
           </section>
 
@@ -1055,9 +1042,6 @@
                 <button class="info-button" id="morphologySyntaxButton" data-control-tone="neutral" type="button" data-app-tooltip="always" data-i18n-aria-label="morphologySyntaxInfo" aria-label="形态语法">i</button>
               </div>
             </div>
-            <div class="top-actions">
-              <button class="secondary-button" id="backToEditorFromMorphologyTablesButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
-            </div>
           </section>
 
           <section class="notice-panel" id="morphologyTablesNoDictionaryNotice" hidden>
@@ -1087,7 +1071,6 @@
               <h2 data-i18n="ipaConfig">自动 IPA 标注</h2>
             </div>
             <div class="top-actions">
-              <button class="secondary-button" id="backToEditorFromIpaButton" data-control-tone="neutral" type="button" data-i18n="backToEditor">返回编辑器</button>
               <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="batchIpaMissingButton" type="button" data-i18n="batchIpaMissing">补全空发音</button>
               <button class="danger-button" data-control-tone="danger" data-control-emphasis="solid" id="batchIpaAllButton" type="button" data-i18n="batchIpaAll">重写全部发音</button>
             </div>

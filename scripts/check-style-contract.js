@@ -355,7 +355,7 @@ const ordinaryActions = new Set([
 for (const [tag] of `${index}\n${app}`.matchAll(/<(?:button|label)\b[^>]*>/g)) {
   const id = tag.match(/\bid="([^"]+)"/)?.[1] || "";
   const action = tag.match(/data-action="([^"]+)"/)?.[1];
-  if (ordinaryCommandIds.has(id) || /^backToEditor.*Button$/.test(id)
+  if (ordinaryCommandIds.has(id)
     || ordinaryActions.has(action) || /\b(?:info-button|file-trigger|analysis-quality-view-button)\b/.test(tag)
     || /\bdata-analysis-(?:[\w-]*retry|tag-sets-more)\b/.test(tag)) {
     assert(tag.includes('data-control-tone="neutral"') && !tag.includes("data-control-emphasis="),

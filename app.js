@@ -697,7 +697,6 @@ const i18n = {
     saveEntry: "保存词条",
     dictionaryManagerEyebrow: "多个词典",
     dictionaryManager: "词典管理",
-    backToEditor: "返回编辑器",
     newDictionary: "新建词典",
     managerNeedsBackend: "词典管理需要本地后端",
     deleteDictionary: "删除词典",
@@ -1304,7 +1303,6 @@ const i18n = {
     saveEntry: "Save Entry",
     dictionaryManagerEyebrow: "Multi Dictionary",
     dictionaryManager: "Dictionary Manager",
-    backToEditor: "Back to Editor",
     newDictionary: "New Dictionary",
     managerNeedsBackend: "Dictionary Management Needs Backend",
     deleteDictionary: "Delete Dictionary",
@@ -1566,15 +1564,6 @@ const elements = {
   morphologyFunctionsView: document.querySelector("#morphologyFunctionsView"),
   morphologyTablesView: document.querySelector("#morphologyTablesView"),
   ipaView: document.querySelector("#ipaView"),
-  backToEditorButton: document.querySelector("#backToEditorButton"),
-  backToEditorFromSettingsButton: document.querySelector("#backToEditorFromSettingsButton"),
-  backToEditorFromAnalysisButton: document.querySelector("#backToEditorFromAnalysisButton"),
-  backToEditorFromQualityButton: document.querySelector("#backToEditorFromQualityButton"),
-  backToEditorFromDocsButton: document.querySelector("#backToEditorFromDocsButton"),
-  backToEditorFromCorpusButton: document.querySelector("#backToEditorFromCorpusButton"),
-  backToEditorFromMorphologyFunctionsButton: document.querySelector("#backToEditorFromMorphologyFunctionsButton"),
-  backToEditorFromMorphologyTablesButton: document.querySelector("#backToEditorFromMorphologyTablesButton"),
-  backToEditorFromIpaButton: document.querySelector("#backToEditorFromIpaButton"),
   batchIpaAllButton: document.querySelector("#batchIpaAllButton"),
   batchIpaMissingButton: document.querySelector("#batchIpaMissingButton"),
   addDictionaryButton: document.querySelector("#addDictionaryButton"),
@@ -1618,7 +1607,7 @@ const elements = {
   entrySearchDefaultButton: document.querySelector("#entrySearchDefaultButton"),
   partFilter: document.querySelector("#partFilter"),
   sortSelect: document.querySelector("#sortSelect"),
-  newEntryButton: document.querySelector("#newEntryButton"),
+  collapsedNewEntryButton: document.querySelector("#collapsedNewEntryButton"),
   entryListNewEntryButton: document.querySelector("#entryListNewEntryButton"),
   importInput: document.querySelector("#importInput"),
   entryDetailPanel: document.querySelector("#entryDetailPanel"),
@@ -4136,6 +4125,7 @@ function renderShellEntryBrowser() {
     elements.entryBrowser.hidden = !canOpenDrawer || !shellState.browserDrawerOpen;
     entryWorkspaceLayout?.syncVisibility();
     elements.entryBrowserToggleButton.hidden = true;
+    elements.collapsedNewEntryButton.hidden = true;
     elements.mobileEntryListButton.setAttribute("aria-expanded", String(shellState.browserDrawerOpen));
     elements.mobileEntryListButton.setAttribute("aria-label", t(shellState.browserDrawerOpen ? "closeEntryList" : "openEntryList"));
     syncMobileDrawerBodyState();
@@ -4159,6 +4149,7 @@ function renderShellEntryBrowser() {
   elements.entryBrowser.hidden = collapsed;
   entryWorkspaceLayout?.syncVisibility();
   elements.entryBrowserToggleButton.hidden = !canToggle;
+  elements.collapsedNewEntryButton.hidden = !collapsed;
   elements.entryBrowserToggleButton.setAttribute("aria-expanded", String(!collapsed));
   const controlLabel = t(collapsed ? "expandEntryBrowser" : "collapseEntryBrowser");
   elements.entryBrowserToggleButton.setAttribute("aria-label", controlLabel);
@@ -4321,7 +4312,6 @@ function renderAvailability() {
   elements.contentGrid.hidden = !backendAvailable || !hasDictionary;
   elements.toolList.hidden = !backendAvailable;
   elements.managerGrid.hidden = !backendAvailable;
-  elements.newEntryButton.hidden = !backendAvailable || !hasDictionary;
   elements.addDictionaryButton.disabled = !backendAvailable;
   elements.importInput.disabled = !backendAvailable;
 
@@ -4360,7 +4350,6 @@ function renderToolNav() {
 
 function renderHeader() {
   const dictionary = activeDictionary();
-  elements.newEntryButton.disabled = !dictionary;
   elements.entryListNewEntryButton.disabled = !dictionary;
 
   if (!backendAvailable) {
@@ -17085,15 +17074,6 @@ elements.mobileNewEntryButton.addEventListener("click", async () => {
 });
 elements.mobileDrawerBackdrop.addEventListener("click", closeMobileDrawers);
 elements.entryBrowserToggleButton.addEventListener("click", toggleEntryBrowser);
-elements.backToEditorButton.addEventListener("click", () => showView("editor"));
-elements.backToEditorFromSettingsButton.addEventListener("click", () => showView("editor"));
-elements.backToEditorFromAnalysisButton.addEventListener("click", () => showView("editor"));
-elements.backToEditorFromQualityButton.addEventListener("click", () => showView("editor"));
-elements.backToEditorFromDocsButton.addEventListener("click", () => showView("editor"));
-elements.backToEditorFromCorpusButton.addEventListener("click", () => showView("editor"));
-elements.backToEditorFromMorphologyFunctionsButton.addEventListener("click", () => showView("editor"));
-elements.backToEditorFromMorphologyTablesButton.addEventListener("click", () => showView("editor"));
-elements.backToEditorFromIpaButton.addEventListener("click", () => showView("editor"));
 elements.addDictionaryButton.addEventListener("click", prepareNewDictionary);
 elements.emptyCreateDictionaryButton.addEventListener("click", () => showView("manager"));
 elements.settingsOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
@@ -17104,7 +17084,7 @@ elements.corpusOpenDictionaryManagerButton.addEventListener("click", () => showV
 elements.morphologyFunctionsOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.morphologyTablesOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.ipaOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
-elements.newEntryButton.addEventListener("click", () => beginNewEntry());
+elements.collapsedNewEntryButton.addEventListener("click", () => beginNewEntry());
 elements.entryListNewEntryButton.addEventListener("click", async () => {
   if (await beginNewEntry()) {
     closeMobileEntryBrowserDrawer();
