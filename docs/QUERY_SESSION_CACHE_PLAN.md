@@ -270,7 +270,7 @@ query kind
 - descriptor 统一规范化字段、fuzzy 字段、标签和排序，并排除 `cursor`、`limit`；无查询文本的 root groups 也会忽略无效的字段搜索选项。
 - 当前每词典最多 8 个会话、全局约 64 MiB、idle TTL 2 分钟；支持 LRU、超大单项跳过、同 key in-flight 合并和开发期统计。
 - repository 的词条、模块、metadata、完整导入/覆盖和词典删除只在成功写入后递增运行时 generation 并按词典失效；空 patch 和失败写入不失效。
-- 查询 generation 与词根 relation generation 已拆分：查询会话仍在相关成功写入后失效；词根拓扑只在词条增删、lemma/来源变化、完整导入覆盖或词典删除时递增 relation generation。普通词条保存和 `patchEntries()` 只同步缓存中的排序字段并清除排序视图，metadata/settings/IPA/docs/morphology/corpus 保存不触碰拓扑。
+- 查询 generation 与词根 relation generation 已拆分：查询会话仍在相关成功写入后失效；词根拓扑只在词条增删、来源目标变化、完整导入覆盖或词典删除时递增 relation generation（拓扑不依赖 lemma，2026-09-30 起改名不再使其失效）。lemma 改名等普通词条保存和 `patchEntries()` 只同步缓存中的排序字段并清除排序视图，metadata/settings/IPA/docs/morphology/corpus 保存不触碰拓扑。
 - Q2 完成时 API 与 offset cursor 尚未改变；该历史边界已由后续 Q4 的版本化 cursor 取代。
 
 2026-07-16 使用 10k 形态压力词典、查询 `bdy`、5 次热查询的基准如下。热查询仍包含当前页 SQLite DTO 和 `searchHits` 重建成本：

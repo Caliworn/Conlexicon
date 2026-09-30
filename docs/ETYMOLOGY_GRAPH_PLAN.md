@@ -1,6 +1,6 @@
 # 词源图与词根拓扑修复计划
 
-状态：计划（2026-09-30），未实装。本计划位于质量检查 F5-1 之前：F5-1 的 `source_cycle` 规则应消费本计划产出的图分解，而不是另写一套 DFS。
+状态：G1–G3 已完成（2026-09-30），词根拓扑已切换到新模块。F5-1 按第 6 节消费分量结果。第 7 节决策已确认。本计划位于质量检查 F5-1 之前：F5-1 的 `source_cycle` 规则应消费本计划产出的图分解，而不是另写一套 DFS。
 
 ## 1. 目标与范围
 
@@ -72,7 +72,7 @@ buildEtymologyGraph({
 ## 5. 消费方迁移
 
 1. **Repository**：`rootTopologyFromDatabase` 保留两条 SQL，把解析和求根交给 `buildEtymologyGraph`，再构建现有的 `groups`、`groupsByRootId`、`rootIdsByEntryId`。拓扑对象形状不变，`RootTopologyCache`、查询会话、location 和关系端点的代码无需改动。
-2. **缓存不变量**：新拓扑不依赖 lemma、排序键或位置，`updateEntryRecords` 只同步排序记录的做法继续成立。当前保存路径在 lemma 变化时也使拓扑失效（`topologyChanged` 包含 lemma 比较），这在新语义下已无必要，但属于可选优化，不纳入本计划的必做项。
+2. **缓存不变量**：新拓扑不依赖 lemma、排序键或位置，`updateEntryRecords` 只同步排序记录的做法继续成立。当前保存路径在 lemma 变化时也使拓扑失效（`topologyChanged` 包含 lemma 比较），新语义下已无必要，G2 随算法切换一并取消：`topologyChanged` 只比较词条是否新增和来源目标序列，lemma 改名改走 `refreshRootTopologyEntryRecords`。查询会话仍按现有规则整体失效，排序记录从数据库重读，因此组内和组间顺序不会过期。该改动必须与新算法同批或在其后落地：旧算法的错误分组依赖按排序键的遍历顺序，改名可能改变分组。
 3. **`entry-relations-model`**：`rootModeGroups` 改为基于 `buildEtymologyGraph` 计算分组，只保留查询、匹配与排序外壳，继续作为 repository-contract 中 API 分页与搜索一致性的期望值。算法正确性不再由它证明（见第 8 节）。确认无调用方后删除 `sourceRootEntries`、`rootCount`、`relationForEntry`，删除前以全仓搜索复核。
 4. **API 契约**：更新 `docs/API_CONTRACT.md` 的词根模式与 `rootFamilyRanking` 说明：
    - 写明第 3 节的词根定义；
@@ -88,18 +88,18 @@ buildEtymologyGraph({
 
 - `source_unresolved` 不依赖本模块，按来源解析结果逐条产生，不受影响。
 - `source_cycle` 的现有语义（[质量计划](QUALITY_RESULT_PLAN.md) 4.3 节）：来源链最终进入循环的词条也产生 issue。基于本模块可以写成：词条所在分量是循环分量，或者它的某个祖先分量是循环分量。这个“可达循环”标记沿用第 4 节的拓扑序传播，O(V+E)。
-- **witness 路径**：当前前端按来源顺序做逐词条 DFS，取第一次回到路径上的节点作为见证，这依赖具体路径，无法记忆化。F5-1 需要为每个循环分量确定一条规范见证（例如从分量中 ID 最小的成员出发，按来源位置顺序在分量内找第一条闭合路径），词条引用其首个可达循环分量的见证。这会改变部分 `cycleEntryIds` 和 issue `id`；服务端 issue 尚未上线且不持久化，属于可以接受的调整。这一点在 F5-1 开工时于质量计划中确认（第 7 节决策 2）。
+- **witness 路径**：当前前端按来源顺序做逐词条 DFS，取第一次回到路径上的节点作为见证，这依赖具体路径，无法记忆化。F5-1 需要为每个循环分量确定一条规范见证（例如从分量中 ID 最小的成员出发，按来源位置顺序在分量内找第一条闭合路径），词条引用其首个可达循环分量的见证。这会改变部分 `cycleEntryIds` 和 issue `id`；服务端 issue 尚未上线且不持久化，属于可以接受的调整。已确认采用（第 7 节决策 2），F5-1 开工时写入质量计划。
 - 依赖方向：F5-1 → `etymology-graph-model`，模块不反向依赖质量模型。前端 `quality-model.js` 的 `sourceCycleForEntry` 在 F5-3 替换旧本地质量结果时随之删除，本计划不修改它。
 
-## 7. 待确认决策
+## 7. 决策（2026-09-30 已确认）
 
-1. **无外部祖先的循环如何成组**（推荐：每个成员各自为根）。
+1. **无外部祖先的循环如何成组**：每个成员各自为根。
    - 推荐方案对称，不需要任意选择代表，且与多词根词条在多个组中出现的现有语义一致；代价是循环后代会在多个组中重复出现。
    - 备选方案：按 ID 选一个稳定代表作为唯一词根。组数更少，但代表的选择对用户没有语言学意义。不能按 lemma 选代表，否则 lemma 改名后拓扑需要重建。
    - 不采用“循环成员不出现在词根模式中”，因为这会让词条从列表里消失。
    - 循环本身是数据错误，由质量检查报告。
-2. **F5-1 的 `source_cycle` 见证规范化**：见第 6 节，推荐采用每分量的规范见证。
-3. **是否同时取消 lemma 变化导致的拓扑失效**：推荐暂不做，作为独立的小优化。
+2. **F5-1 的 `source_cycle` 见证规范化**：采用每个循环分量的规范见证，见第 6 节；F5-1 开工时同步写入质量计划 4.3 节。
+3. **lemma 变化不再使拓扑失效**：随 G2 一并实施，见第 5 节第 2 条。
 
 ## 8. 测试与验收
 
@@ -110,11 +110,12 @@ buildEtymologyGraph({
   - 深链：5 万节点单链与长循环不溢出，结果正确。
 - `scripts/repository-contract.js`：在 `/root-groups` 一致性夹具中加入菱形与循环，并对组成员做显式期望断言，不只和 `rootModeGroups` 比较；`/entry-relations` 的 `rootGroup` 与 `/root-groups/location` 覆盖多词根与循环词条。
 - 性能：在同一台机器上，用 30k 压测词典对比改动前后的拓扑构建耗时，目标不慢于当前约 110ms 的量级；另测一个多词根、宽扇出的合成图，记录耗时与内存。
+- 缓存：`scripts/check-query-session-cache.js` 增加 lemma 改名用例，断言拓扑 generation 不变、不重建、缓存中的排序记录已更新，且词根组按新词形排序；来源变化仍使拓扑失效。
 - 回归：`node scripts/check-all.js`、改动文件的 `node --check`、`git diff --check`。本计划不改 UI，不需要浏览器检查。
 
 ## 9. 实施顺序
 
-1. **G1**：`etymology-graph-model.js` 与 `check-etymology-graph.js`。
-2. **G2**：repository 与 `rootModeGroups` 切换到新模块，补 contract 夹具、性能对比，更新 API 契约和 CHANGELOG。G1 和 G2 可以一次提交。
-3. **G3**：删除 `entry-relations-model` 中已无调用方的函数，可并入 G2。
+1. **G1**（已完成）：`etymology-graph-model.js` 与 `check-etymology-graph.js`。30k 压测词典上，模块本身的求根约 20ms（旧 `rootTopologyFromDatabase` 含 SQL 与分组整体约 110ms）；3 万词条、2000 词根、每词 1–3 个随机来源的合成图约 42ms、约 42 万条组成员关系。
+2. **G2**（已完成）：30k 压测词典上拓扑构建约 108ms（旧算法约 116ms），无菱形数据下分组与旧算法完全一致。repository 与 `rootModeGroups` 切换到新模块，取消 lemma 改名导致的拓扑失效，补 contract 与缓存用例、性能对比，更新 API 契约和 CHANGELOG。G1 和 G2 可以一次提交。
+3. **G3**（已完成）：删除 `entry-relations-model` 中已无调用方的 `sourceRootEntries`、`rootCount`、`relationForEntry`，以及随之失去调用方的 `entryHasSources`、`entrySourceKeys`、`entryIsDirectlyDerivedFrom`；`findDerivedEntries` 仍有模型测试覆盖，保留。
 4. 之后进入 F5-1，按第 6 节消费分量结果。

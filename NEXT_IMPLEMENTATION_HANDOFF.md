@@ -22,7 +22,7 @@
 - **液态玻璃 tinted／solid**（2026-09-24）：已接入语义化 compact 资格入口，自动检查通过；明暗与辅助模式下的可读性、染色强度和分段选中效果待用户验收，当前调参不是视觉定稿。
 - **液态玻璃 LQ-7**（全量性能与资源验收）未实施；SDF Baseline 替换生产算法前须先完成 Lab 人工对照，见 [液态玻璃规范](docs/LIQUID_GLASS_SKIN_SPEC.md) 第 13 节。2026-09-27 代码审查另记录三个待 LQ-7 实测确认的风险：`activate()` 对 `document.body` 建立 subtree MutationObserver；词根模式虚拟列表滚动时逐个注册／注销折叠按钮光学表面；`unregister()` 每次断开后为全部表面重新观察祖先链。
 - **质量检查 F5-1**：下一步实装 QualityService、最小 repository 输入和 `/quality/query`、`/quality/location`，契约见 [QUALITY_RESULT_PLAN](docs/QUALITY_RESULT_PLAN.md)；之后 F5-2／F5-3 迁移质量页面并替换旧本地质量结果 adapter。
-- **词根拓扑修复（共享祖先与循环）**：已确认缺陷并写成 [词源图计划](docs/ETYMOLOGY_GRAPH_PLAN.md)，第 7 节的决策待用户确认后实施 G1–G3；应先于 F5-1。
+- **词源网络视图对循环和菱形缺少表达**（2026-09-30 检查）：视图只显示一层来源和衍生词；两个词互相引用时对方只出现在来源栏，两条反向连线重叠成双箭头，更长的循环和菱形都看不出来。`/entry-relations` 返回的 `rootGroup` 前端拿到但没有渲染。改进方向（循环标记、双向节点、展开到词根层级）属于界面设计，待用户决定。
 - **浏览态词源回退文本**：关系数据加载完成前仍读取前端完整快照（`renderEtymology()`），不在来源补全计划范围内。
 
 ## 4. 待视觉审查（记录，暂不单独修复）
@@ -45,11 +45,10 @@
 
 ## 6. 路线图
 
-1. **词源图与词根拓扑修复**：[计划](docs/ETYMOLOGY_GRAPH_PLAN.md)。
-2. **F5 质量检查查询化**：见上文；`source_cycle` 消费词源图模块的分量结果。
-3. **阶段 A+ 触摸、焦点与无障碍**：[计划](docs/TOUCH_FOCUS_A11Y_PLAN.md)，建议在阶段 B 或 C 之后集中处理。
-4. **阶段 C 例句迁移为语料单元链接**：[计划](docs/EXAMPLE_CORPUS_LINK_PLAN.md)。
-5. **阶段 D 语料库工作区重做**：[计划](docs/CORPUS_WORKSPACE_PLAN.md)，依赖阶段 C。
+1. **F5 质量检查查询化**：见上文；`source_cycle` 消费[词源图模块](docs/ETYMOLOGY_GRAPH_PLAN.md)的分量结果。
+2. **阶段 A+ 触摸、焦点与无障碍**：[计划](docs/TOUCH_FOCUS_A11Y_PLAN.md)，建议在阶段 B 或 C 之后集中处理。
+3. **阶段 C 例句迁移为语料单元链接**：[计划](docs/EXAMPLE_CORPUS_LINK_PLAN.md)。
+4. **阶段 D 语料库工作区重做**：[计划](docs/CORPUS_WORKSPACE_PLAN.md)，依赖阶段 C。
 
 约束：
 

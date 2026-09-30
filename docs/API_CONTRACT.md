@@ -245,7 +245,7 @@ GET /api/dictionaries/:id/settings
 
 SQLite repository 的 `readState()` / `listDictionaries()` 已只返回词典 metadata 和 summary；前端启动流程始终将 `/api/state` 的 `dictionaries` 当作 metadata，再按需加载 active dictionary。每本词典都通过轻量 SQL 返回 `entryCount` 和 `rootCount`，不会在启动、词典切换或打开词典管理页时建立词根拓扑。
 
-基础关系统计按来源记录是否存在严格分类：没有任何 `entry_sources` 行的词条计入 `rootCount`，至少有一行的词条计入 `derivedCount`，两类互斥。来源无法解析或形成循环时，词根模式可以为可见性建立回退分组；这类分组不改变基础分类，因此 `/root-groups` 的分组总数不保证等于 `rootCount`。
+基础关系统计按来源记录是否存在严格分类：没有任何 `entry_sources` 行的词条计入 `rootCount`，至少有一行的词条计入 `derivedCount`，两类互斥。词根模式的分组按下文“词根拓扑语义”计算：只有未解析来源的词条和无外部祖先的循环成员也会各自成组，但不改变基础分类，因此 `/root-groups` 的分组总数不保证等于 `rootCount`。
 
 示例：
 
@@ -585,6 +585,14 @@ GET /api/dictionaries/:id/entry-relations/:entryId
 
 词汇网络详情视图和词根模式均已接入后端关系/词根读取端点。词根模式和词汇网络同根组复用 SQLite repository 的稳定词根拓扑；词典摘要的严格 `rootCount` 独立按无来源词条轻量计算。来源匹配与直接衍生词仍由相同 repository 关系边界返回，不再由前端扫描完整活动词典。
 
+词根拓扑语义（由 `lib/etymology-graph-model.js` 计算，设计见 [词源图计划](ETYMOLOGY_GRAPH_PLAN.md)）：
+
+- 以“词条 → 已解析来源”为边建图；指向不存在词条的来源和纯文本来源不构成边，同一目标只算一次。
+- 没有外部祖先的强连通分量是源分量，其所有成员都是词根：没有已解析来源的词条是自身的词根；无外部祖先的循环中每个成员各自为根，并互为衍生词。
+- 其他词条属于其全部祖先源分量的词根组；共享祖先（菱形）不会使中间词条成为词根，有外部词根的循环成员也不单独成组。
+- 词根不出现在自己组的衍生词中，`derivedCount` 不计词根自身。
+- 分组只取决于词条集合和来源目标，与来源顺序、lemma 和排序无关；排序只影响组和组内衍生词的顺序。
+
 词根模式读取端点：
 
 ```text
@@ -649,7 +657,7 @@ GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&so
 
 性能优化方向：
 
-- repository 已以独立 relation generation 缓存与搜索条件无关的 `rootId -> derivedIds` 稳定拓扑，并同时维护 `entryId -> rootIds`、`rootId -> group` 反向索引；词根查询会话进一步维护 `rootId -> resultIndex`。`/root-groups`、组内子项和 `/entry-relations/:entryId` 复用该拓扑，词典摘要计数不依赖它。拓扑组和查询结果位置的定位均为 O(1)，关系响应仍需按实际返回条目数读取并构建 DTO。词条增删、lemma/来源变化、整库替换和词典删除会使其失效；普通词条保存/patch 仅同步轻量排序记录，其他模块保存不触碰拓扑。查询 session/cursor 的 cache generation 仍按查询一致性要求独立失效。
+- repository 已以独立 relation generation 缓存与搜索条件无关的 `rootId -> derivedIds` 稳定拓扑，并同时维护 `entryId -> rootIds`、`rootId -> group` 反向索引；词根查询会话进一步维护 `rootId -> resultIndex`。`/root-groups`、组内子项和 `/entry-relations/:entryId` 复用该拓扑，词典摘要计数不依赖它。拓扑组和查询结果位置的定位均为 O(1)，关系响应仍需按实际返回条目数读取并构建 DTO。词条增删、来源目标变化、整库替换和词典删除会使其失效；lemma 改名及其他普通词条保存/patch 仅同步轻量排序记录，其他模块保存不触碰拓扑。查询 session/cursor 的 cache generation 仍按查询一致性要求独立失效。
 - `/root-groups` 搜索直接从 `entry_search_values` / `entry_morphology_search_values` 获取命中 ID，再筛选稳定拓扑，不导出完整词典 snapshot。`entry-relations/:entryId` 已复用同一拓扑的反向索引；后续质量检查中的词源问题仍应继续收敛到该关系查询层。
 - SQLite 后端用 `entry_sources(target_entry_id, entry_id)` 索引支持词根分组和词汇网络查询；`source_text` 保留显示/搜索文本，旧 JSON conversion 与 migration 不参与运行期查询。
 - 前端词根模式正常路径以 `/root-groups` 为准；请求失败时显示失败状态，不回退前端本地完整分组。父级未加载窗口以 `pageInfo.total` 和 `windowMetrics` 建立占位，因此滚动条可在折叠、搜索自动展开及全局展开状态下代表完整词根组集合。全局展开采用状态意图：父级页进入可见范围后才加载各组衍生词；单组收起作为例外保留到重新展开或“全部收起/全部展开”重置。组内衍生词不建立第二层分页窗口。

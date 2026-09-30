@@ -572,6 +572,24 @@ async function checkRepositoryIntegration() {
     await repository.queryEntries(dictionary.id, fuzzyQuery);
     assert.equal(fuzzyBuilds, 2, "a successful write must rebuild the fuzzy session");
 
+    // The topology depends only on entries and source targets, so a rename
+    // refreshes the cached sort record instead of rebuilding.
+    const renamedLemma = "zzzz renamed root";
+    const renamedRootEntry = await repository.saveEntry(dictionary.id, { ...savedRootEntry.entry, lemma: renamedLemma });
+    assert.equal(
+      repository.rootTopologyCache.generation(dictionary.id),
+      topologyGenerationBeforeEntrySave,
+      "a lemma rename must not invalidate the root topology",
+    );
+    const renamedAsc = await repository.queryRootGroups(dictionary.id, { sort: "lemmaAsc", limit: 100 });
+    const renamedDesc = await repository.queryRootGroups(dictionary.id, { sort: "lemmaDesc", limit: 100 });
+    assert.equal(topologyBuilds, 1, "a lemma rename should reuse the root topology");
+    assert.equal(repository.currentRootTopology(dictionary.id).entriesById.get(rootEntry.id).lemma, renamedLemma);
+    assert.equal(renamedAsc.items.at(-1).root.id, rootEntry.id, "root groups sort by the renamed lemma");
+    assert.equal(renamedAsc.items.at(-1).root.lemma, renamedLemma);
+    assert.equal(renamedDesc.items[0].root.id, rootEntry.id);
+    await repository.saveEntry(dictionary.id, { ...renamedRootEntry.entry, lemma: rootEntry.lemma });
+
     const routeEntry = await repository.getEntry(dictionary.id, "entry-route");
     await repository.saveEntry(dictionary.id, {
       ...routeEntry,

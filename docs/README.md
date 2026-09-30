@@ -12,7 +12,7 @@
 | [Query Session Cache Plan](QUERY_SESSION_CACHE_PLAN.md) | 已实装设计参考 | 查询会话、cursor、缓存失效、窗口化和结果定位语义。 |
 | [Advanced Filter Query Plan](ADVANCED_FILTER_QUERY_PLAN.md) | F0–F4 核心完成 / F5-0 已完成 | EntryFilter、轻量分析、IPA/形态 feature result，以及 Gloss/质量结果的后续边界。 |
 | [Feature Result Session Plan](FEATURE_RESULT_SESSION_PLAN.md) | F4b-0–F4b-3 已完成 | IPA/形态结果源、运行时会话、音系引擎边界和分阶段验收。 |
-| [Etymology Graph Plan](ETYMOLOGY_GRAPH_PLAN.md) | 计划，未实装 | 修复共享祖先与循环下的词根拓扑；来源图 SCC 分解共享模块，F5-1 词源规则的前置。 |
+| [Etymology Graph Plan](ETYMOLOGY_GRAPH_PLAN.md) | 已实装（2026-09-30） | 词根拓扑语义与来源图强连通分量共享模块；F5-1 `source_cycle` 消费其分量结果。 |
 | [Quality Result Plan](QUALITY_RESULT_PLAN.md) | F5-0 已完成 / F5-1–F5-3 待办 | 质量规则集、issue/summary、独立查询 API、结果会话与迁移验收。 |
 | [Source Autocomplete Plan](SOURCE_AUTOCOMPLETE_PLAN.md) | 已实装（2026-09-30），界面验收部分待完成 | 来源补全复用 lemma 搜索 projection 的只读候选查询、消歧 DTO、异步 controller 与键盘契约。 |
 | [App Shell Specification](APP_SHELL_SPEC.md) | 阶段 A 已完成 | 响应式应用外壳：布局、外壳状态模型、DOM/CSS 边界、断点与验收。 |

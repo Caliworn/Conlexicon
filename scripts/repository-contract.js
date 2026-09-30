@@ -1036,7 +1036,6 @@ function checkModelNormalization() {
     entryRelationsModel.findDerivedEntries(relationDictionary.entries[0], relationDictionary, { index: relationIndex }).map((entry) => entry.id),
     ["entry-derived-id", "entry-derived-lemma"],
   );
-  assert.equal(entryRelationsModel.rootCount(relationDictionary, { index: relationIndex }), 1);
   assert.equal(
     entrySearchModel.entryMatchesSearchText(
       { lemma: "acar", definitions: [{ meaning: "root" }] },
@@ -1587,6 +1586,115 @@ function checkModelNormalization() {
     settings: { ipa: { mappings: [{ from: "a", to: "b" }] } },
   });
   assert.deepEqual(textOnlyIpa.settings.ipa.mappings, [{ from: "a", to: "b", before: "", after: "" }]);
+}
+
+// Shared ancestors, cycles and multiple roots must group by the etymology
+// graph alone; the expected groups are spelled out rather than derived from
+// the same model the repository uses.
+async function checkRootTopologyShapes(repository) {
+  const previousState = await repository.readState();
+  const entry = (key, lemma, sources = []) => ({
+    id: `entry-topo-${key}`,
+    lemma,
+    etymology: {
+      sources: sources.map((source) => (source.startsWith("text:")
+        ? { entryId: "", text: source.slice(5) }
+        : { entryId: `entry-topo-${source}`, text: source })),
+    },
+  });
+  const dictionary = await repository.createDictionary(normalizeDictionary({
+    id: "dict-root-topology-shapes",
+    name: "Root Topology Shapes",
+    entries: [
+      entry("t", "tree"),
+      entry("l", "leaf", ["t"]),
+      entry("r", "root-branch", ["t"]),
+      entry("d", "diamond", ["l", "r"]),
+      entry("a", "alef", ["b"]),
+      entry("b", "bet", ["a"]),
+      entry("x", "xi", ["a"]),
+      entry("u", "under"),
+      entry("p", "pa", ["u", "q"]),
+      entry("q", "qa", ["p"]),
+      entry("m", "mono"),
+      entry("n", "nu"),
+      entry("k", "kappa", ["m", "n"]),
+      entry("z", "zeta", ["text:lost"]),
+      entry("y", "ypsilon", ["z"]),
+    ],
+  }));
+  const id = (key) => `entry-topo-${key}`;
+  const base = `/api/dictionaries/${encodeURIComponent(dictionary.id)}`;
+  try {
+    const expectedGroups = [
+      ["a", ["b", "x"]],
+      ["b", ["a", "x"]],
+      ["m", ["k"]],
+      ["n", ["k"]],
+      ["t", ["d", "l", "r"]],
+      ["u", ["p", "q"]],
+      ["z", ["y"]],
+    ].map(([rootKey, derivedKeys]) => ({ rootId: id(rootKey), derivedIds: derivedKeys.map(id) }));
+    const groupsResult = await callApi(repository, "GET", `${base}/root-groups?sort=lemmaAsc&limit=100`);
+    assert.equal(groupsResult.statusCode, 200);
+    const actualGroups = [];
+    for (const group of groupsResult.body.items) {
+      const entriesResult = await callApi(repository, "GET", `${base}/root-groups/${encodeURIComponent(group.root.id)}/entries?sort=lemmaAsc`);
+      assert.equal(group.derivedCount, entriesResult.body.items.length);
+      actualGroups.push({ rootId: group.root.id, derivedIds: entriesResult.body.items.map((item) => item.id) });
+    }
+    assert.deepEqual(actualGroups, expectedGroups, "root groups follow shared ancestors and cycles, never intermediate entries");
+    await assertRootGroupQueryConsistency(repository, dictionary, {});
+    await assertRootGroupQueryConsistency(repository, dictionary, { q: "xi" });
+    await assertRootGroupQueryConsistency(repository, dictionary, { sort: "lemmaDesc" });
+
+    const relationRoot = async (key) => {
+      const result = await callApi(repository, "GET", `${base}/entry-relations/${encodeURIComponent(id(key))}`);
+      assert.equal(result.statusCode, 200);
+      return {
+        rootKey: result.body.rootGroup.rootKey,
+        entryIds: result.body.rootGroup.entries.map((item) => item.id).sort(),
+      };
+    };
+    assert.deepEqual(await relationRoot("d"), { rootKey: "tree", entryIds: ["d", "l", "r", "t"].map(id).sort() });
+    assert.deepEqual(await relationRoot("r"), { rootKey: "tree", entryIds: ["d", "l", "r", "t"].map(id).sort() });
+    assert.deepEqual(await relationRoot("x"), { rootKey: "alef", entryIds: ["a", "b", "x"].map(id).sort() });
+    assert.deepEqual(await relationRoot("q"), { rootKey: "under", entryIds: ["p", "q", "u"].map(id).sort() });
+
+    const locate = (key, extra = "") => callApi(
+      repository,
+      "GET",
+      `${base}/root-groups/location?entryId=${encodeURIComponent(id(key))}&sort=lemmaAsc&limit=100${extra}`,
+    );
+    let located = await locate("x", `&preferredRootId=${encodeURIComponent(id("b"))}`);
+    assert.deepEqual(
+      [located.body.location.found, located.body.location.rootId, located.body.location.groupIndex],
+      [true, id("b"), 1],
+      "a cycle descendant can be located under either cycle root",
+    );
+    located = await locate("d");
+    assert.deepEqual([located.body.location.rootId, located.body.location.groupIndex], [id("t"), 4]);
+    await assert.rejects(
+      () => locate("d", `&preferredRootId=${encodeURIComponent(id("r"))}`),
+      (error) => error?.status === 400 && error?.code === "invalid_root_context",
+      "an intermediate entry is not a root context",
+    );
+
+    const analysis = await callApi(repository, "POST", `${base}/analysis/query`, {
+      widgets: [{ id: "families", type: "rootFamilyRanking" }],
+    });
+    assert.equal(analysis.statusCode, 200);
+    assert.equal(analysis.body.widgets.families.familyCount, 7);
+    assert.deepEqual(
+      analysis.body.widgets.families.rows.map((row) => [row.lemma, row.derivedEntryCount]),
+      [["tree", 3], ["alef", 2], ["bet", 2], ["under", 2], ["mono", 1], ["nu", 1], ["zeta", 1]],
+    );
+  } finally {
+    await repository.deleteDictionary(dictionary.id);
+    if (previousState.activeDictionaryId) {
+      await repository.activateDictionary(previousState.activeDictionaryId);
+    }
+  }
 }
 
 async function checkReadApiConsistency(repository) {
@@ -2167,6 +2275,7 @@ async function runRepositoryContractTests(options = {}) {
     assert.equal(apiResult.body.items[0].rootGroupMatch, true);
 
     await checkReadApiConsistency(repository);
+    await checkRootTopologyShapes(repository);
     if (shouldStopAfter("readApi")) {
       return { completedStage: "readApi" };
     }

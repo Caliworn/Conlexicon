@@ -16,6 +16,7 @@ const CHECK_GROUPS = [
       "check-quality-model.js",
       "check-search-normalization.js",
       "check-source-candidate-ranking.js",
+      "check-etymology-graph.js",
       "check-entry-query-model.js",
       "check-query-page-cache.js",
       "check-liquid-glass-geometry.js",
