@@ -1607,7 +1607,7 @@ label span {
 
 .entry-display {
   display: grid;
-  gap: 20px;
+  gap: var(--material-entry-detail-section-gap);
   padding: 28px;
   border: 1px solid var(--material-entry-detail-border);
   border-radius: var(--radius-panel);
@@ -1624,7 +1624,7 @@ label span {
   gap: 18px;
   flex-wrap: wrap;
   padding-bottom: 20px;
-  border-bottom: 1px solid color-mix(in srgb, var(--material-entry-detail-border) 72%, transparent);
+  border-bottom: 1px solid var(--material-entry-detail-header-divider);
 }
 
 .entry-display-header > div:first-child {
@@ -1669,9 +1669,23 @@ label span {
   cursor: context-menu;
 }
 
-.entry-display [data-edit-section]:hover,
-.entry-display [data-edit-section].partial-editing {
+.entry-display-header[data-edit-section]:hover,
+.entry-display-header[data-edit-section].partial-editing {
   border-color: color-mix(in srgb, var(--ui-accent) 42%, var(--ui-border));
+}
+
+/* Each skin chooses how sections separate (outlined cards, glass bands or
+   hairlines); hover and partial editing reuse that same material. */
+.display-section[data-edit-section]:hover {
+  border-color: var(--material-entry-detail-section-hover-outline);
+  background: var(--material-entry-detail-section-hover-surface);
+  box-shadow: var(--material-entry-detail-section-hover-edge);
+}
+
+.display-section[data-edit-section].partial-editing {
+  border-color: var(--material-entry-detail-section-editing-outline);
+  background: var(--material-entry-detail-section-editing-surface);
+  box-shadow: var(--material-entry-detail-section-editing-edge);
 }
 
 .entry-display [data-edit-section].partial-editing > :not(.inline-partial-edit-form) {
@@ -1769,14 +1783,28 @@ label span {
 }
 
 .display-section {
+  position: relative;
   display: grid;
   gap: 14px;
   min-width: 0;
-  max-width: 100%;
-  border: 1px solid var(--material-entry-detail-section-border);
-  border-radius: 2px;
-  padding: 16px;
-  background: var(--material-entry-detail-section-background);
+  max-width: calc(100% + 2 * var(--material-entry-detail-section-bleed));
+  margin-inline: calc(-1 * var(--material-entry-detail-section-bleed));
+  border: 1px solid var(--material-entry-detail-section-outline);
+  border-radius: 6px;
+  padding: var(--material-entry-detail-section-padding);
+  background: var(--material-entry-detail-section-surface);
+  box-shadow: var(--material-entry-detail-section-edge);
+  transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.display-section::before {
+  position: absolute;
+  top: -1px;
+  right: var(--material-entry-detail-section-bleed);
+  left: var(--material-entry-detail-section-bleed);
+  border-top: 1px solid var(--material-entry-detail-section-divider);
+  content: "";
+  pointer-events: none;
 }
 
 .section-heading {
@@ -1794,22 +1822,16 @@ label span {
 
 .definition-display-card {
   display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
   min-width: 0;
   max-width: 100%;
-  padding: 18px;
-  border: 1px solid var(--ui-border);
-  background: var(--material-panel-background);
 }
 
 .definition-number {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  background: var(--ui-border);
-  color: var(--ui-text);
+  padding-top: 0.2rem;
+  color: var(--ui-text-muted);
+  font-variant-numeric: tabular-nums;
   font-weight: 900;
 }
 
@@ -1831,9 +1853,12 @@ label span {
   gap: 8px;
   min-width: 0;
   max-width: 100%;
-  padding: 12px;
-  border: 1px solid var(--ui-border);
-  background: color-mix(in srgb, var(--material-panel-background) 92%, var(--ui-canvas-bg));
+}
+
+.example-box {
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--ui-text) 5%, transparent);
 }
 
 .example-box > span,
@@ -2263,11 +2288,9 @@ button.pending-source:focus-visible {
   min-width: 0;
 }
 
-.morphology-display-group {
-  padding: 14px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-panel);
-  background: color-mix(in srgb, var(--material-panel-background) 92%, var(--ui-canvas-bg));
+.morphology-display-group + .morphology-display-group {
+  padding-top: 14px;
+  border-top: 1px solid var(--ui-border);
 }
 
 .morphology-display-group-heading {
@@ -5885,8 +5908,7 @@ textarea.ipa-single-line::-webkit-scrollbar {
     padding: 18px;
   }
 
-  .entry-display-header,
-  .definition-display-card {
+  .entry-display-header {
     grid-template-columns: 1fr;
   }
 
@@ -5919,6 +5941,7 @@ textarea.ipa-single-line::-webkit-scrollbar {
   .content-grid,
   .entry-browser-toggle-icon,
   .content-disclosure-icon,
+  .display-section,
   .entry-quality-issue-tooltip,
   .toast,
   .theme-toggle-glyph {

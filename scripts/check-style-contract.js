@@ -1042,10 +1042,44 @@ assert(
 );
 assert(
   styles.includes("background: var(--material-entry-detail-background);")
-    && styles.includes("background: var(--material-entry-detail-section-background);")
     && styles.includes("backdrop-filter: var(--material-entry-detail-filter);"),
-  "Entry detail must use its focused-object shell and stable section materials",
+  "Entry detail must use its focused-object shell",
 );
+// Skins differ in how detail sections separate (outlined cards, glass bands,
+// hairlines), so the shared section rule and its hover/editing states must read
+// every separation channel from skin tokens instead of fixed component values.
+{
+  const sectionBlock = scopedBlock(styles, ".display-section")[1];
+  for (const declaration of [
+    "border: 1px solid var(--material-entry-detail-section-outline);",
+    "padding: var(--material-entry-detail-section-padding);",
+    "background: var(--material-entry-detail-section-surface);",
+    "box-shadow: var(--material-entry-detail-section-edge);",
+  ]) {
+    assert(sectionBlock.includes(declaration), `Detail sections must consume skin separation tokens: ${declaration}`);
+  }
+  assert(
+    scopedBlock(styles, ".display-section::before")[1].includes("border-top: 1px solid var(--material-entry-detail-section-divider);"),
+    "Hairline section dividers must come from the skin divider token",
+  );
+  for (const [state, selector] of [
+    ["hover", ".display-section[data-edit-section]:hover"],
+    ["editing", ".display-section[data-edit-section].partial-editing"],
+  ]) {
+    const block = scopedBlock(styles, selector)[1];
+    for (const channel of ["surface", "outline", "edge"]) {
+      assert(
+        block.includes(`var(--material-entry-detail-section-${state}-${channel})`),
+        `Editable section ${state} state must use the skin ${channel} token`,
+      );
+    }
+  }
+  assert(
+    /--material-control-background:\s*var\(--material-entry-detail-section-background\)/.test(liquidGlass)
+      && /--material-entry-detail-section-surface:\s*transparent;/.test(liquidGlass),
+    "Liquid Glass fields keep the opaque section material while detail sections use a separate transparent surface",
+  );
+}
 assert(
   styles.includes("background: var(--material-rich-tooltip-background);")
     && styles.includes("backdrop-filter: var(--material-rich-tooltip-filter);")

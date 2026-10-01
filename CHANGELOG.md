@@ -8,6 +8,7 @@
 
 ### 改进
 
+- 词条详情去掉多层嵌套框：只保留一层详情外壳，释义条目、例句、释义备注和形态组不再各自加框；释义编号改为普通数字，例句保留唯一的浅色底块，形态组之间用细线分隔。三套皮肤共用同一套分区结构，用不同的分隔方式区分：经典保留带边框的分区卡片；层叠玻璃改为无边框的半透明玻璃带，上沿有内侧高光、下沿有暗边和轻投影，带间留缝透出玻璃外壳；液态玻璃只在一整片玻璃内用细线分隔分区。可局部编辑分区的悬浮和编辑态也按皮肤区分：经典改变边框颜色，层叠玻璃让玻璃带变亮，液态玻璃显示浅色底；编辑态比悬浮更明显。分区间距、内边距和外扩量作为例外进入皮肤 token（见 `docs/STYLE_SKIN_PLAN.md`），样式契约随之改为检查分区规则消费这些 token。浏览器验收范围和未检查项见交接文档。
 - Liquid Glass Lab 只保留生产光学引擎：删除 SDF Baseline（`lib/liquid-glass-sdf-baseline.js` 及几何检查中的对应断言）和本机 Reference Baseline（`lib/liquid-glass-reference-baseline.js` 及 `.gitignore` 条目），移除渲染路径选择、两条 Baseline 的控件、滤镜宿主与样式，页面约从 2380 行减至 1820 行。此前页面强制要求被 Git 忽略的 Reference 模块，新克隆打开即报错，这一问题随之消除。README、液态玻璃规范同步更新；`THIRD_PARTY_NOTICES.md` 删除已不再分发的 `liquid-glass-web-react` MIT 声明，并补上此前漏列的 Lab 背景 `interior.jpg`（经核实为 Spacejoy 在 Unsplash 发布的“White and brown living room set”，Unsplash License），删除内容重复的 `assets/liquid-glass-lab/README.md`，五张背景图的许可、作者、原始页面以及“直接取自 `archisvaze/liquid-glass` 参考项目”的来源统一记录在 `THIRD_PARTY_NOTICES.md`。
 
 ### 修复
