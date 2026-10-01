@@ -10755,6 +10755,7 @@ function synchronizePageTabs(host, focusedId = "") {
   let primaryPanel = body;
   if (primary && secondary) {
     primaryPanel = document.createElement("div");
+    primaryPanel.className = "analysis-tab-panel";
     secondary.before(primaryPanel);
     primaryPanel.append(secondary, body);
   }
