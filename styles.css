@@ -620,7 +620,9 @@ body[data-entry-layout="mail"] .entry-mail-tools {
   gap: 4px;
   width: fit-content;
   max-width: 100%;
-  align-self: center;
+  /* Left-aligned so a capsule that wraps or changes width never moves the
+     buttons before the change. */
+  align-self: flex-start;
 }
 
 body[data-entry-layout="mail"] .entry-mail-primary-tools {
@@ -629,8 +631,22 @@ body[data-entry-layout="mail"] .entry-mail-primary-tools {
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
+}
+
+body[data-entry-layout="mail"] .entry-mail-divider {
+  flex: 0 0 1px;
+  align-self: center;
+  width: 1px;
+  height: 22px;
+  margin: 0 3px;
+  background: color-mix(in srgb, var(--ui-text) 22%, transparent);
+}
+
+/* Root actions stay visible in place; unavailable ones must read as unavailable. */
+body[data-entry-layout="mail"] .entry-mail-tools :is(button:disabled, button[aria-disabled="true"]) .nav-icon {
+  opacity: 0.4;
 }
 
 body[data-entry-layout="mail"] .entry-mail-root-actions:not([hidden]) {

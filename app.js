@@ -661,6 +661,7 @@ const i18n = {
     tagDisplayReplacementHelp: "每行一条，格式为“标签 = 显示文本”。只改变界面显示，不修改标签本身。",
     entryListRawTagDisplay: "词条列表中显示原始标签",
     filterMenuRawTagDisplay: "筛选菜单中显示原始标签",
+    rootModeNeedsNoFilter: "清除筛选后可用",
     entryListTagDisplayLimit: "词条列表中标签显示上限",
     entryListTagDisplayLimitHelp: "设为 n 时，超过 n 个标签会显示前 n-1 个和省略号。默认为 3。",
     entryListTagDisplayLimitInvalid: "词条列表标签显示上限必须是 2 到 10 之间的整数。",
@@ -1277,6 +1278,7 @@ const i18n = {
     tagDisplayReplacementHelp: "Enter one per line in the format “Tag = Display Text”. This changes only the interface display and does not modify the tag itself.",
     entryListRawTagDisplay: "Show raw tags in the entry list",
     filterMenuRawTagDisplay: "Show raw tags in the filter menu",
+    rootModeNeedsNoFilter: "Clear the filter to use it",
     entryListTagDisplayLimit: "Entry list tag display limit",
     entryListTagDisplayLimitHelp: "Set to n: entries with more than n tags show the first n-1 tags and an ellipsis. Default: 3.",
     entryListTagDisplayLimitInvalid: "Entry list tag display limit must be an integer from 2 to 10.",
@@ -3641,6 +3643,8 @@ function applyAppearance() {
     positionMenu: (menu, trigger) => entryWorkspaceLayout?.positionMenu(menu, trigger),
   });
   const entryLayoutChanged = entryWorkspaceLayout.apply(currentSkin);
+  renderRootModeControls();
+  entryWorkspaceLayout.sync();
   entrySortControl.sync();
   if (entryLayoutChanged) {
     // Density can change even when the mobile drawer width stays identical.
@@ -4656,9 +4660,6 @@ function renderPartFilterControls(dictionary, usedParts = null) {
   elements.entryFilterButton.classList.toggle("active", hasCurrentFilter);
   elements.rootModeToggleButton.querySelector("span").textContent = t("rootMode");
   elements.rootModeToggleButton.setAttribute("aria-pressed", String(rootMode));
-  elements.rootModeToggleButton.hidden = Boolean(activeFilter);
-  elements.expandAllRootsButton.hidden = !rootMode || Boolean(activeFilter);
-  elements.collapseAllRootsButton.hidden = !rootMode || Boolean(activeFilter);
   elements.activeFilterToolbar.hidden = !hasCurrentFilter;
   renderActiveFilterRefreshAvailability();
   elements.activeFilterCycleButton.hidden = !activeFilter || !canCycleActiveFilter();
@@ -4673,14 +4674,34 @@ function renderPartFilterControls(dictionary, usedParts = null) {
     elements.activeFilterLabel.removeAttribute("aria-label");
     elements.entryFilterButton.setAttribute("aria-label", t("filterEntries"));
   }
-  const hasRootSearch = Boolean(normalizeEntrySearchText(searchQuery));
-  const rootGroupsReady = rootMode && rootGroupsQueryState.status === "success";
-  elements.expandAllRootsButton.disabled = rootMode
-    && (hasRootSearch || !rootGroupsReady || (rootExpansionMode === "all" && !collapsedRootEntries.size));
-  elements.collapseAllRootsButton.disabled = rootMode
-    && (hasRootSearch || !rootGroupsReady || (rootExpansionMode === "manual" && !expandedRootEntries.size));
+  renderRootModeControls();
   entryWorkspaceLayout?.sync();
   entrySortControl?.sync();
+}
+
+// The Mail toolbar keeps every root control in place and disables what is
+// unavailable, so entering root mode or applying a filter never shifts its
+// buttons under the pointer. The standard layout keeps hiding them.
+function renderRootModeControls() {
+  const mail = document.body.dataset.entryLayout === "mail";
+  const filtered = Boolean(activeFilter);
+  const rootAvailable = rootMode && !filtered;
+  const hasRootSearch = Boolean(normalizeEntrySearchText(searchQuery));
+  const rootGroupsReady = rootMode && rootGroupsQueryState.status === "success";
+  elements.rootModeToggleButton.hidden = filtered && !mail;
+  if (mail && filtered) {
+    elements.rootModeToggleButton.setAttribute("aria-disabled", "true");
+    elements.rootModeToggleButton.dataset.appTooltipLabel = `${t("rootMode")} · ${t("rootModeNeedsNoFilter")}`;
+  } else {
+    elements.rootModeToggleButton.removeAttribute("aria-disabled");
+    delete elements.rootModeToggleButton.dataset.appTooltipLabel;
+  }
+  elements.expandAllRootsButton.hidden = !rootAvailable && !mail;
+  elements.collapseAllRootsButton.hidden = !rootAvailable && !mail;
+  elements.expandAllRootsButton.disabled = !rootAvailable || hasRootSearch || !rootGroupsReady
+    || (rootExpansionMode === "all" && !collapsedRootEntries.size);
+  elements.collapseAllRootsButton.disabled = !rootAvailable || hasRootSearch || !rootGroupsReady
+    || (rootExpansionMode === "manual" && !expandedRootEntries.size);
 }
 
 function renderActiveFilterRefreshAvailability() {
@@ -16912,7 +16933,8 @@ elements.rootModeToggleButton.addEventListener("click", () => {
 
 elements.expandAllRootsButton.addEventListener("click", () => {
   if (
-    activeFilter
+    !rootMode
+    || activeFilter
     || normalizeEntrySearchText(searchQuery)
     || rootGroupsQueryState.status !== "success"
   ) {
@@ -16927,7 +16949,7 @@ elements.expandAllRootsButton.addEventListener("click", () => {
 });
 
 elements.collapseAllRootsButton.addEventListener("click", () => {
-  if (activeFilter || normalizeEntrySearchText(searchQuery)) {
+  if (!rootMode || activeFilter || normalizeEntrySearchText(searchQuery)) {
     return;
   }
   resetRootExpansionState();
