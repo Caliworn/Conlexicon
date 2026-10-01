@@ -520,6 +520,15 @@ const i18n = {
     sortUpdatedDesc: "编辑时间倒序",
     sortCreatedAsc: "创建时间正序",
     sortCreatedDesc: "创建时间倒序",
+    sortGroupKey: "排序依据",
+    sortGroupOrder: "顺序",
+    sortKeyLemma: "词形",
+    sortKeyUpdated: "编辑时间",
+    sortKeyCreated: "创建时间",
+    sortAToZ: "A → Z",
+    sortZToA: "Z → A",
+    sortNewestFirst: "最新在前",
+    sortOldestFirst: "最早在前",
     editEntry: "编辑词条",
     entryContextMenu: "词条操作",
     createDerivedEntry: "新建衍生条目",
@@ -651,6 +660,7 @@ const i18n = {
     tagDisplayReplacement: "标签显示替换",
     tagDisplayReplacementHelp: "每行一条，格式为“标签 = 显示文本”。只改变界面显示，不修改标签本身。",
     entryListRawTagDisplay: "词条列表中显示原始标签",
+    filterMenuRawTagDisplay: "筛选菜单中显示原始标签",
     entryListTagDisplayLimit: "词条列表中标签显示上限",
     entryListTagDisplayLimitHelp: "设为 n 时，超过 n 个标签会显示前 n-1 个和省略号。默认为 3。",
     entryListTagDisplayLimitInvalid: "词条列表标签显示上限必须是 2 到 10 之间的整数。",
@@ -1126,6 +1136,15 @@ const i18n = {
     sortUpdatedDesc: "Updated Newest",
     sortCreatedAsc: "Created Oldest",
     sortCreatedDesc: "Created Newest",
+    sortGroupKey: "Sort by",
+    sortGroupOrder: "Order",
+    sortKeyLemma: "Lemma",
+    sortKeyUpdated: "Last edited",
+    sortKeyCreated: "Created",
+    sortAToZ: "A → Z",
+    sortZToA: "Z → A",
+    sortNewestFirst: "Newest first",
+    sortOldestFirst: "Oldest first",
     editEntry: "Edit Entry",
     entryContextMenu: "Entry Actions",
     createDerivedEntry: "New Derived Entry",
@@ -1257,6 +1276,7 @@ const i18n = {
     tagDisplayReplacement: "Tag Display Replacement",
     tagDisplayReplacementHelp: "Enter one per line in the format “Tag = Display Text”. This changes only the interface display and does not modify the tag itself.",
     entryListRawTagDisplay: "Show raw tags in the entry list",
+    filterMenuRawTagDisplay: "Show raw tags in the filter menu",
     entryListTagDisplayLimit: "Entry list tag display limit",
     entryListTagDisplayLimitHelp: "Set to n: entries with more than n tags show the first n-1 tags and an ellipsis. Default: 3.",
     entryListTagDisplayLimitInvalid: "Entry list tag display limit must be an integer from 2 to 10.",
@@ -1610,6 +1630,7 @@ const elements = {
   entrySearchConfigFields: document.querySelector("#entrySearchConfigFields"),
   entrySearchDefaultButton: document.querySelector("#entrySearchDefaultButton"),
   partFilter: document.querySelector("#partFilter"),
+  partFilterChips: document.querySelector("#partFilterChips"),
   sortSelect: document.querySelector("#sortSelect"),
   collapsedNewEntryButton: document.querySelector("#collapsedNewEntryButton"),
   entryListNewEntryButton: document.querySelector("#entryListNewEntryButton"),
@@ -1687,6 +1708,7 @@ const elements = {
   entryExampleGlossAlignInput: document.querySelector("#entryExampleGlossAlignInput"),
   tagDisplayMapInput: document.querySelector("#tagDisplayMapInput"),
   entryListRawTagDisplayInput: document.querySelector("#entryListRawTagDisplayInput"),
+  filterMenuRawTagDisplayInput: document.querySelector("#filterMenuRawTagDisplayInput"),
   entryListTagDisplayLimitInput: document.querySelector("#entryListTagDisplayLimitInput"),
   entryListPartDisplayInput: document.querySelector("#entryListPartDisplayInput"),
   partOfSpeechTagsInput: document.querySelector("#partOfSpeechTagsInput"),
@@ -2354,6 +2376,7 @@ function normalizeDictionarySettings(settings = {}) {
     docsAutoSave: Boolean(settings.docsAutoSave ?? true),
     tagDisplayMap: normalizeTagDisplayMap(settings.tagDisplayMap),
     entryListRawTagDisplay: Boolean(settings.entryListRawTagDisplay),
+    filterMenuRawTagDisplay: Boolean(settings.filterMenuRawTagDisplay),
     entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(settings.entryListTagDisplayLimit),
     entryListPartDisplay: normalizeEntryListPartDisplay(settings.entryListPartDisplay),
     partOfSpeechTags: normalizeTagList(settings.partOfSpeechTags),
@@ -3434,6 +3457,7 @@ function applyLocale(root = document) {
   elements.rootModeToggleButton.querySelector("span").textContent = t("rootMode");
   elements.rootModeToggleButton.setAttribute("aria-pressed", String(rootMode));
   entryWorkspaceLayout?.sync();
+  entrySortControl?.sync();
 }
 
 function skinOptionLabel(skinId) {
@@ -3592,6 +3616,7 @@ function refreshEditableSurfaceLocale() {
 }
 
 let entryWorkspaceLayout;
+let entrySortControl;
 
 function applyAppearance() {
   const darkThemeActive = currentTheme === "dark";
@@ -3603,8 +3628,21 @@ function applyAppearance() {
   } else {
     delete document.body.dataset.uiSkin;
   }
-  entryWorkspaceLayout ||= window.createEntryWorkspaceLayout(document, { onMenuOpen: hideAppTooltip });
-  if (entryWorkspaceLayout.apply(currentSkin)) {
+  entryWorkspaceLayout ||= window.createEntryWorkspaceLayout(document, {
+    closeSort: () => entrySortControl?.close(),
+  });
+  entrySortControl ||= window.createEntrySortControl(document, {
+    translate: t,
+    onMenuOpen: () => {
+      hideAppTooltip();
+      setEntrySearchConfigOpen(false);
+      setEntryFilterMenuOpen(false);
+    },
+    positionMenu: (menu, trigger) => entryWorkspaceLayout?.positionMenu(menu, trigger),
+  });
+  const entryLayoutChanged = entryWorkspaceLayout.apply(currentSkin);
+  entrySortControl.sync();
+  if (entryLayoutChanged) {
     // Density can change even when the mobile drawer width stays identical.
     requestAnimationFrame(() => {
       syncEntryVirtualListAfterBrowserLayoutChange({ widthChanged: true });
@@ -4397,7 +4435,7 @@ function setEntrySearchConfigOpen(open) {
   elements.entrySearchConfigButton.setAttribute("aria-expanded", String(entrySearchConfigOpen));
   elements.entrySearchConfigMenu.hidden = !entrySearchConfigOpen;
   if (entrySearchConfigOpen) {
-    entryWorkspaceLayout?.close();
+    entrySortControl?.close();
     setEntryFilterMenuOpen(false);
     entryWorkspaceLayout?.positionMenu(elements.entrySearchConfigMenu, elements.entrySearchConfigButton);
   }
@@ -4409,9 +4447,9 @@ function setEntryFilterMenuOpen(open) {
     return;
   }
   if (entryFilterMenuOpen) {
-    entryWorkspaceLayout?.close();
+    entrySortControl?.close();
     setEntrySearchConfigOpen(false);
-    elements.partFilter.value = currentEntryPartFilter();
+    setPartFilterDraft(currentEntryPartFilter());
   }
   elements.entryFilterButton.setAttribute("aria-expanded", String(entryFilterMenuOpen));
   elements.entryFilterMenu.hidden = !entryFilterMenuOpen;
@@ -4533,7 +4571,7 @@ function renderPartFilter() {
   if (activeFilter) {
     rootMode = false;
   } else if (rootMode) {
-    elements.partFilter.value = "";
+    setPartFilterDraft("");
   }
   if (activeFilterUsesEntryQuery()) {
     refreshActiveFilterFacts(dictionary);
@@ -4549,23 +4587,68 @@ function renderPartFilterLocale() {
   renderPartFilterControls(dictionary, usedParts);
 }
 
+function renderPartFilterChips() {
+  const chips = [...elements.partFilter.options].map((option) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "entry-filter-part-chip";
+    chip.setAttribute("role", "radio");
+    chip.dataset.partValue = option.value;
+    chip.textContent = option.textContent;
+    chip.disabled = elements.partFilter.disabled;
+    if (option.value && option.value !== NO_PART_FILTER_VALUE) {
+      // Same raw/replacement tooltip as entry list tags.
+      const chipClasses = ["chip", "part-chip", tagIsRedHighlighted(option.value) ? "highlight-tag" : ""].filter(Boolean).join(" ");
+      chip.dataset.appTooltip = "always";
+      chip.dataset.appTooltipWrap = "true";
+      chip.dataset.appTooltipVariant = "tag-info";
+      chip.dataset.appTooltipLabel = option.textContent;
+      chip.dataset.appTooltipHtml = renderEntryListTagTooltipHtml(option.value, chipClasses);
+    }
+    return chip;
+  });
+  elements.partFilterChips.replaceChildren(...chips);
+  syncPartFilterChips();
+}
+
+function syncPartFilterChips() {
+  const chips = [...elements.partFilterChips.children];
+  const checked = chips.find((chip) => chip.dataset.partValue === elements.partFilter.value) || chips[0];
+  for (const chip of chips) {
+    chip.setAttribute("aria-checked", String(chip === checked));
+    chip.tabIndex = chip === checked ? 0 : -1;
+  }
+}
+
+function setPartFilterDraft(value, { focus = false } = {}) {
+  elements.partFilter.value = value;
+  syncPartFilterChips();
+  if (focus) {
+    elements.partFilterChips.querySelector('[aria-checked="true"]')?.focus();
+  }
+}
+
 function renderPartFilterControls(dictionary, usedParts = null) {
   const current = currentEntryPartFilter();
   const facetsReady = Array.isArray(usedParts);
   const pendingSelection = !facetsReady && current && current !== NO_PART_FILTER_VALUE ? [current] : [];
   const options = ["", NO_PART_FILTER_VALUE, ...(facetsReady ? usedParts : pendingSelection)];
 
+  const rawTags = normalizeDictionarySettings(dictionary?.settings).filterMenuRawTagDisplay;
   elements.partFilter.innerHTML = options
     .map((part) => {
       const label = part === NO_PART_FILTER_VALUE
         ? t("noPart")
-        : (part ? tagIdentityText(activeTagDisplayIdentity(part, dictionary)) : t("filterAny"));
+        : (part
+          ? (rawTags ? part : tagIdentityText(activeTagDisplayIdentity(part, dictionary)))
+          : t("filterAny"));
       return `<option value="${escapeHtml(part)}">${escapeHtml(label)}</option>`;
     })
     .join("");
 
   elements.partFilter.value = options.includes(current) ? current : "";
   elements.partFilter.disabled = !dictionary;
+  renderPartFilterChips();
   elements.searchInput.disabled = !dictionary;
   renderEntrySearchConfig();
   const hasCurrentFilter = Boolean(activeFilter);
@@ -4597,6 +4680,7 @@ function renderPartFilterControls(dictionary, usedParts = null) {
   elements.collapseAllRootsButton.disabled = rootMode
     && (hasRootSearch || !rootGroupsReady || (rootExpansionMode === "manual" && !expandedRootEntries.size));
   entryWorkspaceLayout?.sync();
+  entrySortControl?.sync();
 }
 
 function renderActiveFilterRefreshAvailability() {
@@ -13239,6 +13323,7 @@ function fillSettingsForm(dictionary) {
   elements.entryExampleGlossAlignInput.checked = settings.entryExampleGlossAlign;
   elements.tagDisplayMapInput.value = serializeTagDisplayMap(settings.tagDisplayMap);
   elements.entryListRawTagDisplayInput.checked = settings.entryListRawTagDisplay;
+  elements.filterMenuRawTagDisplayInput.checked = settings.filterMenuRawTagDisplay;
   elements.entryListTagDisplayLimitInput.value = settings.entryListTagDisplayLimit;
   elements.entryListPartDisplayInput.value = settings.entryListPartDisplay;
   elements.tagListSeparatorStyleInput.value = settings.tagListSeparatorStyle;
@@ -13494,6 +13579,7 @@ function settingsFormSnapshot() {
     docsAutoSave: elements.docsAutoSaveInput.checked,
     tagDisplayMap: normalizeTagDisplayMap(parseTagDisplayMap(elements.tagDisplayMapInput.value)),
     entryListRawTagDisplay: elements.entryListRawTagDisplayInput.checked,
+    filterMenuRawTagDisplay: elements.filterMenuRawTagDisplayInput.checked,
     entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(elements.entryListTagDisplayLimitInput.value),
     entryListPartDisplay: normalizeEntryListPartDisplay(elements.entryListPartDisplayInput.value),
     partOfSpeechTags: parseTagListText(elements.partOfSpeechTagsInput.value),
@@ -13531,6 +13617,7 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     docsAutoSave: settings.docsAutoSave,
     tagDisplayMap: settings.tagDisplayMap,
     entryListRawTagDisplay: settings.entryListRawTagDisplay,
+    filterMenuRawTagDisplay: settings.filterMenuRawTagDisplay,
     entryListTagDisplayLimit: settings.entryListTagDisplayLimit,
     entryListPartDisplay: settings.entryListPartDisplay,
     partOfSpeechTags: settings.partOfSpeechTags,
@@ -13688,6 +13775,7 @@ function collectDictionarySettingsFromForm(existing = {}) {
     docsAutoSave: elements.docsAutoSaveInput.checked,
     tagDisplayMap: parseTagDisplayMap(elements.tagDisplayMapInput.value),
     entryListRawTagDisplay: elements.entryListRawTagDisplayInput.checked,
+    filterMenuRawTagDisplay: elements.filterMenuRawTagDisplayInput.checked,
     entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(elements.entryListTagDisplayLimitInput.value),
     entryListPartDisplay: normalizeEntryListPartDisplay(elements.entryListPartDisplayInput.value),
     partOfSpeechTags: parseTagListText(elements.partOfSpeechTagsInput.value),
@@ -16349,7 +16437,7 @@ async function activateDictionary(dictionaryId) {
     pendingEntryCardScroll = null;
     searchQuery = "";
     elements.searchInput.value = "";
-    elements.partFilter.value = "";
+    setPartFilterDraft("");
     await refreshState();
     showToast(`${t("switchedTo")} “${dictionary.name}”`);
   } catch (error) {
@@ -16691,7 +16779,7 @@ elements.entryFilterButton.addEventListener("click", () => {
   }
   setEntryFilterMenuOpen(!entryFilterMenuOpen);
   if (entryFilterMenuOpen) {
-    elements.partFilter.focus();
+    setPartFilterDraft(elements.partFilter.value, { focus: true });
   }
 });
 
@@ -16701,8 +16789,27 @@ elements.entryFilterCancelButton.addEventListener("click", () => {
 });
 
 elements.entryFilterResetButton.addEventListener("click", () => {
-  elements.partFilter.value = "";
-  elements.partFilter.focus();
+  setPartFilterDraft("", { focus: true });
+});
+
+elements.partFilterChips.addEventListener("click", (event) => {
+  const chip = event.target.closest("[data-part-value]");
+  if (chip && !chip.disabled) {
+    setPartFilterDraft(chip.dataset.partValue, { focus: true });
+  }
+});
+
+elements.partFilterChips.addEventListener("keydown", (event) => {
+  const chips = [...elements.partFilterChips.children].filter((chip) => !chip.disabled);
+  const index = chips.indexOf(document.activeElement);
+  const next = { ArrowRight: index + 1, ArrowDown: index + 1, ArrowLeft: index - 1, ArrowUp: index - 1,
+    Home: 0, End: chips.length - 1 }[event.key];
+  if (next === undefined || index < 0 || !chips.length) {
+    return;
+  }
+  event.preventDefault();
+  const target = chips[(next + chips.length) % chips.length];
+  setPartFilterDraft(target.dataset.partValue, { focus: true });
 });
 
 elements.entryFilterApplyButton.addEventListener("click", applyEntryFilterDraft);
@@ -16797,7 +16904,7 @@ elements.rootModeToggleButton.addEventListener("click", () => {
   setEntryFilterMenuOpen(false);
   rootNavigationContextId = "";
   if (rootMode) {
-    elements.partFilter.value = "";
+    setPartFilterDraft("");
   }
   renderPartFilter();
   renderEntries();

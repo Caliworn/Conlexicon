@@ -641,7 +641,7 @@ body[data-entry-layout="mail"] .entry-mail-tools.has-root-actions {
   border-radius: min(var(--radius-pill), 24px);
 }
 
-body[data-entry-layout="mail"] .entry-mail-primary-tools > :is(.entry-mail-settings, .entry-filter-control, .entry-mail-sort) {
+body[data-entry-layout="mail"] .entry-mail-primary-tools > :is(.entry-mail-settings, .entry-filter-control, .entry-sort-control) {
   position: static;
   flex: 0 0 40px;
 }
@@ -684,45 +684,17 @@ body[data-entry-layout="mail"] .entry-workspace-menu {
 }
 
 body[data-entry-layout="mail"] .entry-workspace-menu.entry-sort-menu {
-  width: 248px;
-  padding: 6px;
-  gap: 2px;
+  width: min(240px, calc(100vw - 24px));
 }
 
-body[data-entry-layout="mail"] .entry-sort-option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  text-align: start;
-  min-height: 36px;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--ui-text);
-  font-size: 0.86rem;
-  font-weight: 500;
-  line-height: 1.4;
-  box-shadow: none;
-  cursor: pointer;
+/* Must outrank the Mail toolbar's ".entry-mail-tools .nav-icon" display rule,
+   or the chevron takes a second grid row under the icon. */
+body[data-entry-layout="mail"] .entry-mail-tools .entry-sort-button :is(.entry-sort-label, .entry-sort-chevron) {
+  display: none;
 }
 
-body[data-entry-layout="mail"] .entry-sort-option:is(:hover, :focus-visible) {
-  background: var(--ui-accent-soft);
-}
-
-body[data-entry-layout="mail"] .entry-sort-option:focus-visible {
-  outline: 2px solid var(--ui-focus);
-  outline-offset: -2px;
-}
-
-body[data-entry-layout="mail"] .entry-sort-option::after {
-  content: "";
-  width: 1em;
-}
-
-body[data-entry-layout="mail"] .entry-sort-option[aria-checked="true"]::after {
-  content: "✓";
+body[data-entry-layout="mail"] .entry-sort-button .entry-sort-icon {
+  display: block;
 }
 
 body[data-entry-layout="mail"] .entry-card {
@@ -804,6 +776,119 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
   font-size: 0.9rem;
 }
 
+/* One sort menu for every layout: the standard toolbar shows the state as text
+   where the native select used to be; the Mail layout shows a generic icon. */
+.entry-sort-control {
+  position: relative;
+  min-width: 0;
+}
+
+.secondary-button.entry-sort-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px 0 12px;
+  text-align: start;
+}
+
+.entry-sort-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entry-sort-button .entry-sort-icon {
+  display: none;
+}
+
+.entry-sort-button .entry-sort-chevron {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  color: var(--ui-text-muted);
+}
+
+/* Right-aligned with the trigger and no wider than the trigger plus the filter
+   button beside it, so a narrow drawer never clips its left edge. */
+.entry-search-config-menu.entry-sort-menu {
+  width: min(240px, calc(100% + 50px));
+  gap: 0;
+  padding: 6px;
+}
+
+.entry-sort-group {
+  display: grid;
+  gap: 2px;
+}
+
+.entry-sort-group + .entry-sort-group {
+  margin-top: 4px;
+  border-top: 1px solid var(--ui-border);
+  padding-top: 4px;
+}
+
+.entry-sort-group-label {
+  padding: 6px 10px 2px;
+  color: var(--ui-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.entry-sort-option {
+  display: grid;
+  grid-template-columns: 16px 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 10px 6px 8px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 0.86rem;
+  font-weight: 500;
+  line-height: 1.4;
+  text-align: start;
+  box-shadow: none;
+}
+
+.entry-sort-option:is(:hover, :focus-visible) {
+  background: color-mix(in srgb, var(--ui-text) 7%, transparent);
+}
+
+.entry-sort-option:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: -2px;
+}
+
+.entry-sort-option[aria-checked="true"] {
+  font-weight: 700;
+}
+
+.entry-sort-option[aria-checked="true"] .entry-sort-check::before {
+  content: "✓";
+  color: var(--ui-accent);
+}
+
+.entry-sort-option .entry-sort-key-icon {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  color: var(--ui-text-muted);
+}
+
+.entry-sort-option-label {
+  grid-column: 3;
+  min-width: 0;
+}
+
 .entry-filter-control {
   position: relative;
   min-width: 0;
@@ -855,8 +940,49 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
   font-weight: 800;
 }
 
-.entry-filter-field select {
-  font-weight: 500;
+.entry-filter-part-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Part-of-speech chips present the hidden #partFilter draft value. */
+.entry-filter-part-chip {
+  min-height: 30px;
+  max-width: 100%;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-pill);
+  padding: 4px 12px;
+  overflow: hidden;
+  background: var(--material-control-background);
+  color: var(--ui-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entry-filter-part-chip:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--ui-accent) 45%, var(--ui-border));
+}
+
+.entry-filter-part-chip[aria-checked="true"] {
+  border-color: color-mix(in srgb, var(--ui-accent) 55%, var(--ui-border));
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent-hover);
+}
+
+.entry-filter-part-chip:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+  .entry-filter-part-chip[aria-checked="true"] {
+    border-color: Highlight;
+    outline: 2px solid Highlight;
+    outline-offset: -3px;
+  }
 }
 
 .entry-filter-menu-actions {

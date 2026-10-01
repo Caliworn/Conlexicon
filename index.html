@@ -198,10 +198,6 @@
                   <div class="entry-mail-tools-surface" aria-hidden="true"></div>
                   <div class="entry-mail-primary-tools" id="entryMailPrimaryTools">
                   <div class="entry-mail-settings" id="entryMailSettings"></div>
-                  <div class="entry-mail-sort" id="entryMailSort">
-                    <button class="secondary-button" id="entrySortButton" data-control-tone="neutral" type="button" aria-haspopup="menu" aria-controls="entrySortMenu" aria-expanded="false" data-app-tooltip="always"></button>
-                    <div class="entry-search-config-menu entry-sort-menu" id="entrySortMenu" role="menu" hidden></div>
-                  </div>
                   </div>
                   <div class="entry-mail-root-actions" id="entryMailRootActions" hidden></div>
                 </div>
@@ -212,12 +208,13 @@
                     </svg>
                   </button>
                   <div class="entry-filter-menu" id="entryFilterMenu" role="dialog" data-i18n-aria-label="filterEntries" aria-label="筛选词条" hidden>
-                    <label class="entry-filter-field">
-                      <span data-i18n="activeFilterPartOfSpeech">词性</span>
-                      <select id="partFilter" data-i18n-aria-label="partFilterLabel" aria-label="词性条件">
+                    <div class="entry-filter-field">
+                      <span id="partFilterHeading" data-i18n="activeFilterPartOfSpeech">词性</span>
+                      <div class="entry-filter-part-chips" id="partFilterChips" role="radiogroup" aria-labelledby="partFilterHeading"></div>
+                      <select id="partFilter" data-i18n-aria-label="partFilterLabel" aria-label="词性条件" hidden>
                         <option value="" data-i18n="filterAny">不限</option>
                       </select>
-                    </label>
+                    </div>
                     <div class="entry-filter-menu-actions">
                       <button class="secondary-button" id="entryFilterResetButton" data-control-tone="neutral" type="button" data-i18n="resetFilter">重置</button>
                       <span></span>
@@ -226,14 +223,18 @@
                     </div>
                   </div>
                 </div>
-                <select id="sortSelect" data-i18n-aria-label="entrySortLabel" aria-label="词条排序">
-                  <option value="lemmaAsc" data-i18n="sortLemmaAsc">首字母正序</option>
-                  <option value="lemmaDesc" data-i18n="sortLemmaDesc">首字母倒序</option>
-                  <option value="updatedAsc" data-i18n="sortUpdatedAsc">编辑时间正序</option>
-                  <option value="updatedDesc" data-i18n="sortUpdatedDesc">编辑时间倒序</option>
-                  <option value="createdAsc" data-i18n="sortCreatedAsc">创建时间正序</option>
-                  <option value="createdDesc" data-i18n="sortCreatedDesc">创建时间倒序</option>
-                </select>
+                <div class="entry-sort-control" id="entrySortControl">
+                  <button class="secondary-button entry-sort-button" id="entrySortButton" data-control-tone="neutral" type="button" aria-haspopup="menu" aria-controls="entrySortMenu" aria-expanded="false"></button>
+                  <div class="entry-search-config-menu entry-sort-menu" id="entrySortMenu" role="menu" hidden></div>
+                  <select id="sortSelect" hidden data-i18n-aria-label="entrySortLabel" aria-label="词条排序">
+                    <option value="lemmaAsc" data-i18n="sortLemmaAsc">首字母正序</option>
+                    <option value="lemmaDesc" data-i18n="sortLemmaDesc">首字母倒序</option>
+                    <option value="updatedAsc" data-i18n="sortUpdatedAsc">编辑时间正序</option>
+                    <option value="updatedDesc" data-i18n="sortUpdatedDesc">编辑时间倒序</option>
+                    <option value="createdAsc" data-i18n="sortCreatedAsc">创建时间正序</option>
+                    <option value="createdDesc" data-i18n="sortCreatedDesc">创建时间倒序</option>
+                  </select>
+                </div>
                 <button class="secondary-button entry-list-new-button" data-control-tone="accent" data-control-emphasis="outline" id="entryListNewEntryButton" type="button" data-app-tooltip="always" data-i18n-aria-label="quickNewEntryTooltip" aria-label="新建词条">
                   <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M12 5v14M5 12h14"></path>
@@ -679,6 +680,10 @@
                 <label class="toggle-row">
                   <span data-i18n="entryListRawTagDisplay">词条列表中显示原始标签</span>
                   <input id="entryListRawTagDisplayInput" type="checkbox">
+                </label>
+                <label class="toggle-row">
+                  <span data-i18n="filterMenuRawTagDisplay">筛选菜单中显示原始标签</span>
+                  <input id="filterMenuRawTagDisplayInput" type="checkbox">
                 </label>
                 <div class="subsection-title">
                   <h3 data-i18n="entryListTagDisplayLimit">词条列表中标签显示上限</h3>
@@ -1269,6 +1274,7 @@
     <script src="lib/liquid-glass-geometry.js"></script>
     <script src="lib/liquid-glass-engine.js"></script>
     <script src="lib/entry-workspace-layout.js"></script>
+    <script src="lib/entry-sort-control.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

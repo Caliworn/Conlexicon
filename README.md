@@ -25,7 +25,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - **Corpus**: ordered blocks, speaker/modality layers, standalone units, inherited attributes, ID and parent-link validation, and gloss-based unit names.
 - **Gloss rendering**: `\gla`, `\glb`, `\glc`, and `\ft`, with separate settings for corpus unit cards, unit headings, and entry examples, plus per-line font, size, bold, italic, and `\glb` small caps.
 - **Data analysis**: an on-demand overview of lexicon size, coverage, parts of speech, and editing activity, plus tag and tag-set rankings, root families, orthography, IPA checks and distributions, and morphology statistics. Most figures open the matching entries. Quality checks have their own page, grouped by priority and module.
-- **Settings**: per-dictionary options for parts of speech, tag separators and display replacements, search defaults, gloss rendering, polysemy display, how unsaved edits are handled when navigating, auto-save, IPA keyboard symbols, and navigation order.
+- **Settings**: per-dictionary options for parts of speech, tag separators and display replacements (the entry list and the filter menu can each show raw tags instead), search defaults, gloss rendering, polysemy display, how unsaved edits are handled when navigating, auto-save, IPA keyboard symbols, and navigation order.
 - **Appearance**: Classic, Layered Glass, and Liquid Glass skins, light and dark themes, and Chinese or English UI; the global skin, theme, and language are remembered in `data/index.json`. Liquid Glass is still being tuned and falls back to plain materials when its optics are unavailable or accessibility modes are on.
 - **Layout**: a responsive shell with collapsible navigation and entry list, and mobile drawers. New entries start from the entry-list toolbar's + button (also shown beside the list toggle when the list is collapsed); other pages return to the editor through the navigation.
 
@@ -44,7 +44,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - **语料库**：有序语料块、发言人／模态语料层、独立语料单元、属性继承、ID 与父级链接校验，以及基于 Gloss 的单元名。
 - **Gloss 渲染**：支持 `\gla`、`\glb`、`\glc`、`\ft`；语料单元卡片、单元标题和词条例句分别设置，并可逐行配置字体、字号、粗体、斜体以及 `\glb` small caps。
 - **数据分析**：按需加载的总览（词汇规模、资料覆盖、词性分布、编辑活动），以及标签与标签集合排行、词根家族、正写法、IPA 检查与分布、形态统计；多数统计项可直接打开对应词条。质量检查有独立页面，按优先度和检查模块分组。
-- **设置**：词典级的词性、标签分隔符与显示替换、默认搜索方式、Gloss 渲染、多义项显示、导航时未保存编辑的处理方式、自动保存、IPA 键盘符号和导航排序。
+- **设置**：词典级的词性、标签分隔符与显示替换（词条列表和筛选菜单可分别改为显示原始标签）、默认搜索方式、Gloss 渲染、多义项显示、导航时未保存编辑的处理方式、自动保存、IPA 键盘符号和导航排序。
 - **外观**：经典、层叠玻璃和液态玻璃三套皮肤，浅色与深色主题，中英文界面；全局皮肤、主题和语言记忆在 `data/index.json` 中。液态玻璃仍在调校中，光学效果不可用或开启辅助模式时会退回普通材质。
 - **布局**：响应式外壳，导航和词条列表均可收起，移动端使用抽屉。新建词条从词条列表工具栏的“+”开始（列表收起时列表开关旁也会显示“+”）；其他页面通过导航返回词条编辑。
 

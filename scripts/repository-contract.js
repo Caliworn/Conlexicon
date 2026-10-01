@@ -1385,6 +1385,11 @@ function checkModelNormalization() {
   assert.equal(normalized.settings.entryListTagDisplayLimit, 10);
   assert.equal(normalized.settings.entryListPartDisplay, "chips");
   assert.equal(normalized.settings.showEmptyEntrySections, false);
+  assert.equal(normalized.settings.filterMenuRawTagDisplay, false, "Filter menu tags default to their display labels");
+  assert.equal(
+    normalizeDictionary({ name: "Raw", settings: { filterMenuRawTagDisplay: 1 } }).settings.filterMenuRawTagDisplay,
+    true,
+  );
   assert.deepEqual(normalized.settings.entrySectionOrder, ["notes", "derived", "definitions", "etymology", "morphology"]);
   assert.equal(normalized.settings.ipa.mappings[0].to, "ˈa");
 

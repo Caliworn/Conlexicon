@@ -32,6 +32,13 @@ assert(
   workspaceLayoutScriptPosition >= 0 && workspaceLayoutScriptPosition < appScriptPosition,
   "Workspace layout must load before app.js so skin initialization and rollback can restore control positions",
 );
+const sortControlScriptPosition = index.indexOf('src="lib/entry-sort-control.js"');
+assert(
+  sortControlScriptPosition >= 0 && sortControlScriptPosition < appScriptPosition
+    && /<select id="sortSelect" hidden/.test(index)
+    && /<select id="partFilter"[^>]* hidden>/.test(index),
+  "Sort and part-of-speech choices use the app's own controls in every skin; the native selects only hold state",
+);
 assert(
   liquidGlassGeometryScriptPosition >= 0
     && liquidGlassGeometryScriptPosition < liquidGlassEngineScriptPosition
