@@ -6,7 +6,6 @@ const {
   ByteBudgetLru,
   LiquidGlassEngine,
   buildResourceKey,
-  lightFacingMatrixValues,
   normalizeLightVector,
   COMPACT_CONTROL_SELECTOR,
   SURFACE_ROLE_DEFINITIONS,
@@ -75,7 +74,7 @@ function almostEqual(actual, expected, epsilon, message) {
   const engine = new LiquidGlassEngine({
     document: { createElementNS: (_, name) => makeNode(name), querySelector: () => host },
   });
-  const { filterElement } = engine.createFilter("alpha-test", ["map", "rim"], {
+  const filterElement = engine.createFilter("alpha-test", ["map", "rim"], {
     width: 120, height: 38, maxDisplacement: 4, opticalBlur: 1,
     saturation: 1, specularStrength: 0.48,
   });
@@ -268,7 +267,7 @@ assert.notEqual(keyA, keyC, "Materially different geometry must not share a cach
 assert.equal(
   keyA,
   keyWithMovedLight,
-  "The unified light vector must update filter matrices without regenerating geometry maps",
+  "The unified light vector must rebake highlights without regenerating geometry maps",
 );
 assert.equal(
   buildResourceKey({ ...options, opticalBlur: 4, saturation: 1.09, role: "focus" }),
@@ -521,11 +520,52 @@ const movedLight = normalizeLightVector(4, 3, 1.08);
 almostEqual(movedLight.x, 0.8, 1e-9, "Unified light X must be normalized");
 almostEqual(movedLight.y, 0.6, 1e-9, "Unified light Y must be normalized");
 assert.equal(movedLight.strength, 1.08, "Unified light strength must remain independently tunable");
-assert.equal(
-  lightFacingMatrixValues(movedLight).trim().split(/\s+/).length,
-  20,
-  "The runtime facing-light matrix must remain a valid 4x5 color matrix",
-);
+
+// The rim highlight is baked from the normal/rim map and lives outside the
+// backdrop filter, so backdrop changes never rerun it.
+{
+  const maps = geometry.generateSurfaceMaps(options);
+  const light = normalizeLightVector(-0.55, -0.84, 1);
+  const highlight = geometry.bakeSpecularHighlight(maps.specular, maps.width, maps.height, light, 0.64);
+  assert.equal(highlight.length, maps.specular.length, "The baked highlight must match the map dimensions");
+  const alphaAt = (x, y) => highlight[(y * maps.width + x) * 4 + 3];
+  const middleX = Math.floor(maps.width / 2);
+  const middleY = Math.floor(maps.height / 2);
+  assert.equal(alphaAt(middleX, middleY), 0, "The surface interior outside the rim must stay unlit");
+  assert(
+    alphaAt(middleX, 0) > alphaAt(middleX, maps.height - 1),
+    "An edge facing the light must be brighter than the opposite edge",
+  );
+  const unlit = geometry.bakeSpecularHighlight(maps.specular, maps.width, maps.height, light, 0);
+  assert(unlit.every((value, index) => index % 4 !== 3 || value === 0), "Zero strength must bake no highlight");
+}
+{
+  const makeNode = (name) => ({
+    name, attrs: {}, children: [],
+    setAttribute(key, value) { this.attrs[key] = value; },
+    append(...nodes) { this.children.push(...nodes); },
+  });
+  const host = makeNode("defs");
+  const engine = new LiquidGlassEngine({
+    document: { createElementNS: (_, name) => makeNode(name), querySelector: () => host },
+  });
+  const base = { width: 120, height: 38, maxDisplacement: 4, opticalBlur: 1, saturation: 1.04 };
+  const names = (filter) => filter.children.map((node) => node.name);
+  const rgb = names(engine.createFilter("rgb-test", ["map", "rim"], base));
+  const mono = names(engine.createFilter("mono-test", ["map", "rim"], { ...base, chromaticDispersion: false }));
+  for (const chain of [rgb, mono]) {
+    assert(!chain.includes("feFlood") && !chain.includes("feComponentTransfer"),
+      "Backdrop filters must not recompute the background-independent rim highlight");
+  }
+  assert.equal(rgb.filter((name) => name === "feDisplacementMap").length, 3, "Large surfaces keep RGB dispersion");
+  assert.deepEqual(mono, ["feGaussianBlur", "feImage", "feDisplacementMap", "feColorMatrix"],
+    "Surfaces without dispersion refract once");
+  assert.notEqual(
+    buildResourceKey({ ...options, opticalBlur: 1, saturation: 1.04, chromaticDispersion: false }),
+    buildResourceKey({ ...options, opticalBlur: 1, saturation: 1.04, chromaticDispersion: true }),
+    "Dispersion changes the filter and must not share a resource key",
+  );
+}
 
 function qualityEngine({ url = true, assisted = false } = {}) {
   const runtimeWindow = {

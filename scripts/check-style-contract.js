@@ -714,6 +714,11 @@ assert(
     && !/blur\(/.test(liquidGlassOpticalRoleRule.declarations),
   "Q3 must use a low-alpha role tint and generated optics without the Q1 material blur",
 );
+assert(
+  liquidGlassOpticalRoleRule.declarations.includes("background-image: var(--liquid-glass-specular-layer, none);")
+    && liquidGlassOpticalRoleRule.declarations.includes("background-origin: border-box;"),
+  "Q3 ready surfaces must paint the baked rim highlight over the whole border box, outside the backdrop filter",
+);
 const liquidGlassQ1RuntimeRule = liquidGlassStyleBlocks.find(({ selector, declarations }) => (
   selector.includes('[data-liquid-glass-optics="pending"]')
     && selector.includes('[data-liquid-glass-optics="fallback"]')

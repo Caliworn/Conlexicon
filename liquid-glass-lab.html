@@ -335,6 +335,10 @@
     }
 
     .lab-surface[data-liquid-glass-optics="ready"] {
+      background-image: var(--liquid-glass-specular-layer, none);
+      background-size: 100% 100%;
+      background-repeat: no-repeat;
+      background-origin: border-box;
       -webkit-backdrop-filter: var(--liquid-glass-optical-filter);
       backdrop-filter: var(--liquid-glass-optical-filter);
     }
@@ -346,12 +350,13 @@
 
     @media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
       .lab-surface[data-product-optics="off"] {
+        background-image: none !important;
         -webkit-backdrop-filter: none !important;
         backdrop-filter: none !important;
       }
 
       .lab-surface[data-product-tint="off"] {
-        background: transparent !important;
+        background-color: transparent !important;
       }
 
       .lab-surface[data-product-border="off"] {
@@ -1465,7 +1470,7 @@
           ? currentProductAppearance
           : null;
         if (productMaterial) {
-          elements.surface.style.background = productMaterial.backgroundColor;
+          elements.surface.style.backgroundColor = productMaterial.backgroundColor;
           elements.surface.style.borderWidth = productMaterial.borderWidth;
           elements.surface.style.borderStyle = productMaterial.borderStyle;
           elements.surface.style.borderColor = productMaterial.borderColor;
@@ -1473,7 +1478,7 @@
           elements.surface.style.color = productMaterial.color;
           elements.surface.style.setProperty("--lab-surface-border", productMaterial.borderColor);
         } else {
-          elements.surface.style.background = light
+          elements.surface.style.backgroundColor = light
             ? `rgba(235, 247, 249, ${tint})`
             : `rgba(12, 26, 32, ${tint})`;
         }

@@ -6,11 +6,11 @@
 
 - 生命周期恢复由引擎统一处理：Q3 激活时观察 hidden/class/style 属性变化，仅将影响已注册表面的祖先或表面加入逐帧合并检查；可见性恢复不依赖 ResizeObserver。几何 transitionend/transitioncancel 后检查最终参数；仍有相关过渡运行时等待其结束，最终状态取消额外 resize 防抖。无动画的状态变化同样有效；transform/opacity 动画不触发重建。关闭引擎时移除观察器、事件和待处理帧。
 - Q3 资源解析统一覆盖注册、重新显示、参数更新和 resize：相同当前资源不写状态；精确缓存命中同步领取并替换，先保留目标引用再释放旧引用，不经过 pending。仅连续 resize 的缓存/在途任务均未命中时等待 80ms；等待或失败使用 Q1，不拉伸旧几何。现有精确参数键、32MiB 会话 LRU、提交时几何/注册/会话校验及换肤清理继续保留，不预生成尺寸档位。
-- 当前状态：LQ-1–LQ-6 已完成并完成第一优先级光学校正、可读性修正与圆角法线连续性修正；正式 continuous、focus、floating 与 modal 表面在 Q3 使用角色化光学模糊、受安全 bezel 约束的几何滤镜、真实 RGB rim 和静态环境 specular，micro 保持无逐控件 backdrop 采样的 CSS 体积材质。LQ-7 尚未实施。
+- 当前状态：LQ-1–LQ-6 已完成并完成第一优先级光学校正、可读性修正与圆角法线连续性修正；正式 continuous、floating 与 modal 表面在 Q3 使用角色化光学模糊、受安全 bezel 约束的几何滤镜、真实 RGB rim 和预烘焙的静态环境 specular 层，紧凑 relationship 表面只做单次位移，micro 保持无逐控件 backdrop 采样的 CSS 体积材质。LQ-7 已完成候选 1、2（高光拆层、紧凑表面去色散），其余待实测。
 - 用户可见名称：`液态玻璃 / Liquid Glass`。
 - 内部 ID：`liquid-glass`。
 - 经典皮肤继续作为默认与未知值回退；`layered-glass` 继续保持已经冻结的层叠玻璃边界。
-- LQ-2 的固定噪声滤镜与 LQ-3 的五层指针光场只保留为历史阶段记录；LQ-6 已从产品源码移除两条旧视觉路径。Q3 就绪表面只使用动态 URL filter，在滤镜内部先按角色模糊背景采样，再执行几何折射、RGB 色散和静态环境 specular；不叠加外部 Q1 blur。等待或生成失败退回 Q1：沿用同角色 Q3 的 tint、光学模糊、饱和度、边框和阴影参数，但不生成贴图，也不执行位移、RGB 色散或 specular。辅助模式继续使用实色材质。Q2 定义保持不变，其必要性等待单独讨论。
+- LQ-2 的固定噪声滤镜与 LQ-3 的五层指针光场只保留为历史阶段记录；LQ-6 已从产品源码移除两条旧视觉路径。Q3 就绪表面只使用动态 URL filter，在滤镜内部先按角色模糊背景采样，再执行几何折射和 RGB 色散；静态环境 specular 是滤镜外的独立预烘焙背景层；不叠加外部 Q1 blur。等待或生成失败退回 Q1：沿用同角色 Q3 的 tint、光学模糊、饱和度、边框和阴影参数，但不生成贴图，也不执行位移、RGB 色散或 specular。辅助模式继续使用实色材质。Q2 定义保持不变，其必要性等待单独讨论。
 
 ## 2. 设计目标
 
@@ -248,7 +248,9 @@ liquidGlassEngine.deactivate();
 2. 用几何位移图执行主体折射。
 3. 在外侧光学 rim 内对 R/G/B 使用略有差异的采样尺度并重新合成，形成真实依附边缘的窄幅色散；正文区域不出现彩边。
 4. 进行轻度饱和度和亮度补偿，避免多次合成把画面洗灰。
-5. 将法线与默认环境光向量点乘，和 rim 相乘后生成白色 specular，再以 screen 模式叠加；CSS 不再补充 radial/conic 焦散、方向性 glint 或固定彩色边。
+5. specular 不在滤镜内：引擎把法线与当前光源向量点乘、经同一伽马曲线后乘以 rim 和强度，烘焙成一张带透明度的近白高光图（`bakeSpecularHighlight`），作为 `--liquid-glass-specular-layer` 背景图层画在 tint 之上。高光与背景无关，背景变化时不重算；只有光源改变（目前只有 Lab）才在主线程重新烘焙并替换图片。对近白高光，普通 alpha 叠加与原 screen 混合的差异不超过约 6%；层序由 tint 之下改为 tint 之上，高光略亮，需目视确认。CSS 不补充 radial/conic 焦散、方向性 glint 或固定彩色边。
+
+紧凑 `relationship` 角色（以及 `micro` 默认值）关闭 RGB 色散（`chromaticDispersion: false`）：其最大位移 4px，三路尺度换算后红蓝相差约 1px，与元素宽度无关，肉眼不可辨。滤镜只保留模糊、位移图、单次位移和饱和度 4 个节点；大表面保留三路色散。色散开关进入资源键。2026-10-01 浏览器实测：各页面注册为 relationship 的表面高度均为 38–61px，桌面最宽 490px（其他设置“添加规则”），480px 宽度下多个主按钮和分段控件拉伸到约 420–444px，均仍是薄型控件。
 
 色散不是常驻青紫描边。当前 Q3 对 R/G/B 使用三组略有差异的位移尺度并重新合成，使彩边随边缘方向、背景内容和折射强度变化；等待、失败和 Q1 直接回到普通 blur，不再保留静态 CSS 色边。
 
@@ -258,12 +260,13 @@ liquidGlassEngine.deactivate();
 
 ```text
 content / focus ring       清晰前景；backdrop-filter 不处理前景内容
-surface backdrop-filter   Q3 URL 内依次执行角色化 blur、RGB displacement 与 SVG specular
+rim highlight              预烘焙高光图（background-image），与背景无关
 base tint                  角色级中性染色与最低可读底色（替代方向见 13.19）
+surface backdrop-filter   Q3 URL 内依次执行角色化 blur 与 displacement（大表面含 RGB 色散）
 page background            被采样的环境内容
 ```
 
-正式表面继续使用既有 DOM；没有为光学效果增加业务节点。`backdrop-filter` 直接作用于表面背景，不会折射文字和控件前景；方向性 specular 已在同一 SVG filter 内由法线/rim 图合成，不再占用伪元素绘制假高光或 settle。
+正式表面继续使用既有 DOM；没有为光学效果增加业务节点。`backdrop-filter` 直接作用于表面背景，不会折射文字和控件前景；方向性 specular 由法线/rim 图预烘焙为表面自身的背景图层，不新增伪元素或 DOM，也不使用 settle。
 
 Q1 与 Q3 通过同一个表面局部接口衔接：各正式消费者映射质量无关的 `--liquid-glass-surface-tint` 和角色化 `--liquid-glass-surface-q1-filter`；`pending` / `fallback` 由一条统一规则消费 tint 与普通 blur，`ready` 继续消费同一 tint，只把 filter 原子替换为 `--liquid-glass-optical-filter`。明暗主题中的来源 tint 使用 navigation、drawer、mobile-bar、focus、floating、tooltip 和 modal 等表面语义命名，不再以 `q3` 命名被 Q1/Q3 共享的值。组件边框和阴影本来就是两级共用材质，因此继续由组件角色 token 常驻，不在质量状态规则中重复声明。
 
@@ -368,8 +371,8 @@ Q1 与 Q3 通过同一个表面局部接口衔接：各正式消费者映射质�
 
 **待实测的优化候选**（均未测量，按预期收益排序，由 LQ-7 逐项对比后决定）：
 
-1. **高光移出背景滤镜**：边缘高光只取决于表面法线和光源，与背景无关；正式应用的光源固定（`setLightVector` 只有 Lab 调用），但目前高光链仍在 `createFilter` 的背景滤镜内，约占半条链，每次背景变化都重算。可以在生成贴图时烘焙成带透明度的高光图，用普通 CSS 背景叠加（例如伪元素）；Lab 调光源时重新烘焙。
-2. **紧凑表面去掉 RGB 色散**：`relationship` 角色最大位移 4px，三路系数 2.12／2.0／1.88 换算后红蓝相差约 1px，肉眼难辨；紧凑表面数量最多，只做 1 次 `feDisplacementMap` 并省掉通道拆分与 screen 合并，滤镜开销约降到三分之一。导航、modal 等大表面保留色散。
+1. **（已完成 2026-10-01）高光移出背景滤镜**：边缘高光只取决于表面法线和光源，与背景无关；正式应用的光源固定（`setLightVector` 只有 Lab 调用），但目前高光链仍在 `createFilter` 的背景滤镜内，约占半条链，每次背景变化都重算。可以在生成贴图时烘焙成带透明度的高光图，用普通 CSS 背景叠加（例如伪元素）；Lab 调光源时重新烘焙。
+2. **（已完成 2026-10-01）紧凑表面去掉 RGB 色散**：`relationship` 角色最大位移 4px，三路系数 2.12／2.0／1.88 换算后红蓝相差约 1px，肉眼难辨；紧凑表面数量最多，只做 1 次 `feDisplacementMap` 并省掉通道拆分与 screen 合并，滤镜开销约降到三分之一。导航、modal 等大表面保留色散。
 3. **模糊改用原生 `blur()`**：以 `backdrop-filter: blur(Npx) url(#filter)` 串联代替滤镜内的 `feGaussianBlur`。Chromium 原生背景模糊有降采样优化，通常更便宜。需对比边缘处理（当前 `edgeMode="duplicate"`）和模糊、折射顺序变化带来的画面差异。
 4. **减少同时存在的光学表面**：即本节记录的待实测风险，包括词根模式虚拟列表滚动时逐个注册／注销折叠按钮表面、`body` 级 subtree MutationObserver、注销后重新观察全部祖先链。评估大列表内的折叠按钮是否需要独立折射。
 5. **去掉 PNG 编码**：贴图在 Worker 中编码为 PNG 再交给 `feImage` 解码，只发生在首次出现或尺寸变化时，收益最小；只有频繁 resize 时才值得处理。

@@ -749,7 +749,13 @@ body[data-ui-skin="liquid-glass"] :is(
     [data-liquid-glass-role="floating"][data-liquid-glass-optics="ready"],
     [data-liquid-glass-role="modal"][data-liquid-glass-optics="ready"]
   ) {
+    /* The engine bakes the rim highlight into its own image; it sits above the
+       tint and never reruns when the backdrop changes. */
     background: var(--liquid-glass-surface-tint);
+    background-image: var(--liquid-glass-specular-layer, none);
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+    background-origin: border-box;
     backdrop-filter: var(--liquid-glass-optical-filter);
     -webkit-backdrop-filter: var(--liquid-glass-optical-filter);
   }
