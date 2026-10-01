@@ -92,9 +92,9 @@ runs the complete model, SQLite, API, and integration suite. Focused checks and 
 
 ### Liquid Glass Lab / 液态玻璃实验页
 
-A standalone tuning and geometry diagnostic page is available at `http://localhost:4173/liquid-glass-lab.html`. It does not call application APIs or save parameter changes. The repository includes an MIT-licensed SDF Baseline adapted from `PallavAg/liquid-glass-web-react` and five licensed backgrounds from Unsplash and Pexels, credited in `assets/liquid-glass-lab/README.md`. A local `archisvaze/liquid-glass` Reference Baseline can be added by developers but is not distributed. See [the Liquid Glass specification](docs/LIQUID_GLASS_SKIN_SPEC.md) for details.
+A standalone tuning and geometry diagnostic page is available at `http://localhost:4173/liquid-glass-lab.html`. It runs the production optical engine only, does not call application APIs, and does not save parameter changes. Its five licensed backgrounds from Unsplash and Pexels are credited in `THIRD_PARTY_NOTICES.md`. See [the Liquid Glass specification](docs/LIQUID_GLASS_SKIN_SPEC.md) for details.
 
-独立的参数调试与几何诊断页位于 `http://localhost:4173/liquid-glass-lab.html`，不调用应用 API，也不保存参数改动。仓库包含改编自 MIT 许可 `PallavAg/liquid-glass-web-react` 的 SDF Baseline，以及五张来自 Unsplash 和 Pexels、具有明确许可的背景图，署名见 `assets/liquid-glass-lab/README.md`。开发者可在本地另行提供 `archisvaze/liquid-glass` Reference Baseline，该模块不随仓库分发。详见[液态玻璃规范](docs/LIQUID_GLASS_SKIN_SPEC.md)。
+独立的参数调试与几何诊断页位于 `http://localhost:4173/liquid-glass-lab.html`，只运行生产光学引擎，不调用应用 API，也不保存参数改动。五张来自 Unsplash 和 Pexels、具有明确许可的背景图，署名见 `THIRD_PARTY_NOTICES.md`。详见[液态玻璃规范](docs/LIQUID_GLASS_SKIN_SPEC.md)。
 
 ## Data Storage / 数据存储
 

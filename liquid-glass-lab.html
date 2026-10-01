@@ -299,33 +299,6 @@
       z-index: 2;
     }
 
-    .lab-surface:is([data-renderer="reference"], [data-renderer="sdf"]) {
-      isolation: isolate;
-      overflow: visible;
-      border: 0;
-      background: transparent !important;
-      box-shadow: none;
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
-    }
-
-    .lab-surface[data-renderer="reference"] {
-      box-shadow: 0 4px var(--reference-outer-shadow-blur) rgba(0, 0, 0, 0.18);
-    }
-
-    .lab-surface[data-renderer="reference"]::before,
-    .lab-surface[data-renderer="sdf"][data-sdf-appearance="reference"]::before,
-    .lab-surface[data-renderer="reference"]::after,
-    .lab-surface[data-renderer="sdf"]::after {
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      corner-shape: inherit;
-      clip-path: inherit;
-      content: "";
-      pointer-events: none;
-    }
-
     .lab-surface[data-outer-shape="global-superellipse"] {
       border-color: transparent;
     }
@@ -351,27 +324,6 @@
       vector-effect: non-scaling-stroke;
     }
 
-    .lab-surface[data-renderer="reference"]::before,
-    .lab-surface[data-renderer="sdf"][data-sdf-appearance="reference"]::before {
-      z-index: 1;
-      background-color: rgba(var(--reference-tint-color), var(--reference-tint-opacity));
-      box-shadow: inset 0 0 var(--reference-shadow-blur) var(--reference-shadow-spread) var(--reference-shadow-color);
-    }
-
-    .lab-surface[data-renderer="reference"]::after {
-      z-index: -1;
-      isolation: isolate;
-      -webkit-backdrop-filter: url(#liquid-glass-reference-filter);
-      backdrop-filter: url(#liquid-glass-reference-filter);
-    }
-
-    .lab-surface[data-renderer="sdf"]::after {
-      z-index: -1;
-      isolation: isolate;
-      -webkit-backdrop-filter: url(#liquid-glass-sdf-filter);
-      backdrop-filter: url(#liquid-glass-sdf-filter);
-    }
-
     .lab-surface.is-dragging {
       cursor: grabbing;
     }
@@ -380,19 +332,6 @@
       border-color: rgba(9, 48, 57, 0.18);
       color: #0c252c;
       box-shadow: 0 24px 70px rgba(23, 59, 67, 0.18);
-    }
-
-    :root[data-theme="light"] .lab-surface[data-renderer="reference"] {
-      box-shadow: 0 4px var(--reference-outer-shadow-blur) rgba(0, 0, 0, 0.18);
-    }
-
-    :root[data-theme="light"] .lab-surface[data-renderer="sdf"] {
-      box-shadow: none;
-    }
-
-    .lab-surface[data-renderer="sdf"][data-sdf-appearance="reference"],
-    :root[data-theme="light"] .lab-surface[data-renderer="sdf"][data-sdf-appearance="reference"] {
-      box-shadow: 0 4px var(--reference-outer-shadow-blur) rgba(0, 0, 0, 0.18);
     }
 
     .lab-surface[data-liquid-glass-optics="ready"] {
@@ -406,28 +345,28 @@
     }
 
     @media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
-      .lab-surface[data-renderer="product"][data-product-optics="off"] {
+      .lab-surface[data-product-optics="off"] {
         -webkit-backdrop-filter: none !important;
         backdrop-filter: none !important;
       }
 
-      .lab-surface[data-renderer="product"][data-product-tint="off"] {
+      .lab-surface[data-product-tint="off"] {
         background: transparent !important;
       }
 
-      .lab-surface[data-renderer="product"][data-product-border="off"] {
+      .lab-surface[data-product-border="off"] {
         border-color: transparent !important;
       }
 
-      .lab-surface[data-renderer="product"][data-product-border="off"] .lab-global-shape-outline {
+      .lab-surface[data-product-border="off"] .lab-global-shape-outline {
         opacity: 0;
       }
 
-      .lab-surface[data-renderer="product"][data-product-shadow="off"] {
+      .lab-surface[data-product-shadow="off"] {
         box-shadow: none !important;
       }
 
-      .lab-surface[data-renderer="product"][data-product-foreground="off"] {
+      .lab-surface[data-product-foreground="off"] {
         color: var(--lab-neutral-surface-text) !important;
       }
     }
@@ -640,10 +579,6 @@
       pointer-events: none;
     }
 
-    .lab-renderer-controls[hidden] {
-      display: none;
-    }
-
     .lab-source-link {
       color: var(--lab-accent);
     }
@@ -694,7 +629,7 @@
 
     @media (prefers-reduced-transparency: reduce) {
       .lab-surface,
-      .lab-surface[data-renderer] {
+      .lab-surface[data-outer-shape] {
         border: 1px solid var(--lab-border);
         background: var(--lab-panel-strong) !important;
         color: var(--lab-text);
@@ -703,17 +638,11 @@
         backdrop-filter: none !important;
       }
 
-      .lab-surface[data-renderer="reference"]::before,
-      .lab-surface[data-renderer="sdf"][data-sdf-appearance="reference"]::before,
-      .lab-surface[data-renderer="reference"]::after,
-      .lab-surface[data-renderer="sdf"]::after {
-        content: none;
-      }
     }
 
     @media (forced-colors: active) {
       .lab-surface,
-      .lab-surface[data-renderer] {
+      .lab-surface[data-outer-shape] {
         border: 1px solid CanvasText;
         background: Canvas !important;
         color: CanvasText;
@@ -722,12 +651,6 @@
         backdrop-filter: none !important;
       }
 
-      .lab-surface[data-renderer="reference"]::before,
-      .lab-surface[data-renderer="sdf"][data-sdf-appearance="reference"]::before,
-      .lab-surface[data-renderer="reference"]::after,
-      .lab-surface[data-renderer="sdf"]::after {
-        content: none;
-      }
     }
   </style>
 </head>
@@ -736,7 +659,7 @@
     <header class="lab-header">
       <div>
         <h1 class="lab-title">Liquid Glass Lab</h1>
-        <p class="lab-subtitle">三条隔离渲染管线、共享场景且无持久化的实验页</p>
+        <p class="lab-subtitle">生产光学引擎的隔离调参与外观对照页，无持久化</p>
       </div>
       <button id="themeButton" type="button" aria-pressed="true">切换浅色场景</button>
     </header>
@@ -744,14 +667,6 @@
     <div class="lab-layout">
       <section class="lab-workspace" aria-label="液态玻璃预览">
         <div class="lab-toolbar">
-          <div class="lab-toolbar-group">
-            <label for="rendererSelect">渲染路径</label>
-            <select id="rendererSelect">
-              <option value="reference">Reference Baseline</option>
-              <option value="sdf">SDF Baseline</option>
-              <option value="product" selected>Product Engine</option>
-            </select>
-          </div>
           <div class="lab-toolbar-group">
             <label for="sceneSelect">背景参照</label>
             <select id="sceneSelect">
@@ -782,7 +697,7 @@
             <div class="lab-bands"></div>
             <div class="lab-words" aria-hidden="true"><span>a</span><span>ɬ</span><span>ŋ</span><span>ə</span></div>
           </div>
-          <article id="labSurface" class="lab-surface" data-renderer="product" aria-label="可拖动液态玻璃示例卡片">
+          <article id="labSurface" class="lab-surface" aria-label="可拖动液态玻璃示例卡片">
             <svg id="globalShapeOutline" class="lab-global-shape-outline" aria-hidden="true" focusable="false">
               <path id="globalShapeOutlinePath"></path>
             </svg>
@@ -804,11 +719,11 @@
 
         <div class="lab-maps">
           <figure class="lab-map-figure">
-            <figcaption><span>位移图</span><span id="displacementLegend">R = X · G = Y</span></figcaption>
+            <figcaption><span>位移图</span><span>R = X · G = Y · B = rim</span></figcaption>
             <canvas id="displacementCanvas" class="lab-map-canvas" aria-label="当前参数生成的位移贴图"></canvas>
           </figure>
           <figure class="lab-map-figure">
-            <figcaption><span id="secondaryMapTitle">Specular 图</span><span id="secondaryMapLegend">灰度 + Alpha</span></figcaption>
+            <figcaption><span>法线 / rim 图</span><span id="secondaryMapLegend">R = normal X · G = normal Y</span></figcaption>
             <canvas id="normalCanvas" class="lab-map-canvas" aria-label="当前参数生成的法线和边缘贴图"></canvas>
           </figure>
         </div>
@@ -848,7 +763,6 @@
           <p id="outerShapeNote" class="lab-status-note">角部模型保留直边；指数 2 为传统圆角，2 以上为超椭圆角。</p>
         </section>
 
-        <div id="productControls" class="lab-renderer-controls">
         <section class="lab-control-section">
           <h3>预设与贴图</h3>
           <div class="lab-select-grid">
@@ -979,98 +893,20 @@
           </label>
           <p class="lab-status-note">RGB 三路色散比例仍使用生产引擎当前固定值。首版不为实验页扩张公共参数接口。</p>
         </section>
-        </div>
-
-        <div id="referenceControls" class="lab-renderer-controls" hidden>
-          <section class="lab-control-section">
-            <h3>Reference Refraction</h3>
-            <label class="lab-field"><span class="lab-field-heading"><span>Glass Thickness</span><output id="referenceThicknessOutput" class="lab-field-value">80</output></span><input id="referenceThicknessInput" data-reference-control type="range" min="10" max="200" value="80"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Bezel Width</span><output id="referenceBezelOutput" class="lab-field-value">60px</output></span><input id="referenceBezelInput" data-reference-control type="range" min="2" max="60" value="60"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Refractive Index</span><output id="referenceIorOutput" class="lab-field-value">3.00</output></span><input id="referenceIorInput" data-reference-control type="range" min="1" max="3" step="0.05" value="3"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Scale Ratio</span><output id="referenceScaleOutput" class="lab-field-value">1.00</output></span><input id="referenceScaleInput" data-reference-control type="range" min="0" max="2" step="0.05" value="1"></label>
-          </section>
-          <section class="lab-control-section">
-            <h3>Reference Appearance</h3>
-            <label class="lab-field"><span class="lab-field-heading"><span>Blur</span><output id="referenceBlurOutput" class="lab-field-value">0.3px</output></span><input id="referenceBlurInput" data-reference-control type="range" min="0" max="8" step="0.1" value="0.3"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Specular Opacity</span><output id="referenceSpecularOpacityOutput" class="lab-field-value">0.50</output></span><input id="referenceSpecularOpacityInput" data-reference-control type="range" min="0" max="1" step="0.05" value="0.5"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Specular Saturation</span><output id="referenceSpecularSaturationOutput" class="lab-field-value">4</output></span><input id="referenceSpecularSaturationInput" data-reference-control type="range" min="0" max="12" step="1" value="4"></label>
-          </section>
-          <section class="lab-control-section">
-            <h3>Reference Surface Styling</h3>
-            <label class="lab-field"><span class="lab-field-heading"><span>Inner Shadow Color</span></span><input id="referenceShadowColorInput" data-reference-control type="color" value="#ffffff"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Inner Shadow Blur</span><output id="referenceShadowBlurOutput" class="lab-field-value">20px</output></span><input id="referenceShadowBlurInput" data-reference-control type="range" min="0" max="40" value="20"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Inner Shadow Spread</span><output id="referenceShadowSpreadOutput" class="lab-field-value">−5px</output></span><input id="referenceShadowSpreadInput" data-reference-control type="range" min="-15" max="10" value="-5"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Tint Color</span></span><input id="referenceTintColorInput" data-reference-control type="color" value="#ffffff"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Tint Opacity</span><output id="referenceTintOpacityOutput" class="lab-field-value">6%</output></span><input id="referenceTintOpacityInput" data-reference-control type="range" min="0" max="40" value="6"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Outer Shadow Blur</span><output id="referenceOuterShadowOutput" class="lab-field-value">24px</output></span><input id="referenceOuterShadowInput" data-reference-control type="range" min="0" max="50" value="24"></label>
-            <p class="lab-status-note">算法与滤镜顺序逐行移植自 <a class="lab-source-link" href="https://github.com/archisvaze/liquid-glass/blob/main/index.html">archisvaze/liquid-glass</a> 当前 SVG 示例；来源仓库未声明许可证，因此仅作隔离研究对照，不调用生产几何、Worker、RGB 重组或 LRU。</p>
-          </section>
-        </div>
-
-        <div id="sdfControls" class="lab-renderer-controls" hidden>
-          <section class="lab-control-section">
-            <h3>Controlled Comparisons</h3>
-            <div class="lab-compare-grid">
-              <button type="button" data-sdf-preset="reference-optics">Ref 趋近 · 光学</button>
-              <button type="button" data-sdf-preset="reference-appearance">Ref 趋近 · +外观</button>
-              <button type="button" data-sdf-preset="source">来源默认</button>
-              <button type="button" data-sdf-preset="optics">纯折射 · Q512</button>
-              <button type="button" data-sdf-preset="quality-low">低清边界 · Q128</button>
-              <button type="button" data-sdf-preset="quality-high">高精边界 · Q1024</button>
-              <button type="button" data-sdf-preset="depth-wide">宽边带 · D30</button>
-              <button type="button" data-sdf-preset="linear">线性坡度 · C0</button>
-              <button type="button" data-sdf-preset="dome">球顶坡度 · C1</button>
-              <button type="button" data-sdf-preset="radius-small">小圆角 · R20</button>
-              <button type="button" data-sdf-preset="radius-large">大圆角 · R100</button>
-            </div>
-            <p class="lab-status-note">两个“Ref 趋近”使用完全相同的 SDF 光学参数，第二项只补入当前 Reference 的 tint、内阴影和外阴影，用于区分算法与外观层差距；其中关闭 RGB 色散只为匹配没有分路的 Reference，不代表 Apple 系统材质没有色散。其余预设先恢复来源光学参数；纯折射系列关闭 glow、edge highlight 与 specular。圆角快捷方式会更新上方的共享圆角。</p>
-          </section>
-          <section class="lab-control-section">
-            <h3>SDF Map</h3>
-            <label class="lab-field" for="sdfQualitySelect"><span class="lab-field-heading"><span>Square Map Quality</span></span><select id="sdfQualitySelect" data-sdf-control><option value="128">128</option><option value="256">256</option><option value="512" selected>512</option><option value="1024">1024</option></select></label>
-          </section>
-          <section class="lab-control-section">
-            <h3>SDF Refraction</h3>
-            <label class="lab-field"><span class="lab-field-heading"><span>Strength</span><output id="sdfStrengthOutput" class="lab-field-value">0.100</output></span><input id="sdfStrengthInput" data-sdf-control type="range" min="0" max="0.25" step="0.005" value="0.1"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Chromatic Aberration</span><output id="sdfChromaticOutput" class="lab-field-value">0.20</output></span><input id="sdfChromaticInput" data-sdf-control type="range" min="0" max="1" step="0.01" value="0.2"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Blur</span><output id="sdfBlurOutput" class="lab-field-value">0.0px</output></span><input id="sdfBlurInput" data-sdf-control type="range" min="0" max="12" step="0.1" value="0"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Depth</span><output id="sdfDepthOutput" class="lab-field-value">10px</output></span><input id="sdfDepthInput" data-sdf-control type="range" min="1" max="100" step="1" value="10"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Curvature</span><output id="sdfCurvatureOutput" class="lab-field-value">0.65</output></span><input id="sdfCurvatureInput" data-sdf-control type="range" min="0" max="1" step="0.01" value="0.65"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Splay</span><output id="sdfSplayOutput" class="lab-field-value">1.00</output></span><input id="sdfSplayInput" data-sdf-control type="range" min="0" max="1" step="0.01" value="1"></label>
-          </section>
-          <section class="lab-control-section">
-            <h3>SDF Specular</h3>
-            <label class="lab-field"><span class="lab-field-heading"><span>Glow</span><output id="sdfGlowOutput" class="lab-field-value">0.10</output></span><input id="sdfGlowInput" data-sdf-control type="range" min="0" max="1" step="0.01" value="0.1"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Glow Spread</span><output id="sdfGlowSpreadOutput" class="lab-field-value">1.00</output></span><input id="sdfGlowSpreadInput" data-sdf-control type="range" min="0" max="1" step="0.01" value="1"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Glow Exponent</span><output id="sdfGlowExponentOutput" class="lab-field-value">1.50</output></span><input id="sdfGlowExponentInput" data-sdf-control type="range" min="0.1" max="8" step="0.1" value="1.5"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Edge Highlight</span><output id="sdfEdgeHighlightOutput" class="lab-field-value">0.25</output></span><input id="sdfEdgeHighlightInput" data-sdf-control type="range" min="0" max="1" step="0.01" value="0.25"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Edge Width</span><output id="sdfEdgeWidthOutput" class="lab-field-value">3.0px</output></span><input id="sdfEdgeWidthInput" data-sdf-control type="range" min="0.1" max="40" step="0.1" value="3"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Edge Exponent</span><output id="sdfEdgeExponentOutput" class="lab-field-value">1.50</output></span><input id="sdfEdgeExponentInput" data-sdf-control type="range" min="0.1" max="8" step="0.1" value="1.5"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Specular Gain</span><output id="sdfSpecularOutput" class="lab-field-value">1.00</output></span><input id="sdfSpecularInput" data-sdf-control type="range" min="0" max="2" step="0.05" value="1"></label>
-            <label class="lab-field"><span class="lab-field-heading"><span>Specular Angle</span><output id="sdfAngleOutput" class="lab-field-value">45°</output></span><input id="sdfAngleInput" data-sdf-control type="range" min="-180" max="180" step="1" value="45"></label>
-            <p class="lab-status-note">核心贴图数学改编自 MIT 许可的 <a class="lab-source-link" href="https://github.com/PallavAg/liquid-glass-web-react">PallavAg/liquid-glass-web-react</a>。SDF 只定义轮廓和边缘衰减，位移方向来自线性/球顶梯度；二值 Alpha 轮廓按原实现保留，便于直接观察其采样边界。</p>
-          </section>
-        </div>
       </aside>
     </div>
   </main>
 
   <svg id="liquidGlassFilterDefs" width="0" height="0" aria-hidden="true" focusable="false"><defs></defs></svg>
-  <svg width="0" height="0" aria-hidden="true" focusable="false" color-interpolation-filters="sRGB"><defs id="referenceSvgDefs"></defs></svg>
-  <svg width="0" height="0" aria-hidden="true" focusable="false" color-interpolation-filters="sRGB"><defs id="sdfSvgDefs"></defs></svg>
   <script src="lib/liquid-glass-geometry.js"></script>
   <script src="lib/liquid-glass-engine.js"></script>
-  <script src="lib/liquid-glass-reference-baseline.js"></script>
-  <script src="lib/liquid-glass-sdf-baseline.js"></script>
   <script>
     (() => {
       "use strict";
 
       const geometry = window.ConlexiconLiquidGlassGeometry;
       const engineApi = window.ConlexiconLiquidGlassEngine;
-      const referenceBaseline = window.ConlexiconLiquidGlassReferenceBaseline;
-      const sdfBaseline = window.ConlexiconLiquidGlassSdfBaseline;
-      if (!geometry || !engineApi || !referenceBaseline || !sdfBaseline) {
+      if (!geometry || !engineApi) {
         throw new Error("Liquid Glass lab modules failed to load.");
       }
 
@@ -1082,7 +918,6 @@
         globalShapeOutline: document.querySelector("#globalShapeOutline"),
         globalShapeOutlinePath: document.querySelector("#globalShapeOutlinePath"),
         themeButton: document.querySelector("#themeButton"),
-        rendererSelect: document.querySelector("#rendererSelect"),
         sceneSelect: document.querySelector("#sceneSelect"),
         presetSelect: document.querySelector("#presetSelect"),
         productQualitySelect: document.querySelector("#productQualitySelect"),
@@ -1097,17 +932,7 @@
         bezelValue: document.querySelector("#bezelValue"),
         mapValue: document.querySelector("#mapValue"),
         cacheValue: document.querySelector("#cacheValue"),
-        productControls: document.querySelector("#productControls"),
-        referenceControls: document.querySelector("#referenceControls"),
-        sdfControls: document.querySelector("#sdfControls"),
-        referenceSvgDefs: document.querySelector("#referenceSvgDefs"),
-        sdfSvgDefs: document.querySelector("#sdfSvgDefs"),
-        sdfQualitySelect: document.querySelector("#sdfQualitySelect"),
-        displacementLegend: document.querySelector("#displacementLegend"),
-        secondaryMapTitle: document.querySelector("#secondaryMapTitle"),
         secondaryMapLegend: document.querySelector("#secondaryMapLegend"),
-        referenceShadowColorInput: document.querySelector("#referenceShadowColorInput"),
-        referenceTintColorInput: document.querySelector("#referenceTintColorInput"),
         outerShapeSelect: document.querySelector("#outerShapeSelect"),
         cornerExponentInput: document.querySelector("#cornerExponentInput"),
         cornerExponentOutput: document.querySelector("#cornerExponentOutput"),
@@ -1154,47 +979,6 @@
         spec.output = document.getElementById(spec.output);
       });
 
-      const referenceRangeSpecs = {
-        glassThickness: { input: "referenceThicknessInput", output: "referenceThicknessOutput", suffix: "", digits: 0 },
-        bezelWidth: { input: "referenceBezelInput", output: "referenceBezelOutput", suffix: "px", digits: 0 },
-        ior: { input: "referenceIorInput", output: "referenceIorOutput", suffix: "", digits: 2 },
-        scaleRatio: { input: "referenceScaleInput", output: "referenceScaleOutput", suffix: "", digits: 2 },
-        blurAmount: { input: "referenceBlurInput", output: "referenceBlurOutput", suffix: "px", digits: 1 },
-        specularOpacity: { input: "referenceSpecularOpacityInput", output: "referenceSpecularOpacityOutput", suffix: "", digits: 2 },
-        specularSaturation: { input: "referenceSpecularSaturationInput", output: "referenceSpecularSaturationOutput", suffix: "", digits: 0 },
-        shadowBlur: { input: "referenceShadowBlurInput", output: "referenceShadowBlurOutput", suffix: "px", digits: 0 },
-        shadowSpread: { input: "referenceShadowSpreadInput", output: "referenceShadowSpreadOutput", suffix: "px", digits: 0 },
-        tintOpacity: { input: "referenceTintOpacityInput", output: "referenceTintOpacityOutput", suffix: "%", digits: 0 },
-        outerShadowBlur: { input: "referenceOuterShadowInput", output: "referenceOuterShadowOutput", suffix: "px", digits: 0 },
-      };
-
-      Object.values(referenceRangeSpecs).forEach((spec) => {
-        spec.input = document.getElementById(spec.input);
-        spec.output = document.getElementById(spec.output);
-      });
-
-      const sdfRangeSpecs = {
-        strength: { input: "sdfStrengthInput", output: "sdfStrengthOutput", suffix: "", digits: 3 },
-        chromaticAberration: { input: "sdfChromaticInput", output: "sdfChromaticOutput", suffix: "", digits: 2 },
-        blur: { input: "sdfBlurInput", output: "sdfBlurOutput", suffix: "px", digits: 1 },
-        depth: { input: "sdfDepthInput", output: "sdfDepthOutput", suffix: "px", digits: 0 },
-        curvature: { input: "sdfCurvatureInput", output: "sdfCurvatureOutput", suffix: "", digits: 2 },
-        splay: { input: "sdfSplayInput", output: "sdfSplayOutput", suffix: "", digits: 2 },
-        glow: { input: "sdfGlowInput", output: "sdfGlowOutput", suffix: "", digits: 2 },
-        glowSpread: { input: "sdfGlowSpreadInput", output: "sdfGlowSpreadOutput", suffix: "", digits: 2 },
-        glowExponent: { input: "sdfGlowExponentInput", output: "sdfGlowExponentOutput", suffix: "", digits: 2 },
-        edgeHighlight: { input: "sdfEdgeHighlightInput", output: "sdfEdgeHighlightOutput", suffix: "", digits: 2 },
-        edgeWidth: { input: "sdfEdgeWidthInput", output: "sdfEdgeWidthOutput", suffix: "px", digits: 1 },
-        edgeExponent: { input: "sdfEdgeExponentInput", output: "sdfEdgeExponentOutput", suffix: "", digits: 2 },
-        specular: { input: "sdfSpecularInput", output: "sdfSpecularOutput", suffix: "", digits: 2 },
-        specularAngle: { input: "sdfAngleInput", output: "sdfAngleOutput", suffix: "°", digits: 0 },
-      };
-
-      Object.values(sdfRangeSpecs).forEach((spec) => {
-        spec.input = document.getElementById(spec.input);
-        spec.output = document.getElementById(spec.output);
-      });
-
       const PRODUCT_LAB_ROLE = "diagnostic";
       const productLayerInputs = [...document.querySelectorAll("[data-product-layer]")];
       const productComparisonButtons = [...document.querySelectorAll("[data-product-comparison]")];
@@ -1225,40 +1009,6 @@
       };
       let lastProductPreset = "focus";
 
-      const sdfOpticsOnly = Object.freeze({
-        glow: 0,
-        edgeHighlight: 0,
-        specular: 0,
-      });
-      const sdfReferenceMatch = Object.freeze({
-        strength: 0.25,
-        chromaticAberration: 0,
-        blur: 0.3,
-        depth: 48,
-        curvature: 1,
-        splay: 0.25,
-        glow: 0,
-        edgeHighlight: 0.52,
-        edgeWidth: 2,
-        edgeExponent: 2,
-        specular: 1,
-        specularAngle: 45,
-        quality: 1024,
-      });
-      const sdfComparisonPresets = Object.freeze({
-        "reference-optics": { values: sdfReferenceMatch, referenceAppearance: false },
-        "reference-appearance": { values: sdfReferenceMatch, referenceAppearance: true },
-        source: { values: {}, referenceAppearance: false },
-        optics: { values: { ...sdfOpticsOnly }, referenceAppearance: false },
-        "quality-low": { values: { ...sdfOpticsOnly, quality: 128 }, referenceAppearance: false },
-        "quality-high": { values: { ...sdfOpticsOnly, quality: 1024 }, referenceAppearance: false },
-        "depth-wide": { values: { ...sdfOpticsOnly, depth: 30 }, referenceAppearance: false },
-        linear: { values: { ...sdfOpticsOnly, curvature: 0 }, referenceAppearance: false },
-        dome: { values: { ...sdfOpticsOnly, curvature: 1 }, referenceAppearance: false },
-        "radius-small": { values: { ...sdfOpticsOnly, radius: 20 }, referenceAppearance: false },
-        "radius-large": { values: { ...sdfOpticsOnly, radius: 100 }, referenceAppearance: false },
-      });
-
       const opticalEngine = engineApi.createEngine({
         workerUrl: "lib/liquid-glass-map-worker.js",
         maxBytes: 64 * 1024 * 1024,
@@ -1274,7 +1024,6 @@
       let dragState = null;
       let dragPosition = { x: 0, y: 0 };
       let pendingDragPosition = null;
-      let lastSdfResult = null;
       let appearanceProbePromise = null;
       let currentProductAppearance = null;
       const appearanceProbeFrames = new Map();
@@ -1306,28 +1055,22 @@
 
       function updateShapeControls() {
         const global = selectedShapeModel() === "global-superellipse";
-        const reference = elements.rendererSelect.value === "reference";
-        const product = elements.rendererSelect.value === "product";
         if (!supportsSuperellipse && !global) {
           elements.cornerExponentInput.value = "2";
         }
         elements.cornerExponentInput.disabled = !supportsSuperellipse && !global;
-        geometrySpecs.radius.input.disabled = global && !reference;
+        geometrySpecs.radius.input.disabled = global;
         elements.cornerExponentOutput.value = cornerExponent().toFixed(2);
-        if (reference) {
-          elements.outerShapeNote.textContent = "Reference Baseline 始终使用来源传统圆角；共享轮廓选择会保留，但不修改该基准。";
-        } else if (global) {
+        if (global) {
           elements.outerShapeNote.textContent = "全局超椭圆使用整张表面的 Lamé 曲线；传统圆角半径不参与该模型。";
         } else if (supportsSuperellipse) {
           elements.outerShapeNote.textContent = "角部模型保留直边；指数 2 为传统圆角，2 以上为超椭圆角。";
         } else {
           elements.outerShapeNote.textContent = "当前浏览器不支持 CSS corner-shape；角部模型指数已锁定为 2。全局超椭圆仍可通过匹配的 clip-path 与贴图比较。";
         }
-        if (product) {
-          elements.secondaryMapLegend.textContent = global
-            ? "R = normal X · G = normal Y · A = shape"
-            : "R = normal X · G = normal Y";
-        }
+        elements.secondaryMapLegend.textContent = global
+          ? "R = normal X · G = normal Y · A = shape"
+          : "R = normal X · G = normal Y";
       }
 
       function formatGeometryRange(name) {
@@ -1370,77 +1113,6 @@
 
       function updateAllOutputs() {
         Object.keys(rangeSpecs).forEach(formatRange);
-      }
-
-      function readReferenceNumber(name) {
-        return Number(referenceRangeSpecs[name].input.value);
-      }
-
-      function formatReferenceRange(name) {
-        const spec = referenceRangeSpecs[name];
-        const value = Number(spec.input.value);
-        const formatted = spec.digits === 0 ? String(Math.round(value)) : value.toFixed(spec.digits);
-        spec.output.value = `${value < 0 ? "−" : ""}${value < 0 ? formatted.slice(1) : formatted}${spec.suffix}`;
-      }
-
-      function updateReferenceOutputs() {
-        Object.keys(referenceRangeSpecs).forEach(formatReferenceRange);
-      }
-
-      function readSdfNumber(name) {
-        return Number(sdfRangeSpecs[name].input.value);
-      }
-
-      function formatSdfRange(name) {
-        const spec = sdfRangeSpecs[name];
-        const value = Number(spec.input.value);
-        const formatted = spec.digits === 0 ? String(Math.round(value)) : value.toFixed(spec.digits);
-        spec.output.value = `${value < 0 ? "−" : ""}${value < 0 ? formatted.slice(1) : formatted}${spec.suffix}`;
-      }
-
-      function updateSdfOutputs() {
-        Object.keys(sdfRangeSpecs).forEach(formatSdfRange);
-      }
-
-      function applyReferenceDefaults() {
-        Object.entries(referenceBaseline.LAB_DEFAULTS).forEach(([name, value]) => {
-          if (referenceRangeSpecs[name]) {
-            referenceRangeSpecs[name].input.value = String(value);
-          }
-        });
-        elements.referenceShadowColorInput.value = referenceBaseline.DEFAULTS.shadowColor;
-        elements.referenceTintColorInput.value = referenceBaseline.DEFAULTS.tintColor;
-        updateReferenceOutputs();
-        scheduleRefresh();
-      }
-
-      function applySdfValues(overrides = {}, referenceAppearance = false) {
-        const values = { ...sdfBaseline.LAB_DEFAULTS, ...overrides };
-        Object.entries(values).forEach(([name, value]) => {
-          if (sdfRangeSpecs[name]) {
-            sdfRangeSpecs[name].input.value = String(value);
-          }
-        });
-        if (Object.prototype.hasOwnProperty.call(overrides, "radius")) {
-          setGeometryValue("radius", overrides.radius);
-          syncGeometryBounds();
-        }
-        elements.surface.dataset.sdfAppearance = referenceAppearance ? "reference" : "none";
-        elements.sdfQualitySelect.value = String(values.quality);
-        updateSdfOutputs();
-        scheduleRefresh();
-      }
-
-      function applySdfDefaults() {
-        applySdfValues();
-      }
-
-      function applySdfComparisonPreset(name) {
-        const preset = sdfComparisonPresets[name];
-        if (!preset) {
-          return;
-        }
-        applySdfValues(preset.values, preset.referenceAppearance);
       }
 
       function applyPreset(name) {
@@ -1492,61 +1164,6 @@
           opticalBlur: readNumber("opticalBlur"),
           saturation: readNumber("saturation"),
         };
-      }
-
-      function currentReferenceConfig() {
-        return {
-          ...referenceBaseline.LAB_DEFAULTS,
-          width: readGeometryNumber("width"),
-          height: readGeometryNumber("height"),
-          radius: readGeometryNumber("radius"),
-          glassThickness: readReferenceNumber("glassThickness"),
-          bezelWidth: readReferenceNumber("bezelWidth"),
-          ior: readReferenceNumber("ior"),
-          scaleRatio: readReferenceNumber("scaleRatio"),
-          blurAmount: readReferenceNumber("blurAmount"),
-          specularOpacity: readReferenceNumber("specularOpacity"),
-          specularSaturation: readReferenceNumber("specularSaturation"),
-          shadowBlur: readReferenceNumber("shadowBlur"),
-          shadowSpread: readReferenceNumber("shadowSpread"),
-          tintOpacity: readReferenceNumber("tintOpacity"),
-          outerShadowBlur: readReferenceNumber("outerShadowBlur"),
-          shadowColor: elements.referenceShadowColorInput.value,
-          tintColor: elements.referenceTintColorInput.value,
-        };
-      }
-
-      function currentSdfConfig() {
-        return sdfBaseline.normalizeOptions({
-          ...sdfBaseline.LAB_DEFAULTS,
-          width: readGeometryNumber("width"),
-          height: readGeometryNumber("height"),
-          radius: readGeometryNumber("radius"),
-          outerShape: selectedOuterShape(),
-          cornerExponent: cornerExponent(),
-          strength: readSdfNumber("strength"),
-          chromaticAberration: readSdfNumber("chromaticAberration"),
-          blur: readSdfNumber("blur"),
-          depth: readSdfNumber("depth"),
-          curvature: readSdfNumber("curvature"),
-          splay: readSdfNumber("splay"),
-          glow: readSdfNumber("glow"),
-          glowSpread: readSdfNumber("glowSpread"),
-          glowExponent: readSdfNumber("glowExponent"),
-          edgeHighlight: readSdfNumber("edgeHighlight"),
-          edgeWidth: readSdfNumber("edgeWidth"),
-          edgeExponent: readSdfNumber("edgeExponent"),
-          specular: readSdfNumber("specular"),
-          specularAngle: readSdfNumber("specularAngle"),
-          quality: Number(elements.sdfQualitySelect.value),
-        });
-      }
-
-      function hexToRgb(hex) {
-        const r = parseInt(hex.slice(1, 3), 16);
-        const g = parseInt(hex.slice(3, 5), 16);
-        const b = parseInt(hex.slice(5, 7), 16);
-        return `${r}, ${g}, ${b}`;
       }
 
       function escapeHtmlAttribute(value) {
@@ -1808,18 +1425,13 @@
       }
 
       function updateSurfaceAppearance() {
-        const renderer = elements.rendererSelect.value;
-        const reference = renderer === "reference";
-        const sdf = renderer === "sdf";
-        const config = reference ? currentReferenceConfig() : sdf ? currentSdfConfig() : null;
         const requestedWidth = readGeometryNumber("width");
         const availableWidth = Math.max(120, elements.stage.clientWidth - 40);
         const width = Math.min(requestedWidth, availableWidth);
         const height = readGeometryNumber("height");
         const radius = readGeometryNumber("radius");
-        const actualOuterShape = reference ? "round" : selectedOuterShape();
+        const actualOuterShape = selectedOuterShape();
         const global = actualOuterShape === "global-superellipse";
-        elements.surface.dataset.renderer = renderer;
         const tint = readNumber("tint");
         const light = elements.root.dataset.theme === "light";
         elements.surface.style.width = `${width}px`;
@@ -1849,7 +1461,7 @@
         elements.surface.style.removeProperty("box-shadow");
         elements.surface.style.removeProperty("color");
         elements.surface.style.removeProperty("--lab-surface-border");
-        const productMaterial = !reference && !sdf && productAppearanceSelected()
+        const productMaterial = productAppearanceSelected()
           ? currentProductAppearance
           : null;
         if (productMaterial) {
@@ -1861,21 +1473,12 @@
           elements.surface.style.color = productMaterial.color;
           elements.surface.style.setProperty("--lab-surface-border", productMaterial.borderColor);
         } else {
-          elements.surface.style.background = reference || sdf ? "transparent" : light
+          elements.surface.style.background = light
             ? `rgba(235, 247, 249, ${tint})`
             : `rgba(12, 26, 32, ${tint})`;
         }
         elements.surface.style.setProperty("--lab-fallback-blur", `${readNumber("opticalBlur")}px`);
         elements.surface.style.setProperty("--lab-fallback-saturation", String(readNumber("saturation")));
-        if (reference || (sdf && elements.surface.dataset.sdfAppearance === "reference")) {
-          const appearanceConfig = reference ? config : currentReferenceConfig();
-          elements.surface.style.setProperty("--reference-outer-shadow-blur", `${appearanceConfig.outerShadowBlur}px`);
-          elements.surface.style.setProperty("--reference-shadow-blur", `${appearanceConfig.shadowBlur}px`);
-          elements.surface.style.setProperty("--reference-shadow-spread", `${appearanceConfig.shadowSpread}px`);
-          elements.surface.style.setProperty("--reference-shadow-color", appearanceConfig.shadowColor);
-          elements.surface.style.setProperty("--reference-tint-color", hexToRgb(appearanceConfig.tintColor));
-          elements.surface.style.setProperty("--reference-tint-opacity", (appearanceConfig.tintOpacity / 100).toFixed(3));
-        }
         window.requestAnimationFrame(clampSurfacePosition);
       }
 
@@ -1990,22 +1593,6 @@
         }, { forceRefresh: true });
       }
 
-      function drawDataUrlMap(canvas, url) {
-        const image = new Image();
-        const generation = previewGeneration;
-        image.addEventListener("load", () => {
-          if (generation !== previewGeneration) {
-            return;
-          }
-          canvas.width = image.naturalWidth;
-          canvas.height = image.naturalHeight;
-          const context = canvas.getContext("2d", { alpha: true });
-          context.clearRect(0, 0, canvas.width, canvas.height);
-          context.drawImage(image, 0, 0);
-        }, { once: true });
-        image.src = url;
-      }
-
       function assistedOpticsSuppressed() {
         return reducedTransparencyQuery.matches || forcedColorsQuery.matches;
       }
@@ -2017,47 +1604,6 @@
           canvas.height = 1;
           canvas.getContext("2d")?.clearRect(0, 0, 1, 1);
         });
-      }
-
-      function renderReferenceBaseline() {
-        updateSurfaceAppearance();
-        opticalEngine.unregister(elements.surface);
-        elements.sdfSvgDefs.replaceChildren();
-        lastSdfResult = null;
-        const config = currentReferenceConfig();
-        if (assistedOpticsSuppressed()) {
-          elements.referenceSvgDefs.replaceChildren();
-          clearMapPreviews();
-          return { config, result: null };
-        }
-        const result = referenceBaseline.rebuildFilter(elements.surface, elements.referenceSvgDefs, config);
-        previewGeneration += 1;
-        if (result) {
-          drawDataUrlMap(elements.displacementCanvas, result.dispUrl);
-          drawDataUrlMap(elements.normalCanvas, result.specUrl);
-        }
-        return { config, result };
-      }
-
-      function renderSdfBaseline() {
-        updateSurfaceAppearance();
-        opticalEngine.unregister(elements.surface);
-        elements.referenceSvgDefs.replaceChildren();
-        const config = currentSdfConfig();
-        if (assistedOpticsSuppressed()) {
-          elements.sdfSvgDefs.replaceChildren();
-          lastSdfResult = null;
-          clearMapPreviews();
-          return { config, result: null };
-        }
-        const result = sdfBaseline.rebuildFilter(elements.surface, elements.sdfSvgDefs, config);
-        lastSdfResult = result;
-        previewGeneration += 1;
-        if (result) {
-          drawDataUrlMap(elements.displacementCanvas, result.mapUrl);
-          drawDataUrlMap(elements.normalCanvas, result.specularUrl);
-        }
-        return { config, result };
       }
 
       function drawMap(canvas, bytes, width, height) {
@@ -2091,43 +1637,6 @@
       }
 
       function updateReadout(config = currentConfig()) {
-        if (elements.rendererSelect.value === "reference") {
-          const referenceConfig = currentReferenceConfig();
-          const width = elements.surface.offsetWidth;
-          const height = elements.surface.offsetHeight;
-          const clampedBezel = Math.min(referenceConfig.bezelWidth, referenceConfig.radius - 1, Math.min(width, height) / 2 - 1);
-          const suppressed = assistedOpticsSuppressed();
-          elements.qualityValue.textContent = suppressed ? "Q0" : "REFERENCE";
-          elements.surfaceStateValue.textContent = suppressed ? "solid fallback" : "baseline";
-          elements.sizeValue.textContent = `${width} × ${height}`;
-          elements.bezelValue.textContent = `${clampedBezel.toFixed(1)}px`;
-          elements.mapValue.textContent = suppressed ? "disabled" : `${width} × ${height}`;
-          elements.cacheValue.textContent = "none";
-          elements.liveStatus.textContent = suppressed
-            ? "Reference Baseline · optics disabled"
-            : selectedOuterShape() === "superellipse"
-            ? "Reference Baseline · rounded rectangle（共享超椭圆不支持）"
-            : "Reference Baseline · convex_squircle · rounded rectangle";
-          return;
-        }
-        if (elements.rendererSelect.value === "sdf") {
-          const sdfConfig = currentSdfConfig();
-          const width = elements.surface.offsetWidth;
-          const height = elements.surface.offsetHeight;
-          const suppressed = assistedOpticsSuppressed();
-          elements.qualityValue.textContent = suppressed ? "Q0" : "SDF";
-          elements.surfaceStateValue.textContent = suppressed ? "solid fallback" : "baseline";
-          elements.sizeValue.textContent = `${width} × ${height}`;
-          elements.bezelValue.textContent = `${sdfConfig.depth.toFixed(1)}px depth`;
-          elements.mapValue.textContent = suppressed ? "disabled" : `${sdfConfig.quality} × ${sdfConfig.quality}`;
-          elements.cacheValue.textContent = "none";
-          elements.liveStatus.textContent = suppressed
-            ? "SDF Baseline · optics disabled"
-            : lastSdfResult
-            ? `SDF Baseline · ${lastSdfResult.generationMs.toFixed(1)}ms`
-            : "SDF Baseline · waiting";
-          return;
-        }
         const stats = opticalEngine.stats();
         const surfaceState = elements.surface.dataset.liquidGlassOptics || "unregistered";
         const suppressed = assistedOpticsSuppressed();
@@ -2150,19 +1659,6 @@
 
       function refresh() {
         window.clearTimeout(refreshTimer);
-        if (elements.rendererSelect.value === "reference") {
-          renderReferenceBaseline();
-          updateReadout();
-          return;
-        }
-        if (elements.rendererSelect.value === "sdf") {
-          renderSdfBaseline();
-          updateReadout();
-          return;
-        }
-        elements.referenceSvgDefs.replaceChildren();
-        elements.sdfSvgDefs.replaceChildren();
-        lastSdfResult = null;
         registerSurface();
         const config = currentConfig();
         if (assistedOpticsSuppressed() || opticalEngine.stats().quality !== "q3") {
@@ -2189,34 +1685,6 @@
         updateReadout();
       }
 
-      function updateRendererUi() {
-        const renderer = elements.rendererSelect.value;
-        const reference = renderer === "reference";
-        const sdf = renderer === "sdf";
-        elements.productControls.hidden = renderer !== "product";
-        elements.referenceControls.hidden = !reference;
-        elements.sdfControls.hidden = !sdf;
-        elements.resetButton.textContent = reference || sdf ? "恢复参考默认值" : "恢复角色默认值";
-        if (reference) {
-          elements.displacementLegend.textContent = "R = X · G = Y";
-          elements.secondaryMapTitle.textContent = "Specular 图";
-          elements.secondaryMapLegend.textContent = "灰度 + Alpha";
-          elements.normalCanvas.setAttribute("aria-label", "当前参考参数生成的 specular 贴图");
-        } else if (sdf) {
-          elements.displacementLegend.textContent = "R = X · G = Y · A = shape";
-          elements.secondaryMapTitle.textContent = "B 通道镜面图";
-          elements.secondaryMapLegend.textContent = "B − 128 · A = shape";
-          elements.normalCanvas.setAttribute("aria-label", "当前 SDF 参数生成的镜面贴图");
-        } else {
-          elements.displacementLegend.textContent = "R = X · G = Y · B = rim";
-          elements.secondaryMapTitle.textContent = "法线 / rim 图";
-          elements.secondaryMapLegend.textContent = "R = normal X · G = normal Y";
-          elements.normalCanvas.setAttribute("aria-label", "当前参数生成的法线和边缘贴图");
-        }
-        updateShapeControls();
-        scheduleRefresh();
-      }
-
       function updateProductQuality() {
         activateRequestedProductQuality();
         if (productAppearanceSelected()) {
@@ -2231,14 +1699,6 @@
         }
       });
       elements.resetButton.addEventListener("click", () => {
-        if (elements.rendererSelect.value === "reference") {
-          applyReferenceDefaults();
-          return;
-        }
-        if (elements.rendererSelect.value === "sdf") {
-          applySdfDefaults();
-          return;
-        }
         const preset = elements.presetSelect.value === "custom"
           ? lastProductPreset
           : elements.presetSelect.value;
@@ -2270,23 +1730,6 @@
         });
         control.addEventListener("change", scheduleRefresh);
       });
-      document.querySelectorAll("[data-reference-control]").forEach((control) => {
-        control.addEventListener("input", () => {
-          updateReferenceOutputs();
-          scheduleRefresh();
-        });
-        control.addEventListener("change", scheduleRefresh);
-      });
-      document.querySelectorAll("[data-sdf-control]").forEach((control) => {
-        control.addEventListener("input", () => {
-          updateSdfOutputs();
-          scheduleRefresh();
-        });
-        control.addEventListener("change", scheduleRefresh);
-      });
-      document.querySelectorAll("[data-sdf-preset]").forEach((button) => {
-        button.addEventListener("click", () => applySdfComparisonPreset(button.dataset.sdfPreset));
-      });
       productComparisonButtons.forEach((button) => {
         button.addEventListener("click", () => applyProductComparison(button.dataset.productComparison));
       });
@@ -2296,7 +1739,6 @@
       elements.appearanceSourceSelect.addEventListener("change", updateAppearanceControls);
       elements.appearanceRoleSelect.addEventListener("change", refreshProductAppearance);
       elements.productQualitySelect.addEventListener("change", updateProductQuality);
-      elements.rendererSelect.addEventListener("change", updateRendererUi);
       rangeSpecs.tint.input.addEventListener("input", () => {
         formatRange("tint");
         if (productAppearanceSelected()) {
@@ -2362,12 +1804,9 @@
       applyPreset("focus");
       applyProductComparison("full");
       updateAppearanceControls();
-      applyReferenceDefaults();
-      applySdfDefaults();
       applyScene();
       activateRequestedProductQuality();
       updateLight();
-      updateRendererUi();
       refresh();
       window.addEventListener("beforeunload", () => {
         opticalEngine.destroy();

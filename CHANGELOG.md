@@ -6,6 +6,10 @@
 
 ## 2026-10-01
 
+### 改进
+
+- Liquid Glass Lab 只保留生产光学引擎：删除 SDF Baseline（`lib/liquid-glass-sdf-baseline.js` 及几何检查中的对应断言）和本机 Reference Baseline（`lib/liquid-glass-reference-baseline.js` 及 `.gitignore` 条目），移除渲染路径选择、两条 Baseline 的控件、滤镜宿主与样式，页面约从 2380 行减至 1820 行。此前页面强制要求被 Git 忽略的 Reference 模块，新克隆打开即报错，这一问题随之消除。README、液态玻璃规范同步更新；`THIRD_PARTY_NOTICES.md` 删除已不再分发的 `liquid-glass-web-react` MIT 声明，并补上此前漏列的 Lab 背景 `interior.jpg`（经核实为 Spacejoy 在 Unsplash 发布的“White and brown living room set”，Unsplash License），删除内容重复的 `assets/liquid-glass-lab/README.md`，五张背景图的许可、作者、原始页面以及“直接取自 `archisvaze/liquid-glass` 参考项目”的来源统一记录在 `THIRD_PARTY_NOTICES.md`。
+
 ### 文档
 
 - 液态玻璃规范补充 LQ-7 性能上限分析（折射真实 DOM 只能走 `backdrop-filter` 加 SVG 滤镜，成本随可见光学面积、滤镜节点数和背景变化频率增长）与五项待实测的优化候选；记录 SDF 已完全放弃，不再作为生产替换选项。Lab 复评：确认新克隆因强制依赖被忽略的 Reference 模块而无法打开，Lab 落后于紧凑角色与 tinted／solid；整理方向为生产材质工作台，SDF 路径待移除。

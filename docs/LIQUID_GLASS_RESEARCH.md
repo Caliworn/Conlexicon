@@ -32,7 +32,7 @@
 | SDF Baseline | 来源圆角矩形 SDF，另有 Lab-only 超椭圆角与全局 Lamé 轮廓扩展；线性/球顶梯度决定位移方向 | RGB 三路位移、B 通道镜面、Alpha 轮廓 | 检查解析边界、固定方形贴图和球顶梯度是否改善连续性 |
 | Product Engine | 精确 rounded-rect 外轮廓、Lab-only 超椭圆角/全局 Lamé 分支、独立 bezel 与连续全支撑光学方向场 | 光学模糊、RGB 重组、统一环境 specular、Worker/LRU | 验证最终组件角色、降级、资源生命周期与性能架构 |
 
-三条路径在本机 Reference 文件存在时共享 Lab 的连续色场、高对比网格、色带、大号文字、拖动坐标，以及唯一一组宽度、高度、圆角、外轮廓模型和超椭圆指数。角部模型保留直边：指数范围 `2–8`、默认 `4`，`2` 复用传统圆角快速路径，更大的值启用 Product/SDF 超椭圆角；全局模型直接以 `|x/a|^n + |y/b|^n = 1` 定义整张表面，`n=2` 为椭圆且 Product/SDF 不消费 radius。Product 与 SDF 同步改变 CSS clip/corner shape 和贴图几何；Reference 为保护逐行来源基准始终使用传统圆角，并显式报告差异。圆角滑杆上限只由共享短边的一半决定；Product/SDF 全局模型会保留但禁用该值，Reference 仍可调整其来源圆角。切换渲染路径或恢复模型默认值不会改变共享选择。仓库分发五张仅供 Lab 光学对照的背景图：室内、Diamond Valley Lake 花丛、Whangarei Falls 栈桥和草地人物来自 Unsplash，浅水岩石来自 Pexels；逐张作者、原始页面和许可链接记录在 `assets/liquid-glass-lab/README.md`，这些图片不得视为 Conlexicon 产品美术资产。SDF 来源实现原本过滤包含镜头的内容层；Lab 唯一有意的结构适配是把同一 map/filter 作用到卡片的 `backdrop-filter` 伪元素，使它能与另外两条路径观察同一实时背景。SDF Baseline 默认不叠加自行设计的 tint、边界或外阴影，避免装饰层污染轮廓、位移和镜面的观察。该适配意味着 Lab 能比较视觉结果，但不能据此宣称浏览器覆盖或性能与上游组件完全相同。
+三条路径在本机 Reference 文件存在时共享 Lab 的连续色场、高对比网格、色带、大号文字、拖动坐标，以及唯一一组宽度、高度、圆角、外轮廓模型和超椭圆指数。角部模型保留直边：指数范围 `2–8`、默认 `4`，`2` 复用传统圆角快速路径，更大的值启用 Product/SDF 超椭圆角；全局模型直接以 `|x/a|^n + |y/b|^n = 1` 定义整张表面，`n=2` 为椭圆且 Product/SDF 不消费 radius。Product 与 SDF 同步改变 CSS clip/corner shape 和贴图几何；Reference 为保护逐行来源基准始终使用传统圆角，并显式报告差异。圆角滑杆上限只由共享短边的一半决定；Product/SDF 全局模型会保留但禁用该值，Reference 仍可调整其来源圆角。切换渲染路径或恢复模型默认值不会改变共享选择。仓库分发五张仅供 Lab 光学对照的背景图：室内、Diamond Valley Lake 花丛、Whangarei Falls 栈桥和草地人物来自 Unsplash，浅水岩石来自 Pexels；逐张作者、原始页面和许可链接记录在 `THIRD_PARTY_NOTICES.md`，这些图片不得视为 Conlexicon 产品美术资产。SDF 来源实现原本过滤包含镜头的内容层；Lab 唯一有意的结构适配是把同一 map/filter 作用到卡片的 `backdrop-filter` 伪元素，使它能与另外两条路径观察同一实时背景。SDF Baseline 默认不叠加自行设计的 tint、边界或外阴影，避免装饰层污染轮廓、位移和镜面的观察。该适配意味着 Lab 能比较视觉结果，但不能据此宣称浏览器覆盖或性能与上游组件完全相同。
 
 ## 4. 已纠正的实现认识
 
@@ -66,7 +66,7 @@ Lab 的视觉结论由人工验收后再写入本文件；自动检查只覆盖�
 ## 6. 下一步决策门槛
 
 - Reference 与 SDF 已确认不适合作为主体正式光学后端；它们继续留在 Lab 作为隔离的视觉与性能基准，不再接入应用角色 registry。Product 是后续正式改进主线。
-- 2026-10-01：SDF 曾尝试接入正式表面，性能不可接受，已完全放弃。本文第 5 节的 SDF 对照问题和下一条 coverage/oversampling 实验不再进行；SDF 路径的清理见 `LIQUID_GLASS_SKIN_SPEC.md` 13.17。本文其余内容作为研究记录保留。
+- 2026-10-01：SDF 曾尝试接入正式表面，性能不可接受，已完全放弃。本文第 5 节的 SDF 对照问题和下一条 coverage/oversampling 实验不再进行；SDF 与本机 Reference 的代码已于同日从仓库和 Lab 删除，见 `LIQUID_GLASS_SKIN_SPEC.md` 13.17；本文描述的三条 Lab 路径和对照问题均为历史研究记录。
 - 如果只在 `1024` quality 下改善，先测生成成本、内存和缩放稳定性，再决定 Worker 化、非方形 map 或解析 SVG map，不能用更高分辨率掩盖模型问题。
 - 如果 SDF 仍有明显二值轮廓，下一轮优先加入独立的 coverage/oversampling 实验分支；保留原始 SDF Baseline 作为不可变对照。
 - 动态光源、形状融合、Q2 和 LQ-7 仍是独立议题，不与本轮静态几何结论捆绑。

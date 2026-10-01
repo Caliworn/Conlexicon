@@ -2,7 +2,6 @@
 const assert = require("node:assert/strict");
 
 const geometry = require("../lib/liquid-glass-geometry");
-const sdfBaseline = require("../lib/liquid-glass-sdf-baseline");
 const {
   ByteBudgetLru,
   LiquidGlassEngine,
@@ -498,126 +497,6 @@ for (const [mapX, mapY] of [[4, 73], [30, 15], [97, 4], [164, 15]]) {
     "The generated refraction lookup must remain visually equivalent to the analytic profile",
   );
 }
-
-const sdfOptions = {
-  width: 200,
-  height: 100,
-  radius: 30,
-  depth: 14,
-  curvature: 0.65,
-  quality: 128,
-};
-const sdfMapA = sdfBaseline.computeDisplacementMap(sdfOptions);
-const sdfMapB = sdfBaseline.computeDisplacementMap(sdfOptions);
-const sdfExplicitRound = sdfBaseline.computeDisplacementMap({
-  ...sdfOptions,
-  outerShape: "round",
-  cornerExponent: 8,
-});
-const sdfExponentTwo = sdfBaseline.computeDisplacementMap({
-  ...sdfOptions,
-  outerShape: "superellipse",
-  cornerExponent: 2,
-});
-assert.equal(sdfMapA.width, 128, "The SDF baseline must preserve its requested square map quality");
-assert.equal(sdfMapA.height, 128, "The SDF baseline map must remain square like the upstream renderer");
-assert.equal(sdfMapA.pixels.length, 128 * 128 * 4, "The SDF baseline must emit a complete RGBA map");
-assert.deepEqual(sdfMapA.pixels, sdfMapB.pixels, "The SDF baseline map must be deterministic");
-assert.deepEqual(
-  sdfMapA.pixels,
-  sdfExplicitRound.pixels,
-  "The inactive exponent must not alter the source-compatible SDF round output",
-);
-assert.deepEqual(
-  sdfMapA.pixels,
-  sdfExponentTwo.pixels,
-  "Exponent two must use the source-compatible SDF round fast path",
-);
-assert(
-  sdfMapA.pixels.every((value, index) => index % 4 !== 3 || value === 0 || value === 255),
-  "The SDF research baseline must preserve the upstream binary alpha mask for honest aliasing comparisons",
-);
-
-function sdfPixel(map, x, y) {
-  const offset = (y * map.width + x) * 4;
-  return Array.from(map.pixels.slice(offset, offset + 4));
-}
-
-const sdfSquircle = sdfBaseline.computeDisplacementMap({
-  ...sdfOptions,
-  outerShape: "superellipse",
-  cornerExponent: 4,
-});
-const sdfSquircleRepeat = sdfBaseline.computeDisplacementMap({
-  ...sdfOptions,
-  outerShape: "superellipse",
-  cornerExponent: 4,
-});
-assert.deepEqual(sdfSquircle.pixels, sdfSquircleRepeat.pixels, "The SDF superellipse extension must be deterministic");
-assert.equal(
-  sdfBaseline.normalizeOptions({ ...sdfOptions, outerShape: "superellipse" }).depth,
-  sdfBaseline.normalizeOptions(sdfOptions).depth,
-  "The SDF superellipse outline must not narrow optical depth",
-);
-assert.equal(sdfPixel(sdfSquircle, 0, 0)[3], 0, "The SDF squircle must still exclude the outer image corner");
-assert.equal(sdfPixel(sdfSquircle, 64, 64)[3], 255, "The SDF squircle center must remain inside the mask");
-const roundCoverage = sdfMapA.pixels.reduce(
-  (total, value, index) => total + (index % 4 === 3 && value === 255 ? 1 : 0),
-  0,
-);
-const squircleCoverage = sdfSquircle.pixels.reduce(
-  (total, value, index) => total + (index % 4 === 3 && value === 255 ? 1 : 0),
-  0,
-);
-assert(squircleCoverage > roundCoverage, "A squircle with the same radius must retain more corner area than a rounded rectangle");
-
-const sdfGlobalEllipse = sdfBaseline.computeDisplacementMap({
-  ...sdfOptions,
-  outerShape: "global-superellipse",
-  cornerExponent: 2,
-});
-const sdfGlobalSquircle = sdfBaseline.computeDisplacementMap({
-  ...sdfOptions,
-  outerShape: "global-superellipse",
-  cornerExponent: 4,
-});
-assert.equal(
-  sdfBaseline.normalizeOptions({
-    ...sdfOptions,
-    outerShape: "global-superellipse",
-    cornerExponent: 2,
-  }).outerShape,
-  "global-superellipse",
-  "The SDF Lab extension must preserve a global ellipse at exponent two",
-);
-assert.equal(sdfPixel(sdfGlobalEllipse, 0, 0)[3], 0, "The global SDF ellipse must exclude the map corner");
-assert.equal(sdfPixel(sdfGlobalEllipse, 64, 64)[3], 255, "The global SDF ellipse must include its center");
-const globalEllipseCoverage = sdfGlobalEllipse.pixels.reduce(
-  (total, value, index) => total + (index % 4 === 3 && value === 255 ? 1 : 0),
-  0,
-);
-const globalSquircleCoverage = sdfGlobalSquircle.pixels.reduce(
-  (total, value, index) => total + (index % 4 === 3 && value === 255 ? 1 : 0),
-  0,
-);
-assert(
-  globalSquircleCoverage > globalEllipseCoverage,
-  "Increasing the global superellipse exponent must expand the exact Lamé outline toward the box",
-);
-
-assert.equal(sdfPixel(sdfMapA, 0, 0)[3], 0, "The rounded SDF corner must stay outside the binary shape mask");
-assert.equal(sdfPixel(sdfMapA, 64, 64)[3], 255, "The SDF center must stay inside the binary shape mask");
-const sdfTopLeft = sdfPixel(sdfMapA, 20, 20);
-const sdfTopRight = sdfPixel(sdfMapA, 107, 20);
-const sdfBottomLeft = sdfPixel(sdfMapA, 20, 107);
-assert(Math.abs(sdfTopLeft[0] + sdfTopRight[0] - 255) <= 1, "Mirrored SDF X displacement must remain symmetric");
-assert(Math.abs(sdfTopLeft[1] + sdfBottomLeft[1] - 255) <= 1, "Mirrored SDF Y displacement must remain symmetric");
-assert(
-  !sdfBaseline.computeDisplacementMap({ ...sdfOptions, depth: 30 }).pixels.every(
-    (value, index) => value === sdfMapA.pixels[index],
-  ),
-  "Changing SDF optical depth must materially change the generated map",
-);
 
 const evicted = [];
 const cache = new ByteBudgetLru({

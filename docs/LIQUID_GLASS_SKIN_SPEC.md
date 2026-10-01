@@ -376,7 +376,7 @@ Q1 与 Q3 通过同一个表面局部接口衔接：各正式消费者映射质�
 
 **测量方法**：固定一个背景持续变化的场景，例如在导航和若干紧凑控件下滚动词条列表；用 Chrome Performance 记录帧耗时与 GPU 耗时；每次只改变一项，与当前版本对比。预期第 1、2 项收益最明显，第 3 项取决于画面是否可接受。
 
-**SDF 不再作为候选**（2026-10-01）：SDF 曾尝试接入正式表面，性能不可接受，已完全放弃，不再作为生产替换选项或 LQ-7 前提。`lib/liquid-glass-sdf-baseline.js`、`scripts/check-liquid-glass-geometry.js` 中对应的检查、Lab 的 SDF 路径和 README 中的 SDF 说明待清理，见 13.17。
+**SDF 不再作为候选**（2026-10-01）：SDF 曾尝试接入正式表面，性能不可接受，已完全放弃，不再作为生产替换选项或 LQ-7 前提。相关代码、检查、Lab 路径和 README 说明已于同日删除，见 13.17。
 
 ### 13.12 验收标准
 
@@ -437,20 +437,16 @@ Q1 与 Q3 通过同一个表面局部接口衔接：各正式消费者映射质�
 
 ### 13.17 独立 Liquid Glass Lab
 
-- `liquid-glass-lab.html` 是由现有静态服务器直接提供的独立开发页，默认打开 Product Engine 的 Focus 参数；它不进入主应用导航，不读取或写入词典、界面偏好、`data/`、Web Storage 或任何 `/api/` 端点。
-- 仓库分发互相隔离的 `Product Engine` 与 `SDF Baseline`：前者继续复用生产 `liquid-glass-geometry.js`、Worker、`liquid-glass-engine.js`、动态 SVG registry 与会话 LRU；后者改编 MIT 许可的 PallavAg 实现，以圆角矩形 SDF 计算边界/falloff、线性/球顶梯度计算位移，并使用 RGB 三路色散、B 通道镜面和二值 Alpha 轮廓。开发者本机可另外保留被 Git 忽略的 `liquid-glass-reference-baseline.js`，按最初参考项目复现凸 squircle 截面、Snell profile、单路位移图、specular 图与 primitive 合成顺序。SDF 默认不附加无来源的 tint、边界或外阴影；两条 Baseline 均不调用或修改生产几何、角色注册和缓存。
-- Lab 以唯一一组表面宽度、高度、圆角、外轮廓模型和超椭圆指数驱动 Product、Reference 与 SDF，初始几何为可容纳示例文字的 `420×200px`、`60px` 圆角和指数 `4`。角部模型保留直边：指数 `2` 规范化到 Round 快速路径并复用其缓存和贴图字节，更大的值启用 Product/SDF 超椭圆角；全局模型使用整张表面的 Lamé 隐式轮廓，指数 `2` 为椭圆且 Product/SDF 不消费 radius。Product/SDF 的 CSS 裁切与贴图必须匹配；Product 全局轮廓另由 normal/rim 贴图 Alpha 在 SVG 最终合成内裁掉矩形预模糊的角外输出，不额外增加 CSS mask；全局轮廓的 Product 光学带使用解析梯度和一阶欧氏 signed-distance 近似，保持单遍生成，不调用逐角最近点迭代。圆角上限只取共享短边的一半，不设额外固定封顶；Product/SDF 全局模型禁用但保留当前 radius；Reference 继续使用并允许调整来源圆角。浏览器不支持 `corner-shape` 时仅将角部模型锁定为 Round，全局模型继续使用生成的 polygon clip；Reference 始终保持来源传统圆角并提示差异。切换路径和恢复模型默认值均不改写共享几何。Product 的角色命名只用于装载 continuous/focus/floating/modal 参数预设，实际 Lab 表面固定注册为不参与产品表面映射的 `diagnostic` 角色；手动调参后恢复默认值回到最近使用的预设。其余可调范围保持贴图上限、请求 bezel、厚度、IOR、最大位移、光学内模糊、饱和度、tint、specular 强度及统一光源角度/强度；正式表面与 Lab Product 均只生成完整四边轮廓，不再提供已失去产品消费者的单边模式。Reference 保留最初来源的独立光学参数语义。SDF 保留来源的 strength、chromatic aberration、blur、depth、curvature、splay、glow、edge highlight、specular、angle 和固定方形 quality 语义；SDF 小/大圆角快捷比较显式修改同一共享圆角。
-- 舞台提供连续色场、高对比网格、色带和大号文字四种诊断参照；仓库分发五张具有明确 Unsplash 或 Pexels 使用许可的 Lab 背景，逐张作者、原始页面和许可记录见 `assets/liquid-glass-lab/README.md`。图片只在选中时加载，不进入产品皮肤。舞台随当前路径显示生产位移/法线-rim 图、本机 Reference 位移/specular 图或 SDF RGBA 位移/B 通道镜面图。Product 可在 Q3 完整光学与 Q1 普通玻璃间切换，切换时保留共享几何、当前参数预设和外观选择；Q1 不生成诊断贴图。Product 默认保留 Neutral Lab 外观；可选 Product role 来源通过 1024px/480px 隔离样式探针加载正式主题和共享组件 CSS，按当前 Q1/Q3 状态及真实桌面/移动 fixture 镜像 Navigation、drawer、mobile bar、查看/编辑 Focus、floating、rich/quality tooltip、toast、modal 与 network 的计算 tint、边框、完整阴影和前景色，不维护第二份主题值。外观来源和角色不改写光学预设；快捷状态或独立开关只旁路最终层。共享宽高、圆角、padding、背景场景及 modal/network 环境遮罩不随外观来源变化；正式样式不可用时明确恢复 Neutral Lab。预览卡片使用中性示例文字且可在舞台范围内拖动；拖动只更新合帧后的 transform，不重建几何资源。窄屏时实际几何宽度按舞台净宽收束，避免可见表面与滤镜测量不一致。
-- Lab 的 `color-scheme` 必须跟随自身明暗主题，而不是同时声明两种模式。系统减少透明度时三条渲染路径统一关闭 backdrop filter、Baseline 伪元素与透明底色，并使用当前 Lab 主题的实色 panel/text token；只有强制颜色模式使用 `Canvas` / `CanvasText` 系统色。减少透明度或强制颜色启用期间，两条 Baseline 不再构建 SVG filter/贴图，Product Engine 重新探测为 Q0，全部诊断贴图停止生成；偏好解除后按当前参数恢复。
-- 第三方来源、许可、已纠正的 SDF 认识和人工对照问题单独记录在 `docs/LIQUID_GLASS_RESEARCH.md`；研究结论未经人工验收不得倒灌为生产契约。
-- **2026-10-01 复评（未实施）**：Lab 仍有价值，可以在不碰业务页面的情况下把问题定位到几何、光学或外观包装，并能复现特定尺寸、圆角和背景。但它应从“算法比较”转为“生产材质工作台”。已确认的问题：
-  - **新克隆无法打开**：页面启动时要求四个模块全部加载，否则抛出 `Liquid Glass lab modules failed to load.`；而 `lib/liquid-glass-reference-baseline.js` 被 Git 忽略、不随仓库分发。除维护者本机外，Lab 都会报错，与上文“本机可另外保留”的可选定位矛盾。修法是模块缺失时隐藏对应路径，可以先于整体整理单独修复。
-  - **落后于生产**：Lab 最后一次修改是 2026-08-22，没有 2026-09-23 的紧凑 `relationship` 角色，也没有 2026-09-24 的 tinted／solid 配方。产品外观探针虽然加载正式样式，但组件结构由 `appearanceProbeMarkup()` 手写，组件类名或结构变化后会脱节。
-  - **整理方向**：
-    - 保留：Product 默认打开；Q1／Q3、明暗、测试背景；几何、贴图与性能诊断（低频项折叠）；中性与真实产品外观对照。
-    - 补充：紧凑角色、tinted／solid 与交互状态对照，直接复用产品组件结构和生产配方，不再手写副本。与 `STYLE_SKIN_PLAN.md` 第 5 节的控件对照页合并为一份。
-    - 移除：SDF 路径及其模块与检查（见 LQ-7 中“SDF 不再作为候选”）；本机 Reference 移出主流程，确有研究需要时另设本机入口。
-  - **时机**：Reference 缺失报错先修；整体整理放在 LQ-7 或下一次光学调参时进行。
+- `liquid-glass-lab.html` 是由现有静态服务器直接提供的独立开发页，只有生产 Product Engine 一条渲染路径，默认装载 Focus 参数；它不进入主应用导航，不读取或写入词典、界面偏好、`data/`、Web Storage 或任何 `/api/` 端点。它复用生产的 `liquid-glass-geometry.js`、Worker、`liquid-glass-engine.js`、动态 SVG registry 与会话 LRU，不维护第二份算法。
+- **2026-10-01 清理**：删除 SDF Baseline（`lib/liquid-glass-sdf-baseline.js` 及其检查）和本机 Reference Baseline（`lib/liquid-glass-reference-baseline.js` 及 `.gitignore` 条目），移除渲染路径选择、两条 Baseline 的控件、滤镜宿主与样式。此前页面强制要求被 Git 忽略的 Reference 模块，新克隆打开即报错，这一问题随之消除。SDF 已完全放弃，见 LQ-7；早期对照结论保留在 `docs/LIQUID_GLASS_RESEARCH.md`。
+- 表面几何由宽度、高度、圆角、外轮廓模型和超椭圆指数驱动，初始为可容纳示例文字的 `420×200px`、`60px` 圆角和指数 `4`。角部模型保留直边：指数 `2` 规范化到 Round 快速路径并复用其缓存和贴图字节，更大的值启用超椭圆角；全局模型使用整张表面的 Lamé 隐式轮廓，指数 `2` 为椭圆，不消费 radius（输入禁用但保留当前值）。CSS 裁切与贴图必须匹配；全局轮廓另由 normal/rim 贴图 Alpha 在 SVG 最终合成内裁掉矩形预模糊的角外输出，不额外增加 CSS mask；全局轮廓的光学带使用解析梯度和一阶欧氏 signed-distance 近似，保持单遍生成。圆角上限只取短边的一半。浏览器不支持 `corner-shape` 时仅将角部模型锁定为 Round，全局模型继续使用生成的 polygon clip。
+- 角色命名只用于装载 continuous/focus/floating/modal 参数预设，实际 Lab 表面固定注册为不参与产品表面映射的 `diagnostic` 角色；手动调参后恢复默认值回到最近使用的预设。可调范围为贴图上限、请求 bezel、厚度、IOR、最大位移、光学内模糊、饱和度、tint、specular 强度及统一光源角度/强度；只生成完整四边轮廓。
+- 舞台提供连续色场、高对比网格、色带和大号文字四种诊断参照；仓库分发五张具有明确 Unsplash 或 Pexels 使用许可的背景，逐张作者、原始页面和许可记录见 `THIRD_PARTY_NOTICES.md`。图片只在选中时加载，不进入产品皮肤。舞台下方显示生产位移图与法线/rim 图。Q3 与 Q1 之间可切换，切换时保留几何、参数预设和外观选择；Q1 不生成诊断贴图。
+- 外观默认 Neutral Lab；可选 Product role 来源通过 1024px/480px 隔离样式探针加载正式主题和共享组件 CSS，按当前 Q1/Q3 状态及桌面/移动 fixture 镜像 Navigation、drawer、mobile bar、查看/编辑 Focus、floating、rich/quality tooltip、toast、modal 与 network 的计算 tint、边框、完整阴影和前景色，不维护第二份主题值。外观来源和角色不改写光学预设；快捷状态或独立开关只旁路最终层。正式样式不可用时明确恢复 Neutral Lab。预览卡片可在舞台范围内拖动，拖动只更新合帧后的 transform，不重建几何资源；窄屏时实际宽度按舞台净宽收束。
+- Lab 的 `color-scheme` 跟随自身明暗主题。系统减少透明度时关闭 backdrop filter 与透明底色，使用当前 Lab 主题的实色 panel/text token；强制颜色模式使用 `Canvas` / `CanvasText`。两种模式启用期间 Product Engine 重新探测为 Q0，诊断贴图停止生成；偏好解除后按当前参数恢复。
+- **仍待整理**（2026-10-01 复评，未实施）：Lab 应作为生产材质工作台，与产品保持一致。
+  - **落后于生产**：没有 2026-09-23 的紧凑 `relationship` 角色，也没有 2026-09-24 的 tinted／solid 配方；产品外观探针的组件结构由 `appearanceProbeMarkup()` 手写，组件类名或结构变化后会脱节。
+  - **补充方向**：紧凑角色、tinted／solid 与交互状态对照，直接复用产品组件结构和生产配方；与 `STYLE_SKIN_PLAN.md` 第 5 节的控件对照页合并为一份；几何、贴图与性能诊断中的低频项折叠。时机放在 LQ-7 或下一次光学调参。
 
 ### 13.18 浮动连续导航卡片
 

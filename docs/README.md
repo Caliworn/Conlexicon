@@ -24,7 +24,7 @@
 | [Style Skin Plan](STYLE_SKIN_PLAN.md) | S0 已完成 / 控件材质职责收尾待实施 | 样式 token、材质角色、视觉基线与通用皮肤边界；普通控件材质职责收尾、控件对照页与视觉定稿的分批计划。 |
 | [Layered Glass Skin Specification](LAYERED_GLASS_SKIN_SPEC.md) | LG-1–LG-4C 已完成 | 层叠玻璃皮肤的层级、透明度、静态与指针响应光学层、运行期选择、降级与性能验收。 |
 | [Liquid Glass Skin Specification](LIQUID_GLASS_SKIN_SPEC.md) | LQ-1–LQ-6 已完成 / LQ-7 待实施 | 液态玻璃的材质角色、生产光学引擎、正式表面覆盖、降级和性能边界；LQ-7 性能上限分析与待实测优化候选，Lab 整理方向。 |
-| [Liquid Glass Web Research](LIQUID_GLASS_RESEARCH.md) | 活跃研究记录 | Apple 公开设计边界、开源实现/许可、三条 Lab 基线、已纠正结论与决策门槛；SDF 已于 2026-10-01 放弃。 |
+| [Liquid Glass Web Research](LIQUID_GLASS_RESEARCH.md) | 历史研究记录 | Apple 公开设计边界、开源实现/许可、早期三条 Lab 基线的对照结论；SDF 与 Reference 已于 2026-10-01 放弃并删除。 |
 | [Handoff History](archive/HANDOFF_HISTORY.md) | 历史归档，非现行规范 | 2026-09-30 精简前的交接文档，含阶段 B 实施流水与当时的接手清单。 |
 
 ## 推荐阅读顺序

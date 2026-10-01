@@ -4,6 +4,3 @@ node_modules/
 electron-shell/
 .DS_Store
 Thumbs.db
-
-# Local-only Liquid Glass code reference without redistribution permission.
-lib/liquid-glass-reference-baseline.js
