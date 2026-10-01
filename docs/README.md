@@ -7,6 +7,7 @@
 | 文档 | 状态 | 用途 |
 | --- | --- | --- |
 | [API Contract](API_CONTRACT.md) | 稳定契约 | 前后端 HTTP API、错误结构、读取与保存边界。 |
+| [Data Normalization Repair Plan](DATA_NORMALIZATION_REPAIR_PLAN.md) | 已复评，尚未实装 | SQLite JSON 读取不再吞错、只读接口按需读取、删除无用词条形态派生字段、前后端共享纯数据规则、settings 读取收敛、普通保存不再做跨类型 ID 扫描。 |
 | [SQLite Backend Plan](SQLITE_BACKEND_PLAN.md) | 当前架构 | SQLite schema、repository 现状、查询层与后续优化。 |
 | [SQLite Migration Plan](SQLITE_MIGRATION_PLAN.md) | 当前架构 / 后续计划 | 旧 JSON 导入、SQLite 迁移、导出 profile、备份与回滚边界。 |
 | [Query Session Cache Plan](QUERY_SESSION_CACHE_PLAN.md) | 已实装设计参考 | 查询会话、cursor、缓存失效、窗口化和结果定位语义。 |
