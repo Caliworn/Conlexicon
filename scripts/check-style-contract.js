@@ -816,7 +816,13 @@ assert(
     && !liquidGlass.includes('[data-liquid-glass-role="micro"]'),
   "LQ-5 micro surfaces must remain CSS volume materials without per-control backdrop maps",
 );
-for (const explicitSelector of [
+// Small text popups sit over the dense entry list, where refraction reads as
+// seams, and content-sized tooltips would regenerate maps on nearly every open.
+for (const popupSelector of [
+  ".entry-search-config-menu",
+  ".entry-filter-menu",
+  ".source-suggestions",
+  ".skin-picker-menu",
   ".entry-context-menu",
   ".app-tooltip.chip-list-tooltip",
   ".app-tooltip.tag-info-tooltip",
@@ -824,11 +830,10 @@ for (const explicitSelector of [
   ".entry-quality-issue-tooltip",
   ".toast",
 ]) {
-  const definition = liquidGlassSurfaceDefinitions.find(({ selector }) => selector.split(", ").includes(explicitSelector));
-  assert.equal(
-    definition?.registration,
-    "explicit",
-    `Transient or virtualized surface must use explicit lifecycle registration: ${explicitSelector}`,
+  const definition = liquidGlassSurfaceDefinitions.find(({ selector }) => selector.split(", ").includes(popupSelector));
+  assert(
+    definition?.role === "floating" && definition.registration === "css" && definition.sampleBackdrop === false,
+    `Floating popups must stay on the Q1 floating material: ${popupSelector}`,
   );
 }
 const liquidGlassFocusDefinition = liquidGlassSurfaceDefinitions.find(({ role }) => role === "focus");
@@ -848,6 +853,15 @@ for (const selector of [".entry-display", "#entryForm"]) {
     liquidGlassEngineApi.LiquidGlassEngine.prototype.registerMappedSurface.call({ active: true }, element),
     false,
     `${selector} must stay CSS-only even when explicitly requested through the mapped surface API`,
+  );
+}
+for (const selector of [".modal-panel", ".network-panel"]) {
+  const element = { matches: (selectors) => selectors.split(",").map((item) => item.trim()).includes(selector) };
+  assert.equal(liquidGlassEngineApi.surfaceRoleDefinition(element, { includeCssOnly: true })?.role, "modal");
+  assert.equal(
+    liquidGlassEngineApi.LiquidGlassEngine.prototype.registerMappedSurface.call({ active: true }, element),
+    false,
+    `${selector} is a large text panel over a static scrim and must stay on the Q1 modal material`,
   );
 }
 assert.deepEqual(

@@ -1982,7 +1982,6 @@ function appInfoDialog(title, options = {}) {
   elements.infoDialogTitle.textContent = title;
   elements.infoDialogBody.innerHTML = options.html || infoDialogTextHtml(options.text);
   elements.infoDialog.hidden = false;
-  liquidGlassOpticalEngine?.registerMappedSurface(elements.infoDialog.querySelector(".modal-panel"));
   elements.closeInfoDialogButton.focus();
 }
 
@@ -2004,7 +2003,6 @@ function appConfirm(message, options = {}) {
     elements.confirmAcceptButton.dataset.controlTone = options.danger ? "danger" : "accent";
     elements.confirmAcceptButton.dataset.controlEmphasis = "solid";
     elements.confirmDialog.hidden = false;
-    liquidGlassOpticalEngine?.registerMappedSurface(elements.confirmDialog.querySelector(".modal-panel"));
     elements.confirmAcceptButton.focus();
   });
 }
@@ -2028,7 +2026,6 @@ function appEditSwitchPrompt(message) {
     elements.confirmAcceptButton.dataset.controlTone = "accent";
     elements.confirmAcceptButton.dataset.controlEmphasis = "solid";
     elements.confirmDialog.hidden = false;
-    liquidGlassOpticalEngine?.registerMappedSurface(elements.confirmDialog.querySelector(".modal-panel"));
     elements.confirmAcceptButton.focus();
   });
 }
@@ -3594,14 +3591,6 @@ function refreshEditableSurfaceLocale() {
   refreshCorpusEditorLocale();
 }
 
-function syncToastLiquidGlassSurface() {
-  if (elements.toast.classList.contains("show")) {
-    liquidGlassOpticalEngine?.registerMappedSurface(elements.toast);
-    return;
-  }
-  liquidGlassOpticalEngine?.unregisterMappedSurface(elements.toast);
-}
-
 let entryWorkspaceLayout;
 
 function applyAppearance() {
@@ -3626,7 +3615,6 @@ function applyAppearance() {
     resetLayeredGlassPointerEffect(true);
   }
   liquidGlassOpticalEngine?.setEnabled(currentSkin === "liquid-glass");
-  syncToastLiquidGlassSurface();
 }
 
 function layeredGlassPointerEffectsEnabled() {
@@ -4050,7 +4038,6 @@ function showAppTooltip(target) {
   elements.appTooltip.classList.toggle("tag-info-tooltip", target.dataset.appTooltipVariant === "tag-info");
   elements.appTooltip.classList.toggle("rich-tooltip", target.dataset.appTooltipVariant === "rich");
   elements.appTooltip.hidden = false;
-  liquidGlassOpticalEngine?.registerMappedSurface(elements.appTooltip);
   target.setAttribute("aria-describedby", "appTooltip");
   requestAnimationFrame(() => {
     if (activeAppTooltipTarget !== target || elements.appTooltip.hidden) {
@@ -4087,7 +4074,6 @@ function hideAppTooltip() {
     activeAppTooltipTarget.removeAttribute("aria-describedby");
   }
   activeAppTooltipTarget = null;
-  liquidGlassOpticalEngine?.unregisterMappedSurface(elements.appTooltip);
   elements.appTooltip.classList.remove("wrap");
   elements.appTooltip.classList.remove("chip-list-tooltip");
   elements.appTooltip.classList.remove("tag-info-tooltip");
@@ -7188,7 +7174,6 @@ function closeEntryContextMenu() {
     return;
   }
   activeEntryContextMenu.cleanup?.forEach((cleanup) => cleanup());
-  liquidGlassOpticalEngine?.unregisterMappedSurface(activeEntryContextMenu.element);
   activeEntryContextMenu.element.remove();
   activeEntryContextMenu = null;
 }
@@ -7246,7 +7231,6 @@ function showEntryContextMenu(event, entry, options = {}) {
     menu.append(button);
   });
   document.body.append(menu);
-  liquidGlassOpticalEngine?.registerMappedSurface(menu);
   positionEntryContextMenu(menu, event.clientX, event.clientY);
 
   const closeOnPointerDown = (pointerEvent) => {
@@ -9018,7 +9002,6 @@ function renderLexicalNetwork() {
   if (!networkOpen) {
     return;
   }
-  liquidGlassOpticalEngine?.registerMappedSurface(elements.lexicalNetworkPanel);
 
   const dictionary = activeDictionary();
   const entry = networkScene.nodes.get(networkEntryId)?.entry
@@ -13021,7 +13004,6 @@ function bindSourceAutocompleteInput(input) {
     renderSourceCompletion(input);
   });
   const box = sourceAutocompleteBoxForInput(input);
-  liquidGlassOpticalEngine?.registerMappedSurface(box);
   // Only real pointer movement changes the current option, so a list that
   // opens or re-renders under a resting pointer never preselects anything.
   box.addEventListener("pointermove", (event) => {
@@ -16621,10 +16603,8 @@ function showToast(message) {
   clearTimeout(toastTimer);
   elements.toast.textContent = message;
   elements.toast.classList.add("show");
-  syncToastLiquidGlassSurface();
   toastTimer = setTimeout(() => {
     elements.toast.classList.remove("show");
-    syncToastLiquidGlassSurface();
     toastTimer = null;
   }, 2200);
 }
@@ -17004,22 +16984,6 @@ elements.entryList.addEventListener("pointerover", (event) => {
     return;
   }
   updateEntryQualityIssueTooltipPlacement(issue);
-  liquidGlassOpticalEngine?.registerMappedSurface(
-    issue.querySelector(".entry-quality-issue-tooltip"),
-  );
-});
-elements.entryList.addEventListener("pointerout", (event) => {
-  const issue = event.target instanceof Element ? event.target.closest(".entry-quality-issue") : null;
-  if (
-    !issue
-    || !elements.entryList.contains(issue)
-    || (event.relatedTarget instanceof Node && issue.contains(event.relatedTarget))
-  ) {
-    return;
-  }
-  liquidGlassOpticalEngine?.unregisterMappedSurface(
-    issue.querySelector(".entry-quality-issue-tooltip"),
-  );
 });
 elements.entryList.addEventListener("scroll", updateHoveredEntryQualityIssueTooltipPlacement, { passive: true });
 
@@ -17085,7 +17049,6 @@ document.addEventListener("visibilitychange", () => {
 ].forEach((mediaQuery) => mediaQuery.addEventListener("change", () => {
   resetGlassInteractiveEffects(true);
   liquidGlassOpticalEngine?.setEnabled(currentSkin === "liquid-glass");
-  syncToastLiquidGlassSurface();
 }));
 // Runs after element handlers, so they can compare against the previous position.
 document.addEventListener("pointermove", (event) => {

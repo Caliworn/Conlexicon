@@ -26,22 +26,23 @@ const {
     querySelectorAll: () => [],
   };
   assert.equal(surfaceRoleDefinition(button), compact);
-  for (const selector of [".modal-panel", ".network-panel", ".dictionary-panel",
-    ".entry-mail-tools", ".entry-search-control", ".entry-search-config-menu"]) {
+  for (const selector of [".dictionary-panel", ".entry-mail-tools", ".entry-search-control"]) {
     button.parentElement = owner(selector);
     for (const state of ["pending", "ready", "fallback"]) {
       button.parentElement.dataset.liquidGlassOptics = state;
       assert.equal(surfaceRoleDefinition(button), null, selector + " owns its nested controls in " + state);
     }
   }
-  button.parentElement = owner(".entry-display");
-  assert.equal(surfaceRoleDefinition(button), compact, "Q1 content shells allow compact Q3 children");
+  for (const selector of [".entry-display", ".modal-panel", ".network-panel", ".entry-search-config-menu"]) {
+    button.parentElement = owner(selector);
+    assert.equal(surfaceRoleDefinition(button), compact, selector + " is a Q1 shell that allows compact Q3 children");
+  }
   const engine = new LiquidGlassEngine();
   const addition = { type: "childList", target: {}, addedNodes: [button], removedNodes: [] };
   assert.equal(engine.mappingChanged([addition]), true, "New eligible controls need registration");
   engine.surfaces.set(button, { mapped: true, registration: "automatic", role: compact.role });
   assert.equal(engine.mappingChanged([addition]), false, "Already registered controls do not trigger another sync");
-  button.parentElement = owner(".modal-panel");
+  button.parentElement = owner(".dictionary-panel");
   assert.equal(engine.mappingChanged([addition]), true, "Moving into Q3 releases the child surface");
   engine.surfaces.clear();
   assert.equal(engine.mappingChanged([addition]), false, "New Q3-nested controls stay CSS-only");
@@ -76,7 +77,7 @@ function almostEqual(actual, expected, epsilon, message) {
   });
   const filterElement = engine.createFilter("alpha-test", ["map", "rim"], {
     width: 120, height: 38, maxDisplacement: 4, opticalBlur: 1,
-    saturation: 1, specularStrength: 0.48,
+    saturation: 1, specularStrength: 0.48, chromaticDispersion: true,
   });
   const start = filterElement.children.findIndex((node) => node.attrs.result === "opticalRedChannel");
   const end = filterElement.children.findIndex((node) => node.attrs.result === "opticalColor");
@@ -551,15 +552,15 @@ assert.equal(movedLight.strength, 1.08, "Unified light strength must remain inde
   });
   const base = { width: 120, height: 38, maxDisplacement: 4, opticalBlur: 1, saturation: 1.04 };
   const names = (filter) => filter.children.map((node) => node.name);
-  const rgb = names(engine.createFilter("rgb-test", ["map", "rim"], base));
-  const mono = names(engine.createFilter("mono-test", ["map", "rim"], { ...base, chromaticDispersion: false }));
+  const rgb = names(engine.createFilter("rgb-test", ["map", "rim"], { ...base, chromaticDispersion: true }));
+  const mono = names(engine.createFilter("mono-test", ["map", "rim"], base));
   for (const chain of [rgb, mono]) {
     assert(!chain.includes("feFlood") && !chain.includes("feComponentTransfer"),
       "Backdrop filters must not recompute the background-independent rim highlight");
   }
-  assert.equal(rgb.filter((name) => name === "feDisplacementMap").length, 3, "Large surfaces keep RGB dispersion");
+  assert.equal(rgb.filter((name) => name === "feDisplacementMap").length, 3, "Opt-in dispersion splits RGB");
   assert.deepEqual(mono, ["feGaussianBlur", "feImage", "feDisplacementMap", "feColorMatrix"],
-    "Surfaces without dispersion refract once");
+    "Without an explicit opt-in, surfaces refract once");
   assert.notEqual(
     buildResourceKey({ ...options, opticalBlur: 1, saturation: 1.04, chromaticDispersion: false }),
     buildResourceKey({ ...options, opticalBlur: 1, saturation: 1.04, chromaticDispersion: true }),
