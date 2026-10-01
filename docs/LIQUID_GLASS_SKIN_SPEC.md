@@ -438,7 +438,7 @@ Q1 与 Q3 通过同一个表面局部接口衔接：各正式消费者映射质�
 ### 13.17 独立 Liquid Glass Lab
 
 - `liquid-glass-lab.html` 是由现有静态服务器直接提供的独立开发页，只有生产 Product Engine 一条渲染路径，默认装载 Focus 参数；它不进入主应用导航，不读取或写入词典、界面偏好、`data/`、Web Storage 或任何 `/api/` 端点。它复用生产的 `liquid-glass-geometry.js`、Worker、`liquid-glass-engine.js`、动态 SVG registry 与会话 LRU，不维护第二份算法。
-- **2026-10-01 清理**：删除 SDF Baseline（`lib/liquid-glass-sdf-baseline.js` 及其检查）和本机 Reference Baseline（`lib/liquid-glass-reference-baseline.js` 及 `.gitignore` 条目），移除渲染路径选择、两条 Baseline 的控件、滤镜宿主与样式。此前页面强制要求被 Git 忽略的 Reference 模块，新克隆打开即报错，这一问题随之消除。SDF 已完全放弃，见 LQ-7；早期对照结论保留在 `docs/LIQUID_GLASS_RESEARCH.md`。
+- **2026-10-01 清理**：删除 SDF Baseline（`lib/liquid-glass-sdf-baseline.js` 及其检查）和本机 Reference Baseline（`lib/liquid-glass-reference-baseline.js` 及 `.gitignore` 条目），移除渲染路径选择、两条 Baseline 的控件、滤镜宿主与样式。此前页面强制要求被 Git 忽略的 Reference 模块，新克隆打开即报错，这一问题随之消除。SDF 已完全放弃，见 LQ-7；早期对照结论保留在 `docs/archive/LIQUID_GLASS_RESEARCH.md`。
 - 表面几何由宽度、高度、圆角、外轮廓模型和超椭圆指数驱动，初始为可容纳示例文字的 `420×200px`、`60px` 圆角和指数 `4`。角部模型保留直边：指数 `2` 规范化到 Round 快速路径并复用其缓存和贴图字节，更大的值启用超椭圆角；全局模型使用整张表面的 Lamé 隐式轮廓，指数 `2` 为椭圆，不消费 radius（输入禁用但保留当前值）。CSS 裁切与贴图必须匹配；全局轮廓另由 normal/rim 贴图 Alpha 在 SVG 最终合成内裁掉矩形预模糊的角外输出，不额外增加 CSS mask；全局轮廓的光学带使用解析梯度和一阶欧氏 signed-distance 近似，保持单遍生成。圆角上限只取短边的一半。浏览器不支持 `corner-shape` 时仅将角部模型锁定为 Round，全局模型继续使用生成的 polygon clip。
 - 角色命名只用于装载 continuous/focus/floating/modal 参数预设，实际 Lab 表面固定注册为不参与产品表面映射的 `diagnostic` 角色；手动调参后恢复默认值回到最近使用的预设。可调范围为贴图上限、请求 bezel、厚度、IOR、最大位移、光学内模糊、饱和度、tint、specular 强度及统一光源角度/强度；只生成完整四边轮廓。
 - 舞台提供连续色场、高对比网格、色带和大号文字四种诊断参照；仓库分发五张具有明确 Unsplash 或 Pexels 使用许可的背景，逐张作者、原始页面和许可记录见 `THIRD_PARTY_NOTICES.md`。图片只在选中时加载，不进入产品皮肤。舞台下方显示生产位移图与法线/rim 图。Q3 与 Q1 之间可切换，切换时保留几何、参数预设和外观选择；Q1 不生成诊断贴图。
@@ -458,7 +458,7 @@ Q1 与 Q3 通过同一个表面局部接口衔接：各正式消费者映射质�
 
 ### 13.19 待验证方向：tint 与玻璃感（2026-10-01，未实施）
 
-本节记录待在 Lab 中验证的方向，不改变当前契约。关于 Apple 的描述来自公开的设计规范、API 文档和对系统表现的观察；Apple 没有公开内部实现（见 `docs/LIQUID_GLASS_RESEARCH.md`）。
+本节记录待在 Lab 中验证的方向，不改变当前契约。关于 Apple 的描述来自公开的设计规范、API 文档和对系统表现的观察；Apple 没有公开内部实现（见 `docs/archive/LIQUID_GLASS_RESEARCH.md`）。
 
 **Apple 的做法**：
 

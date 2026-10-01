@@ -43,15 +43,19 @@ const routeApi = createApiRouter({ repository });
 const serveStatic = createStaticFileServer({ rootDir });
 
 async function handleRequest(request, response) {
-  const url = new URL(request.url, `http://${request.headers.host}`);
-
+  let url;
   try {
+    url = new URL(request.url, `http://${request.headers.host}`);
     if (url.pathname.startsWith("/api/") && (await routeApi(request, response, url))) {
       return;
     }
     await serveStatic(request, response, url);
   } catch (error) {
     console.error(error);
+    if (!url) {
+      sendText(response, 400, "Invalid request URL");
+      return;
+    }
     if (url.pathname.startsWith("/api/")) {
       sendJson(response, error.status || 500, serializeApiError(error));
       return;

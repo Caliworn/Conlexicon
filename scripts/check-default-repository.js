@@ -11,7 +11,7 @@ function randomPort() {
   return 43000 + Math.floor(Math.random() * 10000);
 }
 
-function requestJson(port, method, pathname, body) {
+function requestJson(port, method, pathname, body, headers = {}) {
   return new Promise((resolve, reject) => {
     const payload = body === undefined ? "" : JSON.stringify(body);
     const request = http.request({
@@ -21,6 +21,7 @@ function requestJson(port, method, pathname, body) {
       method,
       headers: {
         ...(payload ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(payload) } : {}),
+        ...headers,
       },
     }, (response) => {
       const chunks = [];
@@ -30,7 +31,7 @@ function requestJson(port, method, pathname, body) {
         try {
           resolve({
             status: response.statusCode,
-            body: text ? JSON.parse(text) : null,
+            body: text && response.headers["content-type"]?.includes("application/json") ? JSON.parse(text) : text || null,
           });
         } catch (error) {
           reject(new Error(`Invalid JSON response from ${method} ${pathname}: ${text}\n${error.message}`));
@@ -134,6 +135,10 @@ async function checkSqliteServer() {
     const server = await startServer({ dataDir, port });
     try {
       assert.match(server.stdout(), /\(sqlite repository\)/);
+
+      const malformedHost = await requestJson(port, "GET", "/api/state", undefined, { Host: "[invalid" });
+      assert.equal(malformedHost.status, 400);
+      assert.equal(malformedHost.body, "Invalid request URL");
 
       let response = await requestJson(port, "GET", "/api/state");
       assert.equal(response.status, 200);

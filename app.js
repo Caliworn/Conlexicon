@@ -99,6 +99,8 @@ const entryFilterFactsByDictionaryVersion = new Map();
 const entryFilterFactsInFlight = new Map();
 let docsViewMode = "split";
 let docsSaveTimer = null;
+let docsSavePromise = null;
+let docsSaveRequested = false;
 let corpusSaveTimer = null;
 let corpusSavePromise = null;
 let corpusSaveRequested = false;
@@ -7780,6 +7782,7 @@ async function closePendingEditsForPageSwitch() {
       }
     }
   } catch (error) {
+    console.error(error);
     return false;
   }
 
@@ -13668,6 +13671,8 @@ async function confirmUnsavedChanges(message, actions = {}) {
 
 function discardDocsDraft() {
   clearTimeout(docsSaveTimer);
+  docsSaveTimer = null;
+  docsSaveRequested = false;
   docsDraftState = null;
 }
 
@@ -13906,6 +13911,38 @@ function docsFormIsDirty(dictionary = activeDictionary()) {
   return docsDraftState.markdown !== String(dictionary.docs?.markdown || "");
 }
 
+async function runDocsSaveQueue() {
+  let savedAny = false;
+  while (docsSaveRequested) {
+    docsSaveRequested = false;
+    const dictionary = activeDictionary();
+    if (!dictionary) {
+      return savedAny;
+    }
+    const draft = ensureDocsDraft(dictionary);
+    const docs = {
+      ...(dictionary.docs || {}),
+      markdown: draft.markdown,
+    };
+    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/docs`, {
+      method: "PUT",
+      body: JSON.stringify(docs),
+    });
+    applyDictionaryModulePayload(saved);
+    savedAny = true;
+
+    // Preserve the live editor and save input made while the request was pending.
+    if (docsDraftState === draft && activeDictionary()?.id === dictionary.id) {
+      clearTimeout(docsSaveTimer);
+      docsSaveTimer = null;
+      if (docsFormIsDirty()) {
+        docsSaveRequested = true;
+      }
+    }
+  }
+  return savedAny;
+}
+
 async function saveLanguageDocs(showSavedToast = true) {
   const dictionary = activeDictionary();
   if (!dictionary) {
@@ -13913,26 +13950,22 @@ async function saveLanguageDocs(showSavedToast = true) {
     return false;
   }
   clearTimeout(docsSaveTimer);
-  if (!docsFormIsDirty(dictionary)) {
+  docsSaveTimer = null;
+  if (!docsSavePromise && !docsFormIsDirty(dictionary)) {
     if (showSavedToast) {
       showToast(t("noChangesToSave"));
     }
     return true;
   }
-  const draft = ensureDocsDraft(dictionary);
-  const docs = {
-    ...(dictionary.docs || {}),
-    markdown: draft.markdown,
-  };
-  try {
-    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/docs`, {
-      method: "PUT",
-      body: JSON.stringify(docs),
+  ensureDocsDraft(dictionary);
+  docsSaveRequested = true;
+  if (!docsSavePromise) {
+    docsSavePromise = runDocsSaveQueue().finally(() => {
+      docsSavePromise = null;
     });
-    applyDictionaryModulePayload(saved);
-    docsDraftState = null;
-    render();
-    renderLanguageDocs(activeDictionary());
+  }
+  try {
+    await docsSavePromise;
     if (showSavedToast) {
       showToast(t("docsSaved"));
     }

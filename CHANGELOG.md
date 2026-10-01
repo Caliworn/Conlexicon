@@ -10,8 +10,18 @@
 
 - Liquid Glass Lab 只保留生产光学引擎：删除 SDF Baseline（`lib/liquid-glass-sdf-baseline.js` 及几何检查中的对应断言）和本机 Reference Baseline（`lib/liquid-glass-reference-baseline.js` 及 `.gitignore` 条目），移除渲染路径选择、两条 Baseline 的控件、滤镜宿主与样式，页面约从 2380 行减至 1820 行。此前页面强制要求被 Git 忽略的 Reference 模块，新克隆打开即报错，这一问题随之消除。README、液态玻璃规范同步更新；`THIRD_PARTY_NOTICES.md` 删除已不再分发的 `liquid-glass-web-react` MIT 声明，并补上此前漏列的 Lab 背景 `interior.jpg`（经核实为 Spacejoy 在 Unsplash 发布的“White and brown living room set”，Unsplash License），删除内容重复的 `assets/liquid-glass-lab/README.md`，五张背景图的许可、作者、原始页面以及“直接取自 `archisvaze/liquid-glass` 参考项目”的来源统一记录在 `THIRD_PARTY_NOTICES.md`。
 
+### 修复
+
+- 修复语言文档自动保存清掉请求期间新输入的问题（A01）：沿用语料的串行保存循环，响应只更新已保存基线，保留草稿并补存后续输入，不重绘编辑器；保存失败保留草稿，旧词典响应不清理当前词典草稿。浏览器已检查中英文、经典皮肤明暗主题下的编辑选择、焦点，以及长文档滚动和保存后撤销；请求交错、回退到旧内容、词典切换和失败重试通过隔离回归验证。
+- 畸形 Host／URL 纳入请求错误边界，返回 400，避免未处理异常使服务退出（A09）；回归检查验证失败请求之后仍能读取正常 API。切换编辑的确认流程遇到异常时记录原始错误，仍阻止导航，正常取消不打印错误（C03）。
+
+### 性能
+
+- 正写法筛选的 SQL 自定义函数改用已校验条件的共享 matcher，保留入口校验（C04），随后删除已无运行时调用方的旧 `orthographyMatches()` 及其吞错包装，模型检查改为先校验再匹配；关系索引删除无读取方的规范化 ID／词形映射及对应依赖，保留按原始 ID 解析来源、衍生关系和排序（C05）。语法检查、定向回归与 `node scripts/check-all.js` 通过；审计清单移除这五项。
+
 ### 文档
 
+- `AGENTS.md` 新增文档生命周期规则：长期契约与规范持续更新，一次性实施计划完成后迁出有效契约并删除，失效研究记录移入 `docs/archive/`。据此将已失效的 `LIQUID_GLASS_RESEARCH.md` 移入归档并标注非现行规范；`check-editor-saves.js` 注明其按函数边界截取 `app.js` 的前提。
 - 新增浏览器调试片段 `scripts/liquid-glass-tint-probe.js`：在液态玻璃皮肤下粘贴到控制台，即可按比例缩放 7 个角色表面的 tint、轮换 Lab 背景照片、切换明暗主题，用于验证规范 13.19 的“低 tint／无 tint”方向；运行时读取皮肤原值，刷新或关闭即恢复，不进入应用与 `check-all`。已在临时数据目录下验证明暗主题切换、照片覆盖和关闭清理。
 - 液态玻璃规范新增 13.19“tint 与玻璃感”待验证方向：对比 Apple regular 玻璃的自适应明暗压缩与本项目静态均匀叠色，记录照片背景测试中参数不变而玻璃感明显增强的观察，列出背景细节、玻璃面积、折射前模糊和静态高光等其他因素，提出以明暗压缩代替叠色、按表面类型区分 tint，并给出 Lab 对照方法。
 - 液态玻璃规范补充 LQ-7 性能上限分析（折射真实 DOM 只能走 `backdrop-filter` 加 SVG 滤镜，成本随可见光学面积、滤镜节点数和背景变化频率增长）与五项待实测的优化候选；记录 SDF 已完全放弃，不再作为生产替换选项。Lab 复评：确认新克隆因强制依赖被忽略的 Reference 模块而无法打开，Lab 落后于紧凑角色与 tinted／solid；整理方向为生产材质工作台，SDF 路径待移除。

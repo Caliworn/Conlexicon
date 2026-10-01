@@ -1,6 +1,8 @@
 # Liquid Glass Web Research
 
-本文记录 Conlexicon 液态玻璃实现的外部证据、可复现实验和待验证结论。它不是把任一开源项目直接定义为产品规范；产品边界仍以 [Liquid Glass Skin Specification](LIQUID_GLASS_SKIN_SPEC.md) 为准。
+> **历史归档（2026-10-01 移入）**：本文描述的 Reference 与 SDF 两条 Lab 路径及其代码已删除，SDF 已放弃，文中的对照问题和下一步门槛不再进行。保留本文只为追溯早期研究和已纠正的结论，不是现行规范；当前 Lab 与光学契约见 [液态玻璃规范](../LIQUID_GLASS_SKIN_SPEC.md)。
+
+本文记录 Conlexicon 液态玻璃实现的外部证据、可复现实验和待验证结论。它不是把任一开源项目直接定义为产品规范；产品边界仍以 [Liquid Glass Skin Specification](../LIQUID_GLASS_SKIN_SPEC.md) 为准。
 
 ## 1. 研究目标
 
