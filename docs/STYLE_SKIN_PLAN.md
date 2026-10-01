@@ -147,3 +147,41 @@ S0-1 曾把原 `:root` 和 `body.dark-theme` 主题值集中迁入 `theme-tokens
 拆分前后的浏览器验收均比较浅色和暗色下的画布、导航、控件、面板、浮层、tooltip、toast 与词汇网络计算样式；关键宽度继续覆盖 320/480/768/1024/1440px。圆角接线只替换等值 `8px` 和 `999px`，不得改变当前形状。
 
 新增皮肤必须使用独立且有作用域的文件完整定义标准 token；透明度、模糊、圆角、降级策略和性能验收仍由各皮肤规范负责。两套玻璃皮肤的具体边界分别见 `docs/LAYERED_GLASS_SKIN_SPEC.md` 和 `docs/LIQUID_GLASS_SKIN_SPEC.md`。
+
+## 5. 普通控件材质职责收尾与视觉定稿（2026-10-01 计划，未实施）
+
+目标：普通控件只有一条外观链路，即“语义 → 皮肤配方 → 当前状态 → 最终绘制”。先理清各层职责，再集中调视觉，不再逐个按钮修补；架构清理、三套皮肤重设计和新光学效果不放在同一批。
+
+| 层 | 负责 | 不负责 |
+| --- | --- | --- |
+| 组件类（`.primary-button` 等） | 尺寸、间距、图标排列、布局 | 按 primary／secondary 名字决定颜色和阴影 |
+| 语义属性 | `data-control-tone`（neutral／accent／danger）、`data-control-emphasis`（outline／tinted／solid） | 具体颜色值 |
+| 皮肤配方 | 各状态的底色、文字、边框、阴影 | 业务状态 |
+| 状态出口 | 按 hover、pressed、selected、expanded、disabled 写入 `--control-current-*` | 另造一套材质 |
+| 光学引擎 | 注册、折射、缓存、降级 | 按钮的语义颜色和交互阴影 |
+
+### 5.1 现状（2026-10-01 对照代码）
+
+- 已完成：`index.html` 中全部 `primary-button`（23）、`secondary-button`（31）、`danger-button`（1）都声明了 `data-control-tone`，抽查 `app.js` 动态生成的按钮也都带着；hover、按下、禁用、展开等状态已统一写入 `--control-current-*`（见第 2 节“控件颜色语义接口”）。
+- 剩余四项：
+  1. `.secondary-button`（`styles.css` 约 1381 行）仍直接声明 `background`、`color`、`border-color`、`box-shadow`、`backdrop-filter`，与语义配方并存，最终显示哪个取决于选择器优先级。应删除，而不是迁移。
+  2. 阴影仍由类名决定（约 1374 行）：`.primary-button`／`.danger-button` 用动作阴影，`.secondary-button` 用控件阴影。应改由 emphasis 决定。确认弹窗目前靠增删 `primary-button`／`danger-button` 类切换外观（`app.js` 约 2025 行附近），需一并改为只切换语义属性。
+  3. 无语义属性时的后备规则，如 `.secondary-button:where(:not([data-control-tone])):hover`，在所有按钮都带 tone 后基本是死代码；删除前全仓确认没有遗漏的按钮。
+  4. 光学注册会改变外观：液态玻璃中“已注册的紧凑表面提供自己的浅色外阴影”（`theme-liquid-glass.css` 约 601 行）。同一个 solid 在独立 Q3、父玻璃内部和降级到 Q1 时阴影可能不同。光学层应只负责折射，阴影仍由配方决定，只允许必要的层级阴影差异。
+
+### 5.2 批次
+
+1. **材质职责收尾**：完成 5.1 的四项，外观基本不变，同步调整 `scripts/check-style-contract.js`。不重命名所有类，不新增组件框架。
+2. **控件对照页**：
+   - 内容：七种有效配方 × 默认、hover、pressed、disabled 及需要的 selected／expanded × 页面底、Q1 容器、Q3 容器 × 三套皮肤 × 明暗；直接加载生产 CSS，不复制配方。
+   - 与 Liquid Glass Lab 的产品外观对照合并为一份（见 `LIQUID_GLASS_SKIN_SPEC.md` 13.17），可以是独立页面，也可以是 Lab 的一个面板，但只维护一份，组件结构复用产品实现。
+   - `check-all` 在 Node 中运行，没有浏览器，项目也不引入 npm 依赖，因此“自动检查最终计算样式”不能进入自动回归。替代做法是页面自带浏览器内自检，在页面或控制台报告状态是否生效、文字与底色对比度是否达标；验收时在浏览器中打开查看，属于人工触发的检查。它可以替代继续增加“源码必须包含某条声明”的契约。
+3. **视觉定稿**：用对照页按以下顺序处理：
+   1. 文字与底色配对，包括暗色主题实色按钮白字对比度约 2.86:1 的问题（见交接文档“待视觉审查”）；
+   2. 同一配方在页面、Q1 外壳、Q3 面板中的材质一致性；
+   3. outline／tinted／solid 的轻、中、强层级，不只靠越来越暗来区分；
+   4. hover 可见、pressed 可区分，但不盖掉选中状态；
+   5. 去掉没有明确用途的凸边和重复投影，结构分隔线保持独立。
+
+   液态玻璃 solid／tinted 的透明度目前是实验参数，不在第 1、2 批中固化。
+4. **层叠玻璃的特色设计**：单独一批，定位明确后再做。
