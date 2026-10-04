@@ -455,6 +455,8 @@ body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
   .entry-mail-primary-tools > button,
   .entry-mail-root-actions > button,
   .entry-mail-primary-tools > div > button,
+  .entry-mail-group > button,
+  .entry-mail-group > div > button,
   .root-mode-controls button
 ) {
   --material-control-background: transparent;
@@ -476,6 +478,8 @@ body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
   .entry-mail-primary-tools > button,
   .entry-mail-root-actions > button,
   .entry-mail-primary-tools > div > button,
+  .entry-mail-group > button,
+  .entry-mail-group > div > button,
   .root-mode-controls button
 ):where(:not([data-control-tone])):hover:not(:disabled) {
   --material-control-background: color-mix(in srgb, var(--ui-accent) 8%, transparent);
@@ -486,6 +490,8 @@ body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
   .entry-mail-primary-tools > button,
   .entry-mail-root-actions > button,
   .entry-mail-primary-tools > div > button,
+  .entry-mail-group > button,
+  .entry-mail-group > div > button,
   .root-mode-controls button
 ):where(:not([data-control-tone])):active:not(:disabled) {
   --material-control-background: var(--ui-accent-soft);

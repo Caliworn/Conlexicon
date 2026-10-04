@@ -226,6 +226,8 @@ const mailControlPaint = liquidGlass.match(
 assert(mailControlPaint, "Mail controls must consume their shared outer glass material");
 assert(mailControlPaint[1].includes(".entry-mail-primary-tools > button"),
   "Mail ownership must include the new-entry quick action");
+assert(mailControlPaint[1].includes(".entry-mail-group > button") && mailControlPaint[1].includes(".entry-mail-group > div > button"),
+  "Mail controls moved into wrap groups must keep the shared outer glass material");
 const mailControlProperties = controlProperties(mailControlPaint[2]);
 assert.equal(mailControlProperties["--control-background"], "transparent",
   "Semantic controls inside Mail must not paint an independent panel block");

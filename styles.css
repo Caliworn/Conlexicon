@@ -634,6 +634,19 @@ body[data-entry-layout="mail"] .entry-mail-primary-tools {
   min-width: 0;
 }
 
+/* Groups never split across rows: menus, root mode, and "new" wrap as units. */
+body[data-entry-layout="mail"] .entry-mail-group {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+body[data-entry-layout="mail"] .entry-mail-group-new {
+  margin-left: auto;
+}
+
 body[data-entry-layout="mail"] .entry-mail-divider {
   position: absolute;
   width: 1px;
@@ -656,13 +669,15 @@ body[data-entry-layout="mail"] .entry-mail-tools.has-root-actions {
   border-radius: min(var(--radius-pill), 24px);
 }
 
-body[data-entry-layout="mail"] .entry-mail-primary-tools > :is(.entry-mail-settings, .entry-filter-control, .entry-sort-control) {
+body[data-entry-layout="mail"] .entry-mail-group > :is(.entry-mail-settings, .entry-filter-control, .entry-sort-control) {
   position: static;
   flex: 0 0 40px;
 }
 
 body[data-entry-layout="mail"] .entry-mail-primary-tools > button,
 body[data-entry-layout="mail"] .entry-mail-primary-tools > div > button,
+body[data-entry-layout="mail"] .entry-mail-group > button,
+body[data-entry-layout="mail"] .entry-mail-group > div > button,
 body[data-entry-layout="mail"] .entry-mail-root-actions > button {
   display: grid;
   width: 40px;
