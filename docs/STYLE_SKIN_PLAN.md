@@ -26,7 +26,7 @@
 | 层叠玻璃 | 无边框半透明玻璃带，上沿 1px 内侧高光，带间留缝透出外壳 | 玻璃带变亮、高光加强；编辑时加强调色描边 |
 | 液态玻璃 | 一整片玻璃，分区之间只有细线；分区向两侧外扩，使浅色底不贴字 | 浅色底；编辑时改为强调色浅底并加描边 |
 
-分隔方式本身就是皮肤外观，因此分区的间距、内边距和外扩量作为例外进入皮肤 token：`--material-entry-detail-section-{gap,padding,bleed,surface,outline,edge,divider}`，悬浮和局部编辑状态各有 `-{hover,editing}-{surface,outline,edge}`，标题区下沿使用 `--material-entry-detail-header-divider`。共享规则只消费这些 token，不得为某个皮肤另写一套分区结构。悬浮与编辑反馈只作用于带 `data-edit-section` 的分区；不可局部编辑的衍生分区没有分区级反馈，内部链接、标签和按钮保持各自的控件状态。
+分隔方式本身就是皮肤外观，因此分区的间距、内边距和外扩量作为例外进入皮肤 token：`--material-entry-detail-section-{gap,padding,bleed,surface,outline,edge,divider}`，悬浮和局部编辑状态各有 `-{hover,editing}-{surface,outline,edge}`，标题区下沿使用 `--material-entry-detail-header-divider`。共享规则只消费这些 token，不得为某个皮肤另写一套分区结构。悬浮与编辑反馈只作用于带 `data-edit-section` 的分区；不可局部编辑的衍生分区没有分区级反馈，内部链接、标签和按钮保持各自的控件状态。局部编辑时分区的编辑态是唯一容器：`.inline-partial-edit-form` 不绘制边框、底色或阴影，分区标题保持可见并附“编辑中”状态，只隐藏分区内容（2026-10-09）。
 
 `--material-entry-detail-section-background/-border` 仍是分区的稳定材质：经典和层叠玻璃的分区表面引用它们；液态玻璃的分区表面为透明，但输入字段继续借用这两个 token，不能为去掉分区底色而改写它们。不支持 blur、减少透明度路径下，层叠玻璃的玻璃带退为带细边框的实色分区；强制高对比路径使用系统色描边和 `Highlight` 状态。
 

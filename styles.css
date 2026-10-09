@@ -1844,8 +1844,16 @@ label span {
   box-shadow: var(--material-entry-detail-section-editing-edge);
 }
 
-.entry-display [data-edit-section].partial-editing > :not(.inline-partial-edit-form) {
+/* The section heading stays visible while editing; the form replaces only
+   the section content. */
+.entry-display [data-edit-section].partial-editing > :not(.inline-partial-edit-form, .section-heading) {
   display: none !important;
+}
+
+.partial-edit-status {
+  color: var(--ui-accent);
+  font-size: 0.82rem;
+  font-weight: 800;
 }
 
 .entry-display-header.partial-editing {
@@ -5209,15 +5217,10 @@ textarea.ipa-single-line::-webkit-scrollbar {
   gap: 10px;
 }
 
+/* The host section's skin editing state is the only container. */
 .inline-partial-edit-form {
   display: grid;
   gap: 14px;
-  margin-top: 14px;
-  padding: 16px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-panel);
-  background: color-mix(in srgb, var(--material-panel-background) 92%, var(--ui-canvas-bg));
-  box-shadow: var(--material-floating-soft-shadow);
 }
 
 .partial-edit-body {

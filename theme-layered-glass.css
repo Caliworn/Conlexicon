@@ -68,7 +68,6 @@ body[data-ui-skin="layered-glass"] {
   --material-floating-background: rgba(247, 251, 250, 0.58);
   --material-floating-border: rgba(74, 96, 99, 0.34);
   --material-floating-shadow: 0 24px 58px rgba(20, 37, 41, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.96), inset 0 -1px 0 rgba(67, 101, 99, 0.1);
-  --material-floating-soft-shadow: 0 16px 38px rgba(20, 37, 41, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.82);
   --material-floating-filter: blur(28px) saturate(1.15);
   --material-mobile-bar-background: rgba(238, 244, 242, 0.6);
   --material-mobile-bar-shadow: 0 12px 28px rgba(20, 37, 41, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.68);
@@ -175,7 +174,6 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --material-floating-background: rgba(25, 36, 40, 0.56);
   --material-floating-border: rgba(222, 244, 239, 0.26);
   --material-floating-shadow: 0 26px 64px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(0, 0, 0, 0.24);
-  --material-floating-soft-shadow: 0 18px 42px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.14);
   --material-mobile-bar-background: rgba(17, 25, 28, 0.6);
   --material-mobile-bar-shadow: 0 14px 34px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.09);
   --material-navigation-background: #10181c;
@@ -545,7 +543,6 @@ body[data-ui-skin="layered-glass"] [data-layered-glass-pointer="active"] {
     --material-floating-background: Canvas;
     --material-floating-border: CanvasText;
     --material-floating-shadow: none;
-    --material-floating-soft-shadow: none;
     --material-floating-filter: none;
     --material-mobile-bar-background: Canvas;
     --material-mobile-bar-shadow: none;

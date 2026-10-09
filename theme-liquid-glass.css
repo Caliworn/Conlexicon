@@ -76,7 +76,6 @@ body[data-ui-skin="liquid-glass"] {
   --material-floating-background: var(--liquid-glass-floating-surface-tint);
   --material-floating-border: rgba(255, 255, 255, 0.72);
   --material-floating-shadow: 0 32px 78px rgba(7, 28, 36, 0.3), 0 8px 24px rgba(7, 28, 36, 0.16);
-  --material-floating-soft-shadow: 0 20px 50px rgba(7, 28, 36, 0.2);
   --material-floating-filter: var(--liquid-glass-q1-floating-filter);
   --material-mobile-bar-background: var(--liquid-glass-mobile-bar-surface-tint);
   --material-mobile-bar-shadow: 0 15px 36px rgba(12, 35, 43, 0.2);
@@ -199,7 +198,6 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-floating-background: var(--liquid-glass-floating-surface-tint);
   --material-floating-border: rgba(229, 255, 251, 0.22);
   --material-floating-shadow: 0 34px 86px rgba(0, 0, 0, 0.62), 0 9px 26px rgba(0, 0, 0, 0.36);
-  --material-floating-soft-shadow: 0 22px 56px rgba(0, 0, 0, 0.46);
   --material-mobile-bar-background: var(--liquid-glass-mobile-bar-surface-tint);
   --material-mobile-bar-shadow: 0 17px 42px rgba(0, 0, 0, 0.44);
   --material-navigation-background: var(--liquid-glass-navigation-surface-tint);
@@ -1029,7 +1027,6 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
     --material-floating-background: Canvas;
     --material-floating-border: CanvasText;
     --material-floating-shadow: none;
-    --material-floating-soft-shadow: none;
     --material-floating-filter: none;
     --material-mobile-bar-background: Canvas;
     --material-mobile-bar-shadow: none;

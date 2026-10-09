@@ -533,6 +533,7 @@ const i18n = {
     entryContextMenu: "词条操作",
     createDerivedEntry: "新建衍生条目",
     partialEdit: "局部编辑",
+    partialEditing: "编辑中",
     definitions: "释义",
     etymology: "词源",
     entryNotes: "词条备注",
@@ -1150,6 +1151,7 @@ const i18n = {
     entryContextMenu: "Entry Actions",
     createDerivedEntry: "New Derived Entry",
     partialEdit: "Local Edit",
+    partialEditing: "Editing",
     definitions: "Definitions",
     etymology: "Etymology",
     entryNotes: "Entry Notes",
@@ -15688,23 +15690,33 @@ async function openPartialEdit(section) {
   form.className = "inline-partial-edit-form";
   form.autocomplete = "off";
   form.noValidate = true;
-  const titleKey = {
-    basic: "entry",
-    definitions: "definitions",
-    etymology: "etymology",
-    morphology: "morphologyDisplay",
-    notes: "entryNotes",
-  }[section] || "partialEdit";
-  form.innerHTML = `
+  // Sections keep their own heading visible and only gain an editing status;
+  // the header region has no section heading, so its form carries the title.
+  const headingLabel = host.querySelector(":scope > .section-heading > span");
+  let heading = "";
+  if (headingLabel) {
+    headingLabel.id ||= `partialEditHeading-${section}`;
+    const status = document.createElement("span");
+    status.className = "partial-edit-status";
+    status.id = "partialEditStatus";
+    status.dataset.i18n = "partialEditing";
+    status.textContent = t("partialEditing");
+    headingLabel.after(status);
+    form.setAttribute("aria-labelledby", `${headingLabel.id} ${status.id}`);
+  } else {
+    form.setAttribute("aria-labelledby", "partialEditTitle");
+    heading = `
     <div class="form-heading compact-heading">
       <div>
         <p class="eyebrow" data-i18n="partialEdit">${escapeHtml(t("partialEdit"))}</p>
-        <h3 data-i18n="${titleKey}">${escapeHtml(partialEditTitle(section))}</h3>
+        <h3 id="partialEditTitle" data-i18n="entry">${escapeHtml(t("entry"))}</h3>
       </div>
-      <button class="secondary-button" type="button" data-control-tone="neutral" data-action="cancel-partial-edit" data-i18n="cancel">${escapeHtml(t("cancel"))}</button>
-    </div>
+    </div>`;
+  }
+  form.innerHTML = `${heading}
     <div class="partial-edit-body"></div>
     <div class="form-actions">
+      <button class="secondary-button" type="button" data-control-tone="neutral" data-action="cancel-partial-edit" data-i18n="cancel">${escapeHtml(t("cancel"))}</button>
       <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" type="submit" data-i18n="save">${escapeHtml(t("save"))}</button>
     </div>
   `;
@@ -15763,10 +15775,7 @@ async function openPartialEdit(section) {
     bindSourceAutocompleteInput(body.querySelector('[data-field="sources"]'));
   } else if (section === "notes") {
     body.innerHTML = `
-      <label>
-        <span data-i18n="entryNotes">${escapeHtml(t("entryNotes"))}</span>
-        <textarea data-field="notes" rows="6">${escapeHtml(entry.notes || "")}</textarea>
-      </label>
+      <textarea data-field="notes" rows="6" aria-labelledby="${escapeHtml(headingLabel?.id || "")}">${escapeHtml(entry.notes || "")}</textarea>
     `;
   } else if (section === "morphology") {
     body.innerHTML = `
@@ -15780,17 +15789,6 @@ async function openPartialEdit(section) {
 
   body.querySelector("input, textarea")?.focus();
   return true;
-}
-
-function partialEditTitle(section) {
-  const titles = {
-    basic: t("entry"),
-    definitions: t("definitions"),
-    etymology: t("etymology"),
-    morphology: t("morphologyDisplay"),
-    notes: t("entryNotes"),
-  };
-  return titles[section] || t("partialEdit");
 }
 
 function renderPartialDefinitionList(definitions = []) {
@@ -15989,10 +15987,29 @@ function partialEditForm() {
   return partialEditHost?.querySelector(".inline-partial-edit-form") || null;
 }
 
+// Escape is an explicit cancel, so unsaved changes always ask instead of
+// following the dictionary's page-switch action.
+async function requestPartialEditCancel() {
+  if (!partialEntryFormIsDirty()) {
+    cancelPartialEdit();
+    return;
+  }
+  const returnFocus = document.activeElement;
+  const action = await appEditSwitchPrompt(t("partialEditSwitchPrompt"));
+  if (action === "save") {
+    await savePartialEdit({ preventDefault() {} });
+  } else if (action === "discard") {
+    cancelPartialEdit();
+  } else if (returnFocus?.isConnected) {
+    returnFocus.focus();
+  }
+}
+
 function cancelPartialEdit() {
   const partialSourceInput = partialEditHost?.querySelector("#partialSourceEntryInput");
   if (partialSourceInput) resetSourceCompletion(partialSourceInput);
   partialEditHost?.querySelector(".inline-partial-edit-form")?.remove();
+  partialEditHost?.querySelector(".partial-edit-status")?.remove();
   partialEditHost?.classList.remove("partial-editing");
   partialEditHost = null;
   partialEditSection = "";
@@ -18157,6 +18174,12 @@ document.addEventListener("keydown", (event) => {
   }
 
   if (event.key === "Escape" && closeMobileDrawers()) {
+    return;
+  }
+
+  if (event.key === "Escape" && !event.isComposing && partialEditForm()?.contains(event.target)) {
+    event.preventDefault();
+    requestPartialEditCancel().catch((error) => console.error(error));
     return;
   }
 
