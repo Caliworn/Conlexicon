@@ -1,6 +1,6 @@
 # Entry Editor Unboxing Plan / 词条编辑去框化设计草案
 
-状态：设计草案（2026-10-05），已做一次独立复评（第 8 节）。2026-10-09 用户确认 D1–D8 按建议执行，D9 留到 U4 再定；U1 已实装（2026-10-09），U2–U5 待实施。
+状态：设计草案（2026-10-05），已做一次独立复评（第 8 节）。2026-10-09 用户确认 D1–D8 按建议执行，D9 留到 U4 再定；U1、U2 已实装（2026-10-09），U3–U5 待实施。
 
 本文设计完整编辑（`#entryForm`）和局部编辑（`.inline-partial-edit-form`）的去框化，使编辑态沿用词条详情已有的分区分隔接口（[Style Skin Plan](STYLE_SKIN_PLAN.md)“词条详情分区分隔接口”），各皮肤只换材质，不另写结构。本文不改变保存范围、数据模型、未保存检查、API 和字段 `data-field` 契约。
 
@@ -93,7 +93,7 @@ section.display-section.partial-editing[data-edit-section=definitions]   皮肤�
 ```
 
 - 局部编辑表单去掉边框、背景、阴影和 `margin-top`；分区本身的编辑态 token 已经承担“正在编辑”的反馈，不再叠一张浮起卡片。
-- 去掉表单内重复的“局部编辑 / 释义”标题：进入编辑时保留分区原有标题行，只隐藏内容；标题旁加一个小型“编辑中”状态文字（`aria-live` 不需要，表单 `aria-label` 为“局部编辑：释义”）。实现上需要把 `.partial-editing > :not(.inline-partial-edit-form)` 的隐藏规则收窄为不隐藏 `.section-heading`；词条标题区（`basic`）没有 section-heading，沿用表单内标题。
+- 去掉表单内重复的“局部编辑 / 释义”标题：进入编辑时保留分区原有标题行，只隐藏内容；标题旁加一个小型“编辑中”状态文字（`aria-live` 不需要，表单可访问名称取自标题与状态，如“释义 编辑中”）。实现上需要把 `.partial-editing > :not(.inline-partial-edit-form)` 的隐藏规则收窄为不隐藏 `.section-heading`；词条标题区（`basic`）在详情中没有分区标题，编辑时在表单顶部补一行同样的标题行“基本信息 · 编辑中”（2026-10-10 用户确定名称）。
 - 取消和保存合并在表单底部右侧。
 - 新增 `Esc` 取消局部编辑（焦点在表单内、无输入法组字、没有打开的建议列表或弹层时）；无改动时直接取消；有改动时总是弹出“保存 / 放弃更改 / 取消”，不跟随词典的离开时处理设置（D4）。
 - 局部编辑与完整编辑共用字段、条目分隔和操作栏规则，局部编辑的操作栏不吸底。
@@ -178,7 +178,7 @@ section.display-section.partial-editing[data-edit-section=definitions]   皮肤�
 | 阶段 | 内容 | 主要文件 |
 | --- | --- | --- |
 | U1（已完成 2026-10-09） | 局部编辑去框：表单去边框／底／阴影，保留分区标题与“编辑中”，合并操作按钮，`Esc` 取消 | `styles.css`、`app.js` `openPartialEdit`、键盘处理 |
-| U2 | 完整编辑骨架：基础字段进标题区，五个 section 改用分区规则，标题行统一，操作栏合并（暂不吸底） | `index.html`、`styles.css` |
+| U2（已完成 2026-10-09） | 完整编辑骨架：基础字段进标题区，五个 section 改用分区规则，标题行统一，操作栏合并（暂不吸底） | `index.html`、`styles.css` |
 | U3 | 释义与形态组条目去框：编号槽、图标移除按钮、条目分隔 token | `app.js` `definitionFormCardHtml`、`renderEntryMorphologyGroupEditor`、`styles.css`、三套皮肤 |
 | U4 | 字段材质 token 与形态覆盖表单元格去框；降级与高对比路径 | 三套皮肤、`styles.css`、样式契约检查 |
 | U5 | 操作栏吸底（按 D3） | `styles.css`、皮肤 token |

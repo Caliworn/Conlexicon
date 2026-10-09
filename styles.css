@@ -1773,14 +1773,32 @@ label span {
   -webkit-backdrop-filter: var(--material-entry-detail-filter);
 }
 
+/* The header shares the section box geometry, transparent at rest, so hover
+   and partial editing only change the skin material and never move content.
+   Its divider is inset like the section hairlines. */
 .entry-display-header {
+  position: relative;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
   flex-wrap: wrap;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--material-entry-detail-header-divider);
+  max-width: calc(100% + 2 * var(--material-entry-detail-section-bleed));
+  margin: -14px calc(-1 * var(--material-entry-detail-section-bleed)) 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: var(--material-entry-detail-section-padding);
+  transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.entry-display-header::after {
+  position: absolute;
+  right: var(--material-entry-detail-section-bleed);
+  bottom: -1px;
+  left: var(--material-entry-detail-section-bleed);
+  border-top: 1px solid var(--material-entry-detail-header-divider);
+  content: "";
+  pointer-events: none;
 }
 
 .entry-display-header > div:first-child {
@@ -1812,22 +1830,24 @@ label span {
   height: 20px;
 }
 
-.entry-display-header.partial-editing {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-}
-
-.entry-display-header.partial-editing .inline-partial-edit-form {
-  grid-column: 1 / -1;
-}
-
 .entry-display [data-edit-section] {
   cursor: context-menu;
 }
 
-.entry-display-header[data-edit-section]:hover,
+.entry-display-header[data-edit-section]:hover {
+  border-color: var(--material-entry-detail-section-hover-outline);
+  background: var(--material-entry-detail-section-hover-surface);
+  box-shadow: var(--material-entry-detail-section-hover-edge);
+}
+
 .entry-display-header[data-edit-section].partial-editing {
-  border-color: color-mix(in srgb, var(--ui-accent) 42%, var(--ui-border));
+  border-color: var(--material-entry-detail-section-editing-outline);
+  background: var(--material-entry-detail-section-editing-surface);
+  box-shadow: var(--material-entry-detail-section-editing-edge);
+}
+
+.entry-display-header[data-edit-section]:is(:hover, .partial-editing)::after {
+  opacity: 0;
 }
 
 /* Each skin chooses how sections separate (outlined cards, glass bands or
@@ -3270,6 +3290,39 @@ button.pending-source:focus-visible {
   gap: 18px;
 }
 
+/* Full edit mirrors the detail view: same outer padding, header divider and
+   skin-owned section separation, so switching modes does not reflow. */
+#entryForm {
+  gap: var(--material-entry-detail-section-gap);
+  padding: 28px;
+}
+
+.entry-editor-header {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--material-entry-detail-header-divider);
+}
+
+#entryForm .entry-editor-lemma input {
+  height: auto;
+  padding: 6px 12px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.entry-editor-section > .section-heading {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.entry-editor-actions > #deleteEntryButton {
+  margin-right: auto;
+}
+
 #settingsForm {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
@@ -3319,15 +3372,6 @@ button.pending-source:focus-visible {
   font-family: "Segoe UI", "Noto Sans", sans-serif;
   font-weight: 800;
   overflow-wrap: anywhere;
-}
-
-.definition-editor {
-  display: grid;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-panel);
-  background: color-mix(in srgb, var(--material-panel-background) 90%, var(--ui-canvas-bg));
 }
 
 .compact-heading {
@@ -6064,8 +6108,13 @@ textarea.ipa-single-line::-webkit-scrollbar {
     display: grid;
   }
 
-  .entry-display {
+  .entry-display,
+  #entryForm {
     padding: 18px;
+  }
+
+  .entry-editor-actions > #deleteEntryButton {
+    flex-basis: 100%;
   }
 
   .entry-display-header {
@@ -6075,7 +6124,6 @@ textarea.ipa-single-line::-webkit-scrollbar {
   .entry-display-header {
     flex-direction: column;
     gap: 14px;
-    padding-bottom: 18px;
   }
 
   .entry-display-header > div:first-child {
@@ -6102,6 +6150,7 @@ textarea.ipa-single-line::-webkit-scrollbar {
   .entry-browser-toggle-icon,
   .content-disclosure-icon,
   .display-section,
+  .entry-display-header,
   .entry-quality-issue-tooltip,
   .toast,
   .theme-toggle-glyph {

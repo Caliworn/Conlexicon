@@ -339,49 +339,41 @@
 
               <form class="editor-panel" id="entryForm" autocomplete="off" novalidate hidden>
                 <input id="entryId" type="hidden">
-                <div class="form-heading">
-                  <div>
-                    <p class="eyebrow" id="entryMode">新建</p>
-                    <h3 id="entryFormTitle">词条</h3>
-                  </div>
-                  <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" id="deleteEntryButton" type="button" data-i18n="delete">删除</button>
+                <div class="entry-editor-header">
+                  <p class="eyebrow" id="entryMode">新建</p>
+                  <h3 class="visually-hidden" id="entryFormTitle">词条</h3>
+                  <label class="entry-editor-lemma">
+                    <span data-i18n="lemma">词形</span>
+                    <input id="lemmaInput" name="lemma" aria-required="true" maxlength="80">
+                  </label>
+
+                  <label>
+                    <span data-i18n="pronunciation">发音</span>
+                    <div class="inline-field-action">
+                      <textarea class="ipa-single-line" id="pronunciationInput" name="pronunciation" rows="1" maxlength="120"></textarea>
+                      <button class="secondary-button" id="autoIpaButton" data-control-tone="neutral" type="button" data-i18n="autoIpa">自动 IPA</button>
+                    </div>
+                  </label>
+                  <div class="ipa-keyboard" id="ipaKeyboard" data-i18n-aria-label="ipaKeyboardSettings" aria-label="IPA 虚拟键盘"></div>
+
+                  <label>
+                    <span data-i18n="tagsLabel">标签</span>
+                    <input id="tagsInput" name="tags" maxlength="180">
+                    <small class="field-help" data-i18n="tagsHelp">填写词条标签；词性也作为标签在这里输入。多个标签可用半角逗号、全角逗号或顿号分隔。已配置为词性的标签会按词性显示。</small>
+                  </label>
                 </div>
 
-                <label>
-                  <span data-i18n="lemma">词形</span>
-                  <input id="lemmaInput" name="lemma" aria-required="true" maxlength="80">
-                </label>
-
-                <label>
-                  <span data-i18n="pronunciation">发音</span>
-                  <div class="inline-field-action">
-                    <textarea class="ipa-single-line" id="pronunciationInput" name="pronunciation" rows="1" maxlength="120"></textarea>
-                    <button class="secondary-button" id="autoIpaButton" data-control-tone="neutral" type="button" data-i18n="autoIpa">自动 IPA</button>
-                  </div>
-                </label>
-                <div class="ipa-keyboard" id="ipaKeyboard" data-i18n-aria-label="ipaKeyboardSettings" aria-label="IPA 虚拟键盘"></div>
-
-                <label>
-                  <span data-i18n="tagsLabel">标签</span>
-                  <input id="tagsInput" name="tags" maxlength="180">
-                  <small class="field-help" data-i18n="tagsHelp">填写词条标签；词性也作为标签在这里输入。多个标签可用半角逗号、全角逗号或顿号分隔。已配置为词性的标签会按词性显示。</small>
-                </label>
-
-                <section class="definition-editor" data-entry-form-section="definitions">
-                  <div class="form-heading compact-heading">
-                    <div>
-                      <p class="eyebrow" data-i18n="definitions">释义</p>
-                    </div>
+                <section class="display-section entry-editor-section" data-entry-form-section="definitions">
+                  <div class="section-heading">
+                    <span data-i18n="definitions">释义</span>
                     <button class="secondary-button additive-button" data-control-tone="accent" data-control-emphasis="outline" id="addDefinitionButton" type="button" data-i18n="addDefinition">添加释义</button>
                   </div>
                   <div class="definition-form-list" id="definitionFormList"></div>
                 </section>
 
-                <section class="definition-editor" data-entry-form-section="etymology">
-                  <div class="form-heading compact-heading">
-                    <div>
-                      <p class="eyebrow" data-i18n="etymology">词源</p>
-                    </div>
+                <section class="display-section entry-editor-section" data-entry-form-section="etymology">
+                  <div class="section-heading">
+                    <span data-i18n="etymology">词源</span>
                   </div>
                   <div class="source-reference-field">
                     <label for="sourceEntryInput" data-i18n="sourceEntry">来源词条</label>
@@ -394,32 +386,29 @@
                   </label>
                 </section>
 
-                <section class="definition-editor" id="fullEditDerivedSection" data-entry-form-section="derived" hidden>
-                  <div class="form-heading compact-heading">
-                    <div>
-                      <p class="eyebrow" data-i18n="derivedEntries">衍生</p>
-                    </div>
+                <section class="display-section entry-editor-section" id="fullEditDerivedSection" data-entry-form-section="derived" hidden>
+                  <div class="section-heading">
+                    <span data-i18n="derivedEntries">衍生</span>
                   </div>
                   <div class="derived-list" id="fullEditDerived"></div>
                 </section>
 
-                <section class="definition-editor" data-entry-form-section="morphology">
-                  <div class="form-heading compact-heading">
-                    <div>
-                      <p class="eyebrow" data-i18n="morphologyConfig">自动形态学</p>
-                    </div>
+                <section class="display-section entry-editor-section" data-entry-form-section="morphology">
+                  <div class="section-heading">
+                    <span data-i18n="morphologyDisplay">形态学</span>
                   </div>
                   <div class="entry-morphology-controls" id="entryMorphologyControls"></div>
                 </section>
 
-                <section class="definition-editor" data-entry-form-section="notes">
-                  <label>
-                    <span data-i18n="entryNotes">词条整体备注</span>
-                    <textarea id="notesInput" name="notes" rows="4"></textarea>
-                  </label>
+                <section class="display-section entry-editor-section" data-entry-form-section="notes">
+                  <div class="section-heading">
+                    <span id="entryNotesHeading" data-i18n="entryNotes">词条备注</span>
+                  </div>
+                  <textarea id="notesInput" name="notes" rows="4" aria-labelledby="entryNotesHeading"></textarea>
                 </section>
 
-                <div class="form-actions">
+                <div class="form-actions entry-editor-actions">
+                  <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" id="deleteEntryButton" type="button" data-i18n="deleteEntry">删除词条</button>
                   <button class="secondary-button" id="cancelEditButton" data-control-tone="neutral" type="button" data-i18n="cancel">取消</button>
                   <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" type="submit" data-i18n="saveEntry">保存词条</button>
                 </div>

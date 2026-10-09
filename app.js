@@ -532,12 +532,13 @@ const i18n = {
     editEntry: "编辑词条",
     entryContextMenu: "词条操作",
     createDerivedEntry: "新建衍生条目",
-    partialEdit: "局部编辑",
     partialEditing: "编辑中",
+    basicInfo: "基本信息",
     definitions: "释义",
     etymology: "词源",
     entryNotes: "词条备注",
     delete: "删除",
+    deleteEntry: "删除词条",
     lemma: "词形",
     pronunciation: "发音",
     autoIpa: "自动 IPA",
@@ -1150,12 +1151,13 @@ const i18n = {
     editEntry: "Edit Entry",
     entryContextMenu: "Entry Actions",
     createDerivedEntry: "New Derived Entry",
-    partialEdit: "Local Edit",
     partialEditing: "Editing",
+    basicInfo: "Basics",
     definitions: "Definitions",
     etymology: "Etymology",
     entryNotes: "Entry Notes",
     delete: "Delete",
+    deleteEntry: "Delete Entry",
     lemma: "Lemma",
     pronunciation: "Pronunciation",
     autoIpa: "Auto IPA",
@@ -15690,27 +15692,20 @@ async function openPartialEdit(section) {
   form.className = "inline-partial-edit-form";
   form.autocomplete = "off";
   form.noValidate = true;
-  // Sections keep their own heading visible and only gain an editing status;
-  // the header region has no section heading, so its form carries the title.
+  // Every section shows "<name> · editing" in the same heading row. Display
+  // sections already have that row; the header region gets one in the form.
+  const statusHtml = `<span class="partial-edit-status" id="partialEditStatus" data-i18n="partialEditing">${escapeHtml(t("partialEditing"))}</span>`;
   const headingLabel = host.querySelector(":scope > .section-heading > span");
   let heading = "";
   if (headingLabel) {
     headingLabel.id ||= `partialEditHeading-${section}`;
-    const status = document.createElement("span");
-    status.className = "partial-edit-status";
-    status.id = "partialEditStatus";
-    status.dataset.i18n = "partialEditing";
-    status.textContent = t("partialEditing");
-    headingLabel.after(status);
-    form.setAttribute("aria-labelledby", `${headingLabel.id} ${status.id}`);
+    headingLabel.insertAdjacentHTML("afterend", statusHtml);
+    form.setAttribute("aria-labelledby", `${headingLabel.id} partialEditStatus`);
   } else {
-    form.setAttribute("aria-labelledby", "partialEditTitle");
+    form.setAttribute("aria-labelledby", "partialEditTitle partialEditStatus");
     heading = `
-    <div class="form-heading compact-heading">
-      <div>
-        <p class="eyebrow" data-i18n="partialEdit">${escapeHtml(t("partialEdit"))}</p>
-        <h3 id="partialEditTitle" data-i18n="entry">${escapeHtml(t("entry"))}</h3>
-      </div>
+    <div class="section-heading">
+      <span id="partialEditTitle" data-i18n="basicInfo">${escapeHtml(t("basicInfo"))}</span>${statusHtml}
     </div>`;
   }
   form.innerHTML = `${heading}
@@ -15994,12 +15989,20 @@ async function requestPartialEditCancel() {
     cancelPartialEdit();
     return;
   }
+  const host = partialEditHost;
   const returnFocus = document.activeElement;
   const action = await appEditSwitchPrompt(t("partialEditSwitchPrompt"));
-  if (action === "save") {
-    await savePartialEdit({ preventDefault() {} });
-  } else if (action === "discard") {
-    cancelPartialEdit();
+  if (action === "save" || action === "discard") {
+    const closed = action === "discard" || await savePartialEdit({ preventDefault() {} });
+    if (action === "discard") {
+      cancelPartialEdit();
+    }
+    // The dialog held focus while the form closed, so return it explicitly.
+    if (closed && partialEditHost !== host) {
+      focusClosedPartialEditHost(host);
+    } else if (returnFocus?.isConnected) {
+      returnFocus.focus();
+    }
   } else if (returnFocus?.isConnected) {
     returnFocus.focus();
   }
@@ -16008,11 +16011,26 @@ async function requestPartialEditCancel() {
 function cancelPartialEdit() {
   const partialSourceInput = partialEditHost?.querySelector("#partialSourceEntryInput");
   if (partialSourceInput) resetSourceCompletion(partialSourceInput);
-  partialEditHost?.querySelector(".inline-partial-edit-form")?.remove();
-  partialEditHost?.querySelector(".partial-edit-status")?.remove();
-  partialEditHost?.classList.remove("partial-editing");
+  const host = partialEditHost;
+  const hadFocus = Boolean(host?.contains(document.activeElement));
+  host?.querySelector(".inline-partial-edit-form")?.remove();
+  host?.querySelector(".partial-edit-status")?.remove();
+  host?.classList.remove("partial-editing");
   partialEditHost = null;
   partialEditSection = "";
+  if (hadFocus) {
+    focusClosedPartialEditHost(host);
+  }
+}
+
+// Keep keyboard users at the section they just edited instead of the body.
+function focusClosedPartialEditHost(host) {
+  if (!host?.isConnected || host.hidden) {
+    return;
+  }
+  host.tabIndex = -1;
+  host.addEventListener("blur", () => host.removeAttribute("tabindex"), { once: true });
+  host.focus({ preventScroll: true });
 }
 
 function createEntryDraft(overrides = {}) {

@@ -31,7 +31,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 
 - **词典**：新建、切换、导入、导出、配置和删除词典；导入与现有词典 ID 相同的词典前会确认是否覆盖。
 - **存储**：每个词典的词条、形态模板、语料库、语言文档、IPA 规则和设置都保存在各自的 SQLite 文件中；旧 JSON 只作为显式导入、导出和迁移格式。
-- **词条**：词形、发音、标签、多条释义、例句、备注、词源、来源和反向衍生链接。保存后的词条进入阅读视图，可完整编辑或按栏目局部编辑；完整编辑提供取消与保存，需要空白草稿时使用“新建词条”。
+- **词条**：词形、发音、标签、多条释义、例句、备注、词源、来源和反向衍生链接。保存后的词条进入阅读视图，可完整编辑或按栏目局部编辑；完整编辑底部提供删除、取消与保存，需要空白草稿时使用“新建词条”。
 - **词性**：只有词典设置中列出的标签才算词性，因此一个词条可以有多个词性；列表留空表示该词典不使用词性。
 - **来源**：来源分为词条引用和纯文本。引用显示为可移除的卡片，可拖动或用 Alt+方向键排序；纯文本留在输入框内编辑。目标改名时链接不变，目标删除后保留文本，不会自动关联同名词条。词条不能引用自身，也不能重复引用同一目标。未绑定的文本可一步创建为新词条并完成链接，新建衍生词时来源已预先链接。
 - **来源补全**：候选来自服务端词形搜索，与词条列表使用相同的匹配规则；每项单行显示词性和简短释义，每次最多 50 项。同形词以词性和释义区分，不显示 ID。来源链接、来源卡片、衍生词卡片和词汇网络节点共用同一词条悬浮卡片。
@@ -52,10 +52,12 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 
 - `Ctrl`/`Cmd` + `S`: save the active edit form or module when saving is available.
 - `Ctrl`/`Cmd` + `Enter`: create a new entry when focus is not in an editable field. Unsaved edits go through the usual save / discard / cancel prompt first.
+- `Esc` in a local (section) edit: cancel it; with unsaved changes, the save / discard / cancel prompt appears first.
 - In a source field: `↑`/`↓` move the current suggestion; `Enter` links it, and with no current suggestion keeps the text and never submits the form; `Tab` only moves focus; `Esc` closes the suggestions and keeps the text.
 
 - `Ctrl`/`Cmd` + `S`：在当前表单或模块支持保存时执行保存。
 - `Ctrl`/`Cmd` + `Enter`：焦点不在可编辑区域时新建词条；有未保存编辑时先走“保存 / 放弃 / 取消”确认。
+- 局部编辑中按 `Esc`：取消局部编辑；有未保存改动时先弹出“保存 / 放弃 / 取消”确认。
 - 来源输入框内：`↑`/`↓` 移动当前候选；`Enter` 绑定当前候选，没有当前候选时保留文本且不提交表单；`Tab` 只移动焦点；`Esc` 关闭候选并保留文本。
 
 ## Run Locally / 本地运行
