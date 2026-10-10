@@ -1,25 +1,21 @@
 # 数据规范化与 SQLite 读取修复计划
 
-状态：已复评（2026-09-30），尚未实装。初稿由 GPT 根据 2026-09-27 代码审查编写，复评后收窄为下文方案；删改内容及理由见第 8 节。2026-10-01 按修订后的 `AGENTS.md` 数据不变量新增阶段 4。2026-10-10 补充阶段 1 的实装交接范围（3.5），可交 GPT 实装。
+状态：阶段 1 已完成，长期契约见 [SQLite 后端规范](SQLITE_BACKEND_PLAN.md#模块读取与-json-错误)；本文只保留尚未实装的阶段 2–4。后续方案已复评（2026-09-30），阶段 4 依据 2026-10-01 修订的 `AGENTS.md` 数据不变量。
 
-本计划处理[审计清单](AUDIT_OPEN_ISSUES.md)中的 A12、C01、C02 等审查发现：SQLite JSON 读取吞错、前后端规范化函数重复、settings 重复规范化、普通保存时的跨类型 ID 扫描，以及顺带确认的无用词条形态派生字段。它不涉及本地 HTTP 服务安全、皮肤与 CSS、词源拓扑或质量检查架构。
+本计划继续处理[审计清单](AUDIT_OPEN_ISSUES.md)中的 A12 剩余部分与 C01：前后端规范化函数重复、settings 重复规范化、普通保存时的跨类型 ID 扫描和无关模块读取。它不涉及本地 HTTP 服务安全、皮肤与 CSS、词源拓扑或质量检查架构。
 
 ## 1. 已确认的现状
 
 以下依据当前代码检查；行号会随实现变化，接手时按函数名定位。
 
-- **JSON 吞错**：`lib/sqlite-dictionary-repository.js` 的 `parseJson(value, fallback)` 在解析失败时返回默认值，共 6 处调用：`dictionaryQueryContext` 读 settings；`morphologyTemplateGroupsFromDatabase` 读 `match_tags_json`、`row_labels_json`、`column_labels_json`；`baseDictionarySnapshot` 与 `exportDictionarySnapshot` 读全部 `module_blobs`。损坏的 settings 会被当作空配置规范化，之后可能随保存写回默认值。这是按读取与保存路径推断的风险，尚未复现实际数据丢失。
-- **坏 JSON 的来源**：正常写入不会产生坏 JSON。模块数据只经 `writeModuleBlob` 写入 `JSON.stringify(value || {})`，形态标签列同样由代码序列化，且写入都在事务内；新建词典总是写全 settings、docs、corpus、morphology 四个模块。坏数据只可能来自外部直接修改数据库或未来的程序缺陷。
-- **现成的错误路径**：不吞错时，原始 `SyntaxError` 会由 `lib/api-error.js` 的 `systemErrorCode` 映射为已有错误码 `system_json_parse`；前端已有中英文提示（当前文案为“本地 JSON 文件损坏或无法解析”），`server.js` 会打印完整错误。
 - **模型重复**：`app.js` 复制了 `lib/dictionary-model.js` 26 个函数中的 22 个，且已出现漂移：前端规范化 `toolNavOrder`，后端只随 `...settings` 透传。`dictionary-model.js` 依赖 `node:crypto` 和 `apiError`，浏览器不能直接加载。
 - **settings 重复规范化**：`app.js` 中有 33 处调用 `normalizeDictionarySettings(...)`，包括标签判定与显示等逐标签路径；完整词典进入前端状态时已规范化。耗时未量化。
-- **整本读取**：`baseDictionarySnapshot()` 解析全部模块（settings、docs、corpus、morphology，并读取形态模板表），但若干只读调用方只需要 settings：`getEntryRelations`（每次选中词条、词汇网络每次跳转都会调用）、`getEntryFacets`、`queryAnalysis` 的标签统计。GPT 用临时数据复现，关系查询和 facets 每次各自解析约 100 万字符的语料 JSON；实际界面延迟尚未测量。`dictionaryQueryContext()` 只读 settings，查询与来源补全已在使用。各保存操作也读取全部模块，其中词条、形态和语料保存要用完整词典做跨实体 ID 冲突检查（`conflictingEntityIdRecords`），至少依赖 corpus。
+- **整本读取**：`baseDictionarySnapshot()` 解析全部模块（settings、docs、corpus、morphology，并读取形态模板表），各保存操作仍依赖它。其中词条、形态和语料保存要用完整词典做跨实体 ID 冲突检查（`conflictingEntityIdRecords`），至少依赖 corpus。只读的关系、facets 和标签统计已改用只读 settings 的 `dictionaryQueryContext()`，实际界面延迟尚未测量。
 - **运行期 ID 检查**：`conflictingEntityIdRecords` 在每次词条、形态和语料保存时，拿提交的 ID 查询 `entries`、`definitions`、`morphology_template_groups`、`morphology_template_tables`，并解析整个语料库，要求跨类型全局唯一。所有 ID 都由程序以“类型前缀加 UUID”生成，界面不能输入或修改 ID，所有引用都带类型。相关数据库行为：
   - `definitions` 是普通插入，撞到其他词条的义项 ID 会触发主键错误并回滚整个保存（GPT 用临时库验证）；
   - `entries`、形态组和形态表使用 `ON CONFLICT ... DO UPDATE`，主键只保证最终无重复行，不能阻止错误的新建覆盖旧记录；
   - 新建词条目前有两层保护：`POST /entries` 拒绝客户端传入 ID，`saveEntry` 的 `createOnly` 在 ID 已存在时返回 409；
   - 形态写入计划（`lib/morphology-write-plan.js` 的 `morphologyIndex`）用 `Map` 按 ID 整理组和表，同一次提交中两张同 ID 的表会被静默合并，数据库没有机会报错；目前靠全局检查顺带拦住（GPT 已验证）。
-- **无用的形态派生字段**：前端 `normalizeEntry` 用 `morphologyEditorView` 生成扁平的 `entry.morphology`，唯一使用处是保存前把它剥掉（`const { morphology: _editorMorphology, ...payload } = entry`）。`lib/legacy-dictionary-migration.js` 读取旧 JSON 中的 `entry.morphology`，与这个前端派生字段无关。
 
 ## 2. 边界与原则
 
@@ -30,68 +26,6 @@
   - 前端负责本地化默认名称、summary 和显示视图。
 - 前端状态入口不只有首次加载，还包括模块保存响应、词条保存响应、批量 patch、导入和新建。这些入口保留规范化；`renderExampleHtml(example, rawSettings)` 等明确接收原始配置的函数、表单收集和旧格式导入也不视为已规范化状态。
 - 不改完整快照的维护、缓存失效或局部更新策略（另一项已记录技术债），不改 SQLite schema，不操作真实 `data/`。
-
-## 3. 阶段 1：JSON 读取不再吞错、只读接口按需读取、删除形态派生字段
-
-三项都只涉及少量调用点，可以一次完成。保存路径的读取范围依赖阶段 4 去掉跨类型 ID 扫描，不在本阶段内。
-
-### 3.1 JSON 读取
-
-- 删除 `parseJson`，6 处调用改为直接 `JSON.parse`。
-- 记录本身不存在时保留当前默认值，例如 `settingsRow ? JSON.parse(settingsRow.valueJson) : {}`；模块 Map 中缺失的模块同理。新建路径总会写全四个模块，但用户已有数据库可能由早期版本创建，无法确认，保留缺失默认值不会覆盖任何已有数据。
-- 记录存在而内容无效时一律报错。原来的 `valueJson || "{}"` 会把空字符串当作缺失，改后空字符串按损坏处理。
-- 不新增错误码：解析失败沿用 `system_json_parse`。只把前端中英文文案改为不特指文件的说法，例如“本地数据损坏或无法解析”／“Local data is damaged or cannot be parsed”，因为它现在也覆盖数据库中的配置数据。
-- 不校验合法 JSON 的顶层类型（如 settings 被改成 `null` 或数组）：正常写入产生不了这类数据。
-- 可见变化：模块损坏时，读取该模块的操作会失败，而不是静默继续。这是显式报错的预期结果，在 CHANGELOG 中说明。目前 `baseDictionarySnapshot` 读取全部模块，任一模块损坏都会影响所有依赖它的操作；3.2 收窄读取范围后，影响只限于确实需要该模块的操作。
-
-### 3.2 只读接口按需读取
-
-- `getEntryRelations`、`getEntryFacets`、`queryAnalysis` 的标签统计改用 `dictionaryQueryContext()`，只读 settings。实施前确认它们只用到 settings，例如 `entrySummary` 的标签显示与词性判断。
-- 收益有两点：
-  - 选中词条和词汇网络跳转不再每次解析整个语料库，阶段 D 语料变大后差异更明显；
-  - 某个模块损坏时，这些只读接口不受影响，缩小 3.1 中显式报错的影响范围。
-- 保存路径不在本阶段内：词条、形态和语料保存目前依赖 corpus 做跨实体 ID 冲突检查，阶段 4 去掉该扫描后再收窄读取范围。
-- 不缓存模块解析结果，不改变保存语义。
-
-### 3.3 形态派生字段
-
-- 删除前端 `normalizeEntry` 中的 `morphology: morphologyEditorView(...)`、`morphologyEditorView` 函数，以及保存前剥离该字段的解构。
-- 实施前再全仓搜索一次 `entry.morphology`、解构和序列化用法，确认没有新增消费者。
-- 保留 `morphologyMode`、`morphologyGroups`、词典级形态配置和旧 JSON 迁移。不添加断言“字段不存在”的墓碑测试。
-
-### 3.4 验收
-
-- 在 SQLite contract 中加一条测试：临时数据库里把 settings 改成截断的 JSON，用新的 repository 实例（避免读到缓存）确认：
-  - 读取和一个依赖 settings 的保存都返回 `system_json_parse`；
-  - 数据库中的原值未被改写。
-- 同一测试确认 `{}` 和缺失记录仍按当前行为工作。
-- 同一测试另把 docs 或 corpus 改成损坏的 JSON，确认 `/entry-relations` 与 facets 仍正常返回，而导出等依赖该模块的操作报错。
-- 既有 SQLite contract 中保存、实体 ID 冲突和导出相关检查全部通过。
-- 形态自动／手动编辑、显示与保存的既有回归通过。
-
-### 3.5 实装交接（2026-10-10，交 GPT 6.1 sol 实装、Claude 审查）
-
-开工前按函数名重新定位，下列事实已于 2026-10-10 对照代码确认：
-
-- `parseJson` 仍是 6 处调用：`dictionaryQueryContext`（settings）、`morphologyTemplateGroupsFromDatabase`（`matchTagsJson`、`rowLabelsJson`、`columnLabelsJson`，各带 `|| "[]"`）、`baseDictionarySnapshot` 与 `exportDictionarySnapshot`（全部 `module_blobs`）。三个形态标签列的 `|| "[]"` 与 settings 的 `|| "{}"` 同属 3.1 所说“空字符串当作缺失”，一并删除。
-- 3.2 的三处调用点：`getEntryRelations`、`getEntryFacets` 直接调用 `baseDictionarySnapshot`；`queryAnalysis` 在 `partStats`／`tagStats`／`tagSetStats` 任务存在时调用。下游 `entryTagIdentitySnapshotFromDatabase`、`entryTagSetStatsFromDatabase`、`entrySummariesFromRows`、`entrySummary` 只读 `dictionary.id` 与 `dictionary.settings`，`lib/tag-model.js` 的 `displayTag`、`entryParts` 只取 `settings`，`dictionaryQueryContext()` 已提供这两项。实装时若发现读取其他字段，停止并报告，不扩大 `dictionaryQueryContext` 的返回内容。
-- 3.3：`app.js` 中 `normalizeEntry` 的 `morphology: morphologyEditorView(morphologyState)` 及其上方两行注释、`morphologyEditorView` 函数、`entryApiPayload` 中剥离 `morphology` 的解构，共三处；`lib/` 与脚本中没有其他消费者，`legacy-dictionary-migration.js` 读取的是旧 JSON 字段，不动。
-- 3.1 的文案：`app.js` 的 `apiErrorSystemJsonParse` 中英文各一处，以及 `docs/API_CONTRACT.md` 错误码表中 `system_json_parse` 的说明。
-
-**可改**：
-
-- `lib/sqlite-dictionary-repository.js`：仅限 `parseJson` 及其 6 处调用、上述三个只读方法的取数方式；
-- `app.js`：仅限 3.3 的三处与 `apiErrorSystemJsonParse` 的两条文案，不碰其他界面代码；
-- `scripts/check-sqlite-contract.js`：新增 3.4 的损坏用例（需直接改写 `module_blobs`，属于 SQLite 专属测试，不放进通用的 `repository-contract.js`）；受影响的既有 `scripts/check-*.js`；
-- 文档：`docs/API_CONTRACT.md` 的错误码说明、`CHANGELOG.md` 实际完成日期段（“修复”或“性能”，并注明 3.1 第 5 条的可见变化）、[审计清单](AUDIT_OPEN_ISSUES.md) A12 与 C02 中已解决部分、本文 3.5 与第 1 节对应现状、交接文档对应条目。
-
-**不改**：保存路径与 `conflictingEntityIdRecords`（阶段 4）、`lib/dictionary-model.js` 与前端其他规范化函数（阶段 2、3）、SQLite schema、`lib/api-routes.js` 与 `lib/api-error.js`、`styles.css`、`theme-*.css`、`index.html`。
-
-**约束**：遵守 `AGENTS.md` 的“防御性代码”“数据不变量”和测试规则；不新增错误码、不校验 JSON 顶层类型（3.1）、不缓存模块解析结果（3.2）、不写“字段不存在”或“不再读取某模块”的墓碑测试。交付时逐项列出新增或删除的检查及其对应本节条目，对应不上的删除。
-
-**验收命令**：对 `lib/sqlite-dictionary-repository.js`、`app.js` 和改动的检查脚本执行 `node --check`；`node scripts/check-sqlite-contract.js`；`node scripts/check-all.js`（SQLite 不可用必须失败）；`git diff --check`。3.3 只删除死代码、3.1 只改文案，不需要浏览器验收。
-
-完成后：本节与 3.1–3.4 中已实装的内容不再保留为计划，仍有效的契约（损坏模块按 `system_json_parse` 显式报错、只读接口只依赖 settings）写入 `docs/SQLITE_BACKEND_PLAN.md` 或 `docs/API_CONTRACT.md`；本文只留阶段 2–4。
 
 ## 4. 阶段 2：共享纯数据规则
 
@@ -144,7 +78,7 @@
 
 ## 6. 阶段 4：运行期 ID 检查收窄与保存路径按需读取
 
-依据 2026-10-01 修订的 `AGENTS.md` 数据不变量：全局唯一仍是数据约定，但由生成规则、导入边界检查和数据库约束共同保证，普通保存不再扫描无关实体类型。本阶段不依赖阶段 2、3，可在阶段 1 之后直接进行。
+依据 2026-10-01 修订的 `AGENTS.md` 数据不变量：全局唯一仍是数据约定，但由生成规则、导入边界检查和数据库约束共同保证，普通保存不再扫描无关实体类型。本阶段不依赖阶段 2、3，可直接进行。
 
 ### 6.1 检查边界
 
@@ -162,7 +96,7 @@
 - `saveEntry`、`saveMorphology`、`saveCorpusChanges` 不再调用 `conflictingEntityIdRecords`；该函数及只为它服务的辅助函数在确认无其他调用方后删除。
 - 形态保存在生成写入计划之前，检查提交内组 ID 和表 ID 的重复，复用现有错误码 `duplicate_entity_ids_scoped`。语料保存保留现有的模块内检查。
 - 新建词条的两层保护保持不变；主键冲突仍以现有错误路径返回，不为此新增错误码。
-- 去掉扫描后，按 3.2 的方式逐个核对保存操作实际用到的模块，只读取需要的部分：例如词条保存需要 settings 与形态配置，不再需要 corpus、docs。
+- 去掉扫描后，参照[只读接口的模块读取边界](SQLITE_BACKEND_PLAN.md#模块读取与-json-错误)，逐个核对保存操作实际用到的模块，只读取需要的部分：例如词条保存需要 settings 与形态配置，不再需要 corpus、docs。
 - 全局唯一仍是数据约定，导入检查不放宽。程序缺陷导致导出无法重新导入的情况，靠修复缺陷解决，不作为每次保存扫描的理由。
 - 已确认的现状缺口：语料单元的父级关系（多父级、引用不存在的单元、重复链接）目前只由前端语料编辑器校验（`corpusMultipleParents`、`corpusMissingUnit`、`corpusDuplicateLink`），后端语料保存只检查 ID 重复。`AGENTS.md` 把父级关系列为模块内应检查的范围，但补到后端属于新增校验，不在本阶段内；阶段 D 把语料改为 SQL 表时，由外键和唯一约束一并解决，或届时另行决定。
 
@@ -174,7 +108,7 @@
   - 新建词条不能覆盖已有词条（客户端传 ID 被拒绝；`createOnly` 撞 ID 返回 409）；
   - 义项 ID 撞到其他词条的义项时保存失败并整体回滚；
   - 导入跨类型重复 ID 的词典仍被拒绝。
-- 损坏的 docs 或 corpus 不再影响词条保存（与 3.1 的损坏用例合用临时库）。
+- 损坏的 docs 或 corpus 不再影响词条保存（可扩展 `scripts/check-sqlite-contract.js` 中已有的临时库损坏用例）。
 - 不添加只断言“不再查询某表”的墓碑测试。
 
 ## 7. 本轮不处理
@@ -190,17 +124,12 @@
 
 | 初稿内容 | 处理 | 理由 |
 | --- | --- | --- |
-| 新增 `system_dictionary_json_invalid` 错误码、中英文提示、结构化 `details` 和 API 契约条目 | 删除，改为沿用 `system_json_parse` 并调整文案 | 不吞错时原始 `SyntaxError` 已映射为该码，前端已有提示，服务端打印完整错误；新码不带来额外能力。 |
-| 校验 `module_blobs` 与形态标签列的 JSON 顶层类型 | 删除 | 正常写入路径不可能产生错误类型，只能来自外部篡改；为此加校验正是审查要清理的写法。 |
-| 6 条损坏场景验收（逐列注入、事务部分提交、缓存失效等） | 收窄为一条 contract 测试 | 读取在任何写入之前抛错，“失败保存不覆盖数据”是自然结果；保留“用新实例避免缓存”这一有效要求。 |
 | 阶段 B 比较 CommonJS 与浏览器 UMD 下的运行结果 | 改为 Node 模型测试加脚本顺序加载冒烟 | 两边执行同一文件，比较运行结果等于测试 JS 引擎。 |
 | 阶段 C 验证热路径复用同一 settings 对象，并比较耗时与内存分配 | 改为功能回归，性能测量可选 | 主要收益是代码清晰；对象身份在 `app.js` 中难以测试，性能收益未量化。 |
-| 按 A → B → C 顺序实施，形态字段删除放在阶段 C | 形态字段删除提前到阶段 1 | 已确认是死代码，几行即可删除，不依赖共享模块。 |
 | （初稿未涉及） | 新增阶段 4（2026-10-01）：普通保存不再做跨类型 ID 扫描，保存路径随之按需读取 | 依据修订后的 `AGENTS.md`：全局唯一由生成规则、导入检查和数据库约束保证；GPT 复核补充了形态提交内重复会被静默合并、upsert 不阻止新建覆盖旧记录两点，因此保留局部检查。 |
-| （初稿未涉及） | 阶段 1 新增“只读接口按需读取” | 2026-09-30 复查发现多处只需 settings 的只读接口读取全部模块；收窄读取同时缩小损坏报错的影响范围，与 3.1 直接相关。GPT 复核时指出保存路径依赖 corpus 做 ID 冲突检查，因此保存路径不纳入本阶段。 |
 | ID 生成继续依赖 `node:crypto` | 改用 `globalThis.crypto.randomUUID` | 使共享模块在浏览器和 Node 中无需分别注入。 |
 
-保留了初稿中正确的判断：前后端有意不同的来源校验语义、前端状态入口的完整清单、接收原始配置的边界、空字符串按损坏处理、共享默认值不可变、逐处而非批量替换 settings 调用，以及第 6 节的不处理项。
+保留了初稿中正确的判断：前后端有意不同的来源校验语义、前端状态入口的完整清单、接收原始配置的边界、共享默认值不可变、逐处而非批量替换 settings 调用，以及第 7 节的不处理项。
 
 初稿配套的一次性重构脚本 `.audit-refactor.cjs` 未运行即删除：它依赖字符串位置截取，在当前 `index.html` 缩进下会报错，且对 31 处调用做批量机械替换，与本计划的逐处替换原则相悖。
 
@@ -210,6 +139,6 @@
 
 1. 对每个改动的 JavaScript 文件执行 `node --check`，包含 `app.js` 与新增模块、检查脚本。
 2. 运行 `node scripts/check-all.js`；SQLite 不可用必须失败。
-3. 阶段 2、3 改动前端状态与共享模型，需用临时数据目录做浏览器冒烟；阶段 1、4 以 contract 测试为准（阶段 1 在 `app.js` 中只删死代码和改一条文案，见 3.5）。本计划不改视觉与布局，不需要逐宽度检查；无法完成的检查项按 `AGENTS.md` 逐项列出。
+3. 阶段 2、3 改动前端状态与共享模型，需用临时数据目录做浏览器冒烟；阶段 4 以 contract 测试为准。本计划不改视觉与布局，不需要逐宽度检查；无法完成的检查项按 `AGENTS.md` 逐项列出。
 4. 实现完成后按实际日期写 CHANGELOG，并在交接文档中删除已处理的技术债条目。本计划不改变 HTTP 契约；如果实现中改了错误码或保存范围，再同步 `docs/API_CONTRACT.md`。
 5. `git diff --check`，核对改动范围。

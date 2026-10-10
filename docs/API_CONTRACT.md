@@ -247,7 +247,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `system_disk_full` | 磁盘空间不足。 |
 | `system_file_busy` | 文件被占用。 |
 | `system_file_missing` | 目标文件缺失。 |
-| `system_json_parse` | 本地 JSON 文件无法解析。 |
+| `system_json_parse` | 本地数据损坏或无法解析，包括 SQLite 中的模块配置和形态标签 JSON。 |
 | `sqlite_runtime_unavailable` | 当前 Node.js 运行时不提供项目所需的 SQLite 能力。 |
 | `unknown_error` | 未归类错误。 |
 

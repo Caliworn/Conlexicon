@@ -80,6 +80,13 @@ SQLite 化后，`DictionaryQueryContext` 应从“请求级临时 Map/Set”自�
 - 前端不能依赖“保存后返回完整词典 JSON”来刷新所有状态。
 - SQLite repository 跑完整当前主契约；旧 JSON 转换和目录迁移使用独立定向检查，不存在第二套运行期 repository 契约。
 
+### 模块读取与 JSON 错误
+
+- SQLite 中已存在的模块 blob 和形态模板标签列直接用 `JSON.parse` 读取；无效 JSON（包括空字符串）向调用方抛错，HTTP 层沿用 `system_json_parse`，不以默认值掩盖损坏。依赖该数据的保存会在写入前失败，保留原值。
+- 模块记录缺失时保留当前默认值；合法的 `{}` 仍可读取与保存。不对合法 JSON 新增顶层类型校验，也不缓存模块解析结果。
+- 词条关系、facets，以及轻量分析的 `partStats`／`tagStats`／`tagSetStats` 只依赖词典 ID 与 settings，通过 `dictionaryQueryContext()` 获取配置；docs、corpus 或形态模块损坏不影响这些只读结果。完整快照、导出与当前保存路径仍读取全部模块，损坏时显式失败。
+- 普通保存仍有跨类型实体 ID 扫描，读取范围的进一步收窄属于[数据规范化计划](DATA_NORMALIZATION_REPAIR_PLAN.md)阶段 4。
+
 ## 5. 当前 SQLite schema
 
 本节记录当前 `SqliteDictionaryRepository` 实际创建的 schema。它已经不再只是初始草案：词条核心、释义、标签、来源、形态模板组、形态子表、词条形态组和 override 已经关系化；低频或尚未定型的模块继续放在 `module_blobs` 中。开发期 SQLite schema 中间态不承诺兼容迁移，测试库不匹配时从 JSON 重新生成。当前开发线不保存 schema 版本或 migration 表；下一个正式 release 才应引入带有明确升级脚本的版本化 migration 机制。

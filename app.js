@@ -796,7 +796,7 @@ const i18n = {
     apiErrorSystemDiskFull: "磁盘空间不足，无法保存",
     apiErrorSystemFileBusy: "文件正被占用，无法保存",
     apiErrorSystemFileMissing: "目标文件不存在或已被移动",
-    apiErrorSystemJsonParse: "本地 JSON 文件损坏或无法解析",
+    apiErrorSystemJsonParse: "本地数据损坏或无法解析",
     apiErrorNetwork: "无法连接到本地服务",
     apiErrorUnknown: "发生未知错误",
     importOverwriteTitle: "词典 ID 已存在",
@@ -1417,7 +1417,7 @@ const i18n = {
     apiErrorSystemDiskFull: "Disk is full; cannot save",
     apiErrorSystemFileBusy: "File is busy; cannot save",
     apiErrorSystemFileMissing: "Target file is missing or was moved",
-    apiErrorSystemJsonParse: "Local JSON file is damaged or cannot be parsed",
+    apiErrorSystemJsonParse: "Local data is damaged or cannot be parsed",
     apiErrorNetwork: "Cannot connect to the local service",
     apiErrorUnknown: "An unknown error occurred",
     importOverwriteTitle: "Dictionary ID already exists",
@@ -2348,11 +2348,8 @@ function normalizeEntry(entry, usedIds = new Set()) {
       description: entry.etymology?.description || "",
     },
     notes: entry.notes || "",
-    // `morphology` is a temporary flattened view used by the legacy analysis path.
-    // Persistence and current entry editors use the canonical state below.
     morphologyMode: morphologyState.morphologyMode,
     morphologyGroups: morphologyState.morphologyGroups,
-    morphology: morphologyEditorView(morphologyState),
     createdAt: entry.createdAt || new Date().toISOString(),
     updatedAt: entry.updatedAt || new Date().toISOString(),
   };
@@ -2843,34 +2840,6 @@ function legacyMorphologyTableViews(templateGroups = []) {
       cells,
     };
   }));
-}
-
-function morphologyEditorView({ morphologyMode = "auto", morphologyGroups = [] } = {}) {
-  const explicitGroup = morphologyMode === "manual" ? morphologyGroups[0] : null;
-  const sourceGroups = explicitGroup ? [explicitGroup] : morphologyGroups;
-  if (explicitGroup?.templateGroupId) {
-    const overrides = {};
-    Object.values(explicitGroup.overrides || {}).forEach((cellMap) => {
-      Object.entries(cellMap || {}).forEach(([key, value]) => {
-        if (!overrides[key] && String(value || "").trim()) {
-          overrides[key] = String(value);
-        }
-      });
-    });
-    return { tableId: explicitGroup.templateGroupId, overrides };
-  }
-  const overrides = {};
-  sourceGroups.forEach((group) => Object.values(group.overrides || {}).forEach((cellMap) => {
-    Object.entries(cellMap || {}).forEach(([key, value]) => {
-      if (!overrides[key] && String(value || "").trim()) {
-        overrides[key] = String(value);
-      }
-    });
-  }));
-  return {
-    tableId: "auto",
-    overrides,
-  };
 }
 
 function morphologyCellKey(row, col) {
@@ -15858,11 +15827,10 @@ function entryDefinitionsRequirementMessage(entry, dictionary = activeDictionary
 }
 
 function entryApiPayload(entry = {}, options = {}) {
-  const { morphology: _editorMorphology, ...payload } = entry;
   if (!options.omitId) {
-    return payload;
+    return entry;
   }
-  const { id: _serverGeneratedId, ...createPayload } = payload;
+  const { id: _serverGeneratedId, ...createPayload } = entry;
   return createPayload;
 }
 
