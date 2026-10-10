@@ -104,6 +104,7 @@ body[data-ui-skin="liquid-glass"] {
   --material-list-item-background: rgba(248, 251, 252, 0.62);
   --liquid-glass-list-card-border: rgba(9, 48, 57, 0.14);
   --liquid-glass-list-card-shadow: 0 3px 10px rgba(20, 43, 51, 0.06);
+  --liquid-glass-compact-control-shadow: var(--liquid-glass-list-card-shadow);
   --material-list-item-secondary-color: inherit;
   --material-list-item-secondary-opacity: 0.77;
   --material-browser-background: rgba(232, 241, 243, 0.66);
@@ -467,36 +468,7 @@ body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
   --control-hover-background: color-mix(in srgb, var(--control-tone-color, var(--ui-accent)) 18%, transparent);
   --control-pressed-background: color-mix(in srgb, var(--control-tone-color, var(--ui-accent)) 28%, transparent);
   --control-open-background: color-mix(in srgb, var(--control-tone-color, var(--ui-accent)) 10%, transparent);
-  --material-control-shadow: none;
-  --material-control-hover-shadow: none;
-  --material-control-pressed-shadow: none;
-  --material-action-hover-shadow: none;
-  --material-action-pressed-shadow: none;
   --material-control-filter: none;
-}
-
-body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
-  .entry-search-control > button,
-  .entry-mail-primary-tools > button,
-  .entry-mail-root-actions > button,
-  .entry-mail-primary-tools > div > button,
-  .entry-mail-group > button,
-  .entry-mail-group > div > button,
-  .root-mode-controls button
-):where(:not([data-control-tone])):hover:not(:disabled) {
-  --material-control-background: color-mix(in srgb, var(--ui-accent) 8%, transparent);
-}
-
-body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
-  .entry-search-control > button,
-  .entry-mail-primary-tools > button,
-  .entry-mail-root-actions > button,
-  .entry-mail-primary-tools > div > button,
-  .entry-mail-group > button,
-  .entry-mail-group > div > button,
-  .root-mode-controls button
-):where(:not([data-control-tone])):active:not(:disabled) {
-  --material-control-background: var(--ui-accent-soft);
 }
 
 body[data-ui-skin="liquid-glass"] .dictionary-panel {
@@ -543,9 +515,6 @@ body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"] {
   --liquid-glass-surface-tint: var(--material-floating-background);
   --liquid-glass-surface-q1-filter: blur(1px) saturate(1.04);
   --material-control-background: var(--liquid-glass-surface-tint);
-  --material-control-shadow: var(--liquid-glass-list-card-shadow);
-  --material-control-hover-shadow: var(--liquid-glass-list-card-shadow);
-  --material-control-pressed-shadow: var(--liquid-glass-list-card-shadow);
   background: var(--liquid-glass-surface-tint);
   border-color: var(--material-floating-border);
   box-shadow: var(--liquid-glass-list-card-shadow);
@@ -577,9 +546,6 @@ body[data-ui-skin="liquid-glass"] [data-control-selection] {
 
 /* The skin defines optical recipes; the shared state resolver chooses the paint. */
 body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis="outline"]) {
-  --control-shadow: var(--material-control-shadow);
-  --control-hover-shadow: var(--material-control-hover-shadow);
-  --control-pressed-shadow: var(--material-control-pressed-shadow);
   --control-open-background: color-mix(in srgb, var(--material-floating-background) 90%, var(--control-tone-color));
   --control-background: var(--material-floating-background);
   --control-hover-background: color-mix(in srgb, var(--material-floating-background) 82%, var(--control-tone-color));
@@ -633,12 +599,18 @@ body[data-ui-skin="liquid-glass"] [data-control-emphasis="solid"] {
   --control-hover-border: color-mix(in srgb, var(--control-glass-solid-ink) 65%, transparent);
 }
 
-/* Material state is independent of optical registration. The skin's control
-   shadows are neutral; registered compact surfaces supply their light outer shadow. */
-body[data-ui-skin="liquid-glass"] :is([data-control-emphasis="tinted"], [data-control-emphasis="solid"]) {
-  --control-shadow: var(--material-control-shadow);
-  --control-hover-shadow: var(--material-control-hover-shadow);
-  --control-pressed-shadow: var(--material-control-pressed-shadow);
+/* Every semantic recipe carries the same light compact shadow, whether or not the
+   control is registered or its optics fell back. Inside a glass owner the parent
+   supplies the depth, so nested controls stay flat; these owners mirror the
+   engine's backdrop owners that can contain controls. */
+body[data-ui-skin="liquid-glass"] :is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]) {
+  --control-shadow: var(--liquid-glass-compact-control-shadow);
+  --control-hover-shadow: var(--liquid-glass-compact-control-shadow);
+  --control-pressed-shadow: var(--liquid-glass-compact-control-shadow);
+}
+
+body[data-ui-skin="liquid-glass"] :is(.dictionary-panel, .mobile-app-bar, .entry-search-control, .entry-mail-tools, #docsModeControl, #corpusModeControl) {
+  --liquid-glass-compact-control-shadow: none;
 }
 
 body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:is([data-control-emphasis="tinted"], [data-control-emphasis="solid"]) {

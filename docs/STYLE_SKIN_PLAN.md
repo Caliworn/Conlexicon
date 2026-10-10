@@ -122,9 +122,18 @@ Mail 搜索/工具外壳的内部控件同时映射旧 material 与新 control �
 solid 通透度实验：浅色默认／hover／pressed 覆盖率为 82%／88%／94%，
 暗色为 75%／82%／90%；暗色语义色占 ink 的比例从 55% 提到 65%，减少混黑。
 边框使用弱透射同色边，不新增渐变、高光或光学参数。
-液态 tinted／solid 在材质层统一将三态阴影接入 control token，不依赖 Q3 注册；
-皮肤默认 control 无阴影，独立 compact 在自身作用域提供轻微外投影，
-因此父 Q3 内按钮不会回退到旧 action 的固定 inset 高光与内凹效果。
+
+**阴影归属（2026-10-10 材质职责收尾）**：阴影属于配方，类名和光学注册都不决定阴影。
+共享规则中，标准按钮（`.primary-button`、`.secondary-button`、`.danger-button`）是凸起控件，
+由 emphasis 选择阴影族：neutral 与 outline 消费 `--material-control-*-shadow`，solid 消费
+`--material-action-*-shadow`，tinted 和图标、开关、页签等行内控件保持无阴影。“是否凸起”
+是组件层级，“哪一族阴影”是语义；两条规则用 `:where()` 包裹 emphasis，保持原有优先级。
+这些类不再有无语义后备绘制，标准按钮必须声明 `data-control-tone`；确认弹窗复用同一个按钮，
+只切换 tone／emphasis，不增删类。液态玻璃中所有语义配方三态统一消费
+`--liquid-glass-compact-control-shadow`（取列表卡片的轻外投影），与是否注册、Q3 是否就绪
+或降级到 Q1 无关；光学注册只负责折射、tint 与滤镜。位于玻璃父表面内的控件由父级提供层次，
+在导航、移动应用栏、Mail 搜索与工具区、文档／语料分段控件内把该 token 设为 `none`。
+这份 CSS 父级清单必须与引擎中可包含控件的背景采样父级一致，由样式契约核对。
 保留白色前景；浅色覆盖率不直接降到 75%，避免浅背景对比过低。
 暗色遇明亮背景时仍需实测文字对比，当前参数不是任意背景上的对比保证。
 
@@ -157,12 +166,13 @@ S0-1 曾把原 `:root` 和 `body.dark-theme` 主题值集中迁入 `theme-tokens
 1. 四张样式表必须按经典、层叠玻璃、液态玻璃、组件的顺序加载。
 2. 三套皮肤必须完整定义全部标准 token；五种角色圆角必须各有组件消费者，但允许皮肤使用不同值。
 3. 组件样式不得声明皮肤 token，也不得恢复旧别名、主题分支、目标皮肤预览或主题材质字面量。
+4. 标准按钮（含动态创建的）都声明语义 tone，阴影族由 emphasis 选择；液态玻璃的控件阴影来自配方而非光学注册，扁平化的父级清单与引擎一致（见第 2 节“阴影归属”）。
 
 拆分前后的浏览器验收均比较浅色和暗色下的画布、导航、控件、面板、浮层、tooltip、toast 与词汇网络计算样式；关键宽度继续覆盖 320/480/768/1024/1440px。圆角接线只替换等值 `8px` 和 `999px`，不得改变当前形状。
 
 新增皮肤必须使用独立且有作用域的文件完整定义标准 token；透明度、模糊、圆角、降级策略和性能验收仍由各皮肤规范负责。两套玻璃皮肤的具体边界分别见 `docs/LAYERED_GLASS_SKIN_SPEC.md` 和 `docs/LIQUID_GLASS_SKIN_SPEC.md`。
 
-## 5. 普通控件材质职责收尾与视觉定稿（2026-10-01 计划，未实施）
+## 5. 普通控件材质职责收尾与视觉定稿（2026-10-01 计划，第 1 批已完成）
 
 目标：普通控件只有一条外观链路，即“语义 → 皮肤配方 → 当前状态 → 最终绘制”。先理清各层职责，再集中调视觉，不再逐个按钮修补；架构清理、三套皮肤重设计和新光学效果不放在同一批。
 
@@ -174,18 +184,9 @@ S0-1 曾把原 `:root` 和 `body.dark-theme` 主题值集中迁入 `theme-tokens
 | 状态出口 | 按 hover、pressed、selected、expanded、disabled 写入 `--control-current-*` | 另造一套材质 |
 | 光学引擎 | 注册、折射、缓存、降级 | 按钮的语义颜色和交互阴影 |
 
-### 5.1 现状（2026-10-01 对照代码）
+### 5.1 批次
 
-- 已完成：`index.html` 中全部 `primary-button`（23）、`secondary-button`（31）、`danger-button`（1）都声明了 `data-control-tone`，抽查 `app.js` 动态生成的按钮也都带着；hover、按下、禁用、展开等状态已统一写入 `--control-current-*`（见第 2 节“控件颜色语义接口”）。
-- 剩余四项：
-  1. `.secondary-button`（`styles.css` 约 1381 行）仍直接声明 `background`、`color`、`border-color`、`box-shadow`、`backdrop-filter`，与语义配方并存，最终显示哪个取决于选择器优先级。应删除，而不是迁移。
-  2. 阴影仍由类名决定（约 1374 行）：`.primary-button`／`.danger-button` 用动作阴影，`.secondary-button` 用控件阴影。应改由 emphasis 决定。确认弹窗目前靠增删 `primary-button`／`danger-button` 类切换外观（`app.js` 约 2025 行附近），需一并改为只切换语义属性。
-  3. 无语义属性时的后备规则，如 `.secondary-button:where(:not([data-control-tone])):hover`，在所有按钮都带 tone 后基本是死代码；删除前全仓确认没有遗漏的按钮。
-  4. 光学注册会改变外观：液态玻璃中“已注册的紧凑表面提供自己的浅色外阴影”（`theme-liquid-glass.css` 约 601 行）。同一个 solid 在独立 Q3、父玻璃内部和降级到 Q1 时阴影可能不同。光学层应只负责折射，阴影仍由配方决定，只允许必要的层级阴影差异。
-
-### 5.2 批次
-
-1. **材质职责收尾**：完成 5.1 的四项，外观基本不变，同步调整 `scripts/check-style-contract.js`。不重命名所有类，不新增组件框架。
+1. **材质职责收尾**（2026-10-10 完成）：删除 `.secondary-button` 的直接绘制与无语义后备规则，阴影改由 emphasis 选择，确认弹窗只切换语义属性，液态玻璃阴影不再随光学注册变化。契约见第 2 节“阴影归属”。
 2. **控件对照页**：
    - 内容：七种有效配方 × 默认、hover、pressed、disabled 及需要的 selected／expanded × 页面底、Q1 容器、Q3 容器 × 三套皮肤 × 明暗；直接加载生产 CSS，不复制配方。
    - 与 Liquid Glass Lab 的产品外观对照合并为一份（见 `LIQUID_GLASS_SKIN_SPEC.md` 13.17），可以是独立页面，也可以是 Lab 的一个面板，但只维护一份，组件结构复用产品实现。

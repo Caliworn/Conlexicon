@@ -262,18 +262,38 @@ for (const match of `${app}\n${index}`.matchAll(/<button\b([^>]*class="([^"]+)"[
     && attributes.includes(`data-control-emphasis="${expected[1]}"`),
   `Migrated button family must explicitly declare its semantic paint: ${classList}`);
 }
+// The shared paint has no class-based fallback: a standard button without a
+// semantic tone would render with browser defaults.
+for (const match of `${app}\n${index}`.matchAll(/<button\b([^>]*class="([^"]+)"[^>]*)>/g)) {
+  const [, attributes, classList] = match;
+  if (/\b(?:primary-button|secondary-button|danger-button|danger-ghost)\b/.test(classList)) {
+    assert(attributes.includes("data-control-tone="), `Standard buttons must declare a semantic tone: ${classList}`);
+  }
+}
+assert.equal(
+  [...app.matchAll(/\.className = "[^"]*\b(?:primary-button|secondary-button|danger-button|danger-ghost)\b/g)].length,
+  [...app.matchAll(/(\w+)\.className = "[^"]*\b(?:primary-button|secondary-button|danger-button|danger-ghost)\b[^"]*";\s*\1\.dataset\.controlTone = "\w+";/g)].length,
+  "Dynamic standard buttons must declare a semantic tone",
+);
+// Standard buttons are raised; the emphasis, not the class name, picks the shadow family.
+const standardButtonShadows = [
+  [':is(.primary-button, .secondary-button, .danger-button):where([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-emphasis="outline"])', "control"],
+  [':is(.primary-button, .secondary-button, .danger-button):where([data-control-emphasis="solid"])', "action"],
+];
+for (const [selector, family] of standardButtonShadows) {
+  const shadows = controlProperties(scopedBlock(styles, selector)?.[1] || "");
+  for (const state of ["", "hover-", "pressed-"]) {
+    assert.equal(shadows[`--control-${state}shadow`], `var(--material-${family}-${state}shadow)`,
+      `Standard button emphasis must select the ${family} shadow family`);
+  }
+}
 // Execute the real prompt setup functions: a reused danger dialog must reset to
-// accent for an ordinary confirmation or an edit-switch Save action.
+// accent for an ordinary confirmation or an edit-switch Save action. The fake
+// button has no classList: prompts switch only the semantic attributes.
 {
   const vm = require("node:vm");
-  const acceptClasses = new Set();
   const accept = {
     dataset: {},
-    classList: {
-      toggle(name, enabled) { enabled ? acceptClasses.add(name) : acceptClasses.delete(name); },
-      add(name) { acceptClasses.add(name); },
-      remove(name) { acceptClasses.delete(name); },
-    },
     focus() {},
   };
   const context = vm.createContext({
@@ -294,8 +314,6 @@ for (const match of `${app}\n${index}`.matchAll(/<button\b([^>]*class="([^"]+)"[
     assert.equal(accept.dataset.controlEmphasis, "solid");
     assert(supportsControlRecipe(accept.dataset.controlTone, accept.dataset.controlEmphasis),
       "Reused prompts must resolve to a supported recipe");
-    assert.equal(acceptClasses.has("danger-button"), tone === "danger");
-    assert.equal(acceptClasses.has("primary-button"), tone === "accent");
   }
 }
 const classicDefinitions = new Set(classicLightTokenValues.keys());
@@ -430,12 +448,32 @@ for (const [marker, emphasis] of [
 }
 const opticalOutlineSelector = 'body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis="outline"])';
 const opticalOutline = controlProperties(scopedBlock(liquidGlass, opticalOutlineSelector)[1]);
-const coloredGlassShadows = controlProperties(scopedBlock(liquidGlass,
-  'body[data-ui-skin="liquid-glass"] :is([data-control-emphasis="tinted"], [data-control-emphasis="solid"])')[1]);
+// The recipe owns the compact shadow; registration, Q3 readiness or fallback must
+// not change it. Nested controls are flat because their CSS owner says so.
+const compactGlassShadows = controlProperties(scopedBlock(liquidGlass,
+  'body[data-ui-skin="liquid-glass"] :is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis])')[1]);
 for (const state of ["", "hover-", "pressed-"]) {
-  assert.equal(coloredGlassShadows[`--control-${state}shadow`],
-    `var(--material-control-${state}shadow)`,
-    "Colored glass must resolve neutral control shadows even when nested optics are excluded");
+  assert.equal(compactGlassShadows[`--control-${state}shadow`], "var(--liquid-glass-compact-control-shadow)",
+    "Every liquid semantic recipe resolves one compact shadow");
+}
+assert(!/--(?:material-)?control-(?:hover-|pressed-)?shadow/.test(
+  scopedBlock(liquidGlass, 'body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]')[1]
+    + scopedBlock(liquidGlass, opticalOutlineSelector)[1]),
+"Optical registration must not supply control shadows");
+{
+  const ownerBlock = liquidGlass.match(/body\[data-ui-skin="liquid-glass"\] :is\(([^)]*)\) \{\n  --liquid-glass-compact-control-shadow: none;\n\}/);
+  assert(ownerBlock, "Controls inside a glass owner must resolve a flat compact shadow");
+  const cssOwners = new Set(ownerBlock[1].split(",").map((value) => value.trim()));
+  const leafSurfaces = new Set([
+    liquidGlassEngineApi.COMPACT_CONTROL_SELECTOR,
+    ".analysis-page-tabs button, .analysis-subpage-tabs button",
+    "#displayDerived .derived-link, #fullEditDerived .derived-link",
+  ]);
+  const engineOwners = liquidGlassEngineApi.SURFACE_ROLE_DEFINITIONS
+    .filter(({ sampleBackdrop, selector }) => sampleBackdrop && !leafSurfaces.has(selector))
+    .flatMap(({ selector, controlsWithin }) => (controlsWithin || selector).split(",").map((value) => value.trim()));
+  assert.deepEqual([...cssOwners].sort(), [...new Set(engineOwners)].sort(),
+    "Flat nested controls must follow exactly the engine's backdrop owners that contain controls");
 }
 assert.equal(opticalOutline["--control-background"], "var(--material-floating-background)",
   "Optical outlines use the translucent role material, not an opaque panel");

@@ -2026,8 +2026,6 @@ function appConfirm(message, options = {}) {
     elements.confirmAcceptButton.textContent = options.confirmText || t("confirm");
     elements.confirmCancelButton.hidden = Boolean(options.alert);
     confirmDialogResults = { cancel: false, alternate: false, accept: true };
-    elements.confirmAcceptButton.classList.toggle("danger-button", Boolean(options.danger));
-    elements.confirmAcceptButton.classList.toggle("primary-button", !options.danger);
     elements.confirmAcceptButton.dataset.controlTone = options.danger ? "danger" : "accent";
     elements.confirmAcceptButton.dataset.controlEmphasis = "solid";
     elements.confirmDialog.hidden = false;
@@ -2049,8 +2047,6 @@ function appEditSwitchPrompt(message) {
     elements.confirmAlternateButton.textContent = t("editSwitchDiscard");
     elements.confirmAlternateButton.hidden = false;
     elements.confirmAcceptButton.textContent = t("editSwitchSave");
-    elements.confirmAcceptButton.classList.remove("danger-button");
-    elements.confirmAcceptButton.classList.add("primary-button");
     elements.confirmAcceptButton.dataset.controlTone = "accent";
     elements.confirmAcceptButton.dataset.controlEmphasis = "solid";
     elements.confirmDialog.hidden = false;

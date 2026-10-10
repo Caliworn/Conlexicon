@@ -1527,41 +1527,18 @@ label span {
   --control-current-shadow: var(--control-disabled-shadow);
 }
 
-.primary-button,
-.danger-button {
-  --control-shadow: var(--material-action-shadow);
-  --control-hover-shadow: var(--material-action-hover-shadow);
-  --control-pressed-shadow: var(--material-action-pressed-shadow);
-}
-
-.secondary-button {
+/* Standard buttons are raised; the emphasis picks the shadow family, not the
+   class name. Tinted and inline controls stay flat. */
+:is(.primary-button, .secondary-button, .danger-button):where([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-emphasis="outline"]) {
   --control-shadow: var(--material-control-shadow);
   --control-hover-shadow: var(--material-control-hover-shadow);
   --control-pressed-shadow: var(--material-control-pressed-shadow);
-  background: var(--material-control-background);
-  color: var(--ui-text);
-  border-color: var(--material-control-border);
-  box-shadow: var(--material-control-shadow);
-  backdrop-filter: var(--material-control-filter);
 }
 
-.secondary-button:where(:not([data-control-tone])):hover:not(:disabled):not([aria-disabled="true"]) {
-  box-shadow: var(--material-control-hover-shadow);
-  border-color: var(--ui-border-strong);
-}
-
-.secondary-button:where(:not([data-control-tone])):active:not(:disabled):not([aria-disabled="true"]) {
-  box-shadow: var(--material-control-pressed-shadow);
-}
-
-:is(.primary-button, .secondary-button, .danger-button, .danger-ghost, .icon-button):focus-visible {
-  outline: 2px solid var(--ui-focus);
-  outline-offset: 2px;
-}
-
-:is(.primary-button, .secondary-button, .danger-button):disabled {
-  box-shadow: none;
-  cursor: not-allowed;
+:is(.primary-button, .secondary-button, .danger-button):where([data-control-emphasis="solid"]) {
+  --control-shadow: var(--material-action-shadow);
+  --control-hover-shadow: var(--material-action-hover-shadow);
+  --control-pressed-shadow: var(--material-action-pressed-shadow);
 }
 
 .icon-button {
