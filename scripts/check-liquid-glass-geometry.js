@@ -5,6 +5,7 @@ const geometry = require("../lib/liquid-glass-geometry");
 const {
   ByteBudgetLru,
   LiquidGlassEngine,
+  ResilientMapRenderer,
   buildResourceKey,
   normalizeLightVector,
   COMPACT_CONTROL_SELECTOR,
@@ -890,7 +891,34 @@ async function checkAsyncSurfaceLifecycle() {
   }
 }
 
-checkAsyncSurfaceLifecycle().then(() => {
+// A failing worker rejects every in-flight map at once; all of them must still
+// render on the main-thread fallback instead of surfacing a renderer error.
+async function checkConcurrentWorkerFailure() {
+  const workers = [];
+  class FailingWorker {
+    constructor() { this.listeners = {}; this.terminated = false; workers.push(this); }
+    addEventListener(type, listener) { this.listeners[type] = listener; }
+    postMessage() {
+      setTimeout(() => this.listeners.error?.({ message: "worker script failed to load" }), 0);
+    }
+    terminate() { this.terminated = true; }
+  }
+  const runtimeWindow = { Worker: FailingWorker, setTimeout, clearTimeout };
+  const renderer = new ResilientMapRenderer(runtimeWindow, "lib/liquid-glass-map-worker.js");
+  const surface = geometry.normalizeSurfaceOptions({
+    width: 48, height: 32, radius: 12, bezel: 8, mapWidth: 24, mapHeight: 16,
+  });
+  const results = await Promise.allSettled([0, 1, 2].map(() => renderer.render(surface, null)));
+  assert.deepEqual(results.map(({ status }) => status), ["fulfilled", "fulfilled", "fulfilled"],
+    "Concurrent requests rejected by one worker failure must all use the fallback renderer");
+  assert.equal(results[0].value.width, 24);
+  assert.equal(workers.length, 1);
+  assert.ok(workers[0].terminated, "The failed worker must be retired once");
+  assert.equal(renderer.workerRenderer, null);
+  renderer.dispose();
+}
+
+checkConcurrentWorkerFailure().then(checkAsyncSurfaceLifecycle).then(() => {
   console.log("Liquid Glass geometry, deterministic map, and byte-budget cache checks passed.");
 }).catch((error) => {
   console.error(error);

@@ -174,6 +174,21 @@ async function checkPublicResourceContract() {
       assert.ok(files.has(file), `${page} runtime resource must be public: ${file}`);
     }
   }
+  // Workers load outside HTML: the configured map worker and the scripts it imports.
+  const workerUrls = new Set();
+  for (const source of ["app.js", "liquid-glass-lab.html", "lib/liquid-glass-engine.js"]) {
+    const text = await fs.readFile(path.join(ROOT_DIR, source), "utf8");
+    for (const [, file] of text.matchAll(/workerUrl\b[^"']*["']([^"']+\.js)["']/g)) workerUrls.add(file);
+  }
+  assert.ok(workerUrls.size > 0, "The Liquid Glass map worker URL must be discoverable");
+  for (const workerUrl of workerUrls) {
+    assert.ok(files.has(workerUrl), `Worker script must be public: ${workerUrl}`);
+    const worker = await fs.readFile(path.join(ROOT_DIR, workerUrl), "utf8");
+    for (const [, imported] of worker.matchAll(/importScripts\(\s*["']([^"']+)["']/g)) {
+      const resolved = path.posix.join(path.posix.dirname(workerUrl), imported);
+      assert.ok(files.has(resolved), `Worker import must be public: ${resolved}`);
+    }
+  }
   const directoryImages = await fs.readdir(path.join(ROOT_DIR, "assets", "liquid-glass-lab"));
   for (const file of directoryImages.filter((file) => /\.(jpg|png|jpeg|svg)$/.test(file))) {
     assert.ok(files.has(`assets/liquid-glass-lab/${file}`), `Lab image must be public: ${file}`);
