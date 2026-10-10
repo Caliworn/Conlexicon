@@ -84,8 +84,9 @@ SQLite 化后，`DictionaryQueryContext` 应从“请求级临时 Map/Set”自�
 
 - SQLite 中已存在的模块 blob 和形态模板标签列直接用 `JSON.parse` 读取；无效 JSON（包括空字符串）向调用方抛错，HTTP 层沿用 `system_json_parse`，不以默认值掩盖损坏。依赖该数据的保存会在写入前失败，保留原值。
 - 模块记录缺失时保留当前默认值；合法的 `{}` 仍可读取与保存。不对合法 JSON 新增顶层类型校验，也不缓存模块解析结果。
-- 词条关系、facets，以及轻量分析的 `partStats`／`tagStats`／`tagSetStats` 只依赖词典 ID 与 settings，通过 `dictionaryQueryContext()` 获取配置；docs、corpus 或形态模块损坏不影响这些只读结果。完整快照、导出与当前保存路径仍读取全部模块，损坏时显式失败。
-- 普通保存仍有跨类型实体 ID 扫描，读取范围的进一步收窄属于[数据规范化计划](DATA_NORMALIZATION_REPAIR_PLAN.md)阶段 4。
+- 词条关系、facets，以及轻量分析的 `partStats`／`tagStats`／`tagSetStats` 只依赖词典 ID 与 settings，通过 `dictionaryQueryContext()` 获取配置；docs、corpus 或形态模块损坏不影响这些只读结果。完整快照与导出读取全部模块，损坏时显式失败。
+- 普通保存只读取 settings 与实际用到的模块：词条保存、批量 patch 和 settings 保存读取形态配置（用于形态校验与形态搜索 projection），形态保存读取形态配置，语料保存读取 corpus；metadata、IPA、docs 保存和删除词条只读 settings。docs 或 corpus 损坏不影响词条保存。
+- 普通保存不扫描无关实体类型，只在数据库无法拒绝的提交范围内检查重复：词条保存不做 ID 检查，义项 ID 重复由主键约束失败并整体回滚；形态保存在生成写入计划之前拒绝提交内重复的组／表 ID（写入计划按 ID 建索引，重复会被静默合并）；语料保存检查语料内部 ID 重复。重复返回 `duplicate_entity_ids_scoped`。全局唯一由服务端生成 ID（新建词条只走 `POST`，`PUT` 只更新已有词条）、导入边界的完整检查和数据库主键共同保证。
 
 ## 5. 当前 SQLite schema
 

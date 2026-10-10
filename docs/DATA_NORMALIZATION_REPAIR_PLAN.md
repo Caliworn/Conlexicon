@@ -1,8 +1,8 @@
 # 数据规范化与 SQLite 读取修复计划
 
-状态：阶段 1 已完成，长期契约见 [SQLite 后端规范](SQLITE_BACKEND_PLAN.md#模块读取与-json-错误)；本文只保留尚未实装的阶段 2–4。后续方案已复评（2026-09-30），阶段 4 依据 2026-10-01 修订的 `AGENTS.md` 数据不变量。
+状态：阶段 1、4 已完成（2026-10-10），长期契约见 [SQLite 后端规范](SQLITE_BACKEND_PLAN.md#模块读取与-json-错误)；本文只保留尚未实装的阶段 2、3，方案已于 2026-09-30 复评。
 
-本计划继续处理[审计清单](AUDIT_OPEN_ISSUES.md)中的 A12 剩余部分与 C01：前后端规范化函数重复、settings 重复规范化、普通保存时的跨类型 ID 扫描和无关模块读取。它不涉及本地 HTTP 服务安全、皮肤与 CSS、词源拓扑或质量检查架构。
+本计划继续处理[审计清单](AUDIT_OPEN_ISSUES.md)中的 C01：前后端规范化函数重复与 settings 重复规范化。它不涉及本地 HTTP 服务安全、皮肤与 CSS、词源拓扑或质量检查架构。
 
 ## 1. 已确认的现状
 
@@ -10,12 +10,6 @@
 
 - **模型重复**：`app.js` 复制了 `lib/dictionary-model.js` 26 个函数中的 22 个，且已出现漂移：前端规范化 `toolNavOrder`，后端只随 `...settings` 透传。`dictionary-model.js` 依赖 `node:crypto` 和 `apiError`，浏览器不能直接加载。
 - **settings 重复规范化**：`app.js` 中有 33 处调用 `normalizeDictionarySettings(...)`，包括标签判定与显示等逐标签路径；完整词典进入前端状态时已规范化。耗时未量化。
-- **整本读取**：`baseDictionarySnapshot()` 解析全部模块（settings、docs、corpus、morphology，并读取形态模板表），各保存操作仍依赖它。其中词条、形态和语料保存要用完整词典做跨实体 ID 冲突检查（`conflictingEntityIdRecords`），至少依赖 corpus。只读的关系、facets 和标签统计已改用只读 settings 的 `dictionaryQueryContext()`，实际界面延迟尚未测量。
-- **运行期 ID 检查**：`conflictingEntityIdRecords` 在每次词条、形态和语料保存时，拿提交的 ID 查询 `entries`、`definitions`、`morphology_template_groups`、`morphology_template_tables`，并解析整个语料库，要求跨类型全局唯一。所有 ID 都由程序以“类型前缀加 UUID”生成，界面不能输入或修改 ID，所有引用都带类型。相关数据库行为：
-  - `definitions` 是普通插入，撞到其他词条的义项 ID 会触发主键错误并回滚整个保存（GPT 用临时库验证）；
-  - `entries`、形态组和形态表使用 `ON CONFLICT ... DO UPDATE`，主键只保证最终无重复行，不能阻止错误的新建覆盖旧记录；
-  - 新建词条目前有两层保护：`POST /entries` 拒绝客户端传入 ID，`saveEntry` 的 `createOnly` 在 ID 已存在时返回 409；
-  - 形态写入计划（`lib/morphology-write-plan.js` 的 `morphologyIndex`）用 `Map` 按 ID 整理组和表，同一次提交中两张同 ID 的表会被静默合并，数据库没有机会报错；目前靠全局检查顺带拦住（GPT 已验证）。
 
 ## 2. 边界与原则
 
@@ -76,41 +70,6 @@
 - 验收以功能回归为准：保存设置后，显示、搜索选项、工具顺序、词性、标签显示替换和 docs／corpus 自动保存立即使用新配置。这一步的主要收益是代码清晰，不以性能提升为目标，也不要求性能对比；如果要宣称性能收益，再补测量。
 - 不改变虚拟滚动、未保存离开确认、自动保存草稿与选择／滚动／撤销历史。
 
-## 6. 阶段 4：运行期 ID 检查收窄与保存路径按需读取
-
-依据 2026-10-01 修订的 `AGENTS.md` 数据不变量：全局唯一仍是数据约定，但由生成规则、导入边界检查和数据库约束共同保证，普通保存不再扫描无关实体类型。本阶段不依赖阶段 2、3，可直接进行。
-
-### 6.1 检查边界
-
-| 场景 | 保留的检查 |
-| --- | --- |
-| 导入、旧格式转换 | 一次完整检查：全局 ID 唯一、引用和父级关系（`assertUniqueDictionaryEntityIds` 等），不放宽 |
-| 新建词条 | 服务端生成 ID；`POST /entries` 拒绝客户端 ID；`createOnly` 时 ID 已存在返回 409 |
-| 义项写入 | 主键和事务兜底，不查其他实体类型 |
-| 形态模块保存 | 检查同一次提交内组和表的 ID 是否重复，在写入计划合并之前拒绝；不查词条和语料 |
-| 语料模块保存 | 检查语料内部的 ID 重复（目前是一整块 JSON，没有数据库约束）；不查词条和形态。父级关系见 6.2 末条 |
-| 内部读取、渲染 | 直接使用当前模型的数据，不重复规范化和校验 |
-
-### 6.2 实施
-
-- `saveEntry`、`saveMorphology`、`saveCorpusChanges` 不再调用 `conflictingEntityIdRecords`；该函数及只为它服务的辅助函数在确认无其他调用方后删除。
-- 形态保存在生成写入计划之前，检查提交内组 ID 和表 ID 的重复，复用现有错误码 `duplicate_entity_ids_scoped`。语料保存保留现有的模块内检查。
-- 新建词条的两层保护保持不变；主键冲突仍以现有错误路径返回，不为此新增错误码。
-- 去掉扫描后，参照[只读接口的模块读取边界](SQLITE_BACKEND_PLAN.md#模块读取与-json-错误)，逐个核对保存操作实际用到的模块，只读取需要的部分：例如词条保存需要 settings 与形态配置，不再需要 corpus、docs。
-- 全局唯一仍是数据约定，导入检查不放宽。程序缺陷导致导出无法重新导入的情况，靠修复缺陷解决，不作为每次保存扫描的理由。
-- 已确认的现状缺口：语料单元的父级关系（多父级、引用不存在的单元、重复链接）目前只由前端语料编辑器校验（`corpusMultipleParents`、`corpusMissingUnit`、`corpusDuplicateLink`），后端语料保存只检查 ID 重复。`AGENTS.md` 把父级关系列为模块内应检查的范围，但补到后端属于新增校验，不在本阶段内；阶段 D 把语料改为 SQL 表时，由外键和唯一约束一并解决，或届时另行决定。
-
-### 6.3 验收
-
-- contract 覆盖：
-  - 形态提交内两张同 ID 的表被拒绝，数据库保持原样；
-  - 语料提交内重复 ID 被拒绝；
-  - 新建词条不能覆盖已有词条（客户端传 ID 被拒绝；`createOnly` 撞 ID 返回 409）；
-  - 义项 ID 撞到其他词条的义项时保存失败并整体回滚；
-  - 导入跨类型重复 ID 的词典仍被拒绝。
-- 损坏的 docs 或 corpus 不再影响词条保存（可扩展 `scripts/check-sqlite-contract.js` 中已有的临时库损坏用例）。
-- 不添加只断言“不再查询某表”的墓碑测试。
-
 ## 7. 本轮不处理
 
 - `NOT NULL` 列读取中的 `rowCount || 1` 等兜底：`NOT NULL` 不保证数值大于零，直接删除可能把异常尺寸送进渲染。数值完整性另行评估，不随本计划批量删除。
@@ -139,6 +98,6 @@
 
 1. 对每个改动的 JavaScript 文件执行 `node --check`，包含 `app.js` 与新增模块、检查脚本。
 2. 运行 `node scripts/check-all.js`；SQLite 不可用必须失败。
-3. 阶段 2、3 改动前端状态与共享模型，需用临时数据目录做浏览器冒烟；阶段 4 以 contract 测试为准。本计划不改视觉与布局，不需要逐宽度检查；无法完成的检查项按 `AGENTS.md` 逐项列出。
+3. 阶段 2、3 改动前端状态与共享模型，需用临时数据目录做浏览器冒烟。本计划不改视觉与布局，不需要逐宽度检查；无法完成的检查项按 `AGENTS.md` 逐项列出。
 4. 实现完成后按实际日期写 CHANGELOG，并在交接文档中删除已处理的技术债条目。本计划不改变 HTTP 契约；如果实现中改了错误码或保存范围，再同步 `docs/API_CONTRACT.md`。
 5. `git diff --check`，核对改动范围。

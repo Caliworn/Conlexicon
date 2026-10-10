@@ -65,7 +65,7 @@ async function callApi(repository, method, urlPath, body) {
   };
 }
 
-async function checkCorpusIdCollisionInvariants(repository) {
+async function checkEntityIdSaveScopeInvariants(repository) {
   const dictionary = await repository.createDictionary(normalizeDictionary({
     id: "dict-corpus-id-collision-contract",
     name: "Corpus ID Collision Contract",
@@ -98,15 +98,21 @@ async function checkCorpusIdCollisionInvariants(repository) {
   }));
 
   try {
+    const entryPath = (entryId) => `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(entryId)}`;
     await assertRejectStatus(
-      repository.saveEntry(dictionary.id, {
-        id: "corpus-unit-contract",
-        lemma: "entry collides with corpus",
-        definitions: [{ meaning: "collision" }],
+      callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`, {
+        id: "client-chosen-entry-id",
+        lemma: "client id",
       }),
-      409,
-      "entry save rejects entry id colliding with corpus blob id",
+      400,
+      "entry creation rejects client-chosen ids",
     );
+    await assertRejectStatus(
+      callApi(repository, "PUT", entryPath("corpus-unit-contract"), { lemma: "update-only route" }),
+      404,
+      "entry PUT updates existing entries only and cannot create client-chosen ids",
+    );
+    assert.equal(await repository.getEntry(dictionary.id, "corpus-unit-contract"), null);
     const createCollision = await assertRejectStatus(
       repository.saveEntry(dictionary.id, {
         id: "entry-corpus-contract",
@@ -117,45 +123,27 @@ async function checkCorpusIdCollisionInvariants(repository) {
       "create-only entry save rejects an existing entry id",
     );
     assert.deepEqual(createCollision.details.duplicates, [{ id: "entry-corpus-contract", types: ["entry"] }]);
-    await assertRejectStatus(
+    assert.equal((await repository.getEntry(dictionary.id, "entry-corpus-contract")).lemma, "corpus contract");
+
+    const other = (await repository.saveEntry(dictionary.id, {
+      lemma: "other entry",
+      definitions: [{ meaning: "own definition" }],
+    }, { createOnly: true })).entry;
+    await assert.rejects(
       repository.saveEntry(dictionary.id, {
-        lemma: "definition collides with corpus",
-        definitions: [{ id: "corpus-unit-contract", meaning: "collision" }],
+        ...other,
+        lemma: "must roll back",
+        definitions: [{ id: "def-corpus-contract", meaning: "steals another entry's definition id" }],
       }),
-      409,
-      "entry save rejects definition id colliding with corpus blob id",
+      "definition id owned by another entry fails on the primary key",
     );
-    await assertRejectStatus(
-      repository.saveEntry(dictionary.id, {
-        id: "entry-payload-duplicate",
-        lemma: "duplicate inside entry payload",
-        definitions: [{ id: "entry-payload-duplicate", meaning: "collision" }],
-      }),
-      409,
-      "entry save rejects duplicate ids inside its replacement scope",
+    assert.deepEqual(await repository.getEntry(dictionary.id, other.id), other, "failed entry save rolls back as a whole");
+    assert.equal(
+      (await repository.getEntry(dictionary.id, "entry-corpus-contract")).definitions[0].meaning,
+      "contract",
+      "the definition owner is unchanged",
     );
-    await assertRejectStatus(
-      repository.saveEntry(dictionary.id, {
-        lemma: "definition collides with morphology",
-        definitions: [{ id: "morph-group-contract", meaning: "collision" }],
-      }),
-      409,
-      "entry save rejects definition id colliding with morphology projection id",
-    );
-    await assertRejectStatus(
-      repository.saveCorpusChanges(dictionary.id, {
-        units: [{ id: "entry-corpus-contract", content: "corpus collides with entry" }],
-      }),
-      409,
-      "corpus save rejects corpus id colliding with existing entry id",
-    );
-    await assertRejectStatus(
-      repository.saveCorpusChanges(dictionary.id, {
-        units: [{ id: "def-corpus-contract", content: "corpus collides with definition" }],
-      }),
-      409,
-      "corpus save rejects corpus id colliding with existing definition id",
-    );
+
     await assertRejectStatus(
       repository.saveCorpusChanges(dictionary.id, {
         units: [
@@ -166,13 +154,22 @@ async function checkCorpusIdCollisionInvariants(repository) {
       409,
       "corpus save rejects duplicate ids inside corpus blob",
     );
-    await assertRejectStatus(
+    const morphologyBefore = (await repository.getDictionarySnapshot(dictionary.id)).morphology;
+    const duplicateTables = await assertRejectStatus(
       repository.saveMorphology(dictionary.id, {
-        templateGroups: [{ id: "entry-corpus-contract", name: "Collision", tables: [] }],
+        templateGroups: [{
+          ...morphologyBefore.templateGroups[0],
+          tables: [
+            morphologyBefore.templateGroups[0].tables[0],
+            { ...morphologyBefore.templateGroups[0].tables[0], title: "Same id" },
+          ],
+        }],
       }),
       409,
-      "morphology save rejects morphology id colliding with existing entry id",
+      "morphology save rejects duplicate table ids inside the submission",
     );
+    assert.equal(duplicateTables.code, "duplicate_entity_ids_scoped");
+    assert.deepEqual((await repository.getDictionarySnapshot(dictionary.id)).morphology, morphologyBefore);
     const unchangedMorphology = await repository.saveMorphology(dictionary.id, dictionary.morphology);
     assert.equal(unchangedMorphology.morphology.templateGroups[0].id, "morph-group-contract");
   } finally {
@@ -2385,7 +2382,7 @@ async function runRepositoryContractTests(options = {}) {
       "invalid entry patch pronunciation",
     );
 
-    await checkCorpusIdCollisionInvariants(repository);
+    await checkEntityIdSaveScopeInvariants(repository);
     await checkEntryFilterFactsContract(repository);
     await checkAnalysisQueryContract(repository);
     await checkTagSetAnalysisContract(repository);

@@ -107,6 +107,14 @@ async function checkSqliteJsonReads() {
       isJsonParseError,
       "export must surface system_json_parse when required corpus data is damaged",
     );
+
+    writeModule("docs", '{"markdown":');
+    reopenRepository();
+    const derived = await repository.getEntry(dictionary.id, "entry-derived");
+    const savedEntry = await repository.saveEntry(dictionary.id, { ...derived, notes: "saved beside damaged modules" });
+    assert.equal(savedEntry.entry.notes, "saved beside damaged modules", "entry saves must not depend on docs or corpus");
+    const patched = await repository.patchEntries(dictionary.id, [{ id: "entry-derived", patch: { pronunciation: "patched" } }]);
+    assert.equal(patched.entries[0].pronunciation, "patched", "entry patches must not depend on docs or corpus");
   } finally {
     repository.close();
     await fs.rm(dataDir, { recursive: true, force: true });
