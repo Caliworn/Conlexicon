@@ -68,7 +68,7 @@
 
 **第 1 阶段：数据一致性与本地安全边界**
 
-1. A02＋A03：`index.json` 的串行读改写与原子写入，一起设计。
+1. A02＋A03：`index.json` 的串行读改写与原子写入。[设计草案](docs/INDEX_WRITE_CONSISTENCY_PLAN.md)已于 2026-10-10 完成并复评，待用户确认后交 GPT 实装、Claude 审查。
 2. A06–A08：只监听本机，校验 Host 与写请求来源，写请求要求 JSON 类型，静态服务只公开前端资源（A07）。这也是以后支持用户上传文件（如背景图）的前提。
 
 **第 2 阶段：功能线**
@@ -99,6 +99,14 @@
 **需要用户尽早决定**：tint 方向（视觉定稿前）；A10 是否先做锚点止血。
 
 **明确搁置**：照片背景作为正式选项（视觉定稿与 A07 之后）、词源网络视图表达循环与菱形、A04／A05 联合保存与多窗口冲突、A13／A14 完整快照（先测量）、C06 分析加载函数重构、C07 死代码与 C09 兜底（随相关改动清理）、R01–R06（按测量结果或发布目标）。
+
+**桌面外壳（Electron）搁置清单**（2026-10-10 检查，外壳目前不维护；`electron-shell/` 被 `.gitignore` 排除，不在仓库内）。恢复维护时按顺序处理：
+
+1. 纳入版本控制，否则打包配置的变化无法审查。
+2. 已确认无法运行：Electron 31.7.7 自带 Node 20.18.0，实测 `require("node:sqlite")` 报 `ERR_UNKNOWN_BUILTIN_MODULE`，服务启动即失败；需升级到自带 Node 22 且包含 `node:sqlite` 的版本（具体版本待实测），Electron 31 也已停止安全更新。打包清单 `extraResources` 只含 `server.js`、`index.html`、`app.js`、`styles.css`、`lib`，缺三个 `theme-*.css`。
+3. 数据安全：`before-quit` 先杀服务进程，窗口关闭时前端补发的自动保存可能失败（推断）；有未保存手动更改时 `beforeunload` 在 Electron 中会静默取消关闭而不弹框（推断），需外壳接管为“保存 / 放弃 / 取消”；没有单实例锁，连开两次即两个写者（审计 R08）；服务退出的 IPC 通知已由 `preload.js` 暴露，但 `app.js` 没有消费，服务崩溃时界面无提示。
+4. 安全：`setWindowOpenHandler` 把任意 URL 交给 `shell.openExternal`，未限制 `http`／`https`，也未限制窗口内导航；服务监听全部网卡的问题随 A06–A08 解决。
+5. 体验与发布：每次启动随机端口导致 `localStorage` 按来源隔离，主题与皮肤的启动缓存每次失效；窗口 `minHeight: 800` 超过 768px 高的屏幕；无代码签名与自动更新；桌面数据目录在 Electron `userData` 下，与开发用 `data/` 分离，缺备份与迁移入口。
 
 **之后**：阶段 A+ 触摸、焦点与无障碍（[计划](docs/TOUCH_FOCUS_A11Y_PLAN.md)）；阶段 C 例句迁移为语料单元链接（[计划](docs/EXAMPLE_CORPUS_LINK_PLAN.md)）；阶段 D 语料库工作区重做（[计划](docs/CORPUS_WORKSPACE_PLAN.md)，依赖阶段 C）。
 
