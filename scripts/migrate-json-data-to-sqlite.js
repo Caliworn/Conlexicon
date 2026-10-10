@@ -201,13 +201,13 @@ async function migrateJsonDataDirectoryToSqlite({
     const activeDictionaryId = migratedIds.includes(sourceIndex.activeDictionaryId)
       ? sourceIndex.activeDictionaryId
       : migratedIds[0] || "";
-    await targetRepository.writeIndex({
+    await targetRepository.updateIndex(() => ({
       activeDictionaryId,
       dictionaryIds: migratedIds,
-      uiLanguage: sourceIndex.uiLanguage,
-      uiTheme: sourceIndex.uiTheme,
-      uiSkin: sourceIndex.uiSkin,
-    });
+      uiLanguage: targetRepository.normalizeUiLanguage(sourceIndex.uiLanguage),
+      uiTheme: targetRepository.normalizeUiTheme(sourceIndex.uiTheme),
+      uiSkin: targetRepository.normalizeUiSkin(sourceIndex.uiSkin),
+    }));
     report.targetActiveDictionaryId = activeDictionaryId;
     report.finishedAt = new Date().toISOString();
     return report;

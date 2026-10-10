@@ -107,7 +107,11 @@ data/dictionaries/*.sqlite   one file per dictionary: content and settings
 
 The `data/` directory is ignored by Git so personal dictionaries are never committed.
 
+Run only one server process per data directory at a time. Index reads and updates are serialized within that process, and writes use atomic file replacement; this does not coordinate multiple server processes.
+
 `data/index.json` 保存词典索引、当前词典及全局界面语言、主题和皮肤；每个词典的内容与设置保存在 `data/dictionaries/*.sqlite`。`data/` 已被 Git 忽略，个人词库不会被提交。
+
+同一数据目录同一时间只允许一个服务进程写入。索引读取和更新在该进程内串行执行，写入通过原子替换文件发布，不协调多个服务进程。
 
 Legacy JSON dictionaries are not migrated on startup; import them from the dictionary management page. For bulk migration testing, use the explicit script with separate directories. It refuses a non-empty target and never modifies the source:
 

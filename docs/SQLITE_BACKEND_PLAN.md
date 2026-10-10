@@ -36,6 +36,18 @@ data/dictionaries/<dictionary-id>.sqlite
 
 词典名称、语言、描述及 summary 由各 `.sqlite` 文件查询；每本词典的 `entryCount` 和严格 `rootCount` 都使用轻量 SQL，其中 `rootCount` 是没有任何 `entry_sources` 行的词条数。它们不写入 `index.json` 或 metadata，也不因启动或打开词典管理页建立拓扑。每个 `.sqlite` 文件保存一个词典的内容、配置、文档、语料和派生索引。
 
+### 索引写入与失败恢复
+
+- 同一服务进程的 repository 实例用一条 Promise 队列串行执行索引的全部读取与“读 → 判断 → 修改 → 写入”，覆盖默认索引创建、新建、导入、删除、激活、偏好更新与缺失词典剪除。某项操作失败仍向调用方抛出，后续排队任务继续执行。读取也排队，防止 Windows 上本进程的读取句柄阻止原子替换。
+- 公开读取通过 `readIndex()` 获取锁；`requireDictionary()`、`hasDictionary()` 与 `exportDictionary()` 通过它读索引。普通更新通过 `updateIndex(mutator)`，mutator 只做纯计算并返回完整索引。锁内只用 `readIndexFile()`、`writeIndexFile()` 和接收给定索引的 `requireDictionaryInIndex()`；不得调用 `readIndex()`、`requireDictionary()`、`updateIndex()` 等再次取锁的方法，以免自己等待自己。写入时不再回读旧文件补全字段，不添加重入检测或超时。
+- `writeIndexFile()` 先写同目录固定文件 `index.json.tmp`，对文件句柄 `sync()` 并关闭，再 `rename` 替换 `index.json`。发布前失败时旧索引保持完整，临时文件留待下次覆盖；不加重试，Windows 不做目录 fsync。其他进程占用导致的替换失败继续向调用方报错。
+- 索引仍逐次读文件、不缓存。`readState()` 整体在一次锁内完成读取、文件检查、元数据加载，以及需要时的剪除与当前词典改选；不在锁外预读再回写旧快照。
+- 新建与导入在锁内判断 ID 冲突，包括已登记 ID 和已有库文件；覆盖与重新生成 ID 的确认规则不变。先登记并设为当前词典，再打开数据库和执行 SQLite 写入事务；登记失败不创建或修改库。写库失败时恢复之前的完整索引，仅对本次新建的库关闭连接并删除文件；覆盖导入的旧数据由 SQLite 事务回滚保留。
+- 上述补偿各自尝试执行；任何补偿失败都用 `AggregateError` 同时保留原始错误和补偿错误，不报告成功。数据库初始化失败时关闭尚未缓存的连接，以便新库清理；关闭也失败时同样保留两项错误。
+- 删除保持“关闭连接 → 删除文件 → 失效缓存 → 更新索引”的顺序；最后一步失败会报错，遗留登记由下次 `readState()` 剪除，不另做删除补偿。
+- HTTP API 路径、请求与响应结构、错误码不变；索引写入等未分类失败仍按现有契约返回 500。离线 JSON 目录迁移脚本先用仓储的 `normalizeUiLanguage`、`normalizeUiTheme`、`normalizeUiSkin` 规范化三项偏好，再通过 `updateIndex()` 写入完整索引。
+- **运行约束：一个数据目录同一时间只允许一个服务进程写入。** 进程内队列不解决多个进程的丢更新；不引入跨进程锁或索引缓存。新建与导入的补偿针对可捕获的操作失败，不提供掉电或强制终止后的跨文件事务恢复。
+
 反推 API 契约：
 
 - `GET /api/state` 不应长期返回完整词典数组；应拆成轻量启动状态、词典列表、当前词典 summary 和按需读取。

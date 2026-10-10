@@ -9,9 +9,8 @@
 | [API Contract](API_CONTRACT.md) | 稳定契约 | 前后端 HTTP API、错误结构、读取与保存边界。 |
 | [Audit Open Issues](AUDIT_OPEN_ISSUES.md) | 长期维护，2026-10-01 复核 | 审计、安全审计与技术债复查中所有未解决问题的唯一清单：保存一致性、HTTP 访问边界、规则执行与算法、无关全量工作、代码质量与待测风险，含处理顺序；不含皮肤与视觉问题。 |
 | [HTTP Access Boundary Spec](HTTP_ACCESS_BOUNDARY_SPEC.md) | 实装规格（2026-10-10），待实装 | A06–A08：只监听本机、Host 白名单、写请求同源与 JSON 媒体类型、静态资源显式清单，含验收与交付范围。 |
-| [Index Write Consistency Plan](INDEX_WRITE_CONSISTENCY_PLAN.md) | 设计已确认（2026-10-10），待实装 | A02＋A03：`index.json` 串行读改写、原子替换、新建与导入失败时回到请求前状态；多进程记为运行约束。 |
 | [Data Normalization Repair Plan](DATA_NORMALIZATION_REPAIR_PLAN.md) | 已复评，尚未实装 | SQLite JSON 读取不再吞错、只读接口按需读取、删除无用词条形态派生字段、前后端共享纯数据规则、settings 读取收敛、普通保存不再做跨类型 ID 扫描。 |
-| [SQLite Backend Plan](SQLITE_BACKEND_PLAN.md) | 当前架构 | SQLite schema、repository 现状、查询层与后续优化。 |
+| [SQLite Backend Plan](SQLITE_BACKEND_PLAN.md) | 当前架构 | SQLite schema、repository 现状、索引串行与原子写入、失败恢复、查询层与后续优化。 |
 | [SQLite Migration Plan](SQLITE_MIGRATION_PLAN.md) | 当前架构 / 后续计划 | 旧 JSON 导入、SQLite 迁移、导出 profile、备份与回滚边界。 |
 | [Query Session Cache Plan](QUERY_SESSION_CACHE_PLAN.md) | 已实装设计参考 | 查询会话、cursor、缓存失效、窗口化和结果定位语义。 |
 | [Advanced Filter Query Plan](ADVANCED_FILTER_QUERY_PLAN.md) | F0–F4 核心完成 / F5-0 已完成 | EntryFilter、轻量分析、IPA/形态 feature result，以及 Gloss/质量结果的后续边界。 |

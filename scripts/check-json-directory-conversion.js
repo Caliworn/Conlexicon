@@ -100,6 +100,22 @@ async function main() {
     assert.equal(secondSnapshot.name, "Migration Second");
     assert.deepEqual(secondSnapshot.entries[0].etymology.sources, [{ entryId: "", text: "root" }]);
 
+    for (const [label, preferences] of [
+      ["missing-preferences", {}],
+      ["invalid-preferences", { uiLanguage: "unsupported", uiTheme: "unsupported", uiSkin: "unsupported" }],
+    ]) {
+      const source = path.join(tempRoot, `${label}-source`);
+      const target = path.join(tempRoot, `${label}-target`);
+      await writeJson(path.join(source, "index.json"), { activeDictionaryId: "", dictionaryIds: [], ...preferences });
+      await migrateJsonDataDirectoryToSqlite({ sourceDataDir: source, targetDataDir: target });
+      const index = JSON.parse(await fs.readFile(path.join(target, "index.json"), "utf8"));
+      assert.deepEqual(
+        { uiLanguage: index.uiLanguage, uiTheme: index.uiTheme, uiSkin: index.uiSkin },
+        { uiLanguage: "zh", uiTheme: "light", uiSkin: "classic" },
+        "Directory migration must persist canonical preference values, not rely on normalization when reading",
+      );
+    }
+
     console.log("JSON directory conversion check passed.");
   } finally {
     targetRepository.close?.();

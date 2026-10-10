@@ -49,6 +49,8 @@
 
 ### 导入、导出与词典生命周期
 
+新建与导入先登记索引，再执行数据库事务；可捕获的写库失败会恢复原索引并清理本次新库，覆盖导入保留旧数据。补偿失败仍报错，不报告成功。删除在文件已删而索引更新失败时，由下次列表读取剪除残留登记。请求、响应和错误码沿用下表；持久化边界见 [索引写入与失败恢复](SQLITE_BACKEND_PLAN.md#索引写入与失败恢复)。
+
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/export?dictionaryId=&format=&profile=` | 导出数据 | 当前支持 JSON 完整词典 payload | 默认 `format=json&profile=legacy-json`；`profile=portable-json` 当前只是同结构兼容别名，不代表已有独立 portable 格式。原生 SQLite 与 XLSX 导出尚未实装。 |
