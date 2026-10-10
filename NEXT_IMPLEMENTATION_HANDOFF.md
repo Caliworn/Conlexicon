@@ -62,13 +62,11 @@
 - GPT 6.1 sol：A02＋A03 按定稿设计实装；A06–A08（由 Claude 先补一页带验收命令的规格）；数据规范化阶段 1（C02、A12）；F5-1～F5-3 的后端与 A11；阶段 3 规则引擎的解析器与执行核心。
 - 交给 GPT 的任务：规格写明可改与禁改的文件（`styles.css`、`theme-*.css`、`index.html` 与 `app.js` 界面部分不碰）和验收命令；提示中点名 `AGENTS.md` 的“防御性代码”“数据不变量”和测试规则；交付时列出每一处新增的校验或兜底及其防止的具体风险，说不出风险的在审查时删除。
 - 两边不同时修改同一文件区域；`CHANGELOG.md` 与本文由完成任务的一方更新，审查方核对。
-- 当前落地顺序：A02＋A03 已实装并于 2026-10-10 经 Claude 审查通过；GPT 后续可按规格做 A06–A08；Claude 做界面线材质职责收尾。
+- 当前落地顺序：A02＋A03 与 A06–A08 均已于 2026-10-10 经 Claude 审查通过；Claude 做界面线材质职责收尾。
 
 **第 0 阶段（已完成，2026-10-01）**：A01 语言文档自动保存丢输入、A09 畸形 Host 让服务退出，以及 C03、C04、C05 三个小项。
 
-**第 1 阶段：数据一致性与本地安全边界**
-
-1. A06–A08：只监听本机，校验 Host 与写请求来源，写请求要求 JSON 类型，静态服务只公开前端资源（A07）。[实装规格](docs/HTTP_ACCESS_BOUNDARY_SPEC.md)已于 2026-10-10 写好，交 GPT 实装、Claude 审查。这也是以后支持用户上传文件（如背景图）的前提。
+**第 1 阶段：数据一致性与本地安全边界**（已完成，2026-10-10）：A02＋A03 索引写入一致性与 A06–A08 HTTP 访问边界，后者契约见 [API Contract](docs/API_CONTRACT.md#本地-http-访问边界)。
 
 **第 2 阶段：功能线**
 
@@ -97,14 +95,14 @@
 
 **需要用户尽早决定**：tint 方向（视觉定稿前）；A10 是否先做锚点止血。
 
-**明确搁置**：照片背景作为正式选项（视觉定稿与 A07 之后）、词源网络视图表达循环与菱形、A04／A05 联合保存与多窗口冲突、A13／A14 完整快照（先测量）、C06 分析加载函数重构、C07 死代码与 C09 兜底（随相关改动清理）、R01–R06（按测量结果或发布目标）。
+**明确搁置**：照片背景作为正式选项（视觉定稿之后）、词源网络视图表达循环与菱形、A04／A05 联合保存与多窗口冲突、A13／A14 完整快照（先测量）、C06 分析加载函数重构、C07 死代码与 C09 兜底（随相关改动清理）、R01–R06（按测量结果或发布目标）。
 
 **桌面外壳（Electron）搁置清单**（2026-10-10 检查，外壳目前不维护；`electron-shell/` 被 `.gitignore` 排除，不在仓库内）。恢复维护时按顺序处理：
 
 1. 纳入版本控制，否则打包配置的变化无法审查。
-2. 已确认无法运行：Electron 31.7.7 自带 Node 20.18.0，实测 `require("node:sqlite")` 报 `ERR_UNKNOWN_BUILTIN_MODULE`，服务启动即失败；需升级到自带 Node 22 且包含 `node:sqlite` 的版本（具体版本待实测），Electron 31 也已停止安全更新。打包清单 `extraResources` 只含 `server.js`、`index.html`、`app.js`、`styles.css`、`lib`，缺三个 `theme-*.css`。
+2. 已确认无法运行：Electron 31.7.7 自带 Node 20.18.0，实测 `require("node:sqlite")` 报 `ERR_UNKNOWN_BUILTIN_MODULE`，服务启动即失败；需升级到自带 Node 22 且包含 `node:sqlite` 的版本（具体版本待实测），Electron 31 也已停止安全更新。打包清单 `extraResources` 只含 `server.js`、`index.html`、`app.js`、`styles.css`、`lib`，缺三个 `theme-*.css`；静态服务改为公开清单后，清单内文件缺失返回 500（不再是 404）。
 3. 数据安全：`before-quit` 先杀服务进程，窗口关闭时前端补发的自动保存可能失败（推断）；有未保存手动更改时 `beforeunload` 在 Electron 中会静默取消关闭而不弹框（推断），需外壳接管为“保存 / 放弃 / 取消”；没有单实例锁，连开两次即两个写者（审计 R08）；服务退出的 IPC 通知已由 `preload.js` 暴露，但 `app.js` 没有消费，服务崩溃时界面无提示。
-4. 安全：`setWindowOpenHandler` 把任意 URL 交给 `shell.openExternal`，未限制 `http`／`https`，也未限制窗口内导航；服务监听全部网卡的问题随 A06–A08 解决。
+4. 安全：`setWindowOpenHandler` 把任意 URL 交给 `shell.openExternal`，未限制 `http`／`https`，也未限制窗口内导航；服务已默认只监听本机，LAN 调试需显式环境变量开启；但外壳以 `...process.env` 启动服务，会继承用户环境中的 `CONLEXICON_LAN_DEBUG`，恢复维护时应在启动环境中剔除该变量。
 5. 体验与发布：每次启动随机端口导致 `localStorage` 按来源隔离，主题与皮肤的启动缓存每次失效；窗口 `minHeight: 800` 超过 768px 高的屏幕；无代码签名与自动更新；桌面数据目录在 Electron `userData` 下，与开发用 `data/` 分离，缺备份与迁移入口。
 
 **之后**：阶段 A+ 触摸、焦点与无障碍（[计划](docs/TOUCH_FOCUS_A11Y_PLAN.md)）；阶段 C 例句迁移为语料单元链接（[计划](docs/EXAMPLE_CORPUS_LINK_PLAN.md)）；阶段 D 语料库工作区重做（[计划](docs/CORPUS_WORKSPACE_PLAN.md)，依赖阶段 C）。

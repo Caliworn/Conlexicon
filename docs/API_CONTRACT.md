@@ -27,9 +27,31 @@
 - `details` 可选。重复实体 ID 错误固定返回 `details.duplicates: Array<{ id, types }>`，前端使用应用内弹窗本地化展示；其他错误详情主要用于调试。
 - 前端应继续在控制台保留原始错误对象；普通错误 toast 不直接展示英文 `message`。
 
+### 本地 HTTP 访问边界
+
+服务默认只监听 `127.0.0.1`，启动日志保持 `Conlexicon running at http://localhost:<port> (sqlite repository)`。只有 `CONLEXICON_LAN_DEBUG=1` 才监听 `0.0.0.0`，其他值均关闭；该开关供手机等真机调试，不在 Electron 外壳提供入口。
+
+入口在路由执行与正文读取前依次检查：
+
+1. 所有 API 与静态请求的 Host 必须是 `localhost:<port>`、`127.0.0.1:<port>` 或 `[::1]:<port>`，使用实际监听端口，比较不区分大小写。LAN 调试开启时，额外允许启动时读取的本机非内部 IPv4 地址加该端口，不接受任意主机名或其他设备的地址。
+2. 非 GET／HEAD 的 `/api/` 请求若携带 Origin，必须严格等于 `http://` 加已通过校验的 Host；`null` 也不允许。不带 Origin 的命令行或脚本请求放行。
+3. 同类写请求的媒体类型必须为 `application/json`，忽略参数和大小写；无正文的 POST、DELETE 也必须携带该类型。前端 `api()`、JSON Blob beacon 与 fetch 兜底均使用同一规则。
+
+| 情况 | 状态码 | 响应 |
+| --- | --- | --- |
+| Host 缺失或不在白名单 | 403 | API 路径为 JSON `forbidden_host`，其他路径为纯文本。 |
+| 写 API 的 Origin 存在但不同源 | 403 | JSON `forbidden_origin`。 |
+| 写 API 的媒体类型缺失或不是 JSON | 415 | JSON `unsupported_media_type`。 |
+| 静态资源不在公开清单 | 404 | 纯文本。 |
+| 静态请求使用 GET／HEAD 以外的方法 | 405 | 纯文本。 |
+
+静态公开清单维护在 `lib/static-server.js`：主页面、Lab 页面、应用脚本与样式、HTML 引用的前端模块，以及五张 Lab 图片；`/` 映射到 `index.html`。按 URL pathname 精确匹配，区分大小写，不解码路径、不开放整个目录。GET 返回文件，HEAD 返回相同类型与长度但不带正文；清单中的文件读取失败照常抛出。
+
+LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印本机可用的局域网地址与警告：局域网内任何设备均可读写该数据目录，建议使用临时数据目录。
+
 ### 畸形请求 URL
 
-请求 URL（含用于解析的 Host）畸形、无法解析时，在进入路由前返回 HTTP 400 和纯文本 `Invalid request URL`；服务继续处理后续请求。此时尚未进入 API 路由，不返回上述 JSON 错误对象。
+请求 URL 使用固定可信基准解析，不使用未经校验的 Host。URL 无法解析时，在进入路由前返回 HTTP 400 和纯文本 `Invalid request URL`；服务继续处理后续请求。畸形 Host 按上述白名单返回 403，不再参与 URL 解析。
 
 ### 请求体大小限制
 
@@ -172,6 +194,9 @@
 | code | 含义 |
 | --- | --- |
 | `request_body_too_large` | 请求体超过当前端点限制；`details.limitBytes` 给出字节上限。 |
+| `forbidden_host` | Host 缺失或不在本地服务的允许清单中，HTTP 403。 |
+| `forbidden_origin` | 写请求的 Origin 与已校验 Host 不同源，HTTP 403。 |
+| `unsupported_media_type` | 写请求未携带 `application/json` 媒体类型，HTTP 415。 |
 | `invalid_json_body` | 请求体不是合法 JSON。 |
 | `invalid_ui_language` | 全局界面语言值无效。 |
 | `invalid_ui_theme` | 全局主题值无效。 |

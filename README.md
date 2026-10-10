@@ -70,12 +70,20 @@ Conlexicon 使用一个小型 Node.js 后端，不需要安装 npm 依赖；运�
 node server.js
 ```
 
-Then open `http://localhost:4173/`. For testing or manual migration, point the server at a separate data directory:
+Then open `http://localhost:4173/`. The server binds to `127.0.0.1` by default. For testing or manual migration, point it at a separate data directory:
 
-然后打开 `http://localhost:4173/`。测试或手动迁移时，建议指定单独的数据目录：
+然后打开 `http://localhost:4173/`。服务默认只监听本机 `127.0.0.1`。测试或手动迁移时，建议指定单独的数据目录：
 
 ```bash
 CONLEXICON_DATA_DIR=/tmp/conlexicon-sqlite node server.js
+```
+
+For phone or other LAN device testing, explicitly set `CONLEXICON_LAN_DEBUG=1`. This binds to `0.0.0.0` and prints the machine's LAN URLs. Any device on that LAN can read and write the chosen data directory, so use temporary test data. Other values leave LAN access disabled.
+
+需要手机等局域网真机调试时，显式设置 `CONLEXICON_LAN_DEBUG=1`，服务会监听 `0.0.0.0` 并打印本机局域网地址。局域网内任何设备都能读写所选数据目录，请配合临时测试数据使用；其他值均不会开启局域网访问。
+
+```bash
+CONLEXICON_LAN_DEBUG=1 CONLEXICON_DATA_DIR=/tmp/conlexicon-lan-debug node server.js
 ```
 
 Schema changes during development do not migrate existing databases. To move data from a database with an older schema, export JSON with the old version, keep a backup, and import it into a database created by the current version.

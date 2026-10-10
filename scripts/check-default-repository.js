@@ -7,8 +7,15 @@ const { spawn } = require("node:child_process");
 
 const ROOT_DIR = path.resolve(__dirname, "..");
 
-function randomPort() {
-  return 43000 + Math.floor(Math.random() * 10000);
+function availablePort() {
+  return new Promise((resolve, reject) => {
+    const probe = http.createServer();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const port = probe.address().port;
+      probe.close((error) => error ? reject(error) : resolve(port));
+    });
+  });
 }
 
 function requestJson(port, method, pathname, body, headers = {}) {
@@ -46,12 +53,13 @@ function requestJson(port, method, pathname, body, headers = {}) {
   });
 }
 
-function startServer({ dataDir, port }) {
+function startServer({ dataDir, port, lanDebug = "" }) {
   return new Promise((resolve, reject) => {
     const env = {
       ...process.env,
       CONLEXICON_DATA_DIR: dataDir,
       PORT: String(port),
+      CONLEXICON_LAN_DEBUG: lanDebug,
     };
     const child = spawn(process.execPath, ["server.js"], {
       cwd: ROOT_DIR,
@@ -131,14 +139,14 @@ async function withTempDataDir(prefix, fn) {
 
 async function checkSqliteServer() {
   await withTempDataDir("conlexicon-sqlite-server-", async (dataDir) => {
-    const port = randomPort();
+    const port = await availablePort();
     const server = await startServer({ dataDir, port });
     try {
       assert.match(server.stdout(), /\(sqlite repository\)/);
 
       const malformedHost = await requestJson(port, "GET", "/api/state", undefined, { Host: "[invalid" });
-      assert.equal(malformedHost.status, 400);
-      assert.equal(malformedHost.body, "Invalid request URL");
+      assert.equal(malformedHost.status, 403);
+      assert.equal(malformedHost.body.error.code, "forbidden_host");
 
       let response = await requestJson(port, "GET", "/api/state");
       assert.equal(response.status, 200);
@@ -162,12 +170,29 @@ async function checkSqliteServer() {
       assert.equal(response.body.dictionaries[0].id, response.body.activeDictionaryId);
     } finally {
       await stopServer(server.child);
+      await assert.rejects(requestJson(port, "GET", "/api/state"), { code: "ECONNREFUSED" });
+    }
+  });
+}
+
+async function checkLanDebugStartup() {
+  await withTempDataDir("conlexicon-lan-startup-", async (dataDir) => {
+    const port = await availablePort();
+    const server = await startServer({ dataDir, port, lanDebug: "1" });
+    try {
+      assert.equal((await requestJson(port, "GET", "/api/state")).status, 200);
+      assert.match(server.stdout(), new RegExp(`Conlexicon running at http://localhost:${port} \\(sqlite repository\\)`));
+      assert.match(server.stderr(), /LAN DEBUG: .*Any device on the LAN can read and write this data directory\. Use a temporary CONLEXICON_DATA_DIR\./);
+    } finally {
+      await stopServer(server.child);
+      await assert.rejects(requestJson(port, "GET", "/api/state"), { code: "ECONNREFUSED" });
     }
   });
 }
 
 async function main() {
   await checkSqliteServer();
+  await checkLanDebugStartup();
   console.log("SQLite server startup check passed.");
 }
 

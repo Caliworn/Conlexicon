@@ -31,6 +31,7 @@ const CHECK_GROUPS = [
       "check-sqlite-schema.js",
       "check-sqlite-lifecycle.js",
       "check-index-consistency.js",
+      "check-http-access.js",
       "check-source-references.js",
       "check-source-candidates.js",
       "check-sqlite-contract.js",

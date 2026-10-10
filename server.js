@@ -1,7 +1,4 @@
-const http = require("node:http");
 const path = require("node:path");
-const { createApiRouter } = require("./lib/api-routes");
-const { serializeApiError } = require("./lib/api-error");
 const {
   DEFAULT_INDEX,
   assertUniqueDictionaryEntityIds,
@@ -10,13 +7,13 @@ const {
   normalizeUiSkin,
   normalizeUiTheme,
 } = require("./lib/dictionary-model");
-const { sendJson, sendText } = require("./lib/http-utils");
+const { createHttpServer } = require("./lib/http-server");
 const { SqliteDictionaryRepository } = require("./lib/sqlite-dictionary-repository");
-const { createStaticFileServer } = require("./lib/static-server");
 
 const rootDir = __dirname;
 const dataDir = process.env.CONLEXICON_DATA_DIR ? path.resolve(process.env.CONLEXICON_DATA_DIR) : path.join(rootDir, "data");
 const port = Number(process.env.PORT || 4173);
+const lanDebug = process.env.CONLEXICON_LAN_DEBUG;
 
 function repositoryOptions() {
   return {
@@ -39,33 +36,14 @@ function createRepository() {
 
 const repository = createRepository();
 
-const routeApi = createApiRouter({ repository });
-const serveStatic = createStaticFileServer({ rootDir });
-
-async function handleRequest(request, response) {
-  let url;
-  try {
-    url = new URL(request.url, `http://${request.headers.host}`);
-    if (url.pathname.startsWith("/api/") && (await routeApi(request, response, url))) {
-      return;
-    }
-    await serveStatic(request, response, url);
-  } catch (error) {
-    console.error(error);
-    if (!url) {
-      sendText(response, 400, "Invalid request URL");
-      return;
-    }
-    if (url.pathname.startsWith("/api/")) {
-      sendJson(response, error.status || 500, serializeApiError(error));
-      return;
-    }
-    sendText(response, error.status || 500, error.message || "Internal server error");
-  }
-}
-
 repository.ensureDataStore().then(() => {
-  http.createServer(handleRequest).listen(port, () => {
-    console.log(`Conlexicon running at http://localhost:${port} (sqlite repository)`);
+  const { server, listenHost, lanAddresses } = createHttpServer({ repository, rootDir, lanDebug });
+  server.listen(port, listenHost, () => {
+    const actualPort = server.address().port;
+    console.log(`Conlexicon running at http://localhost:${actualPort} (sqlite repository)`);
+    if (lanDebug === "1") {
+      const addresses = lanAddresses.map((address) => `http://${address}:${actualPort}`).join(", ") || "(no non-internal IPv4 addresses)";
+      console.warn(`LAN DEBUG: ${addresses}. Any device on the LAN can read and write this data directory. Use a temporary CONLEXICON_DATA_DIR.`);
+    }
   });
 });
