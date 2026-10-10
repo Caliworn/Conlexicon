@@ -76,8 +76,8 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/export?dictionaryId=&format=&profile=` | 导出数据 | 当前支持 JSON 完整词典 payload | 默认 `format=json&profile=legacy-json`；`profile=portable-json` 当前只是同结构兼容别名，不代表已有独立 portable 格式。原生 SQLite 与 XLSX 导出尚未实装。 |
-| `POST` | `/api/import?overwrite=&regenerateId=&profile=` | 导入 JSON | 应用状态 | 默认 `profile=legacy-json`；完整快照导入会通过转换服务执行 legacy 兼容解析、规范化和实体 ID 检查。`regenerateId=true` 只生成一次新词典 UUID，并且不会复用 `overwrite` 覆盖理论上同 ID 的既有词典。 |
-| `POST` | `/api/dictionaries` | 新建词典 | 完整词典 JSON | 后端只生成一次词典 UUID，并使用非覆盖式创建；显式或理论生成冲突都不会覆盖既有词典。创建成功后设为当前词典。 |
+| `POST` | `/api/import?overwrite=&regenerateId=&profile=` | 导入 JSON | 应用状态 | 默认 `profile=legacy-json`；完整快照导入会通过转换服务执行 legacy 兼容解析、规范化和实体 ID 检查。`regenerateId=true` 生成新的词典 UUID，按非覆盖方式新建，忽略 `overwrite`。 |
+| `POST` | `/api/dictionaries` | 新建词典 | 完整词典 JSON | 后端生成词典 UUID，并使用非覆盖式创建；ID 已存在时返回 `dictionary_id_exists`。创建成功后设为当前词典。 |
 | `GET` | `/api/dictionaries/:id` | 读取当前词典完整快照 | 完整词典 JSON | 前端启动或切换当前词典时按需加载详情与尚未拆出的模块；普通列表、搜索、facets 和关系查询优先使用专用读取 API。 |
 | `POST` | `/api/dictionaries/:id/activate` | 切换当前词典 | 应用状态 | 只改 `index.json` 中的当前词典。 |
 | `DELETE` | `/api/dictionaries/:id` | 删除词典 | 应用状态 | 删除词典文件并更新索引。 |
@@ -101,7 +101,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | `{ items, pageInfo, searchSummary }`，其中 `items` 固定为词条摘要 DTO | 支持结构化 JSON `filter`，以及现有 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`sort`、`cursor`、`windowOffset`、`limit`。结构化 `filter` 不得与平铺筛选参数混用。无参数请求也使用默认排序和窗口大小，不返回完整词条数组。 |
 | `POST` | `/api/dictionaries/:id/entries/filter-facts` | 批量读取结构筛选是否存在候选 | `{ dictionaryId, generation, facts }` | 最多接受 16 个 filter descriptor；只返回按请求 ID 对应的 `available` 布尔值，不接受搜索、排序或分页语义。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId/location` | 定位词条在当前查询中的窗口 | `{ items, pageInfo, searchSummary, location }` | 接受与 `/entries` 相同的查询 descriptor 和 `limit`，但不接受客户端 cursor；目标存在但被查询排除时返回 `location.found: false`。 |
-| `POST` | `/api/dictionaries/:id/entries` | 新建词条 | `{ entry, summary }` | 客户端不得携带词条 ID；后端为每次请求生成一次 UUID，并在 `entry.id` 返回。生成 ID 的理论冲突作为内部 `500` 失败，不覆盖旧实体、不在单次请求内重试；不做其他实体 ID 检查，义项 ID 冲突由主键约束拒绝并整体回滚。`summary` 是写入后的轻量词典计数。 |
+| `POST` | `/api/dictionaries/:id/entries` | 新建词条 | `{ entry, summary }` | 客户端不得携带词条 ID；后端为每次请求生成一次 UUID，并在 `entry.id` 返回。新建为非覆盖式写入，ID 已存在时返回 409 `duplicate_entity_ids_scoped`；不做其他实体 ID 检查，义项 ID 冲突由主键约束拒绝并整体回滚。`summary` 是写入后的轻量词典计数。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
 | `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存已有词条 | `{ entry, summary }` | 只更新已有词条，词条不存在时返回 404 `entry_not_found`，不按客户端 ID 新建。不做实体 ID 检查：义项 ID 重复（无论同一词条内还是撞到其他词条）由主键约束失败并整体回滚。`summary` 是写入后的轻量词典计数。 |
 | `DELETE` | `/api/dictionaries/:id/entries/:entryId` | 删除单个词条 | `{ updatedAt, summary }` | 不因无关历史重复 ID 阻断删除；`summary` 是删除后的轻量词典计数。 |
