@@ -87,12 +87,8 @@ body.mobile-drawer-open {
   min-height: 42px;
   padding: 0;
   place-items: center;
-  border: 1px solid var(--material-control-border);
+  border: 1px solid;
   border-radius: var(--radius-mobile-control);
-  background: var(--material-control-background);
-  box-shadow: var(--material-control-shadow);
-  backdrop-filter: var(--material-control-filter);
-  color: var(--ui-text);
 }
 
 .mobile-app-bar-button:disabled {
@@ -106,11 +102,6 @@ body.mobile-drawer-open {
   --control-shadow: var(--material-control-shadow);
   --control-hover-shadow: var(--material-control-hover-shadow);
   --control-pressed-shadow: var(--material-control-pressed-shadow);
-  --control-hover-background: var(--ui-accent-soft);
-  --control-hover-border: var(--ui-accent);
-  --control-hover-color: var(--ui-accent-hover);
-  --control-open-background: var(--ui-accent-soft);
-  --control-pressed-background: color-mix(in srgb, var(--ui-accent-soft) 85%, var(--ui-accent));
 }
 
 .mobile-app-bar-button:focus-visible {
@@ -1217,11 +1208,8 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
   max-height: var(--active-filter-control-height);
   aspect-ratio: 1;
   flex: 0 0 auto;
-  border: 1px solid color-mix(in srgb, var(--ui-accent) 48%, transparent);
   border-radius: var(--radius-control);
   padding: 0;
-  background: var(--material-control-background);
-  color: var(--ui-accent-hover);
   font-size: var(--active-filter-control-font-size);
   font-weight: 800;
   line-height: 1;
@@ -1546,9 +1534,6 @@ label span {
   place-items: center;
   width: 40px;
   padding: 0;
-  background: var(--material-navigation-action-background);
-  color: var(--ui-text-on-solid);
-  border-color: var(--material-navigation-action-border);
   font-size: 1.25rem;
 }
 
@@ -1557,10 +1542,8 @@ label span {
   place-items: center;
   width: 28px;
   height: 28px;
-  border: 1px solid var(--material-control-border);
+  border: 1px solid;
   border-radius: var(--radius-pill);
-  background: var(--material-control-background);
-  color: var(--ui-accent);
   font-weight: 950;
   line-height: 1;
 }
@@ -2574,10 +2557,8 @@ button.pending-source:focus-visible {
   width: 30px;
   height: 30px;
   padding: 0;
-  border: 1px solid var(--material-inset-border);
+  border: 1px solid;
   border-radius: var(--radius-control);
-  background: var(--material-inset-background);
-  color: var(--ui-text-muted);
 }
 
 .content-disclosure-button[data-control-tone="neutral"] {
@@ -3440,11 +3421,9 @@ button.pending-source:focus-visible {
   place-items: center;
   min-width: 38px;
   min-height: 34px;
-  border: 1px solid var(--material-inset-border);
+  border: 1px solid;
   border-radius: var(--radius-control);
   padding: 0 10px;
-  background: var(--material-inset-background);
-  color: var(--ui-text);
   font-size: 1rem;
   font-weight: 900;
 }
@@ -3541,10 +3520,8 @@ button.pending-source:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  border: 1px solid var(--material-control-border);
+  border: 1px solid;
   border-radius: 6px;
-  background: var(--material-control-background);
-  color: var(--ui-text);
   cursor: pointer;
 }
 
@@ -3799,11 +3776,9 @@ button.pending-source:focus-visible {
   place-items: center;
   width: 34px;
   height: 34px;
-  border: 1px solid var(--material-control-border);
+  border: 1px solid;
   border-radius: var(--radius-control);
   padding: 0;
-  background: var(--material-control-background);
-  color: var(--ui-text);
   font: inherit;
   font-weight: 900;
 }
