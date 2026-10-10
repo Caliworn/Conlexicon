@@ -62,6 +62,8 @@ body[data-ui-skin="liquid-glass"] {
   --material-entry-detail-section-editing-surface: color-mix(in srgb, var(--ui-accent) 8%, transparent);
   --material-entry-detail-section-editing-outline: color-mix(in srgb, var(--ui-accent) 36%, transparent);
   --material-entry-detail-section-editing-edge: none;
+  --material-entry-editor-item-divider: var(--ui-border);
+  --material-entry-editor-item-gap: 12px;
   --material-control-background: rgba(246, 251, 251, 0.58);
   --material-control-border: rgba(255, 255, 255, 0.78);
   --material-control-shadow: none;
@@ -185,6 +187,8 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-entry-detail-section-editing-surface: color-mix(in srgb, var(--ui-accent) 8%, transparent);
   --material-entry-detail-section-editing-outline: color-mix(in srgb, var(--ui-accent) 36%, transparent);
   --material-entry-detail-section-editing-edge: none;
+  --material-entry-editor-item-divider: var(--ui-border);
+  --material-entry-editor-item-gap: 12px;
   --material-control-background: rgba(29, 43, 49, 0.62);
   --material-control-border: rgba(229, 255, 251, 0.2);
   --material-control-shadow: none;

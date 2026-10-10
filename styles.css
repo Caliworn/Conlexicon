@@ -2432,10 +2432,11 @@ button.pending-source:focus-visible {
 .entry-morphology-group-card {
   display: grid;
   gap: 12px;
-  padding: 14px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-panel);
-  background: color-mix(in srgb, var(--material-panel-background) 94%, var(--ui-canvas-bg));
+  min-width: 0;
+}
+
+.entry-morphology-group-list {
+  gap: var(--material-entry-editor-item-gap);
 }
 
 .entry-morphology-group-heading {
@@ -3378,25 +3379,45 @@ button.pending-source:focus-visible {
   min-height: auto;
 }
 
+/* Repeated editor items carry no box of their own: definitions use the detail
+   view's number column, and items separate with a skin-owned hairline. */
 .definition-form-list {
   display: grid;
-  gap: 12px;
+  gap: var(--material-entry-editor-item-gap);
 }
 
 .definition-form-card {
   display: grid;
-  gap: 12px;
-  padding: 14px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-panel);
-  background: var(--material-panel-background);
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  min-width: 0;
 }
 
-.definition-form-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.definition-form-card + .definition-form-card,
+.entry-morphology-group-card + .entry-morphology-group-card {
+  border-top: 1px solid var(--material-entry-editor-item-divider);
+  padding-top: var(--material-entry-editor-item-gap);
+}
+
+.definition-form-fields {
+  display: grid;
   gap: 12px;
+  min-width: 0;
+}
+
+.definition-remove-button {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  min-height: 34px;
+  height: 34px;
+  padding: 0;
+}
+
+.definition-remove-button .nav-icon {
+  width: 18px;
+  height: 18px;
 }
 
 .definition-optional-fields {

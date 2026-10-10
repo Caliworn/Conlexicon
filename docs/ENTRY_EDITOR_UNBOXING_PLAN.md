@@ -1,6 +1,6 @@
 # Entry Editor Unboxing Plan / 词条编辑去框化设计草案
 
-状态：设计草案（2026-10-05），已做一次独立复评（第 8 节）。2026-10-09 用户确认 D1–D8 按建议执行，D9 留到 U4 再定；U1、U2 已实装（2026-10-09），U3–U5 待实施。
+状态：设计草案（2026-10-05），已做一次独立复评（第 8 节）。2026-10-09 用户确认 D1–D8 按建议执行，D9 留到 U4 再定；U1、U2 已实装（2026-10-09），U3 已实装（2026-10-10），U4–U5 待实施。
 
 本文设计完整编辑（`#entryForm`）和局部编辑（`.inline-partial-edit-form`）的去框化，使编辑态沿用词条详情已有的分区分隔接口（[Style Skin Plan](STYLE_SKIN_PLAN.md)“词条详情分区分隔接口”），各皮肤只换材质，不另写结构。本文不改变保存范围、数据模型、未保存检查、API 和字段 `data-field` 契约。
 
@@ -68,7 +68,7 @@ form#entryForm                         外壳（不变：editor-panel / 皮肤 e
 
 - 复用详情的 `22px | 1fr` 编号槽网格：编号是纯数字，不再显示“释义 1”粗体标题；可访问名称由 `aria-label="释义 1"` 提供。
 - 移除按钮移到条目右上角，改为紧凑图标按钮（保留 `danger/tinted` 语义和文字 tooltip）；只有一条释义时仍隐藏。
-- 条目之间使用新 token `--material-entry-editor-item-divider`：经典与层叠为间距 + 细线，液态只用细线。
+- 条目之间使用新 token `--material-entry-editor-item-divider` 与 `--material-entry-editor-item-gap`：三套皮肤都是间距 + 细线，经典 14px、层叠玻璃与液态玻璃 12px，细线颜色各自取值。
 - 例句字段不加详情中的浅色例句底块：编辑态的例句已经是字段，再加底块会形成第 4 层。
 
 ### 3.4 形态分区
@@ -141,7 +141,7 @@ section.display-section.partial-editing[data-edit-section=definitions]   皮肤�
 
 - >640px：释义编号槽 22px；发音字段与“自动 IPA”同行。
 - ≤640px：沿用现有断点，`.inline-field-action` 已在此改为单列，自动 IPA 落到字段下方；`.form-actions` 按钮已均分宽度，操作栏中删除单独占一行。
-- <480px：编号槽缩为 18px。
+- 编号槽在所有宽度保持 22px：现有样式没有 480px 断点，320px 下实测无溢出，不为此新增断点（U3 实装时修正）。
 - 320px：分区内边距由皮肤 token 控制，不得出现横向滚动；形态覆盖表继续在 `.morphology-table-scroll` 内横向滚动。
 
 ## 8. 独立复评
@@ -179,7 +179,7 @@ section.display-section.partial-editing[data-edit-section=definitions]   皮肤�
 | --- | --- | --- |
 | U1（已完成 2026-10-09） | 局部编辑去框：表单去边框／底／阴影，保留分区标题与“编辑中”，合并操作按钮，`Esc` 取消 | `styles.css`、`app.js` `openPartialEdit`、键盘处理 |
 | U2（已完成 2026-10-09） | 完整编辑骨架：基础字段进标题区，五个 section 改用分区规则，标题行统一，操作栏合并（暂不吸底） | `index.html`、`styles.css` |
-| U3 | 释义与形态组条目去框：编号槽、图标移除按钮、条目分隔 token | `app.js` `definitionFormCardHtml`、`renderEntryMorphologyGroupEditor`、`styles.css`、三套皮肤 |
+| U3（已完成 2026-10-10） | 释义与形态组条目去框：编号槽、图标移除按钮、条目分隔 token | `app.js` `definitionFormCardHtml`、`renderEntryMorphologyGroupEditor`、`styles.css`、三套皮肤 |
 | U4 | 字段材质 token 与形态覆盖表单元格去框；降级与高对比路径 | 三套皮肤、`styles.css`、样式契约检查 |
 | U5 | 操作栏吸底（按 D3） | `styles.css`、皮肤 token |
 

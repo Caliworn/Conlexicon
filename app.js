@@ -12403,17 +12403,21 @@ function definitionOptionalFieldsHtml(definition = {}) {
   `;
 }
 
+// Mirrors the detail view: a plain number column, the fields, and an icon
+// remove action. Screen readers still hear "Definitions N".
 function definitionFormCardHtml(definition, index, removeAction) {
   return `
-    <div class="definition-form-header">
-      <strong><span data-i18n="definitions">${escapeHtml(t("definitions"))}</span> ${index + 1}</strong>
-      <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="${removeAction}" data-i18n="removeDefinition">${escapeHtml(t("removeDefinition"))}</button>
+    <span class="definition-number"><span class="visually-hidden" data-i18n="definitions">${escapeHtml(t("definitions"))}</span> ${index + 1}</span>
+    <div class="definition-form-fields">
+      <label>
+        <span data-i18n="meaning">${escapeHtml(t("meaning"))}</span>
+        <textarea data-field="meaning" rows="3">${escapeHtml(definitionFormValue(definition, "meaning"))}</textarea>
+      </label>
+      ${definitionOptionalFieldsHtml(definition)}
     </div>
-    <label>
-      <span data-i18n="meaning">${escapeHtml(t("meaning"))}</span>
-      <textarea data-field="meaning" rows="3">${escapeHtml(definitionFormValue(definition, "meaning"))}</textarea>
-    </label>
-    ${definitionOptionalFieldsHtml(definition)}
+    <button class="danger-ghost definition-remove-button" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="${removeAction}" data-app-tooltip="always" data-i18n-aria-label="removeDefinition" aria-label="${escapeHtml(t("removeDefinition"))}">
+      <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"></path></svg>
+    </button>
   `;
 }
 

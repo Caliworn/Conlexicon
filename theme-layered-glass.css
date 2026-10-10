@@ -54,6 +54,8 @@ body[data-ui-skin="layered-glass"] {
   --material-entry-detail-section-editing-surface: rgba(255, 255, 255, 0.64);
   --material-entry-detail-section-editing-outline: color-mix(in srgb, var(--ui-accent) 42%, transparent);
   --material-entry-detail-section-editing-edge: inset 0 1px 0 rgba(255, 255, 255, 0.98), inset 0 -1px 0 rgba(74, 96, 99, 0.16), 0 2px 6px rgba(20, 42, 45, 0.1);
+  --material-entry-editor-item-divider: rgba(74, 96, 99, 0.16);
+  --material-entry-editor-item-gap: 12px;
   --material-control-background: rgba(252, 254, 253, 0.7);
   --material-control-border: rgba(74, 96, 99, 0.26);
   --material-control-shadow: 0 4px 10px rgba(20, 42, 45, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.96), inset 0 2px 0 rgba(255, 255, 255, 0.18), inset 0 -1px 0 rgba(67, 101, 99, 0.11);
@@ -161,6 +163,8 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --material-entry-detail-section-editing-surface: rgba(255, 255, 255, 0.1);
   --material-entry-detail-section-editing-outline: color-mix(in srgb, var(--ui-accent) 46%, transparent);
   --material-entry-detail-section-editing-edge: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  --material-entry-editor-item-divider: rgba(222, 244, 239, 0.12);
+  --material-entry-editor-item-gap: 12px;
   --material-control-background: rgba(37, 49, 53, 0.7);
   --material-control-border: rgba(222, 244, 239, 0.2);
   --material-control-shadow: 0 5px 12px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 2px 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 rgba(0, 0, 0, 0.22);

@@ -71,6 +71,8 @@ body:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-glass"])) {
   --material-entry-detail-section-editing-surface: var(--material-entry-detail-section-background);
   --material-entry-detail-section-editing-outline: color-mix(in srgb, var(--ui-accent) 72%, var(--ui-border));
   --material-entry-detail-section-editing-edge: var(--ui-accent-focus-ring);
+  --material-entry-editor-item-divider: color-mix(in srgb, var(--ui-border) 80%, transparent);
+  --material-entry-editor-item-gap: 14px;
   --material-control-background: #ffffff;
   --material-control-border: var(--ui-border);
   --material-control-shadow: none;
@@ -173,6 +175,8 @@ body.dark-theme:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-gl
   --material-entry-detail-section-editing-surface: var(--material-entry-detail-section-background);
   --material-entry-detail-section-editing-outline: color-mix(in srgb, var(--ui-accent) 72%, var(--ui-border));
   --material-entry-detail-section-editing-edge: var(--ui-accent-focus-ring);
+  --material-entry-editor-item-divider: color-mix(in srgb, var(--ui-border) 80%, transparent);
+  --material-entry-editor-item-gap: 14px;
   --material-control-background: #1f282d;
   --material-control-border: var(--ui-border);
   --material-inset-background: #263238;
