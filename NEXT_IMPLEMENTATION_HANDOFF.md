@@ -68,8 +68,8 @@
 
 **第 1 阶段：数据一致性与本地安全边界**
 
-1. A02＋A03：`index.json` 的串行读改写与原子写入。[设计草案](docs/INDEX_WRITE_CONSISTENCY_PLAN.md)已于 2026-10-10 完成并复评，待用户确认后交 GPT 实装、Claude 审查。
-2. A06–A08：只监听本机，校验 Host 与写请求来源，写请求要求 JSON 类型，静态服务只公开前端资源（A07）。这也是以后支持用户上传文件（如背景图）的前提。
+1. A02＋A03：`index.json` 的串行读改写与原子写入。[设计](docs/INDEX_WRITE_CONSISTENCY_PLAN.md)已于 2026-10-10 确认，交 GPT 实装、Claude 审查。
+2. A06–A08：只监听本机，校验 Host 与写请求来源，写请求要求 JSON 类型，静态服务只公开前端资源（A07）。[实装规格](docs/HTTP_ACCESS_BOUNDARY_SPEC.md)已于 2026-10-10 写好，交 GPT 实装、Claude 审查。这也是以后支持用户上传文件（如背景图）的前提。
 
 **第 2 阶段：功能线**
 

@@ -1,6 +1,6 @@
 # Index Write Consistency Plan / 索引写入一致性设计（A02＋A03）
 
-状态：设计草案（2026-10-10），已做独立复评（第 8 节），待用户确认后交 GPT 6.1 sol 实装、Claude 审查（分工见交接文档第 6 节）。完成后把第 3、4 节中仍有效的契约迁入 [SQLite Backend Plan](SQLITE_BACKEND_PLAN.md) 的 `index.json` 一节，删除本文，并从[审计清单](AUDIT_OPEN_ISSUES.md)删除 A02、A03。
+状态：设计已确认（2026-10-10，已做独立复评，见第 8 节），交 GPT 6.1 sol 实装、Claude 审查（分工见交接文档第 6 节）。完成后把第 3、4 节中仍有效的契约迁入 [SQLite Backend Plan](SQLITE_BACKEND_PLAN.md) 的 `index.json` 一节，删除本文，并从[审计清单](AUDIT_OPEN_ISSUES.md)删除 A02、A03。
 
 ## 1. 现状（已对照代码确认）
 
