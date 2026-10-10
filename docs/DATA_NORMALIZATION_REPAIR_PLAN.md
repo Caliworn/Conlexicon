@@ -1,6 +1,6 @@
 # 数据规范化与 SQLite 读取修复计划
 
-状态：已复评（2026-09-30），尚未实装。初稿由 GPT 根据 2026-09-27 代码审查编写，复评后收窄为下文方案；删改内容及理由见第 8 节。2026-10-01 按修订后的 `AGENTS.md` 数据不变量新增阶段 4。
+状态：已复评（2026-09-30），尚未实装。初稿由 GPT 根据 2026-09-27 代码审查编写，复评后收窄为下文方案；删改内容及理由见第 8 节。2026-10-01 按修订后的 `AGENTS.md` 数据不变量新增阶段 4。2026-10-10 补充阶段 1 的实装交接范围（3.5），可交 GPT 实装。
 
 本计划处理[审计清单](AUDIT_OPEN_ISSUES.md)中的 A12、C01、C02 等审查发现：SQLite JSON 读取吞错、前后端规范化函数重复、settings 重复规范化、普通保存时的跨类型 ID 扫描，以及顺带确认的无用词条形态派生字段。它不涉及本地 HTTP 服务安全、皮肤与 CSS、词源拓扑或质量检查架构。
 
@@ -68,6 +68,30 @@
 - 同一测试另把 docs 或 corpus 改成损坏的 JSON，确认 `/entry-relations` 与 facets 仍正常返回，而导出等依赖该模块的操作报错。
 - 既有 SQLite contract 中保存、实体 ID 冲突和导出相关检查全部通过。
 - 形态自动／手动编辑、显示与保存的既有回归通过。
+
+### 3.5 实装交接（2026-10-10，交 GPT 6.1 sol 实装、Claude 审查）
+
+开工前按函数名重新定位，下列事实已于 2026-10-10 对照代码确认：
+
+- `parseJson` 仍是 6 处调用：`dictionaryQueryContext`（settings）、`morphologyTemplateGroupsFromDatabase`（`matchTagsJson`、`rowLabelsJson`、`columnLabelsJson`，各带 `|| "[]"`）、`baseDictionarySnapshot` 与 `exportDictionarySnapshot`（全部 `module_blobs`）。三个形态标签列的 `|| "[]"` 与 settings 的 `|| "{}"` 同属 3.1 所说“空字符串当作缺失”，一并删除。
+- 3.2 的三处调用点：`getEntryRelations`、`getEntryFacets` 直接调用 `baseDictionarySnapshot`；`queryAnalysis` 在 `partStats`／`tagStats`／`tagSetStats` 任务存在时调用。下游 `entryTagIdentitySnapshotFromDatabase`、`entryTagSetStatsFromDatabase`、`entrySummariesFromRows`、`entrySummary` 只读 `dictionary.id` 与 `dictionary.settings`，`lib/tag-model.js` 的 `displayTag`、`entryParts` 只取 `settings`，`dictionaryQueryContext()` 已提供这两项。实装时若发现读取其他字段，停止并报告，不扩大 `dictionaryQueryContext` 的返回内容。
+- 3.3：`app.js` 中 `normalizeEntry` 的 `morphology: morphologyEditorView(morphologyState)` 及其上方两行注释、`morphologyEditorView` 函数、`entryApiPayload` 中剥离 `morphology` 的解构，共三处；`lib/` 与脚本中没有其他消费者，`legacy-dictionary-migration.js` 读取的是旧 JSON 字段，不动。
+- 3.1 的文案：`app.js` 的 `apiErrorSystemJsonParse` 中英文各一处，以及 `docs/API_CONTRACT.md` 错误码表中 `system_json_parse` 的说明。
+
+**可改**：
+
+- `lib/sqlite-dictionary-repository.js`：仅限 `parseJson` 及其 6 处调用、上述三个只读方法的取数方式；
+- `app.js`：仅限 3.3 的三处与 `apiErrorSystemJsonParse` 的两条文案，不碰其他界面代码；
+- `scripts/check-sqlite-contract.js`：新增 3.4 的损坏用例（需直接改写 `module_blobs`，属于 SQLite 专属测试，不放进通用的 `repository-contract.js`）；受影响的既有 `scripts/check-*.js`；
+- 文档：`docs/API_CONTRACT.md` 的错误码说明、`CHANGELOG.md` 实际完成日期段（“修复”或“性能”，并注明 3.1 第 5 条的可见变化）、[审计清单](AUDIT_OPEN_ISSUES.md) A12 与 C02 中已解决部分、本文 3.5 与第 1 节对应现状、交接文档对应条目。
+
+**不改**：保存路径与 `conflictingEntityIdRecords`（阶段 4）、`lib/dictionary-model.js` 与前端其他规范化函数（阶段 2、3）、SQLite schema、`lib/api-routes.js` 与 `lib/api-error.js`、`styles.css`、`theme-*.css`、`index.html`。
+
+**约束**：遵守 `AGENTS.md` 的“防御性代码”“数据不变量”和测试规则；不新增错误码、不校验 JSON 顶层类型（3.1）、不缓存模块解析结果（3.2）、不写“字段不存在”或“不再读取某模块”的墓碑测试。交付时逐项列出新增或删除的检查及其对应本节条目，对应不上的删除。
+
+**验收命令**：对 `lib/sqlite-dictionary-repository.js`、`app.js` 和改动的检查脚本执行 `node --check`；`node scripts/check-sqlite-contract.js`；`node scripts/check-all.js`（SQLite 不可用必须失败）；`git diff --check`。3.3 只删除死代码、3.1 只改文案，不需要浏览器验收。
+
+完成后：本节与 3.1–3.4 中已实装的内容不再保留为计划，仍有效的契约（损坏模块按 `system_json_parse` 显式报错、只读接口只依赖 settings）写入 `docs/SQLITE_BACKEND_PLAN.md` 或 `docs/API_CONTRACT.md`；本文只留阶段 2–4。
 
 ## 4. 阶段 2：共享纯数据规则
 
@@ -186,6 +210,6 @@
 
 1. 对每个改动的 JavaScript 文件执行 `node --check`，包含 `app.js` 与新增模块、检查脚本。
 2. 运行 `node scripts/check-all.js`；SQLite 不可用必须失败。
-3. 阶段 2、3 改动前端状态与共享模型，需用临时数据目录做浏览器冒烟；阶段 1、4 只改后端，以 contract 测试为准。本计划不改视觉与布局，不需要逐宽度检查；无法完成的检查项按 `AGENTS.md` 逐项列出。
+3. 阶段 2、3 改动前端状态与共享模型，需用临时数据目录做浏览器冒烟；阶段 1、4 以 contract 测试为准（阶段 1 在 `app.js` 中只删死代码和改一条文案，见 3.5）。本计划不改视觉与布局，不需要逐宽度检查；无法完成的检查项按 `AGENTS.md` 逐项列出。
 4. 实现完成后按实际日期写 CHANGELOG，并在交接文档中删除已处理的技术债条目。本计划不改变 HTTP 契约；如果实现中改了错误码或保存范围，再同步 `docs/API_CONTRACT.md`。
 5. `git diff --check`，核对改动范围。
