@@ -1773,29 +1773,32 @@ label span {
   -webkit-backdrop-filter: var(--material-entry-detail-filter);
 }
 
-/* The header shares the section box geometry, transparent at rest, so hover
-   and partial editing only change the skin material and never move content.
-   Its divider is inset like the section hairlines. */
+/* The header keeps its content at the shell's content edge. A transparent
+   frame extends outward by the inset (offset by negative margins), so the
+   hover feedback appears around the content without moving it; the divider
+   stays at content width. While editing, the frame aligns with the sections. */
 .entry-display-header {
+  --entry-display-header-inset: 12px;
   position: relative;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
   flex-wrap: wrap;
-  max-width: calc(100% + 2 * var(--material-entry-detail-section-bleed));
-  margin: -14px calc(-1 * var(--material-entry-detail-section-bleed)) 0;
+  max-width: calc(100% + 2 * (var(--entry-display-header-inset) + 1px));
+  margin: calc(-1 * (var(--entry-display-header-inset) + 1px));
+  margin-bottom: 0;
   border: 1px solid transparent;
   border-radius: 6px;
-  padding: var(--material-entry-detail-section-padding);
+  padding: var(--entry-display-header-inset) var(--entry-display-header-inset) 20px;
   transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
 
 .entry-display-header::after {
   position: absolute;
-  right: var(--material-entry-detail-section-bleed);
+  right: var(--entry-display-header-inset);
   bottom: -1px;
-  left: var(--material-entry-detail-section-bleed);
+  left: var(--entry-display-header-inset);
   border-top: 1px solid var(--material-entry-detail-header-divider);
   content: "";
   pointer-events: none;
@@ -1841,6 +1844,9 @@ label span {
 }
 
 .entry-display-header[data-edit-section].partial-editing {
+  max-width: calc(100% + 2 * var(--material-entry-detail-section-bleed));
+  margin: 0 calc(-1 * var(--material-entry-detail-section-bleed));
+  padding: var(--material-entry-detail-section-padding);
   border-color: var(--material-entry-detail-section-editing-outline);
   background: var(--material-entry-detail-section-editing-surface);
   box-shadow: var(--material-entry-detail-section-editing-edge);
@@ -3306,7 +3312,8 @@ button.pending-source:focus-visible {
   border-bottom: 1px solid var(--material-entry-detail-header-divider);
 }
 
-#entryForm .entry-editor-lemma input {
+/* The id keeps this above the global text-input rule in both editors. */
+:is(#entryForm, .inline-partial-edit-form) .entry-editor-lemma input {
   height: auto;
   padding: 6px 12px;
   font-family: Georgia, "Times New Roman", serif;
@@ -6143,8 +6150,10 @@ textarea.ipa-single-line::-webkit-scrollbar {
   }
 
   .entry-display-header {
+    --entry-display-header-inset: 10px;
     flex-direction: column;
     gap: 14px;
+    padding-bottom: 18px;
   }
 
   .entry-display-header > div:first-child {

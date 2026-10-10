@@ -15724,7 +15724,7 @@ async function openPartialEdit(section) {
 
   if (section === "basic") {
     body.innerHTML = `
-      <label>
+      <label class="entry-editor-lemma">
         <span data-i18n="lemma">${escapeHtml(t("lemma"))}</span>
         <input data-field="lemma" aria-required="true" maxlength="80" value="${escapeHtml(entry.lemma)}">
       </label>
