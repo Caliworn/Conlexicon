@@ -158,40 +158,26 @@ async function checkStaticResources(port) {
 }
 
 async function checkPublicResourceContract() {
+  // Pages load resources through HTML, generated links, Lab images, workers and
+  // importScripts. Scan every public text file for static-looking paths instead
+  // of enumerating loaders: each referenced path must be public, and each public
+  // file must be referenced by another public file or be an entry page.
   const files = new Set(PUBLIC_STATIC_FILES);
-  for (const page of ["index.html", "liquid-glass-lab.html"]) {
-    const html = await fs.readFile(path.join(ROOT_DIR, page), "utf8");
-    for (const [, file] of html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/g)) {
-      assert.ok(files.has(file), `${page} script must be public: ${file}`);
-    }
-    for (const [, file] of html.matchAll(/<link\b[^>]*\brel=["']stylesheet["'][^>]*\bhref=["']([^"']+)["']/g)) {
-      // The lab's generated link elements interpolate the two URLs checked below.
-      if (!file.startsWith("${")) {
-        assert.ok(files.has(file), `${page} stylesheet must be public: ${file}`);
-      }
-    }
-    for (const [, file] of html.matchAll(/["'](assets\/liquid-glass-lab\/[^"']+|[^"']+\.css)["']/g)) {
-      assert.ok(files.has(file), `${page} runtime resource must be public: ${file}`);
+  const entryPages = new Set(["index.html", "liquid-glass-lab.html"]);
+  const staticPath = /["'`(]((?:\.\/)?(?:[\w-]+\/)*[\w.-]+\.(?:js|css|html|png|jpe?g|svg|json|woff2?))["'`)]/g;
+  const referenced = new Set();
+  for (const file of PUBLIC_STATIC_FILES.filter((name) => /\.(?:html|js|css)$/.test(name))) {
+    const text = await fs.readFile(path.join(ROOT_DIR, file), "utf8");
+    // Page scripts resolve against the page root; a worker resolves against its own URL.
+    const base = file.endsWith("-worker.js") ? path.posix.dirname(file) : "";
+    for (const [, reference] of text.matchAll(staticPath)) {
+      const resolved = path.posix.normalize(path.posix.join(base, reference));
+      referenced.add(resolved);
+      assert.ok(files.has(resolved), `${file} loads a path missing from the public allowlist: ${resolved}`);
     }
   }
-  // Workers load outside HTML: the configured map worker and the scripts it imports.
-  const workerUrls = new Set();
-  for (const source of ["app.js", "liquid-glass-lab.html", "lib/liquid-glass-engine.js"]) {
-    const text = await fs.readFile(path.join(ROOT_DIR, source), "utf8");
-    for (const [, file] of text.matchAll(/workerUrl\b[^"']*["']([^"']+\.js)["']/g)) workerUrls.add(file);
-  }
-  assert.ok(workerUrls.size > 0, "The Liquid Glass map worker URL must be discoverable");
-  for (const workerUrl of workerUrls) {
-    assert.ok(files.has(workerUrl), `Worker script must be public: ${workerUrl}`);
-    const worker = await fs.readFile(path.join(ROOT_DIR, workerUrl), "utf8");
-    for (const [, imported] of worker.matchAll(/importScripts\(\s*["']([^"']+)["']/g)) {
-      const resolved = path.posix.join(path.posix.dirname(workerUrl), imported);
-      assert.ok(files.has(resolved), `Worker import must be public: ${resolved}`);
-    }
-  }
-  const directoryImages = await fs.readdir(path.join(ROOT_DIR, "assets", "liquid-glass-lab"));
-  for (const file of directoryImages.filter((file) => /\.(jpg|png|jpeg|svg)$/.test(file))) {
-    assert.ok(files.has(`assets/liquid-glass-lab/${file}`), `Lab image must be public: ${file}`);
+  for (const file of files) {
+    assert.ok(referenced.has(file) || entryPages.has(file), `Public file is not loaded by any public page or script: ${file}`);
   }
   // A missing public file is an I/O failure, not a silent 404 fallback.
   const serveStatic = createStaticFileServer({ rootDir: ROOT_DIR, files: ["missing-public-file.js"] });
