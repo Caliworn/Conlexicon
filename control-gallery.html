@@ -174,9 +174,61 @@
     /* Double: a canvas-colored halo inside an accent ring, so one layer always
        contrasts with whatever is behind. It replaces the control's own shadow
        while focused. */
-    body.cg-body[data-cg-focus-scheme="double"] :is(:focus-visible, [data-cg-focus]):not(input, select, textarea) {
+    /* Ink: keyboard focus takes the body text color, so it carries no tone and
+       contrasts on every surface; text fields keep an accent "active input" edge. */
+    /* Ink with context: the planned production shape. A zero-specificity fallback
+       gives every focusable element the single ink ring; inside the navigation the
+       ring takes the navigation's own text color, which each skin already sets to
+       contrast its navigation surface, and sits inside the row. */
+    body.cg-body[data-cg-focus-scheme="ink-context"] :where(:focus-visible, [data-cg-focus]) {
+      outline: 2px solid var(--ui-focus);
+      outline-offset: 2px;
+    }
+
+    body.cg-body[data-cg-focus-scheme="ink-context"] .dictionary-panel {
+      --ui-focus: var(--material-navigation-text) !important;
+    }
+
+    body.cg-body[data-cg-focus-scheme="ink-context"] .dictionary-panel .tool-button:is(:focus-visible, [data-cg-focus]) {
+      outline: 2px solid var(--ui-focus) !important;
+      outline-offset: -2px !important;
+    }
+
+    body.cg-body:is([data-cg-focus-scheme="ink"], [data-cg-focus-scheme="ink-context"], [data-cg-focus-scheme^="double-ink"]) {
+      --ui-focus: var(--ui-text) !important;
+      --cg-field-focus: var(--ui-accent-hover);
+      --cg-field-glow: rgba(255, 255, 255, 0.7);
+    }
+
+    body.cg-body.dark-theme:is([data-cg-focus-scheme="ink"], [data-cg-focus-scheme="ink-context"], [data-cg-focus-scheme^="double-ink"]) {
+      --cg-field-focus: var(--ui-accent);
+      --cg-field-glow: rgba(255, 255, 255, 0.22);
+    }
+
+    body.cg-body:is([data-cg-focus-scheme="ink"], [data-cg-focus-scheme="ink-context"], [data-cg-focus-scheme^="double-ink"]) :is(input, select, textarea):is(:focus, [data-cg-focus]) {
+      border-color: var(--cg-field-focus) !important;
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--cg-field-focus) 22%, transparent) !important;
+    }
+
+    /* Glass candidate: in Liquid Glass an active field lights its own rim from the
+       inside (top highlight, accent hairline and a faint inner tint) instead of
+       growing an outer ring. Plain CSS, so it holds at every optical quality. */
+    body.cg-body[data-ui-skin="liquid-glass"]:is([data-cg-focus-scheme="double-ink-glass"], [data-cg-focus-scheme="ink-context"]) :is(input, select, textarea):is(:focus, [data-cg-focus]) {
+      box-shadow:
+        inset 0 1px 1px var(--cg-field-glow),
+        inset 0 0 0 1px color-mix(in srgb, var(--cg-field-focus) 40%, transparent),
+        inset 0 0 14px color-mix(in srgb, var(--cg-field-focus) 16%, transparent) !important;
+    }
+
+    body.cg-body:is([data-cg-focus-scheme="double"], [data-cg-focus-scheme^="double-ink"]) :is(:focus-visible, [data-cg-focus]):not(input, select, textarea) {
       outline: none !important;
       box-shadow: 0 0 0 2px var(--ui-canvas-bg), 0 0 0 4px var(--ui-focus) !important;
+    }
+
+    /* Navigation rows sit in a scrolling column that would clip an outer ring, so
+       the double ring is drawn inside the row (ink edge, canvas band within). */
+    body.cg-body:is([data-cg-focus-scheme="double"], [data-cg-focus-scheme^="double-ink"]) .dictionary-panel .tool-button:is(:focus-visible, [data-cg-focus]) {
+      box-shadow: inset 0 0 0 2px var(--ui-focus), inset 0 0 0 4px var(--ui-canvas-bg) !important;
     }
 
     body.cg-body[data-cg-focus-scheme="double"] :is(input, select, textarea):is(:focus, [data-cg-focus]) {
@@ -193,6 +245,21 @@
     .cg-subhead {
       margin: 18px 0 4px;
       font-size: 13.5px;
+    }
+
+    /* The product navigation is a sticky, full-height column; here it is an
+       in-flow card of its expanded width. Paint and optics stay product-owned. */
+    .cg-nav-shell {
+      position: relative !important;
+      inset: auto !important;
+      transform: none !important;
+      width: 260px !important;
+      max-width: 100% !important;
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      margin: 0 !important;
+      z-index: auto !important;
     }
 
     .cg-roles {
@@ -368,6 +435,10 @@
         <option value="dark-gold">压暗金色（仅浅色）</option>
         <option value="accent">强调色</option>
         <option value="double">双层强调色</option>
+        <option value="ink">中性墨色（文本框强调色）</option>
+        <option value="ink-context">中性墨色 + 导航上下文 + 全局兜底 + 液态玻璃文本框边缘提亮</option>
+        <option value="double-ink">双层中性墨色（文本框强调色）</option>
+        <option value="double-ink-glass">双层中性墨色 + 液态玻璃文本框边缘提亮</option>
       </select>
     </label>
     <button class="secondary-button" data-control-tone="neutral" id="cgRunCheck" type="button">运行全部自检</button>
@@ -420,6 +491,16 @@
       <div class="cg-specials" id="cgSearchFields"></div>
     </section>
 
+    <section>
+      <h2>导航</h2>
+      <p class="cg-note">产品导航外壳里的目的地按钮（经典为深色实底，两套玻璃为玻璃导航；液态玻璃中是 Q3 光学外壳）。经典皮肤的目的地按钮没有项目焦点规则，真实键盘聚焦时显示浏览器默认焦点环，强制的“焦点”格因此不显示任何焦点；两套玻璃皮肤用内偏移焦点环，避免被可滚动的导航列裁掉。</p>
+      <div class="cg-nav-row">
+        <aside class="dictionary-panel app-nav cg-nav-shell" data-nav-state="expanded">
+          <nav class="tool-list" aria-label="导航样本" id="cgNavList"></nav>
+        </aside>
+      </div>
+    </section>
+
     <section class="cg-roles-section">
       <h2>材质角色表面</h2>
       <p class="cg-note">产品各材质角色的空外壳，使用产品类名，对照页只把它们改为原位排列的固定尺寸。Liquid Glass Lab 的产品外观探针读取这里的夹具（以及上方“页面底 · 默认”的七种控件）。抽屉和移动顶栏的外观只在视口窄于 800px 时生效（与横竖比例无关）：宽窗口下它们显示在一个 480px 宽的内嵌视口中，跟随本页的皮肤、明暗与背景；窗口本身窄于 800px 时直接原位显示。</p>
@@ -460,8 +541,17 @@
       const SKINS = ["classic", "layered-glass", "liquid-glass"];
       const SKIN_LABELS = { classic: "经典", "layered-glass": "层叠玻璃", "liquid-glass": "液态玻璃" };
       const THEME_LABELS = { light: "浅色", dark: "暗色" };
-      const CONTEXT_LABELS = { page: "页面底", q1: "Q1 外壳", q3: "Q3 外壳", search: "列表搜索框" };
-      const FOCUS_SCHEME_LABELS = { current: "当前金色", "dark-gold": "压暗金色", accent: "强调色", double: "双层强调色" };
+      const CONTEXT_LABELS = { page: "页面底", q1: "Q1 外壳", q3: "Q3 外壳", search: "列表搜索框", nav: "导航" };
+      const FOCUS_SCHEME_LABELS = {
+        current: "当前金色",
+        "dark-gold": "压暗金色",
+        accent: "强调色",
+        double: "双层强调色",
+        ink: "中性墨色",
+        "ink-context": "中性墨色 + 导航上下文 + 全局兜底 + 玻璃文本框",
+        "double-ink": "双层中性墨色",
+        "double-ink-glass": "双层中性墨色 + 玻璃文本框",
+      };
       const FORCED_STATES = [
         [/:hover\b/g, "[data-cg-hover]"],
         [/:active\b/g, "[data-cg-active]"],
@@ -661,6 +751,29 @@
           for (let index = row.states.length; index < columns; index += 1) {
             container.append(document.createElement("div"));
           }
+        });
+      }
+
+      // Navigation destinations as index.html writes them, one per state.
+      function buildNav(list) {
+        const icon = '<span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path><path d="M14 2v6h6M8 13h8M8 17h6"></path></svg></span>';
+        [
+          ["default", "默认", {}],
+          ["hover", "悬浮", { "data-cg-hover": "" }],
+          ["current", "当前", { class: "tool-button active", "aria-current": "page" }],
+          ["focus", "焦点", { "data-cg-focus": "" }],
+          ["current-focus", "当前 + 焦点", { class: "tool-button active", "aria-current": "page", "data-cg-focus": "" }],
+          ["live", "实时（可悬浮、Tab）", {}],
+        ].forEach(([id, label, attributes]) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "tool-button";
+          setAttributes(button, attributes);
+          button.dataset.cgSpecimen = `nav/tool/${id}`;
+          if (id === "live") button.dataset.cgLive = "";
+          button.innerHTML = `${icon}<span class="tool-label"></span>`;
+          button.querySelector(".tool-label").textContent = label;
+          list.append(button);
         });
       }
 
@@ -944,9 +1057,16 @@
         let focusColor = null;
         if (outlineVisible) {
           focusColor = parseColor(computed.outlineColor);
-        } else if (element.matches("input, select, textarea")
-          || (document.body.dataset.cgFocusScheme === "double" && computed.boxShadow !== "none")) {
+        } else if (element.matches("input, select, textarea")) {
+          // Fields show focus with their painted edge, which may differ from the
+          // button ring color.
+          focusColor = parseColor(computed.borderTopColor);
+        } else if (document.body.dataset.cgFocusScheme?.startsWith("double") && computed.boxShadow !== "none") {
           focusColor = resolveColor(computed.getPropertyValue("--ui-focus").trim());
+          // A double ring is visible through whichever band stands out: the focus
+          // band on light ground, the canvas band on dark ground such as a navy nav.
+          const band = resolveColor(computed.getPropertyValue("--ui-canvas-bg").trim());
+          if (contrast(band, backdrop) > contrast(over(focusColor, backdrop), backdrop)) focusColor = band;
         }
         return {
           background,
@@ -1187,6 +1307,7 @@
         buildMatrix(container, container.dataset.cgContext, container.dataset.cgRows === "fields" ? FIELD_ROWS : ROWS);
       });
       buildSearchFields(document.getElementById("cgSearchFields"));
+      buildNav(document.getElementById("cgNavList"));
       buildSpecials(elements.specials);
       // Fixed-state specimens ignore the pointer and keyboard, so moving the mouse
       // never changes a column and Tab reaches only the live column.
