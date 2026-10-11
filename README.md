@@ -106,6 +106,12 @@ A standalone tuning and geometry diagnostic page is available at `http://localho
 
 独立的参数调试与几何诊断页位于 `http://localhost:4173/liquid-glass-lab.html`，只运行生产光学引擎，不调用应用 API，也不保存参数改动。五张来自 Unsplash 和 Pexels、具有明确许可的背景图，署名见 `THIRD_PARTY_NOTICES.md`。详见[液态玻璃规范](docs/LIQUID_GLASS_SKIN_SPEC.md)。
 
+### Control gallery / 控件对照页
+
+`http://localhost:4173/control-gallery.html` shows every semantic control recipe and its states side by side under each skin and theme, using the production stylesheets, and runs an in-page contrast and state check. It does not call application APIs or save anything. Open it through the local server: from a `file://` URL the browser blocks reading stylesheet rules, so forced states cannot be shown.
+
+`http://localhost:4173/control-gallery.html` 用生产样式表并排展示各语义控件配方及其状态，可切换皮肤与明暗，并在页内检查对比度和状态区分；不调用应用 API，也不保存任何内容。必须通过本地服务打开，直接打开文件时浏览器不允许读取样式规则，悬浮等状态无法强制显示。详见[样式皮肤规范](docs/STYLE_SKIN_PLAN.md)第 5 节。
+
 ## Data Storage / 数据存储
 
 ```text

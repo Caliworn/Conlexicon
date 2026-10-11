@@ -79,6 +79,22 @@ assert(
   !/(?:fetch\s*\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB|\/api\/)/.test(liquidGlassLab),
   "The standalone lab must not access product data, APIs, or persistent browser storage",
 );
+// The control gallery paints specimens only with production stylesheets, in the
+// product's load order, and stays isolated from product data like the Lab.
+const controlGallery = fs.readFileSync(path.join(ROOT_DIR, "control-gallery.html"), "utf8");
+const galleryStylesheets = [...controlGallery.matchAll(/<link rel="stylesheet" href="([^"]+)" data-product-style>/g)].map((match) => match[1]);
+assert.deepEqual(
+  galleryStylesheets,
+  ["theme-classic.css", "theme-layered-glass.css", "theme-liquid-glass.css", "styles.css"],
+  "The control gallery must load the production stylesheets in product order",
+);
+for (const [, source] of controlGallery.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
+  assert.doesNotThrow(() => new Function(source), "Control gallery inline script must be valid JavaScript");
+}
+assert(
+  !/(?:fetch\s*\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB|\/api\/)/.test(controlGallery),
+  "The control gallery must not access product data, APIs, or persistent browser storage",
+);
 assert(
   liquidGlassLab.includes('new URL("theme-liquid-glass.css", window.location.href)')
     && liquidGlassLab.includes('new URL("styles.css", window.location.href)')

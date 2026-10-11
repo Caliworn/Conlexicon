@@ -163,7 +163,7 @@ async function checkPublicResourceContract() {
   // of enumerating loaders: each referenced path must be public, and each public
   // file must be referenced by another public file or be an entry page.
   const files = new Set(PUBLIC_STATIC_FILES);
-  const entryPages = new Set(["index.html", "liquid-glass-lab.html"]);
+  const entryPages = new Set(["index.html", "liquid-glass-lab.html", "control-gallery.html"]);
   const staticPath = /["'`(]((?:\.\/)?(?:[\w-]+\/)*[\w.-]+\.(?:js|css|html|png|jpe?g|svg|json|woff2?))["'`)]/g;
   const referenced = new Set();
   for (const file of PUBLIC_STATIC_FILES.filter((name) => /\.(?:html|js|css)$/.test(name))) {
