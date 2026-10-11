@@ -1,6 +1,10 @@
 data/
-stress-test-data/
 node_modules/
 electron-shell/
 .DS_Store
 Thumbs.db
+
+# Local AI-tool configuration and scratch data
+.agents/
+.claude/
+.tmp/
