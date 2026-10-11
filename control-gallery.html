@@ -84,10 +84,15 @@
 
     .cg-matrix {
       display: grid;
-      grid-template-columns: 112px repeat(var(--cg-columns), minmax(104px, auto));
+      grid-template-columns: 100px repeat(var(--cg-columns), minmax(100px, auto));
       align-items: center;
-      gap: 12px 14px;
+      gap: 12px 10px;
       width: max-content;
+    }
+
+    /* Fields fill their container in the product; here they get a fixed width. */
+    .cg-matrix :is(input, select, textarea) {
+      width: 180px;
     }
 
     .cg-matrix > .cg-head {
@@ -139,6 +144,55 @@
       display: block;
       padding: 16px;
       border-radius: var(--radius-panel);
+    }
+
+    /* Fixed specimens and their shells are still pictures. A transition would leave
+       computed colors at the previous skin or state when the page switches and
+       reads at once, so only the live column keeps product motion. */
+    body.cg-body :not([data-cg-live]) {
+      transition: none !important;
+    }
+
+    /* Candidate focus schemes, temporary until the focus decision is made. They
+       only override the two focus tokens, except "double", which needs its own
+       ring. Production rules keep drawing every scheme. */
+    body.cg-body[data-cg-focus-scheme="dark-gold"]:not(.dark-theme) {
+      --ui-focus: #8a6100 !important;
+      --ui-focus-ring: 0 0 0 3px rgba(138, 97, 0, 0.22) !important;
+    }
+
+    body.cg-body:is([data-cg-focus-scheme="accent"], [data-cg-focus-scheme="double"]) {
+      --ui-focus: var(--ui-accent-hover) !important;
+      --ui-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ui-accent-hover) 22%, transparent) !important;
+    }
+
+    body.cg-body.dark-theme:is([data-cg-focus-scheme="accent"], [data-cg-focus-scheme="double"]) {
+      --ui-focus: var(--ui-accent) !important;
+      --ui-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 26%, transparent) !important;
+    }
+
+    /* Double: a canvas-colored halo inside an accent ring, so one layer always
+       contrasts with whatever is behind. It replaces the control's own shadow
+       while focused. */
+    body.cg-body[data-cg-focus-scheme="double"] :is(:focus-visible, [data-cg-focus]):not(input, select, textarea) {
+      outline: none !important;
+      box-shadow: 0 0 0 2px var(--ui-canvas-bg), 0 0 0 4px var(--ui-focus) !important;
+    }
+
+    body.cg-body[data-cg-focus-scheme="double"] :is(input, select, textarea):is(:focus, [data-cg-focus]) {
+      box-shadow: 0 0 0 2px var(--ui-canvas-bg), 0 0 0 4px var(--ui-focus) !important;
+    }
+
+    .cg-search-cell {
+      display: grid;
+      gap: 4px;
+      width: 260px;
+      max-width: 100%;
+    }
+
+    .cg-subhead {
+      margin: 18px 0 4px;
+      font-size: 13.5px;
     }
 
     .cg-roles {
@@ -308,6 +362,14 @@
         <option value="photo">照片（interior.jpg）</option>
       </select>
     </label>
+    <label>焦点方案
+      <select id="cgFocusScheme">
+        <option value="current">当前金色</option>
+        <option value="dark-gold">压暗金色（仅浅色）</option>
+        <option value="accent">强调色</option>
+        <option value="double">双层强调色</option>
+      </select>
+    </label>
     <button class="secondary-button" data-control-tone="neutral" id="cgRunCheck" type="button">运行全部自检</button>
   </header>
 
@@ -346,6 +408,18 @@
       </div>
     </section>
 
+    <section>
+      <h2>文本框</h2>
+      <p class="cg-note">文本框激活即显示聚焦样式（<code>:focus</code>，鼠标点进去也会出现），按钮只在键盘导航时显示焦点环（<code>:focus-visible</code>）。“聚焦”列下方的数字是聚焦边框或焦点环与背后底色的对比度。顶部“焦点方案”同时作用于按钮焦点环与文本框聚焦样式，只在本页覆盖焦点 token，用于选定方案。</p>
+      <div class="cg-scroll"><div class="cg-matrix" data-cg-context="page" data-cg-rows="fields"></div></div>
+      <article class="entry-display cg-context-q1">
+        <div class="cg-scroll"><div class="cg-matrix" data-cg-context="q1" data-cg-rows="fields"></div></div>
+      </article>
+      <h3 class="cg-subhead">词条列表搜索框</h3>
+      <p class="cg-note">产品的列表工具栏搜索控件（液态玻璃中为 Mail 胶囊搜索框，其他皮肤为普通输入框）。</p>
+      <div class="cg-specials" id="cgSearchFields"></div>
+    </section>
+
     <section class="cg-roles-section">
       <h2>材质角色表面</h2>
       <p class="cg-note">产品各材质角色的空外壳，使用产品类名，对照页只把它们改为原位排列的固定尺寸。Liquid Glass Lab 的产品外观探针读取这里的夹具（以及上方“页面底 · 默认”的七种控件）。抽屉和移动顶栏的外观只在视口窄于 800px 时生效（与横竖比例无关）：宽窗口下它们显示在一个 480px 宽的内嵌视口中，跟随本页的皮肤、明暗与背景；窗口本身窄于 800px 时直接原位显示。</p>
@@ -372,7 +446,7 @@
 
     <section class="cg-report" aria-live="polite">
       <h2>自检结果</h2>
-      <p class="cg-note">按三套皮肤 × 明暗逐一检查：文字对比度 ≥ 4.5（禁用项除外）；焦点环对比度 ≥ 3；悬浮相对默认、按下相对悬浮、禁用相对默认、选中相对未选中、选中悬浮相对普通悬浮、展开相对收起都应可见。“难以察觉”指底色色差 ΔE &lt; 5、1px 边框与文字 ΔE &lt; 15，且阴影与位移不变（滤镜只改亮度时也计入此类）；ΔE 按 CIE76 计算，阈值是经验值。</p>
+      <p class="cg-note">按三套皮肤 × 明暗逐一检查：文字对比度 ≥ 4.5（禁用项除外）；焦点环对比度 ≥ 3；悬浮相对默认、按下相对悬浮、禁用相对默认、选中相对未选中、选中悬浮相对普通悬浮、展开相对收起都应可见；每个禁用样本在悬浮时必须与禁用完全相同（检查时临时生成悬浮副本，读完即删，页面上不单列）。“难以察觉”指底色色差 ΔE &lt; 5、1px 边框与文字 ΔE &lt; 15，且阴影与位移不变（滤镜只改亮度时也计入此类）；ΔE 按 CIE76 计算，阈值是经验值。</p>
       <div id="cgReport"><p class="cg-note">尚未运行。</p></div>
     </section>
   </main>
@@ -386,11 +460,14 @@
       const SKINS = ["classic", "layered-glass", "liquid-glass"];
       const SKIN_LABELS = { classic: "经典", "layered-glass": "层叠玻璃", "liquid-glass": "液态玻璃" };
       const THEME_LABELS = { light: "浅色", dark: "暗色" };
-      const CONTEXT_LABELS = { page: "页面底", q1: "Q1 外壳", q3: "Q3 外壳" };
+      const CONTEXT_LABELS = { page: "页面底", q1: "Q1 外壳", q3: "Q3 外壳", search: "列表搜索框" };
+      const FOCUS_SCHEME_LABELS = { current: "当前金色", "dark-gold": "压暗金色", accent: "强调色", double: "双层强调色" };
       const FORCED_STATES = [
         [/:hover\b/g, "[data-cg-hover]"],
         [/:active\b/g, "[data-cg-active]"],
         [/:focus-visible\b/g, "[data-cg-focus]"],
+        // Text fields show focus on any :focus; keyboard focus implies both.
+        [/:focus(?![-\w])/g, "[data-cg-focus]"],
       ];
 
       const RECIPES = [
@@ -410,27 +487,20 @@
         ["pressed", "按下", { "data-cg-hover": "", "data-cg-active": "" }],
         ["focus", "焦点", { "data-cg-focus": "" }],
         ["disabled", "禁用", { disabled: "" }],
-        ["disabled-hover", "禁用 + 悬浮", { disabled: "", "data-cg-hover": "" }],
         ["live", "实时", {}],
       ];
 
-      const SELECTION_STATES = [
-        ["off", "未选中", { "aria-pressed": "false" }],
-        ["off-hover", "未选中悬浮", { "aria-pressed": "false", "data-cg-hover": "" }],
-        ["on", "选中", { "aria-pressed": "true" }],
-        ["on-hover", "选中悬浮", { "aria-pressed": "true", "data-cg-hover": "" }],
-        ["on-pressed", "选中按下", { "aria-pressed": "true", "data-cg-hover": "", "data-cg-active": "" }],
-        ["on-disabled", "选中禁用", { "aria-pressed": "true", disabled: "" }],
-        ["live", "实时（点击切换）", { "aria-pressed": "false" }],
-      ];
-
-      const DISCLOSURE_STATES = [
-        ["closed", "收起", { "aria-expanded": "false" }],
-        ["closed-hover", "收起悬浮", { "aria-expanded": "false", "data-cg-hover": "" }],
-        ["open", "展开", { "aria-expanded": "true" }],
-        ["open-hover", "展开悬浮", { "aria-expanded": "true", "data-cg-hover": "" }],
-        ["open-pressed", "展开按下", { "aria-expanded": "true", "data-cg-hover": "", "data-cg-active": "" }],
-        ["live", "实时（点击切换）", { "aria-expanded": "false" }],
+      // Persistent-state rows follow the action columns (default, hover, pressed,
+      // focus, disabled, live); null leaves a column empty. The off/on and
+      // closed/open rows share one specimen group, so checks compare across them,
+      // and only the first row carries the live specimen, which toggles itself.
+      const persistentStates = (prefix, label, attribute, value, live) => [
+        [prefix, label, { [attribute]: value }],
+        [`${prefix}-hover`, `${label}悬浮`, { [attribute]: value, "data-cg-hover": "" }],
+        [`${prefix}-pressed`, `${label}按下`, { [attribute]: value, "data-cg-hover": "", "data-cg-active": "" }],
+        [`${prefix}-focus`, `${label}焦点`, { [attribute]: value, "data-cg-focus": "" }],
+        [`${prefix}-disabled`, `${label}禁用`, { [attribute]: value, disabled: "" }],
+        live ? ["live", "实时（点击切换）", { [attribute]: value }] : null,
       ];
 
       const ROWS = [
@@ -440,17 +510,53 @@
           states: ACTION_STATES,
           build: () => controlButton(recipe),
         })),
-        {
+        ...[["off", "未选中", "false", true], ["on", "选中", "true", false]].map(([prefix, label, value, live]) => ({
           id: "selection",
-          label: "neutral 选中",
-          states: SELECTION_STATES,
+          groupLabel: "neutral 选中／未选中",
+          label: `neutral ${label}`,
+          states: persistentStates(prefix, label, "aria-pressed", value, live),
           build: () => controlButton({ tone: "neutral", className: "secondary-button", text: "词根模式", selection: true }),
+        })),
+        ...[["closed", "收起", "false", true], ["open", "展开", "true", false]].map(([prefix, label, value, live]) => ({
+          id: "disclosure",
+          groupLabel: "neutral 展开／收起",
+          label: `neutral ${label}`,
+          states: persistentStates(prefix, label, "aria-expanded", value, live),
+          build: disclosureButton,
+        })),
+      ];
+
+      const FIELD_STATES = [
+        ["default", "默认", {}],
+        ["focus", "聚焦", { "data-cg-focus": "" }],
+        ["disabled", "禁用", { disabled: "" }],
+        ["live", "实时", {}],
+      ];
+
+      const field = (tagName, setup) => () => {
+        const element = document.createElement(tagName);
+        setup(element);
+        return element;
+      };
+
+      const FIELD_ROWS = [
+        {
+          id: "field-text",
+          label: "单行输入",
+          states: FIELD_STATES,
+          build: field("input", (input) => { input.type = "text"; input.value = "示例文字"; }),
         },
         {
-          id: "disclosure",
-          label: "neutral 展开",
-          states: DISCLOSURE_STATES,
-          build: () => controlButton({ tone: "neutral", className: "secondary-button", text: "展开 ▾", disclosure: true }),
+          id: "field-select",
+          label: "下拉选择",
+          states: FIELD_STATES,
+          build: field("select", (select) => { select.innerHTML = "<option>选项一</option><option>选项二</option>"; }),
+        },
+        {
+          id: "field-textarea",
+          label: "多行输入",
+          states: FIELD_STATES,
+          build: field("textarea", (textarea) => { textarea.value = "示例文字"; textarea.rows = 2; }),
         },
       ];
 
@@ -461,15 +567,21 @@
         ["action", "default", "disabled", "禁用相对默认"],
         ["selection", "off", "on", "选中相对未选中"],
         ["selection", "off-hover", "on-hover", "选中悬浮相对未选中悬浮"],
+        ["selection", "off-hover", "off-pressed", "未选中按下相对悬浮"],
         ["selection", "on", "on-hover", "选中悬浮相对选中"],
+        ["selection", "on-hover", "on-pressed", "选中按下相对悬浮"],
+        ["selection", "off-disabled", "on-disabled", "选中禁用相对未选中禁用"],
         ["disclosure", "closed", "open", "展开相对收起"],
+        ["disclosure", "closed-hover", "closed-pressed", "收起按下相对悬浮"],
         ["disclosure", "open", "open-hover", "展开悬浮相对展开"],
+        ["disclosure", "open-hover", "open-pressed", "展开按下相对悬浮"],
       ];
 
       const elements = {
         skin: document.getElementById("cgSkin"),
         theme: document.getElementById("cgTheme"),
         backdrop: document.getElementById("cgBackdrop"),
+        focusScheme: document.getElementById("cgFocusScheme"),
         run: document.getElementById("cgRunCheck"),
         status: document.getElementById("cgStatus"),
         report: document.getElementById("cgReport"),
@@ -513,6 +625,15 @@
         return button;
       }
 
+      // The product's content disclosure (morphology tables, root folding), as app.js
+      // writes it: the chevron turns with aria-expanded.
+      function disclosureButton() {
+        const button = controlButton({ tone: "neutral", className: "content-disclosure-button", text: "", disclosure: true });
+        button.setAttribute("aria-label", "展开内容");
+        button.innerHTML = '<svg class="content-disclosure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>';
+        return button;
+      }
+
       function specimenCell(row, [stateId, stateLabel, attributes], context) {
         const cell = document.createElement("div");
         cell.className = "cg-cell";
@@ -521,25 +642,52 @@
         label.textContent = stateLabel;
         const specimen = setAttributes(row.build(), attributes);
         specimen.dataset.cgSpecimen = `${context}/${row.id}/${stateId}`;
-        if (stateId === "live") specimen.dataset.cgLive = "";
+        if (stateId === "live" || stateId.startsWith("live-")) specimen.dataset.cgLive = "";
         const metric = document.createElement("span");
         metric.className = "cg-metric";
         cell.append(label, specimen, metric);
         return cell;
       }
 
-      function buildMatrix(container, context) {
-        const columns = Math.max(...ROWS.map((row) => row.states.length));
+      function buildMatrix(container, context, rows) {
+        const columns = Math.max(...rows.map((row) => row.states.length));
         container.style.setProperty("--cg-columns", columns);
-        ROWS.forEach((row) => {
+        rows.forEach((row) => {
           const label = document.createElement("div");
           label.className = "cg-row-label";
           label.textContent = row.label;
           container.append(label);
-          row.states.forEach((state) => container.append(specimenCell(row, state, context)));
+          row.states.forEach((state) => container.append(state ? specimenCell(row, state, context) : document.createElement("div")));
           for (let index = row.states.length; index < columns; index += 1) {
             container.append(document.createElement("div"));
           }
+        });
+      }
+
+      // The list toolbar search control as index.html writes it; Liquid Glass styles
+      // it only inside .entry-list-toolbar under the Mail layout.
+      function buildSearchFields(container) {
+        FIELD_STATES.forEach(([stateId, stateLabel, attributes]) => {
+          const cell = document.createElement("div");
+          cell.className = "cg-search-cell";
+          const label = document.createElement("span");
+          label.className = "cg-cell-state";
+          label.textContent = stateLabel;
+          const toolbar = document.createElement("div");
+          toolbar.className = "filter-row entry-list-toolbar";
+          toolbar.innerHTML = `
+            <div class="entry-search-control">
+              <div class="entry-mail-search-surface" aria-hidden="true"></div>
+              <svg class="nav-icon entry-mail-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg>
+              <input type="search" placeholder="搜索词形、释义、标签" value="lemma">
+            </div>`;
+          const input = setAttributes(toolbar.querySelector("input"), attributes);
+          input.dataset.cgSpecimen = `search/mail-search/${stateId}`;
+          if (stateId === "live") input.dataset.cgLive = "";
+          const metric = document.createElement("span");
+          metric.className = "cg-metric";
+          cell.append(label, toolbar, metric);
+          container.append(cell);
         });
       }
 
@@ -755,14 +903,11 @@
         return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
       }
 
-      // A surface's own paint: the semantic resolver output, else its background,
-      // else a Liquid Glass tint painted by the optical layer.
+      // A surface's own paint: what is actually painted, so a skin rule that bypasses
+      // the recipe still shows. A transparent surface may instead carry the tint the
+      // Liquid Glass optical layer paints.
       function surfaceColor(element) {
         const computed = getComputedStyle(element);
-        if (element.hasAttribute("data-control-tone")) {
-          const current = computed.getPropertyValue("--control-current-background").trim();
-          if (current) return resolveColor(current);
-        }
         const background = parseColor(computed.backgroundColor);
         if (background.a > 0) return background;
         const tint = computed.getPropertyValue("--liquid-glass-surface-tint").trim();
@@ -770,8 +915,8 @@
       }
 
       function containerSurface(element) {
-        // The Mail toolbar paints through its decorative surface leaf.
-        const leaf = element.querySelector?.(":scope > .entry-mail-tools-surface");
+        // The Mail toolbar and search control paint through decorative surface leaves.
+        const leaf = element.querySelector?.(":scope > :is(.entry-mail-tools-surface, .entry-mail-search-surface)");
         return leaf && getComputedStyle(leaf).display !== "none" ? leaf : element;
       }
 
@@ -794,6 +939,15 @@
         const border = borderWidth > 0 ? over(parseColor(computed.borderTopColor), backdrop) : background;
         const color = over(parseColor(computed.color), background);
         const outlineVisible = computed.outlineStyle !== "none" && parseFloat(computed.outlineWidth) > 0;
+        // Focus shows as an outline on buttons, as a focus-colored border on text
+        // fields, and as a box-shadow ring in the candidate "double" scheme.
+        let focusColor = null;
+        if (outlineVisible) {
+          focusColor = parseColor(computed.outlineColor);
+        } else if (element.matches("input, select, textarea")
+          || (document.body.dataset.cgFocusScheme === "double" && computed.boxShadow !== "none")) {
+          focusColor = resolveColor(computed.getPropertyValue("--ui-focus").trim());
+        }
         return {
           background,
           border,
@@ -802,7 +956,11 @@
           filter: computed.filter,
           transform: computed.transform,
           textContrast: contrast(color, background),
-          focusContrast: outlineVisible ? contrast(over(parseColor(computed.outlineColor), backdrop), backdrop) : null,
+          // Icon-only controls are non-text graphics: WCAG 1.4.11 asks 3:1, not 4.5:1.
+          inkThreshold: element.matches("input, select, textarea") || element.textContent.trim() ? 4.5 : 3,
+          // A disclosure's state shows in its turning chevron, not in its own box.
+          iconTransform: [...element.querySelectorAll("svg")].map((icon) => getComputedStyle(icon).transform).join(" "),
+          focusContrast: focusColor ? contrast(over(focusColor, backdrop), backdrop) : null,
           disabled: element.matches(":disabled"),
         };
       }
@@ -814,12 +972,13 @@
         const shadowChanged = from.shadow !== to.shadow;
         const filterChanged = from.filter !== to.filter;
         const transformChanged = from.transform !== to.transform;
-        if (background < 0.5 && border < 0.5 && color < 0.5 && !shadowChanged && !filterChanged && !transformChanged) {
+        const iconChanged = from.iconTransform !== to.iconTransform;
+        if (background < 0.5 && border < 0.5 && color < 0.5 && !shadowChanged && !filterChanged && !transformChanged && !iconChanged) {
           return { level: "same", detail: "完全相同" };
         }
         const detail = `ΔE 底 ${background.toFixed(1)} · 边 ${border.toFixed(1)} · 字 ${color.toFixed(1)}`
-          + `${shadowChanged ? " · 阴影变" : ""}${filterChanged ? " · 滤镜变" : ""}${transformChanged ? " · 位移变" : ""}`;
-        const visible = background >= 5 || border >= 15 || color >= 15 || shadowChanged || transformChanged;
+          + `${shadowChanged ? " · 阴影变" : ""}${filterChanged ? " · 滤镜变" : ""}${transformChanged ? " · 位移变" : ""}${iconChanged ? " · 图标转动" : ""}`;
+        const visible = background >= 5 || border >= 15 || color >= 15 || shadowChanged || transformChanged || iconChanged;
         return { level: visible ? "ok" : "faint", detail };
       }
 
@@ -845,7 +1004,7 @@
 
       function annotateMetrics(readings) {
         document.querySelectorAll("[data-cg-specimen]").forEach((element) => {
-          const metric = element.nextElementSibling?.classList.contains("cg-metric") ? element.nextElementSibling : null;
+          const metric = element.closest(".cg-cell, .cg-search-cell")?.querySelector(":scope > .cg-metric");
           if (!metric) return;
           const reading = readings.get(element.dataset.cgSpecimen);
           if (!reading) {
@@ -855,10 +1014,12 @@
           }
           const focus = element.hasAttribute("data-cg-focus");
           const value = focus ? reading.focusContrast : reading.textContrast;
-          const threshold = focus ? 3 : 4.5;
+          const threshold = focus ? 3 : reading.inkThreshold;
           metric.textContent = value === null ? "无焦点环" : `${focus ? "环 " : ""}${value.toFixed(2)}`;
           metric.dataset.level = reading.disabled ? "info" : value === null || value < threshold ? "fail" : "ok";
-          metric.title = focus ? "焦点环与背后底色的对比度（≥ 3）" : "文字与底色的对比度（≥ 4.5）";
+          metric.title = focus
+            ? "焦点环或聚焦边框与背后底色的对比度（≥ 3）"
+            : reading.inkThreshold === 3 ? "图标与底色的对比度（≥ 3）" : "文字与底色的对比度（≥ 4.5）";
         });
       }
 
@@ -868,23 +1029,39 @@
         return readings;
       }
 
-      function evaluate(readings, skin, theme) {
+      // Disabled controls must ignore hover. Every disabled specimen gets a hovered
+      // twin in the same place, is read against it, and the twin is removed, so the
+      // page shows no extra column for a state that should look identical.
+      function disabledHoverChanges() {
+        return [...specimens()].filter(([id]) => id.endsWith("disabled")).flatMap(([id, element]) => {
+          const twin = element.cloneNode(true);
+          twin.removeAttribute("data-cg-specimen");
+          twin.setAttribute("data-cg-hover", "");
+          element.after(twin);
+          const result = difference(readSpecimen(element), readSpecimen(twin));
+          twin.remove();
+          return result.level === "same" ? [] : [{ id, detail: result.detail }];
+        });
+      }
+
+      function evaluate(readings, skin, theme, hoverOnDisabled) {
         const findings = [];
         const combo = `${SKIN_LABELS[skin]} ${THEME_LABELS[theme]}`;
         const push = (level, where, check, detail) => findings.push({ level, combo, where, check, detail });
         readings.forEach((reading, id) => {
           const [context, row, state] = id.split("/");
           const where = `${CONTEXT_LABELS[context] || "特例"} · ${row} · ${state}`;
-          if (state === "focus") {
+          if (state === "focus" || state.endsWith("-focus")) {
             if (reading.focusContrast === null) push("fail", where, "焦点环", "未显示焦点环");
             else if (reading.focusContrast < 3) push("fail", where, "焦点环对比度", reading.focusContrast.toFixed(2));
-          } else if (!reading.disabled && reading.textContrast < 4.5) {
-            push("fail", where, "文字对比度", reading.textContrast.toFixed(2));
+          } else if (!reading.disabled && reading.textContrast < reading.inkThreshold) {
+            push("fail", where, reading.inkThreshold === 3 ? "图标对比度" : "文字对比度", reading.textContrast.toFixed(2));
           }
         });
         const contexts = [...new Set([...readings.keys()].map((id) => id.split("/")[0]))];
         contexts.filter((context) => context !== "special").forEach((context) => {
-          ROWS.forEach((row) => {
+          // One pass per specimen group: split rows (off/on, closed/open) share theirs.
+          [...new Map(ROWS.map((row) => [row.id, { ...row, label: row.groupLabel || row.label }])).values()].forEach((row) => {
             const kind = RECIPES.some((recipe) => recipe.id === row.id) ? "action" : row.id;
             STATE_PAIRS.filter(([pairKind]) => pairKind === kind).forEach(([, from, to, label]) => {
               const first = readings.get(`${context}/${row.id}/${from}`);
@@ -895,11 +1072,6 @@
                 push(result.level === "same" ? "fail" : "warn", `${CONTEXT_LABELS[context]} · ${row.label}`, label, result.detail);
               }
             });
-            const disabled = readings.get(`${context}/${row.id}/disabled`);
-            const disabledHover = readings.get(`${context}/${row.id}/disabled-hover`);
-            if (disabled && disabledHover && difference(disabled, disabledHover).level !== "same") {
-              push("fail", `${CONTEXT_LABELS[context]} · ${row.label}`, "禁用时不应有悬浮反馈", difference(disabled, disabledHover).detail);
-            }
           });
         });
         const specialPairs = [
@@ -921,6 +1093,10 @@
           const result = difference(first, second);
           if (result.level !== "ok") push(result.level === "same" ? "fail" : "warn", "特例", label, result.detail);
         });
+        hoverOnDisabled.forEach(({ id, detail }) => {
+          const [context, row, state] = id.split("/");
+          push("fail", `${CONTEXT_LABELS[context] || "特例"} · ${row} · ${state}`, "禁用时不应有悬浮反馈", detail);
+        });
         return findings;
       }
 
@@ -929,7 +1105,7 @@
         const warns = findings.length - fails;
         const summary = document.createElement("p");
         summary.className = "cg-summary";
-        summary.textContent = `已检查 ${combos} 种皮肤与主题组合：${fails} 项未达标，${warns} 项难以察觉。`;
+        summary.textContent = `焦点方案“${FOCUS_SCHEME_LABELS[elements.focusScheme.value]}”下已检查 ${combos} 种皮肤与主题组合：${fails} 项未达标，${warns} 项难以察觉。`;
         elements.report.replaceChildren(summary);
         if (!findings.length) return;
         const table = document.createElement("table");
@@ -953,6 +1129,7 @@
       function render() {
         applyCombination(elements.skin.value, elements.theme.value);
         document.body.classList.toggle("cg-photo", elements.backdrop.value === "photo");
+        document.body.dataset.cgFocusScheme = elements.focusScheme.value;
         annotateMetrics(readAll());
         syncMobileFrame();
       }
@@ -979,7 +1156,7 @@
         // Before the embedded page finishes loading there is nothing to sync; its load
         // event syncs again.
         if (!frameDocument?.getElementById("cgSkin")) return;
-        [["cgSkin", elements.skin], ["cgTheme", elements.theme], ["cgBackdrop", elements.backdrop]].forEach(([id, source]) => {
+        [["cgSkin", elements.skin], ["cgTheme", elements.theme], ["cgBackdrop", elements.backdrop], ["cgFocusScheme", elements.focusScheme]].forEach(([id, source]) => {
           const select = frameDocument.getElementById(id);
           if (select.value === source.value) return;
           select.value = source.value;
@@ -996,7 +1173,7 @@
         SKINS.forEach((skin) => {
           ["light", "dark"].forEach((theme) => {
             applyCombination(skin, theme);
-            findings.push(...evaluate(readAll(), skin, theme));
+            findings.push(...evaluate(readAll(), skin, theme, disabledHoverChanges()));
             combos += 1;
           });
         });
@@ -1007,8 +1184,9 @@
 
       document.body.append(colorProbe);
       document.querySelectorAll("[data-cg-context]").forEach((container) => {
-        buildMatrix(container, container.dataset.cgContext);
+        buildMatrix(container, container.dataset.cgContext, container.dataset.cgRows === "fields" ? FIELD_ROWS : ROWS);
       });
+      buildSearchFields(document.getElementById("cgSearchFields"));
       buildSpecials(elements.specials);
       // Fixed-state specimens ignore the pointer and keyboard, so moving the mouse
       // never changes a column and Tab reaches only the live column.
@@ -1023,7 +1201,7 @@
         if (live.classList.contains("entry-card")) live.classList.toggle("active");
       });
       // Switching never depends on rule cloning, so a cloning failure cannot freeze the page.
-      [elements.skin, elements.theme, elements.backdrop].forEach((select) => select.addEventListener("change", render));
+      [elements.skin, elements.theme, elements.backdrop, elements.focusScheme].forEach((select) => select.addEventListener("change", render));
       elements.run.addEventListener("click", runAllChecks);
       try {
         // file:// pages may not read stylesheet rules (Chrome treats each file as its own origin).
