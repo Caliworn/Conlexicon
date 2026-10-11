@@ -8924,6 +8924,8 @@ function renderEtymology(entry, showEmptySections = false, relationState = { sta
         const accessibleName = [lemma, detail?.spoken].filter(Boolean).join(" ");
         const button = document.createElement("button");
         button.className = "source-link";
+        button.dataset.controlTone = "accent";
+        button.dataset.controlEmphasis = "tinted";
         button.type = "button";
         button.textContent = lemma;
         if (detail) {
@@ -8942,6 +8944,8 @@ function renderEtymology(entry, showEmptySections = false, relationState = { sta
         const pending = document.createElement("button");
         pending.type = "button";
         pending.className = "source-link pending-source";
+        pending.dataset.controlTone = "accent";
+        pending.dataset.controlEmphasis = "outline";
         pending.textContent = sourceName;
         pending.setAttribute("aria-label", formatText("createSourceEntry", { source: sourceName }));
         pending.addEventListener("click", () => beginSourceEntry(entry, sourcePosition));
@@ -11750,7 +11754,7 @@ function analysisMetricCard(label, value, note = "", action = null) {
 
 function analysisCard(title, body, options = {}) {
   const destination = options.destinationPage
-    ? `<button type="button" class="analysis-card-navigation" data-analysis-destination-page="${escapeHtml(options.destinationPage)}"${options.destinationSubpage ? ` data-analysis-destination-subpage="${escapeHtml(options.destinationSubpage)}"` : ""}><span>${escapeHtml(aText("详情", "Details"))}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button>`
+    ? `<button type="button" class="analysis-card-navigation" data-control-tone="neutral" data-analysis-destination-page="${escapeHtml(options.destinationPage)}"${options.destinationSubpage ? ` data-analysis-destination-subpage="${escapeHtml(options.destinationSubpage)}"` : ""}><span>${escapeHtml(aText("详情", "Details"))}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button>`
     : "";
   const className = ["analysis-card", options.className].filter(Boolean).join(" ");
   return `<article class="${escapeHtml(className)}"><header class="analysis-card-header"><h3>${escapeHtml(title)}</h3>${destination}</header>${body}</article>`;

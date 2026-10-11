@@ -188,8 +188,9 @@ for (const [source, lightSelector, darkSelector] of [
           return values[name].replace(/var\((--[a-z0-9-]+)\)/g, (_, token) => resolve(token, depth + 1));
         };
         const colorToken = tone === "neutral" ? "--ui-text" : `--ui-${tone}`;
-        assert.equal(resolve("--control-color"), resolve(emphasis === "solid"
-          ? "--control-tone-on-solid" : colorToken));
+        // Tinted ink sits on the tone's weak fill, so it uses the deeper hover ink.
+        assert.equal(resolve("--control-color"), resolve(emphasis === "solid" ? "--control-tone-on-solid"
+          : emphasis === "tinted" ? "--control-tone-hover-color" : colorToken));
         assert.equal(resolve("--control-border"), tone === "neutral" ? resolve("--ui-border")
           : emphasis === "outline" ? resolve(colorToken) : "transparent");
         const background = { outline: "--material-panel-background",

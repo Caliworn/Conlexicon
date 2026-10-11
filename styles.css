@@ -1449,8 +1449,11 @@ label span {
   --control-pressed-background: color-mix(in srgb, var(--control-tone-tint) 90%, var(--control-tone-color));
 }
 
+/* Ink sits on the tone's own weak fill, so it takes the deeper hover ink to keep
+   accent text readable; danger ink is already deep enough and is unchanged. */
 [data-control-emphasis="tinted"] {
   --control-background: var(--control-tone-tint);
+  --control-color: var(--control-tone-hover-color);
 }
 
 [data-control-emphasis="solid"] {
@@ -2043,11 +2046,9 @@ label span {
   justify-self: start;
   max-width: 100%;
   min-height: 32px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid;
   border-radius: var(--radius-control);
   padding: 0 10px;
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent-hover);
   font-weight: 900;
 }
 
@@ -2261,16 +2262,11 @@ button.derived-link:hover {
   font-weight: 800;
 }
 
-.pending-source {
+/* Still resolving whether the source exists: a placeholder, not a control. */
+span.pending-source {
+  border-color: var(--ui-border);
   color: var(--ui-text-muted);
   background: var(--material-inset-background);
-}
-
-button.pending-source:hover,
-button.pending-source:focus-visible {
-  border-color: var(--ui-accent);
-  color: var(--ui-accent-hover);
-  background: var(--ui-accent-soft);
 }
 
 .gloss-block {
@@ -2657,12 +2653,11 @@ button.pending-source:focus-visible {
   gap: 12px;
 }
 
-.morphology-drag-handle {
+/* Drag grips are not commands: no recipe, no optical surface, only a hover cue. */
+:is(.morphology-drag-handle, .ipa-rule-drag-handle) {
   display: inline-grid;
   place-items: center;
-  flex: 0 0 auto;
   width: 32px;
-  min-height: 38px;
   padding: 0;
   border: 0;
   border-radius: 6px;
@@ -2674,14 +2669,18 @@ button.pending-source:focus-visible {
   user-select: none;
 }
 
-.morphology-drag-handle:hover,
-.morphology-drag-handle:focus-visible {
+:is(.morphology-drag-handle, .ipa-rule-drag-handle):is(:hover, :focus-visible) {
   background: var(--material-inset-background);
   color: var(--ui-text);
 }
 
-.morphology-drag-handle:active {
+:is(.morphology-drag-handle, .ipa-rule-drag-handle):active {
   cursor: grabbing;
+}
+
+.morphology-drag-handle {
+  flex: 0 0 auto;
+  min-height: 38px;
 }
 
 .morphology-config-card {
@@ -4155,11 +4154,9 @@ button.pending-source:focus-visible {
   align-items: center;
   gap: 3px;
   min-height: 28px;
-  border: 1px solid var(--material-inset-border);
+  border: 1px solid;
   border-radius: 6px;
   padding: 4px 6px 4px 9px;
-  background: var(--material-inset-background);
-  color: var(--ui-accent-hover);
   font: inherit;
   font-size: 0.78rem;
   font-weight: 850;
@@ -4174,13 +4171,6 @@ button.pending-source:focus-visible {
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 2;
-}
-
-.analysis-card-navigation:hover,
-.analysis-card-navigation:focus-visible {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent);
 }
 
 .analysis-card h4 {
@@ -4609,7 +4599,6 @@ button.analysis-bar-label:hover,
 
 .analysis-issue-list li[data-entry-id]:hover {
   border-color: var(--ui-accent);
-  box-shadow: var(--ui-accent-focus-ring);
 }
 
 .analysis-issue-list li > span {
@@ -4853,29 +4842,7 @@ button.analysis-bar-label:hover,
 }
 
 .ipa-rule-drag-handle {
-  display: inline-grid;
-  place-items: center;
-  width: 32px;
   height: 44px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--ui-text-muted);
-  font-size: 1rem;
-  font-weight: 900;
-  cursor: grab;
-  user-select: none;
-}
-
-.ipa-rule-drag-handle:hover,
-.ipa-rule-drag-handle:focus-visible {
-  background: var(--material-inset-background);
-  color: var(--ui-text);
-}
-
-.ipa-rule-drag-handle:active {
-  cursor: grabbing;
 }
 
 textarea.ipa-single-line {

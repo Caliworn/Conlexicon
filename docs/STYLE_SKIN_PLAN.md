@@ -42,7 +42,7 @@ accent 与 danger 必须明确选择 outline、tinted 或 solid。契约按上�
 | emphasis | 默认底色 / 边框 | 用途 |
 | --- | --- | --- |
 | outline | 同皮肤 panel 中性底 / tone 色 | 描边操作 |
-| tinted | tone 弱底 / 初始透明边框 | 弱强调／危险操作 |
+| tinted | tone 弱底 / 初始透明边框；文字用 tone 的 hover 色（accent 为 `--ui-accent-hover`，2026-10-11） | 弱强调／危险操作，已建来源链接 |
 | solid | tone 实色 / 初始透明边框 | 高强调操作 |
 
 局部 `--control-tone-*` 从当前皮肤的 `--ui-*` / `--material-*` 取值；
