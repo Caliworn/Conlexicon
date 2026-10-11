@@ -549,6 +549,7 @@ const i18n = {
     etymologyInfo: "来源与说明",
     sourceEntry: "来源词条",
     sourceReferenceHint: "选择建议添加引用；纯文本保留在输入框，以逗号分隔。拖动卡片排序，或聚焦卡片后按 Alt+方向键。",
+    sourceReferenceHintShort: "选择候选以链接词条，纯文本用逗号分隔。",
     sourceCandidatesLoading: "正在查找…",
     sourceCandidatesMore: "共 {total} 项，继续输入以缩小范围",
     sourceCandidatesFailed: "候选加载失败",
@@ -1168,6 +1169,7 @@ const i18n = {
     etymologyInfo: "Source and Notes",
     sourceEntry: "Source Entry",
     sourceReferenceHint: "Choose a suggestion to link an entry. Keep plain text here, separated by commas. Drag a card, or focus it and press Alt+arrow keys to reorder.",
+    sourceReferenceHintShort: "Pick a suggestion to link an entry; separate plain text with commas.",
     sourceCandidatesLoading: "Searching…",
     sourceCandidatesMore: "{total} matches. Keep typing to narrow them down.",
     sourceCandidatesFailed: "Couldn't load suggestions",
@@ -12884,11 +12886,13 @@ function renderSourceReferenceTokens(input) {
     tokens = document.createElement("span");
     tokens.dataset.sourceReferenceTokens = "true";
     tokens.className = "source-reference-tokens";
+    tokens.setAttribute("role", "list");
     input.before(tokens);
     const hint = document.createElement("small");
     hint.className = "source-reference-hint";
-    hint.dataset.i18n = "sourceReferenceHint";
-    hint.textContent = t("sourceReferenceHint");
+    hint.setAttribute("aria-hidden", "true");
+    hint.dataset.i18n = "sourceReferenceHintShort";
+    hint.textContent = t("sourceReferenceHintShort");
     input.parentElement.append(hint);
   }
   tokens.replaceChildren();
@@ -12950,6 +12954,10 @@ function renderSourceReferenceTokens(input) {
   (state?.sources || []).forEach((source, index) => {
     const token = document.createElement("span");
     token.className = "source-reference-card";
+    token.dataset.controlTone = "accent";
+    token.dataset.controlEmphasis = "tinted";
+    token.setAttribute("role", "listitem");
+    token.setAttribute("aria-keyshortcuts", "Alt+ArrowLeft Alt+ArrowRight Alt+ArrowUp Alt+ArrowDown");
     token.tabIndex = 0;
     token.draggable = true;
     token.addEventListener("pointerdown", (event) => {
@@ -13074,9 +13082,10 @@ function bindSourceAutocompleteInput(input) {
   }
   const field = input.closest(".source-reference-field");
   // The composite field is not a label: its buttons must never become a
-  // label's implicit control. Non-interactive space only focuses the input.
+  // label's implicit control. Non-interactive space only focuses the input;
+  // a clicked card keeps focus so Alt+arrow reordering can follow.
   field?.addEventListener("click", (event) => {
-    if (event.target.closest("button, input, textarea, select, a, label, [role='option']")) return;
+    if (event.target.closest("button, input, textarea, select, a, label, [role='option'], .source-reference-card")) return;
     input.focus();
   });
   field?.addEventListener("focusout", (event) => {

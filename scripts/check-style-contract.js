@@ -469,7 +469,14 @@ assert(!/--(?:material-)?control-(?:hover-|pressed-)?shadow/.test(
     liquidGlassEngineApi.COMPACT_CONTROL_SELECTOR,
     ".analysis-page-tabs button, .analysis-subpage-tabs button",
     "#displayDerived .derived-link, #fullEditDerived .derived-link",
+    // A source card only holds its remove button, which is part of the card
+    // and carries no semantic recipe.
+    ".source-reference-card",
   ]);
+  const removeButton = app.slice(app.indexOf('remove.className = "source-reference-remove";'),
+    app.indexOf("token.append(label, remove);"));
+  assert(removeButton && !removeButton.includes("controlTone"),
+    "The source card's remove button must stay part of the card, without its own recipe");
   const engineOwners = liquidGlassEngineApi.SURFACE_ROLE_DEFINITIONS
     .filter(({ sampleBackdrop, selector }) => sampleBackdrop && !leafSurfaces.has(selector))
     .flatMap(({ selector, controlsWithin }) => (controlsWithin || selector).split(",").map((value) => value.trim()));
