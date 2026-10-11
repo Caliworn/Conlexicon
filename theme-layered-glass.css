@@ -23,8 +23,10 @@ body[data-ui-skin="layered-glass"] {
   --ui-warning-badge-text: #805300;
   --ui-danger: #b43f46;
   --ui-danger-soft: rgba(250, 229, 230, 0.9);
-  --ui-focus: #d9a937;
-  --ui-focus-ring: 0 0 0 3px rgba(217, 169, 55, 0.26);
+  --ui-focus: var(--ui-text);
+  --ui-highlight: #d9a937;
+  --ui-field-focus: var(--ui-accent-hover);
+  --ui-field-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ui-field-focus) 22%, transparent);
 
   --material-panel-background: rgba(250, 252, 251, 0.82);
   --material-panel-border: var(--ui-border);
@@ -143,8 +145,10 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --ui-warning-badge-text: #ffd36f;
   --ui-danger: #ee7c84;
   --ui-danger-soft: rgba(62, 34, 38, 0.92);
-  --ui-focus: #d2aa4b;
-  --ui-focus-ring: 0 0 0 3px rgba(210, 170, 75, 0.28);
+  --ui-focus: var(--ui-text);
+  --ui-highlight: #d2aa4b;
+  --ui-field-focus: var(--ui-accent-hover);
+  --ui-field-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ui-field-focus) 26%, transparent);
 
   --material-panel-background: rgba(28, 38, 42, 0.84);
   --material-panel-border: var(--ui-border);
@@ -264,11 +268,6 @@ body[data-ui-skin="layered-glass"] .dictionary-panel .tool-button:hover:not(.act
   border-color: var(--layered-navigation-row-hover-border);
   background: var(--layered-navigation-row-hover-background);
   box-shadow: var(--layered-navigation-row-hover-shadow);
-}
-
-body[data-ui-skin="layered-glass"] .dictionary-panel .tool-button:focus-visible {
-  outline: 2px solid var(--ui-focus);
-  outline-offset: -2px;
 }
 
 body[data-ui-skin="layered-glass"] .dictionary-panel :where(.utility-button, .nav-collapse-button) {

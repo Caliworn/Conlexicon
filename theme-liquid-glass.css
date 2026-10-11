@@ -31,8 +31,14 @@ body[data-ui-skin="liquid-glass"] {
   --ui-warning-badge-text: #805300;
   --ui-danger: #b43f46;
   --ui-danger-soft: rgba(250, 226, 229, 0.88);
-  --ui-focus: #d3a32d;
-  --ui-focus-ring: 0 0 0 3px rgba(211, 163, 45, 0.27);
+  --ui-focus: var(--ui-text);
+  --ui-highlight: #d3a32d;
+  --ui-field-focus: var(--ui-accent-hover);
+  --ui-field-focus-ring: 0 0 0 1px rgba(255, 255, 255, 0.9),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 0 0 1px color-mix(in srgb, var(--ui-field-focus) 45%, transparent),
+    inset 0 0 18px color-mix(in srgb, var(--ui-field-focus) 30%, transparent),
+    inset 0 0 0 999px rgba(255, 255, 255, 0.42);
 
   --material-panel-background: rgba(247, 251, 252, 0.74);
   --material-panel-border: rgba(255, 255, 255, 0.68);
@@ -160,8 +166,14 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --ui-warning-badge-text: #ffd36f;
   --ui-danger: #ee7c84;
   --ui-danger-soft: rgba(62, 34, 38, 0.9);
-  --ui-focus: #d2aa4b;
-  --ui-focus-ring: 0 0 0 3px rgba(210, 170, 75, 0.29);
+  --ui-focus: var(--ui-text);
+  --ui-highlight: #d2aa4b;
+  --ui-field-focus: var(--ui-accent-hover);
+  --ui-field-focus-ring: 0 0 0 1px rgba(255, 255, 255, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34),
+    inset 0 0 0 1px color-mix(in srgb, var(--ui-field-focus) 45%, transparent),
+    inset 0 0 18px color-mix(in srgb, var(--ui-field-focus) 30%, transparent),
+    inset 0 0 0 999px rgba(255, 255, 255, 0.1);
 
   --material-panel-background: rgba(23, 34, 40, 0.72);
   --material-panel-border: rgba(229, 255, 251, 0.16);
@@ -378,11 +390,6 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button:active:not(:dis
   background: var(--liquid-glass-navigation-active-background);
 }
 
-body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button:focus-visible {
-  outline: 2px solid var(--ui-focus);
-  outline-offset: -2px;
-}
-
 body[data-ui-skin="liquid-glass"] .dictionary-panel .utility-actions {
   gap: 4px;
   padding: 12px 0 0;
@@ -529,12 +536,6 @@ body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:where(
 
 body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:where(button, label):not([data-control-tone]):active:not(:disabled):not(:has(> input:disabled)) {
   --liquid-glass-surface-tint: color-mix(in srgb, var(--material-floating-background) 85%, var(--ui-accent));
-}
-
-body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:focus-visible,
-body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:has(> input:focus-visible) {
-  outline: 2px solid var(--ui-focus);
-  outline-offset: 2px;
 }
 
 body[data-ui-skin="liquid-glass"] [data-control-selection] {

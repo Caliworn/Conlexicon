@@ -104,11 +104,6 @@ body.mobile-drawer-open {
   --control-pressed-shadow: var(--material-control-pressed-shadow);
 }
 
-.mobile-app-bar-button:focus-visible {
-  outline: 2px solid var(--ui-focus);
-  outline-offset: 2px;
-}
-
 .mobile-app-bar-title {
   flex: 1 1 auto;
   min-width: 0;
@@ -884,8 +879,8 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
   background: color-mix(in srgb, var(--ui-text) 7%, transparent);
 }
 
+/* The fallback draws the ring; menu rows only pull it inside the menu edge. */
 .entry-sort-option:focus-visible {
-  outline: 2px solid var(--ui-focus);
   outline-offset: -2px;
 }
 
@@ -991,11 +986,6 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
   border-color: color-mix(in srgb, var(--ui-accent) 55%, var(--ui-border));
   background: var(--ui-accent-soft);
   color: var(--ui-accent-hover);
-}
-
-.entry-filter-part-chip:focus-visible {
-  outline: 2px solid var(--ui-focus);
-  outline-offset: 2px;
 }
 
 @media (forced-colors: active) {
@@ -1280,8 +1270,8 @@ textarea {
 input:not([type="checkbox"]):not([type="radio"]):focus,
 select:focus,
 textarea:focus {
-  border-color: var(--ui-focus);
-  box-shadow: var(--ui-focus-ring);
+  border-color: var(--ui-field-focus);
+  box-shadow: var(--ui-field-focus-ring);
 }
 
 input:is([type="checkbox"], [type="radio"]) {
@@ -1295,6 +1285,8 @@ input:is([type="checkbox"], [type="radio"]) {
   transition: none;
 }
 
+/* Fields share outline: none above, which outranks the zero-specificity fallback,
+   so check boxes restore the ring themselves. */
 input:is([type="checkbox"], [type="radio"]):focus-visible {
   outline: 2px solid var(--ui-focus);
   outline-offset: 2px;
@@ -1505,9 +1497,29 @@ label span {
   --control-current-shadow: var(--control-pressed-shadow);
 }
 
-:is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]):focus-visible {
+/* Every focusable element gets the skin's ink ring. Zero specificity is the
+   contract: any component focus rule, including a field's outline: none, wins.
+   Do not prefix this selector; a prefix outside :where() counts. */
+:where(:focus-visible) {
   outline: 2px solid var(--ui-focus);
   outline-offset: 2px;
+}
+
+/* Navigation surfaces differ from the page (dark in Classic and Layered Glass),
+   so their ring takes the navigation ink, and destination rows draw it inside
+   the scrolling column that would clip an outer ring. */
+.dictionary-panel :focus-visible {
+  outline-color: var(--material-navigation-text);
+}
+
+.dictionary-panel .tool-button:focus-visible {
+  outline-offset: -2px;
+}
+
+/* The entry and corpus lists scroll, and their cards touch the list edges, so an
+   outer ring would be clipped there; focus inside the lists is drawn inward. */
+:is(.entry-list, .corpus-item-list) :focus-visible {
+  outline-offset: -2px;
 }
 
 :is([data-control-tone="neutral"]:not([data-control-emphasis]), [data-control-tone][data-control-emphasis]):is(:disabled, [aria-disabled="true"]) {
@@ -2133,7 +2145,6 @@ label span {
   background: linear-gradient(var(--ui-danger-soft), var(--ui-danger-soft)), var(--ui-canvas-bg);
 }
 .source-reference-remove:focus-visible {
-  outline: 2px solid var(--ui-focus);
   outline-offset: 1px;
 }
 .source-reference-card.dragging { opacity: 0.5; }
@@ -2247,11 +2258,6 @@ label span {
 
 button.derived-link:hover {
   border-color: var(--ui-accent);
-}
-
-.derived-readonly:focus-visible {
-  outline: 2px solid var(--ui-focus);
-  outline-offset: 2px;
 }
 
 .derived-link strong {
@@ -2563,11 +2569,6 @@ span.pending-source {
   --control-background: var(--material-inset-background);
   --control-border: var(--material-inset-border);
   --control-color: var(--ui-text-muted);
-}
-
-.content-disclosure-button:focus-visible {
-  outline: 2px solid var(--ui-focus);
-  outline-offset: 2px;
 }
 
 .content-disclosure-button:disabled {
@@ -2900,7 +2901,7 @@ span.pending-source {
 .search-snippet mark {
   border-radius: 3px;
   padding: 0;
-  background: color-mix(in srgb, var(--ui-focus) 45%, transparent);
+  background: color-mix(in srgb, var(--ui-highlight) 45%, transparent);
   color: inherit;
 }
 
@@ -2981,7 +2982,7 @@ span.pending-source {
 
 .entry-quality-issue.medium {
   border-color: color-mix(in srgb, var(--ui-warning) 62%, var(--ui-border));
-  background: color-mix(in srgb, var(--ui-focus) 24%, var(--material-panel-background));
+  background: color-mix(in srgb, var(--ui-highlight) 24%, var(--material-panel-background));
   color: var(--ui-warning-badge-text);
 }
 
@@ -4257,7 +4258,7 @@ button.analysis-composition-subset {
 }
 
 .analysis-composition-stat.derived .analysis-composition-stat-label > span {
-  background: var(--ui-focus);
+  background: var(--ui-highlight);
 }
 
 .analysis-composition-stat strong {
@@ -4300,7 +4301,7 @@ button.analysis-composition-subset:hover strong {
 }
 
 .analysis-composition .derived {
-  background: var(--ui-focus);
+  background: var(--ui-highlight);
 }
 
 .analysis-composition-subset {
@@ -4507,7 +4508,7 @@ button.analysis-bar-label:hover,
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--ui-accent), var(--ui-focus));
+  background: linear-gradient(90deg, var(--ui-accent), var(--ui-highlight));
 }
 
 .analysis-bar-row strong {
@@ -4964,7 +4965,6 @@ textarea.ipa-single-line::-webkit-scrollbar {
 }
 
 .skin-picker-option:focus-visible {
-  outline: 2px solid var(--ui-focus);
   outline-offset: -2px;
 }
 

@@ -153,96 +153,6 @@
       transition: none !important;
     }
 
-    /* Candidate focus schemes, temporary until the focus decision is made. They
-       only override the two focus tokens, except "double", which needs its own
-       ring. Production rules keep drawing every scheme. */
-    body.cg-body[data-cg-focus-scheme="dark-gold"]:not(.dark-theme) {
-      --ui-focus: #8a6100 !important;
-      --ui-focus-ring: 0 0 0 3px rgba(138, 97, 0, 0.22) !important;
-    }
-
-    body.cg-body:is([data-cg-focus-scheme="accent"], [data-cg-focus-scheme="double"]) {
-      --ui-focus: var(--ui-accent-hover) !important;
-      --ui-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ui-accent-hover) 22%, transparent) !important;
-    }
-
-    body.cg-body.dark-theme:is([data-cg-focus-scheme="accent"], [data-cg-focus-scheme="double"]) {
-      --ui-focus: var(--ui-accent) !important;
-      --ui-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ui-accent) 26%, transparent) !important;
-    }
-
-    /* Double: a canvas-colored halo inside an accent ring, so one layer always
-       contrasts with whatever is behind. It replaces the control's own shadow
-       while focused. */
-    /* Ink: keyboard focus takes the body text color, so it carries no tone and
-       contrasts on every surface; text fields keep an accent "active input" edge. */
-    /* Ink with context: the planned production shape. A zero-specificity fallback
-       gives every focusable element the single ink ring; inside the navigation the
-       ring takes the navigation's own text color, which each skin already sets to
-       contrast its navigation surface, and sits inside the row. */
-    /* The whole selector sits in :where(), scheme scope included, so the fallback
-       keeps zero specificity and every component focus rule (including a field's
-       outline: none) still wins, as the production fallback must. */
-    :where(body.cg-body[data-cg-focus-scheme="ink-context"] :is(:focus-visible, [data-cg-focus])) {
-      outline: 2px solid var(--ui-focus);
-      outline-offset: 2px;
-    }
-
-    body.cg-body[data-cg-focus-scheme="ink-context"] .dictionary-panel {
-      --ui-focus: var(--material-navigation-text) !important;
-    }
-
-    body.cg-body[data-cg-focus-scheme="ink-context"] .dictionary-panel .tool-button:is(:focus-visible, [data-cg-focus]) {
-      outline: 2px solid var(--ui-focus) !important;
-      outline-offset: -2px !important;
-    }
-
-    body.cg-body:is([data-cg-focus-scheme="ink"], [data-cg-focus-scheme="ink-context"], [data-cg-focus-scheme^="double-ink"]) {
-      --ui-focus: var(--ui-text) !important;
-      --cg-field-focus: var(--ui-accent-hover);
-      --cg-field-glow: rgba(255, 255, 255, 0.9);
-      --cg-field-lift: rgba(255, 255, 255, 0.42);
-    }
-
-    body.cg-body.dark-theme:is([data-cg-focus-scheme="ink"], [data-cg-focus-scheme="ink-context"], [data-cg-focus-scheme^="double-ink"]) {
-      --cg-field-focus: var(--ui-accent);
-      --cg-field-glow: rgba(255, 255, 255, 0.34);
-      --cg-field-lift: rgba(255, 255, 255, 0.1);
-    }
-
-    body.cg-body:is([data-cg-focus-scheme="ink"], [data-cg-focus-scheme="ink-context"], [data-cg-focus-scheme^="double-ink"]) :is(input, select, textarea):is(:focus, [data-cg-focus]) {
-      border-color: var(--cg-field-focus) !important;
-      box-shadow: 0 0 0 3px color-mix(in srgb, var(--cg-field-focus) 22%, transparent) !important;
-    }
-
-    /* Glass candidate: in Liquid Glass an active field lights up instead of growing
-       an outer ring: the glass brightens, an accent glow rises along the inner rim,
-       and a light hairline catches the outer edge. Plain CSS, so it holds at every
-       optical quality. */
-    body.cg-body[data-ui-skin="liquid-glass"]:is([data-cg-focus-scheme="double-ink-glass"], [data-cg-focus-scheme="ink-context"]) :is(input, select, textarea):is(:focus, [data-cg-focus]) {
-      background-color: var(--cg-field-lift) !important;
-      box-shadow:
-        0 0 0 1px var(--cg-field-glow),
-        inset 0 1px 0 var(--cg-field-glow),
-        inset 0 0 0 1px color-mix(in srgb, var(--cg-field-focus) 45%, transparent),
-        inset 0 0 18px color-mix(in srgb, var(--cg-field-focus) 30%, transparent) !important;
-    }
-
-    body.cg-body:is([data-cg-focus-scheme="double"], [data-cg-focus-scheme^="double-ink"]) :is(:focus-visible, [data-cg-focus]):not(input, select, textarea) {
-      outline: none !important;
-      box-shadow: 0 0 0 2px var(--ui-canvas-bg), 0 0 0 4px var(--ui-focus) !important;
-    }
-
-    /* Navigation rows sit in a scrolling column that would clip an outer ring, so
-       the double ring is drawn inside the row (ink edge, canvas band within). */
-    body.cg-body:is([data-cg-focus-scheme="double"], [data-cg-focus-scheme^="double-ink"]) .dictionary-panel .tool-button:is(:focus-visible, [data-cg-focus]) {
-      box-shadow: inset 0 0 0 2px var(--ui-focus), inset 0 0 0 4px var(--ui-canvas-bg) !important;
-    }
-
-    body.cg-body[data-cg-focus-scheme="double"] :is(input, select, textarea):is(:focus, [data-cg-focus]) {
-      box-shadow: 0 0 0 2px var(--ui-canvas-bg), 0 0 0 4px var(--ui-focus) !important;
-    }
-
     .cg-search-cell {
       display: grid;
       gap: 4px;
@@ -382,6 +292,7 @@
       width: 240px !important;
       min-width: 0 !important;
       max-width: 100% !important;
+      max-height: none !important;
     }
 
     .cg-cards {
@@ -437,18 +348,6 @@
         <option value="photo">照片（interior.jpg）</option>
       </select>
     </label>
-    <label>焦点方案
-      <select id="cgFocusScheme">
-        <option value="current">当前金色</option>
-        <option value="dark-gold">压暗金色（仅浅色）</option>
-        <option value="accent">强调色</option>
-        <option value="double">双层强调色</option>
-        <option value="ink">中性墨色（文本框强调色）</option>
-        <option value="ink-context">中性墨色 + 导航上下文 + 全局兜底 + 液态玻璃文本框边缘提亮</option>
-        <option value="double-ink">双层中性墨色（文本框强调色）</option>
-        <option value="double-ink-glass">双层中性墨色 + 液态玻璃文本框边缘提亮</option>
-      </select>
-    </label>
     <button class="secondary-button" data-control-tone="neutral" id="cgRunCheck" type="button">运行全部自检</button>
   </header>
 
@@ -489,7 +388,7 @@
 
     <section>
       <h2>文本框</h2>
-      <p class="cg-note">文本框激活即显示聚焦样式（<code>:focus</code>，鼠标点进去也会出现），按钮只在键盘导航时显示焦点环（<code>:focus-visible</code>）。“聚焦”列下方的数字是聚焦边框或焦点环与背后底色的对比度。顶部“焦点方案”同时作用于按钮焦点环与文本框聚焦样式，只在本页覆盖焦点 token，用于选定方案。</p>
+      <p class="cg-note">文本框激活即显示聚焦样式（<code>:focus</code>，鼠标点进去也会出现），按钮只在键盘导航时显示焦点环（<code>:focus-visible</code>）。“聚焦”列下方的数字是聚焦边框与背后底色的对比度。文本框聚焦用强调色边框（<code>--ui-field-focus</code>）加 <code>--ui-field-focus-ring</code>：经典与层叠玻璃为淡外光晕，液态玻璃为边缘提亮（玻璃变亮、内侧强调色辉光、外沿亮色细线），不加外轮廓。</p>
       <div class="cg-scroll"><div class="cg-matrix" data-cg-context="page" data-cg-rows="fields"></div></div>
       <article class="entry-display cg-context-q1">
         <div class="cg-scroll"><div class="cg-matrix" data-cg-context="q1" data-cg-rows="fields"></div></div>
@@ -501,7 +400,7 @@
 
     <section>
       <h2>导航</h2>
-      <p class="cg-note">产品导航外壳里的目的地按钮（经典为深色实底，两套玻璃为玻璃导航；液态玻璃中是 Q3 光学外壳）。经典皮肤的目的地按钮没有项目焦点规则，真实键盘聚焦时显示浏览器默认焦点环，强制的“焦点”格因此不显示任何焦点；两套玻璃皮肤用内偏移焦点环，避免被可滚动的导航列裁掉。</p>
+      <p class="cg-note">产品导航外壳里的目的地按钮（经典为深色实底，两套玻璃为玻璃导航；液态玻璃中是 Q3 光学外壳）。导航内的焦点环取各皮肤的导航文字色 <code>--material-navigation-text</code>（深色导航为浅色环），目的地按钮用内偏移，避免被可滚动的导航列裁掉。</p>
       <div class="cg-nav-row">
         <aside class="dictionary-panel app-nav cg-nav-shell" data-nav-state="expanded">
           <nav class="tool-list" aria-label="导航样本" id="cgNavList"></nav>
@@ -550,16 +449,6 @@
       const SKIN_LABELS = { classic: "经典", "layered-glass": "层叠玻璃", "liquid-glass": "液态玻璃" };
       const THEME_LABELS = { light: "浅色", dark: "暗色" };
       const CONTEXT_LABELS = { page: "页面底", q1: "Q1 外壳", q3: "Q3 外壳", search: "列表搜索框", nav: "导航" };
-      const FOCUS_SCHEME_LABELS = {
-        current: "当前金色",
-        "dark-gold": "压暗金色",
-        accent: "强调色",
-        double: "双层强调色",
-        ink: "中性墨色",
-        "ink-context": "中性墨色 + 导航上下文 + 全局兜底 + 玻璃文本框",
-        "double-ink": "双层中性墨色",
-        "double-ink-glass": "双层中性墨色 + 玻璃文本框",
-      };
       const FORCED_STATES = [
         [/:hover\b/g, "[data-cg-hover]"],
         [/:active\b/g, "[data-cg-active]"],
@@ -679,7 +568,6 @@
         skin: document.getElementById("cgSkin"),
         theme: document.getElementById("cgTheme"),
         backdrop: document.getElementById("cgBackdrop"),
-        focusScheme: document.getElementById("cgFocusScheme"),
         run: document.getElementById("cgRunCheck"),
         status: document.getElementById("cgStatus"),
         report: document.getElementById("cgReport"),
@@ -819,10 +707,12 @@
           ["hover", "悬浮", { "data-cg-hover": "" }],
           ["active", "当前", { class: "entry-card active", "aria-current": "true" }],
           ["active-hover", "当前 + 悬浮", { class: "entry-card active", "aria-current": "true", "data-cg-hover": "" }],
+          ["focus", "焦点", { "data-cg-focus": "" }],
+          ["active-focus", "当前 + 焦点", { class: "entry-card active", "aria-current": "true", "data-cg-focus": "" }],
           ["live", "实时（点击切换当前）", {}],
         ];
         const cards = document.createElement("div");
-        cards.className = "cg-cards";
+        cards.className = "entry-list cg-cards";
         cardStates.forEach(([id, label, attributes]) => {
           const card = document.createElement("button");
           card.type = "button";
@@ -843,6 +733,7 @@
         sortMenu.setAttribute("role", "menu");
         [["default", "默认", "false", {}], ["hover", "悬浮", "false", { "data-cg-hover": "" }],
           ["checked", "已选", "true", {}], ["checked-hover", "已选 + 悬浮", "true", { "data-cg-hover": "" }],
+          ["focus", "焦点", "false", { "data-cg-focus": "" }], ["checked-focus", "已选 + 焦点", "true", { "data-cg-focus": "" }],
           ["live", "实时（点击切换）", "false", {}]]
           .forEach(([id, label, checked, attributes]) => {
             const option = document.createElement("button");
@@ -864,6 +755,7 @@
         contextMenu.setAttribute("role", "menu");
         [["default", "默认", "", {}], ["hover", "悬浮", "", { "data-cg-hover": "" }],
           ["danger", "删除", "danger", {}], ["danger-hover", "删除 + 悬浮", "danger", { "data-cg-hover": "" }],
+          ["focus", "焦点", "", { "data-cg-focus": "" }], ["danger-focus", "删除 + 焦点", "danger", { "data-cg-focus": "" }],
           ["live", "实时", "", {}], ["danger-live", "实时删除", "danger", {}]]
           .forEach(([id, label, className, attributes]) => {
             const item = document.createElement("button");
@@ -882,7 +774,8 @@
         skinMenu.className = "skin-picker-menu cg-static";
         skinMenu.setAttribute("role", "menu");
         [["default", "默认", "false", {}], ["hover", "悬浮", "false", { "data-cg-hover": "" }],
-          ["checked", "已选", "true", {}], ["live", "实时（点击切换）", "false", {}]]
+          ["checked", "已选", "true", {}], ["focus", "焦点", "false", { "data-cg-focus": "" }],
+          ["checked-focus", "已选 + 焦点", "true", { "data-cg-focus": "" }], ["live", "实时（点击切换）", "false", {}]]
           .forEach(([id, label, checked, attributes]) => {
             const option = document.createElement("button");
             option.type = "button";
@@ -918,7 +811,10 @@
             tags.append(tag);
           });
         detail.append(tags);
-        container.append(figure("详情标签", detail));
+        // Clickable tags are spans without tabindex or role: keyboard focus cannot
+        // reach them in the product, so a forced focus cell would show a ring that
+        // never occurs. The caption says so instead.
+        container.append(figure("详情标签（不可键盘聚焦，无焦点格）", detail));
       }
 
       function figure(caption, content) {
@@ -1060,21 +956,13 @@
         const border = borderWidth > 0 ? over(parseColor(computed.borderTopColor), backdrop) : background;
         const color = over(parseColor(computed.color), background);
         const outlineVisible = computed.outlineStyle !== "none" && parseFloat(computed.outlineWidth) > 0;
-        // Focus shows as an outline on buttons, as a focus-colored border on text
-        // fields, and as a box-shadow ring in the candidate "double" scheme.
+        // Focus shows as an outline ring, except on text fields, which mark it with
+        // their painted edge (--ui-field-focus) instead.
         let focusColor = null;
         if (outlineVisible) {
           focusColor = parseColor(computed.outlineColor);
         } else if (element.matches("input, select, textarea")) {
-          // Fields show focus with their painted edge, which may differ from the
-          // button ring color.
           focusColor = parseColor(computed.borderTopColor);
-        } else if (document.body.dataset.cgFocusScheme?.startsWith("double") && computed.boxShadow !== "none") {
-          focusColor = resolveColor(computed.getPropertyValue("--ui-focus").trim());
-          // A double ring is visible through whichever band stands out: the focus
-          // band on light ground, the canvas band on dark ground such as a navy nav.
-          const band = resolveColor(computed.getPropertyValue("--ui-canvas-bg").trim());
-          if (contrast(band, backdrop) > contrast(over(focusColor, backdrop), backdrop)) focusColor = band;
         }
         return {
           background,
@@ -1180,8 +1068,15 @@
           const [context, row, state] = id.split("/");
           const where = `${CONTEXT_LABELS[context] || "特例"} · ${row} · ${state}`;
           if (state === "focus" || state.endsWith("-focus")) {
-            if (reading.focusContrast === null) push("fail", where, "焦点环", "未显示焦点环");
-            else if (reading.focusContrast < 3) push("fail", where, "焦点环对比度", reading.focusContrast.toFixed(2));
+            if (reading.focusContrast === null) {
+              // Some components mark focus with fill instead of a ring (context menu
+              // items); compare with the same state unfocused.
+              const base = readings.get(`${context}/${row}/${state.replace(/-?focus$/, "") || "default"}`);
+              const change = base && difference(base, reading);
+              if (!change || change.level !== "ok") push("fail", where, "焦点", change ? `无焦点环，相对未聚焦：${change.detail}` : "未显示焦点环");
+            } else if (reading.focusContrast < 3) {
+              push("fail", where, "焦点环对比度", reading.focusContrast.toFixed(2));
+            }
           } else if (!reading.disabled && reading.textContrast < reading.inkThreshold) {
             push("fail", where, reading.inkThreshold === 3 ? "图标对比度" : "文字对比度", reading.textContrast.toFixed(2));
           }
@@ -1233,7 +1128,7 @@
         const warns = findings.length - fails;
         const summary = document.createElement("p");
         summary.className = "cg-summary";
-        summary.textContent = `焦点方案“${FOCUS_SCHEME_LABELS[elements.focusScheme.value]}”下已检查 ${combos} 种皮肤与主题组合：${fails} 项未达标，${warns} 项难以察觉。`;
+        summary.textContent = `已检查 ${combos} 种皮肤与主题组合：${fails} 项未达标，${warns} 项难以察觉。`;
         elements.report.replaceChildren(summary);
         if (!findings.length) return;
         const table = document.createElement("table");
@@ -1257,7 +1152,6 @@
       function render() {
         applyCombination(elements.skin.value, elements.theme.value);
         document.body.classList.toggle("cg-photo", elements.backdrop.value === "photo");
-        document.body.dataset.cgFocusScheme = elements.focusScheme.value;
         annotateMetrics(readAll());
         syncMobileFrame();
       }
@@ -1284,7 +1178,7 @@
         // Before the embedded page finishes loading there is nothing to sync; its load
         // event syncs again.
         if (!frameDocument?.getElementById("cgSkin")) return;
-        [["cgSkin", elements.skin], ["cgTheme", elements.theme], ["cgBackdrop", elements.backdrop], ["cgFocusScheme", elements.focusScheme]].forEach(([id, source]) => {
+        [["cgSkin", elements.skin], ["cgTheme", elements.theme], ["cgBackdrop", elements.backdrop]].forEach(([id, source]) => {
           const select = frameDocument.getElementById(id);
           if (select.value === source.value) return;
           select.value = source.value;
@@ -1330,7 +1224,7 @@
         if (live.classList.contains("entry-card")) live.classList.toggle("active");
       });
       // Switching never depends on rule cloning, so a cloning failure cannot freeze the page.
-      [elements.skin, elements.theme, elements.backdrop, elements.focusScheme].forEach((select) => select.addEventListener("change", render));
+      [elements.skin, elements.theme, elements.backdrop].forEach((select) => select.addEventListener("change", render));
       elements.run.addEventListener("click", runAllChecks);
       try {
         // file:// pages may not read stylesheet rules (Chrome treats each file as its own origin).

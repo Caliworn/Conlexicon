@@ -107,7 +107,7 @@ section.display-section.partial-editing[data-edit-section=definitions]   皮肤�
 | 局部编辑分区 | 强调色边框 + 焦点环（复用 editing token） | 玻璃带变亮 + 强调色描边（复用） | 强调色浅底 + 描边（复用） |
 | 字段默认 | 1px 边框 + 面板底（等同现状） | 无边框的较实玻璃填充 + 1px 下沿线 | 浅填充（复用现有 `--material-entry-detail-section-background` 字段材质）+ 弱边框 |
 | 字段悬浮 | 边框加深 | 填充变亮、下沿线加深 | 填充略加深 |
-| 字段聚焦 | `--ui-focus` 边框 + 焦点环（不变） | 同左，不改共享焦点环 | 同左 |
+| 字段聚焦 | `--ui-field-focus` 边框 + `--ui-field-focus-ring`（2026-10-11 起，见 Style Skin Plan“焦点”） | 同左 | 同左（液态玻璃为边缘提亮） |
 | 重复项分隔 | 12px 间距 + 细线 | 10px 间距 + 半透明细线 | 细线 |
 | 操作栏 | 面板底 + 上沿细线 | 玻璃带 + 上沿高光 | 外壳内细线；吸底时为紧凑浮层玻璃 |
 

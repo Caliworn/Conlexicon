@@ -79,6 +79,21 @@ assert(
   !/(?:fetch\s*\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB|\/api\/)/.test(liquidGlassLab),
   "The standalone lab must not access product data, APIs, or persistent browser storage",
 );
+// Focus: one zero-specificity fallback gives every focusable element the skin's
+// ink ring, so component focus rules (and a field's outline: none) always win.
+// A prefix outside :where() would count and override them.
+assert(/\n:where\(:focus-visible\) \{\n  outline: 2px solid var\(--ui-focus\);/.test(styles),
+  "The focus fallback must be an unprefixed :where(:focus-visible) rule drawing --ui-focus");
+// --ui-focus means focus only; the warm palette accent it used to lend to search
+// hits, quality badges and analysis charts is --ui-highlight.
+for (const [, property] of `${styles}\n${classic}\n${layeredGlass}\n${liquidGlass}`.matchAll(/([a-z-]+)\s*:[^;{}]*var\(--ui-focus\)/g)) {
+  assert(["outline", "outline-color"].includes(property), `--ui-focus may only color focus outlines, not ${property}`);
+}
+for (const [name, source] of [["Layered Glass", layeredGlass], ["Liquid Glass", liquidGlass]]) {
+  assert(!/\.tool-button:focus-visible\s*\{[^}]*outline:/.test(source),
+    `${name} must not redraw navigation focus; the shared navigation focus rule owns it`);
+}
+
 // The control gallery paints specimens only with production stylesheets, in the
 // product's load order, and stays isolated from product data like the Lab.
 const controlGallery = fs.readFileSync(path.join(ROOT_DIR, "control-gallery.html"), "utf8");

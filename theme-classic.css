@@ -39,8 +39,10 @@ body:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-glass"])) {
   --ui-warning-badge-text: #8a5a00;
   --ui-danger: #b43f46;
   --ui-danger-soft: #fae5e6;
-  --ui-focus: #e7b548;
-  --ui-focus-ring: 0 0 0 3px rgba(231, 181, 72, 0.24);
+  --ui-focus: var(--ui-text);
+  --ui-highlight: #e7b548;
+  --ui-field-focus: var(--ui-accent-hover);
+  --ui-field-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ui-field-focus) 22%, transparent);
 
   /* Material roles are the skin boundary consumed by component styles. */
   --material-panel-background: #ffffff;
@@ -150,8 +152,10 @@ body.dark-theme:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-gl
   --ui-warning-badge-text: #ffd36f;
   --ui-danger: #ee7c84;
   --ui-danger-soft: #3e2226;
-  --ui-focus: #d2aa4b;
-  --ui-focus-ring: 0 0 0 3px rgba(231, 181, 72, 0.24);
+  --ui-focus: var(--ui-text);
+  --ui-highlight: #d2aa4b;
+  --ui-field-focus: var(--ui-accent-hover);
+  --ui-field-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ui-field-focus) 26%, transparent);
   --material-panel-background: #1f282d;
   --material-panel-border: var(--ui-border);
   --material-panel-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
