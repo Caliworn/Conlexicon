@@ -5044,6 +5044,36 @@ function scheduleVirtualListThrottledRender(virtualList) {
   }, Math.max(0, VIRTUAL_LIST_RENDER_THROTTLE_MS - elapsed));
 }
 
+const VIRTUAL_LIST_FOCUSABLE = 'button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+const virtualCardSignatures = new WeakMap();
+const entryCardContexts = new WeakMap();
+
+// Selection is synced in place, so it is left out of the content signature.
+function signVirtualCard(card) {
+  const clone = card.cloneNode(true);
+  clone.classList.remove("active", "selected");
+  clone.removeAttribute("aria-current");
+  virtualCardSignatures.set(card, clone.outerHTML);
+  return card;
+}
+
+// Window renders keep an unchanged card, so keyboard focus, transitions and
+// optical resources survive scrolling; changed content replaces the card.
+function reconcileVirtualCard(current, next) {
+  if (virtualCardSignatures.get(current) !== virtualCardSignatures.get(next)) {
+    current.replaceWith(next);
+    return;
+  }
+  current.className = next.className;
+  if (next.hasAttribute("aria-current")) {
+    current.setAttribute("aria-current", next.getAttribute("aria-current"));
+  } else {
+    current.removeAttribute("aria-current");
+  }
+  const context = entryCardContexts.get(next);
+  if (context) entryCardContexts.set(current, context);
+}
+
 function renderVirtualListWindow(virtualList) {
   const { container, items, offsets } = virtualList;
   if (!container || !items.length || !virtualList.renderItem) {
@@ -5059,6 +5089,10 @@ function renderVirtualListWindow(virtualList) {
   const oldDisclosureButtons = container === elements.entryList
     ? new Set(container.querySelectorAll(".content-disclosure-button"))
     : new Set();
+  const focused = container.contains(document.activeElement) ? document.activeElement : null;
+  const focusedRow = focused?.closest(".virtual-list-row");
+  const focusedKey = focusedRow?.dataset.virtualKey;
+  const focusedIndex = focusedRow ? [...focusedRow.querySelectorAll(VIRTUAL_LIST_FOCUSABLE)].indexOf(focused) : -1;
   const nextNodes = [];
   const topSpacer = document.createElement("div");
   topSpacer.className = "virtual-list-spacer";
@@ -5113,6 +5147,13 @@ function renderVirtualListWindow(virtualList) {
     nextButtons.forEach((button) => {
       if (!oldDisclosureButtons.has(button)) liquidGlassOpticalEngine?.registerMappedSurface(button);
     });
+  }
+  // A replaced (or, without moveBefore, moved) card drops focus to the body and
+  // Tab would restart at the list top.
+  if (focusedKey && document.activeElement !== focused) {
+    const row = nextNodes.find((node) => node.dataset.virtualKey === focusedKey);
+    const targets = row ? [...row.querySelectorAll(VIRTUAL_LIST_FOCUSABLE)] : [];
+    (targets[focusedIndex] || targets[0])?.focus({ preventScroll: true });
   }
   container.querySelectorAll(".virtual-list-row").forEach((row) => virtualList.resizeObserver?.observe(row));
   virtualList.onRangeChange?.({
@@ -5535,6 +5576,11 @@ function renderEntryRows(entries = [], options = {}) {
         role: "entry",
         settingsSizeSignature,
       }),
+    updateItem: (card, row) => {
+      if (row.kind !== "entry" || !card?.matches(".entry-card") || card.dataset.entryId !== row.entry.id) return false;
+      reconcileVirtualCard(card, createEntryCard(row.entry, { qualityIssues: row.qualityIssues }));
+      return true;
+    },
     renderItem: (row) => row.kind === "truncation"
       ? renderEntryQueryTruncationNotice(row)
       : row.kind === "window-placeholder"
@@ -6981,6 +7027,12 @@ function startEntryFacetsApiCheck(dictionary) {
 }
 
 function updateRootModeRow(wrapper, row) {
+  if (row.kind === "derived") {
+    if (!wrapper?.classList.contains("virtual-root-derived-row") || wrapper.dataset.rootId !== row.rootId
+      || wrapper.firstElementChild?.dataset.entryId !== row.entry.id) return false;
+    reconcileVirtualCard(wrapper.firstElementChild, createEntryCard(row.entry, { derived: true, rootId: row.rootId }));
+    return true;
+  }
   if (row.kind !== "root" || !wrapper?.classList.contains("root-entry-group")
     || wrapper.dataset.rootId !== row.group.root.id) return false;
   const toggle = wrapper.querySelector(".root-toggle-button");
@@ -6989,8 +7041,8 @@ function updateRootModeRow(wrapper, row) {
   if (expanded && !rootGroupDerivedState(activeDictionary(), group.root.id)) {
     startRootGroupDerivedLoad(activeDictionary(), group.root.id);
   }
-  // Refresh entry data while keeping the connected disclosure node and its Q3 resource.
-  wrapper.firstElementChild.replaceWith(createEntryCard(group.root, { root: true, rootId: group.root.id }));
+  // Keep the disclosure node and its Q3 resource; the card is replaced only when it changed.
+  reconcileVirtualCard(wrapper.firstElementChild, createEntryCard(group.root, { root: true, rootId: group.root.id }));
   if (toggle) {
     toggle.disabled = rootSearchExpandsGroups() && rootGroupMatchedDerivedCount(group) > 0;
     toggle.classList.toggle("expanded", expanded);
@@ -7135,22 +7187,26 @@ function createEntryCard(entry, options = {}) {
     </div>
     ${footerHtml ? `<div class="entry-card-footer">${footerHtml}</div>` : ""}
   `;
+  // A reused card keeps its listeners, so they read the latest entry data.
+  entryCardContexts.set(button, { entry, rootId: options.rootId || "" });
   button.addEventListener("click", (event) => {
+    const context = entryCardContexts.get(button);
     const tagTarget = event.target.closest("[data-entry-tag-index]");
     if (tagTarget && button.contains(tagTarget)) {
       event.preventDefault();
       event.stopPropagation();
-      applyTagFilter(entry, tagTarget.dataset.entryTagValue || "");
+      applyTagFilter(context.entry, tagTarget.dataset.entryTagValue || "");
       return;
     }
-    switchToEntry(entry.id, { rootId: options.rootId || "" });
+    switchToEntry(context.entry.id, { rootId: context.rootId });
   });
   button.addEventListener("contextmenu", (event) => {
+    const context = entryCardContexts.get(button);
     event.preventDefault();
     event.stopPropagation();
-    showEntryContextMenu(event, entry, { rootId: options.rootId || "" });
+    showEntryContextMenu(event, context.entry, { rootId: context.rootId });
   });
-  return button;
+  return signVirtualCard(button);
 }
 
 function renderEntryListSelection() {
@@ -14566,6 +14622,11 @@ function renderCorpusItemList(corpus, viewState) {
       resetToken: corpusVirtualResetToken(viewState),
       getKey: (block) => `block:${block.id}`,
       getSizeCacheKey: (block) => corpusItemSizeCacheKey("block", block, viewState),
+      updateItem: (card, block) => {
+        if (card?.dataset.corpusBlockId !== block.id) return false;
+        reconcileVirtualCard(card, createCorpusBlockCard(block, viewState));
+        return true;
+      },
       renderItem: (block) => createCorpusBlockCard(block, viewState),
     });
     return;
@@ -14587,6 +14648,11 @@ function renderCorpusItemList(corpus, viewState) {
     getKey: (unit) => `unit:${unit.id}`,
     getEstimatedHeight: () => 92,
     getSizeCacheKey: (unit) => corpusItemSizeCacheKey("unit", unit, viewState),
+    updateItem: (card, unit) => {
+      if (card?.dataset.corpusUnitId !== unit.id) return false;
+      reconcileVirtualCard(card, createCorpusUnitCard(unit, corpus, viewState));
+      return true;
+    },
     renderItem: (unit) => createCorpusUnitCard(unit, corpus, viewState),
   });
 }
@@ -14630,7 +14696,7 @@ function createCorpusBlockCard(block, viewState) {
     <strong>${escapeHtml(block.title || t("corpusBlockFallback"))}</strong>
     <span>${escapeHtml(formatText("corpusBlockStats", { layers: block.layers.length, units: unitCount }))}</span>
   `;
-  return button;
+  return signVirtualCard(button);
 }
 
 function createCorpusUnitCard(unit, corpus, viewState) {
@@ -14643,7 +14709,7 @@ function createCorpusUnitCard(unit, corpus, viewState) {
     <div class="corpus-unit-name-host">${renderCorpusUnitNameHtml(unit, "card")}</div>
     <span>${escapeHtml(formatText("corpusUnitParentLabel", { parent: corpusParentLabel(parent) }))}</span>
   `;
-  return button;
+  return signVirtualCard(button);
 }
 
 function scheduleCorpusItemScroll(mode, itemId, behavior = "smooth") {
