@@ -141,6 +141,87 @@
       border-radius: var(--radius-panel);
     }
 
+    .cg-roles {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .cg-roles > figure {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+    }
+
+    .cg-roles figcaption {
+      font-size: 12.5px;
+      font-weight: 700;
+    }
+
+    /* Product surfaces are fixed, sticky or off-canvas; here they sit in flow at a
+       fixed size. Paint, borders, shadows and filters stay with the product rules. */
+    .cg-roles [data-cg-role] {
+      position: relative !important;
+      inset: auto !important;
+      transform: none !important;
+      width: 220px !important;
+      max-width: 100% !important;
+      height: 120px !important;
+      min-height: 0 !important;
+      margin: 0 !important;
+      z-index: auto !important;
+      /* The mobile bar is placed on the app grid's first row; here it follows its caption. */
+      grid-row: auto !important;
+      grid-column: auto !important;
+      /* Entrance animations (the tooltip fade-in) are motion, not material; without
+         them a fixture always shows its settled appearance. */
+      animation: none !important;
+    }
+
+    /* Mobile surfaces take their geometry and material from the < 800px media
+       query, so wide windows show them through a 480px embedded viewport. */
+    @media (min-width: 800px) {
+      .cg-roles > figure[data-cg-mobile] {
+        display: none;
+      }
+    }
+
+    @media (max-width: 799.98px) {
+      .cg-roles > .cg-mobile-frame {
+        display: none;
+      }
+    }
+
+    .cg-mobile-frame iframe {
+      display: block;
+      width: 480px;
+      max-width: 100%;
+      border: 1px solid var(--ui-border);
+      border-radius: var(--radius-panel);
+    }
+
+    /* The embedded mobile view shows only the mobile surfaces. */
+    body.cg-mobile-view :is(.cg-toolbar, .cg-error, .cg-main > section:not(.cg-roles-section), .cg-roles-section > :not(.cg-roles), .cg-roles > figure:not([data-cg-mobile])) {
+      display: none !important;
+    }
+
+    body.cg-mobile-view .cg-main {
+      padding: 12px;
+    }
+
+    /* The parent sizes the frame to this page's content, so the page must not size
+       itself to the frame. */
+    body.cg-body.cg-mobile-view {
+      min-height: 0;
+    }
+
+    /* The quality tooltip only shows while its issue chip is hovered. The chip keeps
+       the selector ancestry (forced hover) but draws no box of its own here. */
+    .cg-roles .entry-quality-issue {
+      display: contents !important;
+    }
+
     .cg-specials {
       display: flex;
       flex-wrap: wrap;
@@ -265,6 +346,24 @@
       </div>
     </section>
 
+    <section class="cg-roles-section">
+      <h2>材质角色表面</h2>
+      <p class="cg-note">产品各材质角色的空外壳，使用产品类名，对照页只把它们改为原位排列的固定尺寸。Liquid Glass Lab 的产品外观探针读取这里的夹具（以及上方“页面底 · 默认”的七种控件）。抽屉和移动顶栏的外观只在视口窄于 800px 时生效（与横竖比例无关）：宽窗口下它们显示在一个 480px 宽的内嵌视口中，跟随本页的皮肤、明暗与背景；窗口本身窄于 800px 时直接原位显示。</p>
+      <div class="cg-roles">
+        <figure><figcaption>导航</figcaption><aside class="dictionary-panel app-nav" data-nav-state="expanded" data-cg-role="navigation"></aside></figure>
+        <figure data-cg-mobile><figcaption>导航抽屉</figcaption><aside class="dictionary-panel app-nav" data-nav-state="drawer" data-cg-role="navigation-drawer"></aside></figure>
+        <figure data-cg-mobile><figcaption>移动顶栏</figcaption><header class="mobile-app-bar" data-cg-role="mobile-bar"></header></figure>
+        <figure><figcaption>详情外壳</figcaption><article class="entry-display" data-cg-role="focus-display"></article></figure>
+        <figure><figcaption>编辑外壳</figcaption><form class="editor-panel" id="entryForm" data-cg-role="focus-editor"></form></figure>
+        <figure><figcaption>浮层菜单</figcaption><div class="entry-search-config-menu" data-cg-role="floating"></div></figure>
+        <figure><figcaption>富 tooltip</figcaption><div class="app-tooltip rich-tooltip" data-cg-role="rich-tooltip"></div></figure>
+        <figure><figcaption>质量 tooltip</figcaption><span class="entry-quality-issue low" data-cg-hover><span class="entry-quality-issue-tooltip" role="tooltip" data-cg-role="quality-tooltip"></span></span></figure>
+        <figure><figcaption>Toast</figcaption><div class="toast show" data-cg-role="toast"></div></figure>
+        <figure><figcaption>弹窗</figcaption><section class="modal-panel" data-cg-role="modal"></section></figure>
+        <figure><figcaption>词汇网络面板</figcaption><section class="network-panel" data-cg-role="network"></section></figure>
+      </div>
+    </section>
+
     <section>
       <h2>待决定的非语义特例</h2>
       <p class="cg-note">尚未接入语义配方的列表当前项、菜单项与可点击标签，供“菜单悬浮中性还是强调”“列表悬浮如何区别于选中”“标签悬浮样式”并排比较。</p>
@@ -379,7 +478,19 @@
         error: document.getElementById("cgError"),
       };
 
-      const engine = window.ConlexiconLiquidGlassEngine?.createEngine({
+      // Probe mode: Liquid Glass Lab loads this page as its isolated appearance probe
+      // and writes optical states itself, so the page runs no engine and no motion.
+      const viewParams = new URLSearchParams(location.search);
+      const probe = viewParams.has("probe");
+      // Mobile view: the 480px embedded viewport of the top-level page.
+      const mobileView = viewParams.has("mobile");
+      if (mobileView) document.body.classList.add("cg-mobile-view");
+      if (probe) {
+        const still = document.createElement("style");
+        still.textContent = "*, *::before, *::after { animation: none !important; transition: none !important; }";
+        document.head.append(still);
+      }
+      const engine = probe ? null : window.ConlexiconLiquidGlassEngine?.createEngine({
         workerUrl: "lib/liquid-glass-map-worker.js",
         // Matches the application budget; the Q3 owner here is a large surface.
         maxBytes: 32 * 1024 * 1024,
@@ -843,6 +954,40 @@
         applyCombination(elements.skin.value, elements.theme.value);
         document.body.classList.toggle("cg-photo", elements.backdrop.value === "photo");
         annotateMetrics(readAll());
+        syncMobileFrame();
+      }
+
+      // Only the top-level page embeds the mobile view; probes and the view itself do not.
+      const mobileFrame = probe || mobileView ? null : createMobileFrame();
+
+      function createMobileFrame() {
+        const frame = document.createElement("iframe");
+        frame.title = "移动端视口（480px）";
+        frame.src = "control-gallery.html?mobile";
+        frame.addEventListener("load", syncMobileFrame);
+        const caption = document.createElement("figcaption");
+        caption.textContent = "抽屉与移动顶栏（480px 视口）";
+        const holder = document.createElement("figure");
+        holder.className = "cg-mobile-frame";
+        holder.append(caption, frame);
+        document.querySelector(".cg-roles").append(holder);
+        return frame;
+      }
+
+      function syncMobileFrame() {
+        const frameDocument = mobileFrame?.contentDocument;
+        // Before the embedded page finishes loading there is nothing to sync; its load
+        // event syncs again.
+        if (!frameDocument?.getElementById("cgSkin")) return;
+        [["cgSkin", elements.skin], ["cgTheme", elements.theme], ["cgBackdrop", elements.backdrop]].forEach(([id, source]) => {
+          const select = frameDocument.getElementById(id);
+          if (select.value === source.value) return;
+          select.value = source.value;
+          select.dispatchEvent(new Event("change"));
+        });
+        // The frame's height includes its border; the content height does not.
+        const border = mobileFrame.offsetHeight - mobileFrame.clientHeight;
+        mobileFrame.style.height = `${frameDocument.documentElement.scrollHeight + border}px`;
       }
 
       function runAllChecks() {
@@ -884,7 +1029,7 @@
         // file:// pages may not read stylesheet rules (Chrome treats each file as its own origin).
         if (location.protocol === "file:") throw new Error("页面以 file:// 打开，浏览器不允许读取样式表规则。");
         const cloned = cloneForcedStateRules();
-        elements.status.textContent = `已复制 ${cloned} 条状态规则；光学引擎${engine ? "可用" : "不可用"}。`;
+        elements.status.textContent = `已复制 ${cloned} 条状态规则；${probe ? "探针模式，不运行光学引擎" : `光学引擎${engine ? "可用" : "不可用"}`}。`;
       } catch (error) {
         console.error("Control gallery could not force hover, pressed and focus states.", error);
         elements.error.textContent = `悬浮、按下、焦点三列无法强制显示：${error.message}请启动本地服务后通过 http://localhost:4173/control-gallery.html 打开（已在运行的服务需重启才能提供本页）。`;

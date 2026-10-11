@@ -443,13 +443,11 @@ Q1 与 Q3 通过同一个表面局部接口衔接：各正式消费者映射质�
 - `liquid-glass-lab.html` 是由现有静态服务器直接提供的独立开发页，只有生产 Product Engine 一条渲染路径，默认装载 Focus 参数；它不进入主应用导航，不读取或写入词典、界面偏好、`data/`、Web Storage 或任何 `/api/` 端点。它复用生产的 `liquid-glass-geometry.js`、Worker、`liquid-glass-engine.js`、动态 SVG registry 与会话 LRU，不维护第二份算法。
 - **2026-10-01 清理**：删除 SDF Baseline（`lib/liquid-glass-sdf-baseline.js` 及其检查）和本机 Reference Baseline（`lib/liquid-glass-reference-baseline.js` 及 `.gitignore` 条目），移除渲染路径选择、两条 Baseline 的控件、滤镜宿主与样式。此前页面强制要求被 Git 忽略的 Reference 模块，新克隆打开即报错，这一问题随之消除。SDF 已完全放弃，见 LQ-7；早期对照结论保留在 `docs/archive/LIQUID_GLASS_RESEARCH.md`。
 - 表面几何由宽度、高度、圆角、外轮廓模型和超椭圆指数驱动，初始为可容纳示例文字的 `420×200px`、`60px` 圆角和指数 `4`。角部模型保留直边：指数 `2` 规范化到 Round 快速路径并复用其缓存和贴图字节，更大的值启用超椭圆角；全局模型使用整张表面的 Lamé 隐式轮廓，指数 `2` 为椭圆，不消费 radius（输入禁用但保留当前值）。CSS 裁切与贴图必须匹配；全局轮廓另由 normal/rim 贴图 Alpha 在 SVG 最终合成内裁掉矩形预模糊的角外输出，不额外增加 CSS mask；全局轮廓的光学带使用解析梯度和一阶欧氏 signed-distance 近似，保持单遍生成。圆角上限只取短边的一半。浏览器不支持 `corner-shape` 时仅将角部模型锁定为 Round，全局模型继续使用生成的 polygon clip。
-- 角色命名只用于装载 continuous/focus/floating/modal 参数预设，实际 Lab 表面固定注册为不参与产品表面映射的 `diagnostic` 角色；手动调参后恢复默认值回到最近使用的预设。可调范围为贴图上限、请求 bezel、厚度、IOR、最大位移、光学内模糊、饱和度、tint、specular 强度及统一光源角度/强度；只生成完整四边轮廓。
-- 舞台提供连续色场、高对比网格、色带和大号文字四种诊断参照；仓库分发五张具有明确 Unsplash 或 Pexels 使用许可的背景，逐张作者、原始页面和许可记录见 `THIRD_PARTY_NOTICES.md`。图片只在选中时加载，不进入产品皮肤。舞台下方显示生产位移图与法线/rim 图。Q3 与 Q1 之间可切换，切换时保留几何、参数预设和外观选择；Q1 不生成诊断贴图。
-- 外观默认 Neutral Lab；可选 Product role 来源通过 1024px/480px 隔离样式探针加载正式主题和共享组件 CSS，按当前 Q1/Q3 状态及桌面/移动 fixture 镜像 Navigation、drawer、mobile bar、查看/编辑 Focus、floating、rich/quality tooltip、toast、modal 与 network 的计算 tint、边框、完整阴影和前景色，不维护第二份主题值。外观来源和角色不改写光学预设；快捷状态或独立开关只旁路最终层。正式样式不可用时明确恢复 Neutral Lab。预览卡片可在舞台范围内拖动，拖动只更新合帧后的 transform，不重建几何资源；窄屏时实际宽度按舞台净宽收束。
+- 角色命名只用于装载 continuous/focus/relationship/floating/modal 参数预设，实际 Lab 表面固定注册为不参与产品表面映射的 `diagnostic` 角色；手动调参后恢复默认值回到最近使用的预设。可调范围为贴图上限、请求 bezel、厚度、IOR、最大位移、光学内模糊、饱和度、tint、specular 强度、RGB 色散开关（预设装载角色默认值，生产角色均为关闭；三路比例沿用引擎固定值）及统一光源角度/强度；只生成完整四边轮廓。Relationship 预设不改变舞台几何，紧凑控件尺寸需手动设置。
+- 舞台提供连续色场、高对比网格、色带和大号文字四种诊断参照；仓库分发五张具有明确 Unsplash 或 Pexels 使用许可的背景，逐张作者、原始页面和许可记录见 `THIRD_PARTY_NOTICES.md`。图片只在选中时加载，不进入产品皮肤。舞台下方可展开生产位移图与法线/rim 图；它与“共享表面几何”一样默认折叠。Q3 与 Q1 之间可切换，切换时保留几何、参数预设和外观选择；Q1 不生成诊断贴图。
+- 外观默认 Neutral Lab；可选 Product role 来源通过 1024px/480px 两个隔离 iframe 以探针模式加载控件对照页 `control-gallery.html?probe`（探针模式不运行光学引擎、关闭动画与过渡），按当前 Q1/Q3 状态写入夹具的光学角色、`data-liquid-glass-optics` 与空光学滤镜，镜像 Navigation、drawer、mobile bar、查看/编辑 Focus、floating、rich/quality tooltip、toast、modal、network 以及七种紧凑控件配方（relationship）的计算 tint、边框、完整阴影和前景色。夹具结构只在对照页维护一份（表面角色在“材质角色表面”一节，紧凑控件取“页面底 · 默认”样本），Lab 不维护第二份结构或主题值；夹具缺失时报错并恢复 Neutral Lab，状态行附带失败原因。以 `file://` 打开时浏览器不允许读取探针文档，Product 来源直接停用，页面顶部说明需从本地服务打开。外观来源和角色不改写光学预设；快捷状态或独立开关只旁路最终层。正式样式不可用时明确恢复 Neutral Lab。预览卡片可在舞台范围内拖动，拖动只更新合帧后的 transform，不重建几何资源；窄屏时实际宽度按舞台净宽收束。
 - Lab 的 `color-scheme` 跟随自身明暗主题。系统减少透明度时关闭 backdrop filter 与透明底色，使用当前 Lab 主题的实色 panel/text token；强制颜色模式使用 `Canvas` / `CanvasText`。两种模式启用期间 Product Engine 重新探测为 Q0，诊断贴图停止生成；偏好解除后按当前参数恢复。
-- **仍待整理**（2026-10-01 复评，未实施）：Lab 应作为生产材质工作台，与产品保持一致。
-  - **落后于生产**：没有 2026-09-23 的紧凑 `relationship` 角色，也没有 2026-09-24 的 tinted／solid 配方；产品外观探针的组件结构由 `appearanceProbeMarkup()` 手写，组件类名或结构变化后会脱节。
-  - **补充方向**：接入 RGB 色散开关（引擎已有 `chromaticDispersion`，默认关闭），用于在细节丰富的背景上对比；紧凑角色、tinted／solid 与交互状态对照，直接复用产品组件结构和生产配方；与 `STYLE_SKIN_PLAN.md` 第 5 节的控件对照页合并为一份；几何、贴图与性能诊断中的低频项折叠。时机放在 LQ-7 或下一次光学调参。
+- **2026-10-11 整理**：2026-10-01 复评列出的落后项已处理：补齐 relationship 预设与七种紧凑配方外观，产品外观探针改读控件对照页夹具，接入 RGB 色散开关，低频的几何与贴图诊断默认折叠。交互状态（悬浮、按下、焦点）的对照留在控件对照页，Lab 只镜像默认状态；性能诊断随 LQ-7 再整理。
 
 ### 13.18 浮动连续导航卡片
 

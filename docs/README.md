@@ -21,7 +21,7 @@
 | [Touch, Focus and Accessibility Plan](TOUCH_FOCUS_A11Y_PLAN.md) | 阶段 A+ 未开始 | 触摸替代交互、输入能力判定、命中区域、焦点管理与无障碍验收。 |
 | [Example Corpus Link Plan](EXAMPLE_CORPUS_LINK_PLAN.md) | 阶段 C 未开始 | 词条例句迁移为语料单元引用的目标模型、自动迁移、编辑行为与验收。 |
 | [Corpus Workspace Plan](CORPUS_WORKSPACE_PLAN.md) | 阶段 D 未开始 | 语料库轨道工作区、文本与时间轴模式、属性继承、长 Gloss、草稿与性能。 |
-| [Style Skin Plan](STYLE_SKIN_PLAN.md) | S0 与控件材质职责收尾已完成 / 控件对照页进行中 | 样式 token、材质角色、视觉基线与通用皮肤边界；普通控件材质职责收尾、控件对照页与视觉定稿的分批计划。 |
+| [Style Skin Plan](STYLE_SKIN_PLAN.md) | S0、控件材质职责收尾与控件对照页已完成 / 视觉定稿待实施 | 样式 token、材质角色、视觉基线与通用皮肤边界；普通控件材质职责收尾、控件对照页与视觉定稿的分批计划。 |
 | [Entry Editor Unboxing Plan](ENTRY_EDITOR_UNBOXING_PLAN.md) | U1–U3 已完成（2026-10-09～10）/ U4 待 tint 定稿，U5 搁置 | 完整编辑与局部编辑去框化：沿用详情分区分隔接口、框预算、字段与操作栏皮肤 token、分阶段实施与验收。 |
 | [Layered Glass Skin Specification](LAYERED_GLASS_SKIN_SPEC.md) | LG-1–LG-4C 已完成 | 层叠玻璃皮肤的层级、透明度、静态与指针响应光学层、运行期选择、降级与性能验收。 |
 | [Liquid Glass Skin Specification](LIQUID_GLASS_SKIN_SPEC.md) | LQ-1–LQ-6 已完成 / LQ-7 待实施 | 液态玻璃的材质角色、生产光学引擎、正式表面覆盖、降级和性能边界；LQ-7 性能上限分析与待实测优化候选，Lab 整理方向，tint 与玻璃感的待验证方向。 |

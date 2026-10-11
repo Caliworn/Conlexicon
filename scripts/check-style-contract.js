@@ -96,12 +96,12 @@ assert(
   "The control gallery must not access product data, APIs, or persistent browser storage",
 );
 assert(
-  liquidGlassLab.includes('new URL("theme-liquid-glass.css", window.location.href)')
-    && liquidGlassLab.includes('new URL("styles.css", window.location.href)')
+  liquidGlassLab.includes('new URL("control-gallery.html?probe", window.location.href)')
+    && !liquidGlassLab.includes("srcdoc")
     && liquidGlassLab.includes("getComputedStyle(fixture)")
     && liquidGlassLab.includes('createAppearanceProbe("desktop"')
     && liquidGlassLab.includes('createAppearanceProbe("mobile"'),
-  "Product Q1/Q3 appearance comparisons must derive from isolated formal desktop and mobile computed styles",
+  "Product Q1/Q3 appearance comparisons must read the control gallery's fixtures, the single copy of product structure, in isolated desktop and mobile probes",
 );
 assert(
   liquidGlassLab.includes('id="productQualitySelect"')

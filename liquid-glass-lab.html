@@ -97,6 +97,17 @@
       margin-bottom: 16px;
     }
 
+    .lab-file-notice {
+      margin: 0 0 16px;
+      padding: 10px 12px;
+      border: 1px solid var(--lab-accent);
+      border-radius: 10px;
+      background: var(--lab-accent-soft);
+      color: var(--lab-text);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
     .lab-title {
       margin: 0;
       font-size: clamp(20px, 3vw, 30px);
@@ -435,6 +446,32 @@
       border-top: 1px solid var(--lab-border);
     }
 
+    /* Low-frequency diagnostics stay folded until needed. */
+    .lab-maps-details > summary {
+      padding: 10px 14px;
+      border-top: 1px solid var(--lab-border);
+      color: var(--lab-muted);
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .lab-maps-details .lab-maps {
+      border-top: 0;
+      padding-top: 0;
+    }
+
+    details.lab-control-section > summary {
+      cursor: pointer;
+    }
+
+    details.lab-control-section > summary h3 {
+      display: inline;
+    }
+
+    details.lab-control-section[open] > summary {
+      margin-bottom: 10px;
+    }
+
     .lab-map-figure {
       margin: 0;
       min-width: 0;
@@ -668,6 +705,7 @@
       </div>
       <button id="themeButton" type="button" aria-pressed="true">切换浅色场景</button>
     </header>
+    <p id="fileProtocolNotice" class="lab-file-notice" role="alert" hidden>当前以 file:// 直接打开。浏览器不允许读取内嵌的控件对照页，“Product role”外观对照已停用；贴图 worker 也可能无法创建、退回主线程生成。请启动本地服务后通过 http://localhost:4173/liquid-glass-lab.html 打开（已在运行的服务需重启才能提供对照页）。</p>
 
     <div class="lab-layout">
       <section class="lab-workspace" aria-label="液态玻璃预览">
@@ -722,6 +760,8 @@
           <div class="lab-metric"><span class="lab-metric-label">Cache</span><span id="cacheValue" class="lab-metric-value">—</span></div>
         </div>
 
+        <details class="lab-maps-details">
+          <summary>位移图与法线 / rim 图</summary>
         <div class="lab-maps">
           <figure class="lab-map-figure">
             <figcaption><span>位移图</span><span>R = X · G = Y · B = rim</span></figcaption>
@@ -732,6 +772,7 @@
             <canvas id="normalCanvas" class="lab-map-canvas" aria-label="当前参数生成的法线和边缘贴图"></canvas>
           </figure>
         </div>
+        </details>
       </section>
 
       <aside class="lab-controls" aria-label="液态玻璃参数">
@@ -740,8 +781,8 @@
           <button id="resetButton" type="button">恢复角色默认值</button>
         </div>
 
-        <section class="lab-control-section">
-          <h3>共享表面几何</h3>
+        <details class="lab-control-section">
+          <summary><h3>共享表面几何</h3></summary>
           <label class="lab-field" for="outerShapeSelect">
             <span class="lab-field-heading"><span>外轮廓模型</span></span>
             <select id="outerShapeSelect" data-shape-control>
@@ -766,7 +807,7 @@
             <input id="cornerExponentInput" data-shape-control type="range" min="2" max="8" step="0.25" value="4">
           </label>
           <p id="outerShapeNote" class="lab-status-note">角部模型保留直边；指数 2 为传统圆角，2 以上为超椭圆角。</p>
-        </section>
+        </details>
 
         <section class="lab-control-section">
           <h3>预设与贴图</h3>
@@ -776,6 +817,7 @@
               <select id="presetSelect">
                 <option value="focus">Focus</option>
                 <option value="continuous">Continuous</option>
+                <option value="relationship">Relationship（紧凑控件）</option>
                 <option value="floating">Floating</option>
                 <option value="modal">Modal</option>
                 <option value="custom">Custom</option>
@@ -791,6 +833,7 @@
             <label class="lab-field" for="mapLimitSelect">
               <span class="lab-field-heading"><span>贴图上限</span></span>
               <select id="mapLimitSelect" data-optic-control>
+                <option value="192">192px</option>
                 <option value="256">256px</option>
                 <option value="420">420px</option>
                 <option value="448">448px</option>
@@ -815,17 +858,28 @@
             <label class="lab-field" for="appearanceRoleSelect">
               <span class="lab-field-heading"><span>正式外观角色</span></span>
               <select id="appearanceRoleSelect" disabled>
-                <option value="navigation">Navigation</option>
-                <option value="navigation-drawer">Navigation drawer</option>
-                <option value="mobile-bar">Mobile bar</option>
-                <option value="focus-display" selected>Focus display</option>
-                <option value="focus-editor">Focus editor</option>
-                <option value="floating">Floating menu</option>
-                <option value="rich-tooltip">Rich tooltip</option>
-                <option value="quality-tooltip">Quality tooltip</option>
-                <option value="toast">Toast</option>
-                <option value="modal">Modal</option>
-                <option value="network">Network panel</option>
+                <optgroup label="表面">
+                  <option value="navigation">Navigation</option>
+                  <option value="navigation-drawer">Navigation drawer</option>
+                  <option value="mobile-bar">Mobile bar</option>
+                  <option value="focus-display" selected>Focus display</option>
+                  <option value="focus-editor">Focus editor</option>
+                  <option value="floating">Floating menu</option>
+                  <option value="rich-tooltip">Rich tooltip</option>
+                  <option value="quality-tooltip">Quality tooltip</option>
+                  <option value="toast">Toast</option>
+                  <option value="modal">Modal</option>
+                  <option value="network">Network panel</option>
+                </optgroup>
+                <optgroup label="紧凑控件（relationship）">
+                  <option value="compact-neutral">neutral</option>
+                  <option value="compact-accent-outline">accent / outline</option>
+                  <option value="compact-accent-tinted">accent / tinted</option>
+                  <option value="compact-accent-solid">accent / solid</option>
+                  <option value="compact-danger-outline">danger / outline</option>
+                  <option value="compact-danger-tinted">danger / tinted</option>
+                  <option value="compact-danger-solid">danger / solid</option>
+                </optgroup>
               </select>
             </label>
           </div>
@@ -843,7 +897,7 @@
             <label class="lab-layer-toggle"><input type="checkbox" data-product-layer="foreground" checked disabled>正式前景色</label>
           </div>
           <p id="appearanceStatus" class="lab-status-note">Neutral Lab · 使用当前 Lab 中性 tint、边框、阴影与前景色。</p>
-          <p class="lab-status-note">这些开关只旁路最终外观层，不重建贴图或清空缓存。Product role 从隔离探针读取当前 Q1/Q3 的正式计算样式；共享宽高、圆角、padding、背景场景和 modal/network 遮罩保持不变。</p>
+          <p class="lab-status-note">这些开关只旁路最终外观层，不重建贴图或清空缓存。Product role 从隔离探针（以探针模式加载的控件对照页 <code>control-gallery.html</code>）读取当前 Q1/Q3 的正式计算样式；共享宽高、圆角、padding、背景场景和 modal/network 遮罩保持不变。紧凑控件只取外观，舞台几何不随之改变，需要时用“共享表面几何”调成按钮尺寸，并配合 Relationship 预设。</p>
         </section>
 
         <section class="lab-control-section">
@@ -896,7 +950,8 @@
             <span class="lab-field-heading"><span>光源强度</span><output id="lightStrengthOutput" class="lab-field-value">1.00</output></span>
             <input id="lightStrengthInput" type="range" min="0" max="1.35" step="0.01" value="1">
           </label>
-          <p class="lab-status-note">RGB 三路色散比例仍使用生产引擎当前固定值。首版不为实验页扩张公共参数接口。</p>
+          <label class="lab-layer-toggle"><input id="dispersionInput" type="checkbox" data-optic-control>RGB 色散</label>
+          <p class="lab-status-note">色散只是开关，三路比例沿用生产引擎的固定值；所有生产角色默认关闭，用于在细节丰富的背景上对比。</p>
         </section>
       </aside>
     </div>
@@ -945,6 +1000,7 @@
         appearanceSourceSelect: document.querySelector("#appearanceSourceSelect"),
         appearanceRoleSelect: document.querySelector("#appearanceRoleSelect"),
         appearanceStatus: document.querySelector("#appearanceStatus"),
+        dispersionInput: document.querySelector("#dispersionInput"),
       };
 
       const photoScenes = Object.freeze({
@@ -993,22 +1049,39 @@
         "optics-tint": Object.freeze({ optics: true, tint: true, border: false, shadow: false, foreground: false }),
         appearance: Object.freeze({ optics: false, tint: true, border: true, shadow: true, foreground: true }),
       });
+      // Fixtures live in control-gallery.html, the single copy of product structure.
+      // opticalRole is the role the production engine would give the fixture.
+      const surfaceRole = (viewport, name, opticalRole, label) => Object.freeze({
+        viewport, selector: `[data-cg-role="${name}"]`, opticalRole, label,
+      });
+      const compactRole = (recipe, label) => Object.freeze({
+        viewport: "desktop", selector: `[data-cg-specimen="page/${recipe}/default"]`, opticalRole: "relationship", label,
+      });
       const productAppearanceRoles = Object.freeze({
-        navigation: Object.freeze({ viewport: "desktop", fixture: "appearanceNavigation", label: "Navigation" }),
-        "navigation-drawer": Object.freeze({ viewport: "mobile", fixture: "appearanceNavigationDrawer", label: "Navigation drawer" }),
-        "mobile-bar": Object.freeze({ viewport: "mobile", fixture: "appearanceMobileBar", label: "Mobile bar" }),
-        "focus-display": Object.freeze({ viewport: "desktop", fixture: "appearanceFocusDisplay", label: "Focus display" }),
-        "focus-editor": Object.freeze({ viewport: "desktop", fixture: "entryForm", label: "Focus editor" }),
-        floating: Object.freeze({ viewport: "desktop", fixture: "appearanceFloating", label: "Floating menu" }),
-        "rich-tooltip": Object.freeze({ viewport: "desktop", fixture: "appearanceRichTooltip", label: "Rich tooltip" }),
-        "quality-tooltip": Object.freeze({ viewport: "desktop", fixture: "appearanceQualityTooltip", label: "Quality tooltip" }),
-        toast: Object.freeze({ viewport: "desktop", fixture: "appearanceToast", label: "Toast" }),
-        modal: Object.freeze({ viewport: "desktop", fixture: "appearanceModal", label: "Modal" }),
-        network: Object.freeze({ viewport: "desktop", fixture: "appearanceNetwork", label: "Network panel" }),
+        navigation: surfaceRole("desktop", "navigation", "continuous", "Navigation"),
+        "navigation-drawer": surfaceRole("mobile", "navigation-drawer", "continuous", "Navigation drawer"),
+        "mobile-bar": surfaceRole("mobile", "mobile-bar", "continuous", "Mobile bar"),
+        "focus-display": surfaceRole("desktop", "focus-display", "focus", "Focus display"),
+        "focus-editor": surfaceRole("desktop", "focus-editor", "focus", "Focus editor"),
+        floating: surfaceRole("desktop", "floating", "floating", "Floating menu"),
+        "rich-tooltip": surfaceRole("desktop", "rich-tooltip", "floating", "Rich tooltip"),
+        "quality-tooltip": surfaceRole("desktop", "quality-tooltip", "floating", "Quality tooltip"),
+        toast: surfaceRole("desktop", "toast", "floating", "Toast"),
+        modal: surfaceRole("desktop", "modal", "modal", "Modal"),
+        network: surfaceRole("desktop", "network", "modal", "Network panel"),
+        "compact-neutral": compactRole("neutral", "Compact neutral"),
+        "compact-accent-outline": compactRole("accent-outline", "Compact accent / outline"),
+        "compact-accent-tinted": compactRole("accent-tinted", "Compact accent / tinted"),
+        "compact-accent-solid": compactRole("accent-solid", "Compact accent / solid"),
+        "compact-danger-outline": compactRole("danger-outline", "Compact danger / outline"),
+        "compact-danger-tinted": compactRole("danger-tinted", "Compact danger / tinted"),
+        "compact-danger-solid": compactRole("danger-solid", "Compact danger / solid"),
       });
       const presets = {
         continuous: { tintLight: 0.52, tintDark: 0.56 },
         focus: { tintLight: 0.30, tintDark: 0.34 },
+        // Compact neutral/outline recipes paint with the floating material.
+        relationship: { tintLight: 0.28, tintDark: 0.32 },
         floating: { tintLight: 0.28, tintDark: 0.32 },
         modal: { tintLight: 0.32, tintDark: 0.36 },
       };
@@ -1136,6 +1209,7 @@
         setRangeValue("saturation", defaults.saturation);
         setRangeValue("tint", elements.root.dataset.theme === "dark" ? preset.tintDark : preset.tintLight);
         setRangeValue("specularStrength", defaults.specularStrength);
+        elements.dispersionInput.checked = defaults.chromaticDispersion;
         updateAllOutputs();
         scheduleRefresh();
       }
@@ -1171,37 +1245,13 @@
         };
       }
 
-      function escapeHtmlAttribute(value) {
-        return String(value)
-          .replaceAll("&", "&amp;")
-          .replaceAll('"', "&quot;")
-          .replaceAll("<", "&lt;")
-          .replaceAll(">", "&gt;");
-      }
-
-      function appearanceProbeMarkup() {
-        const themeUrl = escapeHtmlAttribute(new URL("theme-liquid-glass.css", window.location.href).href);
-        const stylesUrl = escapeHtmlAttribute(new URL("styles.css", window.location.href).href);
-        const opticalSurface = 'data-liquid-glass-optics="ready" style="--liquid-glass-optical-filter: none"';
-        return `<!doctype html>
-          <html><head>
-            <meta charset="utf-8">
-            <link rel="stylesheet" href="${themeUrl}">
-            <link rel="stylesheet" href="${stylesUrl}">
-            <style>*,*::before,*::after{animation:none!important;transition:none!important}</style>
-          </head><body data-ui-skin="liquid-glass" data-liquid-glass-optics-quality="q3">
-            <aside id="appearanceNavigation" class="dictionary-panel app-nav" data-nav-state="expanded" data-liquid-glass-role="continuous" ${opticalSurface}></aside>
-            <aside id="appearanceNavigationDrawer" class="dictionary-panel app-nav" data-nav-state="drawer" data-liquid-glass-role="continuous" ${opticalSurface}></aside>
-            <header id="appearanceMobileBar" class="mobile-app-bar" data-liquid-glass-role="continuous" ${opticalSurface}></header>
-            <article id="appearanceFocusDisplay" class="entry-display" data-liquid-glass-role="focus" ${opticalSurface}></article>
-            <form id="entryForm" class="editor-panel" data-liquid-glass-role="focus" ${opticalSurface}></form>
-            <div id="appearanceFloating" class="entry-search-config-menu" data-liquid-glass-role="floating" ${opticalSurface}></div>
-            <div id="appearanceRichTooltip" class="app-tooltip rich-tooltip" data-liquid-glass-role="floating" ${opticalSurface}></div>
-            <div id="appearanceQualityTooltip" class="entry-quality-issue-tooltip" data-liquid-glass-role="floating" ${opticalSurface}></div>
-            <div id="appearanceToast" class="toast show" data-liquid-glass-role="floating" ${opticalSurface}></div>
-            <section id="appearanceModal" class="modal-panel" data-liquid-glass-role="modal" ${opticalSurface}></section>
-            <section id="appearanceNetwork" class="network-panel" data-liquid-glass-role="modal" ${opticalSurface}></section>
-          </body></html>`;
+      function setProbeSelect(frame, id, value) {
+        const select = frame.contentDocument.getElementById(id);
+        if (!select) {
+          throw new Error(`The control gallery probe has no #${id}.`);
+        }
+        select.value = value;
+        select.dispatchEvent(new Event("change"));
       }
 
       function createAppearanceProbe(viewport, width, height) {
@@ -1227,10 +1277,17 @@
               reject(new Error(`The ${viewport} Product appearance probe has no document body.`));
               return;
             }
+            try {
+              setProbeSelect(frame, "cgSkin", "liquid-glass");
+            } catch (error) {
+              frame.remove();
+              reject(error);
+              return;
+            }
             appearanceProbeFrames.set(viewport, frame);
             resolve(frame);
           }, { once: true });
-          frame.srcdoc = appearanceProbeMarkup();
+          frame.src = new URL("control-gallery.html?probe", window.location.href).href;
           document.body.append(frame);
         });
       }
@@ -1257,10 +1314,8 @@
       }
 
       function syncAppearanceProbeTheme() {
-        const dark = elements.root.dataset.theme === "dark";
-        appearanceProbeFrames.forEach((frame) => {
-          frame.contentDocument?.body?.classList.toggle("dark-theme", dark);
-        });
+        const theme = elements.root.dataset.theme === "dark" ? "dark" : "light";
+        appearanceProbeFrames.forEach((frame) => setProbeSelect(frame, "cgTheme", theme));
       }
 
       function requestedProductQuality() {
@@ -1285,15 +1340,22 @@
 
       function syncAppearanceProbeQuality() {
         const quality = requestedProductQuality();
-        appearanceProbeFrames.forEach((frame) => {
-          const body = frame.contentDocument?.body;
-          if (!body) {
-            return;
-          }
-          body.dataset.liquidGlassOpticsQuality = quality;
-          body.querySelectorAll("[data-liquid-glass-role]").forEach((fixture) => {
-            fixture.dataset.liquidGlassOptics = quality === "q3" ? "ready" : "fallback";
-          });
+        appearanceProbeFrames.forEach((frame, viewport) => {
+          const probeDocument = frame.contentDocument;
+          probeDocument.body.dataset.liquidGlassOpticsQuality = quality;
+          // Write what the engine would: the role, the optics state and an empty
+          // optical filter, since the probe generates no maps.
+          Object.values(productAppearanceRoles)
+            .filter((role) => role.viewport === viewport)
+            .forEach((role) => {
+              const fixture = probeDocument.querySelector(role.selector);
+              if (!fixture) {
+                throw new Error(`The control gallery has no fixture for ${role.label}: ${role.selector}`);
+              }
+              fixture.dataset.liquidGlassRole = role.opticalRole;
+              fixture.dataset.liquidGlassOptics = quality === "q3" ? "ready" : "fallback";
+              fixture.style.setProperty("--liquid-glass-optical-filter", "none");
+            });
         });
         return quality;
       }
@@ -1319,7 +1381,7 @@
       function readProductAppearance(roleName) {
         const role = productAppearanceRoles[roleName];
         const frame = role && appearanceProbeFrames.get(role.viewport);
-        const fixture = frame?.contentDocument?.getElementById(role.fixture);
+        const fixture = frame?.contentDocument?.querySelector(role.selector);
         if (!role || !fixture) {
           throw new Error(`Unknown Product appearance role: ${roleName}`);
         }
@@ -1383,7 +1445,7 @@
           elements.appearanceSourceSelect.value = "neutral";
           currentProductAppearance = null;
           updateAppearanceControls();
-          elements.appearanceStatus.textContent = "Product appearance unavailable · 已恢复 Neutral Lab。";
+          elements.appearanceStatus.textContent = `Product appearance unavailable（${error.message}）· 已恢复 Neutral Lab。`;
         }
       }
 
@@ -1593,6 +1655,7 @@
           maximumMapDimension: Number(elements.mapLimitSelect.value),
           opticalBlur: readNumber("opticalBlur"),
           saturation: readNumber("saturation"),
+          chromaticDispersion: elements.dispersionInput.checked,
           outerShape: selectedOuterShape(),
           cornerExponent: cornerExponent(),
         }, { forceRefresh: true });
@@ -1803,6 +1866,13 @@
         attributeFilter: ["data-liquid-glass-optics"],
       });
       new ResizeObserver(scheduleRefresh).observe(elements.stage);
+
+      // file:// pages cannot reach the gallery probe's document (Chrome gives each
+      // file its own origin), so the Product source is disabled with a visible reason.
+      if (window.location.protocol === "file:") {
+        document.getElementById("fileProtocolNotice").hidden = false;
+        elements.appearanceSourceSelect.querySelector('option[value="product"]').disabled = true;
+      }
 
       syncGeometryBounds();
       updateShapeControls();
