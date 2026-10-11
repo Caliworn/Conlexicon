@@ -180,7 +180,10 @@
        gives every focusable element the single ink ring; inside the navigation the
        ring takes the navigation's own text color, which each skin already sets to
        contrast its navigation surface, and sits inside the row. */
-    body.cg-body[data-cg-focus-scheme="ink-context"] :where(:focus-visible, [data-cg-focus]) {
+    /* The whole selector sits in :where(), scheme scope included, so the fallback
+       keeps zero specificity and every component focus rule (including a field's
+       outline: none) still wins, as the production fallback must. */
+    :where(body.cg-body[data-cg-focus-scheme="ink-context"] :is(:focus-visible, [data-cg-focus])) {
       outline: 2px solid var(--ui-focus);
       outline-offset: 2px;
     }
@@ -197,12 +200,14 @@
     body.cg-body:is([data-cg-focus-scheme="ink"], [data-cg-focus-scheme="ink-context"], [data-cg-focus-scheme^="double-ink"]) {
       --ui-focus: var(--ui-text) !important;
       --cg-field-focus: var(--ui-accent-hover);
-      --cg-field-glow: rgba(255, 255, 255, 0.7);
+      --cg-field-glow: rgba(255, 255, 255, 0.9);
+      --cg-field-lift: rgba(255, 255, 255, 0.42);
     }
 
     body.cg-body.dark-theme:is([data-cg-focus-scheme="ink"], [data-cg-focus-scheme="ink-context"], [data-cg-focus-scheme^="double-ink"]) {
       --cg-field-focus: var(--ui-accent);
-      --cg-field-glow: rgba(255, 255, 255, 0.22);
+      --cg-field-glow: rgba(255, 255, 255, 0.34);
+      --cg-field-lift: rgba(255, 255, 255, 0.1);
     }
 
     body.cg-body:is([data-cg-focus-scheme="ink"], [data-cg-focus-scheme="ink-context"], [data-cg-focus-scheme^="double-ink"]) :is(input, select, textarea):is(:focus, [data-cg-focus]) {
@@ -210,14 +215,17 @@
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--cg-field-focus) 22%, transparent) !important;
     }
 
-    /* Glass candidate: in Liquid Glass an active field lights its own rim from the
-       inside (top highlight, accent hairline and a faint inner tint) instead of
-       growing an outer ring. Plain CSS, so it holds at every optical quality. */
+    /* Glass candidate: in Liquid Glass an active field lights up instead of growing
+       an outer ring: the glass brightens, an accent glow rises along the inner rim,
+       and a light hairline catches the outer edge. Plain CSS, so it holds at every
+       optical quality. */
     body.cg-body[data-ui-skin="liquid-glass"]:is([data-cg-focus-scheme="double-ink-glass"], [data-cg-focus-scheme="ink-context"]) :is(input, select, textarea):is(:focus, [data-cg-focus]) {
+      background-color: var(--cg-field-lift) !important;
       box-shadow:
-        inset 0 1px 1px var(--cg-field-glow),
-        inset 0 0 0 1px color-mix(in srgb, var(--cg-field-focus) 40%, transparent),
-        inset 0 0 14px color-mix(in srgb, var(--cg-field-focus) 16%, transparent) !important;
+        0 0 0 1px var(--cg-field-glow),
+        inset 0 1px 0 var(--cg-field-glow),
+        inset 0 0 0 1px color-mix(in srgb, var(--cg-field-focus) 45%, transparent),
+        inset 0 0 18px color-mix(in srgb, var(--cg-field-focus) 30%, transparent) !important;
     }
 
     body.cg-body:is([data-cg-focus-scheme="double"], [data-cg-focus-scheme^="double-ink"]) :is(:focus-visible, [data-cg-focus]):not(input, select, textarea) {
