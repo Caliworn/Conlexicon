@@ -120,6 +120,8 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `POST` | `/api/dictionaries/:id/analysis/query` | 按需读取轻量分析 widgets | `{ dictionaryId, generation, cacheKey, widgets, diagnostics }` | F4a 同步聚合端点；多个 widget 由 planner 合并为共享 SQLite 任务，不读取或返回完整词典 snapshot。 |
 | `POST` | `/api/dictionaries/:id/analysis/features/query` | 读取派生功能结果摘要或窗口 | summary 模式返回 `{ dictionaryId, generation, resultKey, source, summary, diagnostics }`；items 模式另带 `{ items, pageInfo, searchSummary }` | 当前支持 `ipaAutoCompare`、`ipaDistribution` 和 `morphologyAnalysis` v1；基础算法结果保存在有界进程缓存中，分类、搜索、排序和窗口不触发功能算法重算。 |
 | `POST` | `/api/dictionaries/:id/analysis/features/location` | 定位词条在派生结果视图中的窗口 | feature query 响应加 `{ location }` | 请求额外携带 `entryId`；目标不属于当前分类或搜索结果时返回 `location.found: false`。 |
+| `POST` | `/api/dictionaries/:id/quality/query` | 读取质量检查摘要、问题窗口或受影响词条窗口 | summary 模式返回 `{ dictionaryId, generation, resultKey, source, rulesetVersion, summary, diagnostics }`；items 模式另带 `{ view, searchSummary, items, pageInfo }` | 详见 [Quality result query](#quality-result-queryf5-1-已实装)；不读取完整 snapshot，问题 DTO 只含稳定字段。 |
+| `POST` | `/api/dictionaries/:id/quality/location` | 定位词条在质量 entry 视图中的窗口 | quality items 响应加 `{ location }` | 只接受 `itemKind: "entry"`，请求额外携带 `entryId`。 |
 
 #### `GET /api/dictionaries/:id/entries` 查询参数补充
 
@@ -223,7 +225,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `invalid_corpus_payload` | 语料请求体格式无效。 |
 | `invalid_autosave_payload` | autosave 请求未携带有效 docs 或 corpus 对象。 |
 | `invalid_query_window_offset` | 查询窗口 offset 不是非负安全整数。 |
-| `invalid_entry_query_limit` | 词条或 feature-result 查询 limit 不在 1–200 范围内。 |
+| `invalid_entry_query_limit` | 词条、feature-result 或质量查询 limit 不在 1–200 范围内。 |
 | `invalid_root_group_query_limit` | 父级词根组查询 limit 不在 1–100 范围内。 |
 | `invalid_entry_filter_json` | 结构化 `filter` 参数不是合法 JSON。 |
 | `invalid_entry_filter_payload` | 结构化 `filter` 的顶层不是对象。 |
@@ -256,7 +258,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 - 普通保存优先增加细粒度端点，不再回退到完整词典 PUT。
 - `GET /api/state` 是轻量启动状态入口；普通启动只应读取词典 metadata/summary，再通过 `GET /api/dictionaries/:id` 或专用读取端点按需加载当前词典内容。
 - 语料库下一步可从整份 corpus 模块保存拆成块、层、单元级 changeset。
-- 搜索、词根模式、词汇关系读取、稳定 SQL 高级筛选、轻量分析总览、IPA 自动生成比较及 IPA 分布分析/筛选已依赖 repository 查询/索引或 feature service；其余分析、质量检查及 Gloss/形态功能结果仍应继续迁移，不能长期让前端扫描大型完整快照。
+- 搜索、词根模式、词汇关系读取、稳定 SQL 高级筛选、轻量分析总览、IPA 自动生成比较及 IPA 分布分析/筛选已依赖 repository 查询/索引或 feature service；质量检查后端已由 `/quality/query` 提供，前端质量页面与质量筛选仍待 F5-2／F5-3 迁移；其余分析及 Gloss/形态功能结果仍应继续迁移，不能长期让前端扫描大型完整快照。
 - 短期不引入词典级 revision。等对象级增量端点稳定后，再基于目标对象 `updatedAt` 做轻量乐观锁。
 
 ## 读取 API 现状与后续草案
@@ -1022,38 +1024,40 @@ assignment 的两个计数互斥且和为 `inputEntryCount`；每个 mode 行的
 
 source、version、options、response mode、category、分布 value、page 与搜索字段验证失败分别使用 `invalid_feature_result_source`、`unsupported_feature_result_source`、`invalid_feature_result_source_version`、`invalid_feature_result_source_options`、`invalid_feature_result_response_mode`、`invalid_feature_result_category`、`invalid_feature_result_value` 或既有 EntryQuery 校验码。summary 模式携带 `view` 或 `page` 时返回 `invalid_feature_result_summary_request`；location 缺少目标 ID 时返回 `invalid_feature_result_location_entry_id`。
 
-#### Quality result query（F5-0 契约已冻结，尚未实装）
+#### Quality result query（F5-1 已实装）
 
-F5 的完整规则、issue、summary、执行 planner 和会话边界见 [Quality Result Plan](QUALITY_RESULT_PLAN.md)。计划新增：
+规则集、issue 身份、summary 语义和迁移阶段见 [Quality Result Plan](QUALITY_RESULT_PLAN.md)。服务端由 `QualityResultService`（`lib/quality-result-service.js`）实现：
 
 ```text
 POST /api/dictionaries/:id/quality/query
 POST /api/dictionaries/:id/quality/location
 ```
 
-基础 source 固定为 `{ type: "dictionaryQuality", version: 1, options: {} }`。`responseMode: "summary"` 只接受 source，返回 `{ dictionaryId, generation, resultKey, source, rulesetVersion, summary, diagnostics }`；summary 固定区分 `issueCount`、`affectedEntryCount`、`globalIssueCount`，并按 severity/module 分别返回 `{ key, issueCount, entryCount }`。
+source 固定为 `{ type: "dictionaryQuality", version: 1, options: {} }`，`responseMode` 省略时为 `items`。
 
-`responseMode: "items"` 的 view 固定为：
+- **summary**：请求只接受 source，携带 `view` 或 `page` 返回 `invalid_quality_summary_request`。响应 `{ dictionaryId, generation, resultKey, source, rulesetVersion, summary, diagnostics }`；summary 区分 `inputEntryCount`、`issueCount`、`affectedEntryCount`、`globalIssueCount`，并按 severity（`high / medium / low`）和 module（`lemma / tags / ipa / network / gloss / other`）分别返回 `{ key, issueCount, entryCount }`。summary 不读取词典查询上下文，也不构建窗口。
+- **items**：`view` 必填：
 
 ```js
 {
   itemKind: "issue" | "entry",
-  selector: {
-    group: "all" | "severity" | "module",
-    value: "high" // all 不携带；其他分组按自身枚举校验
-  },
-  search: {
-    text: "",
-    fields: ["lemma", "pronunciation"],
-    fuzzyFields: []
-  },
-  sort: "lemmaAsc"
+  selector: { group: "all" } | { group: "severity", value: "high" } | { group: "module", value: "gloss" },
+  search: { text: "", fields: ["lemma"], fuzzyFields: [] }, // 仅 entry
+  sort: "lemmaAsc"                                          // 仅 entry
 }
 ```
 
-`issue` 视图按问题分页，可返回没有主词条的全局问题，不接受 EntrySearch 或词条 sort；item 携带稳定 `{ id, code, severity, module, entryId, params }` 和可选轻量 entry label，不返回本地化 title/detail。`entry` 视图按唯一受影响词条分页，复用普通 EntrySearch、sort、EntrySummary 和 cursor，每项只附加当前 selector 命中的 issue DTO。location 只接受 entry 视图，并增加 `entryId`。
+  `selector` 省略时为 `all`；`all` 不接受 value。`page` 沿用 EntryQuery 的 `{ limit, cursor, windowOffset }`，limit 为 1–200，默认 200。
+- **issue 视图**：按稳定问题顺序分页（词条按 `position, id` 排列后各规则依次产出，与规则集 v1 构建顺序一致），可返回 `entryId` 为空的全局问题；携带 `search` 或 `sort` 返回 `invalid_quality_issue_view`。item 为 `{ issue, entry }`：`issue` 只含 `{ id, code, severity, module, entryId, params }`，不返回本地化 title/detail；`entry` 是该问题主词条的 EntrySummary，全局问题为 `null`。
+- **entry 视图**：按唯一受影响词条分页，复用 EntrySearch、sort、EntrySummary、`searchSummary` 和 cursor。item 为 `{ entry, issues }`，`issues` 只含当前 selector 命中、且影响该词条的问题；全局近似标签问题会附加到其关联词条上，与 summary 的 `entryCount` 语义一致。
+- 窗口响应在 summary 响应的字段之外附加 `{ view: { itemKind, selector }, searchSummary, items, pageInfo, diagnostics }`；`pageInfo` 与 feature result 相同。
+- **location**：请求额外携带 `entryId`，只接受 entry 视图（issue 视图返回 `invalid_quality_item_kind`），返回 entry 窗口加 `location: { found, index, windowIndex, windowOffset }`；目标词条不在当前 selector 与搜索结果中时 `found: false`、`items` 为空。
 
-质量规则可以把普通 EntryFilter、SQLite 聚合和稳定来源拓扑作为内部执行原语，但 repository 只返回中性事实或候选，不生成质量 code、严重度和详情。HTTP 响应、前端 action 和持久化状态均不得携带完整匹配 ID 数组；F5-1 实装端点时再将其加入“当前端点”和“当前错误码”。
+基础会话以 `{ dictionaryId, generation, source, rulesetVersion, implementationVersion }` 为身份，同一 generation 下的 summary、全部 selector、搜索、排序、窗口和 location 共用一次规则构建；UI 语言不属于请求或身份。会话放在独立的有界 `FeatureResultSessionCache` 实例中（TTL/LRU、in-flight 合并），写入使 generation 前进后旧会话不再命中，旧 cursor 返回 `query_cursor_stale`。每个视图的有序成员在会话内按 LRU 缓存最多 12 个。
+
+规则输入由 repository 的 `qualityInputRecords()` 一次同步读取：词条 `id / lemma / pronunciation`、有序标签、义项 `id / meaning / example`、有序来源 `entryId / text`（顺序与公开词条 DTO 相同）。不读取备注、词源描述、形态、语料、语言文档或完整 snapshot；repository 不生成质量 code、严重度或详情。HTTP 响应不携带全局问题的关联词条 ID 数组或任何完整匹配 ID 数组。
+
+source、version、options、response mode、item kind、selector 与 issue 视图字段验证失败分别返回 `invalid_quality_source`、`unsupported_quality_source`、`invalid_quality_source_version`、`invalid_quality_source_options`、`invalid_quality_response_mode`、`invalid_quality_view`、`invalid_quality_item_kind`、`invalid_quality_selector`、`invalid_quality_issue_view`；请求体不是对象时返回 `invalid_quality_query_payload` 或 `invalid_quality_location_payload`，location 缺少目标 ID 时返回 `invalid_quality_location_entry_id`，page 与搜索字段沿用既有 EntryQuery 校验码。未知词典返回 `dictionary_not_found`。
 
 #### Light / full 任务边界
 
@@ -1128,5 +1132,5 @@ F4a 的 light widgets 不返回后台任务状态。F4b 接入重型 widget 后�
 2. F1–F3 已完成统一 EntryQuery/EntryFilter、SQLite 条件编译和前端 descriptor 迁移；稳定筛选继续复用 `/entries` 的窗口、cursor、缓存与定位。
 3. F4a 已完成 `POST /analysis/query` 的轻量 widgets、最小 planner，以及总览、标签集合、正写法、完整活动日期和词根家族异步接线；这些统计不再读取完整 snapshot。
 4. F4b-0 至 F4b-3 已完成可重建 result source、运行时会话、失效、音系引擎 adapter、IPA 自动比较、IPA 分布和形态分配/覆写迁移；前端分析页与高级筛选均已消费 source/view，root family 排名直接消费稳定 topology。
-5. F5-0 已冻结独立 `/quality/query`、规则集 v1、issue/summary 和混合执行 planner；F5-1 再实装 QualityService/API，随后让质量高级筛选消费共享的内部会话原语。repository 不反向调用质量算法。
+5. F5-0 冻结了独立 `/quality/query`、规则集 v1 和 issue/summary 语义；F5-1 已实装 QualityService 与 `/quality/query`、`/quality/location`，规则由一次合并的最小事实读取加共享规则模块执行，未引入按规则选择执行原语的 planner。F5-2／F5-3 让质量页面和质量筛选消费该 API。repository 不反向调用质量算法。
 6. 语料查询在独立服务边界稳定后按需接入，不恢复前端 materialized ID 或完整快照兜底。

@@ -37,6 +37,7 @@ const CHECK_GROUPS = [
       "check-sqlite-contract.js",
       "check-query-session-cache.js",
       "check-feature-result-session.js",
+      "check-quality-result-session.js",
       "check-entry-search-consistency.js",
       "check-json-directory-conversion.js",
       "check-morphology-acceptance.js",

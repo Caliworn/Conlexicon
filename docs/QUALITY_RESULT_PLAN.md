@@ -1,20 +1,20 @@
 # Quality Result Plan
 
-本文记录质量检查 F5 的领域契约、结果会话和迁移计划。F5-0 已完成规则清点、独立复评和契约冻结；F5-1 以后才接入后端 `QualityService`、HTTP API 和前端远程结果窗口。
+本文记录质量检查 F5 的领域契约、结果会话和迁移计划。F5-0 已完成规则清点、独立复评和契约冻结；F5-1（2026-10-18）已实装后端 `QualityResultService` 与 HTTP API，现行 API 契约见 [API Contract](API_CONTRACT.md#quality-result-queryf5-1-已实装)。F5-2／F5-3 迁移前端。
 
 ## 1. F5-0 结论
 
 质量检查的基本单位是 **issue**，不是布尔筛选条件。简单质量规则可以复用普通 `EntryFilter` 或 SQLite 条件作为执行原语，但规则 code、严重度、模块、详情参数、问题级汇总和规则版本由 `QualityService` 负责，repository 不拥有质量政策。
 
 ```text
-Repository / DictionaryQueryContext
-  提供普通筛选、最小事实、聚合和稳定来源拓扑
+Repository.qualityInputRecords()
+  一次同步读取最小事实：词条、有序标签、义项、有序来源
         ↓
-Quality rule planner
-  为每条规则选择 entryFilter / fact scan / aggregation / topology adapter
+quality-model 规则构建（前后端共用，分批让出事件循环）
+  生成 issue；来源循环复用 etymology-graph-model 的强连通分量
         ↓
-QualityService
-  生成 issue、摘要、问题窗口和词条窗口
+QualityResultService
+  issue 身份、摘要、问题窗口、词条窗口与 location
         ↓
 /quality/query 与 /quality/location
 ```
@@ -40,7 +40,7 @@ QualityService
 | `source_unresolved` | medium | network | entry/source | relation resolution | `sourceText`、`sourcePosition` |
 | `source_cycle` | high | network | entry/graph | topology adapter | `cycleEntryIds`、`cycleLemmas` |
 
-“首选执行原语”不是公开 API 身份。F5-1 planner 可以合并多条简单规则为一次中性事实查询；不得为了表面统一而让 repository 接受 `{ type: "quality" }` 并自行生成上述 code。
+“首选执行原语”是 F5-0 的候选，不是公开 API 身份。F5-1 复评后全部规则改由一次合并的最小事实读取加纯规则模块执行（见第 8 节）；不得为了表面统一而让 repository 接受 `{ type: "quality" }` 并自行生成上述 code。
 
 ## 3. Issue 契约
 
@@ -77,7 +77,14 @@ F5-0 已停止由当前前端把 UI locale normalizer 注入质量模型；现�
 
 ### 4.3 来源循环
 
-保持当前行为：如果某个词条的来源链最终进入循环，该词条也产生 `source_cycle`，即 issue 不只属于循环参与者。`cycleEntryIds / cycleLemmas` 只记录实际循环见证，并重复首节点闭合路径。F5-1 应用一次图计算和记忆化传播实现该语义，不保留逐词条重复 DFS 的成本。
+保持当前行为：如果某个词条的来源链最终进入循环，该词条也产生 `source_cycle`，即 issue 不只属于循环参与者。`cycleEntryIds / cycleLemmas` 只记录实际循环见证，并重复首节点闭合路径。
+
+F5-1 起用一次强连通分量计算和记忆化传播实现，O(V+E)：
+
+- 每个循环分量（成员数大于 1；词条不能引用自身）只有一条规范见证：从分量内 ID 最小的成员出发，按来源位置顺序在分量内深度优先，第一条回到起点的边闭合见证。
+- 循环分量的成员都引用本分量的见证；其他词条按自身来源位置顺序，取第一个能到达循环的来源所继承的见证。
+- 见证只取决于词条集合与来源边，不取决于词条排列顺序。到达同一循环的 issue 共用同一个 params 对象，调用方不得修改。
+- 与 F5-0 的逐词条 DFS 相比，部分 `cycleEntryIds` 及其 issue `id` 会变化；服务端 issue 不持久化，属于可接受的调整（[词源图计划](ETYMOLOGY_GRAPH_PLAN.md)第 7 节决策 2）。
 
 ### 4.4 近似标签
 
@@ -115,67 +122,13 @@ F5-0 已停止由当前前端把 UI locale normalizer 注入质量模型；现�
 - `globalIssueCount` 只统计没有主 `entryId` 的 issue。
 - 各 severity/module 的 `issueCount` 分别加总为全局 `issueCount`；`entryCount` 因集合重叠不可加总。
 
-## 6. F5 API 计划契约
+## 6. API 契约
 
-F5-1 新增：
-
-```text
-POST /api/dictionaries/:id/quality/query
-POST /api/dictionaries/:id/quality/location
-```
-
-summary 请求：
-
-```js
-{
-  source: { type: "dictionaryQuality", version: 1, options: {} },
-  responseMode: "summary"
-}
-```
-
-items 请求：
-
-```js
-{
-  source: { type: "dictionaryQuality", version: 1, options: {} },
-  responseMode: "items",
-  view: {
-    itemKind: "issue" | "entry",
-    selector: {
-      group: "all" | "severity" | "module",
-      value: "high"
-    },
-    search: {
-      text: "",
-      fields: ["lemma", "pronunciation"],
-      fuzzyFields: []
-    },
-    sort: "lemmaAsc"
-  },
-  page: { limit: 200, cursor: "", windowOffset: null }
-}
-```
-
-- `selector.group: "all"` 不接受 value；`severity` 只接受三种严重度；`module` 只接受六种模块。
-- `itemKind: "issue"` 使用服务端稳定问题顺序，不接受 EntrySearch 或词条 sort，并可返回全局 issue。
-- `itemKind: "entry"` 按唯一受影响词条分页，复用 EntrySearch、sort、EntrySummary 和 location；每个窗口项只附加当前 selector 命中的 issues。
-- location 只接受 `itemKind: "entry"`，请求额外携带 `entryId`。
-- summary 不接受 view/page，不构建问题或词条窗口。
-- HTTP 响应、前端 action 和持久化状态都不携带完整匹配 ID 数组。
+F5-1 已实装 `POST /api/dictionaries/:id/quality/query` 与 `/quality/location`；请求、响应、selector、两种视图、location 与错误码以 [API Contract](API_CONTRACT.md#quality-result-queryf5-1-已实装) 为准，本文不再重复。HTTP 响应、前端 action 和持久化状态都不携带完整匹配 ID 数组。
 
 ## 7. Repository 与会话边界
 
-F5-1 repository 首版只提供：
-
-- `id / lemma / pronunciation`；
-- 有序 raw tags；
-- `definition id / position / meaning / example`；
-- `source text / target entry ID / position`（空目标 ID 为未绑定文本；运行期不按词形猜测关系）；
-- 稳定来源解析边和词条排序/搜索窗口能力。
-
-不读取词条备注、词源描述、形态配置、语料、语言文档或完整词典 snapshot。简单 presence 规则可以复用现有 EntryFilter 编译器，或由一次合并事实读取产生相同结果；选择由基准决定，但两条路径必须共享 fixture。
-
-基础会话保存可丢弃的 issues、按词条索引、selector 成员和摘要，绑定 dictionary generation、source、规则集版本及实现版本。首版使用现有较宽 generation 失效；UI 语言、selector、搜索、排序和窗口不进入基础身份。近期不新增 SQLite 派生表、持久化 job 或增量单词条维护。
+repository 只提供 `qualityInputRecords()` 的最小事实，以及已有的词条排序、搜索窗口和 EntrySummary；空目标 ID 的来源为未绑定文本，运行期不按词形猜测关系。基础会话保存可丢弃的 issues、按词条索引、各视图有序成员和摘要，绑定 dictionary generation、source、规则集版本及实现版本（`QUALITY_IMPLEMENTATION_VERSION`）。首版使用现有较宽 generation 失效；UI 语言、selector、搜索、排序和窗口不进入基础身份。近期不新增 SQLite 派生表、持久化 job 或增量单词条维护。
 
 ## 8. 实施阶段
 
@@ -186,11 +139,25 @@ F5-1 repository 首版只提供：
 - 冻结本地化独立、Gloss v1、来源链进入循环和全局近似标签行为。
 - 新增 `scripts/check-quality-model.js`，覆盖全部 code、参数、循环见证、全局关联成员、计数和本地化不改变身份。
 
-### F5-1：QualityService 与 API
+### F5-1：QualityService 与 API（已完成，2026-10-18）
 
-- 新增 quality query model、规则 planner、最小 repository 输入、服务端 builder 和 query/location route。
-- 复用有界 session/cache/cursor 原语；问题构建循环按批次让出事件循环。
-- 建立服务、repository、API 和“不调用完整 snapshot”的定向检查及 10k/30k 基准。
+实装前按 `AGENTS.md` 对本节原方案做了独立复评，结论：
+
+- **收窄**：不建按规则选择执行原语的 planner。12 条规则都只需同一组最小事实，逐条 SQL 会多次扫描同一批表，planner 抽象没有当前调用方；改为一次合并读取加纯规则模块。
+- **单一实现**：规则从 `buildQualityReport` 中抽出为 `buildQualityIssues`／`buildQualityIssuesAsync`，前端现有质量页的本地报告也改由同一模块生成，所以 A11 的指数级循环检测在前端同时消失，两条路径的结果由同一 fixture 断言一致。前端报告在 F5-2 删除。
+- **补充**：issue 视图的 item 附带主词条的 EntrySummary（全局问题为 `null`），F5-2 渲染词形时不需要额外请求；全局近似标签问题附加到其关联词条的 entry 视图项上，与 summary 的 `entryCount` 一致。
+- **复用**：cursor 编码与校验从 `AnalysisFeatureService` 抽到 `lib/result-window-cursor.js` 共用；会话缓存复用 `FeatureResultSessionCache` 的独立实例。
+
+验收：`scripts/check-quality-model.js` 覆盖规范见证、顺序无关、2000 词条共享祖先（旧算法按斐波那契数增长）、5 万成员长循环和同步／异步结果一致；`scripts/check-quality-result-session.js` 覆盖请求校验、与本地报告一致、不读取 snapshot、summary 不读取查询上下文、各视图共用一次构建、窗口与 cursor、保存后失效与重建、location、HTTP 不含关联 ID 数组和未知词典。
+
+基准（`node scripts/benchmark-quality-result.js`，本机，合成词典：每词条引用两个更早的词条，含少量环、空字段、Gloss 和未解析来源，各 5 次冷构建）：
+
+| 规模 | issue 数 | 冷构建 p50 / p95 | 冷构建期间 event-loop 最大阻塞 | 已建会话上的窗口请求 |
+| --- | --- | --- | --- | --- |
+| 10k | 3917 | 88 / 114 ms | 68 ms | 9–11 ms |
+| 30k | 11744 | 609 / 630 ms | 379 ms | 15–61 ms |
+
+10k 低于第 9 节的复评门槛。30k 的主要阻塞是 `qualityInputRecords()` 的同步读取（稳定状态约 170 ms，紧跟导入或 GC 时更高）：它刻意保持为一个同步块，以读到同一个数据库状态；规则阶段每 256 个词条、索引阶段每 1024 个 issue 让出一次，最长间隔约 20 ms。若真实 30k 词典上该阻塞影响交互，再评估进程内 deferred execution 或缩小读取列。
 
 ### F5-2：质量页面远程化
 

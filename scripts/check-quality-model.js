@@ -83,7 +83,7 @@ assert.deepEqual(qualityModel.QUALITY_ISSUE_DEFINITIONS, expectedDefinitions);
 assert.deepEqual(qualityModel.QUALITY_SEVERITY_KEYS, ["high", "medium", "low"]);
 assert.deepEqual(qualityModel.QUALITY_MODULE_KEYS, ["lemma", "tags", "ipa", "network", "gloss", "other"]);
 assert.throws(
-  () => qualityModel.addQualityIssue([], "unknown_quality_issue", null, "Unknown"),
+  () => qualityModel.createQualityIssue("unknown_quality_issue", ""),
   /Unknown quality issue code/,
 );
 
@@ -182,4 +182,108 @@ assert.equal(
   "issue identity must exclude localized title and detail text",
 );
 
-console.log("Quality rule contract checks passed.");
+function sourceRecord(id, sourceIds = []) {
+  return qualityModel.qualityInputRecordFromEntry(completeEntry(id, {
+    sources: sourceIds.map((sourceId) => ({ entryId: sourceId, text: sourceId })),
+  }));
+}
+
+function cycleParamsByEntry(issues) {
+  return Object.fromEntries(issues
+    .filter((issue) => issue.code === "source_cycle")
+    .map((issue) => [issue.entryId, issue.params]));
+}
+
+function seededShuffle(values, seed) {
+  const result = [...values];
+  let state = seed;
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    state = (state * 1103515245 + 12345) % 2147483648;
+    const swap = state % (index + 1);
+    [result[index], result[swap]] = [result[swap], result[index]];
+  }
+  return result;
+}
+
+// Each cyclic component reports one witness that starts at its smallest member
+// ID and follows sources in position order; dependents inherit the first cycle
+// reached through their own source order, independent of record order.
+const witnessRecords = [
+  sourceRecord("ring-c", ["ring-a"]),
+  sourceRecord("ring-a", ["ring-b"]),
+  sourceRecord("ring-b", ["ring-c"]),
+  sourceRecord("pair-y", ["pair-x"]),
+  sourceRecord("pair-x", ["pair-y"]),
+  sourceRecord("fan-in", ["plain", "pair-y", "ring-b"]),
+  sourceRecord("plain"),
+  sourceRecord("downstream", ["fan-in"]),
+];
+const ringWitness = {
+  cycleEntryIds: ["ring-a", "ring-b", "ring-c", "ring-a"],
+  cycleLemmas: ["ring-a", "ring-b", "ring-c", "ring-a"],
+};
+const pairWitness = {
+  cycleEntryIds: ["pair-x", "pair-y", "pair-x"],
+  cycleLemmas: ["pair-x", "pair-y", "pair-x"],
+};
+const expectedCycles = {
+  "ring-c": ringWitness,
+  "ring-a": ringWitness,
+  "ring-b": ringWitness,
+  "pair-y": pairWitness,
+  "pair-x": pairWitness,
+  "fan-in": pairWitness,
+  downstream: pairWitness,
+};
+assert.deepEqual(cycleParamsByEntry(qualityModel.buildQualityIssues(witnessRecords)), expectedCycles);
+for (let seed = 1; seed <= 8; seed += 1) {
+  assert.deepEqual(
+    cycleParamsByEntry(qualityModel.buildQualityIssues(seededShuffle(witnessRecords, seed))),
+    expectedCycles,
+    `cycle witnesses must not depend on record order (seed ${seed})`,
+  );
+}
+
+// A11: shared acyclic ancestry must be visited once. Every entry citing its two
+// predecessors made the old per-entry path search grow with Fibonacci numbers.
+const ladder = Array.from({ length: 2000 }, (_, index) => sourceRecord(
+  `ladder-${index}`,
+  [index - 1, index - 2].filter((source) => source >= 0).map((source) => `ladder-${source}`),
+));
+assert.equal(
+  qualityModel.buildQualityIssues(ladder).some((issue) => issue.code === "source_cycle"),
+  false,
+);
+
+const longCycleLength = 50000;
+const longCycle = Array.from({ length: longCycleLength }, (_, index) => sourceRecord(
+  `long-${String(index).padStart(5, "0")}`,
+  [`long-${String((index + 1) % longCycleLength).padStart(5, "0")}`],
+));
+const longCycleIssues = qualityModel.buildQualityIssues(longCycle).filter((issue) => issue.code === "source_cycle");
+assert.equal(longCycleIssues.length, longCycleLength);
+assert.equal(longCycleIssues[0].params.cycleEntryIds.length, longCycleLength + 1);
+assert.equal(longCycleIssues[0].params.cycleEntryIds[0], "long-00000");
+assert.equal(longCycleIssues[0].params, longCycleIssues[longCycleLength - 1].params);
+
+(async () => {
+  const records = qualityFixture().entries.map(qualityModel.qualityInputRecordFromEntry);
+  let yields = 0;
+  const asyncIssues = await qualityModel.buildQualityIssuesAsync(
+    [...records, ...ladder],
+    async () => {
+      yields += 1;
+    },
+  );
+  assert.deepEqual(asyncIssues, qualityModel.buildQualityIssues([...records, ...ladder]));
+  assert.ok(yields >= 2, "the async builder must yield between record batches");
+  assert.deepEqual(
+    qualityModel.buildQualityIssues(records).map(({ code, entryId, params }) => ({ code, entryId, params })),
+    englishReport.issues.map(({ code, entryId, params }) => ({ code, entryId, params })),
+    "the local display report and the record builder must share one rule implementation",
+  );
+  console.log("Quality rule contract checks passed.");
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

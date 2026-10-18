@@ -51,14 +51,6 @@
 - 先单独修第 1、2 点再改语法，会让用户规则迁移两次。
 - 改动会改变已有规则的生成结果，需在 CHANGELOG 说明；如果改为受限语法，还需要设计已有规则的转换或提示。
 
-### A11：质量检查的循环检测会在无环图上指数级重复展开
-
-- **现状**：`sourceCycleForEntry()` 只记录当前递归路径，节点访问完成后从已访问集合中删除，已查过的无环部分不会被复用。报告又逐词条调用，共享来源会被反复展开。
-- **证据**：此前合成无环图实测，45 个词条约 1.8 秒，49 个约 14.3 秒；当前算法未变，浏览器内的具体耗时未实测。
-- **影响**：少量但结构特殊的数据就能让同步质量检查明显卡住，不只是“词典很大才慢”。
-- **定位**：`lib/quality-model.js` 的 `sourceCycleForEntry()`（约 163 行）及 `buildQualityReport()` 中的逐词条调用；`app.js` 的 `buildQualityViewReport()`。
-- **处理方向**：在 F5-1 中复用 `lib/etymology-graph-model.js` 的强连通分量结果，见[质量计划](QUALITY_RESULT_PLAN.md) 4.3 节和[词源图计划](ETYMOLOGY_GRAPH_PLAN.md)第 6 节。见证路径语义按词源图计划第 7 节决策 2 处理。F5 目前只有计划，不代表本项已修复。
-
 ## 3. 无关的全量工作
 
 ### A13：前端收到局部保存响应后仍规范化整本已加载词典
@@ -72,7 +64,7 @@
 2026-09-29 检查，代码变化后需复核。是否移除快照，应先实测 10k／30k 词典下快照的加载耗时、体积和内存再决定：
 
 - **服务端已有能力的本地后备，可以直接删除**：`filteredEntries()` 的本地筛选路径、`refreshActiveFilterState()` 按快照清理失效 ID。
-- **整词典批处理，宜改为服务端批处理命令**：`batchGenerateIpa()`、`applyTagSortOrder()`、前端 `buildQualityReport()`（其缓存键 `qualityReportCacheKey()` 本身就要序列化全部词条，为 O(N)）。质量部分即 F5。
+- **整词典批处理，宜改为服务端批处理命令**：`batchGenerateIpa()`、`applyTagSortOrder()`、前端 `buildQualityReport()`（其缓存键 `qualityReportCacheKey()` 本身就要序列化全部词条，为 O(N)）。质量部分的服务端 `/quality/query` 已由 F5-1 提供（2026-10-18），前端改为消费它并删除本地报告是 F5-2。
 - **快照同步维护，快照移除后自然消失**：`upsertEntryInDictionary()`、`removeEntryFromDictionary()`、`applyEntryPatchPayload()`，以及 A13 的整本规范化。
 - **小范围查找**：浏览态词源回退文本。关系数据加载完成前，`renderEtymology()` 仍读取前端完整快照。
 
@@ -96,11 +88,6 @@
   - `sampleSurface` 用于验证生成贴图与解析采样一致，`qualityIssueIdentity` 对应质量计划中的问题身份契约，两者都保留；
   - `fieldFuzzyEnabled`、`normalizeConfiguredSearchText`、`resolveDisplayIdentity`、`findDerivedEntries` 待确认；
   - 删除函数时不能顺带丢掉它们覆盖的行为验证。
-
-### C08：质量模型中永远不会执行的后备路径
-
-- **现状**：`lib/quality-model.js` 对必然加载的 `entryRelationsModel` 使用可选调用，并保留一条依赖缺失时才走的 `find` 后备路径（约 149–160、165、208 行）。
-- **处理方向**：F5-1 搬迁质量规则时一并删除。
 
 ### C09：数据库非空列与静态 DOM 的读取兜底
 
@@ -130,11 +117,10 @@
 
 ## 7. 建议处理顺序
 
-1. **A11** 随 F5-1 处理，小规模数据已复现严重阻塞。
-2. **A10**：由第 3 阶段规则引擎处理；可选先做锚点止血。
-3. **A04／A05**：明确联合保存与多窗口冲突契约，配合临时数据回归。
-4. **数据规范化计划阶段 2、3**（C01）；**C06** 单独重构。
-5. **A13／A14**：先测量快照成本再定方案；**C07**、**C09** 随相关工作清理；R 类按测量结果或发布目标决定。
+1. **A10**：由第 3 阶段规则引擎处理；可选先做锚点止血。
+2. **A04／A05**：明确联合保存与多窗口冲突契约，配合临时数据回归。
+3. **数据规范化计划阶段 2、3**（C01）；**C06** 单独重构。
+4. **A13／A14**：先测量快照成本再定方案；**C07**、**C09** 随相关工作清理；R 类按测量结果或发布目标决定。
 
 ## 8. 维护规则
 

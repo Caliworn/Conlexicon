@@ -1082,9 +1082,10 @@ function checkModelNormalization() {
         pronunciation: "",
         tags: ["proper-noun"],
         definitions: [],
+        etymology: { sources: [] },
       },
     ],
-  }, { text: (_zh, en) => en, normalizeText: testNormalize });
+  }, { text: (_zh, en) => en });
   assert.equal(qualityReport.issues.some((issue) => issue.title === "Duplicate lemma" && issue.entryId === "entry-quality-a"), true);
   assert.equal(qualityReport.issues.some((issue) => issue.title === "Multiple primary stresses"), true);
   assert.equal(qualityReport.issues.some((issue) => issue.title === "Gloss alignment mismatch"), true);

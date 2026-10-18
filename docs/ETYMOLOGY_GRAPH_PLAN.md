@@ -86,10 +86,7 @@ buildEtymologyGraph({
 
 ## 6. 与 F5-1 质量检查的关系
 
-- `source_unresolved` 不依赖本模块，按来源解析结果逐条产生，不受影响。
-- `source_cycle` 的现有语义（[质量计划](QUALITY_RESULT_PLAN.md) 4.3 节）：来源链最终进入循环的词条也产生 issue。基于本模块可以写成：词条所在分量是循环分量，或者它的某个祖先分量是循环分量。这个“可达循环”标记沿用第 4 节的拓扑序传播，O(V+E)。
-- **witness 路径**：当前前端按来源顺序做逐词条 DFS，取第一次回到路径上的节点作为见证，这依赖具体路径，无法记忆化。F5-1 需要为每个循环分量确定一条规范见证（例如从分量中 ID 最小的成员出发，按来源位置顺序在分量内找第一条闭合路径），词条引用其首个可达循环分量的见证。这会改变部分 `cycleEntryIds` 和 issue `id`；服务端 issue 尚未上线且不持久化，属于可以接受的调整。已确认采用（第 7 节决策 2），F5-1 开工时写入质量计划。
-- 依赖方向：F5-1 → `etymology-graph-model`，模块不反向依赖质量模型。前端 `quality-model.js` 的 `sourceCycleForEntry` 在 F5-3 替换旧本地质量结果时随之删除，本计划不修改它。
+F5-1 已于 2026-10-18 实装：`lib/quality-model.js` 直接消费本模块导出的 `stronglyConnectedComponents`，按分量拓扑序记忆化传播“可达循环”，O(V+E)；规范见证的规则写在[质量计划](QUALITY_RESULT_PLAN.md) 4.3 节。`source_unresolved` 不依赖本模块。依赖方向保持 F5-1 → `etymology-graph-model`，本模块不反向依赖质量模型；前端 `sourceCycleForEntry` 已随之删除。
 
 ## 7. 决策（2026-09-30 已确认）
 
