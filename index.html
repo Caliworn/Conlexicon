@@ -45,7 +45,7 @@
               <path d="M4 6h.01M4 12h.01M4 18h.01"></path>
             </svg>
           </button>
-          <button class="mobile-app-bar-button mobile-new-entry-button" data-control-tone="accent" data-control-emphasis="outline" id="mobileNewEntryButton" type="button" data-app-tooltip="always" data-i18n-aria-label="newEntry" aria-label="新建词条">
+          <button class="mobile-app-bar-button mobile-new-entry-button" data-control-tone="accent" data-control-emphasis="outline" id="mobileNewEntryButton" type="button" data-app-tooltip="always" data-i18n-aria-label="quickNewEntryTooltip" aria-label="快速录入">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 5v14M5 12h14"></path>
             </svg>
@@ -147,7 +147,7 @@
                     <path d="m6 9 6 6 6-6"></path>
                   </svg>
                 </button>
-                <button class="secondary-button entry-collapsed-new-button" data-control-tone="accent" data-control-emphasis="outline" id="collapsedNewEntryButton" type="button" data-app-tooltip="always" data-i18n-aria-label="newEntry" aria-label="新建词条" hidden>
+                <button class="secondary-button entry-collapsed-new-button" data-control-tone="accent" data-control-emphasis="outline" id="collapsedNewEntryButton" type="button" data-app-tooltip="always" data-i18n-aria-label="quickNewEntryTooltip" aria-label="快速录入" hidden>
                   <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M12 5v14M5 12h14"></path>
                   </svg>
@@ -235,7 +235,7 @@
                     <option value="createdDesc" data-i18n="sortCreatedDesc">创建时间倒序</option>
                   </select>
                 </div>
-                <button class="secondary-button entry-list-new-button" data-control-tone="accent" data-control-emphasis="outline" id="entryListNewEntryButton" type="button" data-app-tooltip="always" data-i18n-aria-label="quickNewEntryTooltip" aria-label="新建词条">
+                <button class="secondary-button entry-list-new-button" data-control-tone="accent" data-control-emphasis="outline" id="entryListNewEntryButton" type="button" data-app-tooltip="always" data-i18n-aria-label="quickNewEntryTooltip" aria-label="快速录入">
                   <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M12 5v14M5 12h14"></path>
                   </svg>
@@ -344,7 +344,7 @@
                   <h3 class="visually-hidden" id="entryFormTitle">词条</h3>
                   <label class="entry-editor-lemma">
                     <span data-i18n="lemma">词形</span>
-                    <input id="lemmaInput" name="lemma" aria-required="true" maxlength="80">
+                    <textarea class="ipa-single-line" id="lemmaInput" name="lemma" rows="1" aria-required="true" maxlength="80"></textarea>
                   </label>
 
                   <label>
@@ -1218,6 +1218,29 @@
           <div class="network-status" id="networkStatus" role="status" aria-live="polite" hidden></div>
         </div>
       </div>
+    </section>
+
+    <section class="modal-overlay" id="quickEntryDialog" hidden>
+      <article class="modal-panel quick-entry-panel" id="quickEntryPanel" role="dialog" aria-modal="true" aria-labelledby="quickEntryTitle">
+        <div class="modal-header">
+          <h2 id="quickEntryTitle" data-i18n="quickEntryTitle">快速录入</h2>
+          <button class="secondary-button" id="closeQuickEntryButton" data-control-tone="neutral" type="button" data-i18n="close">关闭</button>
+        </div>
+        <ul class="quick-entry-log" id="quickEntryLog" aria-live="polite" hidden></ul>
+        <div class="quick-entry-fields" id="quickEntryFields"></div>
+        <p class="quick-entry-message" id="quickEntryMessage" role="status"></p>
+        <div class="quick-entry-footer">
+          <p class="quick-entry-keys">
+            <span><kbd>Enter</kbd> <span data-i18n="quickEntryKeyNext">下一项</span></span>
+            <span><kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="quickEntryKeyMove">切换</span></span>
+            <span><kbd>Tab</kbd> <span data-i18n="quickEntryKeySuggest">填入建议</span></span>
+          </p>
+          <div class="quick-entry-actions">
+            <button class="secondary-button" id="quickEntryFullEditButton" data-control-tone="neutral" type="button" aria-keyshortcuts="Control+Shift+Enter Meta+Shift+Enter"><span data-i18n="quickEntryFullEdit">完整编辑</span><kbd class="quick-entry-shortcut">Ctrl Shift Enter</kbd></button>
+            <button class="secondary-button" id="quickEntrySubmitButton" data-control-tone="accent" data-control-emphasis="solid" type="button" aria-keyshortcuts="Control+Enter Meta+Enter"><span data-i18n="quickEntrySubmit">提交</span><kbd class="quick-entry-shortcut">Ctrl Enter</kbd></button>
+          </div>
+        </div>
+      </article>
     </section>
 
     <section class="modal-overlay" id="infoDialog" hidden>

@@ -428,7 +428,24 @@ const i18n = {
     liquidGlassSkin: "液态玻璃",
     selectSkinCurrent: "选择皮肤，当前：{skin}",
     newEntry: "新建词条",
-    quickNewEntryTooltip: "新建词条",
+    quickNewEntryTooltip: "快速录入",
+    quickEntryTitle: "快速录入",
+    quickEntryKeyNext: "下一项",
+    quickEntryKeyMove: "切换",
+    quickEntryKeySuggest: "填入建议",
+    quickEntryFullEdit: "完整编辑",
+    quickEntrySubmit: "提交",
+    quickEntryDefinitionLabel: "释义 {n}",
+    quickEntryCreated: "已创建",
+    quickEntryDefinitionCount: "{count} 条释义",
+    quickEntryDefinitionCountOne: "1 条释义",
+    quickEntryOpen: "打开",
+    quickEntryHintIpa: "Tab 填入自动 IPA",
+    quickEntryHintTags: "Tab 沿用：{tags}",
+    quickEntryHintRemoveDefinition: "Backspace 删除此行",
+    quickEntryHintSubmit: "Ctrl+Enter 提交",
+    quickEntryRequiredPlaceholder: "必填",
+    quickEntryUnsaved: "快速录入中有未提交的草稿。",
     insertSymbol: "插入 {symbol}",
     backendOffline: "后端未连接",
     openViaServer: "请通过本地服务打开 Conlexicon",
@@ -1048,7 +1065,24 @@ const i18n = {
     liquidGlassSkin: "Liquid Glass",
     selectSkinCurrent: "Choose skin, current: {skin}",
     newEntry: "New Entry",
-    quickNewEntryTooltip: "New Entry",
+    quickNewEntryTooltip: "Quick Entry",
+    quickEntryTitle: "Quick Entry",
+    quickEntryKeyNext: "Next",
+    quickEntryKeyMove: "Move",
+    quickEntryKeySuggest: "Fill suggestion",
+    quickEntryFullEdit: "Full Edit",
+    quickEntrySubmit: "Submit",
+    quickEntryDefinitionLabel: "Definition {n}",
+    quickEntryCreated: "created",
+    quickEntryDefinitionCount: "{count} definitions",
+    quickEntryDefinitionCountOne: "1 definition",
+    quickEntryOpen: "Open",
+    quickEntryHintIpa: "Tab: auto IPA",
+    quickEntryHintTags: "Tab: reuse {tags}",
+    quickEntryHintRemoveDefinition: "Backspace removes this line",
+    quickEntryHintSubmit: "Ctrl+Enter submits",
+    quickEntryRequiredPlaceholder: "Required",
+    quickEntryUnsaved: "Quick entry has an unsubmitted draft.",
     insertSymbol: "Insert {symbol}",
     backendOffline: "Backend Offline",
     openViaServer: "Open Conlexicon Through Local Service",
@@ -1780,6 +1814,14 @@ const elements = {
   infoDialogTitle: document.querySelector("#infoDialogTitle"),
   infoDialogBody: document.querySelector("#infoDialogBody"),
   closeInfoDialogButton: document.querySelector("#closeInfoDialogButton"),
+  quickEntryDialog: document.querySelector("#quickEntryDialog"),
+  quickEntryPanel: document.querySelector("#quickEntryPanel"),
+  quickEntryLog: document.querySelector("#quickEntryLog"),
+  quickEntryFields: document.querySelector("#quickEntryFields"),
+  quickEntryMessage: document.querySelector("#quickEntryMessage"),
+  closeQuickEntryButton: document.querySelector("#closeQuickEntryButton"),
+  quickEntryFullEditButton: document.querySelector("#quickEntryFullEditButton"),
+  quickEntrySubmitButton: document.querySelector("#quickEntrySubmitButton"),
   ipaNoDictionaryNotice: document.querySelector("#ipaNoDictionaryNotice"),
   ipaOpenDictionaryManagerButton: document.querySelector("#ipaOpenDictionaryManagerButton"),
   ipaPanel: document.querySelector("#ipaPanel"),
@@ -15770,7 +15812,7 @@ async function openPartialEdit(section) {
     body.innerHTML = `
       <label class="entry-editor-lemma">
         <span data-i18n="lemma">${escapeHtml(t("lemma"))}</span>
-        <input data-field="lemma" aria-required="true" maxlength="80" value="${escapeHtml(entry.lemma)}">
+        <textarea class="ipa-single-line" rows="1" data-field="lemma" aria-required="true" maxlength="80">${escapeHtml(entry.lemma)}</textarea>
       </label>
       <label>
         <span data-i18n="pronunciation">${escapeHtml(t("pronunciation"))}</span>
@@ -16133,6 +16175,466 @@ async function beginDerivedEntry(sourceEntry) {
   showToast(t("derivedEntryDraft"));
 }
 
+const QUICK_ENTRY_LOG_LIMIT = 3;
+let quickEntryState = null;
+// Tags of the last entry created through the overlay, scoped to its dictionary.
+let quickEntryLastTags = { dictionaryId: "", tags: [] };
+
+function createQuickEntryDraft() {
+  return { lemma: "", pronunciation: "", tags: "", definitions: [""] };
+}
+
+function quickEntryIsOpen() {
+  return !elements.quickEntryDialog.hidden;
+}
+
+function quickEntryHasDraft() {
+  const draft = quickEntryState?.draft;
+  return Boolean(draft && (
+    draft.lemma.trim()
+    || draft.pronunciation.trim()
+    || draft.tags.trim()
+    || draft.definitions.some((meaning) => meaning.trim())
+  ));
+}
+
+function quickEntryFields() {
+  const draft = quickEntryState.draft;
+  return [
+    { key: "lemma", label: t("lemma"), maxLength: 80 },
+    { key: "pronunciation", label: t("pronunciation"), maxLength: 120 },
+    { key: "tags", label: t("tagsLabel"), maxLength: 180 },
+    ...draft.definitions.map((_, definitionIndex) => ({
+      key: "definition",
+      definitionIndex,
+      label: formatText("quickEntryDefinitionLabel", { n: definitionIndex + 1 }),
+    })),
+  ];
+}
+
+function quickEntryFieldValue(field) {
+  const draft = quickEntryState.draft;
+  return field.key === "definition" ? draft.definitions[field.definitionIndex] : draft[field.key];
+}
+
+function quickEntryFieldInputs() {
+  return [...elements.quickEntryFields.querySelectorAll("[data-quick-entry-index]")];
+}
+
+function quickEntryFieldIndex(input) {
+  return Number(input.dataset.quickEntryIndex);
+}
+
+function quickEntryLastTagsForActiveDictionary() {
+  return quickEntryLastTags.dictionaryId === state.activeDictionaryId ? quickEntryLastTags.tags : [];
+}
+
+function quickEntryHint(field) {
+  if (field.key === "pronunciation" && !quickEntryState.draft.pronunciation) {
+    return t("quickEntryHintIpa");
+  }
+  const lastTags = quickEntryLastTagsForActiveDictionary();
+  if (field.key === "tags" && !quickEntryState.draft.tags && lastTags.length) {
+    return formatText("quickEntryHintTags", { tags: serializeTagList(lastTags) });
+  }
+  if (field.key === "definition" && !quickEntryFieldValue(field)) {
+    return field.definitionIndex > 0 ? t("quickEntryHintRemoveDefinition") : "";
+  }
+  if (field.key === "definition" && field.definitionIndex === quickEntryState.draft.definitions.length - 1) {
+    return t("quickEntryHintSubmit");
+  }
+  return "";
+}
+
+function updateQuickEntryRowState() {
+  const fields = quickEntryFields();
+  elements.quickEntryFields.querySelectorAll(".quick-entry-row").forEach((row, index) => {
+    const current = index === quickEntryState.current;
+    row.classList.toggle("is-current", current);
+    row.querySelector(".quick-entry-hint").textContent = current ? quickEntryHint(fields[index]) : "";
+  });
+}
+
+function renderQuickEntryFields() {
+  const settings = normalizeDictionarySettings(activeDictionary().settings);
+  const rows = quickEntryFields().map((field, index) => {
+    const row = document.createElement("label");
+    row.className = "quick-entry-row";
+    const label = document.createElement("span");
+    label.className = "quick-entry-label";
+    label.textContent = field.label;
+    // Native single-line inputs clip stacked diacritics (d͡ʒ, ɣ̟̃); reuse the
+    // single-line textarea that the IPA fields use.
+    const input = document.createElement("textarea");
+    input.className = "ipa-single-line quick-entry-input";
+    input.rows = 1;
+    input.dataset.quickEntryIndex = String(index);
+    input.value = quickEntryFieldValue(field);
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    if (field.maxLength) {
+      input.maxLength = field.maxLength;
+    }
+    // Required fields are only marked here; Enter still moves on and the
+    // submit check enforces them.
+    if (quickEntryFieldIsRequired(field, settings)) {
+      input.setAttribute("aria-required", "true");
+      input.placeholder = t("quickEntryRequiredPlaceholder");
+    }
+    const hint = document.createElement("span");
+    hint.className = "quick-entry-hint";
+    hint.setAttribute("aria-hidden", "true");
+    row.append(label, input, hint);
+    return row;
+  });
+  elements.quickEntryFields.replaceChildren(...rows);
+  updateQuickEntryRowState();
+}
+
+function focusQuickEntryField(index) {
+  const input = quickEntryFieldInputs()[index];
+  quickEntryState.current = index;
+  updateQuickEntryRowState();
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+}
+
+function setQuickEntryMessage(message = "") {
+  elements.quickEntryMessage.textContent = message;
+}
+
+// Extra definition rows left empty disappear once focus leaves them; the
+// first definition row always stays.
+function pruneEmptyQuickEntryDefinitions(keepIndex) {
+  const firstDefinitionIndex = 3;
+  const definitions = quickEntryState.draft.definitions;
+  let removed = false;
+  for (let definitionIndex = definitions.length - 1; definitionIndex >= 1; definitionIndex -= 1) {
+    const fieldIndex = firstDefinitionIndex + definitionIndex;
+    if (fieldIndex !== keepIndex && !definitions[definitionIndex].trim()) {
+      definitions.splice(definitionIndex, 1);
+      if (keepIndex > fieldIndex) {
+        keepIndex -= 1;
+      }
+      removed = true;
+    }
+  }
+  return { removed, keepIndex };
+}
+
+function moveQuickEntryFocus(index) {
+  const { removed, keepIndex } = pruneEmptyQuickEntryDefinitions(index);
+  if (removed) {
+    renderQuickEntryFields();
+  }
+  focusQuickEntryField(keepIndex);
+}
+
+function quickEntryFieldIsRequired(field, settings) {
+  return field.key === "lemma"
+    || (field.key === "pronunciation" && !settings.allowEmptyPronunciation)
+    || (field.key === "tags" && !settings.allowEmptyTags)
+    || (field.key === "definition" && field.definitionIndex === 0 && !settings.allowEmptyDefinitions);
+}
+
+function quickEntryEntryDraft() {
+  const draft = quickEntryState.draft;
+  return createEntryDraft({
+    lemma: draft.lemma.trim(),
+    pronunciation: draft.pronunciation.trim(),
+    tags: parseTagListText(draft.tags),
+    definitions: draft.definitions
+      .map((meaning) => meaning.trim())
+      .filter(Boolean)
+      .map((meaning) => ({ meaning, example: "", note: "" })),
+  });
+}
+
+// Fills the suggestion for an empty IPA or tags field; returns whether the
+// Tab key was consumed.
+function fillQuickEntrySuggestion(field, input) {
+  if (input.value) {
+    return false;
+  }
+  if (field.key === "pronunciation") {
+    const lemma = quickEntryState.draft.lemma.trim();
+    if (!lemma) {
+      setQuickEntryMessage(t("ipaNeedsLemma"));
+      return true;
+    }
+    input.value = generateIpaFromLemma(lemma);
+  } else if (field.key === "tags" && quickEntryLastTagsForActiveDictionary().length) {
+    input.value = serializeTagList(quickEntryLastTagsForActiveDictionary());
+  } else {
+    return false;
+  }
+  quickEntryState.draft[field.key] = input.value;
+  setQuickEntryMessage();
+  updateQuickEntryRowState();
+  return true;
+}
+
+function handleQuickEntryFieldEnter(field, index) {
+  if (field.key !== "definition") {
+    moveQuickEntryFocus(index + 1);
+    return;
+  }
+  if (!quickEntryFieldValue(field).trim()) {
+    return;
+  }
+  const definitions = quickEntryState.draft.definitions;
+  if (field.definitionIndex === definitions.length - 1) {
+    definitions.push("");
+    renderQuickEntryFields();
+  }
+  moveQuickEntryFocus(index + 1);
+}
+
+function removeQuickEntryDefinition(field, index) {
+  quickEntryState.draft.definitions.splice(field.definitionIndex, 1);
+  renderQuickEntryFields();
+  focusQuickEntryField(index - 1);
+}
+
+function appendQuickEntryLog(entry) {
+  const item = document.createElement("li");
+  item.className = "quick-entry-log-item";
+  const lemma = document.createElement("strong");
+  lemma.textContent = entry.lemma;
+  const status = document.createElement("span");
+  const definitionCount = entry.definitions.filter((definition) => definition.meaning).length;
+  status.textContent = definitionCount
+    ? `${t("quickEntryCreated")} · ${(definitionCount === 1 ? t("quickEntryDefinitionCountOne") : formatText("quickEntryDefinitionCount", { count: definitionCount }))}`
+    : t("quickEntryCreated");
+  const open = document.createElement("button");
+  open.type = "button";
+  open.className = "secondary-button quick-entry-open-button";
+  open.dataset.controlTone = "neutral";
+  open.dataset.quickEntryOpen = entry.id;
+  open.textContent = t("quickEntryOpen");
+  item.append(lemma, status, open);
+  elements.quickEntryLog.append(item);
+  while (elements.quickEntryLog.children.length > QUICK_ENTRY_LOG_LIMIT) {
+    elements.quickEntryLog.firstElementChild.remove();
+  }
+  elements.quickEntryLog.hidden = false;
+}
+
+async function submitQuickEntry() {
+  if (!quickEntryState || quickEntryState.submitting) {
+    return false;
+  }
+  const dictionary = activeDictionary();
+  const settings = normalizeDictionarySettings(dictionary.settings);
+  const fields = quickEntryFields();
+  const candidate = quickEntryEntryDraft();
+  const requirementMessage = entrySaveRequirementMessage(candidate, dictionary);
+  if (requirementMessage) {
+    setQuickEntryMessage(requirementMessage);
+    // Tags text can parse to no tags (e.g. only separators); stay put then.
+    const missingIndex = fields.findIndex((field) => (
+      quickEntryFieldIsRequired(field, settings) && !quickEntryFieldValue(field).trim()
+    ));
+    moveQuickEntryFocus(missingIndex >= 0 ? missingIndex : quickEntryState.current);
+    return false;
+  }
+
+  const now = new Date().toISOString();
+  quickEntryState.submitting = true;
+  elements.quickEntrySubmitButton.setAttribute("aria-busy", "true");
+  try {
+    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`, {
+      method: "POST",
+      body: JSON.stringify(entryApiPayload({ ...candidate, createdAt: now, updatedAt: now }, { omitId: true })),
+    });
+    const savedEntry = applySavedEntryResponse(dictionary.id, saved);
+    resetEntryReadStateAfterSave();
+    render({ preserveEditorSurface: Boolean(editorMode === "edit" || partialEditForm()) });
+    quickEntryLastTags = { dictionaryId: dictionary.id, tags: savedEntry.tags };
+    appendQuickEntryLog(savedEntry);
+    quickEntryState.draft = createQuickEntryDraft();
+    setQuickEntryMessage();
+    renderQuickEntryFields();
+    focusQuickEntryField(0);
+    return true;
+  } catch (error) {
+    setQuickEntryMessage(apiErrorToastMessage(error, "saveFailed"));
+    return false;
+  } finally {
+    if (quickEntryState) {
+      quickEntryState.submitting = false;
+    }
+    elements.quickEntrySubmitButton.removeAttribute("aria-busy");
+  }
+}
+
+async function openQuickEntry() {
+  if (!backendAvailable) {
+    return false;
+  }
+  if (!activeDictionary()) {
+    await showView("manager");
+    showToast(t("createDictionaryFirstToast"));
+    return false;
+  }
+  if (quickEntryIsOpen()) {
+    focusQuickEntryField(quickEntryState.current);
+    return true;
+  }
+  if (state.activeView !== "editor") {
+    await showView("editor");
+    if (state.activeView !== "editor") {
+      return false;
+    }
+  }
+  closeMobileDrawers();
+  quickEntryState = {
+    draft: createQuickEntryDraft(),
+    current: 0,
+    submitting: false,
+    returnFocus: document.activeElement,
+  };
+  elements.quickEntryLog.replaceChildren();
+  elements.quickEntryLog.hidden = true;
+  setQuickEntryMessage();
+  renderQuickEntryFields();
+  elements.quickEntryDialog.hidden = false;
+  focusQuickEntryField(0);
+  return true;
+}
+
+function hideQuickEntry({ restoreFocus = true } = {}) {
+  const returnFocus = quickEntryState?.returnFocus;
+  elements.quickEntryDialog.hidden = true;
+  elements.quickEntryFields.replaceChildren();
+  elements.quickEntryLog.replaceChildren();
+  quickEntryState = null;
+  if (restoreFocus && returnFocus?.isConnected && returnFocus.getClientRects().length) {
+    returnFocus.focus();
+  }
+}
+
+async function requestCloseQuickEntry() {
+  if (!quickEntryState || quickEntryState.submitting) {
+    return false;
+  }
+  if (quickEntryHasDraft()) {
+    const confirmed = await confirmUnsavedChanges(t("quickEntryUnsaved"), { save: submitQuickEntry });
+    if (!confirmed) {
+      focusQuickEntryField(quickEntryState.current);
+      return false;
+    }
+  }
+  hideQuickEntry();
+  return true;
+}
+
+async function transferQuickEntryToFullEditor() {
+  if (!quickEntryState || quickEntryState.submitting) {
+    return false;
+  }
+  const started = await beginNewEntry(quickEntryEntryDraft());
+  if (!started) {
+    focusQuickEntryField(quickEntryState.current);
+    return false;
+  }
+  hideQuickEntry({ restoreFocus: false });
+  elements.lemmaInput.focus();
+  return true;
+}
+
+async function openQuickEntryCreatedEntry(entryId) {
+  if (await requestCloseQuickEntry()) {
+    await switchToEntry(entryId);
+  }
+}
+
+function handleQuickEntryKeydown(event) {
+  if (event.isComposing || event.keyCode === 229) {
+    return;
+  }
+  const modifier = (event.ctrlKey || event.metaKey) && !event.altKey;
+  if (modifier && event.key === "Enter") {
+    event.preventDefault();
+    void (event.shiftKey ? transferQuickEntryToFullEditor() : submitQuickEntry());
+    return;
+  }
+  if (modifier && !event.shiftKey && event.key.toLocaleLowerCase() === "s") {
+    event.preventDefault();
+    void submitQuickEntry();
+    return;
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    void requestCloseQuickEntry();
+    return;
+  }
+
+  const input = event.target.closest?.("[data-quick-entry-index]");
+  if (input && !modifier && !event.altKey) {
+    const index = quickEntryFieldIndex(input);
+    const field = quickEntryFields()[index];
+    const lastIndex = quickEntryFieldInputs().length - 1;
+    if (event.key === "Tab" && !event.shiftKey && fillQuickEntrySuggestion(field, input)) {
+      event.preventDefault();
+      return;
+    }
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      handleQuickEntryFieldEnter(field, index);
+      return;
+    }
+    if (event.key === "ArrowUp" && index > 0) {
+      event.preventDefault();
+      moveQuickEntryFocus(index - 1);
+      return;
+    }
+    if (event.key === "ArrowDown" && index < lastIndex) {
+      event.preventDefault();
+      moveQuickEntryFocus(index + 1);
+      return;
+    }
+    if (event.key === "Backspace" && field.key === "definition" && field.definitionIndex > 0 && !input.value) {
+      event.preventDefault();
+      // Holding Backspace to clear a definition must not keep deleting rows.
+      if (!event.repeat) {
+        removeQuickEntryDefinition(field, index);
+      }
+      return;
+    }
+  }
+  trapFocusWithin(elements.quickEntryPanel, event);
+}
+
+function focusableElementsWithin(container) {
+  return [...container.querySelectorAll("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])")]
+    .filter((node) => !node.disabled && node.getClientRects().length);
+}
+
+// Keeps Tab and Shift+Tab cycling inside a modal surface.
+function trapFocusWithin(container, event) {
+  if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) {
+    return false;
+  }
+  const items = focusableElementsWithin(container);
+  if (!items.length) {
+    return false;
+  }
+  const active = document.activeElement;
+  const outside = !container.contains(active);
+  if (event.shiftKey && (outside || active === items[0])) {
+    event.preventDefault();
+    items.at(-1).focus();
+    return true;
+  }
+  if (!event.shiftKey && (outside || active === items.at(-1))) {
+    event.preventDefault();
+    items[0].focus();
+    return true;
+  }
+  return false;
+}
+
 async function beginEditEntry() {
   if (!selectedEntry()) {
     return false;
@@ -16211,16 +16713,7 @@ async function saveEntry(event) {
         body: JSON.stringify(sourceContext ? { entry: payload, sourceBinding: sourceContext } : payload),
       },
     );
-    const savedEntry = saved.entry;
-    upsertEntryInDictionary(dictionary.id, savedEntry, { summary: saved.summary });
-    if (saved.ownerEntry) {
-      upsertEntryInDictionary(dictionary.id, saved.ownerEntry, { summary: saved.summary });
-      cacheSavedEntryDetail(dictionary.id, saved.ownerEntry);
-      updateEntrySummaryDtoAfterSave(activeDictionary(), saved.ownerEntry);
-    }
-    state.selectedEntryId = savedEntry.id;
-    cacheSavedEntryDetail(dictionary.id, savedEntry);
-    updateEntrySummaryDtoAfterSave(activeDictionary(), savedEntry);
+    const savedEntry = applySavedEntryResponse(dictionary.id, saved, { select: true });
     entryDraft = null;
     editorMode = "display";
     resetEntryReadStateAfterSave();
@@ -16234,6 +16727,24 @@ async function saveEntry(event) {
     showApiErrorToast(error, "saveFailed");
     return false;
   }
+}
+
+// Applies an entry save response to the loaded dictionary and read caches.
+// `select` makes the saved entry current before its detail is cached.
+function applySavedEntryResponse(dictionaryId, saved, { select = false } = {}) {
+  const savedEntry = saved.entry;
+  upsertEntryInDictionary(dictionaryId, savedEntry, { summary: saved.summary });
+  if (saved.ownerEntry) {
+    upsertEntryInDictionary(dictionaryId, saved.ownerEntry, { summary: saved.summary });
+    cacheSavedEntryDetail(dictionaryId, saved.ownerEntry);
+    updateEntrySummaryDtoAfterSave(activeDictionary(), saved.ownerEntry);
+  }
+  if (select) {
+    state.selectedEntryId = savedEntry.id;
+  }
+  cacheSavedEntryDetail(dictionaryId, savedEntry);
+  updateEntrySummaryDtoAfterSave(activeDictionary(), savedEntry);
+  return savedEntry;
 }
 
 async function deleteSelectedEntry() {
@@ -16810,6 +17321,7 @@ function hasManualModuleChangesOnExit() {
   return (
     (!settings.docsAutoSave && docsFormIsDirty(dictionary))
     || (!settings.corpusAutoSave && corpusFormIsDirty(dictionary))
+    || quickEntryHasDraft()
   );
 }
 
@@ -17309,11 +17821,7 @@ elements.mobileEntryListButton.addEventListener("click", () => {
   }
   openMobileEntryBrowserDrawer();
 });
-elements.mobileNewEntryButton.addEventListener("click", async () => {
-  if (await beginNewEntry()) {
-    closeMobileDrawers();
-  }
-});
+elements.mobileNewEntryButton.addEventListener("click", () => openQuickEntry());
 elements.mobileDrawerBackdrop.addEventListener("click", closeMobileDrawers);
 elements.entryBrowserToggleButton.addEventListener("click", toggleEntryBrowser);
 elements.addDictionaryButton.addEventListener("click", prepareNewDictionary);
@@ -17326,12 +17834,35 @@ elements.corpusOpenDictionaryManagerButton.addEventListener("click", () => showV
 elements.morphologyFunctionsOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.morphologyTablesOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.ipaOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
-elements.collapsedNewEntryButton.addEventListener("click", () => beginNewEntry());
-elements.entryListNewEntryButton.addEventListener("click", async () => {
-  if (await beginNewEntry()) {
-    closeMobileEntryBrowserDrawer();
+elements.collapsedNewEntryButton.addEventListener("click", () => openQuickEntry());
+elements.entryListNewEntryButton.addEventListener("click", () => openQuickEntry());
+elements.quickEntryPanel.addEventListener("keydown", handleQuickEntryKeydown);
+elements.quickEntryFields.addEventListener("input", (event) => {
+  const input = event.target.closest("[data-quick-entry-index]");
+  const field = quickEntryFields()[quickEntryFieldIndex(input)];
+  if (field.key === "definition") {
+    quickEntryState.draft.definitions[field.definitionIndex] = input.value;
+  } else {
+    quickEntryState.draft[field.key] = input.value;
+  }
+  setQuickEntryMessage();
+  updateQuickEntryRowState();
+});
+elements.quickEntryFields.addEventListener("focusin", (event) => {
+  const index = quickEntryFieldIndex(event.target);
+  if (index !== quickEntryState.current) {
+    moveQuickEntryFocus(index);
   }
 });
+elements.quickEntryLog.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-quick-entry-open]");
+  if (button) {
+    void openQuickEntryCreatedEntry(button.dataset.quickEntryOpen);
+  }
+});
+elements.closeQuickEntryButton.addEventListener("click", () => requestCloseQuickEntry());
+elements.quickEntryFullEditButton.addEventListener("click", () => transferQuickEntryToFullEditor());
+elements.quickEntrySubmitButton.addEventListener("click", () => submitQuickEntry());
 elements.editEntryButton.addEventListener("click", beginEditEntry);
 elements.analysisPanel.addEventListener("click", (event) => {
   const activityRetryButton = event.target.closest("[data-analysis-activity-retry]");
@@ -18175,15 +18706,19 @@ function isEditableShortcutTarget(target) {
   return Boolean(target?.closest?.("input, textarea, select, [contenteditable='true'], [contenteditable=''], [role='textbox']"));
 }
 
+// Ctrl/Cmd+Enter opens quick entry; adding Shift opens the full editor.
 function isNewEntryShortcutEvent(event) {
   return (event.ctrlKey || event.metaKey)
     && !event.altKey
-    && !event.shiftKey
     && event.key === "Enter";
 }
 
-async function triggerNewEntryShortcut() {
+async function triggerNewEntryShortcut(fullEditor) {
   if (!backendAvailable) {
+    return;
+  }
+  if (!fullEditor) {
+    await openQuickEntry();
     return;
   }
   if (state.activeView !== "editor") {
@@ -18196,7 +18731,7 @@ async function triggerNewEntryShortcut() {
 }
 
 function handleNewEntryShortcut(event) {
-  if (!isNewEntryShortcutEvent(event)) {
+  if (!isNewEntryShortcutEvent(event) || quickEntryIsOpen()) {
     return false;
   }
   event.preventDefault();
@@ -18205,7 +18740,7 @@ function handleNewEntryShortcut(event) {
     return true;
   }
   if (!event.repeat) {
-    triggerNewEntryShortcut().catch((error) => console.error(error));
+    triggerNewEntryShortcut(event.shiftKey).catch((error) => console.error(error));
   }
   return true;
 }

@@ -3272,8 +3272,11 @@ span.pending-source {
   border-bottom: 1px solid var(--material-entry-detail-header-divider);
 }
 
-/* The id keeps this above the global text-input rule in both editors. */
-:is(#entryForm, .inline-partial-edit-form) .entry-editor-lemma input {
+/* The id keeps this above the global text-input rule in both editors. The
+   lemma is a single-line textarea because native inputs clip stacked
+   diacritics. */
+:is(#entryForm, .inline-partial-edit-form) .entry-editor-lemma textarea {
+  min-height: 0;
   height: auto;
   padding: 6px 12px;
   font-family: Georgia, "Times New Roman", serif;
@@ -5392,6 +5395,159 @@ textarea.ipa-single-line::-webkit-scrollbar {
 
 .info-panel {
   width: min(720px, calc(100vw - 48px));
+}
+
+.quick-entry-panel {
+  gap: 12px;
+  width: min(560px, calc(100vw - 48px));
+}
+
+.quick-entry-log {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--ui-border);
+  list-style: none;
+}
+
+.quick-entry-log[hidden] {
+  display: none;
+}
+
+.quick-entry-log-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--ui-text-muted);
+}
+
+.quick-entry-log-item strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ui-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-entry-log-item .quick-entry-open-button {
+  min-height: 30px;
+  margin-left: auto;
+  padding: 0 10px;
+}
+
+.quick-entry-fields {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 2px;
+}
+
+/* Rows read as command-line prompts: no resting box, the shared focus state
+   marks the active field. */
+.quick-entry-row {
+  display: contents;
+}
+
+.quick-entry-panel .quick-entry-input {
+  min-height: 42px;
+  height: 42px;
+  padding: 8px 12px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.quick-entry-label {
+  color: var(--ui-text-muted);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.quick-entry-row.is-current .quick-entry-label {
+  color: var(--ui-accent);
+}
+
+.quick-entry-hint {
+  max-width: 14em;
+  overflow: hidden;
+  color: var(--ui-text-muted);
+  font-size: 0.8125rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-entry-message {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--ui-danger);
+}
+
+.quick-entry-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.quick-entry-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  color: var(--ui-text-muted);
+  font-size: 0.8125rem;
+}
+
+.quick-entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.quick-entry-panel kbd {
+  display: inline-block;
+  margin-right: 2px;
+  padding: 0 4px;
+  border: 1px solid var(--ui-border);
+  border-radius: 4px;
+  color: inherit;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.quick-entry-panel .quick-entry-shortcut {
+  margin: 0 0 0 8px;
+  border-color: color-mix(in srgb, currentColor 40%, transparent);
+  font-weight: 400;
+}
+
+@media (max-width: 640px), (pointer: coarse) {
+  .quick-entry-hint,
+  .quick-entry-keys,
+  .quick-entry-panel .quick-entry-shortcut {
+    display: none;
+  }
+
+  .quick-entry-fields {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .quick-entry-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .quick-entry-label {
+    margin-top: 6px;
+  }
 }
 
 .confirm-dialog-message {

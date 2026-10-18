@@ -27,7 +27,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - **Data analysis**: an on-demand overview of lexicon size, coverage, parts of speech, and editing activity, plus tag and tag-set rankings, root families, orthography, IPA checks and distributions, and morphology statistics. Most figures open the matching entries. Quality checks have their own page, grouped by priority and module.
 - **Settings**: per-dictionary options for parts of speech, tag separators and display replacements (the entry list and the filter menu can each show raw tags instead), search defaults, gloss rendering, polysemy display, how unsaved edits are handled when navigating, auto-save, IPA keyboard symbols, and navigation order.
 - **Appearance**: Classic, Layered Glass, and Liquid Glass skins, light and dark themes, and Chinese or English UI; the global skin, theme, and language are remembered in `data/index.json`. Liquid Glass is still being tuned and falls back to plain materials when its optics are unavailable or accessibility modes are on.
-- **Layout**: a responsive shell with collapsible navigation and entry list, and mobile drawers. New entries start from the entry-list toolbar's + button (also shown beside the list toggle when the list is collapsed); other pages return to the editor through the navigation.
+- **Layout**: a responsive shell with collapsible navigation and entry list, and mobile drawers. The + button in the entry-list toolbar (also beside the list toggle when the list is collapsed, and in the mobile top bar) opens quick entry: an overlay that asks for lemma, pronunciation, tags and definitions one line at a time, submits an entry, and starts a fresh draft without leaving the current entry. Its Full Edit button carries the draft into the full editor for sources, examples, notes or morphology. Other pages return to the editor through the navigation.
 
 - **词典**：新建、切换、导入、导出、配置和删除词典；导入与现有词典 ID 相同的词典前会确认是否覆盖。
 - **存储**：每个词典的词条、形态模板、语料库、语言文档、IPA 规则和设置都保存在各自的 SQLite 文件中；旧 JSON 只作为显式导入、导出和迁移格式。
@@ -46,17 +46,19 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - **数据分析**：按需加载的总览（词汇规模、资料覆盖、词性分布、编辑活动），以及标签与标签集合排行、词根家族、正写法、IPA 检查与分布、形态统计；多数统计项可直接打开对应词条。质量检查有独立页面，按优先度和检查模块分组。
 - **设置**：词典级的词性、标签分隔符与显示替换（词条列表和筛选菜单可分别改为显示原始标签）、默认搜索方式、Gloss 渲染、多义项显示、导航时未保存编辑的处理方式、自动保存、IPA 键盘符号和导航排序。
 - **外观**：经典、层叠玻璃和液态玻璃三套皮肤，浅色与深色主题，中英文界面；全局皮肤、主题和语言记忆在 `data/index.json` 中。液态玻璃仍在调校中，光学效果不可用或开启辅助模式时会退回普通材质。
-- **布局**：响应式外壳，导航和词条列表均可收起，移动端使用抽屉。新建词条从词条列表工具栏的“+”开始（列表收起时列表开关旁也会显示“+”）；其他页面通过导航返回词条编辑。
+- **布局**：响应式外壳，导航和词条列表均可收起，移动端使用抽屉。词条列表工具栏的“+”（列表收起时在列表开关旁，移动端在顶栏）打开快速录入：浮层中逐行填写词形、发音、标签和释义，提交后留在浮层并开始下一条草稿，不离开当前词条；“完整编辑”把草稿带入完整编辑器，用于补充来源、例句、备注或形态学。其他页面通过导航返回词条编辑。
 
 ## Keyboard Shortcuts / 快捷键
 
 - `Ctrl`/`Cmd` + `S`: save the active edit form or module when saving is available.
-- `Ctrl`/`Cmd` + `Enter`: create a new entry when focus is not in an editable field. Unsaved edits go through the usual save / discard / cancel prompt first.
+- `Ctrl`/`Cmd` + `Enter`: open quick entry when focus is not in an editable field. `Ctrl`/`Cmd` + `Shift` + `Enter` opens the full editor for a new entry instead; unsaved edits go through the usual save / discard / cancel prompt first.
+- In quick entry: `Enter` moves to the next field (on a definition it starts another definition; an empty definition does nothing); `Tab` in an empty field fills the suggestion (auto IPA for pronunciation, the tags of the previous quick entry for tags) and otherwise moves focus, which stays inside the overlay; `↑`/`↓` move between fields; `Backspace` on an empty extra definition removes it; `Ctrl`/`Cmd` + `Enter` or `Ctrl`/`Cmd` + `S` submits; `Ctrl`/`Cmd` + `Shift` + `Enter` moves the draft into the full editor; `Esc` closes, asking first if the draft is not empty.
 - `Esc` in a local (section) edit: cancel it; with unsaved changes, the save / discard / cancel prompt appears first.
 - In a source field: `↑`/`↓` move the current suggestion; `Enter` links it, and with no current suggestion keeps the text and never submits the form; `Tab` only moves focus; `Esc` closes the suggestions and keeps the text.
 
 - `Ctrl`/`Cmd` + `S`：在当前表单或模块支持保存时执行保存。
-- `Ctrl`/`Cmd` + `Enter`：焦点不在可编辑区域时新建词条；有未保存编辑时先走“保存 / 放弃 / 取消”确认。
+- `Ctrl`/`Cmd` + `Enter`：焦点不在可编辑区域时打开快速录入。`Ctrl`/`Cmd` + `Shift` + `Enter` 改为在完整编辑器中新建词条；有未保存编辑时先走“保存 / 放弃 / 取消”确认。
+- 快速录入中：`Enter` 进入下一项（在释义上新起一条释义，空释义不动作）；`Tab` 在空字段上填入建议（发音填自动 IPA，标签沿用上一条快速录入的标签），否则移动焦点，焦点始终留在浮层内；`↑`/`↓` 在字段间移动；空的多余释义上按 `Backspace` 删除该行；`Ctrl`/`Cmd` + `Enter` 或 `Ctrl`/`Cmd` + `S` 提交；`Ctrl`/`Cmd` + `Shift` + `Enter` 把草稿转入完整编辑器；`Esc` 关闭，草稿非空时先确认。
 - 局部编辑中按 `Esc`：取消局部编辑；有未保存改动时先弹出“保存 / 放弃 / 取消”确认。
 - 来源输入框内：`↑`/`↓` 移动当前候选；`Enter` 绑定当前候选，没有当前候选时保留文本且不提交表单；`Tab` 只移动焦点；`Esc` 关闭候选并保留文本。
 
