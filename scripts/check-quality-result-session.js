@@ -158,7 +158,20 @@ function checkQueryModel() {
 async function checkService(repository) {
   const dictionary = qualityDictionary();
   await repository.importDictionarySnapshot(dictionary);
-  const report = qualityModel.buildQualityReport(await repository.getDictionarySnapshot(DICTIONARY_ID));
+  // Reference result from the exported entries, independent of the minimal input reader.
+  const snapshotEntries = (await repository.getDictionarySnapshot(DICTIONARY_ID)).entries;
+  const referenceIssues = qualityModel.buildQualityIssues(snapshotEntries.map((entry) => ({
+    id: entry.id,
+    lemma: entry.lemma,
+    pronunciation: entry.pronunciation,
+    tags: entry.tags,
+    definitions: entry.definitions,
+    sources: entry.etymology.sources,
+  })));
+  const report = {
+    issues: referenceIssues,
+    summary: qualityModel.buildQualitySummary(referenceIssues, snapshotEntries.length),
+  };
 
   // The service reads only the minimal quality input, never a full snapshot.
   const counts = { input: 0, context: 0 };

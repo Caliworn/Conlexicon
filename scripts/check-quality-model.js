@@ -1,66 +1,54 @@
 const assert = require("node:assert/strict");
 const qualityModel = require("../lib/quality-model");
+const { parseGloss } = require("../lib/gloss-model");
 
-function completeEntry(id, options = {}) {
+function completeRecord(id, options = {}) {
   return {
     id,
     lemma: options.lemma ?? id,
     pronunciation: options.pronunciation ?? "/a/",
     tags: options.tags ?? ["n"],
     definitions: options.definitions ?? [{ id: `def-${id}`, meaning: "meaning", example: "" }],
-    etymology: { sources: options.sources ?? [] },
+    sources: options.sources ?? [],
   };
 }
 
 function qualityFixture() {
-  return {
-    entries: [
-      {
-        id: "entry-empty",
-        lemma: "",
-        pronunciation: "",
-        tags: [],
-        definitions: [],
-        etymology: { sources: [] },
-      },
-      completeEntry("entry-duplicate-a", { lemma: "Same" }),
-      completeEntry("entry-duplicate-b", { lemma: "same" }),
-      completeEntry("entry-mixed", {
-        lemma: "mixed",
-        pronunciation: "/ˈaˈb/",
-        tags: ["x".repeat(25)],
-        definitions: [{
-          id: "def-mixed",
-          meaning: "meaning",
-          example: "\\gla a b\n\\glb A B",
-        }],
-        sources: [{ entryId: "", text: "missing-root" }],
-      }),
-      completeEntry("entry-gloss-mismatch", {
-        definitions: [{
-          id: "def-gloss-mismatch",
-          meaning: "meaning",
-          example: "\\gla a b\n\\glb A\n\\ft test",
-        }],
-      }),
-      completeEntry("entry-near-tag-a", { tags: ["proper noun"] }),
-      completeEntry("entry-near-tag-b", { tags: ["proper-noun"] }),
-      completeEntry("cycle-a", { sources: [{ entryId: "cycle-b", text: "cycle-b" }] }),
-      completeEntry("cycle-b", { sources: [{ entryId: "cycle-a", text: "cycle-a" }] }),
-      completeEntry("cycle-upstream", { sources: [{ entryId: "cycle-a", text: "cycle-a" }] }),
-    ],
-  };
-}
-
-function issueProjection(report) {
-  return report.issues.map((issue) => ({
-    code: issue.code,
-    severity: issue.severity,
-    module: issue.module,
-    entryId: issue.entryId,
-    relatedEntryIds: issue.relatedEntryIds || [],
-    params: issue.params,
-  }));
+  return [
+    {
+      id: "entry-empty",
+      lemma: "",
+      pronunciation: "",
+      tags: [],
+      definitions: [],
+      sources: [],
+    },
+    completeRecord("entry-duplicate-a", { lemma: "Same" }),
+    completeRecord("entry-duplicate-b", { lemma: "same" }),
+    completeRecord("entry-mixed", {
+      lemma: "mixed",
+      pronunciation: "/ˈaˈb/",
+      tags: ["x".repeat(25)],
+      definitions: [{
+        id: "def-mixed",
+        meaning: "meaning",
+        example: "\\gla a b\n\\glb A B",
+      }],
+      sources: [{ entryId: "", text: "missing-root" }],
+    }),
+    completeRecord("entry-gloss-mismatch", {
+      definitions: [{
+        id: "def-gloss-mismatch",
+        meaning: "meaning",
+        example: "\\gla a b\n\\glb A\n\\ft test",
+      }],
+    }),
+    completeRecord("entry-near-tag-a", { tags: ["proper noun"] }),
+    completeRecord("entry-near-tag-b", { tags: ["proper-noun"] }),
+    completeRecord("cycle-a", { sources: [{ entryId: "cycle-b", text: "cycle-b" }] }),
+    completeRecord("cycle-b", { sources: [{ entryId: "cycle-a", text: "cycle-a" }] }),
+    completeRecord("cycle-upstream", { sources: [{ entryId: "cycle-a", text: "cycle-a" }] }),
+  ];
 }
 
 const expectedDefinitions = {
@@ -86,23 +74,18 @@ assert.throws(
   () => qualityModel.createQualityIssue("unknown_quality_issue", ""),
   /Unknown quality issue code/,
 );
+assert.deepEqual(parseGloss("\\gla a b\n\\glb A B\n\\ft test"), { gla: ["a", "b"], glb: ["A", "B"], glc: [], ft: "test" });
+assert.equal(parseGloss("plain example"), null);
 
-const dictionary = qualityFixture();
-const englishReport = qualityModel.buildQualityReport(dictionary, { text: (_zh, en) => en });
-const chineseReport = qualityModel.buildQualityReport(dictionary, { text: (zh) => zh });
-const issueCodes = new Set(englishReport.issues.map((issue) => issue.code));
+const records = qualityFixture();
+const issues = qualityModel.buildQualityIssues(records);
+assert.deepEqual(new Set(issues.map((issue) => issue.code)), new Set(Object.keys(expectedDefinitions)));
+issues.forEach((issue) => {
+  assert.equal(issue.severity, expectedDefinitions[issue.code].severity);
+  assert.equal(issue.module, expectedDefinitions[issue.code].module);
+});
 
-assert.deepEqual(issueCodes, new Set(Object.keys(expectedDefinitions)));
-assert.equal(englishReport.rulesetVersion, 1);
-assert.deepEqual(issueProjection(englishReport), issueProjection(chineseReport));
-assert.deepEqual(englishReport.summary, chineseReport.summary);
-assert.notEqual(
-  englishReport.issues.find((issue) => issue.code === "missing_ipa").title,
-  chineseReport.issues.find((issue) => issue.code === "missing_ipa").title,
-  "localized display text may change without changing the quality result contract",
-);
-
-const issueFor = (code, entryId = null) => englishReport.issues.find((issue) => (
+const issueFor = (code, entryId = null) => issues.find((issue) => (
   issue.code === code && (entryId === null || issue.entryId === entryId)
 ));
 
@@ -140,27 +123,15 @@ assert.deepEqual(
   qualityModel.qualityIssueAffectedEntryIds(nearDuplicateTags),
   ["entry-near-tag-a", "entry-near-tag-b"],
 );
-assert.equal(qualityModel.qualityIssuesWithEntries([nearDuplicateTags]).length, 0);
-assert.deepEqual(
-  qualityModel.qualityIssueEntryIdsByModule(englishReport, "tags"),
-  ["entry-near-tag-a", "entry-near-tag-b", "entry-empty", "entry-mixed"],
-);
 
-const upstreamCycle = issueFor("source_cycle", "cycle-upstream");
-assert.deepEqual(upstreamCycle.params, {
+assert.deepEqual(issueFor("source_cycle", "cycle-upstream").params, {
   cycleEntryIds: ["cycle-a", "cycle-b", "cycle-a"],
   cycleLemmas: ["cycle-a", "cycle-b", "cycle-a"],
 });
-assert.equal(
-  englishReport.networkIssues.every((issue) => ["source_unresolved", "source_cycle"].includes(issue.code)),
-  true,
-);
-assert.equal(englishReport.networkIssues.length, 4);
 
-const summary = englishReport.summary;
-assert.deepEqual(summary, qualityModel.buildQualitySummary(englishReport, dictionary.entries.length));
+const summary = qualityModel.buildQualitySummary(issues, records.length);
 assert.equal(summary.inputEntryCount, 10);
-assert.equal(summary.issueCount, englishReport.issues.length);
+assert.equal(summary.issueCount, issues.length);
 assert.equal(summary.affectedEntryCount, 10);
 assert.equal(summary.globalIssueCount, 1);
 assert.equal(
@@ -174,22 +145,22 @@ assert.equal(
 assert.deepEqual(
   summary.modules.find((row) => row.key === "tags"),
   { key: "tags", issueCount: 3, entryCount: 4 },
+  "global issues count their related entries in the module entry count",
 );
-
 assert.equal(
   qualityModel.qualityIssueIdentity(issueFor("gloss_incomplete")),
-  qualityModel.qualityIssueIdentity(chineseReport.issues.find((issue) => issue.code === "gloss_incomplete")),
-  "issue identity must exclude localized title and detail text",
+  qualityModel.qualityIssueIdentity({ ...issueFor("gloss_incomplete"), severity: "low", module: "other" }),
+  "issue identity derives from ruleset version, code, entry and params only",
 );
 
 function sourceRecord(id, sourceIds = []) {
-  return qualityModel.qualityInputRecordFromEntry(completeEntry(id, {
+  return completeRecord(id, {
     sources: sourceIds.map((sourceId) => ({ entryId: sourceId, text: sourceId })),
-  }));
+  });
 }
 
-function cycleParamsByEntry(issues) {
-  return Object.fromEntries(issues
+function cycleParamsByEntry(cycleIssues) {
+  return Object.fromEntries(cycleIssues
     .filter((issue) => issue.code === "source_cycle")
     .map((issue) => [issue.entryId, issue.params]));
 }
@@ -267,7 +238,6 @@ assert.equal(longCycleIssues[0].params.cycleEntryIds[0], "long-00000");
 assert.equal(longCycleIssues[0].params, longCycleIssues[longCycleLength - 1].params);
 
 (async () => {
-  const records = qualityFixture().entries.map(qualityModel.qualityInputRecordFromEntry);
   let yields = 0;
   const asyncIssues = await qualityModel.buildQualityIssuesAsync(
     [...records, ...ladder],
@@ -277,11 +247,6 @@ assert.equal(longCycleIssues[0].params, longCycleIssues[longCycleLength - 1].par
   );
   assert.deepEqual(asyncIssues, qualityModel.buildQualityIssues([...records, ...ladder]));
   assert.ok(yields >= 2, "the async builder must yield between record batches");
-  assert.deepEqual(
-    qualityModel.buildQualityIssues(records).map(({ code, entryId, params }) => ({ code, entryId, params })),
-    englishReport.issues.map(({ code, entryId, params }) => ({ code, entryId, params })),
-    "the local display report and the record builder must share one rule implementation",
-  );
   console.log("Quality rule contract checks passed.");
 })().catch((error) => {
   console.error(error);

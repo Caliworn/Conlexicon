@@ -177,7 +177,7 @@ Feature result source 应由对应 service 产生可重建的查询身份，并�
 - 简单缺失规则允许复用普通 EntryFilter 或合并 SQL facts，Gloss/重音使用 fact scan，重复词形/近似标签使用 aggregation，来源问题使用稳定 topology；这些只是内部执行原语，质量 code、政策和结果汇总仍由 QualityService 拥有。
 - F5-1 实装 `/quality/query` 与 QualityService，只复用 F4b 的内部会话/cache/cursor 原语，不与分析 API 混成一种 endpoint。
 - 暂缓的 Gloss 在例句/语料链接边界明确后接入对应 feature service；质量结果只进入独立 QualityService，不让 analysis planner、repository 和质量算法互相反向调用。
-- F5-2/F5-3 依次迁移质量页面和词条筛选，删除剩余 `activeFilter.entryIds`、`issueMap` 和本地完整 report 桥接。
+- F5-2／F5-3 已于 2026-10-18 迁移质量页面和词条筛选，删除 `activeFilter.entryIds`、`issueMap` 和本地完整 report 桥接。
 
 ## 9. F0 验收结果
 

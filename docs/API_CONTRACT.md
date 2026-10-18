@@ -258,7 +258,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 - 普通保存优先增加细粒度端点，不再回退到完整词典 PUT。
 - `GET /api/state` 是轻量启动状态入口；普通启动只应读取词典 metadata/summary，再通过 `GET /api/dictionaries/:id` 或专用读取端点按需加载当前词典内容。
 - 语料库下一步可从整份 corpus 模块保存拆成块、层、单元级 changeset。
-- 搜索、词根模式、词汇关系读取、稳定 SQL 高级筛选、轻量分析总览、IPA 自动生成比较及 IPA 分布分析/筛选已依赖 repository 查询/索引或 feature service；质量检查后端已由 `/quality/query` 提供，前端质量页面与质量筛选仍待 F5-2／F5-3 迁移；其余分析及 Gloss/形态功能结果仍应继续迁移，不能长期让前端扫描大型完整快照。
+- 搜索、词根模式、词汇关系读取、稳定 SQL 高级筛选、轻量分析总览、IPA 自动生成比较及 IPA 分布分析/筛选已依赖 repository 查询/索引或 feature service；质量页面与质量筛选已消费 `/quality/query`；其余分析及 Gloss/形态功能结果仍应继续迁移，不能长期让前端扫描大型完整快照。
 - 短期不引入词典级 revision。等对象级增量端点稳定后，再基于目标对象 `updatedAt` 做轻量乐观锁。
 
 ## 读取 API 现状与后续草案
@@ -1026,7 +1026,7 @@ source、version、options、response mode、category、分布 value、page 与�
 
 #### Quality result query（F5-1 已实装）
 
-规则集、issue 身份、summary 语义和迁移阶段见 [Quality Result Plan](QUALITY_RESULT_PLAN.md)。服务端由 `QualityResultService`（`lib/quality-result-service.js`）实现：
+规则集、issue 身份、summary 语义和实施记录见 [Quality Result Plan](QUALITY_RESULT_PLAN.md)。前端质量页按需请求 summary 与 issue 窗口；词条列表的质量筛选以 `resultSource: { type: "dictionaryQuality" }` 加 selector 作为 feature-result 筛选的一种，请求本端点的 entry 视图。服务端由 `QualityResultService`（`lib/quality-result-service.js`）实现：
 
 ```text
 POST /api/dictionaries/:id/quality/query
@@ -1132,5 +1132,5 @@ F4a 的 light widgets 不返回后台任务状态。F4b 接入重型 widget 后�
 2. F1–F3 已完成统一 EntryQuery/EntryFilter、SQLite 条件编译和前端 descriptor 迁移；稳定筛选继续复用 `/entries` 的窗口、cursor、缓存与定位。
 3. F4a 已完成 `POST /analysis/query` 的轻量 widgets、最小 planner，以及总览、标签集合、正写法、完整活动日期和词根家族异步接线；这些统计不再读取完整 snapshot。
 4. F4b-0 至 F4b-3 已完成可重建 result source、运行时会话、失效、音系引擎 adapter、IPA 自动比较、IPA 分布和形态分配/覆写迁移；前端分析页与高级筛选均已消费 source/view，root family 排名直接消费稳定 topology。
-5. F5-0 冻结了独立 `/quality/query`、规则集 v1 和 issue/summary 语义；F5-1 已实装 QualityService 与 `/quality/query`、`/quality/location`，规则由一次合并的最小事实读取加共享规则模块执行，未引入按规则选择执行原语的 planner。F5-2／F5-3 让质量页面和质量筛选消费该 API。repository 不反向调用质量算法。
+5. F5-0 冻结了独立 `/quality/query`、规则集 v1 和 issue/summary 语义；F5-1 已实装 QualityService 与 `/quality/query`、`/quality/location`，规则由一次合并的最小事实读取加共享规则模块执行，未引入按规则选择执行原语的 planner。F5-2／F5-3 已让质量页面和质量筛选消费该 API，前端不再计算质量结果。repository 不反向调用质量算法。
 6. 语料查询在独立服务边界稳定后按需接入，不恢复前端 materialized ID 或完整快照兜底。

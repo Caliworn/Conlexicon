@@ -15,7 +15,7 @@
 | [Advanced Filter Query Plan](ADVANCED_FILTER_QUERY_PLAN.md) | F0–F4 核心完成 / F5-0 已完成 | EntryFilter、轻量分析、IPA/形态 feature result，以及 Gloss/质量结果的后续边界。 |
 | [Feature Result Session Plan](FEATURE_RESULT_SESSION_PLAN.md) | F4b-0–F4b-3 已完成 | IPA/形态结果源、运行时会话、音系引擎边界和分阶段验收。 |
 | [Etymology Graph Plan](ETYMOLOGY_GRAPH_PLAN.md) | 已实装（2026-09-30） | 词根拓扑语义与来源图强连通分量共享模块；F5-1 `source_cycle` 消费其分量结果。 |
-| [Quality Result Plan](QUALITY_RESULT_PLAN.md) | F5-0、F5-1 已完成 / F5-2–F5-3 待办 | 质量规则集、issue/summary、独立查询 API、结果会话与迁移验收。 |
+| [Quality Result Plan](QUALITY_RESULT_PLAN.md) | 已实装（2026-10-18） | 质量规则集、issue/summary 语义、结果会话边界与实施记录；API 见 API Contract。 |
 | [Source Autocomplete Plan](SOURCE_AUTOCOMPLETE_PLAN.md) | 已实装（2026-09-30），界面验收部分待完成 | 来源补全复用 lemma 搜索 projection 的只读候选查询、消歧 DTO、异步 controller 与键盘契约。 |
 | [App Shell Specification](APP_SHELL_SPEC.md) | 阶段 A 已完成 | 响应式应用外壳：布局、外壳状态模型、DOM/CSS 边界、断点与验收。 |
 | [Touch, Focus and Accessibility Plan](TOUCH_FOCUS_A11Y_PLAN.md) | 阶段 A+ 未开始 | 触摸替代交互、输入能力判定、命中区域、焦点管理与无障碍验收。 |

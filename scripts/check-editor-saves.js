@@ -6,12 +6,12 @@ const vm = require("node:vm");
 // app.js is not modular yet, so this check slices source between known
 // function declarations and runs it in a VM with stubbed globals. The slices
 // assume ensureDocsDraft() … cloneCorpus() hold the docs save functions and
-// closePendingEditsForPageSwitch() … filteredEntries() hold the switch flow.
+// closePendingEditsForPageSwitch() … activeFilterVariantUsesEntryQuery() hold the switch flow.
 // Reordering app.js or adding functions inside those ranges makes this check
 // fail loudly; update the boundaries (or the stubs) rather than the behaviour.
 const app = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
 const docsFunctions = app.slice(app.indexOf("function ensureDocsDraft("), app.indexOf("function cloneCorpus("));
-const switchFunction = app.slice(app.indexOf("async function closePendingEditsForPageSwitch("), app.indexOf("function filteredEntries("));
+const switchFunction = app.slice(app.indexOf("async function closePendingEditsForPageSwitch("), app.indexOf("function activeFilterVariantUsesEntryQuery("));
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 function docsHarness() {

@@ -1,6 +1,6 @@
 # Quality Result Plan
 
-本文记录质量检查 F5 的领域契约、结果会话和迁移计划。F5-0 已完成规则清点、独立复评和契约冻结；F5-1（2026-10-18）已实装后端 `QualityResultService` 与 HTTP API，现行 API 契约见 [API Contract](API_CONTRACT.md#quality-result-queryf5-1-已实装)。F5-2／F5-3 迁移前端。
+本文记录质量检查 F5 的领域契约、结果会话和实施记录。F5 已全部完成（F5-0 冻结契约；F5-1 实装后端 `QualityResultService` 与 HTTP API；F5-2／F5-3 于 2026-10-18 让质量页面和质量筛选改为消费该 API，前端不再计算质量结果）。现行 API 契约见 [API Contract](API_CONTRACT.md#quality-result-queryf5-1-已实装)。
 
 ## 1. F5-0 结论
 
@@ -58,7 +58,7 @@ QualityResultService
 ```
 
 - 稳定问题身份由规则集版本、`code / entryId / params` 派生；`severity / module` 由 code 的规则定义决定，本地化 `title / detail` 不参与。
-- 当前共享模型在 F5-0 期间继续返回 `title / detail` 以兼容现有前端；远程 API 只返回稳定字段，前端按 code 本地化。
+- 服务端只返回稳定字段；前端（`app.js` 的 `qualityIssueText()`）按 code 与 params 生成标题和详情，UI 语言不进入请求。
 - 同一词条可以产生多个 issue，同一义项、标签或来源也可以分别产生 issue。
 - `near_duplicate_tags` 是一个全局 issue，`entryId` 为空；服务端会话内部保存受影响词条集合，使未来的标签模块 `entryCount` 和“查看词条”包含相关词条，但 HTTP 不返回完整 `relatedEntryIds` 数组。
 - issue `id` 在 F5-1 由规则集版本、code、entryId 和稳定参数派生并散列；不持久化，也不承诺跨规则集版本相同。
@@ -69,7 +69,7 @@ QualityResultService
 
 UI 语言不属于质量计算身份。中文和英文只改变标题、详情和标签，不改变 issue code、参数、数量或成员。词形、标签和来源匹配使用固定的服务端关系规范化基线，不读取自由文本搜索的 NFC、case folding 或自定义等价设置。
 
-F5-0 已停止由当前前端把 UI locale normalizer 注入质量模型；现有报告仍因本地化文本在语言切换时重建，F5-2 改为 code 本地化后不再重算基础结果。
+语言切换只重新渲染已取回的结果，不重新请求、不失效基础会话。
 
 ### 4.2 Gloss
 
@@ -88,7 +88,7 @@ F5-1 起用一次强连通分量计算和记忆化传播实现，O(V+E)：
 
 ### 4.4 近似标签
 
-一个规范化紧凑形式对应多个不同 raw tag 时只产生一个全局 `near_duplicate_tags`。规则参数按稳定遇见顺序保存唯一 `forms`，受影响词条按唯一 ID 计数。当前旧前端仍不把全局问题加入固定 ID 筛选；F5-3 通过远程 entry view 修复问题可见但词条计数为零的不一致。
+一个规范化紧凑形式对应多个不同 raw tag 时只产生一个全局 `near_duplicate_tags`。规则参数按稳定遇见顺序保存唯一 `forms`，受影响词条按唯一 ID 计数。F5-3 起词条列表的质量筛选消费远程 entry view，全局近似标签问题的关联词条会出现在列表中并带问题标记，旧前端“问题可见但词条数为零”的不一致已消除。
 
 ## 5. Summary 契约
 
@@ -159,19 +159,20 @@ repository 只提供 `qualityInputRecords()` 的最小事实，以及已有的�
 
 10k 低于第 9 节的复评门槛。30k 的主要阻塞是 `qualityInputRecords()` 的同步读取（稳定状态约 170 ms，紧跟导入或 GC 时更高）：它刻意保持为一个同步块，以读到同一个数据库状态；规则阶段每 256 个词条、索引阶段每 1024 个 issue 让出一次，最长间隔约 20 ms。若真实 30k 词典上该阻塞影响交互，再评估进程内 deferred execution 或缩小读取列。
 
-### F5-2：质量页面远程化
+### F5-2／F5-3：质量页面与词条筛选迁移（已完成，2026-10-18）
 
-- 页面打开时才请求 summary，并提供 loading/error/retry。
-- 问题子页消费 issue window，删除 `limit: Infinity`、前端完整 report 和 O(N) cache key。
-- 按 code/params 在前端本地化；抽出 Gloss parser 供词条例句继续使用。
+实装前复评，结论：
 
-### F5-3：词条筛选迁移
+- **合并实施**：原计划把页面（F5-2）和词条筛选（F5-3）分开，但前端只有质量页会产生“固定词条 ID 列表”筛选，删除本地报告而不迁移筛选，“在词条列表查看”就无数据可用。两步一起完成，并删除整条本地 ID 筛选路径（`filteredEntries`、`activeFilterAction`、`issueMap`、刷新重建与语言切换桥），这也消掉了 A14 中“服务端已有能力的本地后备”一项。
+- **复用筛选族**：质量筛选不另建一类，而是作为 feature-result 筛选的又一种 source（`resultSource.type: "dictionaryQuality"`，`category` 为 selector 分组 `all / severity / module`，`value` 为分组值），分窗、cursor、定位、计数和变体循环沿用现有实现；只有请求体与端点按 source 类型分支。
+- **有界列表**：问题子页每次取 200 条，“再显示 N 项”按 cursor 追加，与标签集合列表一致；不引入虚拟列表。追加时若词典已在别处变化（cursor 过期），从第一页重新取。
+- **其余**：Gloss 解析抽到 `lib/gloss-model.js`，前端不再加载 `quality-model.js`（它改为仅服务端的 CommonJS 模块，也不再由静态服务公开）。页面打开时才请求 summary 与问题窗口；同一 key（词典 ID 加 `updatedAt`）只请求一次，失败显示重试按钮，不会在每次重绘时重复请求。
 
-- 旧质量 action 改存 source/selector，不保存 `entryIds` 或 `issueMap`。
-- 词条列表 query/location 消费 quality entry view，并从当前窗口 DTO 渲染 issue badge。
-- 删除质量专用本地筛选、刷新重建和语言切换问题正文桥。
+验收：`node scripts/check-all.js` 通过。在临时数据实例（4174）中用 455 条问题的测试词典检查：summary 与各分组计数、按 code 本地化的标题与详情（含循环路径和全局近似标签）、“再显示”从 200 到 400 再到 455 且问题 ID 不重复、切换子页、“在词条列表查看”经质量 entry 窗口加载并显示问题标记（全局问题的两个关联词条均出现）、变体循环、语言切换无新请求且标记与筛选标题随之切换、保存词条后 summary 按新 `updatedAt` 重新请求并反映变化、控制台无错误、320px 宽度无横向溢出。
 
 ## 9. 验收门槛
+
+以下门槛均已满足（2026-10-18）；最后一条的 30k 数据见 F5-1 一节。
 
 - 页面未打开时不建立质量会话；首次请求不调用 snapshot/export 路径。
 - 同 source 的 summary、严重度、模块、问题窗口、词条窗口、搜索、排序和 location 只构建一次基础规则结果。

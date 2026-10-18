@@ -63,8 +63,7 @@
 
 2026-09-29 检查，代码变化后需复核。是否移除快照，应先实测 10k／30k 词典下快照的加载耗时、体积和内存再决定：
 
-- **服务端已有能力的本地后备，可以直接删除**：`filteredEntries()` 的本地筛选路径、`refreshActiveFilterState()` 按快照清理失效 ID。
-- **整词典批处理，宜改为服务端批处理命令**：`batchGenerateIpa()`、`applyTagSortOrder()`、前端 `buildQualityReport()`（其缓存键 `qualityReportCacheKey()` 本身就要序列化全部词条，为 O(N)）。质量部分的服务端 `/quality/query` 已由 F5-1 提供（2026-10-18），前端改为消费它并删除本地报告是 F5-2。
+- **整词典批处理，宜改为服务端批处理命令**：`batchGenerateIpa()`、`applyTagSortOrder()`。（质量页的本地报告与本地 ID 筛选已于 2026-10-18 随 F5-2／F5-3 删除。）
 - **快照同步维护，快照移除后自然消失**：`upsertEntryInDictionary()`、`removeEntryFromDictionary()`、`applyEntryPatchPayload()`，以及 A13 的整本规范化。
 - **小范围查找**：浏览态词源回退文本。关系数据加载完成前，`renderEtymology()` 仍读取前端完整快照。
 

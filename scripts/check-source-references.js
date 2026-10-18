@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const { normalizeDictionary } = require("../lib/dictionary-model");
 const { parseLegacyJsonDictionary, exportDictionarySnapshot } = require("../lib/dictionary-conversion-service");
-const { buildQualityReport } = require("../lib/quality-model");
+const { buildQualityIssues } = require("../lib/quality-model");
 const { normalizeSourceReferences } = require("../lib/source-reference-model");
 const { createTempSqliteRepository, requireSqliteRuntime } = require("./sqlite-check-utils");
 
@@ -137,7 +137,7 @@ async function main() {
       { id: "b", lemma: "b", etymology: { sources: [{ entryId: "a", text: "a" }] } },
     ] });
     await repository.importDictionarySnapshot(cycle);
-    assert.equal(buildQualityReport(await repository.getDictionarySnapshot(cycle.id)).issues.filter((issue) => issue.code === "source_cycle").length, 2);
+    assert.equal(buildQualityIssues(repository.qualityInputRecords(cycle.id)).filter((issue) => issue.code === "source_cycle").length, 2);
     await repository.saveEntry(id, { id: "binding-owner", lemma: "owner", etymology: { sources: [
       { entryId: "same-b", text: "same" }, { entryId: "", text: "new source" }, { entryId: "", text: "new source" },
     ] } });

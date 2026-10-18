@@ -76,7 +76,7 @@ const morphologyModel = window.ConlexiconMorphology;
 const entrySearchModel = window.ConlexiconEntrySearch;
 const searchNormalizationModel = window.ConlexiconSearchNormalization;
 const ENTRY_SEARCH_FIELD_KEYS = entrySearchModel.ENTRY_SEARCH_FIELD_KEYS;
-const qualityModel = window.ConlexiconQuality;
+const glossModel = window.ConlexiconGloss;
 const sourceReferenceModel = window.ConlexiconSourceReferences;
 const sourceInputReferences = new WeakMap();
 const QueryPageCache = window.ConlexiconQueryPageCache.QueryPageCache;
@@ -214,7 +214,26 @@ let selectedEntryDetailState = {
 let selectedEntryDetailLoadPromise = null;
 const entryRelationsCache = new Map();
 const ENTRY_RELATIONS_CACHE_MAX = 24;
-let qualityReportCache = null;
+const QUALITY_SOURCE = Object.freeze({ type: "dictionaryQuality", version: 1, options: {} });
+const QUALITY_SEVERITY_SUBPAGES = Object.freeze(["high", "medium", "low"]);
+const QUALITY_MODULE_SUBPAGES = Object.freeze(["lemma", "tags", "ipa", "network", "gloss", "other"]);
+const QUALITY_ISSUE_PAGE_SIZE = 200;
+let qualitySummaryState = {
+  key: "",
+  status: "idle",
+  response: null,
+  error: null,
+  requestId: 0,
+};
+let qualityIssueWindowState = {
+  key: "",
+  status: "idle",
+  items: [],
+  total: 0,
+  nextCursor: "",
+  error: null,
+  requestId: 0,
+};
 let analysisOverviewQueryState = {
   key: "",
   status: "idle",
@@ -3205,7 +3224,6 @@ function render(options = {}) {
 
 function renderLocaleChange() {
   closeEntryContextMenu();
-  refreshActiveFilterLocalization();
   applyLocale();
   applyAppearance();
   refreshEditableSurfaceLocale();
@@ -3874,7 +3892,7 @@ function entryBrowserCanScrollNow() {
 
 function entryCardScrollQueryIsReady() {
   const dictionary = activeDictionary();
-  if (!dictionary || (activeFilter && !activeFilterUsesRemoteQuery())) {
+  if (!dictionary) {
     return true;
   }
   if (rootMode && rootGroupsQueryCanUseApi(dictionary)) {
@@ -3945,15 +3963,6 @@ function focusCurrentEntryInBrowser() {
   if (!entryId) {
     return;
   }
-  if (
-    activeFilter
-    && !activeFilterUsesRemoteQuery()
-    && !(activeFilter.entryIds || []).includes(entryId)
-  ) {
-    showToast(t("currentEntryNotInList"));
-    return;
-  }
-
   scheduleEntryCardScroll(entryId, { reportMissing: true });
   if (mobileShellMode()) {
     openMobileEntryBrowserDrawer();
@@ -5521,43 +5530,35 @@ function renderEntries(options = {}) {
     return;
   }
 
-  if (entryQueryCanUseApi(dictionary)) {
-    if (allowQueryStart) {
-      startEntryQueryApiCheck(dictionary);
-    }
-    const queryPages = entryQueryWindowForRender(dictionary);
-    if (!queryPages) {
-      if (entryQueryState.status === "loading") {
-        if (staleContentUpdateRetainsContent("list")) {
-          return;
-        }
-        entryListHasSettledContent = false;
-        renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(aText("加载中", "Loading"), ""));
+  if (allowQueryStart) {
+    startEntryQueryApiCheck(dictionary);
+  }
+  const queryPages = entryQueryWindowForRender(dictionary);
+  if (!queryPages) {
+    if (entryQueryState.status === "loading") {
+      if (staleContentUpdateRetainsContent("list")) {
         return;
       }
-      finishStaleContentUpdate("list");
       entryListHasSettledContent = false;
-      renderVirtualListEmpty(
-        elements.entryList,
-        entryVirtualList,
-        emptyState(aText("无法加载词条列表", "Could not load entries"), aText("请刷新或稍后重试。", "Refresh or try again later.")),
-      );
+      renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(aText("加载中", "Loading"), ""));
       return;
     }
-    maybeSelectInitialEditorEntry(entryQueryState.items);
-    renderEntryRows(entryQueryState.items, {
-      pageInfo: entryQueryState.pageInfo,
-      windowPages: queryPages,
-      onRangeChange: (range) => handleEntryQueryWindowRange(dictionary, range),
-    });
     finishStaleContentUpdate("list");
-    entryListHasSettledContent = true;
+    entryListHasSettledContent = false;
+    renderVirtualListEmpty(
+      elements.entryList,
+      entryVirtualList,
+      emptyState(aText("无法加载词条列表", "Could not load entries"), aText("请刷新或稍后重试。", "Refresh or try again later.")),
+    );
     return;
   }
-
+  maybeSelectInitialEditorEntry(entryQueryState.items);
+  renderEntryRows(entryQueryState.items, {
+    pageInfo: entryQueryState.pageInfo,
+    windowPages: queryPages,
+    onRangeChange: (range) => handleEntryQueryWindowRange(dictionary, range),
+  });
   finishStaleContentUpdate("list");
-  const entries = filteredEntries();
-  renderEntryRows(entries);
   entryListHasSettledContent = true;
 }
 
@@ -5573,7 +5574,7 @@ function renderEntryRows(entries = [], options = {}) {
       ? page.items.map((entry) => ({
         kind: "entry",
         entry,
-        qualityIssues: activeFilterIssuesForEntry(entry.id),
+        qualityIssues: entry.qualityIssues || [],
         windowPageIndex: page.index,
         windowEstimateScale: page.estimateScale || 1,
       }))
@@ -5586,7 +5587,7 @@ function renderEntryRows(entries = [], options = {}) {
     : entries.map((entry) => ({
       kind: "entry",
       entry,
-      qualityIssues: activeFilterIssuesForEntry(entry.id),
+      qualityIssues: entry.qualityIssues || [],
     }));
   if (!windowPages && options.pageInfo?.hasMore) {
     rows.push({
@@ -5825,10 +5826,9 @@ function entryCardContentSizeSignature(entry) {
 function entryCardSizeCacheKey(entry, options = {}) {
   const issueSignature = (options.qualityIssues || [])
     .map((issue) => [
-      issue.type,
-      issue.priority,
-      issue.module,
-      issue.title,
+      issue.code,
+      issue.severity,
+      qualityIssueText(issue).title,
     ].map(virtualListSignaturePart).join("~"))
     .join("^");
   return [
@@ -6408,7 +6408,6 @@ function entryQueryCanUseApi(dictionary = activeDictionary()) {
   return Boolean(
     backendAvailable
     && dictionary
-    && (!activeFilter || activeFilterUsesRemoteQuery())
     && !rootMode
   );
 }
@@ -6439,7 +6438,9 @@ function compactEntryQueryResult(result) {
   return {
     items: Array.isArray(result?.items)
       ? result.items
-          .map((item) => item?.entry?.id ? { ...item.entry, feature: item.feature } : item)
+          .map((item) => item?.entry?.id
+            ? { ...item.entry, feature: item.feature, ...(item.issues ? { qualityIssues: item.issues } : {}) }
+            : item)
           .filter((entry) => entry?.id)
       : [],
     pageInfo: result?.pageInfo || null,
@@ -6454,6 +6455,9 @@ function recordFeatureResultSummary(result) {
     return;
   }
   const resultCountForVariant = (variant) => {
+    if (variant.resultSource?.type === QUALITY_SOURCE.type) {
+      return qualitySelectorEntryCount(result.summary, variant.category, variant.value);
+    }
     if (variant.resultSource?.type === "ipaAutoCompare") {
       const row = (result.summary.views || []).find((item) => item.key === variant.category);
       return Math.max(0, Number(row?.entryCount) || 0);
@@ -6543,7 +6547,11 @@ function updateEntrySummaryDtoAfterSave(dictionary, entry) {
       if (page.status === "success") {
         page.items = page.items.map((item) => (
           item.id === entry.id
-            ? { ...summary, ...(Array.isArray(item.searchHits) ? { searchHits: item.searchHits } : {}) }
+            ? {
+              ...summary,
+              ...(Array.isArray(item.searchHits) ? { searchHits: item.searchHits } : {}),
+              ...(item.qualityIssues ? { qualityIssues: item.qualityIssues } : {}),
+            }
             : item
         ));
       }
@@ -6645,6 +6653,25 @@ function entryQueryLocationUrl(dictionary, entryId) {
 
 function featureResultQueryBody(dictionary, options = {}) {
   const search = entryQuerySearchDescriptor(dictionary);
+  const page = {
+    limit: ENTRY_QUERY_WINDOW_PAGE_SIZE,
+    cursor: options.cursor || "",
+    windowOffset: options.windowOffset === "" ? null : options.windowOffset ?? null,
+  };
+  if (activeFilter.resultSource.type === QUALITY_SOURCE.type) {
+    return {
+      source: activeFilter.resultSource,
+      view: {
+        itemKind: "entry",
+        selector: activeFilter.category === "all"
+          ? { group: "all" }
+          : { group: activeFilter.category, value: activeFilter.value },
+        search,
+        sort: entrySort,
+      },
+      page,
+    };
+  }
   return {
     source: activeFilter.resultSource,
     view: {
@@ -6654,19 +6681,22 @@ function featureResultQueryBody(dictionary, options = {}) {
       search,
       sort: entrySort,
     },
-    page: {
-      limit: ENTRY_QUERY_WINDOW_PAGE_SIZE,
-      cursor: options.cursor || "",
-      windowOffset: options.windowOffset === "" ? null : options.windowOffset ?? null,
-    },
+    page,
   };
+}
+
+function featureResultQueryPath(dictionary, action) {
+  const base = `/api/dictionaries/${encodeURIComponent(dictionary.id)}`;
+  return activeFilter.resultSource.type === QUALITY_SOURCE.type
+    ? `${base}/quality/${action}`
+    : `${base}/analysis/features/${action}`;
 }
 
 function loadEntryQueryApiPage(dictionary, options = {}) {
   if (!activeFilterUsesFeatureQuery()) {
     return api(entryQueryUrl(dictionary, options));
   }
-  return api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/features/query`, {
+  return api(featureResultQueryPath(dictionary, "query"), {
     method: "POST",
     body: JSON.stringify(featureResultQueryBody(dictionary, options)),
   });
@@ -6676,7 +6706,7 @@ function loadEntryQueryApiLocation(dictionary, entryId) {
   if (!activeFilterUsesFeatureQuery()) {
     return api(entryQueryLocationUrl(dictionary, entryId));
   }
-  return api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/features/location`, {
+  return api(featureResultQueryPath(dictionary, "location"), {
     method: "POST",
     body: JSON.stringify({
       ...featureResultQueryBody(dictionary),
@@ -6791,7 +6821,7 @@ function loadEntryQueryWindowPage(dictionary, page) {
       preserveQueryWindowPageHeight(
         page,
         result.items.reduce((total, entry) => (
-          total + estimateEntryCardHeight(entry, { qualityIssues: activeFilterIssuesForEntry(entry.id) })
+          total + estimateEntryCardHeight(entry, { qualityIssues: entry.qualityIssues || [] })
         ), 0),
         Boolean(entryQueryState.windowCursor),
       );
@@ -7296,7 +7326,7 @@ function estimateEntryQualityIssueLines(issues = []) {
   const listWidth = Math.max(0, entryVirtualList.container?.clientWidth || elements.entryList?.clientWidth || 340);
   const basePerLine = listWidth < 300 ? 2 : listWidth < 420 ? 3 : 4;
   const longestTitle = Math.max(
-    ...issues.map((issue) => String(issue.title || aText("质量问题", "Quality issue")).length),
+    ...issues.map((issue) => qualityIssueText(issue).title.length),
   );
   const perLine = longestTitle > 18 ? Math.max(1, basePerLine - 1) : basePerLine;
   return Math.max(1, Math.ceil(issues.length / perLine));
@@ -7447,17 +7477,16 @@ function renderEntryQualityIssueBadges(issues = []) {
   }
   return `<div class="entry-quality-issues" aria-label="${escapeHtml(aText("质量问题", "Quality issues"))}">
     ${issues.map((issue) => {
-    const severity = issue.severity || "low";
-    const title = issue.title || aText("质量问题", "Quality issue");
-    const detail = issue.detail || title;
-    const moduleLabel = qualityIssueModuleLabel(issue.module || "other");
+    const severity = issue.severity;
+    const { title, detail } = qualityIssueText(issue);
+    const moduleLabel = qualityIssueModuleLabel(issue.module);
     return `
       <span class="entry-quality-issue ${escapeHtml(severity)}">
         <span class="entry-quality-issue-label">${escapeHtml(title)}</span>
         <span class="entry-quality-issue-tooltip" role="tooltip">
           <strong>${escapeHtml(title)}</strong>
           <small>${escapeHtml(qualityIssueSeverityLabel(severity))} · ${escapeHtml(moduleLabel)}</small>
-          <span>${escapeHtml(detail)}</span>
+          <span>${escapeHtml(detail || title)}</span>
         </span>
       </span>
     `;
@@ -7707,7 +7736,7 @@ function startEntryQueryLocation(dictionary, entryId) {
       preserveQueryWindowPageHeight(
         page,
         result.items.reduce((total, entry) => (
-          total + estimateEntryCardHeight(entry, { qualityIssues: activeFilterIssuesForEntry(entry.id) })
+          total + estimateEntryCardHeight(entry, { qualityIssues: entry.qualityIssues || [] })
         ), 0),
         Boolean(entryQueryState.windowCursor),
       );
@@ -7840,7 +7869,7 @@ function startRootGroupQueryLocation(dictionary, entryId, options = {}) {
 
 function ensureQueryWindowForEntryScroll(entryId, options = {}) {
   const dictionary = activeDictionary();
-  if (!dictionary || (activeFilter && !activeFilterUsesRemoteQuery())) {
+  if (!dictionary) {
     return;
   }
   if (!rootMode && entryQueryState.status === "success") {
@@ -7947,37 +7976,6 @@ async function closePendingEditsForPageSwitch() {
   return true;
 }
 
-function filteredEntries() {
-  const dictionary = activeDictionary();
-
-  if (!dictionary) {
-    return [];
-  }
-
-  if (activeFilter && !activeFilterUsesRemoteQuery()) {
-    const ids = new Set(activeFilter.entryIds || []);
-    const { fields, fuzzyFields } = entrySearchQueryOptions(dictionary);
-    return [...dictionary.entries]
-      .filter((entry) => ids.has(entry.id))
-      .filter((entry) => entryMatchesSearch(entry, dictionary, {
-        query: searchQuery,
-        fields,
-        fuzzyFields,
-      }))
-      .sort(compareEntries);
-  }
-
-  if (activeFilterUsesRemoteQuery()) {
-    return [];
-  }
-
-  const query = searchQuery;
-  const { fields, fuzzyFields } = entrySearchQueryOptions(dictionary);
-
-  return [...dictionary.entries]
-    .filter((entry) => entryMatchesSearch(entry, dictionary, { query, fields, fuzzyFields }))
-    .sort(compareEntries);
-}
 
 function activeFilterVariantUsesEntryQuery(variant) {
   return Boolean(variant?.filter && typeof variant.filter === "object" && !Array.isArray(variant.filter));
@@ -7997,6 +7995,14 @@ function activeFilterVariantUsesFeatureQuery(variant) {
   if (variant.resultSource.type === "ipaDistribution") {
     return ["unit", "initial", "final", "syllableCount"].includes(variant.category)
       && String(variant.value ?? "").trim() !== "";
+  }
+  if (variant.resultSource.type === QUALITY_SOURCE.type) {
+    const value = String(variant.value ?? "").trim();
+    if (variant.category === "all") {
+      return !value;
+    }
+    const values = variant.category === "severity" ? QUALITY_SEVERITY_SUBPAGES : QUALITY_MODULE_SUBPAGES;
+    return ["severity", "module"].includes(variant.category) && values.includes(value);
   }
   if (variant.resultSource.type === "morphologyAnalysis") {
     const category = String(variant.category || "");
@@ -8098,9 +8104,6 @@ function seedActiveFilterFacts(dictionary, variants = []) {
 function activeFilterVariantFactStatus(variant, dictionary = activeDictionary()) {
   if (activeFilterVariantUsesFeatureQuery(variant)) {
     return Number(variant.resultCount) > 0 ? "available" : "empty";
-  }
-  if (!activeFilterVariantUsesEntryQuery(variant)) {
-    return variant?.entryIds?.length ? "available" : "empty";
   }
   return entryFilterFact(dictionary, variant.filter)?.status || "unknown";
 }
@@ -8212,8 +8215,6 @@ function activeFilterStateForVariant(base, variant, variantIndex) {
     value: variant.value,
     scope: variant.scope,
     resultCount: variant.resultCount,
-    entryIds: variant.entryIds,
-    issueMap: variant.issueMap,
     variantIndex,
   };
 }
@@ -8249,23 +8250,11 @@ async function activateFilter(action) {
   elements.searchInput.value = searchQuery;
   state.activeView = "editor";
   revealEntryBrowserForResults();
-  if (activeFilterUsesRemoteQuery()) {
-    activeFilter.selectFirstOnLoad = !action.preferredEntryId;
-    if (action.preferredEntryId) {
-      state.selectedEntryId = action.preferredEntryId;
-    }
-    resetEntryQueryState();
-  } else {
-    const entryIds = activeFilter.entryIds || [];
-    const nextEntryId = action.preferredEntryId && entryIds.includes(action.preferredEntryId)
-      ? action.preferredEntryId
-      : entryIds[0];
-    if (nextEntryId) {
-      state.selectedEntryId = nextEntryId;
-      editorMode = "display";
-      entryDraft = null;
-    }
+  activeFilter.selectFirstOnLoad = !action.preferredEntryId;
+  if (action.preferredEntryId) {
+    state.selectedEntryId = action.preferredEntryId;
   }
+  resetEntryQueryState();
   render();
   if (activeFilterUsesEntryQuery()) {
     refreshActiveFilterFacts(dictionary);
@@ -8306,7 +8295,7 @@ function clearActiveFilter() {
   render();
 }
 
-function normalizeActiveFilterVariants(action, options = {}) {
+function normalizeActiveFilterVariants(action) {
   const variants = action?.variants?.length
     ? action.variants
     : [action];
@@ -8314,7 +8303,6 @@ function normalizeActiveFilterVariants(action, options = {}) {
     .map((variant) => {
       const usesEntryQuery = activeFilterVariantUsesEntryQuery(variant);
       const usesFeatureQuery = activeFilterVariantUsesFeatureQuery(variant);
-      const entryIds = usesEntryQuery || usesFeatureQuery ? [] : entryIdsFrom(variant.entryIds);
       const filter = usesEntryQuery ? entryQueryModel.normalizeEntryFilter(variant.filter) : null;
       const search = usesEntryQuery && (variant.searchScope || variant.search)
         ? entryQueryModel.normalizeEntrySearch(variant.searchScope || variant.search)
@@ -8330,7 +8318,6 @@ function normalizeActiveFilterVariants(action, options = {}) {
         initialFilterFact: usesEntryQuery && variant.initialFilterFact
           ? { ...variant.initialFilterFact }
           : null,
-        entryIds,
         resultSource: usesFeatureQuery ? {
           type: variant.resultSource.type,
           version: 1,
@@ -8344,42 +8331,15 @@ function normalizeActiveFilterVariants(action, options = {}) {
           )).trim()
           : "",
         resultCount: usesFeatureQuery ? Math.max(0, Number(variant.resultCount) || 0) : 0,
-        issueMap: usesEntryQuery || usesFeatureQuery ? {} : activeFilterIssueMapFromIssues(variant.issues, entryIds),
       };
     })
     .filter((variant, index) => (
       activeFilterVariantUsesEntryQuery(variant)
       || activeFilterVariantUsesFeatureQuery(variant)
-      || variant.entryIds.length
-      || (options.keepFirstEmpty && index === 0)
     ));
 }
 
-function activeFilterIssueMapFromIssues(issues = [], entryIds = []) {
-  if (!issues.length) {
-    return {};
-  }
-  const allowedIds = new Set(entryIds);
-  return issues.reduce((map, issue) => {
-    if (!issue?.entryId || !allowedIds.has(issue.entryId)) {
-      return map;
-    }
-    if (!map[issue.entryId]) {
-      map[issue.entryId] = [];
-    }
-    map[issue.entryId].push({
-      severity: issue.severity || "low",
-      title: issue.title || aText("质量问题", "Quality issue"),
-      detail: issue.detail || "",
-      module: issue.module || "other",
-    });
-    return map;
-  }, {});
-}
 
-function activeFilterIssuesForEntry(entryId) {
-  return activeFilter?.issueMap?.[entryId] || [];
-}
 
 function activeFilterDisplayTitle(dictionary = activeDictionary()) {
   if (!activeFilter) {
@@ -8463,85 +8423,15 @@ function entryPartFilterAction(part) {
   });
 }
 
-function rebuildActiveFilterAction(options = {}) {
-  const dictionary = activeDictionary();
-  if (!dictionary || !activeFilter) {
-    return null;
-  }
-  const allowEmptyActive = Boolean(options.allowEmptyActive);
-  if (activeFilterUsesRemoteQuery()) {
-    return null;
-  }
-  if (activeFilter.meta?.type === "quality") {
-    return qualityIssueFilterAction(
-      getQualityViewReport(dictionary),
-      activeFilter.meta.group,
-      activeFilter.meta.activeKey,
-      { allowEmptyActive },
-    );
-  }
-  return null;
-}
 
-function applyActiveFilterAction(action, options = {}) {
-  if (!activeFilter || !action) {
-    return false;
-  }
-  const variants = normalizeActiveFilterVariants(action, { keepFirstEmpty: Boolean(options.keepFirstEmpty) });
-  const activeVariant = variants[0];
-  if (!activeVariant) {
-    return false;
-  }
-  activeFilter = activeFilterStateForVariant({
-    ...activeFilter,
-    meta: activeVariant.key && action.meta ? { ...action.meta, activeKey: activeVariant.key } : action.meta,
-    variants,
-  }, activeVariant, 0);
-  if (activeFilterUsesRemoteQuery()) {
-    resetEntryQueryState();
-    return true;
-  }
-  const ids = new Set(activeFilter.entryIds || []);
-  if (ids.size && !ids.has(state.selectedEntryId)) {
-    state.selectedEntryId = activeFilter.entryIds[0] || state.selectedEntryId;
-    editorMode = "display";
-    entryDraft = null;
-  }
-  return true;
-}
 
 function refreshActiveFilterState() {
-  if (!activeFilter) {
-    return false;
-  }
-  if (activeFilterUsesRemoteQuery()) {
-    const dictionary = activeDictionary();
-    if (!dictionary) {
-      return false;
-    }
-    invalidateCurrentEntryQueryCache(dictionary);
-    resetEntryQueryState();
-    return true;
-  }
-  const action = rebuildActiveFilterAction({ allowEmptyActive: true });
-  if (action) {
-    return applyActiveFilterAction(action, { keepFirstEmpty: true });
-  }
   const dictionary = activeDictionary();
-  if (!dictionary) {
+  if (!activeFilter || !dictionary) {
     return false;
   }
-  const existingIds = new Set(dictionary.entries.map((entry) => entry.id));
-  activeFilter = {
-    ...activeFilter,
-    entryIds: (activeFilter.entryIds || []).filter((id) => existingIds.has(id)),
-    variants: (activeFilter.variants || [])
-      .map((variant) => ({
-        ...variant,
-        entryIds: (variant.entryIds || []).filter((id) => existingIds.has(id)),
-      }))
-      .filter((variant, index) => variant.entryIds.length || index === activeFilter.variantIndex),
-  };
+  invalidateCurrentEntryQueryCache(dictionary);
+  resetEntryQueryState();
   return true;
 }
 
@@ -8551,11 +8441,7 @@ function refreshActiveFilter() {
   }
   revealEntryBrowserForResults();
   render();
-  if (activeFilterUsesRemoteQuery()) {
-    scheduleEntryCardScroll(state.selectedEntryId);
-  } else if (activeFilter?.entryIds?.length && activeFilter.entryIds.includes(state.selectedEntryId)) {
-    scheduleEntryCardScroll(state.selectedEntryId);
-  }
+  scheduleEntryCardScroll(state.selectedEntryId);
 }
 
 function nextActiveFilterVariantIndex() {
@@ -8593,32 +8479,11 @@ function cycleActiveFilterVariant() {
     meta: next.key && activeFilter.meta ? { ...activeFilter.meta, activeKey: next.key } : activeFilter.meta,
     selectFirstOnLoad: activeFilterVariantUsesEntryQuery(next) || activeFilterVariantUsesFeatureQuery(next),
   }, next, nextIndex);
-  if (activeFilterUsesRemoteQuery()) {
-    resetEntryQueryState();
-    revealEntryBrowserForResults();
-    render();
-    return;
-  }
-  const ids = new Set(activeFilter.entryIds);
-  if (!ids.has(state.selectedEntryId)) {
-    state.selectedEntryId = activeFilter.entryIds[0] || state.selectedEntryId;
-  }
+  resetEntryQueryState();
   revealEntryBrowserForResults();
   render();
-  scheduleEntryCardScroll(state.selectedEntryId);
 }
 
-function entryMatchesSearch(entry, dictionary = activeDictionary(), options = {}) {
-  const query = options.query ?? searchQuery;
-  const searchOptions = entrySearchQueryOptions(dictionary);
-  const fields = options.fields ?? searchOptions.fields;
-  const fuzzyFields = options.fuzzyFields ?? searchOptions.fuzzyFields;
-  return entrySearchModel.entryMatchesSearchText(entry, dictionary, query, {
-    normalizeText: searchOptions.normalizeText,
-    fields,
-    fuzzyFields,
-  });
-}
 
 function dictionaryStatsText(dictionary) {
   if (!dictionary) {
@@ -9786,7 +9651,7 @@ function renderExampleHtml(example, rawSettings = {}) {
 }
 
 function parseGloss(example) {
-  return qualityModel.parseGloss(example);
+  return glossModel.parseGloss(example);
 }
 
 function renderSmallCaps(value) {
@@ -10773,47 +10638,145 @@ function renderQuality(dictionary = activeDictionary()) {
 
   analysisFilterRegistry.clear();
   analysisFilterCounter = 0;
-  const report = getQualityViewReport(dictionary);
-  elements.qualityPanel.innerHTML = renderQualityPage(report);
+  const subpage = activeQualitySubpage();
+  void loadQualitySummary(dictionary);
+  void loadQualityIssueWindow(dictionary, subpage);
+  elements.qualityPanel.innerHTML = renderQualityPage(subpage);
   synchronizePageTabs(elements.qualityPanel, focusedTab);
   setupQualityMasonryLayouts();
   liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
 
-function getQualityViewReport(dictionary) {
-  const key = qualityReportCacheKey(dictionary);
-  if (qualityReportCache?.key === key) {
-    return qualityReportCache.report;
-  }
-  const report = buildQualityViewReport(dictionary);
-  qualityReportCache = { key, report };
-  return report;
+// Quality results are server sessions keyed by dictionary generation; the UI
+// language only changes how codes and params are rendered.
+function qualityResultKey(dictionary) {
+  return stableJson({
+    dictionaryId: dictionary.id,
+    updatedAt: dictionary.updatedAt || "",
+  });
 }
 
-function qualityReportCacheKey(dictionary) {
+function qualityQueryPath(dictionary, action = "query") {
+  return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/quality/${action}`;
+}
+
+function rerenderQualityIfVisible(dictionary) {
+  if (state.activeView === "quality" && activeDictionary()?.id === dictionary.id) {
+    renderQuality(activeDictionary());
+  }
+}
+
+async function loadQualitySummary(dictionary, { force = false } = {}) {
+  const key = qualityResultKey(dictionary);
+  // Renders call this freely; only a new key or an explicit retry requests again.
+  if (!force && qualitySummaryState.key === key) {
+    return;
+  }
+  const requestId = qualitySummaryState.requestId + 1;
+  qualitySummaryState = { key, status: "loading", response: null, error: null, requestId };
+  try {
+    const response = await api(qualityQueryPath(dictionary), {
+      method: "POST",
+      body: JSON.stringify({ source: QUALITY_SOURCE, responseMode: "summary" }),
+    });
+    if (qualitySummaryState.requestId !== requestId) {
+      return;
+    }
+    qualitySummaryState = { key, status: "ready", response, error: null, requestId };
+  } catch (error) {
+    if (qualitySummaryState.requestId !== requestId) {
+      return;
+    }
+    qualitySummaryState = { key, status: "error", response: null, error, requestId };
+    console.error(error);
+  }
+  rerenderQualityIfVisible(dictionary);
+}
+
+function qualityIssueWindowKey(dictionary, subpage) {
   return stableJson({
-    dictionaryId: dictionary?.id || "",
-    dictionaryUpdatedAt: dictionary?.updatedAt || "",
-    language: currentLanguage,
-    settings: {
-      ipa: dictionary?.settings?.ipa || {},
-    },
-    entries: (dictionary?.entries || []).map((entry) => ({
-      id: entry.id || "",
-      lemma: entry.lemma || "",
-      pronunciation: entry.pronunciation || "",
-      tags: entry.tags || [],
-      definitions: (entry.definitions || []).map((definition) => ({
-        id: definition.id || "",
-        meaning: definition.meaning || "",
-        example: definition.example || "",
-      })),
-      etymology: {
-        sources: entry.etymology?.sources || [],
-      },
-      updatedAt: entry.updatedAt || "",
-    })),
+    result: qualityResultKey(dictionary),
+    selector: qualitySubpageSelector(subpage),
   });
+}
+
+async function loadQualityIssueWindow(dictionary, subpage, { more = false, force = false } = {}) {
+  const key = qualityIssueWindowKey(dictionary, subpage);
+  const current = qualityIssueWindowState;
+  if (more) {
+    if (current.key !== key || !current.nextCursor || current.status === "loading-more") {
+      return;
+    }
+  } else if (!force && current.key === key) {
+    return;
+  }
+  const requestId = current.requestId + 1;
+  const keptItems = more ? current.items : [];
+  qualityIssueWindowState = {
+    key,
+    status: more ? "loading-more" : "loading",
+    items: keptItems,
+    total: more ? current.total : 0,
+    nextCursor: more ? current.nextCursor : "",
+    error: null,
+    requestId,
+  };
+  try {
+    const response = await api(qualityQueryPath(dictionary), {
+      method: "POST",
+      body: JSON.stringify({
+        source: QUALITY_SOURCE,
+        responseMode: "items",
+        view: { itemKind: "issue", selector: qualitySubpageSelector(subpage) },
+        page: { limit: QUALITY_ISSUE_PAGE_SIZE, cursor: more ? current.nextCursor : "" },
+      }),
+    });
+    if (qualityIssueWindowState.requestId !== requestId) {
+      return;
+    }
+    qualityIssueWindowState = {
+      key,
+      status: "ready",
+      items: [...keptItems, ...response.items],
+      total: response.pageInfo.total,
+      nextCursor: response.pageInfo.nextCursor,
+      error: null,
+      requestId,
+    };
+  } catch (error) {
+    if (qualityIssueWindowState.requestId !== requestId) {
+      return;
+    }
+    if (more && error.code === "query_cursor_stale") {
+      // The dictionary changed elsewhere since the first page; start over.
+      void loadQualityIssueWindow(dictionary, subpage, { force: true });
+      return;
+    }
+    qualityIssueWindowState = {
+      key,
+      status: "error",
+      items: keptItems,
+      total: more ? current.total : 0,
+      nextCursor: more ? current.nextCursor : "",
+      error,
+      requestId,
+    };
+    console.error(error);
+  }
+  rerenderQualityIfVisible(dictionary);
+}
+
+function retryQuality(dictionary) {
+  if (qualitySummaryState.status === "error") {
+    void loadQualitySummary(dictionary, { force: true });
+  }
+  if (qualityIssueWindowState.status === "error") {
+    const subpage = activeQualitySubpage();
+    void loadQualityIssueWindow(dictionary, subpage, qualityIssueWindowState.items.length
+      ? { more: true }
+      : { force: true });
+  }
+  renderQuality(dictionary);
 }
 
 // Tabs activate manually: arrows move focus, Enter/Space retain native click.
@@ -10928,29 +10891,29 @@ function analysisSubpages(page) {
   return subpages[page] || [];
 }
 
-function renderQualityPage(report) {
-  const subpage = activeQualitySubpage();
+function renderQualityPage(subpage) {
+  const summary = qualitySummaryState.status === "ready" ? qualitySummaryState.response.summary : null;
   return `
-    ${qualitySubpageNav(subpage, report)}
+    ${qualitySubpageNav(subpage, summary)}
     <section class="analysis-page-body">
-      ${qualityPageBody(report, subpage)}
+      ${qualityPageBody(subpage, summary)}
     </section>
   `;
 }
 
-function qualitySubpageNav(activeSubpage, report = null) {
+function qualitySubpageNav(activeSubpage, summary) {
   return `<div class="analysis-subpage-tab-groups quality-subpage-tab-groups">${qualitySubpageGroups().map((group) => `
     <div class="analysis-subpage-tab-group">
       <span>${escapeHtml(group.label)}</span>
       <nav class="analysis-subpage-tabs">${group.subpages.map(([subpage, label]) => `
-        ${renderQualitySubpageButton(subpage, label, activeSubpage, report)}
+        ${renderQualitySubpageButton(subpage, label, activeSubpage, summary)}
       `).join("")}</nav>
     </div>
   `).join("")}</div>`;
 }
 
-function renderQualitySubpageButton(subpage, label, activeSubpage, report = null) {
-  const count = report ? qualitySubpageEntryCount(report, subpage) : null;
+function renderQualitySubpageButton(subpage, label, activeSubpage, summary) {
+  const count = summary ? qualitySubpageEntryCount(summary, subpage) : null;
   const isActive = subpage === activeSubpage;
   const disabled = count === 0 && !isActive;
   const countBadge = count === null ? "" : `<span class="analysis-tab-count">${escapeHtml(count)}</span>`;
@@ -11608,176 +11571,172 @@ function renderAnalysisActivityQuery(response, subpage) {
   return `<section class="analysis-detail-grid">${analysisCard(aText("编辑词条（按日期）", "Entries by Update Date"), analysisBarList(rowsForField(activity.updated, "updated"), { empty: aText("暂无编辑记录", "No edit records") }))}</section>`;
 }
 
-function qualityPageBody(report, subpage) {
-  const filterBar = renderQualityFilterBar(report, subpage);
-  if (["lemma", "tags", "ipa", "other"].includes(subpage)) {
-    const moduleIssues = qualityIssuesByModule(report, subpage);
-    return `${filterBar}<section class="analysis-detail-grid">${analysisCard(qualityIssueModuleLabel(subpage), analysisIssueList(moduleIssues, { limit: Infinity }))}</section>`;
+function qualityPageBody(subpage, summary) {
+  if (qualitySummaryState.status === "error") {
+    return qualityErrorState(aText("无法加载质量检查", "Could not load quality checks"));
   }
-  if (subpage === "network") {
-    return `${filterBar}<section class="analysis-detail-grid">${analysisCard(aText("词源网络检查", "Etymology Network Checks"), analysisIssueList(report.networkIssues, { limit: Infinity }))}</section>`;
-  }
-  if (subpage === "gloss") {
-    const glossIssues = qualityIssuesByModule(report, "gloss");
-    return `${filterBar}<section class="analysis-detail-grid">${analysisCard(aText("Glossed 例句问题", "Glossed Example Issues"), analysisIssueList(glossIssues, { limit: Infinity }))}</section>`;
-  }
-  if (["high", "medium", "low"].includes(subpage)) {
-    const issues = report.issues.filter((issue) => issue.severity === subpage);
-    return `${filterBar}<section class="analysis-detail-grid">${analysisCard(aText("质量检查", "Quality Checks"), analysisIssueList(issues, { limit: Infinity }))}</section>`;
-  }
-  return `${filterBar}<section class="analysis-detail-grid">${analysisCard(aText("质量检查", "Quality Checks"), analysisIssueList(report.issues, { limit: Infinity }))}</section>`;
+  const cardTitle = QUALITY_MODULE_SUBPAGES.includes(subpage)
+    ? qualityIssueModuleLabel(subpage)
+    : aText("质量检查", "Quality Checks");
+  return `${renderQualityFilterBar(subpage, summary)}<section class="analysis-detail-grid">${analysisCard(cardTitle, renderQualityIssueWindow())}</section>`;
 }
 
-function renderQualityFilterBar(report, subpage) {
+function qualityErrorState(title) {
+  return `<div class="empty-state">
+    <strong>${escapeHtml(title)}</strong>
+    <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
+    <button type="button" class="secondary-button" data-control-tone="neutral" data-quality-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+  </div>`;
+}
+
+function renderQualityIssueWindow() {
+  const windowState = qualityIssueWindowState;
+  if (windowState.status === "loading" || windowState.status === "idle") {
+    return `<p class="muted-text">${escapeHtml(aText("正在检查质量问题", "Checking quality issues"))}</p>`;
+  }
+  if (windowState.status === "error" && !windowState.items.length) {
+    return qualityErrorState(aText("无法加载问题列表", "Could not load the issue list"));
+  }
+  const remaining = windowState.total - windowState.items.length;
+  const footer = windowState.status === "error"
+    ? qualityErrorState(aText("无法加载更多问题", "Could not load more issues"))
+    : remaining > 0
+      ? `<button type="button" class="secondary-button analysis-tag-set-more" data-control-tone="neutral" data-quality-issues-more ${windowState.status === "loading-more" ? "disabled" : ""}>${escapeHtml(
+        aText("再显示 {count} 项", "Show {count} more").replace("{count}", Math.min(QUALITY_ISSUE_PAGE_SIZE, remaining)),
+      )}</button>`
+      : "";
+  return `${qualityIssueList(windowState.items)}${footer}`;
+}
+
+function qualityIssueList(items) {
+  if (!items.length) {
+    return `<p class="muted-text">${escapeHtml(aText("未发现问题", "No issues found"))}</p>`;
+  }
+  return `<ul class="analysis-issue-list">${items.map(({ issue, entry }) => {
+    const { title, detail } = qualityIssueText(issue);
+    return `
+    <li class="analysis-issue ${escapeHtml(issue.severity)}"${entry ? ` data-entry-id="${escapeHtml(entry.id)}"` : ""}>
+      <span>${escapeHtml(issue.severity)}</span>
+      <div>
+        ${entry ? `<button type="button" data-entry-id="${escapeHtml(entry.id)}">${escapeHtml(entry.lemma || aText("无词形", "No lemma"))}</button>` : ""}
+        <strong>${escapeHtml(title)}</strong>
+        ${detail ? `<small>${escapeHtml(detail)}</small>` : ""}
+      </div>
+    </li>
+  `;
+  }).join("")}</ul>`;
+}
+
+function qualityIssueText(issue) {
+  const titles = {
+    gloss_incomplete: ["Gloss 不完整", "Incomplete gloss"],
+    gloss_alignment_mismatch: ["Gloss 对齐数量不一致", "Gloss alignment mismatch"],
+    duplicate_lemma: ["重复词形", "Duplicate lemma"],
+    near_duplicate_tags: ["近似标签可能不一致", "Near-duplicate tags"],
+    missing_lemma: ["缺少词形", "Missing lemma"],
+    missing_tags: ["缺少标签", "Missing tags"],
+    missing_definition: ["缺少释义", "Missing definition"],
+    missing_ipa: ["缺少 IPA", "Missing IPA"],
+    multiple_primary_stress: ["多个主重音", "Multiple primary stresses"],
+    tag_too_long: ["标签过长", "Long tag"],
+    source_unresolved: ["未解析来源", "Unresolved source"],
+    source_cycle: ["词源循环引用", "Etymology cycle"],
+  };
+  const params = issue.params;
+  const details = {
+    gloss_incomplete: () => `${aText("缺少", "Missing")}: ${params.missingFields.map((key) => `\\${key}`).join(", ")}`,
+    gloss_alignment_mismatch: () => `\\gla ${params.glaCount} / \\glb ${params.glbCount}`,
+    duplicate_lemma: () => params.lemmas.join(", "),
+    near_duplicate_tags: () => params.forms.join(", "),
+    multiple_primary_stress: () => `${aText("主重音数量", "Primary stress count")}: ${params.primaryStressCount}`,
+    tag_too_long: () => params.tag,
+    source_unresolved: () => params.sourceText,
+    source_cycle: () => params.cycleLemmas.join(" → "),
+  };
+  return {
+    title: aText(...titles[issue.code]),
+    detail: details[issue.code]?.() || "",
+  };
+}
+
+function renderQualityFilterBar(subpage, summary) {
   const label = qualitySubpageLabel(subpage);
-  const count = qualitySubpageEntryCount(report, subpage);
-  const action = qualityFilterActionForSubpage(report, subpage);
+  const count = summary ? qualitySubpageEntryCount(summary, subpage) : null;
+  const action = summary ? qualityFilterAction(summary, subpage) : null;
   const attrs = analysisActionAttributes(action);
   return `
     <section class="analysis-quality-current" aria-label="${escapeHtml(aText("质量检查筛选", "Quality filters"))}">
       <strong>${escapeHtml(t("qualityCurrentCategory"))}: ${escapeHtml(label)}</strong>
-      <span>${escapeHtml(count)} ${escapeHtml(t("qualityEntryCount"))}</span>
+      <span>${count === null ? "" : `${escapeHtml(count)} ${escapeHtml(t("qualityEntryCount"))}`}</span>
       <button class="secondary-button analysis-quality-view-button" data-control-tone="neutral" type="button"${attrs} ${attrs ? "" : "disabled"}>${escapeHtml(t("viewQualityEntries"))}</button>
       <button class="info-button" type="button" data-control-tone="neutral" data-action="quality-filter-info" data-app-tooltip="always" aria-label="${escapeHtml(t("qualityFilterInfo"))}">i</button>
     </section>
   `;
 }
 
-function qualityIssuesWithEntries(issues = []) {
-  return qualityModel.qualityIssuesWithEntries(issues);
-}
-
-function qualitySubpageKey(subpage) {
-  const priorityMap = {
-    issues: "all",
-    high: "high",
-    medium: "medium",
-    low: "low",
-  };
-  if (priorityMap[subpage]) {
-    return { group: "priority", key: priorityMap[subpage] };
+function qualitySubpageSelector(subpage) {
+  if (QUALITY_SEVERITY_SUBPAGES.includes(subpage)) {
+    return { group: "severity", value: subpage };
   }
-  const moduleKeys = new Set(["lemma", "tags", "ipa", "network", "gloss", "other"]);
-  if (moduleKeys.has(subpage)) {
-    return { group: "module", key: subpage };
+  if (QUALITY_MODULE_SUBPAGES.includes(subpage)) {
+    return { group: "module", value: subpage };
   }
-  return { group: "priority", key: "all" };
+  return { group: "all" };
 }
 
 function qualitySubpageLabel(subpage) {
   const labels = Object.fromEntries(qualitySubpageGroups().flatMap((group) => group.subpages));
-  return labels[subpage] || labels.issues || aText("全部问题", "All Issues");
+  return labels[subpage];
 }
 
-function qualitySubpageEntryCount(report, subpage) {
-  const action = qualityFilterActionForSubpage(report, subpage);
-  return action?.entryIds?.length || 0;
-}
-
-function qualityFilterActionForSubpage(report, subpage) {
-  const { group, key } = qualitySubpageKey(subpage);
-  return qualityIssueFilterAction(report, group, key);
-}
-
-function qualityIssueFilterDefinitions(report, group) {
-  const issueEntries = qualityIssuesWithEntries(report.issues);
-  if (group === "module") {
-    return ["lemma", "tags", "ipa", "network", "gloss", "other"].map((module) => ({
-      key: module,
-      titleDescriptor: qualityIssueModuleFilterTitleDescriptor(module),
-      issues: qualityIssuesWithEntries(qualityIssuesByModule(report, module)),
-    }));
+// Unique affected entries, including members of global issues.
+function qualitySelectorEntryCount(summary, group, value) {
+  if (group === "all") {
+    return summary.affectedEntryCount;
   }
-  return [
-    { key: "all", titleDescriptor: activeFilterTitleDescriptor("activeFilterQualityIssues"), issues: issueEntries },
-    { key: "high", titleDescriptor: activeFilterTitleDescriptor("activeFilterHighQualityIssues"), issues: issueEntries.filter((issue) => issue.severity === "high") },
-    { key: "medium", titleDescriptor: activeFilterTitleDescriptor("activeFilterMediumQualityIssues"), issues: issueEntries.filter((issue) => issue.severity === "medium") },
-    { key: "low", titleDescriptor: activeFilterTitleDescriptor("activeFilterLowQualityIssues"), issues: issueEntries.filter((issue) => issue.severity === "low") },
-  ];
+  const rows = group === "severity" ? summary.severities : summary.modules;
+  return rows.find((row) => row.key === value).entryCount;
 }
 
-function qualityIssueFilterAction(report, group, activeKey, options = {}) {
-  const definitions = qualityIssueFilterDefinitions(report, group);
-  const active = definitions.find((item) => item.key === activeKey) || definitions[0];
-  if (!active) {
-    return null;
-  }
-  return qualityIssueActiveFilterAction(
-    active.titleDescriptor,
-    active.issues,
-    definitions.filter((item) => item.key !== active.key),
-    {
-      key: active.key,
-      meta: { type: "quality", group, activeKey: active.key },
-      allowEmptyActive: Boolean(options.allowEmptyActive),
-    },
-  );
+function qualitySubpageEntryCount(summary, subpage) {
+  const selector = qualitySubpageSelector(subpage);
+  return qualitySelectorEntryCount(summary, selector.group, selector.value);
 }
 
-function refreshActiveFilterLocalization() {
-  if (
-    !activeFilter
-    || activeFilterUsesRemoteQuery()
-    || activeFilter.meta?.type !== "quality"
-  ) {
-    return;
-  }
-  const action = rebuildActiveFilterAction({ allowEmptyActive: true });
-  if (!action) {
-    return;
-  }
-  const localizedVariants = normalizeActiveFilterVariants(action, { keepFirstEmpty: true });
-  const localizedByKey = new Map(localizedVariants.map((variant) => [variant.key, variant]));
-  const variants = (activeFilter.variants || []).map((variant) => {
-    const localized = localizedByKey.get(variant.key);
-    return localized
-      ? {
-        ...variant,
-        titleDescriptor: localized.titleDescriptor,
-        issueMap: localized.issueMap,
-      }
-      : variant;
+// The entry list consumes the same server session through the feature-result
+// filter family; variants cycle within the subpage's priority or module group.
+function qualityFilterAction(summary, subpage) {
+  const keys = QUALITY_MODULE_SUBPAGES.includes(subpage)
+    ? QUALITY_MODULE_SUBPAGES
+    : ["issues", ...QUALITY_SEVERITY_SUBPAGES];
+  const variants = keys.map((key) => {
+    const selector = qualitySubpageSelector(key);
+    return {
+      key,
+      titleDescriptor: qualityFilterTitleDescriptor(key),
+      category: selector.group,
+      value: selector.value || "",
+      resultCount: qualitySubpageEntryCount(summary, key),
+    };
   });
-  const activeKey = activeFilter.key || variants[activeFilter.variantIndex]?.key || "";
-  const active = localizedByKey.get(activeKey);
-  activeFilter = {
-    ...activeFilter,
-    variants,
-    ...(active ? {
-      titleDescriptor: active.titleDescriptor,
-      issueMap: active.issueMap,
-    } : {}),
+  const active = qualitySubpageSelector(subpage);
+  return featureResultActiveFilterAction(QUALITY_SOURCE, variants, active.group, active.value || "");
+}
+
+function qualityFilterTitleDescriptor(subpage) {
+  const keys = {
+    issues: "activeFilterQualityIssues",
+    high: "activeFilterHighQualityIssues",
+    medium: "activeFilterMediumQualityIssues",
+    low: "activeFilterLowQualityIssues",
+    lemma: "activeFilterWordFormIssues",
+    tags: "activeFilterTagIssues",
+    ipa: "activeFilterIpaIssues",
+    network: "activeFilterEtymologyIssues",
+    gloss: "activeFilterGlossedExampleIssues",
+    other: "activeFilterOtherIssues",
   };
-}
-
-function qualityIssueActiveFilterAction(titleDescriptor, issues = [], variants = [], options = {}) {
-  const activeIssues = qualityIssuesWithEntries(issues);
-  const entryIds = entryIdsFrom(activeIssues.map((issue) => issue.entryId));
-  return entryIds.length || options.allowEmptyActive
-    ? activeFilterAction(titleDescriptor, entryIds, {
-      key: options.key || "",
-      issues: activeIssues,
-      variants: variants.map((variant) => {
-        const variantIssues = qualityIssuesWithEntries(variant.issues);
-        return {
-          key: variant.key || "",
-          titleDescriptor: variant.titleDescriptor,
-          entryIds: entryIdsFrom(variantIssues.map((issue) => issue.entryId)),
-          issues: variantIssues,
-        };
-      }),
-      meta: options.meta || null,
-      allowEmptyActive: Boolean(options.allowEmptyActive),
-    })
-    : null;
-}
-
-function qualityIssuesByModule(report, module) {
-  return qualityModel.qualityIssuesByModule(report, module);
-}
-
-function qualityIssueEntryIdsByModule(report, module) {
-  return qualityModel.qualityIssueEntryIdsByModule(report, module);
+  return activeFilterTitleDescriptor(keys[subpage]);
 }
 
 function qualityIssueModuleLabel(module) {
@@ -11789,7 +11748,7 @@ function qualityIssueModuleLabel(module) {
     gloss: aText("Glossed 例句问题", "Glossed example issues"),
     other: aText("其他问题", "Other issues"),
   };
-  return labels[module] || labels.other;
+  return labels[module];
 }
 
 function qualityIssueSeverityLabel(severity) {
@@ -11798,19 +11757,7 @@ function qualityIssueSeverityLabel(severity) {
     medium: aText("中优先度", "Medium priority"),
     low: aText("低优先度", "Low priority"),
   };
-  return labels[severity] || labels.low;
-}
-
-function qualityIssueModuleFilterTitleDescriptor(module) {
-  const keys = {
-    lemma: "activeFilterWordFormIssues",
-    tags: "activeFilterTagIssues",
-    ipa: "activeFilterIpaIssues",
-    network: "activeFilterEtymologyIssues",
-    gloss: "activeFilterGlossedExampleIssues",
-    other: "activeFilterOtherIssues",
-  };
-  return activeFilterTitleDescriptor(keys[module] || keys.other);
+  return labels[severity];
 }
 
 function analysisIpaCompareRows(response) {
@@ -11841,11 +11788,6 @@ function analysisIpaCompareRows(response) {
   ];
 }
 
-function buildQualityViewReport(dictionary) {
-  return qualityModel.buildQualityReport(dictionary, {
-    text: aText,
-  });
-}
 
 function analysisMetricCard(label, value, note = "", action = null) {
   const attrs = analysisActionAttributes(action);
@@ -11944,22 +11886,6 @@ function analysisFactList(rows) {
   `).join("")}</dl>`;
 }
 
-function analysisIssueList(issues, options = {}) {
-  if (!issues.length) {
-    return `<p class="muted-text">${escapeHtml(aText("未发现问题", "No issues found"))}</p>`;
-  }
-  const limit = options.limit === Infinity ? issues.length : (Number.isFinite(options.limit) ? options.limit : 80);
-  return `<ul class="analysis-issue-list">${issues.slice(0, limit).map((issue) => `
-    <li class="analysis-issue ${escapeHtml(issue.severity || "low")}"${issue.entryId ? ` data-entry-id="${escapeHtml(issue.entryId)}"` : ""}>
-      <span>${escapeHtml(issue.severity || "")}</span>
-      <div>
-        ${issue.entryId ? `<button type="button" data-entry-id="${escapeHtml(issue.entryId)}">${escapeHtml(issue.entryLemma || aText("无词形", "No lemma"))}</button>` : ""}
-        <strong>${escapeHtml(issue.title)}</strong>
-        ${issue.detail ? `<small>${escapeHtml(issue.detail)}</small>` : ""}
-      </div>
-    </li>
-  `).join("")}</ul>`;
-}
 
 function cleanIpaText(value) {
   return ipaModel.cleanIpaText(value);
@@ -11977,11 +11903,6 @@ function aText(zh, en) {
   return currentLanguage === "zh" ? zh : en;
 }
 
-function entryIdsFrom(items) {
-  return [...new Set((items || [])
-    .map((item) => typeof item === "string" ? item : item?.id)
-    .filter(Boolean))];
-}
 
 function entryFilterAction(titleDescriptor, filter, options = {}) {
   const available = options.available
@@ -12037,29 +11958,6 @@ function binaryPresenceFilterAction(activeTitleDescriptor, field, activeCount, a
   });
 }
 
-function activeFilterAction(titleDescriptor, items, options = {}) {
-  const entryIds = entryIdsFrom(items);
-  const variants = [
-    {
-      key: options.key || "",
-      titleDescriptor: normalizeActiveFilterTitleDescriptor(titleDescriptor),
-      entryIds,
-      issues: options.issues || [],
-    },
-    ...(options.variants || []).map((variant) => ({
-      key: variant.key || "",
-      titleDescriptor: normalizeActiveFilterTitleDescriptor(variant.titleDescriptor),
-      entryIds: entryIdsFrom(variant.entryIds),
-      issues: variant.issues || [],
-    })),
-  ].filter((variant, index) => variant.entryIds.length || (index === 0 && options.allowEmptyActive));
-  return {
-    type: "active-filter",
-    entryIds,
-    variants,
-    meta: options.meta || null,
-  };
-}
 
 function featureResultActiveFilterAction(source, variants, activeCategory, activeValue = "", activeScope = "") {
   const normalizedVariants = (variants || []).map((variant) => ({
@@ -12125,7 +12023,7 @@ function analysisActionAttributes(action) {
   if (normalized.type === "view" && normalized.view) {
     return ` data-view-target="${escapeHtml(normalized.view)}"`;
   }
-  if (normalized.type === "active-filter" && (normalized.entryIds?.length || normalized.variants?.length)) {
+  if (normalized.type === "active-filter" && normalized.variants?.length) {
     const id = `filter-${analysisFilterCounter += 1}`;
     analysisFilterRegistry.set(id, normalized);
     return ` data-active-filter-id="${escapeHtml(id)}"`;
@@ -17983,6 +17881,15 @@ elements.qualityPanel.addEventListener("click", (event) => {
     appInfoDialog(t("qualityFilterInfoTitle"), {
       text: t("qualityFilterInfoBody"),
     });
+    return;
+  }
+  if (event.target.closest("[data-quality-retry]")) {
+    retryQuality(activeDictionary());
+    return;
+  }
+  if (event.target.closest("[data-quality-issues-more]")) {
+    void loadQualityIssueWindow(activeDictionary(), activeQualitySubpage(), { more: true });
+    renderQuality(activeDictionary());
     return;
   }
   const subpageButton = event.target.closest("[data-quality-subpage]");

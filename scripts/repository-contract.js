@@ -18,7 +18,7 @@ const ipaModel = require("../lib/ipa-model");
 const tagModel = require("../lib/tag-model");
 const entrySearchModel = require("../lib/entry-search-model");
 const entryRelationsModel = require("../lib/entry-relations-model");
-const qualityModel = require("../lib/quality-model");
+const { parseGloss } = require("../lib/gloss-model");
 
 const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
 const CONTRACT_STAGES = {
@@ -1060,37 +1060,12 @@ function checkModelNormalization() {
     ),
     false,
   );
-  assert.deepEqual(qualityModel.parseGloss("\\gla a b\n\\glb A B\n\\ft test"), {
+  assert.deepEqual(parseGloss("\\gla a b\n\\glb A B\n\\ft test"), {
     gla: ["a", "b"],
     glb: ["A", "B"],
     glc: [],
     ft: "test",
   });
-  const qualityReport = qualityModel.buildQualityReport({
-    entries: [
-      {
-        id: "entry-quality-a",
-        lemma: "same",
-        pronunciation: "/ˈaˈb/",
-        tags: ["proper noun", "tag-with-a-very-very-long-name"],
-        definitions: [{ meaning: "a", example: "\\gla a b\n\\glb A\n\\ft test" }],
-        etymology: { sources: [{ entryId: "", text: "missing-root" }] },
-      },
-      {
-        id: "entry-quality-b",
-        lemma: "same",
-        pronunciation: "",
-        tags: ["proper-noun"],
-        definitions: [],
-        etymology: { sources: [] },
-      },
-    ],
-  }, { text: (_zh, en) => en });
-  assert.equal(qualityReport.issues.some((issue) => issue.title === "Duplicate lemma" && issue.entryId === "entry-quality-a"), true);
-  assert.equal(qualityReport.issues.some((issue) => issue.title === "Multiple primary stresses"), true);
-  assert.equal(qualityReport.issues.some((issue) => issue.title === "Gloss alignment mismatch"), true);
-  assert.equal(qualityReport.issues.some((issue) => issue.title === "Near-duplicate tags"), true);
-  assert.equal(qualityReport.networkIssues.some((issue) => issue.title === "Unresolved source"), true);
   assert.equal(ipaModel.normalizeIpaSettings({ mappings: [{ from: "a", to: "ˈa" }] }).mappings[0].to, "ˈa");
   assert.deepEqual(ipaModel.normalizeClusterList("t͡ʃ, t, t͡ʃ"), ["t͡ʃ", "t"]);
   assert.equal(

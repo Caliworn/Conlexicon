@@ -387,7 +387,7 @@ items 中的 feature 只返回当前词条的 `{ mode, assignedGroupIds, activeO
 - 词根家族排行已通过 `rootFamilyRanking` widget 复用稳定 `RootTopologyCache`，返回全部非空家族的轻量摘要，不建立 feature session。
 - 正写法统计先冻结 Unicode 语义，再选择轻量 projection 或 summary query。
 - Gloss 结果等待阶段 C 的例句/语料链接读取边界，避免为即将删除的 `definition.example` 建长期契约。
-- F5-0 已冻结独立质量 API、12 类 issue、summary 计数和混合执行 planner；F5-1–F5-3 继续实装 QualityService 并删除剩余质量 ID/issue bridge。
+- F5 已完成（2026-10-18）：独立质量 API、12 类 issue 与 summary 计数由 QualityService 实装，质量筛选作为 feature-result 筛选的一种 source 消费它，质量 ID/issue bridge 已删除。
 
 ## 11. F4b-1 验收门槛
 
