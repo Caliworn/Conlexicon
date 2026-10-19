@@ -2396,7 +2396,7 @@ function normalizeEntry(entry) {
 }
 
 function defaultEntrySearchProfile(dictionary = activeDictionary()) {
-  const search = entrySearchModel.normalizeEntrySearchSettings(dictionary?.settings?.search);
+  const search = dictionarySettings(dictionary).search;
   return {
     fields: Object.fromEntries(ENTRY_SEARCH_FIELD_KEYS.map((field) => [
       field,
@@ -2726,6 +2726,27 @@ function activeDictionary() {
   return state.dictionaries.find((dictionary) => dictionary.id === state.activeDictionaryId) || null;
 }
 
+let defaultDictionarySettingsSnapshot = null;
+
+function deepFreeze(value) {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    Object.values(value).forEach(deepFreeze);
+  }
+  return value;
+}
+
+// Loaded dictionaries carry settings normalized when they enter state; metadata
+// placeholders and "no dictionary" have none. The shared defaults are frozen:
+// forms and sort logic must copy before editing.
+function dictionarySettings(dictionary = activeDictionary()) {
+  if (dictionary?.settings) {
+    return dictionary.settings;
+  }
+  defaultDictionarySettingsSnapshot ||= deepFreeze(normalizeDictionarySettings());
+  return defaultDictionarySettingsSnapshot;
+}
+
 function selectedEntry() {
   const dictionary = activeDictionary();
   if (
@@ -2874,7 +2895,7 @@ function entryPart(entry) {
 }
 
 function entryParts(entry, dictionary = activeDictionary()) {
-  return tagModel.entryParts(entry, normalizeDictionarySettings(dictionary?.settings), {
+  return tagModel.entryParts(entry, dictionarySettings(dictionary), {
     normalizeText: searchNormalizationModel.normalizeStructuralKey,
   });
 }
@@ -2888,13 +2909,13 @@ function entryPartText(entry, dictionary = activeDictionary()) {
 }
 
 function entryTagIsPart(entry, tag, dictionary = activeDictionary()) {
-  return tagModel.entryTagIsPart(entry, tag, normalizeDictionarySettings(dictionary?.settings), {
+  return tagModel.entryTagIsPart(entry, tag, dictionarySettings(dictionary), {
     normalizeText: searchNormalizationModel.normalizeStructuralKey,
   });
 }
 
 function displayTag(tag, dictionary = activeDictionary()) {
-  return tagModel.displayTag(tag, normalizeDictionarySettings(dictionary?.settings));
+  return tagModel.displayTag(tag, dictionarySettings(dictionary));
 }
 
 function activeTagDisplayIdentity(tag, dictionary = activeDictionary()) {
@@ -2915,7 +2936,7 @@ function activeTagDisplayIdentity(tag, dictionary = activeDictionary()) {
 }
 
 function entryListTagDisplayIdentity(tag, dictionary = activeDictionary()) {
-  const settings = normalizeDictionarySettings(dictionary?.settings);
+  const settings = dictionarySettings(dictionary);
   if (settings.entryListRawTagDisplay) {
     return tagModel.displayIdentity(tag, tag, false);
   }
@@ -2933,7 +2954,7 @@ function tagIdentityHtml(identity) {
 }
 
 function tagIsRedHighlighted(tag, dictionary = activeDictionary()) {
-  return tagModel.tagIsRedHighlighted(tag, normalizeDictionarySettings(dictionary?.settings), {
+  return tagModel.tagIsRedHighlighted(tag, dictionarySettings(dictionary), {
     normalizeText: searchNormalizationModel.normalizeStructuralKey,
   });
 }
@@ -4089,7 +4110,7 @@ function toggleEntryBrowser() {
 
 function renderAvailability() {
   const hasDictionary = Boolean(activeDictionary());
-  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
+  const settings = dictionarySettings();
   elements.backendNotice.hidden = backendAvailable;
   elements.managerBackendNotice.hidden = backendAvailable;
   elements.emptyDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "editor";
@@ -4141,7 +4162,7 @@ function renderView() {
 }
 
 function renderToolNav() {
-  const order = normalizeToolNavOrder(activeDictionary()?.settings?.toolNavOrder);
+  const order = dictionarySettings().toolNavOrder;
   order.forEach((view) => {
     const button = [...elements.toolButtons].find((item) => item.dataset.view === view);
     if (button) {
@@ -4411,7 +4432,7 @@ function renderPartFilterControls(dictionary, usedParts = null) {
   const pendingSelection = !facetsReady && current && current !== NO_PART_FILTER_VALUE ? [current] : [];
   const options = ["", NO_PART_FILTER_VALUE, ...(facetsReady ? usedParts : pendingSelection)];
 
-  const rawTags = normalizeDictionarySettings(dictionary?.settings).filterMenuRawTagDisplay;
+  const rawTags = dictionarySettings(dictionary).filterMenuRawTagDisplay;
   elements.partFilter.innerHTML = options
     .map((part) => {
       const label = part === NO_PART_FILTER_VALUE
@@ -5542,7 +5563,7 @@ function virtualListSignaturePart(value) {
 }
 
 function entryCardSettingsSizeSignature() {
-  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
+  const settings = dictionarySettings();
   return [
     currentLanguage,
     settings.entryListPolysemyDisplay,
@@ -6167,7 +6188,7 @@ function entryQueryApiKey(dictionary = activeDictionary()) {
   if (!dictionary) {
     return "";
   }
-  const settings = normalizeDictionarySettings(dictionary.settings);
+  const settings = dictionarySettings(dictionary);
   return [
     dictionary.id,
     dictionary.updatedAt || "",
@@ -6716,7 +6737,7 @@ function entryFacetsApiKey(dictionary = activeDictionary()) {
   if (!dictionary) {
     return "";
   }
-  const settings = normalizeDictionarySettings(dictionary.settings);
+  const settings = dictionarySettings(dictionary);
   return [
     dictionary.id,
     dictionary.updatedAt || "",
@@ -6959,7 +6980,7 @@ function renderEntryQueryTruncationNotice(row) {
 }
 
 function createEntryCard(entry, options = {}) {
-  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
+  const settings = dictionarySettings();
   const partText = settings.entryListPartDisplay === "chips" ? "" : entryPartText(entry);
   const { fields: searchFields, fuzzyFields } = entrySearchQueryOptions();
   const lemmaSearchEnabled = searchFields.has("lemma");
@@ -7053,7 +7074,7 @@ function renderEditorEntrySelection() {
 }
 
 function shouldUseCompactEntryCard(entry, options = {}) {
-  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
+  const settings = dictionarySettings();
   const meaningSummary = options.meaningSummary ?? entryDefinitionSummary(entry, settings.entryListPolysemyDisplay);
   const searchSnippets = options.searchSnippets ?? renderEntrySearchSnippets(entry);
   return !meaningSummary && !searchSnippets;
@@ -7088,7 +7109,7 @@ function estimateSearchSnippetCount(searchSnippets = "") {
 }
 
 function estimateEntryCardHeight(entry, options = {}) {
-  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
+  const settings = dictionarySettings();
   const meaningSummary = options.meaningSummary ?? entryDefinitionSummary(entry, settings.entryListPolysemyDisplay);
   const searchSnippets = options.searchSnippets ?? renderEntrySearchSnippets(entry);
   const hasBody = Boolean(meaningSummary || searchSnippets);
@@ -7673,7 +7694,7 @@ async function closePendingEditsForPageSwitch() {
     return true;
   }
 
-  const settings = normalizeDictionarySettings(dictionary.settings);
+  const settings = dictionarySettings(dictionary);
   const inlineForm = partialEditForm();
   try {
     if (inlineForm) {
@@ -8293,7 +8314,7 @@ function highlightSearchText(value, fuzzyEnabled = false, searchEnabled = true) 
   const text = String(value || "");
   const searchOptions = entrySearchQueryOptions();
   const query = searchOptions.normalizeText(searchQuery);
-  if (!normalizeDictionarySettings(activeDictionary()?.settings).searchHighlight) {
+  if (!dictionarySettings().searchHighlight) {
     return escapeHtml(text);
   }
   if (!text || !query || !searchEnabled) {
@@ -8541,7 +8562,7 @@ function renderEmptyDetail() {
 }
 
 function renderEntryDisplay(entry) {
-  const showEmptySections = normalizeDictionarySettings(activeDictionary()?.settings).showEmptyEntrySections;
+  const showEmptySections = dictionarySettings().showEmptyEntrySections;
   const partTags = (entry.tags || [])
     .map((tag, index) => ({ tag, index }))
     .filter(({ tag }) => entryTagIsPart(entry, tag));
@@ -8584,7 +8605,7 @@ function renderEntryDisplay(entry) {
       <div class="definition-number">${index + 1}</div>
       <div class="definition-content">
         <p class="definition-meaning">${escapeHtml(definition.meaning)}</p>
-        ${definition.example ? `<div class="example-box"><span>${escapeHtml(t("example"))}</span>${renderExampleHtml(definition.example, activeDictionary()?.settings)}</div>` : ""}
+        ${definition.example ? `<div class="example-box"><span>${escapeHtml(t("example"))}</span>${renderExampleHtml(definition.example)}</div>` : ""}
         ${definition.note ? `<div class="definition-note"><span>${escapeHtml(t("definitionNote"))}</span><p>${escapeHtml(definition.note)}</p></div>` : ""}
       </div>
     `;
@@ -8606,7 +8627,7 @@ function applyEntryDisplaySectionOrder() {
     morphology: elements.displayMorphologySection,
     notes: elements.displayEntryNotesSection,
   };
-  normalizeEntrySectionOrder(activeDictionary()?.settings?.entrySectionOrder)
+  dictionarySettings().entrySectionOrder
     .forEach((section) => elements.entryDisplay.append(sections[section]));
 }
 
@@ -9044,7 +9065,7 @@ function networkTruncatedLabel(value, width, fontSize = 16) {
 // source cards and derived-entry cards.
 function entrySummaryTooltipHtml(entry) {
   const partText = entryPartText(entry);
-  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
+  const settings = dictionarySettings();
   return `
     <div class="network-tooltip-content">
       <b>${escapeHtml(entry.lemma || "")}</b>
@@ -9304,7 +9325,7 @@ function refreshEntryRelationConsumers(entryId, key) {
     if (editorMode === "edit") {
       renderFullEditDerivedEntries(entry);
     } else {
-      const showEmptySections = normalizeDictionarySettings(activeDictionary()?.settings).showEmptyEntrySections;
+      const showEmptySections = dictionarySettings().showEmptyEntrySections;
       renderEntryRelationSections(entry, showEmptySections);
     }
   }
@@ -9382,8 +9403,7 @@ function renderGlossTokenText(key, value, settings) {
     : escapeHtml(value);
 }
 
-function renderExampleHtml(example, rawSettings = {}) {
-  const settings = normalizeDictionarySettings(rawSettings);
+function renderExampleHtml(example, settings = dictionarySettings()) {
   const pattern = parseCorpusRenderPattern(settings.entryExampleRenderPattern);
   if (pattern.error) {
     return `<p class="corpus-unit-render-error" title="${escapeHtml(pattern.error)}">${escapeHtml(t("corpusRenderError"))}</p>`;
@@ -9604,7 +9624,7 @@ function analysisIpaCompareQueryKey(dictionary) {
 }
 
 function analysisIpaDistributionQueryKey(dictionary) {
-  const ipa = normalizeIpaSettings(dictionary?.settings?.ipa);
+  const ipa = dictionarySettings(dictionary).ipa;
   return stableJson({
     dictionaryId: dictionary?.id || "",
     updatedAt: dictionary?.updatedAt || "",
@@ -11914,7 +11934,7 @@ function applyFullEntrySectionOrder() {
   if (!actions) {
     return;
   }
-  normalizeEntrySectionOrder(activeDictionary()?.settings?.entrySectionOrder)
+  dictionarySettings().entrySectionOrder
     .forEach((section) => actions.before(sections[section]));
 }
 
@@ -13068,7 +13088,7 @@ function syncEntrySearchSettingsControls() {
 }
 
 function fillSettingsForm(dictionary) {
-  const settings = normalizeDictionarySettings(dictionary?.settings);
+  const settings = dictionarySettings(dictionary);
   fillGlossStyleForm(settings.glossStyles);
   elements.corpusUnitCardRenderPatternInput.value = settings.corpusUnitCardRenderPattern;
   elements.corpusUnitCardGlossAlignInput.checked = settings.corpusUnitCardGlossAlign;
@@ -13176,7 +13196,7 @@ function entrySectionOrderInsertBefore(y) {
 }
 
 function renderIpaKeyboard(dictionary = activeDictionary()) {
-  const symbols = normalizeIpaKeyboard(dictionary?.settings?.ipaKeyboard);
+  const symbols = dictionarySettings(dictionary).ipaKeyboard;
   elements.ipaKeyboard.innerHTML = "";
   symbols.forEach((symbol) => {
     const button = document.createElement("button");
@@ -13197,7 +13217,7 @@ function renderPartialIpaKeyboard(dictionary = activeDictionary()) {
     return;
   }
   keyboard.innerHTML = "";
-  normalizeIpaKeyboard(dictionary?.settings?.ipaKeyboard).forEach((symbol) => {
+  dictionarySettings(dictionary).ipaKeyboard.forEach((symbol) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "ipa-key";
@@ -13223,7 +13243,7 @@ function insertSymbolIntoInput(symbol, input) {
 }
 
 function fillIpaForm(dictionary) {
-  const ipa = normalizeIpaSettings(dictionary?.settings?.ipa);
+  const ipa = dictionarySettings(dictionary).ipa;
   renderIpaRuleList(elements.ipaMappingList, ipa.mappings);
   elements.ipaVowelsInput.value = ipa.syllable.vowels;
   elements.ipaSyllableSeparatorInput.value = ipa.syllable.separator;
@@ -13359,7 +13379,7 @@ function settingsFormSnapshot() {
 }
 
 function savedSettingsSnapshot(dictionary = activeDictionary()) {
-  const settings = normalizeDictionarySettings(dictionary?.settings);
+  const settings = dictionarySettings(dictionary);
   return {
     glossStyles: settings.glossStyles,
     corpusUnitCardRenderPattern: settings.corpusUnitCardRenderPattern,
@@ -13434,7 +13454,7 @@ function savedMorphologySnapshot(dictionary = activeDictionary()) {
 }
 
 function savedIpaSnapshot(dictionary = activeDictionary()) {
-  const ipa = normalizeIpaSettings(dictionary?.settings?.ipa);
+  const ipa = dictionarySettings(dictionary).ipa;
   return {
     mappings: ipa.mappings,
     syllable: ipa.syllable,
@@ -13661,7 +13681,7 @@ async function applyTagSortOrder() {
       return;
     }
     dictionary = activeDictionary();
-    order = normalizeTagList(dictionary.settings?.tagSortOrder);
+    order = dictionarySettings(dictionary).tagSortOrder;
   }
 
   const confirmed = await appConfirm(t("tagOrderConfirm"), {
@@ -13711,7 +13731,7 @@ function renderLanguageDocs(dictionary) {
     elements.docsMarkdownInput.value = markdown;
   }
   elements.docsPreview.innerHTML = renderMarkdown(markdown);
-  if (dictionary && normalizeDictionarySettings(dictionary.settings).docsAutoSave && docsFormIsDirty(dictionary)) {
+  if (dictionary && dictionarySettings(dictionary).docsAutoSave && docsFormIsDirty(dictionary)) {
     scheduleDocsSave();
   }
 }
@@ -13808,7 +13828,7 @@ async function saveLanguageDocs(showSavedToast = true) {
 function scheduleDocsSave() {
   clearTimeout(docsSaveTimer);
   const dictionary = activeDictionary();
-  if (!dictionary || !normalizeDictionarySettings(dictionary.settings).docsAutoSave || !docsFormIsDirty(dictionary)) {
+  if (!dictionary || !dictionarySettings(dictionary).docsAutoSave || !docsFormIsDirty(dictionary)) {
     return;
   }
   docsSaveTimer = setTimeout(() => {
@@ -13959,7 +13979,7 @@ function corpusIntegrityIssues(corpus = ensureCorpusDraft()) {
 }
 
 function corpusUnitLabel(unit, fallback = "") {
-  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
+  const settings = dictionarySettings();
   const pattern = parseCorpusRenderPattern(settings.corpusUnitCardRenderPattern);
   let content = "";
   if (!pattern.error && pattern.groups.length) {
@@ -14050,7 +14070,7 @@ function corpusUnitRenderConfig(settings, context) {
 }
 
 function renderCorpusUnitNameHtml(unit, context = "content") {
-  const settings = normalizeDictionarySettings(activeDictionary()?.settings);
+  const settings = dictionarySettings();
   const renderConfig = corpusUnitRenderConfig(settings, context);
   const pattern = parseCorpusRenderPattern(renderConfig.pattern);
   if (pattern.error) {
@@ -14215,7 +14235,7 @@ function renderCorpus(dictionary = activeDictionary()) {
   renderCorpusIntegrity(corpus);
   renderCorpusItemList(corpus, viewState);
   renderCorpusEditor(corpus, viewState);
-  if (normalizeDictionarySettings(dictionary.settings).corpusAutoSave && corpusFormIsDirty(dictionary)) {
+  if (dictionarySettings(dictionary).corpusAutoSave && corpusFormIsDirty(dictionary)) {
     scheduleCorpusSave();
   }
 }
@@ -14738,7 +14758,7 @@ function saveCorpus(showSavedToast = true) {
 function scheduleCorpusSave() {
   clearTimeout(corpusSaveTimer);
   const dictionary = activeDictionary();
-  if (!dictionary || !normalizeDictionarySettings(dictionary.settings).corpusAutoSave || !corpusFormIsDirty(dictionary)) {
+  if (!dictionary || !dictionarySettings(dictionary).corpusAutoSave || !corpusFormIsDirty(dictionary)) {
     return;
   }
   corpusSaveTimer = setTimeout(() => {
@@ -15557,7 +15577,7 @@ function entrySaveRequirementMessage(entry, dictionary = activeDictionary()) {
 }
 
 function entryBasicRequirementMessages(entry, dictionary = activeDictionary()) {
-  const settings = normalizeDictionarySettings(dictionary?.settings);
+  const settings = dictionarySettings(dictionary);
   const messages = [];
   if (!entry.lemma?.trim()) {
     messages.push(t("requiredEntry"));
@@ -15572,7 +15592,7 @@ function entryBasicRequirementMessages(entry, dictionary = activeDictionary()) {
 }
 
 function entryDefinitionsRequirementMessages(entry, dictionary = activeDictionary()) {
-  const settings = normalizeDictionarySettings(dictionary?.settings);
+  const settings = dictionarySettings(dictionary);
   const messages = [];
   if (!settings.allowEmptyDefinitions && !(entry.definitions || []).some((definition) => definition.meaning)) {
     messages.push(t("requiredDefinition"));
@@ -15901,7 +15921,7 @@ function updateQuickEntryRowState() {
 }
 
 function renderQuickEntryFields() {
-  const settings = normalizeDictionarySettings(activeDictionary().settings);
+  const settings = dictionarySettings();
   const rows = quickEntryFields().map((field, index) => {
     const row = document.createElement("label");
     row.className = "quick-entry-row";
@@ -16070,7 +16090,7 @@ async function submitQuickEntry() {
     return false;
   }
   const dictionary = activeDictionary();
-  const settings = normalizeDictionarySettings(dictionary.settings);
+  const settings = dictionarySettings(dictionary);
   const fields = quickEntryFields();
   const candidate = quickEntryEntryDraft();
   const requirementMessage = entrySaveRequirementMessage(candidate, dictionary);
@@ -16915,7 +16935,7 @@ async function confirmLeaveUnsavedConfigView() {
       save: () => saveMorphologyTables({ preventDefault() {} }),
     });
   }
-  const settings = normalizeDictionarySettings(activeDictionary().settings);
+  const settings = dictionarySettings();
   if (state.activeView === "docs" && docsFormIsDirty()) {
     if (settings.docsAutoSave) {
       try {
@@ -16962,7 +16982,7 @@ function hasManualModuleChangesOnExit() {
   if (!dictionary) {
     return false;
   }
-  const settings = normalizeDictionarySettings(dictionary.settings);
+  const settings = dictionarySettings(dictionary);
   return (
     (!settings.docsAutoSave && docsFormIsDirty(dictionary))
     || (!settings.corpusAutoSave && corpusFormIsDirty(dictionary))
@@ -16976,7 +16996,7 @@ function flushAutomaticModuleSaves() {
     return;
   }
   syncCorpusEditorToDraft();
-  const settings = normalizeDictionarySettings(dictionary.settings);
+  const settings = dictionarySettings(dictionary);
   const body = { updatedAt: new Date().toISOString() };
   if (settings.docsAutoSave && docsFormIsDirty(dictionary)) {
     body.docs = {

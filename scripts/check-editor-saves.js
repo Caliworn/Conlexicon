@@ -34,7 +34,7 @@ function docsHarness() {
     },
     clearTimeout() {},
     setTimeout() { return 1; },
-    normalizeDictionarySettings: (settings) => settings,
+    dictionarySettings: (dictionary) => dictionary.settings,
     showToast() {},
     showApiErrorToast: (error) => errors.push(error),
     t: (key) => key,
@@ -116,7 +116,7 @@ async function checkEditSwitchErrors() {
   const error = new Error("unexpected dirty check error");
   const context = vm.createContext({
     activeDictionary: () => ({ settings: { partialEditPageSwitchAction: "prompt" } }),
-    normalizeDictionarySettings: (settings) => settings,
+    dictionarySettings: (dictionary) => dictionary.settings,
     partialEditForm: () => ({}),
     partialEntryFormIsDirty: () => { throw error; },
     console: { error: (value) => errors.push(value) },

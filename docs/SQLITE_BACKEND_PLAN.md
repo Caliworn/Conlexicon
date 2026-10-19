@@ -95,6 +95,8 @@ SQLite 化后，`DictionaryQueryContext` 应从“请求级临时 Map/Set”自�
 - `dictionary-model.js` 只保留 Node 侧内容：错误包装、完整词典入口、实体 ID 唯一性检查与导入；`app.js` 保留本地化默认名称、summary、显示视图（如形态的临时扁平表格视图）和前端状态入口。
 - settings 保留未知字段，显式 `false`、空字符串与空集合不被默认值替换；`toolNavOrder` 与 `entrySectionOrder` 保留合法项的顺序，去掉重复与未知项并补齐缺项。导出的默认数组冻结，规范化结果总是新对象。
 - 契约检查为 `scripts/check-dictionary-data-model.js`，其中按 `index.html` 的脚本顺序在 VM 中加载到 `app.js` 之前，确认浏览器全局和依赖可用。
+- 前端只在词典进入状态时规范化一次：首次加载与切换词典的完整快照、模块保存响应、词条保存与删除响应、批量 patch 都经 `normalizeDictionary`（`replaceDictionaryInState`／`replaceLoadedDictionarySource`）。读取已加载词典的配置一律用 `dictionarySettings(dictionary = activeDictionary())`，不再对状态中的 settings 或其中单个字段重复规范化；新增的状态入口必须同样经过规范化，不在读取处兜底。
+- 没有活动词典、或词典只是 metadata 占位（未加载，没有 `settings`）时，`dictionarySettings` 返回一份深度冻结的默认设置，只供读取；表单收集和排序逻辑需要修改时先复制。表单从 DOM 收集的原始输入（如 `ipaSettingsFromForm`）仍在边界规范化。
 
 ## 5. 当前 SQLite schema
 
