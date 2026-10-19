@@ -90,7 +90,7 @@ SQLite 化后，`DictionaryQueryContext` 应从“请求级临时 Map/Set”自�
 
 ### 共享数据规则
 
-- 前后端相同的纯数据规范化只有一份实现：`lib/dictionary-data-model.js`（UMD，浏览器全局 `ConlexiconDictionaryData`）。它覆盖 settings（含 gloss 样式、工具导航顺序、词条区域顺序）、docs、corpus 与各级语料实体、definition、词条字段整形、全局界面偏好，以及实体 ID 生成与登记（`globalThis.crypto.randomUUID`）；依赖已有的 tag、IPA、entry-search、morphology 共享模型，不复制它们。
+- 前后端相同的纯数据规范化只有一份实现：`lib/dictionary-data-model.js`（UMD，浏览器全局 `ConlexiconDictionaryData`）。它覆盖 settings（含 gloss 样式、工具导航顺序、词条区域顺序）、docs、corpus 与各级语料实体、definition、词条字段整形、全局界面偏好，以及缺失实体 ID 的补齐（`ensureEntityId`，用 `globalThis.crypto.randomUUID`，不扫描已有 ID）；依赖已有的 tag、IPA、entry-search、morphology 共享模型，不复制它们。
 - 词条字段整形接收调用方处理好的来源：`dictionary-model.js` 严格校验，重复目标与自引用以 `apiError` 拒绝；`app.js` 以 `allowDuplicateTargets` 宽松读取，使早期数据库中的重复引用仍可见、可删除后保存。共享模块不带“严格／宽松”参数。
 - `dictionary-model.js` 只保留 Node 侧内容：错误包装、完整词典入口、实体 ID 唯一性检查与导入；`app.js` 保留本地化默认名称、summary、显示视图（如形态的临时扁平表格视图）和前端状态入口。
 - settings 保留未知字段，显式 `false`、空字符串与空集合不被默认值替换；`toolNavOrder` 与 `entrySectionOrder` 保留合法项的顺序，去掉重复与未知项并补齐缺项。导出的默认数组冻结，规范化结果总是新对象。

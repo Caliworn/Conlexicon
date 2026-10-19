@@ -79,11 +79,8 @@ function checkStability() {
 }
 
 function checkIdGeneration() {
-  const usedIds = new Set();
-  assert.equal(dataModel.reserveEntityId(" kept ", "def", usedIds), "kept");
-  const generated = dataModel.reserveEntityId("", "def", usedIds);
-  assert.match(generated, /^def-[0-9a-f-]{36}$/);
-  assert.ok(usedIds.has("kept") && usedIds.has(generated));
+  assert.equal(dataModel.ensureEntityId(" kept ", "def"), "kept");
+  assert.match(dataModel.ensureEntityId("", "def"), /^def-[0-9a-f-]{36}$/);
 }
 
 // Loads every script index.html includes before app.js, in page order, so a

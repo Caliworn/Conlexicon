@@ -201,7 +201,7 @@ GET /api/export?dictionaryId=...&format=xlsx
 
 诊断修复模块可以复用迁移 report 的结构，但不要把未解析来源等普通质量检查问题塞进迁移诊断。迁移诊断只处理“会影响数据能否安全进入 canonical storage”的问题。
 
-在语料库尚未正式 SQL 化之前，`corpus` 仍作为 module blob 保存，但其 block、layer、unit ID 仍属于全局实体 ID 命名空间。完整导入、迁移、词条保存和语料模块保存都必须把 corpus blob 内部 ID 纳入防撞；普通设置和文档保存则不应因为无关的历史 corpus ID 问题被阻断。repository contract 已覆盖 corpus ID 与词条/释义 ID 互撞、corpus 内部重复 ID 等场景，避免后续 SQLite 下推或语料库重构时绕过该规则。
+在语料库尚未正式 SQL 化之前，`corpus` 仍作为 module blob 保存，但其 block、layer、unit ID 仍属于全局实体 ID 命名空间。完整导入与迁移把 corpus blob 内部 ID 纳入全量跨类型唯一性检查；语料模块保存只检查语料内部重复，词条、普通设置和文档保存不检查 corpus ID（规则见 [API Contract](API_CONTRACT.md#实体-id-校验约定)）。repository contract 覆盖导入时 corpus ID 与词条／释义 ID 互撞和语料保存时的内部重复，避免后续 SQLite 下推或语料库重构时绕过该规则。
 
 ## 10. 默认切换清单与当前策略
 

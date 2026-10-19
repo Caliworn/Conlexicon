@@ -80,6 +80,7 @@ const dictionaryDataModel = window.ConlexiconDictionaryData;
 const {
   DEFAULT_ENTRY_SECTION_ORDER,
   DEFAULT_TOOL_NAV_ORDER,
+  ensureEntityId,
   normalizeCorpus,
   normalizeCorpusBlock,
   normalizeCorpusLayer,
@@ -97,7 +98,6 @@ const {
   normalizeUiLanguage,
   normalizeUiSkin,
   normalizeUiTheme,
-  reserveEntityId,
   uid,
 } = dictionaryDataModel;
 const sourceInputReferences = new WeakMap();
@@ -973,7 +973,6 @@ const i18n = {
     corpusMultipleParents: "单元“{unit}”被链接到多个父级：{parents}",
     corpusMissingUnit: "父级“{parent}”引用了不存在的单元：{unit}",
     corpusDuplicateLink: "父级“{parent}”重复引用了单元“{unit}”",
-    corpusDuplicateEntityId: "语料 ID“{id}”被多个对象使用：{types}",
     duplicateEntityIdsTitle: "检测到重复 ID",
     duplicateEntityIdsMessage: "以下 ID 被多个词典对象使用，保存或导入已停止：\n{details}",
     entryEntity: "词条",
@@ -1613,7 +1612,6 @@ const i18n = {
     corpusMultipleParents: "Unit “{unit}” is linked to multiple parents: {parents}",
     corpusMissingUnit: "Parent “{parent}” references a missing unit: {unit}",
     corpusDuplicateLink: "Parent “{parent}” references unit “{unit}” more than once",
-    corpusDuplicateEntityId: "Corpus ID “{id}” is used by multiple objects: {types}",
     duplicateEntityIdsTitle: "Duplicate IDs detected",
     duplicateEntityIdsMessage: "These IDs are used by multiple dictionary objects. Saving or importing has been stopped:\n{details}",
     entryEntity: "Entry",
@@ -2369,12 +2367,11 @@ function normalizeDictionaryMetadata(dictionary = {}) {
 }
 
 function normalizeDictionary(dictionary) {
-  const usedEntityIds = new Set();
   const entries = Array.isArray(dictionary.entries)
     ? dictionary.entries.map((entry) => normalizeEntry({
       ...entry,
-      id: reserveEntityId(entry.id, "entry", usedEntityIds),
-    }, usedEntityIds))
+      id: ensureEntityId(entry.id, "entry"),
+    }))
     : [];
   return {
     id: dictionary.id || uid("dict"),
@@ -2383,8 +2380,8 @@ function normalizeDictionary(dictionary) {
     description: dictionary.description || "",
     settings: normalizeDictionarySettings(dictionary.settings),
     docs: normalizeDocs(dictionary.docs),
-    corpus: normalizeCorpus(dictionary.corpus, usedEntityIds),
-    morphology: normalizeMorphology(dictionary.morphology, usedEntityIds),
+    corpus: normalizeCorpus(dictionary.corpus),
+    morphology: normalizeMorphology(dictionary.morphology),
     createdAt: dictionary.createdAt || new Date().toISOString(),
     updatedAt: dictionary.updatedAt || new Date().toISOString(),
     summary: normalizeDictionarySummary(dictionary.summary),
@@ -2392,10 +2389,10 @@ function normalizeDictionary(dictionary) {
   };
 }
 
-function normalizeEntry(entry, usedIds = new Set()) {
+function normalizeEntry(entry) {
   // Previously stored duplicates must remain readable/removable; saves are validated by the server.
   const sources = sourceReferenceModel.normalizeSourceReferences(entry.etymology?.sources || [], { allowDuplicateTargets: true });
-  return dictionaryDataModel.normalizeEntryFields(entry, sources, usedIds);
+  return dictionaryDataModel.normalizeEntryFields(entry, sources);
 }
 
 function defaultEntrySearchProfile(dictionary = activeDictionary()) {
@@ -2636,10 +2633,9 @@ function serializeTagDisplayMap(map = {}) {
     .join("\n");
 }
 
-function normalizeMorphology(morphology = {}, usedIds = new Set()) {
+function normalizeMorphology(morphology = {}) {
   const normalized = morphologyModel.normalizeMorphology(morphology, {
-    usedIds,
-    reserveEntityId,
+    ensureEntityId,
     defaultGroupName: t("morphologyTable"),
     defaultTableTitle: t("morphologyTable"),
   });
@@ -2724,33 +2720,6 @@ function hasStressOutput(value) {
 
 function normalizeIpaRule(rule = {}) {
   return ipaModel.normalizeIpaRule(rule);
-}
-
-function corpusEntityIdRecords(corpus = {}) {
-  const records = [];
-  (corpus.blocks || []).forEach((block) => {
-    records.push({ id: String(block.id || "").trim(), typeKey: "corpusBlock" });
-    (block.layers || []).forEach((layer) => {
-      records.push({ id: String(layer.id || "").trim(), typeKey: "corpusLayer" });
-    });
-  });
-  (corpus.units || []).forEach((unit) => {
-    records.push({ id: String(unit.id || "").trim(), typeKey: "corpusUnit" });
-  });
-  return records.filter((record) => record.id);
-}
-
-function duplicateEntityIdGroups(records) {
-  const recordsById = new Map();
-  records.forEach((record) => {
-    if (!recordsById.has(record.id)) {
-      recordsById.set(record.id, []);
-    }
-    recordsById.get(record.id).push(record);
-  });
-  return [...recordsById.entries()]
-    .filter(([, matches]) => matches.length > 1)
-    .map(([id, matches]) => ({ id, matches }));
 }
 
 function activeDictionary() {
@@ -13955,10 +13924,6 @@ function corpusIntegrityIssues(corpus = ensureCorpusDraft()) {
   const unitsById = new Map(corpus.units.map((unit) => [unit.id, unit]));
   const parentsByUnit = new Map();
   const issues = [];
-  duplicateEntityIdGroups(corpusEntityIdRecords(corpus)).forEach(({ id, matches }) => {
-    const types = [...new Set(matches.map(({ typeKey }) => t(typeKey)))].join(", ");
-    issues.push(formatText("corpusDuplicateEntityId", { id, types }));
-  });
   corpusParentRefs(corpus).forEach((ref) => {
     const parent = corpusParentLabel(ref);
     const seen = new Set();
