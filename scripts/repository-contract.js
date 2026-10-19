@@ -326,6 +326,22 @@ async function checkAnalysisQueryContract(repository) {
       presence: [{ field: "source", present: false }],
     });
     assert.deepEqual(result.body.widgets.lexicon.multiSourceAction.filter, { sourceCount: { min: 2 } });
+    // beta and gamma are sources of alpha, so only delta is an isolated root.
+    assert.equal(result.body.widgets.lexicon.isolatedRootEntryCount, 1);
+    const isolatedRootAction = result.body.widgets.lexicon.isolatedRootAction;
+    assert.equal(isolatedRootAction.resultCount, 1);
+    const isolatedRoots = await callApi(
+      repository,
+      "GET",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries?filter=${encodeURIComponent(JSON.stringify(isolatedRootAction.filter))}`,
+    );
+    assert.deepEqual(isolatedRoots.body.items.map((entry) => entry.id), ["entry-analysis-delta"]);
+    const withDerived = await callApi(
+      repository,
+      "GET",
+      `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries?filter=${encodeURIComponent(JSON.stringify({ presence: [{ field: "derivedEntries", present: true }] }))}&sort=lemmaAsc`,
+    );
+    assert.deepEqual(withDerived.body.items.map((entry) => entry.id), ["entry-analysis-beta", "entry-analysis-gamma"]);
 
     const coverage = Object.fromEntries(result.body.widgets.coverage.rows.map((row) => [row.field, row]));
     assert.equal(result.body.widgets.coverage.entryTotal, 4);

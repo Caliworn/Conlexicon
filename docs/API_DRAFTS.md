@@ -86,7 +86,6 @@ Feature Services
 relationSummary
   rootCount
   derivedCount
-  isolatedRootCount
   multiSourceCount
 
 rootFamilies
@@ -103,7 +102,7 @@ directDerivedEntries
   source entry/key -> derived entries
 ```
 
-现状：词根家族排行、词根模式和词汇网络都直接消费 repository 的 `RootTopologyCache`；来源只按精确目标 ID 匹配，运行期没有按文本解析来源的步骤，`sourceResolution` 的文本匹配目前只存在于旧 JSON 导入转换中。孤立词根尚未作为分析 widget 接线。
+现状：词根家族排行、词根模式和词汇网络都直接消费 repository 的 `RootTopologyCache`；来源只按精确目标 ID 匹配，运行期没有按文本解析来源的步骤，`sourceResolution` 的文本匹配目前只存在于旧 JSON 导入转换中。孤立词根已作为 `lexiconSummary` 的严格计数接入（2026-10-19），不依赖拓扑。
 
 ## 4. 诊断修复模块
 

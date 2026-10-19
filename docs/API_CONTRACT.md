@@ -144,7 +144,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
   }
   ```
 
-  所有字段均可省略。`tags.mode` 为 `any`、`all` 或 `exact`；`exact` 要求词条包含全部指定标签且不含任何额外标签。`presence.field` 支持 `definition`、`example`、`entryNote`、`source`、`ipa`、`tag`；`tag` 表示词条是否至少有一个标签，`present: false` 编译为对 `entry_tags` 的不存在性查询。`sourceCount` 与 `tagCount` 都是包含边界的非负整数区间，`max` 可省略；前者统计来源记录，后者统计词条的标签数量。`activityDays.field` 支持 `created`、`updated`，日期按 UTC `YYYY-MM-DD` 的 `[dayStart, nextDayStart)` 半开范围比较。同一 presence 或日期字段不得给出冲突条件。`orthography` 是单一正写法结构条件，category 支持 `length`、`initial`、`character`、`bigram`；长度按整个 lemma 的 Unicode 码点数计算，首字符先 trim，字符忽略 Unicode 空白，双字符只统计空白分隔片段内部的相邻码点。该条件不执行 NFC、搜索规范化或字素簇合并。当前 `entryNote` 只表示词条级备注，不包含释义备注或形态组备注。
+  所有字段均可省略。`tags.mode` 为 `any`、`all` 或 `exact`；`exact` 要求词条包含全部指定标签且不含任何额外标签。`presence.field` 支持 `definition`、`example`、`entryNote`、`source`、`derivedEntries`、`ipa`、`tag`；`source` 表示词条有任何来源记录（已绑定或纯文本），`derivedEntries` 表示有其他词条以已绑定来源引用它（即它有衍生词）；`tag` 表示词条是否至少有一个标签，`present: false` 编译为对 `entry_tags` 的不存在性查询。`sourceCount` 与 `tagCount` 都是包含边界的非负整数区间，`max` 可省略；前者统计来源记录，后者统计词条的标签数量。`activityDays.field` 支持 `created`、`updated`，日期按 UTC `YYYY-MM-DD` 的 `[dayStart, nextDayStart)` 半开范围比较。同一 presence 或日期字段不得给出冲突条件。`orthography` 是单一正写法结构条件，category 支持 `length`、`initial`、`character`、`bigram`；长度按整个 lemma 的 Unicode 码点数计算，首字符先 trim，字符忽略 Unicode 空白，双字符只统计空白分隔片段内部的相邻码点。该条件不执行 NFC、搜索规范化或字素簇合并。当前 `entryNote` 只表示词条级备注，不包含释义备注或形态组备注。
 - `fields`：逗号分隔的搜索字段白名单；当前支持 `lemma`、`pronunciation`、`tags`、`definitions`、`examples`、`notes`、`etymology`、`morphology`。为空或全部无效时搜索全部字段。
 - `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；仅对同时出现在 `fields` 中的字段生效。
 - 基础搜索逐个独立字段值匹配：一条释义、一个标签、一个来源或一段备注必须自行包含查询文本，查询不会跨多个值拼接命中；`notes` 中的词条备注、释义备注和每个词条形态组备注也分别作为独立值。多标签组合等条件应使用高级筛选。自由文本按当前词典的 `settings.search.normalization` 处理。SQLite 的严格及 fuzzy 查询均直接读取静态 `entry_search_values` 和按需读取形态 `entry_morphology_search_values`；fuzzy 通过连接级确定性函数复用共享搜索模型的评分语义。该路径支持 NFC、Unicode case folding 和自定义等价规则。结构键和词源关系键不套用该自由文本配置。
@@ -707,6 +707,7 @@ GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&so
       rootEntryCount: 6400,
       derivedEntryCount: 3600,
       multiSourceEntryCount: 180,
+      isolatedRootEntryCount: 900,
       action: { type: "view", target: "editor" },
       rootAction: {
         type: "entryFilter",
@@ -722,6 +723,11 @@ GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&so
         type: "entryFilter",
         resultCount: 180,
         filter: { sourceCount: { min: 2 } }
+      },
+      isolatedRootAction: {
+        type: "entryFilter",
+        resultCount: 900,
+        filter: { presence: [{ field: "source", present: false }, { field: "derivedEntries", present: false }] }
       }
     },
     "coverage": {
@@ -771,11 +777,11 @@ Widget 通过以下任务依赖生成：
 | `activityDistribution` | `activityStats` |
 | `rootFamilyRanking` | `rootTopology` |
 
-同一任务在一次请求中只执行一次；只有 `activityPreview` 时使用请求中的最大 limit 读取日期桶，再分别裁剪；请求包含 `activityDistribution` 时读取完整日期桶，并继续按各自 limit 裁剪预览 widget。`lexiconSummary.rootEntryCount` 严格表示没有任何来源记录的词条数，`derivedEntryCount` 表示至少有一条来源记录的词条数；这两个计数不建立词根拓扑，也不表达孤立词根。`partDistribution.rows[].entryCount`、`tagFrequency.rows[].entryCount`、`tagSetDistribution.rows[].entryCount`、`orthographyDistribution` 各分布行和两类活动 widget 的 `created/updated[].entryCount` 均为唯一词条数。词性、其他标签和标签集合行同时返回来自活跃标签身份快照的 `displayLabel` 与 `displayAmbiguous`，不同 widget 不得按自身截断后的局部行重新推断显示碰撞。`partDistribution` 另返回 `partTypeCount`、`noPartOfSpeechCount` 和对应的 `noPartAction`；`tagFrequency` 从共享标签身份快照排除当前 `partOfSpeechTags` 中的所有标签，并返回 `tagTypeCount` 及结构化标签筛选 action。`tagSetDistribution` 以无序的完整原始标签集合为身份，返回非空集合的 `tagSetCount`、`taggedEntryCount`、`untaggedEntryCount`、`multiTagEntryCount` 和结构化 `tags`；`taggedAction`、`untaggedAction`、`multiTagAction` 分别使用 `presence.tag: true`、`presence.tag: false`、`tagCount.min: 2` 进入普通词条查询。无标签词条不作为空集合混入排行，集合种类没有词条结果 action。显示替换和显示顺序不改变集合身份，每个非空集合行的 action 使用 `tags.mode: "exact"`，因此单标签集合表示“仅有该标签”，多标签集合也不会把带额外标签的超集纳入结果。`orthographyDistribution` 从最小 `id + lemma` 输入返回 `lemmaEntryCount`、`wordLengths`、`initials`、`characters` 和 `bigrams`；字符与双字符行同时返回 `occurrenceCount` 和 `entryCount`，每行 action 使用相同共享模型生成的单一 `orthography` 结构筛选。所有 `entryFilter` action 使用 `resultCount` 表示目标结果词条数。`coverageBreakdown.rows[].field` 支持 `definition`、`example`、`entryNote`、`ipa`；每行使用 `coveredEntryCount`、`missingEntryCount`，释义和例句行另带项目单位的 `itemCount`。词性分布 action 使用 `{ part }` descriptor，无词性行使用保留值 `__conlexicon_no_part__`。
+同一任务在一次请求中只执行一次；只有 `activityPreview` 时使用请求中的最大 limit 读取日期桶，再分别裁剪；请求包含 `activityDistribution` 时读取完整日期桶，并继续按各自 limit 裁剪预览 widget。`lexiconSummary.rootEntryCount` 严格表示没有任何来源记录的词条数，`derivedEntryCount` 表示至少有一条来源记录的词条数；`isolatedRootEntryCount` 是词根中没有任何词条以已绑定来源引用它的部分（孤立词根），对应的 `isolatedRootAction` 筛选为 `presence: [{ field: "source", present: false }, { field: "derivedEntries", present: false }]`。三者都按来源记录严格计算，不建立词根拓扑：只有纯文本来源的词条算衍生词，既不是词根也不是孤立词根（词根模式的拓扑把它当作词根）。`partDistribution.rows[].entryCount`、`tagFrequency.rows[].entryCount`、`tagSetDistribution.rows[].entryCount`、`orthographyDistribution` 各分布行和两类活动 widget 的 `created/updated[].entryCount` 均为唯一词条数。词性、其他标签和标签集合行同时返回来自活跃标签身份快照的 `displayLabel` 与 `displayAmbiguous`，不同 widget 不得按自身截断后的局部行重新推断显示碰撞。`partDistribution` 另返回 `partTypeCount`、`noPartOfSpeechCount` 和对应的 `noPartAction`；`tagFrequency` 从共享标签身份快照排除当前 `partOfSpeechTags` 中的所有标签，并返回 `tagTypeCount` 及结构化标签筛选 action。`tagSetDistribution` 以无序的完整原始标签集合为身份，返回非空集合的 `tagSetCount`、`taggedEntryCount`、`untaggedEntryCount`、`multiTagEntryCount` 和结构化 `tags`；`taggedAction`、`untaggedAction`、`multiTagAction` 分别使用 `presence.tag: true`、`presence.tag: false`、`tagCount.min: 2` 进入普通词条查询。无标签词条不作为空集合混入排行，集合种类没有词条结果 action。显示替换和显示顺序不改变集合身份，每个非空集合行的 action 使用 `tags.mode: "exact"`，因此单标签集合表示“仅有该标签”，多标签集合也不会把带额外标签的超集纳入结果。`orthographyDistribution` 从最小 `id + lemma` 输入返回 `lemmaEntryCount`、`wordLengths`、`initials`、`characters` 和 `bigrams`；字符与双字符行同时返回 `occurrenceCount` 和 `entryCount`，每行 action 使用相同共享模型生成的单一 `orthography` 结构筛选。所有 `entryFilter` action 使用 `resultCount` 表示目标结果词条数。`coverageBreakdown.rows[].field` 支持 `definition`、`example`、`entryNote`、`ipa`；每行使用 `coveredEntryCount`、`missingEntryCount`，释义和例句行另带项目单位的 `itemCount`。词性分布 action 使用 `{ part }` descriptor，无词性行使用保留值 `__conlexicon_no_part__`。
 
 `rootFamilyRanking` 按衍生词数量降序、词根词形升序返回全部非空词根家族，同时返回家族总数 `familyCount`。每行固定为 `{ rootId, lemma, derivedEntryCount, action? }`，其中 action 定位词根词条；不会返回家族成员或 `derivedIds`。该任务直接消费与 `/root-groups`、词汇网络共享的稳定 `RootTopologyCache`，同一词典的拓扑已存在时不重新解析来源关系；多来源词条可以分别计入其所属家族，因此不能累加排行得到全局衍生词数量。
 
-当前总览固定消费四个 widget，分别渲染词汇规模、资料覆盖、词性分布和编辑活动；编辑活动使用 `activityPreview`。进入“词汇 > 标签”后同一次请求完整的 `partDistribution`、`tagFrequency` 与 `tagSetDistribution`；标签集合不再由前端扫描完整词典。集合卡片首批渲染 100 行，继续展开只消费已经返回的 widget rows，不追加请求。进入“编辑进度”详情后另行请求 `activityDistribution`，进入“词根家族”详情后另行请求 `rootFamilyRanking`。资料覆盖只表达释义、例句、IPA 与备注；来源存在性由 `lexiconSummary` 的词根/衍生词构成和对应筛选表达，不在 `coverageBreakdown` 中重复返回。词根家族不属于首屏轻量总览；孤立词根尚未作为分析 widget 接线。
+当前总览固定消费四个 widget，分别渲染词汇规模、资料覆盖、词性分布和编辑活动；编辑活动使用 `activityPreview`。进入“词汇 > 标签”后同一次请求完整的 `partDistribution`、`tagFrequency` 与 `tagSetDistribution`；标签集合不再由前端扫描完整词典。集合卡片首批渲染 100 行，继续展开只消费已经返回的 widget rows，不追加请求。进入“编辑进度”详情后另行请求 `activityDistribution`，进入“词根家族”详情后另行请求 `rootFamilyRanking`。资料覆盖只表达释义、例句、IPA 与备注；来源存在性由 `lexiconSummary` 的词根/衍生词构成和对应筛选表达，不在 `coverageBreakdown` 中重复返回。词根家族不属于首屏轻量总览。总览“词汇构成”卡片在词根下显示孤立词根数，点击进入对应筛选。
 
 请求验证失败使用 `invalid_analysis_query_payload`、`invalid_analysis_widgets`、`invalid_analysis_widget`、`invalid_analysis_widget_id`、`unsupported_analysis_widget`、`invalid_analysis_widget_limit` 或 `duplicate_analysis_widget_id`。
 

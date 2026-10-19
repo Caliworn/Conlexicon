@@ -460,6 +460,7 @@ const i18n = {
     activeFilterMorphologyActiveOverrideTable: "活跃覆写表格",
     activeFilterMorphologyInactiveOverrideTable: "休眠覆写表格",
     activeFilterMultiSourceEntries: "多来源词条",
+    activeFilterIsolatedRoots: "孤立词根",
     activeFilterHasExamples: "有例句",
     activeFilterNoExamples: "无例句",
     activeFilterHasNotes: "有备注",
@@ -1068,6 +1069,7 @@ const i18n = {
     activeFilterMorphologyActiveOverrideTable: "Active override table",
     activeFilterMorphologyInactiveOverrideTable: "Dormant override table",
     activeFilterMultiSourceEntries: "Multi-source entries",
+    activeFilterIsolatedRoots: "Isolated roots",
     activeFilterHasExamples: "Has examples",
     activeFilterNoExamples: "No examples",
     activeFilterHasNotes: "Has notes",
@@ -10023,7 +10025,7 @@ function analysisNoPartFactRows(partWidget) {
 function renderAnalysisOverviewQuery(response) {
   const { widgets } = response;
   const { lexicon } = widgets;
-  const { entryCount, rootEntryCount, derivedEntryCount, multiSourceEntryCount } = lexicon;
+  const { entryCount, rootEntryCount, derivedEntryCount, multiSourceEntryCount, isolatedRootEntryCount } = lexicon;
   const rootAction = analysisQueryFilterAction(
     lexicon.rootAction,
     activeFilterTitleDescriptor("activeFilterRoots"),
@@ -10045,6 +10047,10 @@ function renderAnalysisOverviewQuery(response) {
         resultCount: lexicon.rootAction.resultCount,
       }] : [],
     },
+  );
+  const isolatedRootAction = analysisQueryFilterAction(
+    lexicon.isolatedRootAction,
+    activeFilterTitleDescriptor("activeFilterIsolatedRoots"),
   );
   const multiSourceAction = analysisQueryFilterAction(
     lexicon.multiSourceAction,
@@ -10101,6 +10107,7 @@ function renderAnalysisOverviewQuery(response) {
   };
   const rootRatio = entryCount ? rootEntryCount / entryCount : 0;
   const derivedRatio = entryCount ? derivedEntryCount / entryCount : 0;
+  const isolatedRootRatio = rootEntryCount ? isolatedRootEntryCount / rootEntryCount : 0;
   const multiSourceRatio = derivedEntryCount ? multiSourceEntryCount / derivedEntryCount : 0;
   return `
     <section class="analysis-grid analysis-overview-grid">
@@ -10117,6 +10124,15 @@ function renderAnalysisOverviewQuery(response) {
           <span class="root" style="width: ${(rootRatio * 100).toFixed(2)}%"></span>
           <span class="derived" style="width: ${(derivedRatio * 100).toFixed(2)}%"></span>
         </div>
+        ${analysisCompositionSubset(
+          aText("其中孤立词根", "Isolated roots"),
+          isolatedRootEntryCount,
+          aText(
+            `占词根 ${percentText(isolatedRootRatio)}，无来源也无衍生词`,
+            `${percentText(isolatedRootRatio)} of roots, no sources and no derived entries`,
+          ),
+          isolatedRootAction,
+        )}
         ${analysisCompositionSubset(
           aText("其中多来源词条", "Multi-source entries"),
           multiSourceEntryCount,
