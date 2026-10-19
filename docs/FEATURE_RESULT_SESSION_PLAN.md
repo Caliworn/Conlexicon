@@ -9,7 +9,7 @@
 1. **Feature result**：必须运行 IPA、Gloss 或形态算法才能得到的派生结果，由 F4b feature service 负责。
 2. **Topology summary**：词根家族排行直接消费现有稳定词根拓扑，不建立 feature session。
 3. **Deterministic summary/facet**：词长、首字母、字符和双字符组合先统一 Unicode 语义，再由轻量 projection 或 summary query 提供。
-4. **Quality result**：质量检查需要问题分类和详情；F5-0 已在 [Quality Result Plan](QUALITY_RESULT_PLAN.md) 冻结独立 `/quality/query`、规则集 v1 和混合执行 planner，后续只复用 F4b 的内部会话原语。
+4. **Quality result**：质量检查需要问题分类和详情；F5 已实装独立的 `/quality/query` 与规则集 v1（契约见 [API Contract](API_CONTRACT.md#quality-result-queryf5-1-已实装)），只复用 F4b 的内部会话原语；F5-0 曾计划的混合执行 planner 在 F5-1 复评时取消。
 
 F4b 不建设通用分析任务平台，不把功能结果伪装成普通 `EntryFilter`，也不把前端 `entryIds` 机械搬进 HTTP 响应。
 

@@ -415,18 +415,7 @@ POST /api/dictionaries/:id/analysis/query
 
 ### 7.6 质量检查 query
 
-质量检查应成为独立 API，而不是数据分析的附属 slice：
-
-```text
-POST /api/dictionaries/:id/quality/query
-```
-
-必须明确：
-
-- 支持按优先级、模块、问题类型查询。
-- 返回问题摘要、匹配词条 ID 和必要详情。
-- 质量高级筛选可以用同一个 filter descriptor 进入词条列表。
-- 质量检查缓存与数据分析缓存分离。
+已实装（F5，2026-10-18）：质量检查是独立的 `/quality/query` 与 `/quality/location`，不是数据分析的附属 slice。repository 只通过 `qualityInputRecords()` 一次同步读取词条、有序标签、义项和有序来源这几项最小事实，不生成质量 code；规则集、issue 与 summary 语义、会话缓存和性能边界见 [API Contract](API_CONTRACT.md#quality-result-queryf5-1-已实装)。响应不返回匹配词条 ID 数组；词条列表的质量筛选请求 entry 视图窗口。会话缓存与数据分析缓存是两个独立实例。
 
 ### 7.7 保存返回值
 
@@ -470,7 +459,7 @@ SQLite repository 的核心读写、schema、迁移脚本和 smoke 已经落地�
 
 1. 查询缓存 Q1–Q4 已完成前端查询缓存、严格/fuzzy entries 与 root groups 后端运行时会话、summary DTO、按需详情、词根组子项懒加载、版本化 cursor 和纯滚动数据窗口；普通词条和父级词根组采用小窗口，单个词根组展开后一次读取全部衍生词，子端点不分页。词根拓扑使用独立 relation generation，搜索条件和无关保存不再触发关系重建。
 2. 两段式 stale-while-revalidate、词条切换局部渲染和详情关系 API/缓存接线均已实装；选择词条不再重建当前虚拟列表窗口或前端全词典词源关系索引。失败继续走明确错误状态，不用旧内容掩盖失败。
-3. 将高级筛选、数据分析和质量检查逐步接入查询 API/query planner；词汇网络已复用稳定拓扑的 `entryId → rootIds`、`rootId → group` 反向索引，质量检查中的词源查询后续接入同一层。
+3. 高级筛选、数据分析和质量检查均已接入查询 API；词汇网络复用稳定拓扑的 `entryId → rootIds`、`rootId → group` 反向索引，质量检查的来源循环规则与词根拓扑共用 `etymology-graph-model` 的强连通分量。
 4. 候选索引是否采用 FTS/ngram 由真实词典基准决定；语料 SQL 化留到语料升级阶段。
 5. 旧 JSON 仅维持导入、导出和离线目录迁移价值，不参与运行期查询与保存。
 
@@ -499,9 +488,9 @@ SQLite repository 的核心读写、schema、迁移脚本和 smoke 已经落地�
 | `queryEntries()` | 无参数和带参数请求都返回摘要 DTO 分页对象；无全文搜索时已下推到 SQL，覆盖词性、标签、字段存在性、来源数量、活动日期、排序和窗口读取。P0 已将正向词性及标签 `any/all` 从逐词条相关 `EXISTS` 改为 `(tag, entry_id)` 索引驱动的候选 ID 集合；词性只由词典显式配置的词性标签集合决定，不再读取标签位置。F3 已将活动日期改为索引可用的 UTC 半开范围，并让来源数量上下界共享一次计数 | 否 | 完整词条只通过 `getEntry()` 按需读取；无词性反向查询复用标签候选集；后续只按真实基准继续优化查询形状 |
 | 全文 / fuzzy / 动态形态搜索 | 严格及 fuzzy 查询均按字段读取 `entry_search_values` 与 `entry_morphology_search_values`，首次查询建立有序命中 ID 会话，后续窗口、总数和定位复用同一结果；形态单字段和静态+形态混合查询均返回统一 `searchHits`；fuzzy 通过连接级确定性函数复用共享评分 | 不再依赖完整 snapshot、逐词条动态形态生成或重复的严格 `COUNT`/页面/排名；fuzzy 仍需线性扫描所选 projection records | 继续以真实基准评估查询形状和候选索引 |
 | `getEntryFacets()` | 已改为 SQL 聚合，覆盖词性、标签频率和无词性计数 | 否 | 后续如增加筛选上下文 facets，再扩展 SQL |
-| `getEntryRelations()` | 已使用 `entry_sources`/`entries` 查询来源和直接衍生，并复用稳定词根拓扑的 `entryId → rootIds`、`rootId → group` 反向索引组装同根组 | 否；前端词条详情和词汇网络均消费该 API | 质量检查中的词源问题后续接入同一关系层；不再把词汇网络列为待接线项 |
-| `queryRootGroups()` | 词根与衍生词 ID 拓扑按独立 relation generation 稳定缓存；无搜索和带搜索查询只生成排序/匹配视图，搜索命中直接读取静态与形态 projection | 否；不再导出完整 snapshot 或重复构建关系；无关保存只刷新轻量排序记录 | fuzzy projection 仍是线性扫描，可继续结合真实基准评估候选索引；质量检查后续复用同一拓扑 |
-| 质量检查 / 数据分析 | 数据分析总览、活动、IPA、形态和词根家族排行均已按需接入后端；`rootFamilyRanking` 直接消费 `RootTopologyCache`，不返回家族成员 ID。质量检查仍使用前端完整 report cache | 已迁移分析页不再读取完整活动词典；质量检查仍会序列化并扫描相关词条字段 | F5 将质量检查推进为独立按需 API，并让词源检查复用同一稳定拓扑 |
+| `getEntryRelations()` | 已使用 `entry_sources`/`entries` 查询来源和直接衍生，并复用稳定词根拓扑的 `entryId → rootIds`、`rootId → group` 反向索引组装同根组 | 否；前端词条详情和词汇网络均消费该 API | 无 |
+| `queryRootGroups()` | 词根与衍生词 ID 拓扑按独立 relation generation 稳定缓存；无搜索和带搜索查询只生成排序/匹配视图，搜索命中直接读取静态与形态 projection | 否；不再导出完整 snapshot 或重复构建关系；无关保存只刷新轻量排序记录 | fuzzy projection 仍是线性扫描，可继续结合真实基准评估候选索引 |
+| 质量检查 / 数据分析 | 数据分析总览、活动、IPA、形态和词根家族排行均已按需接入后端；`rootFamilyRanking` 直接消费 `RootTopologyCache`，不返回家族成员 ID。质量检查由 `/quality/query` 按需构建，规则输入来自 `qualityInputRecords()` 的最小读取 | 否；前端不再读取或序列化整本词典来计算质量结果 | 30k 冷构建的同步读取约阻塞 380 ms，触发复评的门槛见 API Contract |
 | 契约测试 | SQLite repository 已跑通当前完整 repository contract | 否 | 主路径语义变化验证 SQLite contract；模型、旧 JSON 转换和目录迁移分别运行定向检查 |
 | 主服务接入 | 运行期只使用 SQLite repository，旧 JSON runtime repository 和后端 feature flag 已移除；SQLite 路径已完成 API/UI smoke；`scripts/check-default-repository.js` 覆盖 SQLite 服务启动 | 否；旧 JSON 词典通过单文件导入或只读目录迁移工具迁入 SQLite | 继续做真实词典实测；后续再设计产品内自动迁移向导 |
 

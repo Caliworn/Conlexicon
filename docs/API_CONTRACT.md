@@ -618,13 +618,17 @@ GET /api/dictionaries/:id/entry-relations/:entryId
 
 词汇网络详情视图和词根模式均已接入后端关系/词根读取端点。词根模式和词汇网络同根组复用 SQLite repository 的稳定词根拓扑；词典摘要的严格 `rootCount` 独立按无来源词条轻量计算。来源匹配与直接衍生词仍由相同 repository 关系边界返回，不再由前端扫描完整活动词典。
 
-词根拓扑语义（由 `lib/etymology-graph-model.js` 计算，设计见 [词源图计划](ETYMOLOGY_GRAPH_PLAN.md)）：
+词根拓扑语义（由 `lib/etymology-graph-model.js` 计算）：
 
 - 以“词条 → 已解析来源”为边建图；指向不存在词条的来源和纯文本来源不构成边，同一目标只算一次。
 - 没有外部祖先的强连通分量是源分量，其所有成员都是词根：没有已解析来源的词条是自身的词根；无外部祖先的循环中每个成员各自为根，并互为衍生词。
 - 其他词条属于其全部祖先源分量的词根组；共享祖先（菱形）不会使中间词条成为词根，有外部词根的循环成员也不单独成组。
 - 词根不出现在自己组的衍生词中，`derivedCount` 不计词根自身。
 - 分组只取决于词条集合和来源目标，与来源顺序、lemma 和排序无关；排序只影响组和组内衍生词的顺序。
+
+无外部祖先的循环选择“每个成员各自为根”：它对称，不需要任意挑选代表，与多来源词条出现在多个组中的语义一致，循环后代因此会在多个组中重复出现。按 ID 选唯一代表对用户没有语言学意义，按 lemma 选代表会让改名触发拓扑重建；让循环成员不出现在词根模式中则会使词条从列表消失。循环本身是数据错误，由质量检查的 `source_cycle` 报告。
+
+`etymology-graph-model` 是无 I/O 的共享模块（UMD）：`stronglyConnectedComponents` 用迭代版 Tarjan，不做递归，长来源链不会栈溢出；`buildEtymologyGraph` 按分量拓扑序传播词根集合。消费方为 repository 的词根拓扑（`rootTopologyFromDatabase`）、`entry-relations-model` 的 `rootModeGroups`（repository contract 中 `/root-groups` 的期望值）和质量模型的来源循环规则。模块不产出质量 code、见证路径或本地化文本，也不反向依赖质量模型。算法正确性由 `scripts/check-etymology-graph.js` 的固定用例、顺序无关、暴力可达性对照和 5 万节点深链覆盖。
 
 词根模式读取端点：
 
@@ -1026,7 +1030,9 @@ source、version、options、response mode、category、分布 value、page 与�
 
 #### Quality result query（F5-1 已实装）
 
-规则集、issue 身份、summary 语义和实施记录见 [Quality Result Plan](QUALITY_RESULT_PLAN.md)。前端质量页按需请求 summary 与 issue 窗口；词条列表的质量筛选以 `resultSource: { type: "dictionaryQuality" }` 加 selector 作为 feature-result 筛选的一种，请求本端点的 entry 视图。服务端由 `QualityResultService`（`lib/quality-result-service.js`）实现：
+质量检查的基本单位是 **issue**，不是布尔筛选条件。规则 code、严重度、模块、详情参数、问题级汇总和规则集版本由质量模型（`lib/quality-model.js`，仅服务端，不由静态服务公开）和 `QualityResultService`（`lib/quality-result-service.js`）负责；repository 只提供最小事实，不拥有质量政策。质量结果保持独立 API，不并入 `/analysis/features/query`，内部复用 feature result 的会话缓存与 cursor 原语。
+
+前端质量页打开时才请求 summary 与 issue 窗口，同一词典 ID 加 `updatedAt` 只请求一次，失败显示重试；问题列表每次取 200 条，“再显示”按 cursor 追加，cursor 过期时从第一页重取。词条列表的质量筛选以 `resultSource: { type: "dictionaryQuality" }` 加 selector（`category` 为 `all / severity / module`，`value` 为分组值）作为 feature-result 筛选的一种，请求本端点的 entry 视图。端点：
 
 ```text
 POST /api/dictionaries/:id/quality/query
@@ -1058,6 +1064,55 @@ source 固定为 `{ type: "dictionaryQuality", version: 1, options: {} }`，`res
 规则输入由 repository 的 `qualityInputRecords()` 一次同步读取：词条 `id / lemma / pronunciation`、有序标签、义项 `id / meaning / example`、有序来源 `entryId / text`（顺序与公开词条 DTO 相同）。不读取备注、词源描述、形态、语料、语言文档或完整 snapshot；repository 不生成质量 code、严重度或详情。HTTP 响应不携带全局问题的关联词条 ID 数组或任何完整匹配 ID 数组。
 
 source、version、options、response mode、item kind、selector 与 issue 视图字段验证失败分别返回 `invalid_quality_source`、`unsupported_quality_source`、`invalid_quality_source_version`、`invalid_quality_source_options`、`invalid_quality_response_mode`、`invalid_quality_view`、`invalid_quality_item_kind`、`invalid_quality_selector`、`invalid_quality_issue_view`；请求体不是对象时返回 `invalid_quality_query_payload` 或 `invalid_quality_location_payload`，location 缺少目标 ID 时返回 `invalid_quality_location_entry_id`，page 与搜索字段沿用既有 EntryQuery 校验码。未知词典返回 `dictionary_not_found`。
+
+##### 规则集 v1
+
+`QUALITY_RULESET_VERSION` 固定为 `1`。严重度顺序固定为 `high / medium / low`，模块顺序固定为 `lemma / tags / ipa / network / gloss / other`。
+
+| Code | 严重度 | 模块 | 范围 | 稳定参数 |
+| --- | --- | --- | --- | --- |
+| `gloss_incomplete` | medium | gloss | entry/definition | `definitionId`、`definitionPosition`、`missingFields` |
+| `gloss_alignment_mismatch` | medium | gloss | entry/definition | `definitionId`、`definitionPosition`、`glaCount`、`glbCount` |
+| `duplicate_lemma` | high | lemma | entry/cross-entry | `lemmas`、`duplicateEntryCount` |
+| `near_duplicate_tags` | low | tags | global | `forms`；会话内部另保存受影响词条集合 |
+| `missing_lemma` | high | lemma | entry | 无 |
+| `missing_tags` | high | tags | entry | 无 |
+| `missing_definition` | high | other | entry | 无 |
+| `missing_ipa` | low | ipa | entry | 无 |
+| `multiple_primary_stress` | medium | ipa | entry | `primaryStressCount` |
+| `tag_too_long` | low | tags | entry/tag | `tag`、`codePointLength`、`limit` |
+| `source_unresolved` | medium | network | entry/source | `sourceText`、`sourcePosition` |
+| `source_cycle` | high | network | entry/graph | `cycleEntryIds`、`cycleLemmas` |
+
+全部规则由一次最小事实读取加纯规则模块执行，不按规则分别下推 SQL，也不让 repository 接受 `{ type: "quality" }` 之类的条件自行生成 code。规则阶段每 256 个词条让出一次事件循环。
+
+##### Issue 身份与本地化
+
+- 同一词条可以产生多个 issue，同一义项、标签或来源也可以分别产生 issue。
+- issue `id` 由规则集版本、`code`、`entryId` 和稳定参数派生并散列；`severity / module` 由 code 决定，本地化 `title / detail` 不参与。`id` 不持久化，不承诺跨规则集版本相同。
+- 服务端只返回稳定字段；前端（`app.js` 的 `qualityIssueText()`）按 code 与 params 生成标题和详情。UI 语言不属于质量计算身份：中英文只改变标题、详情和标签，不改变 code、参数、数量或成员；切换语言只重新渲染已取回的结果，不重新请求、不失效会话。
+- 词形、标签和来源匹配使用固定的服务端关系规范化基线，不读取自由文本搜索的 NFC、case folding 或自定义等价设置。
+
+##### 规则边界行为
+
+- **Gloss**：规则集 v1 读取当前 `definitions.example` 中的 `\gla / \glb / \glc / \ft`（解析在 `lib/gloss-model.js`，前后端共用）。这只冻结质量检查语义，不为例句—语料链接建立存储契约；存储模型变化时必须升级输入 adapter 或规则集版本。
+- **来源循环**：来源链最终进入循环的词条也产生 `source_cycle`，issue 不只属于循环参与者；`cycleEntryIds / cycleLemmas` 只记录实际循环见证，并重复首节点闭合路径。实现消费 `etymology-graph-model` 的强连通分量，按分量拓扑序记忆化传播，O(V+E)：
+  - 每个循环分量（成员数大于 1；保存校验拒绝自引用）只有一条规范见证：从分量内 ID 最小的成员出发，按来源位置顺序在分量内深度优先，第一条回到起点的边闭合见证；
+  - 循环分量的成员都引用本分量的见证，其他词条按自身来源位置顺序，取第一个能到达循环的来源所继承的见证；
+  - 见证只取决于词条集合与来源边，与词条排列顺序无关；到达同一循环的 issue 共用同一个 params 对象，调用方不得修改。
+- **近似标签**：一个规范化紧凑形式对应多个不同 raw tag 时只产生一个全局 `near_duplicate_tags`（`entryId` 为空）。`forms` 按稳定遇见顺序去重；受影响词条按唯一 ID 计入 tags 模块的 `entryCount`，并在 entry 视图中带问题标记出现，但 HTTP 不返回关联 ID 数组。
+
+##### Summary 计数语义
+
+- `issueCount` 按 issue 计数，同一词条的多个问题分别计数；各 severity/module 的 `issueCount` 加总等于全局 `issueCount`。
+- `entryCount` 在当前分组内按唯一受影响词条计数，全局近似标签问题使用会话内部关联成员；因集合重叠，各组 `entryCount` 不可加总。
+- `affectedEntryCount` 在所有问题上按唯一词条计数；`globalIssueCount` 只统计没有主 `entryId` 的 issue。
+
+##### 构建边界与性能
+
+页面未打开时不建立质量会话；首次请求不调用 snapshot/export 路径。会话结果可丢弃，近期不新增 SQLite 派生表、持久化 job 或单词条增量维护，首版沿用较宽的 generation 失效。
+
+`node scripts/benchmark-quality-result.js` 在合成词典上测冷构建与窗口请求。2026-10-18 本机结果：10k 冷构建 p95 约 114 ms、event-loop 最大阻塞约 68 ms；30k 冷构建 p95 约 630 ms、最大阻塞约 380 ms，主要来自 `qualityInputRecords()` 的同步读取。该读取刻意保持为一个同步块，以读到同一个数据库状态。只有 10k 冷构建 p95 持续超过 500 ms 或 event-loop 阻塞持续超过 100 ms，或真实大词典上的阻塞影响交互时，才评估进程内 deferred execution 或缩小读取列。
 
 #### Light / full 任务边界
 

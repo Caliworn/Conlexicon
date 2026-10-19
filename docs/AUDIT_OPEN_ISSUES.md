@@ -84,7 +84,7 @@
 - 约 25 个界面文案键只在中英文字典中定义，如 `linkedSource`、`unlinkedSource`、`tableSize`、`morphologyNone`、`glbSmallCaps`、`planned`、`corpusRequiredUnitContent`、`orthographyStressModule`。这是按字面搜索的结果，删前逐个排除动态拼接。
 - 无调用方的薄包装可以删除：`search-normalization-model` 的 `DEFAULT_CONFIGURED_SEARCH_NORMALIZATION`、`createSearchNormalizer`，以及 `tag-model` 的 `entryListDisplayTag`。
 - 只有测试调用的导出逐个看用途，不批量删除：
-  - `sampleSurface` 用于验证生成贴图与解析采样一致，`qualityIssueIdentity` 对应质量计划中的问题身份契约，两者都保留；
+  - `sampleSurface` 用于验证生成贴图与解析采样一致，`qualityIssueIdentity` 对应 API 契约中的质量问题身份，两者都保留；
   - `fieldFuzzyEnabled`、`normalizeConfiguredSearchText`、`resolveDisplayIdentity`、`findDerivedEntries` 待确认；
   - 删除函数时不能顺带丢掉它们覆盖的行为验证。
 
