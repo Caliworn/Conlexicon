@@ -415,7 +415,7 @@ POST /api/dictionaries/:id/analysis/query
 
 ### 7.6 质量检查 query
 
-已实装（F5，2026-10-18）：质量检查是独立的 `/quality/query` 与 `/quality/location`，不是数据分析的附属 slice。repository 只通过 `qualityInputRecords()` 一次同步读取词条、有序标签、义项和有序来源这几项最小事实，不生成质量 code；规则集、issue 与 summary 语义、会话缓存和性能边界见 [API Contract](API_CONTRACT.md#quality-result-queryf5-1-已实装)。响应不返回匹配词条 ID 数组；词条列表的质量筛选请求 entry 视图窗口。会话缓存与数据分析缓存是两个独立实例。
+已实装（F5，2026-10-18）：质量检查是独立的 `/quality/query` 与 `/quality/location`，不是数据分析的附属 slice。repository 只通过 `qualityInputRecords()` 一次同步读取词条、有序标签、义项和有序来源这几项最小事实，不生成质量 code；规则集、issue 与 summary 语义、会话缓存和性能边界见 [API Contract](API_CONTRACT.md#quality-result-query)。响应不返回匹配词条 ID 数组；词条列表的质量筛选请求 entry 视图窗口。会话缓存与数据分析缓存是两个独立实例。
 
 ### 7.7 保存返回值
 

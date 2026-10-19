@@ -173,7 +173,7 @@ Feature result source 应由对应 service 产生可重建的查询身份，并�
 
 ### F5：质量 API 与剩余迁移
 
-- F5 已全部完成（2026-10-18），现行契约见 [API Contract](API_CONTRACT.md#quality-result-queryf5-1-已实装)：12 类稳定 issue code、严重度/模块、详情参数、issue/entry/global 计数，以及独立 `/quality/query` 和 `/quality/location` 的 source/view/window 形状。
+- F5 已全部完成（2026-10-18），现行契约见 [API Contract](API_CONTRACT.md#quality-result-query)：12 类稳定 issue code、严重度/模块、详情参数、issue/entry/global 计数，以及独立 `/quality/query` 和 `/quality/location` 的 source/view/window 形状。
 - F5-1 复评后不按规则选择执行原语：全部规则由一次最小事实读取加纯规则模块执行，质量 code、政策和结果汇总由质量模型与 `QualityResultService` 拥有。
 - `/quality/query` 只复用 F4b 的内部会话/cache/cursor 原语，不与分析 API 混成一种 endpoint。
 - 暂缓的 Gloss 在例句/语料链接边界明确后接入对应 feature service；质量结果只进入独立 QualityService，不让 analysis planner、repository 和质量算法互相反向调用。
