@@ -25,6 +25,7 @@
 
 ### 改进
 
+- 控件对照页的主题切换由下拉菜单改为产品的分段控件（浅色／暗色两个单选按钮，方向键与 Home／End 切换），两个状态并排可见。控件保留原下拉框的 `value` 属性与用户选择时派发 `change` 的接口，Lab 外观探针与内嵌移动视口的同步无需改动。临时数据实例（4174）中验证：真实鼠标点击切换明暗、方向键切回、内嵌移动视口同步，Lab 切换明暗后探针读取的外观随之改变。背景下拉框保留，以便以后加入更多照片。
 - 数据分析的 8 个加载函数合并（审计 C06）：总览、标签、正写法、词根家族、编辑日期、形态、IPA 分布和 IPA 自动检查原先各有一份几乎相同的加载函数、状态变量、“取状态”函数和重试处理。现在由 `ANALYSIS_QUERIES` 表描述每个查询的端点、请求体和缓存键，`analysisQueryView(page, subpage)` 决定每个页面用哪个查询和渲染函数，派发与“加载完成时是否仍在显示”都读这一张映射；`loadAnalysisQuery` 统一加载，每个查询仍有独立的状态与过期响应检查。八个重试按钮改为 `data-analysis-retry="<查询名>"`，由一个处理器分发。IPA 自动检查的缓存键改用 `dictionarySettings()`，与其他读取一致。临时数据实例（4174）中走查数据分析全部 11 个子页，各自使用正确的查询且显示正常；拦截请求让总览、词根家族、IPA 自动检查和形态失败后，各页显示错误与对应名称的重试按钮，重试后恢复正常。
 - 清理死代码（审计 C07）：删除 28 个只在中英文字典里定义、从未使用的界面文案键（已排除动态拼接和 `data-i18n` 引用）；删除没有调用方的 `DEFAULT_CONFIGURED_SEARCH_NORMALIZATION`、`createSearchNormalizer`、`entryListDisplayTag`；只有测试调用的 `normalizeConfiguredSearchText`、`resolveDisplayIdentity`、`fieldFuzzyEnabled` 删除，前两者覆盖的行为改由生产路径验证（`createConfiguredSearchNormalizer().normalize`、facets 使用的 `buildDisplayIdentityIndex` 加 `displayIdentity`）。另发现 `lib/entry-relations-model.js` 由 `index.html` 加载却从未被 `app.js` 使用，服务端也不引用，只有 repository contract 拿它的 `rootModeGroups` 作为 `/root-groups` 的期望值：改为测试专用的 `scripts/root-groups-reference.js`，只保留 `rootModeGroups`，页面和静态公开清单不再包含它；随之删除只为它存在的 `findDerivedEntries`、`resolveSourceEntry` 及其测试。
 - 清理审计 C09 与 C10 中的读取兜底，按“边界校验一次、边界内信任契约”统一：

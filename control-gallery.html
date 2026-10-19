@@ -41,7 +41,7 @@
       font-size: 16px;
     }
 
-    .cg-toolbar label {
+    .cg-toolbar :is(label, .cg-toolbar-group) {
       display: inline-flex;
       align-items: center;
       gap: 6px;
@@ -336,12 +336,13 @@
         <option value="liquid-glass">液态玻璃</option>
       </select>
     </label>
-    <label>主题
-      <select id="cgTheme">
-        <option value="light">浅色</option>
-        <option value="dark">暗色</option>
-      </select>
-    </label>
+    <div class="cg-toolbar-group">
+      <span id="cgThemeLabel">主题</span>
+      <div class="segmented-control" id="cgTheme" role="radiogroup" aria-labelledby="cgThemeLabel">
+        <button type="button" data-control-tone="neutral" data-control-selection role="radio" aria-checked="true" tabindex="0" data-theme-value="light">浅色</button>
+        <button type="button" data-control-tone="neutral" data-control-selection role="radio" aria-checked="false" tabindex="-1" data-theme-value="dark">暗色</button>
+      </div>
+    </div>
     <label>背景
       <select id="cgBackdrop">
         <option value="canvas">皮肤画布</option>
@@ -1223,6 +1224,44 @@
         }
         if (live.classList.contains("entry-card")) live.classList.toggle("active");
       });
+      // The theme is a two-way switch, so it is a segmented radio group. It keeps
+      // the interface of the select it replaced (a value property and a change
+      // event on user choice), which the Lab probe and the mobile view drive.
+      (function setUpThemeSwitch(group) {
+        const options = [...group.querySelectorAll("[data-theme-value]")];
+        const checked = () => options.find((option) => option.getAttribute("aria-checked") === "true");
+        const choose = (option) => {
+          options.forEach((item) => {
+            item.setAttribute("aria-checked", String(item === option));
+            item.tabIndex = item === option ? 0 : -1;
+          });
+        };
+        Object.defineProperty(group, "value", {
+          get: () => checked().dataset.themeValue,
+          set: (value) => choose(options.find((option) => option.dataset.themeValue === value)),
+        });
+        const pick = (option) => {
+          if (option === checked()) return;
+          choose(option);
+          group.dispatchEvent(new Event("change"));
+        };
+        group.addEventListener("click", (event) => {
+          const option = event.target.closest("[data-theme-value]");
+          if (option) pick(option);
+        });
+        group.addEventListener("keydown", (event) => {
+          const step = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[event.key];
+          if (step === undefined && event.key !== "Home" && event.key !== "End") return;
+          event.preventDefault();
+          const index = options.indexOf(checked());
+          const next = event.key === "Home" ? 0
+            : event.key === "End" ? options.length - 1
+              : (index + step + options.length) % options.length;
+          pick(options[next]);
+          options[next].focus();
+        });
+      })(elements.theme);
+
       // Switching never depends on rule cloning, so a cloning failure cannot freeze the page.
       [elements.skin, elements.theme, elements.backdrop].forEach((select) => select.addEventListener("change", render));
       elements.run.addEventListener("click", runAllChecks);
