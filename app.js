@@ -2161,6 +2161,10 @@ const API_ERROR_TOAST_KEYS = {
 };
 
 function apiErrorToastMessage(error, fallbackKey = "saveFailed") {
+  // The server reports the same rule error codes as the settings form check.
+  if (error?.code === "invalid_search_normalization_rule") {
+    return `${t(fallbackKey)}：${searchNormalizationValidationMessage(error.details?.errors?.[0])}`;
+  }
   const key = API_ERROR_TOAST_KEYS[error?.code] || (error instanceof TypeError ? "apiErrorNetwork" : "");
   const detail = key ? t(key) : "";
   if (!detail) {

@@ -76,7 +76,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/export?dictionaryId=&format=&profile=` | 导出数据 | 当前支持 JSON 完整词典 payload | 默认 `format=json&profile=legacy-json`；`profile=portable-json` 当前只是同结构兼容别名，不代表已有独立 portable 格式。原生 SQLite 与 XLSX 导出尚未实装。 |
-| `POST` | `/api/import?overwrite=&regenerateId=&profile=` | 导入 JSON | 应用状态 | 默认 `profile=legacy-json`；完整快照导入会通过转换服务执行 legacy 兼容解析、规范化和实体 ID 检查。`regenerateId=true` 生成新的词典 UUID，按非覆盖方式新建，忽略 `overwrite`。 |
+| `POST` | `/api/import?overwrite=&regenerateId=&profile=` | 导入 JSON | 应用状态 | 默认 `profile=legacy-json`；完整快照导入会通过转换服务执行 legacy 兼容解析、搜索自定义规则检查、规范化和实体 ID 检查。`regenerateId=true` 生成新的词典 UUID，按非覆盖方式新建，忽略 `overwrite`。 |
 | `POST` | `/api/dictionaries` | 新建词典 | 完整词典 JSON | 后端生成词典 UUID，并使用非覆盖式创建；ID 已存在时返回 `dictionary_id_exists`。创建成功后设为当前词典。 |
 | `GET` | `/api/dictionaries/:id` | 读取当前词典完整快照 | 完整词典 JSON | 前端启动或切换当前词典时按需加载详情与尚未拆出的模块；普通列表、搜索、facets 和关系查询优先使用专用读取 API。 |
 | `POST` | `/api/dictionaries/:id/activate` | 切换当前词典 | 应用状态 | 只改 `index.json` 中的当前词典。 |
@@ -87,7 +87,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | 方法 | 路径 | 用途 | 响应 | 校验范围 |
 | --- | --- | --- | --- | --- |
 | `PUT` | `/api/dictionaries/:id/meta` | 保存词典名称、语言、描述 | 词典 metadata payload | 不做实体 ID 检查；响应包含 `id/name/language/description/createdAt/updatedAt`。 |
-| `PUT` | `/api/dictionaries/:id/settings` | 保存其他设置 | `{ id, updatedAt, settings }` | 不做实体 ID 检查；会保留既有 IPA 设置。`settings.search` 含字段级 `enabled/fuzzy`、`etymologyAutocomplete.fuzzy`，以及 `normalization: { unicodeNormalization: "none" | "nfc", caseFolding: boolean, customRules: { canonical, variants[] }[] }`。规范化默认严格关闭；自定义规则按最长变体优先且单次应用。前端据此生成读取 API 参数，并同步用于词根模式、搜索摘要/高亮、字段命中计数和词源自动补全。`settings.tagListSeparatorStyle` 支持 `commaSpace`、`fullwidthComma`、`ideographicComma`，只控制标签列表输入框重新显示时的分隔符。`settings.toolNavOrder` 与 `settings.entrySectionOrder` 由服务端保留合法项顺序、去掉重复与未知项并补齐缺项；未知 settings 字段原样保留。 |
+| `PUT` | `/api/dictionaries/:id/settings` | 保存其他设置 | `{ id, updatedAt, settings }` | 不做实体 ID 检查；会保留既有 IPA 设置。`settings.search` 含字段级 `enabled/fuzzy`、`etymologyAutocomplete.fuzzy`，以及 `normalization: { unicodeNormalization: "none" | "nfc", caseFolding: boolean, customRules: { canonical, variants[] }[] }`。规范化默认严格关闭；自定义规则按最长变体优先且单次应用。前端据此生成读取 API 参数，并同步用于词根模式、搜索摘要/高亮、字段命中计数和词源自动补全。`settings.tagListSeparatorStyle` 支持 `commaSpace`、`fullwidthComma`、`ideographicComma`，只控制标签列表输入框重新显示时的分隔符。`settings.search.normalization.customRules` 必须是数组，每条规则须有非空的 `canonical` 和非空的 `variants`，同一变体不能对应不同的标准形式；任何一条不合规都整次拒绝，返回 400 `invalid_search_normalization_rule`（规则无效时运行期会忽略全部自定义规则，所以不接受部分保存）。`settings.toolNavOrder` 与 `settings.entrySectionOrder` 由服务端保留合法项顺序、去掉重复与未知项并补齐缺项；未知 settings 字段原样保留。 |
 | `PUT` | `/api/dictionaries/:id/docs` | 保存语言文档 | `{ id, updatedAt, docs }` | 不做实体 ID 检查。 |
 | `PUT` | `/api/dictionaries/:id/corpus` | 保存语料库模块 | `{ id, updatedAt, corpus }` | 检查语料内部实体 ID 重复，不查词条与形态。 |
 | `PUT` | `/api/dictionaries/:id/morphology` | 保存自动形态学模块 | `{ id, updatedAt, morphology }` | 请求仍表示完整替换形态模块；后端检查提交内组与表 ID 不重复（不查词条与语料）、规则语法和函数配置，并按稳定组/表 ID 增量写入模板。纯名称、说明、表格标题或行列标签变化不重建生成投影；规则、函数、表结构或自动分配变化只重建实际受影响词条的形态搜索 projection。完全相同的规范化 payload 作为 no-op 返回既有 `updatedAt`。删除组、删除/移动表格或缩小表格会使既有词条形态组或覆写悬空时返回 `morphology_references_in_use`。 |
@@ -105,7 +105,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
 | `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存已有词条 | `{ entry, summary }` | 只更新已有词条，词条不存在时返回 404 `entry_not_found`，不按客户端 ID 新建。不做实体 ID 检查：义项 ID 重复（无论同一词条内还是撞到其他词条）由主键约束失败并整体回滚。`summary` 是写入后的轻量词典计数。 |
 | `DELETE` | `/api/dictionaries/:id/entries/:entryId` | 删除单个词条 | `{ updatedAt, summary }` | 不因无关历史重复 ID 阻断删除；`summary` 是删除后的轻量词典计数。 |
-| `PATCH` | `/api/dictionaries/:id/entries` | 批量更新词条字段 | `{ id, updatedAt, entries, settings? }` | 当前仅允许 patch `tags` 和 `pronunciation`；`entries` 只包含本次更新的词条；可附带 `settings` 用于标签排序设置保存。 |
+| `PATCH` | `/api/dictionaries/:id/entries` | 批量更新词条字段 | `{ id, updatedAt, entries, settings? }` | 当前仅允许 patch `tags` 和 `pronunciation`；`entries` 只包含本次更新的词条；可附带 `settings` 用于标签排序设置保存，附带时与 `PUT /settings` 一样检查搜索自定义规则。 |
 
 ### 读取侧查询
 
@@ -219,6 +219,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `invalid_root_context` | `preferredRootId` 不是目标词条的可用词根上下文。 |
 | `root_group_not_found` | 请求的词根组不存在于当前查询结果。 |
 | `invalid_settings_payload` | 设置请求体格式无效。 |
+| `invalid_search_normalization_rule` | 设置保存、带 settings 的批量 patch 或导入中的搜索自定义规则无效，整次拒绝。`details.errors` 为 `{ index, variantIndex?, variant?, code }[]`，`code` 为 `invalid_rules`（规则列表不是数组）、`invalid_rule`、`invalid_canonical`、`empty_canonical`、`invalid_variants`、`empty_variants`、`invalid_variant`、`empty_variant` 或 `conflicting_variant`，与设置表单的本地检查相同，前端复用同一组提示。 |
 | `invalid_docs_payload` | 语言文档请求体格式无效。 |
 | `invalid_corpus_payload` | 语料请求体格式无效。 |
 | `invalid_autosave_payload` | autosave 请求未携带有效 docs 或 corpus 对象。 |

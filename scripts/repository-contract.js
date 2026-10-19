@@ -1468,6 +1468,26 @@ function checkModelNormalization() {
   assert.equal(legacyConvertedImport.dictionary.settings.toolNavOrder.length, DEFAULT_TOOL_NAV_ORDER.length);
   assert.ok(legacyConvertedImport.report.repairs.length);
 
+  // One invalid rule would silently disable every custom search rule, so the
+  // import boundary rejects the whole set with the form's error codes.
+  assert.throws(
+    () => conversionService.importDictionaryFromJsonPayload({
+      name: "Bad search rules",
+      settings: { search: { normalization: { customRules: [{ canonical: "a", variants: ["á"] }, { canonical: "", variants: ["x"] }] } } },
+    }),
+    (error) => error.code === "invalid_search_normalization_rule"
+      && error.status === 400
+      && error.details.errors[0].index === 1
+      && error.details.errors[0].code === "empty_canonical",
+  );
+  assert.throws(
+    () => conversionService.importDictionaryFromJsonPayload({
+      name: "Non-array search rules",
+      settings: { search: { normalization: { customRules: "a=á" } } },
+    }),
+    (error) => error.code === "invalid_search_normalization_rule" && error.details.errors[0].code === "invalid_rules",
+  );
+
   const convertedImport = conversionService.importDictionaryFromJsonPayload({
     id: "dict-22222222-2222-4222-8222-222222222222",
     name: "Converted",
@@ -2279,6 +2299,25 @@ async function runRepositoryContractTests(options = {}) {
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.settings.allowEmptyTags, false);
     assert.equal(apiResult.body.settings.docsAutoSave, true);
+    const settingsBeforeBadRules = await repository.getDictionaryMeta(first.id);
+    const badRuleError = await assertRejectStatus(
+      callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/settings`, {
+        search: { normalization: { customRules: [{ canonical: "a", variants: ["á"] }, { canonical: "b", variants: ["á"] }] } },
+      }),
+      400,
+      "settings with conflicting search rules",
+    );
+    assert.equal(badRuleError.code, "invalid_search_normalization_rule");
+    assert.deepEqual(
+      badRuleError.details.errors.map(({ index, code }) => ({ index, code })),
+      [{ index: 1, code: "conflicting_variant" }],
+    );
+    assert.equal((await repository.getDictionaryMeta(first.id)).updatedAt, settingsBeforeBadRules.updatedAt, "rejected settings are not written");
+    apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/settings`, {
+      search: { normalization: { customRules: [{ canonical: "a", variants: ["á"] }] } },
+    });
+    assert.equal(apiResult.statusCode, 200);
+    assert.deepEqual(apiResult.body.settings.search.normalization.customRules, [{ canonical: "a", variants: ["á"] }]);
 
     apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/docs`, {
       markdown: "# Notes",
@@ -2339,6 +2378,16 @@ async function runRepositoryContractTests(options = {}) {
     assert.equal(apiResult.body.entries[0].id, repositoryEntryId);
     assert.deepEqual(apiResult.body.entries[0].tags, ["n", "root"]);
     assert.equal(apiResult.body.settings.allowEmptyDefinitions, false);
+    const patchRuleError = await assertRejectStatus(
+      callApi(repository, "PATCH", `/api/dictionaries/${encodeURIComponent(first.id)}/entries`, {
+        settings: { search: { normalization: { customRules: [{ canonical: "a", variants: [] }] } } },
+        updates: [{ id: repositoryEntryId, patch: { tags: ["n"] } }],
+      }),
+      400,
+      "patch with invalid search rules",
+    );
+    assert.equal(patchRuleError.code, "invalid_search_normalization_rule");
+    assert.equal(patchRuleError.details.errors[0].code, "empty_variants");
     await assertRejectStatus(
       callApi(repository, "PATCH", `/api/dictionaries/${encodeURIComponent(first.id)}/entries`, {
         updates: [{ id: repositoryEntryId, patch: { definitions: [] } }],
