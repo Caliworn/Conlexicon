@@ -253,65 +253,9 @@ let qualityIssueWindowState = {
   error: null,
   requestId: 0,
 };
-let analysisOverviewQueryState = {
-  key: "",
-  status: "idle",
-  response: null,
-  error: null,
-  requestId: 0,
-};
-let analysisTagsQueryState = {
-  key: "",
-  status: "idle",
-  response: null,
-  error: null,
-  requestId: 0,
-};
-let analysisOrthographyQueryState = {
-  key: "",
-  status: "idle",
-  response: null,
-  error: null,
-  requestId: 0,
-};
 let analysisTagSetRenderState = {
   key: "",
   visibleCount: 100,
-};
-let analysisIpaCompareQueryState = {
-  key: "",
-  status: "idle",
-  response: null,
-  error: null,
-  requestId: 0,
-};
-let analysisIpaDistributionQueryState = {
-  key: "",
-  status: "idle",
-  response: null,
-  error: null,
-  requestId: 0,
-};
-let analysisMorphologyQueryState = {
-  key: "",
-  status: "idle",
-  response: null,
-  error: null,
-  requestId: 0,
-};
-let analysisActivityQueryState = {
-  key: "",
-  status: "idle",
-  response: null,
-  error: null,
-  requestId: 0,
-};
-let analysisRootFamiliesQueryState = {
-  key: "",
-  status: "idle",
-  response: null,
-  error: null,
-  requestId: 0,
 };
 let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
@@ -387,13 +331,11 @@ const i18n = {
     docsModeLabel: "文档模式",
     corpusModeLabel: "语料类型",
     current: "当前",
-    planned: "待实装",
     ipaConfig: "自动 IPA 标注",
     analysis: "数据分析",
     qualityCheck: "质量检查",
     languageDocs: "语言文档",
     corpus: "语料库",
-    morphologyConfig: "自动形态学",
     morphologyFunctions: "形态函数",
     morphologyDisplay: "形态学",
     morphologyGroup: "形态组",
@@ -413,15 +355,12 @@ const i18n = {
     addMorphologyTableGroup: "新建表格组",
     addMorphologyTable: "添加表格",
     tableName: "表格标题",
-    tableSize: "表格尺寸",
     rowCount: "行数",
     columnCount: "列数",
     rowLabels: "行标签",
     columnLabels: "列标签",
     autoMatchTags: "自动匹配词条标签",
     autoMatchTagsHelp: "词条包含其中任一标签时，将匹配此表格组；若多个表格组同时匹配，只使用排序最前的组。多个标签可用半角逗号、全角逗号或顿号分隔。",
-    referenceMode: "引用",
-    replacementMode: "替换",
     applySize: "应用尺寸",
     removeTable: "删除表格",
     removeMorphologyTableGroup: "删除表格组",
@@ -429,14 +368,11 @@ const i18n = {
     dragMorphologyTableGroup: "拖动以调整表格组排序",
     dragMorphologyTable: "拖动以调整表格排序",
     morphologyAuto: "自动匹配",
-    morphologyNone: "不使用表格",
-    morphologyMode: "形态模式",
     morphologyManual: "手动配置",
     switchToManualMorphology: "改为手动配置",
     switchToManualMorphologyConfirm: "改为手动配置会保留当前自动命中的形态组，并一并转移当前未显示的形态覆盖。之后若恢复自动匹配，所有这些手动形态组、标题、备注和单元格覆盖都会被清空。是否继续？",
     restoreAutoMorphology: "恢复自动匹配",
     restoreAutoMorphologyConfirm: "恢复自动匹配将放弃当前手动形态组及其标题、备注和单元格覆盖。是否继续？",
-    morphologyManualGroups: "手动形态组",
     addEntryMorphologyGroup: "添加形态组",
     removeEntryMorphologyGroup: "移除形态组",
     entryMorphologyGroupTitle: "组标题覆盖",
@@ -444,7 +380,6 @@ const i18n = {
     morphologyGroupNote: "形态组备注",
     useTemplateGroupTitle: "留空则使用表格组标题",
     morphologyOverrideHelp: "留空则使用表格规则；填写内容会覆盖对应栏目。",
-    morphologyRuleSyntaxHelp: "使用 {} 引用词形；{a = e} 引用并替换词形；/leftV(a,o,u) = lar; rightV(e,i,ö,ü) = ler; else = / 按最近左侧或右侧音位选择输出；else 可留空。",
     morphologySyntaxTitle: "形态语法",
     morphologySyntaxInfo: "查看形态语法",
     morphologySyntaxIntro: "每个单元格最终输出一个字符串。普通字符会原样输出，{} 会引用当前词条的词形。系统会先展开所有 {} / {X = Y}，然后再执行 /.../ 条件判断。",
@@ -465,7 +400,6 @@ const i18n = {
     layeredGlassSkin: "层叠玻璃",
     liquidGlassSkin: "液态玻璃",
     selectSkinCurrent: "选择皮肤，当前：{skin}",
-    newEntry: "新建词条",
     quickNewEntryTooltip: "快速录入",
     quickEntryTitle: "快速录入",
     quickEntryKeyNext: "下一项",
@@ -495,7 +429,6 @@ const i18n = {
     emptyDictionaryBody: "词条编辑器会在存在当前词典后显示。进入词典管理即可新建、导入或切换词典。",
     openDictionaryManager: "打开词典管理",
     searchPlaceholder: "搜索词形、释义、标签",
-    allParts: "全部词性",
     noPart: "无词性",
     rootMode: "词根模式",
     expandAll: "全部展开",
@@ -557,9 +490,6 @@ const i18n = {
     activeFilterSyllableCount: "音节数",
     activeFilterCreatedDate: "新增日期",
     activeFilterUpdatedDate: "编辑日期",
-    activeFilterNoTable: "无表格",
-    activeFilterUntitledTable: "未命名表格",
-    clearActiveFilter: "清除筛选",
     refreshActiveFilter: "刷新筛选",
     retryActiveFilter: "重试筛选",
     cycleActiveFilter: "切换筛选条件",
@@ -599,9 +529,7 @@ const i18n = {
     autoIpa: "自动 IPA",
     tagsLabel: "标签",
     tagsHelp: "填写词条标签；词性也作为标签在这里输入。多个标签可用半角逗号、全角逗号或顿号分隔。已配置为词性的标签会按词性显示。",
-    definitionList: "多条释义",
     addDefinition: "添加释义",
-    etymologyInfo: "来源与说明",
     sourceEntry: "来源词条",
     sourceReferenceHint: "选择建议添加引用；纯文本保留在输入框，以逗号分隔。拖动卡片排序，或聚焦卡片后按 Alt+方向键。",
     sourceReferenceHintShort: "选择候选以链接词条，纯文本用逗号分隔。",
@@ -609,8 +537,6 @@ const i18n = {
     sourceCandidatesMore: "共 {total} 项，继续输入以缩小范围",
     sourceCandidatesFailed: "候选加载失败",
     sourceCandidatesRetry: "重试",
-    linkedSource: "词条引用",
-    unlinkedSource: "纯文本 · 点击编辑",
     removeSource: "移除此来源",
     duplicateSourceTarget: "已引用该词条，不能重复添加。",
     selfSourceReference: "词条不能将自己作为来源。请移除此引用后保存。",
@@ -619,8 +545,6 @@ const i18n = {
     etymologyDescription: "说明",
     dictionarySettingsEyebrow: "当前词典",
     settingsNeedDictionary: "其他设置会保存到当前词典文件中。",
-    glossSettings: "Gloss 渲染",
-    glbSmallCaps: "将 \\glb 中的小写字母渲染为 small caps",
     corpusRendering: "渲染",
     corpusRenderPattern: "渲染对象",
     corpusRenderPatternHelp: "留空时将对应内容作为纯文本原样显示并保持换行，不识别 Gloss 格式。填写时仅接受 \\gla、\\glb、\\glc、\\ft；配置中的每一行对应一条输出行，多条非 \\ft 输出行可按词位对齐。用括号包裹对象（如 (\\gla)）可在内容缺失时跳过该对象。",
@@ -761,7 +685,6 @@ const i18n = {
     ipaKeyboardSettings: "IPA 虚拟键盘",
     ipaKeyboardSymbols: "键盘符号",
     ipaKeyboardHelp: "以空格、逗号或换行分隔。新词典默认包含 ˈ 和 ˌ。",
-    interfaceLayout: "界面布局",
     toolNavigationOrder: "工具导航排序",
     toolNavigationOrderHelp: "拖动卡片来调整左侧导航栏顺序。该顺序保存到当前词典文件中。",
     cancel: "取消",
@@ -780,7 +703,6 @@ const i18n = {
     importJson: "导入 JSON",
     saveConfig: "保存配置",
     unnamedDictionary: "未命名词典",
-    dictionary: "词典",
     entries: "个词条",
     roots: "个词根",
     noEntries: "还没有词条",
@@ -800,7 +722,6 @@ const i18n = {
     definitionNote: "释义备注",
     removeDefinition: "删除释义",
     none: "无",
-    wholeEntryNote: "词条整体备注",
     requiredEntry: "请填写词形",
     missingDefinition: "尚未填写释义",
     savedEntry: "词条已保存",
@@ -866,11 +787,9 @@ const i18n = {
     derivedEntries: "衍生",
     ipaNeedDictionary: "自动 IPA 标注规则会保存到当前词典文件中。",
     orthographyModule: "正写法识别",
-    orthographyStressModule: "正写法重音映射",
     mappingRules: "映射规则",
     addMapping: "添加映射",
     mappingRuleHelp: "规则从上到下匹配；输入与前后条件始终只读取原始词形，生成结果不会被后续规则再次读取。较前规则消耗的字符不会再参与后续匹配，可拖动规则调整优先级。输出中写入 ˈ 或以 ' 开头，可将该音节标为重读并覆盖默认重音。",
-    stressMappingHelp: "输出中写入 ˈ 或以 ' 开头，可将该音节标为重读并覆盖默认重音。",
     syllabification: "音节划分",
     syllableRules: "音节规则",
     ipaSyllableHelpTitle: "音节划分逻辑",
@@ -977,14 +896,11 @@ const i18n = {
     duplicateEntityIdsMessage: "以下 ID 被多个词典对象使用，保存或导入已停止：\n{details}",
     entryEntity: "词条",
     definitionEntity: "释义",
-    morphologyTableEntity: "形态表",
     morphologyTemplateGroupEntity: "形态模板组",
     morphologyTemplateTableEntity: "形态模板表",
     corpusBlockFallback: "未命名块",
     corpusLayerFallback: "未命名层",
     corpusUnitFallback: "空单元",
-    corpusRequiredBlockTitle: "请填写块标题",
-    corpusRequiredUnitContent: "请填写单元内容",
     corpusBlockStats: "{layers} 层 · {units} 单元",
     corpusUnitParentLabel: "父级：{parent}",
     lexicalNetwork: "词汇网络",
@@ -1023,13 +939,11 @@ const i18n = {
     docsModeLabel: "Document view mode",
     corpusModeLabel: "Corpus item type",
     current: "Current",
-    planned: "Planned",
     ipaConfig: "Auto IPA",
     analysis: "Analytics",
     qualityCheck: "Quality Checks",
     languageDocs: "Language Docs",
     corpus: "Corpus",
-    morphologyConfig: "Auto Morphology",
     morphologyFunctions: "Morphology Functions",
     morphologyDisplay: "Morphology",
     morphologyGroup: "Morphology Group",
@@ -1049,15 +963,12 @@ const i18n = {
     addMorphologyTableGroup: "New Table Group",
     addMorphologyTable: "Add Table",
     tableName: "Table Title",
-    tableSize: "Table Size",
     rowCount: "Rows",
     columnCount: "Columns",
     rowLabels: "Row Labels",
     columnLabels: "Column Labels",
     autoMatchTags: "Automatic Entry Tag Matching",
     autoMatchTagsHelp: "An entry matches this table group when it contains any listed tag. If multiple groups match, only the first group in the current order is used. Separate multiple tags with halfwidth commas, fullwidth commas, or ideographic commas.",
-    referenceMode: "Reference",
-    replacementMode: "Replacement",
     applySize: "Apply Size",
     removeTable: "Delete Table",
     removeMorphologyTableGroup: "Delete Table Group",
@@ -1065,14 +976,11 @@ const i18n = {
     dragMorphologyTableGroup: "Drag to reorder table groups",
     dragMorphologyTable: "Drag to reorder tables",
     morphologyAuto: "Auto Match",
-    morphologyNone: "No Table",
-    morphologyMode: "Morphology Mode",
     morphologyManual: "Manual Configuration",
     switchToManualMorphology: "Switch to Manual",
     switchToManualMorphologyConfirm: "Switching to manual configuration preserves the currently matched morphology groups and any hidden morphology overlays. Restoring auto matching later will clear all of these manual groups, titles, notes, and cell overrides. Continue?",
     restoreAutoMorphology: "Restore Auto Match",
     restoreAutoMorphologyConfirm: "Restoring auto matching will discard the current manual morphology groups, titles, notes, and cell overrides. Continue?",
-    morphologyManualGroups: "Manual Morphology Groups",
     addEntryMorphologyGroup: "Add Morphology Group",
     removeEntryMorphologyGroup: "Remove Morphology Group",
     entryMorphologyGroupTitle: "Group Title Override",
@@ -1080,7 +988,6 @@ const i18n = {
     morphologyGroupNote: "Morphology Group Note",
     useTemplateGroupTitle: "Leave blank to use the template group title",
     morphologyOverrideHelp: "Leave blank to use table rules; filled cells override that slot.",
-    morphologyRuleSyntaxHelp: "Use {} to reference the lemma; {a = e} references and replaces inside the lemma; /leftV(a,o,u) = lar; rightV(e,i,ö,ü) = ler; else = / chooses output by the nearest left or right phoneme. Empty else inserts nothing.",
     morphologySyntaxTitle: "Morphology Syntax",
     morphologySyntaxInfo: "Show morphology syntax",
     morphologySyntaxIntro: "Each cell outputs one string. Plain text is emitted as written, and {} references the current entry lemma. All {} / {X = Y} references are expanded first, then /.../ conditions are evaluated.",
@@ -1101,7 +1008,6 @@ const i18n = {
     layeredGlassSkin: "Layered Glass",
     liquidGlassSkin: "Liquid Glass",
     selectSkinCurrent: "Choose skin, current: {skin}",
-    newEntry: "New Entry",
     quickNewEntryTooltip: "Quick Entry",
     quickEntryTitle: "Quick Entry",
     quickEntryKeyNext: "Next",
@@ -1131,7 +1037,6 @@ const i18n = {
     emptyDictionaryBody: "The entry editor appears after a current dictionary exists. Open dictionary management to create, import, or switch dictionaries.",
     openDictionaryManager: "Open Dictionary Manager",
     searchPlaceholder: "Search lemma, definition, tags",
-    allParts: "All Parts",
     noPart: "No Part",
     rootMode: "Root Mode",
     expandAll: "Expand All",
@@ -1193,9 +1098,6 @@ const i18n = {
     activeFilterSyllableCount: "Syllable Count",
     activeFilterCreatedDate: "Created Date",
     activeFilterUpdatedDate: "Updated Date",
-    activeFilterNoTable: "No table",
-    activeFilterUntitledTable: "Untitled table",
-    clearActiveFilter: "Clear Filter",
     refreshActiveFilter: "Refresh Filter",
     retryActiveFilter: "Retry Filter",
     cycleActiveFilter: "Cycle Filter Condition",
@@ -1235,9 +1137,7 @@ const i18n = {
     autoIpa: "Auto IPA",
     tagsLabel: "Tags",
     tagsHelp: "Enter entry tags here; parts of speech are tags too. Separate multiple tags with halfwidth commas, fullwidth commas, or ideographic commas. Configured part-of-speech tags are displayed as parts of speech.",
-    definitionList: "Definition List",
     addDefinition: "Add Definition",
-    etymologyInfo: "Source and Notes",
     sourceEntry: "Source Entry",
     sourceReferenceHint: "Choose a suggestion to link an entry. Keep plain text here, separated by commas. Drag a card, or focus it and press Alt+arrow keys to reorder.",
     sourceReferenceHintShort: "Pick a suggestion to link an entry; separate plain text with commas.",
@@ -1245,8 +1145,6 @@ const i18n = {
     sourceCandidatesMore: "{total} matches. Keep typing to narrow them down.",
     sourceCandidatesFailed: "Couldn't load suggestions",
     sourceCandidatesRetry: "Retry",
-    linkedSource: "Linked entry",
-    unlinkedSource: "Plain text · click to edit",
     removeSource: "Remove this source",
     duplicateSourceTarget: "This entry is already referenced and cannot be added again.",
     selfSourceReference: "An entry cannot reference itself as a source. Remove this reference before saving.",
@@ -1255,8 +1153,6 @@ const i18n = {
     etymologyDescription: "Description",
     dictionarySettingsEyebrow: "Current Dictionary",
     settingsNeedDictionary: "Settings are saved in the current dictionary file.",
-    glossSettings: "Gloss Rendering",
-    glbSmallCaps: "Render lowercase letters in \\glb as small caps",
     corpusRendering: "Rendering",
     corpusRenderPattern: "Render Objects",
     corpusRenderPatternHelp: "Leave blank to display the corresponding content verbatim as plain text, preserving line breaks without parsing Gloss syntax. Otherwise use only \\gla, \\glb, \\glc, and \\ft; each configured line becomes one output row, and multiple non-\\ft rows can align by token. Wrap an object in parentheses, such as (\\gla), to skip it when its content is missing.",
@@ -1397,7 +1293,6 @@ const i18n = {
     ipaKeyboardSettings: "IPA Virtual Keyboard",
     ipaKeyboardSymbols: "Keyboard Symbols",
     ipaKeyboardHelp: "Separate symbols with spaces, commas, or line breaks. New dictionaries include ˈ and ˌ by default.",
-    interfaceLayout: "Interface Layout",
     toolNavigationOrder: "Tool Navigation Order",
     toolNavigationOrderHelp: "Drag cards to reorder the left navigation. The order is saved in the current dictionary file.",
     cancel: "Cancel",
@@ -1416,7 +1311,6 @@ const i18n = {
     importJson: "Import JSON",
     saveConfig: "Save Config",
     unnamedDictionary: "Untitled Dictionary",
-    dictionary: "Dictionary",
     entries: "entries",
     roots: "roots",
     noEntries: "No entries yet",
@@ -1438,7 +1332,6 @@ const i18n = {
     addDefinitionNote: "Add Definition Note",
     removeDefinition: "Remove Definition",
     none: "None",
-    wholeEntryNote: "Whole Entry Note",
     requiredEntry: "Fill lemma",
     missingDefinition: "No definition yet",
     savedEntry: "Entry saved",
@@ -1505,11 +1398,9 @@ const i18n = {
     derivedEntries: "Derived",
     ipaNeedDictionary: "Auto IPA rules are saved in the current dictionary file.",
     orthographyModule: "Orthography Recognition",
-    orthographyStressModule: "Orthographic Stress",
     mappingRules: "Mapping Rules",
     addMapping: "Add Mapping",
     mappingRuleHelp: "Rules are tried from top to bottom. Inputs and contexts always read the original lemma; generated output is never fed into later rules. Characters consumed by an earlier rule are unavailable to later rules. Drag rules to change priority. Put ˈ in the output, or start it with ', to mark that syllable as stressed and override default stress.",
-    stressMappingHelp: "Put ˈ in the output, or start it with ', to mark that syllable as stressed and override default stress.",
     syllabification: "Syllabification",
     syllableRules: "Syllabification Rules",
     ipaSyllableHelpTitle: "Syllabification Logic",
@@ -1616,14 +1507,11 @@ const i18n = {
     duplicateEntityIdsMessage: "These IDs are used by multiple dictionary objects. Saving or importing has been stopped:\n{details}",
     entryEntity: "Entry",
     definitionEntity: "Definition",
-    morphologyTableEntity: "Morphology table",
     morphologyTemplateGroupEntity: "Morphology template group",
     morphologyTemplateTableEntity: "Morphology template table",
     corpusBlockFallback: "Untitled Block",
     corpusLayerFallback: "Untitled Layer",
     corpusUnitFallback: "Empty Unit",
-    corpusRequiredBlockTitle: "Enter a block title",
-    corpusRequiredUnitContent: "Enter unit content",
     corpusBlockStats: "{layers} layers · {units} units",
     corpusUnitParentLabel: "Parent: {parent}",
     lexicalNetwork: "Lexical Network",
@@ -9477,654 +9365,159 @@ function renderAnalysisContent(dictionary) {
   analysisFilterCounter = 0;
   const page = activeAnalysisPage();
   const subpage = activeAnalysisSubpage(page);
+  const view = analysisQueryView(page, subpage);
+  const queryState = analysisQueryStateFor(view.query, dictionary);
+  elements.analysisPanel.innerHTML = view.render(queryState, subpage);
+  setupAnalysisMasonryLayouts();
+  if (queryState.status === "idle") {
+    void loadAnalysisQuery(view.query, dictionary);
+  }
+}
+
+// The analysis pages differ only in the request they send, the cache key and
+// the page that shows the result; everything else is shared.
+function analysisDictionaryQueryKey(dictionary) {
+  return stableJson({ dictionaryId: dictionary.id, updatedAt: dictionary.updatedAt });
+}
+
+function analysisFeatureSummaryBody(type) {
+  return { source: { type, version: 1, options: {} }, responseMode: "summary" };
+}
+
+const ANALYSIS_QUERIES = {
+  overview: {
+    endpoint: "query",
+    body: () => ({ widgets: ANALYSIS_OVERVIEW_QUERY_WIDGETS }),
+    key: analysisDictionaryQueryKey,
+  },
+  tags: {
+    endpoint: "query",
+    body: () => ({ widgets: ANALYSIS_TAG_QUERY_WIDGETS }),
+    key: analysisDictionaryQueryKey,
+  },
+  orthography: {
+    endpoint: "query",
+    body: () => ({ widgets: ANALYSIS_ORTHOGRAPHY_QUERY_WIDGETS }),
+    key: analysisDictionaryQueryKey,
+  },
+  rootFamilies: {
+    endpoint: "query",
+    body: () => ({ widgets: [{ id: "families", type: "rootFamilyRanking" }] }),
+    key: analysisDictionaryQueryKey,
+  },
+  activity: {
+    endpoint: "query",
+    body: () => ({ widgets: [{ id: "activity", type: "activityDistribution" }] }),
+    key: analysisDictionaryQueryKey,
+  },
+  morphology: {
+    endpoint: "features/query",
+    body: () => analysisFeatureSummaryBody("morphologyAnalysis"),
+    key: analysisDictionaryQueryKey,
+  },
+  ipaDistribution: {
+    endpoint: "features/query",
+    body: () => analysisFeatureSummaryBody("ipaDistribution"),
+    // Only these two settings change the distribution.
+    key: (dictionary) => {
+      const { syllable } = dictionarySettings(dictionary).ipa;
+      return stableJson({
+        dictionaryId: dictionary.id,
+        updatedAt: dictionary.updatedAt,
+        complexPhonemes: syllable.complexPhonemes,
+        separator: syllable.separator,
+      });
+    },
+  },
+  ipaCompare: {
+    endpoint: "features/query",
+    body: () => analysisFeatureSummaryBody("ipaAutoCompare"),
+    key: (dictionary) => stableJson({
+      dictionaryId: dictionary.id,
+      updatedAt: dictionary.updatedAt,
+      ipaSettings: dictionarySettings(dictionary).ipa,
+    }),
+  },
+};
+
+const analysisQueryStates = new Map(Object.keys(ANALYSIS_QUERIES).map((name) => [name, {
+  key: "",
+  status: "idle",
+  response: null,
+  error: null,
+  requestId: 0,
+}]));
+
+// Which query and renderer a page uses; also decides whether a finished load
+// is still on screen.
+function analysisQueryView(page, subpage) {
   if (page === "overview") {
-    const queryState = analysisOverviewStateFor(dictionary);
-    elements.analysisPanel.innerHTML = renderAnalysisOverviewQueryPage(queryState);
-    setupAnalysisMasonryLayouts();
-    if (queryState.status === "idle") {
-      void loadAnalysisOverview(dictionary);
-    }
-    return;
+    return { query: "overview", render: renderAnalysisOverviewQueryPage };
   }
-  if (page === "entries" && subpage === "tags") {
-    const queryState = analysisTagsStateFor(dictionary);
-    elements.analysisPanel.innerHTML = renderAnalysisTagsQueryPage(queryState);
-    setupAnalysisMasonryLayouts();
-    if (queryState.status === "idle") {
-      void loadAnalysisTags(dictionary);
-    }
-    return;
-  }
-  if (page === "entries" && subpage === "forms") {
-    const queryState = analysisOrthographyStateFor(dictionary);
-    elements.analysisPanel.innerHTML = renderAnalysisOrthographyQueryPage(queryState);
-    setupAnalysisMasonryLayouts();
-    if (queryState.status === "idle") {
-      void loadAnalysisOrthography(dictionary);
-    }
-    return;
-  }
-  if (page === "entries" && subpage === "roots") {
-    const queryState = analysisRootFamiliesStateFor(dictionary);
-    elements.analysisPanel.innerHTML = renderAnalysisRootFamiliesQueryPage(queryState);
-    setupAnalysisMasonryLayouts();
-    if (queryState.status === "idle") {
-      void loadAnalysisRootFamilies(dictionary);
-    }
-    return;
-  }
-  if (page === "ipa" && subpage === "mismatches") {
-    const queryState = analysisIpaCompareStateFor(dictionary);
-    elements.analysisPanel.innerHTML = renderAnalysisIpaCompareQueryPage(queryState);
-    setupAnalysisMasonryLayouts();
-    if (queryState.status === "idle") {
-      void loadAnalysisIpaCompare(dictionary);
-    }
-    return;
+  if (page === "entries") {
+    return {
+      tags: { query: "tags", render: renderAnalysisTagsQueryPage },
+      forms: { query: "orthography", render: renderAnalysisOrthographyQueryPage },
+      roots: { query: "rootFamilies", render: renderAnalysisRootFamiliesQueryPage },
+    }[subpage];
   }
   if (page === "ipa") {
-    const queryState = analysisIpaDistributionStateFor(dictionary);
-    elements.analysisPanel.innerHTML = renderAnalysisIpaDistributionQueryPage(queryState, subpage);
-    setupAnalysisMasonryLayouts();
-    if (queryState.status === "idle") {
-      void loadAnalysisIpaDistribution(dictionary);
-    }
-    return;
+    return subpage === "mismatches"
+      ? { query: "ipaCompare", render: renderAnalysisIpaCompareQueryPage }
+      : { query: "ipaDistribution", render: renderAnalysisIpaDistributionQueryPage };
   }
   if (page === "morphology") {
-    const queryState = analysisMorphologyStateFor(dictionary);
-    elements.analysisPanel.innerHTML = renderAnalysisMorphologyQueryPage(queryState, subpage);
-    setupAnalysisMasonryLayouts();
-    if (queryState.status === "idle") {
-      void loadAnalysisMorphology(dictionary);
-    }
-    return;
+    return { query: "morphology", render: renderAnalysisMorphologyQueryPage };
   }
-  if (page === "activity") {
-    const queryState = analysisActivityStateFor(dictionary);
-    elements.analysisPanel.innerHTML = renderAnalysisActivityQueryPage(queryState, subpage);
-    setupAnalysisMasonryLayouts();
-    if (queryState.status === "idle") {
-      void loadAnalysisActivity(dictionary);
-    }
-    return;
+  return { query: "activity", render: renderAnalysisActivityQueryPage };
+}
+
+function analysisQueryStateFor(name, dictionary) {
+  const stored = analysisQueryStates.get(name);
+  const key = ANALYSIS_QUERIES[name].key(dictionary);
+  if (stored.key !== key) {
+    return { key, status: "idle", response: null, error: null, requestId: stored.requestId };
   }
+  return stored;
 }
 
-function analysisOverviewQueryKey(dictionary) {
-  return stableJson({
-    dictionaryId: dictionary?.id || "",
-    updatedAt: dictionary?.updatedAt || "",
-  });
-}
-
-function analysisIpaCompareQueryKey(dictionary) {
-  return stableJson({
-    dictionaryId: dictionary?.id || "",
-    updatedAt: dictionary?.updatedAt || "",
-    ipaSettings: dictionary?.settings?.ipa || {},
-  });
-}
-
-function analysisIpaDistributionQueryKey(dictionary) {
-  const ipa = dictionarySettings(dictionary).ipa;
-  return stableJson({
-    dictionaryId: dictionary?.id || "",
-    updatedAt: dictionary?.updatedAt || "",
-    complexPhonemes: ipa.syllable.complexPhonemes,
-    separator: ipa.syllable.separator,
-  });
-}
-
-function analysisMorphologyQueryKey(dictionary) {
-  return stableJson({
-    dictionaryId: dictionary?.id || "",
-    updatedAt: dictionary?.updatedAt || "",
-  });
-}
-
-function analysisActivityQueryKey(dictionary) {
-  return stableJson({
-    dictionaryId: dictionary?.id || "",
-    updatedAt: dictionary?.updatedAt || "",
-  });
-}
-
-function analysisRootFamiliesQueryKey(dictionary) {
-  return stableJson({
-    dictionaryId: dictionary?.id || "",
-    updatedAt: dictionary?.updatedAt || "",
-  });
-}
-
-function analysisTagsStateFor(dictionary) {
-  const key = analysisOverviewQueryKey(dictionary);
-  if (analysisTagsQueryState.key !== key) {
-    return {
-      key,
-      status: "idle",
-      response: null,
-      error: null,
-      requestId: analysisTagsQueryState.requestId,
-    };
-  }
-  return analysisTagsQueryState;
-}
-
-function analysisOrthographyStateFor(dictionary) {
-  const key = analysisOverviewQueryKey(dictionary);
-  if (analysisOrthographyQueryState.key !== key) {
-    return {
-      key,
-      status: "idle",
-      response: null,
-      error: null,
-      requestId: analysisOrthographyQueryState.requestId,
-    };
-  }
-  return analysisOrthographyQueryState;
-}
-
-async function loadAnalysisOrthography(dictionary, { force = false } = {}) {
+async function loadAnalysisQuery(name, dictionary, { force = false } = {}) {
   if (!dictionary?.id) {
     return;
   }
-  const key = analysisOverviewQueryKey(dictionary);
-  if (
-    !force
-    && analysisOrthographyQueryState.key === key
-    && ["loading", "ready"].includes(analysisOrthographyQueryState.status)
-  ) {
+  const query = ANALYSIS_QUERIES[name];
+  const key = query.key(dictionary);
+  const current = analysisQueryStates.get(name);
+  if (!force && current.key === key && ["loading", "ready"].includes(current.status)) {
     return;
   }
-  const requestId = analysisOrthographyQueryState.requestId + 1;
-  analysisOrthographyQueryState = {
-    key,
-    status: "loading",
-    response: null,
-    error: null,
-    requestId,
+  const requestId = current.requestId + 1;
+  analysisQueryStates.set(name, { key, status: "loading", response: null, error: null, requestId });
+  // A newer request or a changed key makes this response stale.
+  const isCurrent = () => {
+    const latest = analysisQueryStates.get(name);
+    return latest.requestId === requestId && latest.key === key;
   };
   try {
-    const response = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`, {
+    const response = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/${query.endpoint}`, {
       method: "POST",
-      body: JSON.stringify({ widgets: ANALYSIS_ORTHOGRAPHY_QUERY_WIDGETS }),
+      body: JSON.stringify(query.body()),
     });
-    if (analysisOrthographyQueryState.requestId !== requestId || analysisOrthographyQueryState.key !== key) {
+    if (!isCurrent()) {
       return;
     }
-    analysisOrthographyQueryState = {
-      key,
-      status: "ready",
-      response,
-      error: null,
-      requestId,
-    };
+    analysisQueryStates.set(name, { key, status: "ready", response, error: null, requestId });
   } catch (error) {
-    if (analysisOrthographyQueryState.requestId !== requestId || analysisOrthographyQueryState.key !== key) {
+    if (!isCurrent()) {
       return;
     }
-    analysisOrthographyQueryState = {
-      key,
-      status: "error",
-      response: null,
-      error,
-      requestId,
-    };
+    analysisQueryStates.set(name, { key, status: "error", response: null, error, requestId });
     console.error(error);
   }
+  const page = activeAnalysisPage();
   if (
     state.activeView === "analysis"
-    && activeAnalysisPage() === "entries"
-    && activeAnalysisSubpage("entries") === "forms"
-    && activeDictionary()?.id === dictionary.id
-  ) {
-    renderAnalysis(activeDictionary());
-  }
-}
-
-async function loadAnalysisTags(dictionary, { force = false } = {}) {
-  if (!dictionary?.id) {
-    return;
-  }
-  const key = analysisOverviewQueryKey(dictionary);
-  if (!force && analysisTagsQueryState.key === key && ["loading", "ready"].includes(analysisTagsQueryState.status)) {
-    return;
-  }
-  const requestId = analysisTagsQueryState.requestId + 1;
-  analysisTagsQueryState = {
-    key,
-    status: "loading",
-    response: null,
-    error: null,
-    requestId,
-  };
-  try {
-    const response = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`, {
-      method: "POST",
-      body: JSON.stringify({ widgets: ANALYSIS_TAG_QUERY_WIDGETS }),
-    });
-    if (analysisTagsQueryState.requestId !== requestId || analysisTagsQueryState.key !== key) {
-      return;
-    }
-    analysisTagsQueryState = {
-      key,
-      status: "ready",
-      response,
-      error: null,
-      requestId,
-    };
-  } catch (error) {
-    if (analysisTagsQueryState.requestId !== requestId || analysisTagsQueryState.key !== key) {
-      return;
-    }
-    analysisTagsQueryState = {
-      key,
-      status: "error",
-      response: null,
-      error,
-      requestId,
-    };
-    console.error(error);
-  }
-  if (
-    state.activeView === "analysis"
-    && activeAnalysisPage() === "entries"
-    && activeAnalysisSubpage("entries") === "tags"
-    && activeDictionary()?.id === dictionary.id
-  ) {
-    renderAnalysis(activeDictionary());
-  }
-}
-
-function analysisRootFamiliesStateFor(dictionary) {
-  const key = analysisRootFamiliesQueryKey(dictionary);
-  if (analysisRootFamiliesQueryState.key !== key) {
-    return {
-      key,
-      status: "idle",
-      response: null,
-      error: null,
-      requestId: analysisRootFamiliesQueryState.requestId,
-    };
-  }
-  return analysisRootFamiliesQueryState;
-}
-
-async function loadAnalysisRootFamilies(dictionary, { force = false } = {}) {
-  if (!dictionary?.id) {
-    return;
-  }
-  const key = analysisRootFamiliesQueryKey(dictionary);
-  if (
-    !force
-    && analysisRootFamiliesQueryState.key === key
-    && ["loading", "ready"].includes(analysisRootFamiliesQueryState.status)
-  ) {
-    return;
-  }
-  const requestId = analysisRootFamiliesQueryState.requestId + 1;
-  analysisRootFamiliesQueryState = {
-    key,
-    status: "loading",
-    response: null,
-    error: null,
-    requestId,
-  };
-  try {
-    const response = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`, {
-      method: "POST",
-      body: JSON.stringify({
-        widgets: [{
-          id: "families",
-          type: "rootFamilyRanking",
-        }],
-      }),
-    });
-    if (
-      analysisRootFamiliesQueryState.requestId !== requestId
-      || analysisRootFamiliesQueryState.key !== key
-    ) {
-      return;
-    }
-    analysisRootFamiliesQueryState = {
-      key,
-      status: "ready",
-      response,
-      error: null,
-      requestId,
-    };
-  } catch (error) {
-    if (
-      analysisRootFamiliesQueryState.requestId !== requestId
-      || analysisRootFamiliesQueryState.key !== key
-    ) {
-      return;
-    }
-    analysisRootFamiliesQueryState = {
-      key,
-      status: "error",
-      response: null,
-      error,
-      requestId,
-    };
-    console.error(error);
-  }
-  if (
-    state.activeView === "analysis"
-    && activeAnalysisPage() === "entries"
-    && activeAnalysisSubpage("entries") === "roots"
-    && activeDictionary()?.id === dictionary.id
-  ) {
-    renderAnalysis(activeDictionary());
-  }
-}
-
-function analysisActivityStateFor(dictionary) {
-  const key = analysisActivityQueryKey(dictionary);
-  if (analysisActivityQueryState.key !== key) {
-    return {
-      key,
-      status: "idle",
-      response: null,
-      error: null,
-      requestId: analysisActivityQueryState.requestId,
-    };
-  }
-  return analysisActivityQueryState;
-}
-
-async function loadAnalysisActivity(dictionary, { force = false } = {}) {
-  if (!dictionary?.id) {
-    return;
-  }
-  const key = analysisActivityQueryKey(dictionary);
-  if (
-    !force
-    && analysisActivityQueryState.key === key
-    && ["loading", "ready"].includes(analysisActivityQueryState.status)
-  ) {
-    return;
-  }
-  const requestId = analysisActivityQueryState.requestId + 1;
-  analysisActivityQueryState = {
-    key,
-    status: "loading",
-    response: null,
-    error: null,
-    requestId,
-  };
-  try {
-    const response = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`, {
-      method: "POST",
-      body: JSON.stringify({
-        widgets: [{ id: "activity", type: "activityDistribution" }],
-      }),
-    });
-    if (
-      analysisActivityQueryState.requestId !== requestId
-      || analysisActivityQueryState.key !== key
-    ) {
-      return;
-    }
-    analysisActivityQueryState = {
-      key,
-      status: "ready",
-      response,
-      error: null,
-      requestId,
-    };
-  } catch (error) {
-    if (
-      analysisActivityQueryState.requestId !== requestId
-      || analysisActivityQueryState.key !== key
-    ) {
-      return;
-    }
-    analysisActivityQueryState = {
-      key,
-      status: "error",
-      response: null,
-      error,
-      requestId,
-    };
-    console.error(error);
-  }
-  if (
-    state.activeView === "analysis"
-    && activeAnalysisPage() === "activity"
-    && activeDictionary()?.id === dictionary.id
-  ) {
-    renderAnalysis(activeDictionary());
-  }
-}
-
-function analysisMorphologyStateFor(dictionary) {
-  const key = analysisMorphologyQueryKey(dictionary);
-  if (analysisMorphologyQueryState.key !== key) {
-    return {
-      key,
-      status: "idle",
-      response: null,
-      error: null,
-      requestId: analysisMorphologyQueryState.requestId,
-    };
-  }
-  return analysisMorphologyQueryState;
-}
-
-async function loadAnalysisMorphology(dictionary, { force = false } = {}) {
-  if (!dictionary?.id) {
-    return;
-  }
-  const key = analysisMorphologyQueryKey(dictionary);
-  if (
-    !force
-    && analysisMorphologyQueryState.key === key
-    && ["loading", "ready"].includes(analysisMorphologyQueryState.status)
-  ) {
-    return;
-  }
-  const requestId = analysisMorphologyQueryState.requestId + 1;
-  analysisMorphologyQueryState = {
-    key,
-    status: "loading",
-    response: null,
-    error: null,
-    requestId,
-  };
-  try {
-    const response = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/features/query`, {
-      method: "POST",
-      body: JSON.stringify({
-        source: { type: "morphologyAnalysis", version: 1, options: {} },
-        responseMode: "summary",
-      }),
-    });
-    if (
-      analysisMorphologyQueryState.requestId !== requestId
-      || analysisMorphologyQueryState.key !== key
-    ) {
-      return;
-    }
-    analysisMorphologyQueryState = {
-      key,
-      status: "ready",
-      response,
-      error: null,
-      requestId,
-    };
-  } catch (error) {
-    if (
-      analysisMorphologyQueryState.requestId !== requestId
-      || analysisMorphologyQueryState.key !== key
-    ) {
-      return;
-    }
-    analysisMorphologyQueryState = {
-      key,
-      status: "error",
-      response: null,
-      error,
-      requestId,
-    };
-    console.error(error);
-  }
-  if (
-    state.activeView === "analysis"
-    && activeAnalysisPage() === "morphology"
-    && activeDictionary()?.id === dictionary.id
-  ) {
-    renderAnalysis(activeDictionary());
-  }
-}
-
-function analysisIpaDistributionStateFor(dictionary) {
-  const key = analysisIpaDistributionQueryKey(dictionary);
-  if (analysisIpaDistributionQueryState.key !== key) {
-    return {
-      key,
-      status: "idle",
-      response: null,
-      error: null,
-      requestId: analysisIpaDistributionQueryState.requestId,
-    };
-  }
-  return analysisIpaDistributionQueryState;
-}
-
-async function loadAnalysisIpaDistribution(dictionary, { force = false } = {}) {
-  if (!dictionary?.id) {
-    return;
-  }
-  const key = analysisIpaDistributionQueryKey(dictionary);
-  if (
-    !force
-    && analysisIpaDistributionQueryState.key === key
-    && ["loading", "ready"].includes(analysisIpaDistributionQueryState.status)
-  ) {
-    return;
-  }
-  const requestId = analysisIpaDistributionQueryState.requestId + 1;
-  analysisIpaDistributionQueryState = {
-    key,
-    status: "loading",
-    response: null,
-    error: null,
-    requestId,
-  };
-  try {
-    const response = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/features/query`, {
-      method: "POST",
-      body: JSON.stringify({
-        source: { type: "ipaDistribution", version: 1, options: {} },
-        responseMode: "summary",
-      }),
-    });
-    if (
-      analysisIpaDistributionQueryState.requestId !== requestId
-      || analysisIpaDistributionQueryState.key !== key
-    ) {
-      return;
-    }
-    analysisIpaDistributionQueryState = {
-      key,
-      status: "ready",
-      response,
-      error: null,
-      requestId,
-    };
-  } catch (error) {
-    if (
-      analysisIpaDistributionQueryState.requestId !== requestId
-      || analysisIpaDistributionQueryState.key !== key
-    ) {
-      return;
-    }
-    analysisIpaDistributionQueryState = {
-      key,
-      status: "error",
-      response: null,
-      error,
-      requestId,
-    };
-    console.error(error);
-  }
-  if (
-    state.activeView === "analysis"
-    && activeAnalysisPage() === "ipa"
-    && activeAnalysisSubpage("ipa") !== "mismatches"
-    && activeDictionary()?.id === dictionary.id
-  ) {
-    renderAnalysis(activeDictionary());
-  }
-}
-
-function analysisIpaCompareStateFor(dictionary) {
-  const key = analysisIpaCompareQueryKey(dictionary);
-  if (analysisIpaCompareQueryState.key !== key) {
-    return {
-      key,
-      status: "idle",
-      response: null,
-      error: null,
-      requestId: analysisIpaCompareQueryState.requestId,
-    };
-  }
-  return analysisIpaCompareQueryState;
-}
-
-async function loadAnalysisIpaCompare(dictionary, { force = false } = {}) {
-  if (!dictionary?.id) {
-    return;
-  }
-  const key = analysisIpaCompareQueryKey(dictionary);
-  if (!force && analysisIpaCompareQueryState.key === key && ["loading", "ready"].includes(analysisIpaCompareQueryState.status)) {
-    return;
-  }
-  const requestId = analysisIpaCompareQueryState.requestId + 1;
-  analysisIpaCompareQueryState = {
-    key,
-    status: "loading",
-    response: null,
-    error: null,
-    requestId,
-  };
-  try {
-    const response = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/features/query`, {
-      method: "POST",
-      body: JSON.stringify({
-        source: { type: "ipaAutoCompare", version: 1, options: {} },
-        responseMode: "summary",
-      }),
-    });
-    if (analysisIpaCompareQueryState.requestId !== requestId || analysisIpaCompareQueryState.key !== key) {
-      return;
-    }
-    analysisIpaCompareQueryState = {
-      key,
-      status: "ready",
-      response,
-      error: null,
-      requestId,
-    };
-  } catch (error) {
-    if (analysisIpaCompareQueryState.requestId !== requestId || analysisIpaCompareQueryState.key !== key) {
-      return;
-    }
-    analysisIpaCompareQueryState = {
-      key,
-      status: "error",
-      response: null,
-      error,
-      requestId,
-    };
-    console.error(error);
-  }
-  if (
-    state.activeView === "analysis"
-    && activeAnalysisPage() === "ipa"
-    && activeAnalysisSubpage("ipa") === "mismatches"
+    && analysisQueryView(page, activeAnalysisSubpage(page)).query === name
     && activeDictionary()?.id === dictionary.id
   ) {
     renderAnalysis(activeDictionary());
@@ -10142,7 +9535,7 @@ function renderAnalysisIpaCompareQueryPage(queryState) {
     body = `<div class="empty-state">
       <strong>${escapeHtml(aText("无法完成 IPA 自动生成检查", "Could not complete IPA auto checks"))}</strong>
       <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
-      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-ipa-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-retry="ipaCompare">${escapeHtml(aText("重试", "Retry"))}</button>
     </div>`;
   } else {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在检查 IPA 自动生成结果", "Checking generated IPA"))}</strong></div>`;
@@ -10162,7 +9555,7 @@ function renderAnalysisIpaDistributionQueryPage(queryState, subpage) {
     body = `<div class="empty-state">
       <strong>${escapeHtml(aText("无法加载 IPA 分布", "Could not load IPA distribution"))}</strong>
       <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
-      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-ipa-distribution-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-retry="ipaDistribution">${escapeHtml(aText("重试", "Retry"))}</button>
     </div>`;
   } else {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载 IPA 分布", "Loading IPA distribution"))}</strong></div>`;
@@ -10182,7 +9575,7 @@ function renderAnalysisMorphologyQueryPage(queryState, subpage) {
     body = `<div class="empty-state">
       <strong>${escapeHtml(aText("无法加载形态分析", "Could not load morphology analysis"))}</strong>
       <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
-      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-morphology-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-retry="morphology">${escapeHtml(aText("重试", "Retry"))}</button>
     </div>`;
   } else {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载形态分析", "Loading morphology analysis"))}</strong></div>`;
@@ -10202,7 +9595,7 @@ function renderAnalysisActivityQueryPage(queryState, subpage) {
     body = `<div class="empty-state">
       <strong>${escapeHtml(aText("无法加载编辑日期", "Could not load editing dates"))}</strong>
       <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
-      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-activity-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-retry="activity">${escapeHtml(aText("重试", "Retry"))}</button>
     </div>`;
   } else {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载编辑日期", "Loading editing dates"))}</strong></div>`;
@@ -10231,7 +9624,7 @@ function renderAnalysisRootFamiliesQueryPage(queryState) {
     body = `<div class="empty-state">
       <strong>${escapeHtml(aText("无法加载词根家族", "Could not load root families"))}</strong>
       <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
-      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-root-families-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-retry="rootFamilies">${escapeHtml(aText("重试", "Retry"))}</button>
     </div>`;
   } else {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载词根家族", "Loading root families"))}</strong></div>`;
@@ -10243,73 +9636,6 @@ function renderAnalysisRootFamiliesQueryPage(queryState) {
   `;
 }
 
-function analysisOverviewStateFor(dictionary) {
-  const key = analysisOverviewQueryKey(dictionary);
-  if (analysisOverviewQueryState.key !== key) {
-    return {
-      key,
-      status: "idle",
-      response: null,
-      error: null,
-      requestId: analysisOverviewQueryState.requestId,
-    };
-  }
-  return analysisOverviewQueryState;
-}
-
-async function loadAnalysisOverview(dictionary, { force = false } = {}) {
-  if (!dictionary?.id) {
-    return;
-  }
-  const key = analysisOverviewQueryKey(dictionary);
-  if (!force && analysisOverviewQueryState.key === key && ["loading", "ready"].includes(analysisOverviewQueryState.status)) {
-    return;
-  }
-  const requestId = analysisOverviewQueryState.requestId + 1;
-  analysisOverviewQueryState = {
-    key,
-    status: "loading",
-    response: null,
-    error: null,
-    requestId,
-  };
-  try {
-    const response = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/analysis/query`, {
-      method: "POST",
-      body: JSON.stringify({ widgets: ANALYSIS_OVERVIEW_QUERY_WIDGETS }),
-    });
-    if (analysisOverviewQueryState.requestId !== requestId || analysisOverviewQueryState.key !== key) {
-      return;
-    }
-    analysisOverviewQueryState = {
-      key,
-      status: "ready",
-      response,
-      error: null,
-      requestId,
-    };
-  } catch (error) {
-    if (analysisOverviewQueryState.requestId !== requestId || analysisOverviewQueryState.key !== key) {
-      return;
-    }
-    analysisOverviewQueryState = {
-      key,
-      status: "error",
-      response: null,
-      error,
-      requestId,
-    };
-    console.error(error);
-  }
-  if (
-    state.activeView === "analysis"
-    && activeAnalysisPage() === "overview"
-    && activeDictionary()?.id === dictionary.id
-  ) {
-    renderAnalysis(activeDictionary());
-  }
-}
-
 function renderAnalysisOverviewQueryPage(queryState) {
   let body = "";
   if (queryState.status === "ready") {
@@ -10318,7 +9644,7 @@ function renderAnalysisOverviewQueryPage(queryState) {
     body = `<div class="empty-state">
       <strong>${escapeHtml(aText("无法加载数据分析", "Could not load analysis"))}</strong>
       <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
-      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-retry="overview">${escapeHtml(aText("重试", "Retry"))}</button>
     </div>`;
   } else {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载数据分析", "Loading analysis"))}</strong></div>`;
@@ -10976,7 +10302,7 @@ function renderAnalysisTagsQueryPage(queryState) {
     body = `<div class="empty-state">
       <strong>${escapeHtml(aText("无法加载标签统计", "Could not load tag statistics"))}</strong>
       <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
-      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-tags-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-retry="tags">${escapeHtml(aText("重试", "Retry"))}</button>
     </div>`;
   } else {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载标签统计", "Loading tag statistics"))}</strong></div>`;
@@ -11040,7 +10366,7 @@ function renderAnalysisOrthographyQueryPage(queryState) {
     body = `<div class="empty-state">
       <strong>${escapeHtml(aText("无法加载正写法统计", "Could not load orthography statistics"))}</strong>
       <span>${escapeHtml(aText("请稍后重试。", "Try again shortly."))}</span>
-      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-orthography-retry>${escapeHtml(aText("重试", "Retry"))}</button>
+      <button type="button" class="secondary-button" data-control-tone="neutral" data-analysis-retry="orthography">${escapeHtml(aText("重试", "Retry"))}</button>
     </div>`;
   } else {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载正写法统计", "Loading orthography statistics"))}</strong></div>`;
@@ -17447,48 +16773,6 @@ elements.quickEntryFullEditButton.addEventListener("click", () => transferQuickE
 elements.quickEntrySubmitButton.addEventListener("click", () => submitQuickEntry());
 elements.editEntryButton.addEventListener("click", beginEditEntry);
 elements.analysisPanel.addEventListener("click", (event) => {
-  const activityRetryButton = event.target.closest("[data-analysis-activity-retry]");
-  if (activityRetryButton) {
-    void loadAnalysisActivity(activeDictionary(), { force: true });
-    renderAnalysis(activeDictionary());
-    return;
-  }
-  const morphologyRetryButton = event.target.closest("[data-analysis-morphology-retry]");
-  if (morphologyRetryButton) {
-    void loadAnalysisMorphology(activeDictionary(), { force: true });
-    renderAnalysis(activeDictionary());
-    return;
-  }
-  const ipaDistributionRetryButton = event.target.closest("[data-analysis-ipa-distribution-retry]");
-  if (ipaDistributionRetryButton) {
-    void loadAnalysisIpaDistribution(activeDictionary(), { force: true });
-    renderAnalysis(activeDictionary());
-    return;
-  }
-  const ipaRetryButton = event.target.closest("[data-analysis-ipa-retry]");
-  if (ipaRetryButton) {
-    void loadAnalysisIpaCompare(activeDictionary(), { force: true });
-    renderAnalysis(activeDictionary());
-    return;
-  }
-  const rootFamiliesRetryButton = event.target.closest("[data-analysis-root-families-retry]");
-  if (rootFamiliesRetryButton) {
-    void loadAnalysisRootFamilies(activeDictionary(), { force: true });
-    renderAnalysis(activeDictionary());
-    return;
-  }
-  const tagsRetryButton = event.target.closest("[data-analysis-tags-retry]");
-  if (tagsRetryButton) {
-    void loadAnalysisTags(activeDictionary(), { force: true });
-    renderAnalysis(activeDictionary());
-    return;
-  }
-  const orthographyRetryButton = event.target.closest("[data-analysis-orthography-retry]");
-  if (orthographyRetryButton) {
-    void loadAnalysisOrthography(activeDictionary(), { force: true });
-    renderAnalysis(activeDictionary());
-    return;
-  }
   const tagSetsMoreButton = event.target.closest("[data-analysis-tag-sets-more]");
   if (tagSetsMoreButton) {
     analysisTagSetRenderState.visibleCount += 100;
@@ -17497,7 +16781,7 @@ elements.analysisPanel.addEventListener("click", (event) => {
   }
   const retryButton = event.target.closest("[data-analysis-retry]");
   if (retryButton) {
-    void loadAnalysisOverview(activeDictionary(), { force: true });
+    void loadAnalysisQuery(retryButton.dataset.analysisRetry, activeDictionary(), { force: true });
     renderAnalysis(activeDictionary());
     return;
   }

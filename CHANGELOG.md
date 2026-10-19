@@ -12,6 +12,8 @@
 
 ### 改进
 
+- 数据分析的 8 个加载函数合并（审计 C06）：总览、标签、正写法、词根家族、编辑日期、形态、IPA 分布和 IPA 自动检查原先各有一份几乎相同的加载函数、状态变量、“取状态”函数和重试处理。现在由 `ANALYSIS_QUERIES` 表描述每个查询的端点、请求体和缓存键，`analysisQueryView(page, subpage)` 决定每个页面用哪个查询和渲染函数，派发与“加载完成时是否仍在显示”都读这一张映射；`loadAnalysisQuery` 统一加载，每个查询仍有独立的状态与过期响应检查。八个重试按钮改为 `data-analysis-retry="<查询名>"`，由一个处理器分发。IPA 自动检查的缓存键改用 `dictionarySettings()`，与其他读取一致。临时数据实例（4174）中走查数据分析全部 11 个子页，各自使用正确的查询且显示正常；拦截请求让总览、词根家族、IPA 自动检查和形态失败后，各页显示错误与对应名称的重试按钮，重试后恢复正常。
+- 清理死代码（审计 C07）：删除 28 个只在中英文字典里定义、从未使用的界面文案键（已排除动态拼接和 `data-i18n` 引用）；删除没有调用方的 `DEFAULT_CONFIGURED_SEARCH_NORMALIZATION`、`createSearchNormalizer`、`entryListDisplayTag`；只有测试调用的 `normalizeConfiguredSearchText`、`resolveDisplayIdentity`、`fieldFuzzyEnabled` 删除，前两者覆盖的行为改由生产路径验证（`createConfiguredSearchNormalizer().normalize`、facets 使用的 `buildDisplayIdentityIndex` 加 `displayIdentity`）。另发现 `lib/entry-relations-model.js` 由 `index.html` 加载却从未被 `app.js` 使用，服务端也不引用，只有 repository contract 拿它的 `rootModeGroups` 作为 `/root-groups` 的期望值：改为测试专用的 `scripts/root-groups-reference.js`，只保留 `rootModeGroups`，页面和静态公开清单不再包含它；随之删除只为它存在的 `findDerivedEntries`、`resolveSourceEntry` 及其测试。
 - 清理审计 C09 与 C10 中的读取兜底，按“边界校验一次、边界内信任契约”统一：
   - 前端不再把服务端响应当作不可信输入：词根组、词条窗口、facets、应用状态与词典元数据、数据分析与功能结果各页、搜索命中等处删除逐字段的 `Array.isArray`、`Number(x || 0)`、`Math.max(0, …)`、`String()` 强转和按 `id` 过滤，约 60 处；删除词根组计数对接口早已不返回的 `derived`／`matchedDerived` 数组的回退。保留契约中本就可选的字段（`windowMetrics`、无查询时的 `searchSummary`、只在功能结果和质量视图出现的 `summary`／`source`／`feature`／`issues`、已删除的分布桶或模板组计为 0）、`api()` 对纯文本错误体的处理，以及 `compact*` 中的投影与重塑。新版质量页和来源补全原本就直接使用契约字段，这次让旧路径与之一致。
   - 前端删除对静态 DOM 节点的存在性检查与可选链：14 处 `if (!elements.x) return` 和 19 处 `elements.x?.`。这些节点都写在 `index.html` 中，而只有它加载 `app.js`，兜底只会掩盖改名错误。

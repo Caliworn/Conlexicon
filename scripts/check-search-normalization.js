@@ -10,23 +10,24 @@ function main() {
     "S1 must not alter the active legacy trim + locale-lower baseline",
   );
 
+  const normalize = (value, options) => normalization.createConfiguredSearchNormalizer(options).normalize(value);
   assert.equal(
-    normalization.normalizeConfiguredSearchText(" Cafe\u0301 "),
+    normalize(" Cafe\u0301 "),
     "Cafe\u0301",
     "configured strict mode preserves case and canonical decomposition after outer trimming",
   );
   assert.equal(
-    normalization.normalizeConfiguredSearchText(" Cafe\u0301 ", { unicodeNormalization: "nfc" }),
+    normalize(" Cafe\u0301 ", { unicodeNormalization: "nfc" }),
     "Café",
     "NFC must compose canonically equivalent input",
   );
   assert.equal(
-    normalization.normalizeConfiguredSearchText("Straße Σς \uE000", { caseFolding: true }),
+    normalize("Straße Σς \uE000", { caseFolding: true }),
     "strasse σσ \uE000",
     "Unicode default case folding must include full folds, final sigma, and preserve PUA values",
   );
   assert.equal(
-    normalization.normalizeConfiguredSearchText("ǰ J\u030C", {
+    normalize("ǰ J\u030C", {
       unicodeNormalization: "nfc",
       caseFolding: true,
     }),

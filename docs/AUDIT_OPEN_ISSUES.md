@@ -69,20 +69,6 @@
 
 ## 4. 代码质量与清理
 
-### C06：数据分析的 8 个加载函数复制粘贴
-
-- **现状**：`loadAnalysisOrthography`、`loadAnalysisTags`、`loadAnalysisRootFamilies`、`loadAnalysisActivity` 等 8 个函数（约 `app.js` 9885–10600 行，状态变量约 216–275 行）流程相同。差异包括请求端点（5 个用 `/analysis/query`，3 个用 `/analysis/features/query`）、请求体、缓存键和“当前是否可见”的判断。
-- **处理方向**：单独一次重构，把上述差异全部参数化；每个加载函数保留各自的状态与过期响应检查。以浏览器回归数据分析各页为验收，不以减少行数为目标。
-
-### C07：死代码
-
-- 约 25 个界面文案键只在中英文字典中定义，如 `linkedSource`、`unlinkedSource`、`tableSize`、`morphologyNone`、`glbSmallCaps`、`planned`、`corpusRequiredUnitContent`、`orthographyStressModule`。这是按字面搜索的结果，删前逐个排除动态拼接。
-- 无调用方的薄包装可以删除：`search-normalization-model` 的 `DEFAULT_CONFIGURED_SEARCH_NORMALIZATION`、`createSearchNormalizer`，以及 `tag-model` 的 `entryListDisplayTag`。
-- 只有测试调用的导出逐个看用途，不批量删除：
-  - `sampleSurface` 用于验证生成贴图与解析采样一致，`qualityIssueIdentity` 对应 API 契约中的质量问题身份，两者都保留；
-  - `fieldFuzzyEnabled`、`normalizeConfiguredSearchText`、`resolveDisplayIdentity`、`findDerivedEntries` 待确认；
-  - 删除函数时不能顺带丢掉它们覆盖的行为验证。
-
 ### C09：剩余未逐个检查的读取兜底
 
 C09（数据库非空列与静态 DOM 兜底）与 C10（前端对服务端响应重复校验）已于 2026-10-19 处理，见 `CHANGELOG.md`。以下是当时有意留下、尚未逐个判断的部分：
@@ -117,8 +103,7 @@ C09（数据库非空列与静态 DOM 兜底）与 C10（前端对服务端响�
 
 1. **A10**：由第 3 阶段规则引擎处理；可选先做锚点止血。
 2. **A04／A05**：明确联合保存与多窗口冲突契约，配合临时数据回归。
-3. **C06** 单独重构。
-4. **A13／A14**：先测量快照成本再定方案；**C07**、**C09** 剩余部分随相关工作清理；R 类按测量结果或发布目标决定。
+3. **A13／A14**：先测量快照成本再定方案；**C09** 剩余部分随相关工作清理；R 类按测量结果或发布目标决定。
 
 ## 8. 维护规则
 

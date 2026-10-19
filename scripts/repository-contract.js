@@ -18,7 +18,7 @@ const ipaModel = require("../lib/ipa-model");
 const { DEFAULT_TOOL_NAV_ORDER } = require("../lib/dictionary-data-model");
 const tagModel = require("../lib/tag-model");
 const entrySearchModel = require("../lib/entry-search-model");
-const entryRelationsModel = require("../lib/entry-relations-model");
+const { rootModeGroups } = require("./root-groups-reference");
 const { parseGloss } = require("../lib/gloss-model");
 
 const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
@@ -838,7 +838,7 @@ async function assertStructuredEntryFilter(repository, dictionaryId, filter, exp
 function expectedRootGroupSnapshot(dictionary, query = {}) {
   const searchRuntime = entrySearchModel.searchSettingsQueryOptions(dictionary.settings?.search);
   const normalizedQuery = searchRuntime.normalizeText(query.q || query.query);
-  return entryRelationsModel.rootModeGroups(dictionary, {
+  return rootModeGroups(dictionary, {
     query: normalizedQuery,
     normalizeText: testNormalize,
     compareEntries: testCompareEntries(query.sort || "lemmaAsc"),
@@ -903,21 +903,10 @@ function checkModelNormalization() {
     { value: "alias", displayLabel: "Shared" },
     { value: "n", displayLabel: "Noun" },
   ]);
-  assert.deepEqual(tagModel.resolveDisplayIdentity("topic", "Shared", displayIdentityIndex), {
-    label: "Shared",
-    rawLabel: "topic",
-    ambiguous: true,
-  });
-  assert.deepEqual(tagModel.resolveDisplayIdentity("alias", "Shared", displayIdentityIndex), {
-    label: "Shared",
-    rawLabel: "alias",
-    ambiguous: true,
-  });
-  assert.deepEqual(tagModel.resolveDisplayIdentity("n", "Noun", displayIdentityIndex), {
-    label: "Noun",
-    rawLabel: "",
-    ambiguous: false,
-  });
+  assert.deepEqual([...displayIdentityIndex.get("Shared")], ["topic", "alias"], "repeated raw values count once");
+  assert.deepEqual([...displayIdentityIndex.get("Noun")], ["n"]);
+  assert.deepEqual(tagModel.displayIdentity("topic", "Shared", true), { label: "Shared", rawLabel: "topic", ambiguous: true });
+  assert.deepEqual(tagModel.displayIdentity("n", "Noun", false), { label: "Noun", rawLabel: "", ambiguous: false });
   const normalizedTagLists = normalizeDictionary({
     entries: [{ lemma: "entry", tags: [" n ", null, "n", "null"] }],
     settings: {
@@ -1018,22 +1007,6 @@ function checkModelNormalization() {
     fuzzy: false,
     normalizeText: testNormalize,
   }), false);
-  assert.equal(entrySearchModel.fieldFuzzyEnabled("tags", { fuzzyFields: "tags" }), true);
-  assert.equal(entrySearchModel.fieldFuzzyEnabled("tags", { fuzzyFields: "definitions" }), false);
-  const relationDictionary = {
-    entries: [
-      { id: "entry-root", lemma: "root" },
-      { id: "entry-derived-lemma", lemma: "derived lemma", etymology: { sources: [{ entryId: "entry-root", text: "root" }, { entryId: "entry-root", text: "root" }] } },
-      { id: "entry-derived-id", lemma: "derived id", etymology: { sources: [{ entryId: "entry-root", text: "root" }] } },
-      { id: "entry-derived-unresolved", lemma: "derived unresolved", etymology: { sources: [{ entryId: "", text: "missing-root" }] } },
-    ],
-  };
-  const relationIndex = entryRelationsModel.buildEntryRelationIndex(relationDictionary, { normalizeText: testNormalize });
-  assert.equal(relationIndex.derivedBySourceKey.get("entry-root").length, 2);
-  assert.deepEqual(
-    entryRelationsModel.findDerivedEntries(relationDictionary.entries[0], relationDictionary, { index: relationIndex }).map((entry) => entry.id),
-    ["entry-derived-id", "entry-derived-lemma"],
-  );
   assert.equal(
     entrySearchModel.entryMatchesSearchText(
       { lemma: "acar", definitions: [{ meaning: "root" }] },

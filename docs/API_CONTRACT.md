@@ -573,7 +573,7 @@ GET /api/dictionaries/:id/entry-relations/:entryId
 
 无外部祖先的循环选择“每个成员各自为根”：它对称，不需要任意挑选代表，与多来源词条出现在多个组中的语义一致，循环后代因此会在多个组中重复出现。按 ID 选唯一代表对用户没有语言学意义，按 lemma 选代表会让改名触发拓扑重建；让循环成员不出现在词根模式中则会使词条从列表消失。循环本身是数据错误，由质量检查的 `source_cycle` 报告。
 
-`etymology-graph-model` 是无 I/O 的共享模块（UMD）：`stronglyConnectedComponents` 用迭代版 Tarjan，不做递归，长来源链不会栈溢出；`buildEtymologyGraph` 按分量拓扑序传播词根集合。消费方为 repository 的词根拓扑（`rootTopologyFromDatabase`）、`entry-relations-model` 的 `rootModeGroups`（repository contract 中 `/root-groups` 的期望值）和质量模型的来源循环规则。模块不产出质量 code、见证路径或本地化文本，也不反向依赖质量模型。算法正确性由 `scripts/check-etymology-graph.js` 的固定用例、顺序无关、暴力可达性对照和 5 万节点深链覆盖。
+`etymology-graph-model` 是无 I/O 的共享模块（UMD）：`stronglyConnectedComponents` 用迭代版 Tarjan，不做递归，长来源链不会栈溢出；`buildEtymologyGraph` 按分量拓扑序传播词根集合。消费方为 repository 的词根拓扑（`rootTopologyFromDatabase`）、`scripts/root-groups-reference.js` 的 `rootModeGroups`（repository contract 中 `/root-groups` 的期望值，应用本身不加载）和质量模型的来源循环规则。模块不产出质量 code、见证路径或本地化文本，也不反向依赖质量模型。算法正确性由 `scripts/check-etymology-graph.js` 的固定用例、顺序无关、暴力可达性对照和 5 万节点深链覆盖。
 
 词根模式读取端点：
 
