@@ -1,6 +1,6 @@
 # 数据规范化与 SQLite 读取修复计划
 
-状态：阶段 1、4 已完成（2026-10-10），长期契约见 [SQLite 后端规范](SQLITE_BACKEND_PLAN.md#模块读取与-json-错误)；本文只保留尚未实装的阶段 2、3，方案已于 2026-09-30 复评。
+状态：阶段 1、4 已完成（2026-10-10），阶段 2 已完成（2026-10-19），长期契约见 [SQLite 后端规范](SQLITE_BACKEND_PLAN.md#模块读取与-json-错误)及其[共享数据规则](SQLITE_BACKEND_PLAN.md#共享数据规则)；本文只保留尚未实装的阶段 3，方案已于 2026-09-30 复评。
 
 本计划继续处理[审计清单](AUDIT_OPEN_ISSUES.md)中的 C01：前后端规范化函数重复与 settings 重复规范化。它不涉及本地 HTTP 服务安全、皮肤与 CSS、词源拓扑或质量检查架构。
 
@@ -8,8 +8,7 @@
 
 以下依据当前代码检查；行号会随实现变化，接手时按函数名定位。
 
-- **模型重复**：`app.js` 复制了 `lib/dictionary-model.js` 26 个函数中的 22 个，且已出现漂移：前端规范化 `toolNavOrder`，后端只随 `...settings` 透传。`dictionary-model.js` 依赖 `node:crypto` 和 `apiError`，浏览器不能直接加载。
-- **settings 重复规范化**：`app.js` 中有 33 处调用 `normalizeDictionarySettings(...)`，包括标签判定与显示等逐标签路径；完整词典进入前端状态时已规范化。耗时未量化。
+- **settings 重复规范化**：`app.js` 中有 36 处调用 `normalizeDictionarySettings(...)`（2026-10-19 复核），包括标签判定与显示等逐标签路径；完整词典进入前端状态时已规范化。耗时未量化。
 
 ## 2. 边界与原则
 
@@ -21,43 +20,9 @@
 - 前端状态入口不只有首次加载，还包括模块保存响应、词条保存响应、批量 patch、导入和新建。这些入口保留规范化；`renderExampleHtml(example, rawSettings)` 等明确接收原始配置的函数、表单收集和旧格式导入也不视为已规范化状态。
 - 不改完整快照的维护、缓存失效或局部更新策略（另一项已记录技术债），不改 SQLite schema，不操作真实 `data/`。
 
-## 4. 阶段 2：共享纯数据规则
-
-### 4.1 模块边界
-
-- 新增 `lib/dictionary-data-model.js`（UMD），承载前后端相同的纯数据规范化：
-  - settings、gloss 样式、工具导航顺序、词条区域顺序、docs、corpus 与各级语料实体、definition、词条字段整形、UI 偏好；
-  - ID 生成与登记。浏览器与 Node 均使用 `globalThis.crypto.randomUUID`，不依赖 `node:crypto`。
-- 依赖已有的 tag、IPA、entry-search、morphology 共享模型，不复制它们。
-- 词条字段整形函数接收已处理好的 sources：
-  - 后端 wrapper 做严格来源校验，并抛 `apiError`；
-  - 前端 wrapper 宽松读取。
-  - 不在共享模块里加“宽松／严格”模式参数。
-- `dictionary-model.js` 保留 Node 侧的错误包装、完整词典入口、实体唯一性校验、import 入口和现有公开 exports。
-- `app.js` 保留本地化默认名称、summary、显示视图与状态入口。
-- `index.html` 在依赖模型之后、`app.js` 之前加载新模块。
-
-### 4.2 语义
-
-- 两端使用同一个 `normalizeDictionarySettings`。后端开始规范化 `toolNavOrder`（去重、过滤非法项、保留合法顺序、补齐缺项）是有意的行为变化；合法配置的相对顺序不变。
-- 保留 settings 的未知字段透传、布尔默认值、gloss 默认样式、保存确认选项和搜索／IPA 设置的现有语义。不新增旧字段兼容逻辑。
-- `normalizeGlossStyles` 中对常量 `"serif"` 的规范化调用可直接改用常量，结果不变。
-- 共享的默认数组／对象不能被调用方原地修改：返回新对象，或在迁移时确认没有原地修改。
-
-### 4.3 验收
-
-- Node 下的模型测试，覆盖：
-  - 工具顺序的合法值、重复值、非法值和缺项；
-  - 未知 settings 字段保留；
-  - 显式 `false`、空字符串与空集合保留；
-  - 重复规范化结果稳定。
-- 按 `index.html` 的脚本顺序在 VM 中加载到 `app.js` 之前，确认新模块和依赖它的模型可用。不比较 CommonJS 与浏览器环境的运行结果：两边执行的是同一个文件。
-- 既有回归全部通过，包括导入、导出、ID 唯一性、语料父级与顺序、后端拒绝重复来源和自引用。
-- 浏览器冒烟（临时数据目录）：初次加载、切换词典、词条显示与编辑、导入、语料编辑。
-
 ## 5. 阶段 3：settings 读取收敛
 
-依赖阶段 2：共享规范化后，才能确认所有进入前端状态的 settings 都已规范化。
+前提已满足：阶段 2 起前后端使用同一个 `normalizeDictionarySettings`（`lib/dictionary-data-model.js`）。
 
 - 引入 `dictionarySettings(dictionary = activeDictionary())`：
   - 已加载词典直接返回状态中的 `settings`；
@@ -98,6 +63,6 @@
 
 1. 对每个改动的 JavaScript 文件执行 `node --check`，包含 `app.js` 与新增模块、检查脚本。
 2. 运行 `node scripts/check-all.js`；SQLite 不可用必须失败。
-3. 阶段 2、3 改动前端状态与共享模型，需用临时数据目录做浏览器冒烟。本计划不改视觉与布局，不需要逐宽度检查；无法完成的检查项按 `AGENTS.md` 逐项列出。
+3. 阶段 3 改动前端状态，需用临时数据目录做浏览器冒烟。本计划不改视觉与布局，不需要逐宽度检查；无法完成的检查项按 `AGENTS.md` 逐项列出。
 4. 实现完成后按实际日期写 CHANGELOG，并在交接文档中删除已处理的技术债条目。本计划不改变 HTTP 契约；如果实现中改了错误码或保存范围，再同步 `docs/API_CONTRACT.md`。
 5. `git diff --check`，核对改动范围。

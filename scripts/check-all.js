@@ -13,6 +13,7 @@ const CHECK_GROUPS = [
     name: "models",
     scripts: [
       "check-models.js",
+      "check-dictionary-data-model.js",
       "check-editor-saves.js",
       "check-quality-model.js",
       "check-search-normalization.js",

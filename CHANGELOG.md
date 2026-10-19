@@ -6,6 +6,10 @@
 
 ## 2026-10-19
 
+### 改进
+
+- 数据规范化阶段 2：前后端相同的纯数据规范化（settings、gloss 样式、工具导航与词条区域顺序、docs、语料各级实体、释义、词条字段整形、界面偏好、ID 生成）合并到新的共享模块 `lib/dictionary-data-model.js`，`app.js` 删除约 240 行复制的函数，`dictionary-model.js` 只保留服务端的错误包装、来源严格校验、实体 ID 唯一性检查与导入。两边原先唯一的差异随之消除：服务端现在也规范化 `settings.toolNavOrder`（保留合法项顺序，去掉重复和未知视图，补齐缺项），以前只原样透传；旧 JSON 中的 `morphology` 视图拆分后，导航顺序会补齐其余视图。来源的前后端语义保持不同：服务端拒绝重复目标和自引用，前端仍能读取早期数据库中的重复引用。新增 `scripts/check-dictionary-data-model.js`（导航顺序、未知字段与显式 `false`／空值保留、重复规范化稳定、默认数组不被改写，并按 `index.html` 顺序在 VM 中加载前端脚本），已登记到 `check-all`。`node scripts/check-all.js` 通过；临时数据实例（4174）中以浏览器自动化检查了初次加载、切换词典、完整编辑保存词条、设置保存与还原、语料新建块自动保存和 JSON 导入，控制台与服务端日志无错误。
+
 ### 文档
 
 - F5 文档收尾：删除已完成的 `docs/QUALITY_RESULT_PLAN.md` 与 `docs/ETYMOLOGY_GRAPH_PLAN.md`。仍有效的契约迁入 `docs/API_CONTRACT.md`：质量检查补齐规则集 v1、issue 身份与本地化、Gloss／来源循环见证／近似标签的边界行为、summary 计数语义、构建边界与性能复评门槛；词根拓扑补上循环成组决策的理由和 `etymology-graph-model` 的模块边界。实施记录、复现表和逐阶段验收留在 Git 历史与本文件。`docs/SQLITE_BACKEND_PLAN.md` 中“质量检查仍用前端完整报告”“返回匹配词条 ID”等 F5 之前的过时描述，以及高级筛选、功能结果会话计划中仍指向混合执行 planner 的说法，同步改为现状。

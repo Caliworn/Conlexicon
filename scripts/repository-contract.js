@@ -15,6 +15,7 @@ const { createDictionaryConversionService } = require("../lib/dictionary-convers
 const { migrateLegacyDictionary } = require("../lib/legacy-dictionary-migration");
 const morphologyModel = require("../lib/morphology-model");
 const ipaModel = require("../lib/ipa-model");
+const { DEFAULT_TOOL_NAV_ORDER } = require("../lib/dictionary-data-model");
 const tagModel = require("../lib/tag-model");
 const entrySearchModel = require("../lib/entry-search-model");
 const entryRelationsModel = require("../lib/entry-relations-model");
@@ -1457,12 +1458,14 @@ function checkModelNormalization() {
   assert.equal(legacyConvertedImport.dictionary.settings.search.etymologyAutocomplete.fuzzy, true);
   assert.equal(legacyConvertedImport.dictionary.entries[1].definitions[0].note, "legacy definition note");
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.entries[1].definitions[0], "notes"), false);
-  assert.deepEqual(legacyConvertedImport.dictionary.settings.toolNavOrder, [
+  // The legacy "morphology" view splits in place; the shared settings rule then appends missing views.
+  assert.deepEqual(legacyConvertedImport.dictionary.settings.toolNavOrder.slice(0, 4), [
     "editor",
     "morphology-functions",
     "morphology-tables",
     "settings",
   ]);
+  assert.equal(legacyConvertedImport.dictionary.settings.toolNavOrder.length, DEFAULT_TOOL_NAV_ORDER.length);
   assert.ok(legacyConvertedImport.report.repairs.length);
 
   const convertedImport = conversionService.importDictionaryFromJsonPayload({

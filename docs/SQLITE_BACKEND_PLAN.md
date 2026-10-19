@@ -88,6 +88,14 @@ SQLite 化后，`DictionaryQueryContext` 应从“请求级临时 Map/Set”自�
 - 普通保存只读取 settings 与实际用到的模块：词条保存、批量 patch 和 settings 保存读取形态配置（用于形态校验与形态搜索 projection），形态保存读取形态配置，语料保存读取 corpus；metadata、IPA、docs 保存和删除词条只读 settings。docs 或 corpus 损坏不影响词条保存。
 - 普通保存不扫描无关实体类型，只在数据库无法拒绝的提交范围内检查重复：词条保存不做 ID 检查，义项 ID 重复由主键约束失败并整体回滚；形态保存在生成写入计划之前拒绝提交内重复的组／表 ID（写入计划按 ID 建索引，重复会被静默合并）；语料保存检查语料内部 ID 重复。重复返回 `duplicate_entity_ids_scoped`。全局唯一由服务端生成 ID（新建词条只走 `POST`，`PUT` 只更新已有词条）、导入边界的完整检查和数据库主键共同保证。
 
+### 共享数据规则
+
+- 前后端相同的纯数据规范化只有一份实现：`lib/dictionary-data-model.js`（UMD，浏览器全局 `ConlexiconDictionaryData`）。它覆盖 settings（含 gloss 样式、工具导航顺序、词条区域顺序）、docs、corpus 与各级语料实体、definition、词条字段整形、全局界面偏好，以及实体 ID 生成与登记（`globalThis.crypto.randomUUID`）；依赖已有的 tag、IPA、entry-search、morphology 共享模型，不复制它们。
+- 词条字段整形接收调用方处理好的来源：`dictionary-model.js` 严格校验，重复目标与自引用以 `apiError` 拒绝；`app.js` 以 `allowDuplicateTargets` 宽松读取，使早期数据库中的重复引用仍可见、可删除后保存。共享模块不带“严格／宽松”参数。
+- `dictionary-model.js` 只保留 Node 侧内容：错误包装、完整词典入口、实体 ID 唯一性检查与导入；`app.js` 保留本地化默认名称、summary、显示视图（如形态的临时扁平表格视图）和前端状态入口。
+- settings 保留未知字段，显式 `false`、空字符串与空集合不被默认值替换；`toolNavOrder` 与 `entrySectionOrder` 保留合法项的顺序，去掉重复与未知项并补齐缺项。导出的默认数组冻结，规范化结果总是新对象。
+- 契约检查为 `scripts/check-dictionary-data-model.js`，其中按 `index.html` 的脚本顺序在 VM 中加载到 `app.js` 之前，确认浏览器全局和依赖可用。
+
 ## 5. 当前 SQLite schema
 
 本节记录当前 `SqliteDictionaryRepository` 实际创建的 schema。它已经不再只是初始草案：词条核心、释义、标签、来源、形态模板组、形态子表、词条形态组和 override 已经关系化；低频或尚未定型的模块继续放在 `module_blobs` 中。开发期 SQLite schema 中间态不承诺兼容迁移，测试库不匹配时从 JSON 重新生成。当前开发线不保存 schema 版本或 migration 表；下一个正式 release 才应引入带有明确升级脚本的版本化 migration 机制。

@@ -65,8 +65,6 @@ const SKIN_OPTIONS = [
 const entryQueryModel = window.ConlexiconEntryQuery;
 const ipaModel = window.ConlexiconIpa;
 const IPA_STRESS_MARKER = ipaModel.IPA_STRESS_MARKER;
-const GLOSS_STYLE_KEYS = ["gla", "glb", "glc", "ft"];
-const DEFAULT_ENTRY_EXAMPLE_RENDER_PATTERN = "(\\gla)\n(\\glb)\n(\\glc)\n(\\ft)";
 const DEFAULT_ENTRY_LIST_TAG_DISPLAY_LIMIT = 3;
 const MIN_ENTRY_LIST_TAG_DISPLAY_LIMIT = 2;
 const MAX_ENTRY_LIST_TAG_DISPLAY_LIMIT = 10;
@@ -78,6 +76,30 @@ const searchNormalizationModel = window.ConlexiconSearchNormalization;
 const ENTRY_SEARCH_FIELD_KEYS = entrySearchModel.ENTRY_SEARCH_FIELD_KEYS;
 const glossModel = window.ConlexiconGloss;
 const sourceReferenceModel = window.ConlexiconSourceReferences;
+const dictionaryDataModel = window.ConlexiconDictionaryData;
+const {
+  DEFAULT_ENTRY_SECTION_ORDER,
+  DEFAULT_TOOL_NAV_ORDER,
+  normalizeCorpus,
+  normalizeCorpusBlock,
+  normalizeCorpusLayer,
+  normalizeCorpusUnit,
+  normalizeDefinition,
+  normalizeDictionarySettings,
+  normalizeDocs,
+  normalizeEditPageSwitchAction,
+  normalizeEntryListPartDisplay,
+  normalizeEntrySectionOrder,
+  normalizeGlossFontFamily,
+  normalizeGlossFontSize,
+  normalizeGlossStyles,
+  normalizeToolNavOrder,
+  normalizeUiLanguage,
+  normalizeUiSkin,
+  normalizeUiTheme,
+  reserveEntityId,
+  uid,
+} = dictionaryDataModel;
 const sourceInputReferences = new WeakMap();
 const QueryPageCache = window.ConlexiconQueryPageCache.QueryPageCache;
 const queryPageCache = new QueryPageCache({
@@ -160,9 +182,6 @@ const analysisViewStates = new Map();
 const qualityViewStates = new Map();
 const corpusViewStates = new Map();
 let corpusDraftState = null;
-const DEFAULT_TOOL_NAV_ORDER = ["editor", "docs", "corpus", "analysis", "quality", "ipa", "morphology-functions", "morphology-tables", "settings", "manager"];
-const DEFAULT_ENTRY_SECTION_ORDER = ["definitions", "etymology", "derived", "morphology", "notes"];
-const ENTRY_LIST_PART_DISPLAY_OPTIONS = ["subtitle", "chips", "both"];
 let activeFilter = null;
 let entryQueryState = {
   key: "",
@@ -1954,18 +1973,6 @@ function t(key) {
   return i18n[currentLanguage][key] || i18n.zh[key] || key;
 }
 
-function normalizeUiLanguage(value) {
-  return value === "en" ? "en" : "zh";
-}
-
-function normalizeUiTheme(value) {
-  return value === "dark" ? "dark" : "light";
-}
-
-function normalizeUiSkin(value) {
-  return SKIN_OPTIONS.some((option) => option.id === value) ? value : "classic";
-}
-
 function readCachedUiPreferences() {
   try {
     const raw = localStorage.getItem(UI_PREFERENCES_STORAGE_KEY);
@@ -2386,81 +2393,9 @@ function normalizeDictionary(dictionary) {
 }
 
 function normalizeEntry(entry, usedIds = new Set()) {
-  const tags = normalizeTagList(entry.tags);
-
-  const definitions = Array.isArray(entry.definitions)
-    ? entry.definitions.map((definition) => normalizeDefinition(definition, usedIds))
-    : [];
-
   // Previously stored duplicates must remain readable/removable; saves are validated by the server.
   const sources = sourceReferenceModel.normalizeSourceReferences(entry.etymology?.sources || [], { allowDuplicateTargets: true });
-
-  const morphologyState = morphologyModel.normalizeEntryMorphologyState(entry);
-  return {
-    id: entry.id || uid("entry"),
-    lemma: entry.lemma || "",
-    pronunciation: entry.pronunciation || "",
-    tags,
-    definitions,
-    etymology: {
-      sources,
-      description: entry.etymology?.description || "",
-    },
-    notes: entry.notes || "",
-    morphologyMode: morphologyState.morphologyMode,
-    morphologyGroups: morphologyState.morphologyGroups,
-    createdAt: entry.createdAt || new Date().toISOString(),
-    updatedAt: entry.updatedAt || new Date().toISOString(),
-  };
-}
-
-function normalizeDefinition(definition = {}, usedIds = new Set()) {
-  return {
-    id: reserveEntityId(definition.id, "def", usedIds),
-    meaning: definition.meaning || "",
-    example: definition.example || "",
-    note: definition.note || "",
-  };
-}
-
-function normalizeDictionarySettings(settings = {}) {
-  const search = entrySearchModel.normalizeEntrySearchSettings(settings.search);
-  return {
-    ...settings,
-    glossStyles: normalizeGlossStyles(settings.glossStyles),
-    corpusUnitCardRenderPattern: String(settings.corpusUnitCardRenderPattern ?? settings.corpusUnitRenderPattern ?? ""),
-    corpusUnitCardGlossAlign: Boolean(settings.corpusUnitCardGlossAlign ?? true),
-    corpusUnitRenderPattern: String(settings.corpusUnitRenderPattern || ""),
-    corpusUnitGlossAlign: Boolean(settings.corpusUnitGlossAlign ?? true),
-    entryExampleRenderPattern: String(settings.entryExampleRenderPattern ?? DEFAULT_ENTRY_EXAMPLE_RENDER_PATTERN),
-    entryExampleGlossAlign: Boolean(settings.entryExampleGlossAlign ?? true),
-    corpusAutoSave: Boolean(settings.corpusAutoSave ?? true),
-    docsAutoSave: Boolean(settings.docsAutoSave ?? true),
-    tagDisplayMap: normalizeTagDisplayMap(settings.tagDisplayMap),
-    entryListRawTagDisplay: Boolean(settings.entryListRawTagDisplay),
-    filterMenuRawTagDisplay: Boolean(settings.filterMenuRawTagDisplay),
-    entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(settings.entryListTagDisplayLimit),
-    entryListPartDisplay: normalizeEntryListPartDisplay(settings.entryListPartDisplay),
-    partOfSpeechTags: normalizeTagList(settings.partOfSpeechTags),
-    tagSortOrder: normalizeTagList(settings.tagSortOrder),
-    redHighlightTags: normalizeTagList(settings.redHighlightTags),
-    tagListSeparatorStyle: normalizeTagListSeparatorStyle(settings.tagListSeparatorStyle),
-    entryListTagFiltering: Boolean(settings.entryListTagFiltering ?? true),
-    entryListPolysemyDisplay: Boolean(settings.entryListPolysemyDisplay),
-    networkPolysemyDisplay: Boolean(settings.networkPolysemyDisplay),
-    showEmptyEntrySections: Boolean(settings.showEmptyEntrySections),
-    entrySectionOrder: normalizeEntrySectionOrder(settings.entrySectionOrder),
-    search,
-    searchHighlight: Boolean(settings.searchHighlight ?? true),
-    partialEditPageSwitchAction: normalizeEditPageSwitchAction(settings.partialEditPageSwitchAction),
-    fullEditPageSwitchAction: normalizeEditPageSwitchAction(settings.fullEditPageSwitchAction),
-    allowEmptyPronunciation: Boolean(settings.allowEmptyPronunciation ?? true),
-    allowEmptyTags: Boolean(settings.allowEmptyTags ?? true),
-    allowEmptyDefinitions: Boolean(settings.allowEmptyDefinitions ?? true),
-    ipaKeyboard: normalizeIpaKeyboard(settings.ipaKeyboard),
-    ipa: normalizeIpaSettings(settings.ipa),
-    toolNavOrder: normalizeToolNavOrder(settings.toolNavOrder),
-  };
+  return dictionaryDataModel.normalizeEntryFields(entry, sources, usedIds);
 }
 
 function defaultEntrySearchProfile(dictionary = activeDictionary()) {
@@ -2570,72 +2505,6 @@ function entrySearchQuerySignature(dictionary = activeDictionary()) {
     [...fuzzyFields].join(","),
     stableJson(normalization),
   ].join("|");
-}
-
-function normalizeEditPageSwitchAction(value) {
-  return ["save", "discard", "prompt"].includes(value)
-    ? value
-    : "discard";
-}
-
-function normalizeGlossFontFamily(value) {
-  return ["serif", "sans", "mono"].includes(value) ? value : "serif";
-}
-
-function normalizeGlossFontSize(value) {
-  return ["small", "medium", "large"].includes(value) ? value : "medium";
-}
-
-function normalizeGlossStyles(styles = {}) {
-  const fallbackFont = normalizeGlossFontFamily("serif");
-  return Object.fromEntries(GLOSS_STYLE_KEYS.map((key) => {
-    const style = styles?.[key] && typeof styles[key] === "object" ? styles[key] : {};
-    return [key, {
-      fontFamily: normalizeGlossFontFamily(style.fontFamily || fallbackFont),
-      fontSize: normalizeGlossFontSize(style.fontSize),
-      bold: Boolean(style.bold),
-      italic: Boolean(style.italic ?? (key === "ft")),
-      ...(key === "glb" ? { smallCaps: Boolean(style.smallCaps) } : {}),
-    }];
-  }));
-}
-
-function normalizeToolNavOrder(order = []) {
-  const source = Array.isArray(order) ? order : [];
-  const result = [];
-  source.forEach((item) => {
-    const view = String(item || "").trim();
-    if (DEFAULT_TOOL_NAV_ORDER.includes(view) && !result.includes(view)) {
-      result.push(view);
-    }
-  });
-  DEFAULT_TOOL_NAV_ORDER.forEach((view) => {
-    if (!result.includes(view)) {
-      result.push(view);
-    }
-  });
-  return result;
-}
-
-function normalizeEntrySectionOrder(order = []) {
-  const source = Array.isArray(order) ? order : [];
-  const result = [];
-  source.forEach((item) => {
-    const section = String(item || "").trim();
-    if (DEFAULT_ENTRY_SECTION_ORDER.includes(section) && !result.includes(section)) {
-      result.push(section);
-    }
-  });
-  DEFAULT_ENTRY_SECTION_ORDER.forEach((section) => {
-    if (!result.includes(section)) {
-      result.push(section);
-    }
-  });
-  return result;
-}
-
-function normalizeEntryListPartDisplay(value) {
-  return ENTRY_LIST_PART_DISPLAY_OPTIONS.includes(value) ? value : "subtitle";
 }
 
 function entrySectionLabel(section) {
@@ -2767,82 +2636,6 @@ function serializeTagDisplayMap(map = {}) {
     .join("\n");
 }
 
-function normalizeDocs(docs = {}) {
-  return {
-    markdown: String(docs.markdown || ""),
-  };
-}
-
-function normalizeCorpus(corpus = {}, usedIds = null) {
-  const reservedIds = usedIds || new Set();
-  return {
-    ...corpus,
-    blocks: Array.isArray(corpus.blocks) ? corpus.blocks.map((block) => normalizeCorpusBlock(block, reservedIds)) : [],
-    units: Array.isArray(corpus.units) ? corpus.units.map((unit) => normalizeCorpusUnit(unit, reservedIds)) : [],
-  };
-}
-
-function normalizeCorpusBlock(block = {}, usedIds = new Set()) {
-  const now = new Date().toISOString();
-  return {
-    ...block,
-    id: reserveEntityId(block.id, "corpus-block", usedIds),
-    title: String(block.title || ""),
-    attributes: normalizeCorpusAttributes(block.attributes),
-    tags: normalizeTagList(block.tags),
-    notes: String(block.notes || ""),
-    unitIds: normalizeCorpusUnitIds(block.unitIds),
-    layers: Array.isArray(block.layers) ? block.layers.map((layer) => normalizeCorpusLayer(layer, usedIds)) : [],
-    createdAt: block.createdAt || now,
-    updatedAt: block.updatedAt || now,
-  };
-}
-
-function normalizeCorpusLayer(layer = {}, usedIds = new Set()) {
-  return {
-    ...layer,
-    id: reserveEntityId(layer.id, "corpus-layer", usedIds),
-    name: String(layer.name || ""),
-    speaker: String(layer.speaker || ""),
-    modality: String(layer.modality || ""),
-    attributes: normalizeCorpusAttributes(layer.attributes),
-    tags: normalizeTagList(layer.tags),
-    notes: String(layer.notes || ""),
-    unitIds: normalizeCorpusUnitIds(layer.unitIds),
-  };
-}
-
-function normalizeCorpusUnit(unit = {}, usedIds = new Set()) {
-  const now = new Date().toISOString();
-  return {
-    ...unit,
-    id: reserveEntityId(unit.id, "corpus-unit", usedIds),
-    content: String(unit.content || ""),
-    attributes: normalizeCorpusAttributes(unit.attributes),
-    tags: normalizeTagList(unit.tags),
-    notes: String(unit.notes || ""),
-    createdAt: unit.createdAt || now,
-    updatedAt: unit.updatedAt || now,
-  };
-}
-
-function normalizeCorpusAttributes(attributes = {}) {
-  if (!attributes || typeof attributes !== "object" || Array.isArray(attributes)) {
-    return {};
-  }
-  return Object.fromEntries(
-    Object.entries(attributes)
-      .map(([key, value]) => [String(key).trim(), String(value ?? "")])
-      .filter(([key]) => key),
-  );
-}
-
-function normalizeCorpusUnitIds(unitIds = []) {
-  return Array.isArray(unitIds)
-    ? unitIds.map((unitId) => String(unitId || "").trim()).filter(Boolean)
-    : [];
-}
-
 function normalizeMorphology(morphology = {}, usedIds = new Set()) {
   const normalized = morphologyModel.normalizeMorphology(morphology, {
     usedIds,
@@ -2931,17 +2724,6 @@ function hasStressOutput(value) {
 
 function normalizeIpaRule(rule = {}) {
   return ipaModel.normalizeIpaRule(rule);
-}
-
-function uid(prefix) {
-  return `${prefix}-${crypto.randomUUID()}`;
-}
-
-function reserveEntityId(value, prefix, usedIds) {
-  const existing = String(value || "").trim();
-  const id = existing || uid(prefix);
-  usedIds.add(id);
-  return id;
 }
 
 function corpusEntityIdRecords(corpus = {}) {
