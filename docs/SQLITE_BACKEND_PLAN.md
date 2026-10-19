@@ -87,6 +87,7 @@ SQLite 化后，`DictionaryQueryContext` 应从“请求级临时 Map/Set”自�
 - 词条关系、facets，以及轻量分析的 `partStats`／`tagStats`／`tagSetStats` 只依赖词典 ID 与 settings，通过 `dictionaryQueryContext()` 获取配置；docs、corpus 或形态模块损坏不影响这些只读结果。完整快照与导出读取全部模块，损坏时显式失败。
 - 普通保存只读取 settings 与实际用到的模块：词条保存、批量 patch 和 settings 保存读取形态配置（用于形态校验与形态搜索 projection），形态保存读取形态配置，语料保存读取 corpus；metadata、IPA、docs 保存和删除词条只读 settings。docs 或 corpus 损坏不影响词条保存。
 - 普通保存不扫描无关实体类型，只在数据库无法拒绝的提交范围内检查重复：词条保存不做 ID 检查，义项 ID 重复由主键约束失败并整体回滚；形态保存在生成写入计划之前拒绝提交内重复的组／表 ID（写入计划按 ID 建索引，重复会被静默合并）；语料保存检查语料内部 ID 重复。重复返回 `duplicate_entity_ids_scoped`。全局唯一由服务端生成 ID（新建词条只走 `POST`，`PUT` 只更新已有词条）、导入边界的完整检查和数据库主键共同保证。
+- `NOT NULL` 列、主键和 `COUNT` 结果按写入值直接读取，不在读取处补默认值；可空列（如 `pronunciation`、`notes`、释义字段、`target_entry_id`、时间戳）保留 `NULL` → `""` 的转换。形态子表的 `row_count`／`column_count` 由写入前的形态规范化保证不小于 1（保存与导入都经过它），读取和写入计划都不再兜底。
 
 ### 共享数据规则
 

@@ -2250,9 +2250,9 @@ async function loadState() {
     const serverState = await api("/api/state");
     backendAvailable = true;
     backendMessage = "";
-    currentLanguage = normalizeUiLanguage(serverState.uiLanguage);
-    currentTheme = normalizeUiTheme(serverState.uiTheme);
-    currentSkin = normalizeUiSkin(serverState.uiSkin);
+    currentLanguage = serverState.uiLanguage;
+    currentTheme = serverState.uiTheme;
+    currentSkin = serverState.uiSkin;
     cacheUiPreferences({ uiTheme: currentTheme, uiSkin: currentSkin });
     await applyServerState({
       ...serverState,
@@ -2271,15 +2271,7 @@ async function loadState() {
 }
 
 function normalizeDictionarySummary(summary) {
-  if (!summary || typeof summary !== "object") {
-    return null;
-  }
-  const entryCount = Number(summary.entryCount);
-  const rootCount = Number(summary.rootCount);
-  return {
-    entryCount: Number.isFinite(entryCount) && entryCount >= 0 ? entryCount : null,
-    rootCount: Number.isFinite(rootCount) && rootCount >= 0 ? rootCount : null,
-  };
+  return summary ? { entryCount: summary.entryCount, rootCount: summary.rootCount } : null;
 }
 
 function mergeDictionaryMetadataSnapshot(previous, metadata) {
@@ -2351,21 +2343,22 @@ function normalizeState(source) {
     selectedEntryId: source.selectedEntryId || "",
     selectedDictionaryConfigId: source.selectedDictionaryConfigId || source.activeDictionaryId || "",
     activeView: source.activeView || "editor",
-    uiLanguage: normalizeUiLanguage(source.uiLanguage),
-    uiTheme: normalizeUiTheme(source.uiTheme),
-    uiSkin: normalizeUiSkin(source.uiSkin),
-    dictionaries: Array.isArray(source.dictionaries) ? source.dictionaries.map(normalizeDictionaryMetadata) : [],
+    uiLanguage: source.uiLanguage,
+    uiTheme: source.uiTheme,
+    uiSkin: source.uiSkin,
+    dictionaries: source.dictionaries.map(normalizeDictionaryMetadata),
   };
 }
 
-function normalizeDictionaryMetadata(dictionary = {}) {
+// An empty name is valid data; only its display falls back to the localized default.
+function normalizeDictionaryMetadata(dictionary) {
   return {
-    id: String(dictionary.id || "").trim(),
-    name: String(dictionary.name || t("unnamedDictionary")),
-    language: String(dictionary.language || ""),
-    description: String(dictionary.description || ""),
-    createdAt: String(dictionary.createdAt || ""),
-    updatedAt: String(dictionary.updatedAt || ""),
+    id: dictionary.id,
+    name: dictionary.name || t("unnamedDictionary"),
+    language: dictionary.language,
+    description: dictionary.description,
+    createdAt: dictionary.createdAt,
+    updatedAt: dictionary.updatedAt,
     summary: normalizeDictionarySummary(dictionary.summary),
   };
 }
@@ -3275,9 +3268,6 @@ function skinOptionLabel(skinId) {
 }
 
 function renderSkinPicker() {
-  if (!elements.skinPickerMenu) {
-    return;
-  }
   if (elements.skinPickerMenu.childElementCount !== SKIN_OPTIONS.length) {
     elements.skinPickerMenu.innerHTML = SKIN_OPTIONS.map((option) => `
       <button class="skin-picker-option" type="button" role="menuitemradio" data-skin-option="${option.id}" aria-checked="false" tabindex="-1">
@@ -3397,13 +3387,13 @@ function refreshEditableSurfaceLocale() {
     elements.dictionaryFormTitle.textContent = t("newDictionary");
   }
 
-  elements.toolNavOrderList?.querySelectorAll(".tool-order-card[data-view]").forEach((card) => {
+  elements.toolNavOrderList.querySelectorAll(".tool-order-card[data-view]").forEach((card) => {
     const label = card.querySelector("strong");
     if (label) {
       label.textContent = toolNavLabel(card.dataset.view);
     }
   });
-  elements.entrySectionOrderList?.querySelectorAll(".tool-order-card[data-entry-section]").forEach((card) => {
+  elements.entrySectionOrderList.querySelectorAll(".tool-order-card[data-entry-section]").forEach((card) => {
     const label = card.querySelector("strong");
     if (label) {
       label.textContent = entrySectionLabel(card.dataset.entrySection);
@@ -3413,11 +3403,11 @@ function refreshEditableSurfaceLocale() {
   document.querySelectorAll(".ipa-key").forEach((button) => {
     button.setAttribute("aria-label", formatText("insertSymbol", { symbol: button.textContent || "" }));
   });
-  elements.morphologyTableList?.querySelectorAll("[data-col-label]").forEach((input) => {
+  elements.morphologyTableList.querySelectorAll("[data-col-label]").forEach((input) => {
     const index = Number(input.dataset.colLabel) + 1;
     input.setAttribute("aria-label", `${t("columnLabels")} ${index}`);
   });
-  elements.morphologyTableList?.querySelectorAll("[data-row-label]").forEach((input) => {
+  elements.morphologyTableList.querySelectorAll("[data-row-label]").forEach((input) => {
     const index = Number(input.dataset.rowLabel) + 1;
     input.setAttribute("aria-label", `${t("rowLabels")} ${index}`);
   });
@@ -4231,9 +4221,6 @@ function entrySearchProfileSummary(profile) {
 
 function setEntrySearchConfigOpen(open) {
   entrySearchConfigOpen = Boolean(open);
-  if (!elements.entrySearchConfigButton || !elements.entrySearchConfigMenu) {
-    return;
-  }
   elements.entrySearchConfigButton.setAttribute("aria-expanded", String(entrySearchConfigOpen));
   elements.entrySearchConfigMenu.hidden = !entrySearchConfigOpen;
   if (entrySearchConfigOpen) {
@@ -4245,9 +4232,6 @@ function setEntrySearchConfigOpen(open) {
 
 function setEntryFilterMenuOpen(open) {
   entryFilterMenuOpen = Boolean(open && activeDictionary());
-  if (!elements.entryFilterButton || !elements.entryFilterMenu) {
-    return;
-  }
   if (entryFilterMenuOpen) {
     entrySortControl?.close();
     setEntrySearchConfigOpen(false);
@@ -4312,7 +4296,7 @@ function renderEntrySearchConfig() {
   const profile = runtimeEntrySearchProfile(dictionary);
   const matchState = currentEntrySearchSummary(dictionary);
   const countByField = new Map(
-    (matchState.summary?.fields || []).map((item) => [item.field, Math.max(0, Number(item.entryCount) || 0)]),
+    (matchState.summary?.fields || []).map((item) => [item.field, item.entryCount]),
   );
   const focusedControl = document.activeElement?.dataset.runtimeSearchEnabled
     ? { type: "enabled", field: document.activeElement.dataset.runtimeSearchEnabled }
@@ -5672,22 +5656,16 @@ function rootSearchExpandsGroups() {
 }
 
 function rootGroupDerivedCount(group) {
-  return Math.max(
-    0,
-    Number(group?.derivedCount) || (Array.isArray(group?.derived) ? group.derived.length : 0),
-  );
+  return group.derivedCount;
 }
 
 function rootGroupMatchedDerivedCount(group) {
-  return Math.max(
-    0,
-    Number(group?.matchedDerivedCount) || (Array.isArray(group?.matchedDerived) ? group.matchedDerived.length : 0),
-  );
+  return group.matchedDerivedCount;
 }
 
 function rootGroupIsExpanded(group) {
-  const rootId = group?.root?.id || "";
-  if (!rootId || !rootGroupDerivedCount(group)) {
+  const rootId = group.root.id;
+  if (!rootGroupDerivedCount(group)) {
     return false;
   }
   if (rootSearchExpandsGroups() && rootGroupMatchedDerivedCount(group)) {
@@ -5707,15 +5685,13 @@ function rootGroupEstimatedHeight(group) {
   return rootHeight + derivedHeight;
 }
 
-function rootGroupWindowMetricHeight(metric = {}) {
-  const groupCount = Math.max(0, Number(metric.groupCount) || 0);
-  const derivedCount = Math.max(0, Number(metric.derivedCount) || 0);
+function rootGroupWindowMetricHeight({ groupCount, derivedCount }) {
   const includeDerived = rootExpansionMode === "all" || rootSearchExpandsGroups();
   return (groupCount * 156) + (includeDerived ? derivedCount * 116 : 0);
 }
 
 function applyRootGroupWindowMetrics(state, pageInfo = null) {
-  const metrics = Array.isArray(pageInfo?.windowMetrics) ? pageInfo.windowMetrics : [];
+  const metrics = pageInfo?.windowMetrics || [];
   metrics.forEach((metric, index) => {
     const page = state.pages[index];
     if (!page) {
@@ -5832,26 +5808,15 @@ function evictDistantQueryWindowPages(
 }
 
 function compactRootGroupsQueryResult(result) {
-  const groups = Array.isArray(result?.items)
-    ? result.items.map((group) => ({
-      root: group.root || null,
-      derivedCount: Math.max(0, Number(group.derivedCount) || 0),
-      matchedDerivedCount: Math.max(0, Number(group.matchedDerivedCount) || 0),
-      rootMatches: Boolean(group.rootMatches),
-    })).filter((group) => group.root?.id)
-    : [];
   return {
-    groups,
-    searchSummary: result?.searchSummary || null,
-    pageInfo: result?.pageInfo ? {
-      ...result.pageInfo,
-      windowMetrics: Array.isArray(result.pageInfo.windowMetrics)
-        ? result.pageInfo.windowMetrics.map((metric) => ({
-          groupCount: Math.max(0, Number(metric?.groupCount) || 0),
-          derivedCount: Math.max(0, Number(metric?.derivedCount) || 0),
-        }))
-        : [],
-    } : null,
+    groups: result.items.map(({ root, derivedCount, matchedDerivedCount, rootMatches }) => ({
+      root,
+      derivedCount,
+      matchedDerivedCount,
+      rootMatches,
+    })),
+    searchSummary: result.searchSummary,
+    pageInfo: result.pageInfo,
   };
 }
 
@@ -5949,9 +5914,7 @@ function startRootGroupDerivedLoad(dictionary, rootId) {
     key: queryPageCacheKey("root-group-entries", key),
     dictionaryId: dictionary.id,
     load: () => api(rootGroupDerivedUrl(dictionary, rootId)),
-    transform: (result) => ({
-      items: Array.isArray(result?.items) ? result.items.filter((entry) => entry?.id) : [],
-    }),
+    transform: (result) => ({ items: result.items }),
   })
     .then((result) => {
       const active = rootGroupDerivedStates.get(key);
@@ -6212,17 +6175,14 @@ function entryQueryApiKey(dictionary = activeDictionary()) {
 
 function compactEntryQueryResult(result) {
   return {
-    items: Array.isArray(result?.items)
-      ? result.items
-          .map((item) => item?.entry?.id
-            ? { ...item.entry, feature: item.feature, ...(item.issues ? { qualityIssues: item.issues } : {}) }
-            : item)
-          .filter((entry) => entry?.id)
-      : [],
-    pageInfo: result?.pageInfo || null,
-    searchSummary: result?.searchSummary || null,
-    summary: result?.summary || null,
-    source: result?.source || null,
+    items: result.items.map((item) => (item.entry
+      ? { ...item.entry, feature: item.feature, ...(item.issues ? { qualityIssues: item.issues } : {}) }
+      : item)),
+    pageInfo: result.pageInfo,
+    searchSummary: result.searchSummary,
+    // Only feature and quality responses carry a summary and source.
+    summary: result.summary || null,
+    source: result.source || null,
   };
 }
 
@@ -6235,8 +6195,7 @@ function recordFeatureResultSummary(result) {
       return qualitySelectorEntryCount(result.summary, variant.category, variant.value);
     }
     if (variant.resultSource?.type === "ipaAutoCompare") {
-      const row = (result.summary.views || []).find((item) => item.key === variant.category);
-      return Math.max(0, Number(row?.entryCount) || 0);
+      return result.summary.views.find((item) => item.key === variant.category).entryCount;
     }
     if (variant.resultSource?.type === "ipaDistribution") {
       const facets = {
@@ -6245,24 +6204,24 @@ function recordFeatureResultSummary(result) {
         final: "finals",
         syllableCount: "syllableCounts",
       };
-      const row = (result.summary.distributions?.[facets[variant.category]] || [])
+      // A bucket that no longer exists has no entries.
+      const row = result.summary.distributions[facets[variant.category]]
         .find((item) => String(item.value) === String(variant.value));
-      return Math.max(0, Number(row?.entryCount) || 0);
+      return row?.entryCount ?? 0;
     }
     if (variant.resultSource?.type === "morphologyAnalysis") {
       const summary = result.summary;
       if (variant.category === "assignment") {
-        return Math.max(0, Number(summary.assignment?.[
+        return summary.assignment[
           variant.value === "assigned" ? "assignedEntryCount" : "unassignedEntryCount"
-        ]) || 0);
+        ];
       }
       if (variant.category === "mode") {
-        const row = (summary.modes || []).find((item) => item.mode === variant.value);
-        return Math.max(0, Number(row?.entryCount) || 0);
+        return summary.modes.find((item) => item.mode === variant.value).entryCount;
       }
       if (variant.category === "group") {
-        const row = (summary.groups || []).find((item) => item.groupId === variant.value);
-        return Math.max(0, Number(row?.assignedEntryCount) || 0);
+        // A template group deleted since the filter was made has no entries.
+        return summary.groups.find((item) => item.groupId === variant.value)?.assignedEntryCount ?? 0;
       }
       if (variant.category === "override") {
         const fields = {
@@ -6751,19 +6710,11 @@ function entryFacetsApiKey(dictionary = activeDictionary()) {
 }
 
 function compactEntryFacetsResult(result) {
-  const identities = Array.isArray(result?.identities)
-    ? result.identities.map((identity) => ({
-        value: String(identity?.value || ""),
-        displayLabel: String(identity?.displayLabel || identity?.value || ""),
-        entryCount: Number(identity?.entryCount || 0),
-        isPartOfSpeech: Boolean(identity?.isPartOfSpeech),
-        displayAmbiguous: Boolean(identity?.displayAmbiguous),
-      })).filter((identity) => identity.value)
-    : [];
+  const { identities } = result;
   return {
-    generation: Number(result?.generation || 0),
+    generation: result.generation,
     identities,
-    collisionGroups: Array.isArray(result?.collisionGroups) ? result.collisionGroups : [],
+    collisionGroups: result.collisionGroups,
     parts: identities
       .filter((identity) => identity.isPartOfSpeech)
       .map((identity) => identity.value)
@@ -7099,7 +7050,7 @@ function estimateEntryQualityIssueLines(issues = []) {
   if (!issues.length) {
     return 0;
   }
-  const listWidth = Math.max(0, entryVirtualList.container?.clientWidth || elements.entryList?.clientWidth || 340);
+  const listWidth = Math.max(0, entryVirtualList.container?.clientWidth || elements.entryList.clientWidth || 340);
   const basePerLine = listWidth < 300 ? 2 : listWidth < 420 ? 3 : 4;
   const longestTitle = Math.max(
     ...issues.map((issue) => qualityIssueText(issue).title.length),
@@ -8424,7 +8375,7 @@ function renderEntrySearchSnippets(entry) {
           field: hit.field,
           label: hitLabel(hit),
           value: hit.value,
-          index: Number(hit.sourcePosition) || 0,
+          index: hit.sourcePosition,
         }))
         .filter(({ field, index }) => field !== "definitions" || index !== firstDisplayedDefinitionIndex)
     : (() => {
@@ -8439,7 +8390,7 @@ function renderEntrySearchSnippets(entry) {
             field: record.field,
             label: hitLabel(record),
             value: record.value,
-            index: Number(record.sourcePosition) || 0,
+            index: record.sourcePosition,
           }))
           .filter(({ field, value, index }) => (
             entrySearchModel.textMatches(value, query, {
@@ -8873,9 +8824,6 @@ function createNetworkSvgElement(name, attributes = {}) {
 }
 
 function renderLexicalNetworkScene(focusEntry, relation) {
-  if (!elements.networkViewport || !elements.networkSvg) {
-    return;
-  }
   const nextScene = buildLexicalNetworkScene(focusEntry, relation);
   const layout = layoutLexicalNetworkScene(nextScene);
   nextScene.positions = layout.positions;
@@ -9021,9 +8969,6 @@ function layoutLexicalNetworkScene(scene) {
 }
 
 function updateLexicalNetworkSectionLabels(layout) {
-  if (!elements.networkSections) {
-    return;
-  }
   const labels = (layout.sectionLabels || []).map((section) => {
     const text = createNetworkSvgElement("text", {
       class: `network-section-label ${section.role}`,
@@ -9037,9 +8982,6 @@ function updateLexicalNetworkSectionLabels(layout) {
 }
 
 function renderLexicalNetworkStatus(status) {
-  if (!elements.networkStatus) {
-    return;
-  }
   elements.networkStatus.classList.toggle("error", status === "error");
   if (status === "loading") {
     elements.networkStatus.textContent = t("lexicalNetworkLoading");
@@ -9514,7 +9456,7 @@ function morphologySearchStrings(entry, dictionary = activeDictionary()) {
 }
 
 function renderAnalysis(dictionary = activeDictionary()) {
-  const focusedTab = elements.analysisPanel?.contains(document.activeElement) ? document.activeElement.id : "";
+  const focusedTab = elements.analysisPanel.contains(document.activeElement) ? document.activeElement.id : "";
   try {
     renderAnalysisContent(dictionary);
   } finally {
@@ -9525,9 +9467,6 @@ function renderAnalysis(dictionary = activeDictionary()) {
 }
 
 function renderAnalysisContent(dictionary) {
-  if (!elements.analysisPanel) {
-    return;
-  }
   disconnectMasonryLayoutsWithin(elements.analysisPanel);
   if (!dictionary) {
     elements.analysisPanel.innerHTML = "";
@@ -10278,10 +10217,10 @@ function renderAnalysisActivityQueryPage(queryState, subpage) {
 function renderAnalysisRootFamiliesQueryPage(queryState) {
   let body = "";
   if (queryState.status === "ready") {
-    const widget = queryState.response?.widgets?.families || {};
-    const rows = (widget.rows || []).map((row) => [
+    const widget = queryState.response.widgets.families;
+    const rows = widget.rows.map((row) => [
       row.lemma || aText("无词形", "No lemma"),
-      Math.max(0, Number(row.derivedEntryCount) || 0),
+      row.derivedEntryCount,
       row.action || directEntryAction(row.rootId),
     ]);
     body = `<section class="analysis-detail-grid">${analysisCard(
@@ -10400,9 +10339,6 @@ function activeAnalysisPage() {
 }
 
 function renderQuality(dictionary = activeDictionary()) {
-  if (!elements.qualityPanel) {
-    return;
-  }
   const focusedTab = elements.qualityPanel.contains(document.activeElement) ? document.activeElement.id : "";
   disconnectMasonryLayoutsWithin(elements.qualityPanel);
   if (!dictionary) {
@@ -10792,20 +10728,17 @@ function analysisNoPartAction(partWidget) {
 }
 
 function analysisPartTypeFactRows(partWidget) {
-  return [[aText("词性种类", "Part types"), Number(partWidget?.partTypeCount || 0)]];
+  return [[aText("词性种类", "Part types"), partWidget.partTypeCount]];
 }
 
 function analysisNoPartFactRows(partWidget) {
-  return [[t("noPart"), Number(partWidget?.noPartOfSpeechCount || 0), analysisNoPartAction(partWidget)]];
+  return [[t("noPart"), partWidget.noPartOfSpeechCount, analysisNoPartAction(partWidget)]];
 }
 
 function renderAnalysisOverviewQuery(response) {
-  const widgets = response?.widgets || {};
-  const lexicon = widgets.lexicon || {};
-  const entryCount = Number(lexicon.entryCount || 0);
-  const rootEntryCount = Number(lexicon.rootEntryCount || 0);
-  const derivedEntryCount = Number(lexicon.derivedEntryCount || 0);
-  const multiSourceEntryCount = Number(lexicon.multiSourceEntryCount || 0);
+  const { widgets } = response;
+  const { lexicon } = widgets;
+  const { entryCount, rootEntryCount, derivedEntryCount, multiSourceEntryCount } = lexicon;
   const rootAction = analysisQueryFilterAction(
     lexicon.rootAction,
     activeFilterTitleDescriptor("activeFilterRoots"),
@@ -10832,22 +10765,23 @@ function renderAnalysisOverviewQuery(response) {
     lexicon.multiSourceAction,
     activeFilterTitleDescriptor("activeFilterMultiSourceEntries"),
   );
-  const coverageRows = widgets.coverage?.rows || [];
+  const coverageRows = widgets.coverage.rows;
   const coverageOrder = ["definition", "example", "ipa", "entryNote"];
   const coverageByField = new Map(coverageRows.map((row) => [row.field, row]));
   const coverage = coverageOrder.map((field) => coverageByField.get(field)).filter(Boolean).map((row) => {
-    const itemNote = Number.isFinite(Number(row.itemCount))
-      ? aText(`，共 ${Number(row.itemCount)} 项`, `, ${Number(row.itemCount)} items`)
-      : "";
+    // Only definition and example rows count items.
+    const itemNote = row.itemCount === undefined
+      ? ""
+      : aText(`，共 ${row.itemCount} 项`, `, ${row.itemCount} items`);
     return [
       analysisCoverageFieldMeta(row.field).label,
       row.ratio,
       analysisCoverageRowAction(row),
-      `${Number(row.coveredEntryCount || 0)}/${Number(widgets.coverage?.entryTotal || 0)}${itemNote}`,
+      `${row.coveredEntryCount}/${widgets.coverage.entryTotal}${itemNote}`,
     ];
   });
-  const partWidget = widgets.parts || {};
-  const parts = (partWidget.rows || [])
+  const partWidget = widgets.parts;
+  const parts = partWidget.rows
     .filter((row) => row.part !== NO_PART_FILTER_VALUE)
     .map((row) => {
       const identity = tagModel.displayIdentity(row.part, row.displayLabel, row.displayAmbiguous);
@@ -10861,9 +10795,9 @@ function renderAnalysisOverviewQuery(response) {
         ),
       };
     });
-  const activityWidget = widgets.activity || {};
+  const activityWidget = widgets.activity;
   const activity = {
-    created: (activityWidget.created || []).map((row) => [
+    created: activityWidget.created.map((row) => [
       row.day,
       row.entryCount,
       analysisQueryFilterAction(
@@ -10871,7 +10805,7 @@ function renderAnalysisOverviewQuery(response) {
         activeFilterValueTitleDescriptor("activeFilterCreatedDate", row.day),
       ),
     ]),
-    updated: (activityWidget.updated || []).map((row) => [
+    updated: activityWidget.updated.map((row) => [
       row.day,
       row.entryCount,
       analysisQueryFilterAction(
@@ -10922,15 +10856,15 @@ function renderAnalysisOverviewQuery(response) {
 }
 
 function analysisTagPageRows(response) {
-  const widgets = response?.widgets || {};
-  const parts = (widgets.parts?.rows || [])
+  const { widgets } = response;
+  const parts = widgets.parts.rows
     .filter((row) => row.part !== NO_PART_FILTER_VALUE)
     .map((row) => {
       const identity = tagModel.displayIdentity(row.part, row.displayLabel, row.displayAmbiguous);
       return {
         label: identity.label,
         secondaryLabel: identity.rawLabel,
-        value: Number(row.entryCount || 0),
+        value: row.entryCount,
         action: analysisQueryFilterAction(
           row.action,
           activeFilterValueTitleDescriptor(
@@ -10941,12 +10875,12 @@ function analysisTagPageRows(response) {
         ),
       };
     });
-  const tags = (widgets.tags?.rows || []).map((row) => {
+  const tags = widgets.tags.rows.map((row) => {
     const identity = tagModel.displayIdentity(row.tag, row.displayLabel, row.displayAmbiguous);
     return {
       label: identity.label,
       secondaryLabel: identity.rawLabel,
-      value: Number(row.entryCount || 0),
+      value: row.entryCount,
       action: analysisQueryFilterAction(
         row.action,
         activeFilterValueTitleDescriptor("tags", row.tag, { valueType: "tag" }),
@@ -10965,14 +10899,14 @@ function analysisTagSetTitleDescriptor(tags) {
 }
 
 function analysisTagSetList(widget, queryKey) {
-  const rows = widget?.rows || [];
+  const { rows } = widget;
   if (analysisTagSetRenderState.key !== queryKey) {
     analysisTagSetRenderState = { key: queryKey, visibleCount: 100 };
   }
   const visibleRows = rows.slice(0, analysisTagSetRenderState.visibleCount);
-  const max = Math.max(...rows.map((row) => Number(row.entryCount) || 0), 1);
+  const max = Math.max(...rows.map((row) => row.entryCount), 1);
   const list = visibleRows.map((row) => {
-    const tags = row.tags || [];
+    const { tags } = row;
     const chips = tags.map((tag) => {
       const identity = tagModel.displayIdentity(tag.value, tag.displayLabel, tag.displayAmbiguous);
       return `<span class="analysis-tag-set-chip${tag.isPartOfSpeech ? " is-part" : ""}">
@@ -10980,7 +10914,7 @@ function analysisTagSetList(widget, queryKey) {
         ${identity.rawLabel ? `<small>${escapeHtml(identity.rawLabel)}</small>` : ""}
       </span>`;
     }).join("");
-    const entryCount = Math.max(0, Number(row.entryCount) || 0);
+    const { entryCount } = row;
     const action = analysisQueryFilterAction(row.action, analysisTagSetTitleDescriptor(tags));
     return `
       <button type="button" class="analysis-tag-set-row"${analysisActionAttributes(action)}>
@@ -10992,23 +10926,23 @@ function analysisTagSetList(widget, queryKey) {
   }).join("");
   const remaining = rows.length - visibleRows.length;
   const taggedAction = analysisQueryFilterAction(
-    widget?.taggedAction,
+    widget.taggedAction,
     activeFilterTitleDescriptor("activeFilterHasTags"),
   );
   const untaggedAction = analysisQueryFilterAction(
-    widget?.untaggedAction,
+    widget.untaggedAction,
     activeFilterTitleDescriptor("activeFilterNoTags"),
   );
   const multiTagAction = analysisQueryFilterAction(
-    widget?.multiTagAction,
+    widget.multiTagAction,
     activeFilterTitleDescriptor("activeFilterMultiTagEntries"),
   );
   return `
     ${analysisFactList([
-      [aText("集合种类", "Tag sets"), Number(widget.tagSetCount || 0)],
-      [aText("有标签词条", "Tagged entries"), Number(widget.taggedEntryCount || 0), taggedAction],
-      [aText("无标签词条", "Untagged entries"), Number(widget.untaggedEntryCount || 0), untaggedAction],
-      [aText("多标签词条", "Multi-tag entries"), Number(widget.multiTagEntryCount || 0), multiTagAction],
+      [aText("集合种类", "Tag sets"), widget.tagSetCount],
+      [aText("有标签词条", "Tagged entries"), widget.taggedEntryCount, taggedAction],
+      [aText("无标签词条", "Untagged entries"), widget.untaggedEntryCount, untaggedAction],
+      [aText("多标签词条", "Multi-tag entries"), widget.multiTagEntryCount, multiTagAction],
     ])}
     ${rows.length
       ? `<div class="analysis-tag-set-list">${list}</div>`
@@ -11023,8 +10957,8 @@ function renderAnalysisTagsQueryPage(queryState) {
   let body = "";
   if (queryState.status === "ready") {
     const rows = analysisTagPageRows(queryState.response);
-    const partWidget = queryState.response?.widgets?.parts || {};
-    const tagSetWidget = queryState.response?.widgets?.tagSets || {};
+    const partWidget = queryState.response.widgets.parts;
+    const tagSetWidget = queryState.response.widgets.tagSets;
     body = `<section class="analysis-detail-grid analysis-tags-grid">
       ${analysisCard(aText("词性分布", "Part-of-Speech Distribution"), `
         ${analysisFactList(analysisPartTypeFactRows(partWidget))}
@@ -11055,10 +10989,10 @@ function renderAnalysisTagsQueryPage(queryState) {
 }
 
 function analysisOrthographyRows(rows, labelKey, { frequency = false } = {}) {
-  return (rows || []).map((row) => {
-    const rawValue = String(row.value ?? "");
+  return rows.map((row) => {
+    const rawValue = String(row.value);
     const label = rawValue || aText("未命名", "Untitled");
-    const entryCount = Math.max(0, Number(row.entryCount) || 0);
+    const { entryCount } = row;
     const action = analysisQueryFilterAction(
       row.action,
       activeFilterValueTitleDescriptor(labelKey, label),
@@ -11066,7 +11000,7 @@ function analysisOrthographyRows(rows, labelKey, { frequency = false } = {}) {
     if (!frequency) {
       return [label, entryCount, action];
     }
-    const occurrenceCount = Math.max(0, Number(row.occurrenceCount) || 0);
+    const { occurrenceCount } = row;
     return {
       label,
       value: occurrenceCount,
@@ -11077,7 +11011,7 @@ function analysisOrthographyRows(rows, labelKey, { frequency = false } = {}) {
 }
 
 function renderAnalysisOrthography(response) {
-  const widget = response?.widgets?.orthography || {};
+  const widget = response.widgets.orthography;
   return `<section class="analysis-detail-grid">
     ${analysisCard(aText("词长分布", "Word Length Distribution"), analysisBarList(
       analysisOrthographyRows(widget.wordLengths, "activeFilterWordLength"),
@@ -11119,10 +11053,9 @@ function renderAnalysisOrthographyQueryPage(queryState) {
 }
 
 function ipaDistributionRows(response, facet, category, labelKey) {
-  return (response?.summary?.distributions?.[facet] || []).map((row) => {
-    const value = String(row.value ?? "");
-    const resultCount = Math.max(0, Number(row.entryCount) || 0);
-    const occurrenceCount = Math.max(0, Number(row.occurrenceCount) || 0);
+  return response.summary.distributions[facet].map((row) => {
+    const value = String(row.value);
+    const { entryCount: resultCount, occurrenceCount } = row;
     const titleDescriptor = activeFilterValueTitleDescriptor(labelKey, value);
     const action = featureResultActiveFilterAction(response?.source, [{
       key: `${category}:${value}`,
@@ -11150,10 +11083,8 @@ function renderAnalysisIpaDistributionQuery(response, subpage) {
       ${analysisCard(aText("IPA 尾音分布", "IPA Final Distribution"), analysisBarList(ipaDistributionRows(response, "finals", "final", "activeFilterIpaFinal"), { empty: aText("暂无 IPA", "No IPA yet") }))}
     </section>`;
   }
-  const summary = response?.summary || {};
-  const dictionaryEntryCount = Math.max(0, Number(summary.dictionaryEntryCount) || 0);
-  const ipaEntryCount = Math.max(0, Number(summary.ipaEntryCount) || 0);
-  const noIpaEntryCount = Math.max(0, dictionaryEntryCount - ipaEntryCount);
+  const { dictionaryEntryCount, ipaEntryCount } = response.summary;
+  const noIpaEntryCount = dictionaryEntryCount - ipaEntryCount;
   const ipaCoverage = dictionaryEntryCount ? ipaEntryCount / dictionaryEntryCount : 0;
   return `<section class="analysis-detail-grid">
     ${analysisCard(aText("音节数分布", "Syllable Count Distribution"), analysisBarList(ipaDistributionRows(response, "syllableCounts", "syllableCount", "activeFilterSyllableCount"), { empty: aText("暂无 IPA", "No IPA yet") }))}
@@ -11179,7 +11110,7 @@ function morphologyFeatureVariant(category, value, titleDescriptor, resultCount,
     value,
     scope,
     titleDescriptor,
-    resultCount: Math.max(0, Number(resultCount) || 0),
+    resultCount,
   };
 }
 
@@ -11201,7 +11132,7 @@ function morphologyScopeTitleDescriptor(kind, scope, value) {
 
 function morphologyOverrideBreakdownRows(response, rows, category) {
   const isGroup = category === "overrideGroup";
-  return (rows || []).flatMap((row) => {
+  return rows.flatMap((row) => {
     const id = String(row[isGroup ? "groupId" : "tableId"] || "");
     const baseLabel = isGroup
       ? (row.name || aText("未命名模板组", "Untitled template group"))
@@ -11213,7 +11144,7 @@ function morphologyOverrideBreakdownRows(response, rows, category) {
       ["any", aText("全部", "All"), row.entryCount],
       ["active", aText("活跃", "Active"), row.activeEntryCount],
       ["inactive", aText("休眠", "Dormant"), row.inactiveEntryCount],
-    ].filter(([, , resultCount]) => Number(resultCount) > 0).map(([scope, scopeLabel, resultCount]) => {
+    ].filter(([, , resultCount]) => resultCount > 0).map(([scope, scopeLabel, resultCount]) => {
       const variant = morphologyFeatureVariant(
         category,
         id,
@@ -11223,41 +11154,41 @@ function morphologyOverrideBreakdownRows(response, rows, category) {
       );
       return [
         `${baseLabel} · ${scopeLabel}`,
-        Math.max(0, Number(resultCount) || 0),
-        featureResultActiveFilterAction(response?.source, [variant], category, id, scope),
+        resultCount,
+        featureResultActiveFilterAction(response.source, [variant], category, id, scope),
       ];
     });
   });
 }
 
 function renderAnalysisMorphologyQuery(response, subpage) {
-  const summary = response?.summary || {};
+  const { summary } = response;
   if (subpage === "overrides") {
-    const overrides = summary.overrides || {};
+    const { overrides } = summary;
     const overrideVariants = [
       morphologyFeatureVariant("override", "any", activeFilterTitleDescriptor("activeFilterMorphologyOverrides"), overrides.entryCount),
       morphologyFeatureVariant("override", "active", activeFilterTitleDescriptor("activeFilterMorphologyActiveOverrides"), overrides.activeEntryCount),
       morphologyFeatureVariant("override", "inactive", activeFilterTitleDescriptor("activeFilterMorphologyInactiveOverrides"), overrides.inactiveEntryCount),
     ];
     const overrideAction = (value) => featureResultActiveFilterAction(
-      response?.source,
+      response.source,
       overrideVariants,
       "override",
       value,
     );
-    const topEntries = (overrides.topEntries || []).map((row) => [
+    const topEntries = overrides.topEntries.map((row) => [
       row.lemma || aText("无词形", "No lemma"),
-      Math.max(0, Number(row.storedCellCount) || 0),
+      row.storedCellCount,
       directEntryAction(row.entryId),
     ]);
     return `<section class="analysis-detail-grid">
       ${analysisCard(aText("覆写总览", "Override Overview"), analysisFactList([
-        [aText("有覆写的词条", "Entries with overrides"), overrides.entryCount || 0, overrideAction("any")],
-        [aText("已保存单元格", "Stored cells"), overrides.storedCellCount || 0],
-        [aText("有活跃覆写的词条", "Entries with active overrides"), overrides.activeEntryCount || 0, overrideAction("active")],
-        [aText("活跃覆写单元格", "Active override cells"), overrides.activeCellCount || 0],
-        [aText("有休眠覆写的词条", "Entries with dormant overrides"), overrides.inactiveEntryCount || 0, overrideAction("inactive")],
-        [aText("休眠覆写单元格", "Dormant override cells"), overrides.inactiveCellCount || 0],
+        [aText("有覆写的词条", "Entries with overrides"), overrides.entryCount, overrideAction("any")],
+        [aText("已保存单元格", "Stored cells"), overrides.storedCellCount],
+        [aText("有活跃覆写的词条", "Entries with active overrides"), overrides.activeEntryCount, overrideAction("active")],
+        [aText("活跃覆写单元格", "Active override cells"), overrides.activeCellCount],
+        [aText("有休眠覆写的词条", "Entries with dormant overrides"), overrides.inactiveEntryCount, overrideAction("inactive")],
+        [aText("休眠覆写单元格", "Dormant override cells"), overrides.inactiveCellCount],
       ]))}
       ${analysisCard(aText("覆写词条（按单元格数）", "Override Entries by Stored Cells"), analysisBarList(topEntries, { empty: aText("暂无已保存覆写", "No stored overrides") }))}
       ${analysisCard(aText("覆写词条（按模板组）", "Override Entries by Template Group"), analysisBarList(
@@ -11271,9 +11202,9 @@ function renderAnalysisMorphologyQuery(response, subpage) {
     </section>`;
   }
 
-  const total = Math.max(0, Number(summary.inputEntryCount) || 0);
-  const assigned = Math.max(0, Number(summary.assignment?.assignedEntryCount) || 0);
-  const unassigned = Math.max(0, Number(summary.assignment?.unassignedEntryCount) || 0);
+  const total = summary.inputEntryCount;
+  const assigned = summary.assignment.assignedEntryCount;
+  const unassigned = summary.assignment.unassignedEntryCount;
   const assignmentVariants = [
     morphologyFeatureVariant("assignment", "assigned", activeFilterTitleDescriptor("activeFilterMorphologyAssigned"), assigned),
     morphologyFeatureVariant("assignment", "unassigned", activeFilterTitleDescriptor("activeFilterMorphologyUnassigned"), unassigned),
@@ -11282,13 +11213,13 @@ function renderAnalysisMorphologyQuery(response, subpage) {
     auto: activeFilterTitleDescriptor("activeFilterMorphologyAuto"),
     manual: activeFilterTitleDescriptor("activeFilterMorphologyManual"),
   };
-  const modeVariants = (summary.modes || []).map((row) => morphologyFeatureVariant(
+  const modeVariants = summary.modes.map((row) => morphologyFeatureVariant(
     "mode",
     row.mode,
     modeDescriptors[row.mode],
     row.entryCount,
   ));
-  const groupRows = (summary.groups || []).map((row) => {
+  const groupRows = summary.groups.map((row) => {
     const label = row.name || aText("未命名模板组", "Untitled template group");
     const variant = morphologyFeatureVariant(
       "group",
@@ -11298,8 +11229,8 @@ function renderAnalysisMorphologyQuery(response, subpage) {
     );
     return [
       label,
-      Math.max(0, Number(row.assignedEntryCount) || 0),
-      featureResultActiveFilterAction(response?.source, [variant], "group", row.groupId)
+      row.assignedEntryCount,
+      featureResultActiveFilterAction(response.source, [variant], "group", row.groupId)
         || viewAction("morphology-tables"),
     ];
   });
@@ -11308,30 +11239,30 @@ function renderAnalysisMorphologyQuery(response, subpage) {
       [
         aText("已分配模板组", "Assigned to template groups"),
         total ? assigned / total : 0,
-        featureResultActiveFilterAction(response?.source, assignmentVariants, "assignment", "assigned"),
+        featureResultActiveFilterAction(response.source, assignmentVariants, "assignment", "assigned"),
         `${assigned}/${total}`,
       ],
       [
         aText("未分配模板组", "Not assigned to a template group"),
         total ? unassigned / total : 0,
-        featureResultActiveFilterAction(response?.source, assignmentVariants, "assignment", "unassigned"),
+        featureResultActiveFilterAction(response.source, assignmentVariants, "assignment", "unassigned"),
         `${unassigned}/${total}`,
       ],
     ]))}
-    ${analysisCard(aText("分配模式", "Assignment Mode"), analysisFactList((summary.modes || []).map((row) => [
+    ${analysisCard(aText("分配模式", "Assignment Mode"), analysisFactList(summary.modes.map((row) => [
       row.mode === "manual" ? aText("手动", "Manual") : aText("自动", "Automatic"),
-      Math.max(0, Number(row.entryCount) || 0),
-      featureResultActiveFilterAction(response?.source, modeVariants, "mode", row.mode),
+      row.entryCount,
+      featureResultActiveFilterAction(response.source, modeVariants, "mode", row.mode),
     ])))}
     ${analysisCard(aText("模板组使用", "Template Group Usage"), analysisBarList(groupRows, { empty: aText("暂无形态模板组", "No morphology template groups") }))}
   </section>`;
 }
 
 function renderAnalysisActivityQuery(response, subpage) {
-  const activity = response?.widgets?.activity || {};
-  const rowsForField = (rows, field) => (rows || []).map((row) => [
+  const { activity } = response.widgets;
+  const rowsForField = (rows, field) => rows.map((row) => [
     row.day,
-    Number(row.entryCount || 0),
+    row.entryCount,
     analysisQueryFilterAction(
       row.action,
       activeFilterValueTitleDescriptor(
@@ -11542,24 +11473,24 @@ function analysisIpaCompareRows(response) {
   const matchTitle = activeFilterTitleText(matchTitleDescriptor);
   const looseTitle = activeFilterTitleText(looseTitleDescriptor);
   const strictTitle = activeFilterTitleText(strictTitleDescriptor);
-  const viewCounts = new Map((response?.summary?.views || []).map((row) => [row.key, Number(row.entryCount) || 0]));
-  const outcomeCounts = new Map((response?.summary?.outcomes || []).map((row) => [row.key, Number(row.entryCount) || 0]));
+  const viewCounts = new Map(response.summary.views.map((row) => [row.key, row.entryCount]));
+  const outcomeCounts = new Map(response.summary.outcomes.map((row) => [row.key, row.entryCount]));
   const variants = [
-    { key: "match", titleDescriptor: matchTitleDescriptor, resultCount: viewCounts.get("match") || 0 },
-    { key: "looseMismatch", titleDescriptor: looseTitleDescriptor, resultCount: viewCounts.get("looseMismatch") || 0 },
-    { key: "strictMismatch", titleDescriptor: strictTitleDescriptor, resultCount: viewCounts.get("strictMismatch") || 0 },
+    { key: "match", titleDescriptor: matchTitleDescriptor, resultCount: viewCounts.get("match") },
+    { key: "looseMismatch", titleDescriptor: looseTitleDescriptor, resultCount: viewCounts.get("looseMismatch") },
+    { key: "strictMismatch", titleDescriptor: strictTitleDescriptor, resultCount: viewCounts.get("strictMismatch") },
   ];
   const ipaFilterAction = (category) => featureResultActiveFilterAction(
-    response?.source,
+    response.source,
     variants,
     category,
   );
   return [
-    [matchTitle, viewCounts.get("match") || 0, ipaFilterAction("match")],
-    [looseTitle, viewCounts.get("looseMismatch") || 0, ipaFilterAction("looseMismatch")],
-    [strictTitle, viewCounts.get("strictMismatch") || 0, ipaFilterAction("strictMismatch")],
-    [aText("无法生成", "Unavailable"), outcomeCounts.get("unavailable") || 0],
-    [aText("生成失败", "Failed"), outcomeCounts.get("failed") || 0],
+    [matchTitle, viewCounts.get("match"), ipaFilterAction("match")],
+    [looseTitle, viewCounts.get("looseMismatch"), ipaFilterAction("looseMismatch")],
+    [strictTitle, viewCounts.get("strictMismatch"), ipaFilterAction("strictMismatch")],
+    [aText("无法生成", "Unavailable"), outcomeCounts.get("unavailable")],
+    [aText("生成失败", "Failed"), outcomeCounts.get("failed")],
   ];
 }
 
@@ -12991,12 +12922,12 @@ function collectEntrySearchSettingsForm() {
   return entrySearchModel.normalizeEntrySearchSettings({
     fields,
     normalization: {
-      unicodeNormalization: elements.searchNfcInput?.checked ? "nfc" : "none",
-      caseFolding: Boolean(elements.searchCaseFoldingInput?.checked),
+      unicodeNormalization: elements.searchNfcInput.checked ? "nfc" : "none",
+      caseFolding: elements.searchCaseFoldingInput.checked,
       customRules: collectSearchNormalizationRules(),
     },
     etymologyAutocomplete: {
-      fuzzy: Boolean(elements.sourceFuzzyInput?.checked),
+      fuzzy: elements.sourceFuzzyInput.checked,
     },
   });
 }
@@ -13019,7 +12950,7 @@ function createSearchNormalizationRuleCard(rule = {}) {
 }
 
 function collectSearchNormalizationRules() {
-  return [...(elements.searchNormalizationRuleList?.children || [])].map((card) => ({
+  return [...elements.searchNormalizationRuleList.children].map((card) => ({
     canonical: card.querySelector("[data-search-rule-canonical]")?.value.trim() || "",
     variants: String(card.querySelector("[data-search-rule-variants]")?.value || "")
       .split(/\r?\n/)
@@ -13029,9 +12960,6 @@ function collectSearchNormalizationRules() {
 }
 
 function fillSearchNormalizationRules(rules = []) {
-  if (!elements.searchNormalizationRuleList) {
-    return;
-  }
   elements.searchNormalizationRuleList.replaceChildren(
     ...rules.map((rule) => createSearchNormalizationRuleCard(rule)),
   );
@@ -13072,7 +13000,7 @@ function validateSearchNormalizationForm(search) {
     return true;
   }
   showToast(searchNormalizationValidationMessage(error));
-  const card = elements.searchNormalizationRuleList?.children[error.index];
+  const card = elements.searchNormalizationRuleList.children[error.index];
   card?.querySelector(error.code.includes("canonical")
     ? "[data-search-rule-canonical]"
     : "[data-search-rule-variants]")?.focus();
@@ -13130,9 +13058,6 @@ function fillSettingsForm(dictionary) {
 }
 
 function renderToolNavOrderEditor(order = DEFAULT_TOOL_NAV_ORDER) {
-  if (!elements.toolNavOrderList) {
-    return;
-  }
   elements.toolNavOrderList.innerHTML = "";
   normalizeToolNavOrder(order).forEach((view) => {
     const card = document.createElement("article");
@@ -13148,9 +13073,6 @@ function renderToolNavOrderEditor(order = DEFAULT_TOOL_NAV_ORDER) {
 }
 
 function renderEntrySectionOrderEditor(order = DEFAULT_ENTRY_SECTION_ORDER) {
-  if (!elements.entrySectionOrderList) {
-    return;
-  }
   elements.entrySectionOrderList.innerHTML = "";
   normalizeEntrySectionOrder(order).forEach((section) => {
     const card = document.createElement("article");
@@ -13166,17 +13088,17 @@ function renderEntrySectionOrderEditor(order = DEFAULT_ENTRY_SECTION_ORDER) {
 }
 
 function collectToolNavOrder() {
-  return normalizeToolNavOrder([...elements.toolNavOrderList?.querySelectorAll(".tool-order-card") || []]
+  return normalizeToolNavOrder([...elements.toolNavOrderList.querySelectorAll(".tool-order-card")]
     .map((card) => card.dataset.view));
 }
 
 function collectEntrySectionOrder() {
-  return normalizeEntrySectionOrder([...elements.entrySectionOrderList?.querySelectorAll(".tool-order-card") || []]
+  return normalizeEntrySectionOrder([...elements.entrySectionOrderList.querySelectorAll(".tool-order-card")]
     .map((card) => card.dataset.entrySection));
 }
 
 function toolOrderInsertBefore(y) {
-  const cards = [...(elements.toolNavOrderList?.querySelectorAll(".tool-order-card:not(.dragging)") || [])];
+  const cards = [...elements.toolNavOrderList.querySelectorAll(".tool-order-card:not(.dragging)")];
   return cards.reduce((closest, card) => {
     const box = card.getBoundingClientRect();
     const offset = y - box.top - box.height / 2;
@@ -13188,7 +13110,7 @@ function toolOrderInsertBefore(y) {
 }
 
 function entrySectionOrderInsertBefore(y) {
-  const cards = [...(elements.entrySectionOrderList?.querySelectorAll(".tool-order-card:not(.dragging)") || [])];
+  const cards = [...elements.entrySectionOrderList.querySelectorAll(".tool-order-card:not(.dragging)")];
   return cards.reduce((closest, card) => {
     const box = card.getBoundingClientRect();
     const offset = y - box.top - box.height / 2;
@@ -14213,9 +14135,6 @@ function ensureCorpusSelection(corpus, viewState = activeCorpusViewState()) {
 }
 
 function renderCorpus(dictionary = activeDictionary()) {
-  if (!elements.corpusPanel) {
-    return;
-  }
   syncCorpusEditorToDraft();
   if (!dictionary) {
     elements.corpusItemList.innerHTML = "";
@@ -14245,7 +14164,7 @@ function renderCorpus(dictionary = activeDictionary()) {
 }
 
 function renderCorpusLocale(dictionary = activeDictionary()) {
-  if (!elements.corpusPanel || !dictionary) {
+  if (!dictionary) {
     return;
   }
   const corpus = ensureCorpusDraft(dictionary);
@@ -14257,7 +14176,7 @@ function renderCorpusLocale(dictionary = activeDictionary()) {
 }
 
 function refreshCorpusEditorLocale() {
-  const form = elements.corpusEditor?.querySelector(".corpus-form");
+  const form = elements.corpusEditor.querySelector(".corpus-form");
   const corpus = ensureCorpusDraft();
   if (!form || !corpus) {
     return;
@@ -14639,7 +14558,7 @@ function updateCorpusRecord(record, changes) {
 }
 
 function syncCorpusEditorToDraft() {
-  const form = elements.corpusEditor?.querySelector(".corpus-form");
+  const form = elements.corpusEditor.querySelector(".corpus-form");
   if (!form || !corpusDraftState || elements.corpusEditor.dataset.dictionaryId !== corpusDraftState.dictionaryId) {
     return;
   }
@@ -14826,9 +14745,6 @@ function fillMorphologyFunctionsForm(dictionary) {
 }
 
 function renderMorphologyTablesConfig(dictionary) {
-  if (!elements.morphologyTableList) {
-    return;
-  }
   elements.morphologyTableList.innerHTML = "";
   if (!dictionary) {
     return;
@@ -15300,9 +15216,6 @@ function displayIpaStage(value) {
 }
 
 function renderIpaSandbox() {
-  if (!elements.ipaSandboxInput) {
-    return;
-  }
   const preview = ipaPipelinePreview(elements.ipaSandboxInput.value);
   elements.ipaSandboxMapped.textContent = preview.mapped || "—";
   elements.ipaSandboxSyllables.textContent = preview.syllables || "—";
@@ -16879,9 +16792,9 @@ async function refreshState() {
   const serverState = await api("/api/state");
   backendAvailable = true;
   backendMessage = "";
-  currentLanguage = normalizeUiLanguage(serverState.uiLanguage);
-  currentTheme = normalizeUiTheme(serverState.uiTheme);
-  currentSkin = normalizeUiSkin(serverState.uiSkin);
+  currentLanguage = serverState.uiLanguage;
+  currentTheme = serverState.uiTheme;
+  currentSkin = serverState.uiSkin;
   cacheUiPreferences({ uiTheme: currentTheme, uiSkin: currentSkin });
   await applyServerState({
     ...serverState,
@@ -17762,12 +17675,12 @@ elements.tagListSeparatorStyleInput.addEventListener("change", () => {
 elements.searchFieldEnabledInputs.forEach((input) => {
   input.addEventListener("change", syncEntrySearchSettingsControls);
 });
-elements.addSearchNormalizationRuleButton?.addEventListener("click", () => {
+elements.addSearchNormalizationRuleButton.addEventListener("click", () => {
   const card = createSearchNormalizationRuleCard();
   elements.searchNormalizationRuleList.append(card);
   card.querySelector("[data-search-rule-canonical]")?.focus();
 });
-elements.searchNormalizationRuleList?.addEventListener("click", (event) => {
+elements.searchNormalizationRuleList.addEventListener("click", (event) => {
   if (event.target.closest('[data-action="remove-search-normalization-rule"]')) {
     event.target.closest(".search-normalization-rule-card")?.remove();
   }
