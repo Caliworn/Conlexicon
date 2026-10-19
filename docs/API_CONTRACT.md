@@ -66,7 +66,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/state` | 读取轻量应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme, uiSkin }` | `dictionaries` 只包含 metadata 和 summary；所有词典都通过轻量 SQL 返回 `entryCount` 和严格的 `rootCount`。前端把它当轻量索引，并按需读取当前词典快照；未加载词典不会因此建立词根拓扑。`uiSkin` 为 `classic`、`layered-glass` 或 `liquid-glass`。 |
+| `GET` | `/api/state` | 读取轻量应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme, uiSkin }` | `dictionaries` 只包含 metadata 和 summary；所有词典都通过轻量 SQL 返回 `entryCount` 和严格的 `rootCount`。前端把它当轻量索引，并按需读取当前词典的工作区；未加载词典不会因此建立词根拓扑。`uiSkin` 为 `classic`、`layered-glass` 或 `liquid-glass`。 |
 | `PUT` | `/api/preferences` | 保存全局界面偏好 | `{ uiLanguage, uiTheme, uiSkin }` | 支持独立更新 `uiLanguage`、`uiTheme` 和 `uiSkin`；皮肤与明暗主题正交。未知皮肤值不会写入，并返回 `invalid_ui_skin`。 |
 
 ### 导入、导出与词典生命周期
@@ -78,7 +78,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `GET` | `/api/export?dictionaryId=&format=&profile=` | 导出数据 | 当前支持 JSON 完整词典 payload | 默认 `format=json&profile=legacy-json`；`profile=portable-json` 当前只是同结构兼容别名，不代表已有独立 portable 格式。原生 SQLite 与 XLSX 导出尚未实装。 |
 | `POST` | `/api/import?overwrite=&regenerateId=&profile=` | 导入 JSON | 应用状态 | 默认 `profile=legacy-json`；完整快照导入会通过转换服务执行 legacy 兼容解析、搜索自定义规则检查、规范化和实体 ID 检查。`regenerateId=true` 生成新的词典 UUID，按非覆盖方式新建，忽略 `overwrite`。 |
 | `POST` | `/api/dictionaries` | 新建词典 | 完整词典 JSON | 后端生成词典 UUID，并使用非覆盖式创建；ID 已存在时返回 `dictionary_id_exists`。创建成功后设为当前词典。 |
-| `GET` | `/api/dictionaries/:id` | 读取当前词典完整快照 | 完整词典 JSON | 前端启动或切换当前词典时按需加载详情与尚未拆出的模块；普通列表、搜索、facets 和关系查询优先使用专用读取 API。 |
+| `GET` | `/api/dictionaries/:id` | 读取当前词典工作区 | `{ id, name, language, description, settings, docs, corpus, morphology, createdAt, updatedAt, summary }`，不含 `entries` | 前端启动或切换当前词典时加载；模块为存储中的原样，前端在进入状态时规范化。词条只经 `/entries`、单词条、关系和各查询端点读取，前端不保存整本词条。完整词典（含词条）只经 `/api/export` 导出。 |
 | `POST` | `/api/dictionaries/:id/activate` | 切换当前词典 | 应用状态 | 只改 `index.json` 中的当前词典。 |
 | `DELETE` | `/api/dictionaries/:id` | 删除词典 | 应用状态 | 删除词典文件并更新索引。 |
 
@@ -105,7 +105,8 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
 | `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存已有词条 | `{ entry, summary }` | 只更新已有词条，词条不存在时返回 404 `entry_not_found`，不按客户端 ID 新建。不做实体 ID 检查：义项 ID 重复（无论同一词条内还是撞到其他词条）由主键约束失败并整体回滚。`summary` 是写入后的轻量词典计数。 |
 | `DELETE` | `/api/dictionaries/:id/entries/:entryId` | 删除单个词条 | `{ updatedAt, summary }` | 不因无关历史重复 ID 阻断删除；`summary` 是删除后的轻量词典计数。 |
-| `PATCH` | `/api/dictionaries/:id/entries` | 批量更新词条字段 | `{ id, updatedAt, entries, settings? }` | 当前仅允许 patch `tags` 和 `pronunciation`；`entries` 只包含本次更新的词条；可附带 `settings` 用于标签排序设置保存，附带时与 `PUT /settings` 一样检查搜索自定义规则。 |
+| `PATCH` | `/api/dictionaries/:id/entries` | 批量更新词条字段 | `{ id, updatedAt, entries, settings? }` | 当前仅允许 patch `tags` 和 `pronunciation`；`entries` 只包含本次更新的词条；可附带 `settings` 与本次更新一并保存，附带时与 `PUT /settings` 一样检查搜索自定义规则。 |
+| `POST` | `/api/dictionaries/:id/entries/batch` | 按已保存设置批量改写整本词典 | 试运行：`{ operation, targetCount, dryRun: true }`；执行：`{ id, updatedAt, operation, targetCount, dryRun: false, summary }` | 见下方“整词典批处理”。 |
 
 ### 读取侧查询
 
@@ -148,6 +149,15 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 - `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；仅对同时出现在 `fields` 中的字段生效。
 - 基础搜索逐个独立字段值匹配：一条释义、一个标签、一个来源或一段备注必须自行包含查询文本，查询不会跨多个值拼接命中；`notes` 中的词条备注、释义备注和每个词条形态组备注也分别作为独立值。多标签组合等条件应使用高级筛选。自由文本按当前词典的 `settings.search.normalization` 处理。SQLite 的严格及 fuzzy 查询均直接读取静态 `entry_search_values` 和按需读取形态 `entry_morphology_search_values`；fuzzy 通过连接级确定性函数复用共享搜索模型的评分语义。该路径支持 NFC、Unicode case folding 和自定义等价规则。结构键和词源关系键不套用该自由文本配置。
 - 词源自动补全由独立的 `settings.search.etymologyAutocomplete.fuzzy` 控制，候选通过复用 `/entries` projection 的后端端点获取（见[输入、补全与唯一性](#输入补全与唯一性)），不再扫描前端词典快照。
+
+#### `POST /api/dictionaries/:id/entries/batch`：整词典批处理
+
+前端不保存整本词条，需要遍历全部词条的编辑由服务端按**已保存**的设置完成。请求体：
+
+- `{ operation: "generateIpa", mode: "missing" | "all", dryRun? }`：为词形非空（去首尾空白后）的词条生成发音，`missing` 只处理发音为空的词条，`all` 覆盖全部；生成规则与前端相同，均由 `ipa-model` 的 `generateIpaFromLemma` 按 `settings.ipa` 计算。
+- `{ operation: "applyTagOrder", dryRun? }`：按 `settings.tagSortOrder` 重排每个词条的标签，列出的标签按其顺序排在前面（比较时忽略大小写），其余保持原有相对顺序；只写入顺序确有变化的词条。
+
+`dryRun: true` 只返回将写入的词条数 `targetCount`，不写入；前端用它在确认前判断是否无事可做。目标数为 0 时同样不写入，返回 `dryRun: false` 且不带 `updatedAt`／`summary`。实际写入复用批量 patch 的单事务路径（含搜索投影与词根拓扑排序记录的更新）。`operation` 不在上述两种、`generateIpa` 缺少合法 `mode` 或 `dryRun` 不是布尔值时返回 400 `invalid_entry_batch_payload`。
 
 #### `POST /api/dictionaries/:id/entries/filter-facts`
 
@@ -213,6 +223,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `invalid_entry_payload` | 词条请求体格式无效。 |
 | `entry_id_not_allowed` | 新建词条 POST 携带了只能由后端生成的词条 ID。 |
 | `invalid_entry_updates_payload` | 批量词条更新请求格式无效。 |
+| `invalid_entry_batch_payload` | 整词典批处理的 operation、mode 或 dryRun 无效。 |
 | `entry_not_found` | 词条不存在或已被删除。 |
 | `invalid_entry_morphology` | 词条携带的当前形态组或覆盖项结构无效。 |
 | `invalid_entry_location_target` | 词根窗口定位请求未提供目标词条 ID。 |

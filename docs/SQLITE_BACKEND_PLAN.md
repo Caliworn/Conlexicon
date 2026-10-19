@@ -486,7 +486,7 @@ SQLite repository 的核心读写、schema、迁移脚本和 smoke 已经落地�
 | JSON 导入 / 导出 | 已实现受支持当前字段的 JSON → SQLite projection/blob 写入，以及 SQLite → 当前 JSON profile 导出 | 导出本身需要组装完整 JSON，这是预期交换能力；未知字段不承诺 roundtrip | 保留为导入、导出和迁移边界 |
 | 词典生命周期 | 创建、导入、导出、激活、删除、偏好保存、`hasDictionary()`、`requireDictionary()` 已实现 | 导入和导出会组装完整词典，这是预期兼容能力 | 后续接主服务时补正式迁移和备份流程 |
 | `readState()` / `listDictionaries()` / `getDictionaryMeta()` | 只返回 `dictionary_meta` 与 summary；所有词典的 `entryCount` 和严格 `rootCount` 都由轻量 SQL 计算，这些派生统计不写入 metadata | 不重建完整词典，也不建立词根拓扑 | 前端使用轻量 payload + active dictionary snapshot；词典管理页显示词条数和词根数 |
-| `getDictionarySnapshot()` | 按需组装当前词典完整快照，供当前词典启动加载使用；JSON 导出走独立 `exportDictionary()` 边界 | 是 | 不提供完整快照 PUT；普通保存使用元数据、模块、单词条或批量端点 |
+| `getDictionaryWorkspace()` / `getDictionarySnapshot()` | `GET /api/dictionaries/:id` 只读元数据、模块 blob、形态结构与 summary，不读词条（30k 压测词典约 1 ms、8.6 KiB）；`getDictionarySnapshot()` 组装含全部词条的完整快照，只供导出与测试 | 前者否，后者是 | 不提供完整快照 PUT；普通保存使用元数据、模块、单词条或批量端点，整词典改写使用 `entries/batch` |
 | `updateMetadata()` | 已直接更新 `dictionary_meta` 并返回 metadata payload | 否 | 写入与响应均已收窄 |
 | `updateSettings()` / `updateIpaSettings()` | 已直接更新 `module_blobs.settings`，IPA 只替换 settings 内的 `ipa`；IPA 映射为无 ID 的顺序文本规则，返回 `{ id, updatedAt, settings }` | 否 | 后续如增加 IPA 搜索/质量索引，再同步刷新索引 |
 | `saveDocs()` | 已直接更新 `module_blobs.docs` 并返回 `{ id, updatedAt, docs }` | 否 | 写入与响应均已收窄 |

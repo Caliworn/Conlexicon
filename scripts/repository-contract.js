@@ -66,6 +66,63 @@ async function callApi(repository, method, urlPath, body) {
   };
 }
 
+async function checkWorkspaceAndEntryBatchContract(repository) {
+  const ipaSettings = { mappings: [{ from: "a", to: "ɑ" }] };
+  const dictionary = await repository.createDictionary(normalizeDictionary({
+    id: "dict-entry-batch-contract",
+    name: "Entry Batch Contract",
+    settings: { ipa: ipaSettings, tagSortOrder: ["N", "root"] },
+    docs: { markdown: "# Docs" },
+    entries: [
+      { id: "entry-batch-missing", lemma: "bata", tags: ["root", "x", "n"] },
+      { id: "entry-batch-present", lemma: "taba", pronunciation: "/kept/", tags: ["n", "root"] },
+      { id: "entry-batch-blank", lemma: "   ", tags: ["x"] },
+    ],
+  }));
+  const dictionaryPath = `/api/dictionaries/${encodeURIComponent(dictionary.id)}`;
+
+  // The app's workspace read carries every module and the counts, but no entries.
+  const workspace = (await callApi(repository, "GET", dictionaryPath)).body;
+  assert.equal(Object.hasOwn(workspace, "entries"), false);
+  assert.equal(workspace.docs.markdown, "# Docs");
+  assert.deepEqual(workspace.settings.tagSortOrder, ["N", "root"]);
+  assert.ok(workspace.corpus && workspace.morphology);
+  assert.deepEqual(workspace.summary, { entryCount: 3, rootCount: 3 });
+
+  const batch = (body) => callApi(repository, "POST", `${dictionaryPath}/entries/batch`, body);
+  const entry = async (entryId) => (await callApi(repository, "GET", `${dictionaryPath}/entries/${entryId}`)).body;
+  const before = await repository.getDictionaryMeta(dictionary.id);
+
+  let result = await batch({ operation: "generateIpa", mode: "missing", dryRun: true });
+  assert.deepEqual(result.body, { operation: "generateIpa", targetCount: 1, dryRun: true }, "blank lemmas and existing IPA are skipped");
+  assert.equal((await repository.getDictionaryMeta(dictionary.id)).updatedAt, before.updatedAt, "a dry run writes nothing");
+
+  result = await batch({ operation: "generateIpa", mode: "missing" });
+  assert.equal(result.body.targetCount, 1);
+  assert.deepEqual(result.body.summary, { entryCount: 3, rootCount: 3 });
+  assert.equal((await entry("entry-batch-missing")).pronunciation, ipaModel.generateIpaFromLemma("bata", ipaSettings));
+  assert.equal((await entry("entry-batch-present")).pronunciation, "/kept/");
+
+  result = await batch({ operation: "generateIpa", mode: "all" });
+  assert.equal(result.body.targetCount, 2);
+  assert.equal((await entry("entry-batch-present")).pronunciation, ipaModel.generateIpaFromLemma("taba", ipaSettings));
+
+  // Saved order first (matched without case), the rest in their original order;
+  // entries already in order are not written.
+  result = await batch({ operation: "applyTagOrder" });
+  assert.equal(result.body.targetCount, 1);
+  assert.deepEqual((await entry("entry-batch-missing")).tags, ["n", "root", "x"]);
+  assert.deepEqual((await entry("entry-batch-present")).tags, ["n", "root"]);
+  result = await batch({ operation: "applyTagOrder" });
+  assert.deepEqual(result.body, { operation: "applyTagOrder", targetCount: 0, dryRun: false }, "nothing left to reorder");
+
+  for (const body of [{}, { operation: "generateIpa" }, { operation: "generateIpa", mode: "some" }, { operation: "applyTagOrder", dryRun: "yes" }]) {
+    const error = await assertRejectStatus(batch(body), 400, `invalid batch ${JSON.stringify(body)}`);
+    assert.equal(error.code, "invalid_entry_batch_payload");
+  }
+  await repository.deleteDictionary(dictionary.id);
+}
+
 async function checkEntityIdSaveScopeInvariants(repository) {
   const dictionary = await repository.createDictionary(normalizeDictionary({
     id: "dict-corpus-id-collision-contract",
@@ -2384,6 +2441,7 @@ async function runRepositoryContractTests(options = {}) {
     );
 
     await checkEntityIdSaveScopeInvariants(repository);
+    await checkWorkspaceAndEntryBatchContract(repository);
     await checkEntryFilterFactsContract(repository);
     await checkAnalysisQueryContract(repository);
     await checkTagSetAnalysisContract(repository);
