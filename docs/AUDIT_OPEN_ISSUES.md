@@ -6,8 +6,10 @@
   - 2026-09-26 外部网页端审计报告，以及此前的阶段审计与安全审计（报告未入库）；
   - 2026-09-27 代码审查；
   - 2026-09-29 前端完整快照检查；
-  - 2026-09-30 过度防御与重复代码复查（Claude 两轮扫描，GPT 复核并实测部分条目）。
+  - 2026-09-30 过度防御与重复代码复查（Claude 两轮扫描，GPT 复核并实测部分条目）；
+  - 2026-10-19 代码冗余、过度防御与计算复杂度复查。
 - **复核**：2026-10-01 对照当前代码（基准提交 `4618aad`）复核。文中“已复现”指当时的隔离或临时测试，不表示本次重新做了所有动态测试；未操作真实 `data/`。
+- **本轮范围与证据（2026-10-19，基准 `e5bcd11`）**：重点检查 `app.js`、共享形态／标签／搜索模型、SQLite 读取与保存、查询及功能结果缓存、质量结果服务；新增 A15–A19、C11–C12。A15 用抽取原函数的 VM 表单桩复现；A16 用真实共享模型计数和计时；A17 用真实质量服务与缓存、内存 repository 桩复现；A18 用抽取原函数的 VM 桩计数和计时；A19 用临时 SQLite 实测。计时环境为本机 Node 26.3.1，仅表示这些隔离夹具的耗时，不等于浏览器帧耗时或端到端请求耗时；A17 的字节数来自缓存自身的估算器，不是 RSS。`node scripts/check-all.js` 全部通过，但未覆盖这些新增场景。本轮未修改应用代码、未操作真实 `data/`，未做浏览器交互、堆快照或完整词典规模压测；旧条目不视为全部重新动态验证。
 - **不在范围内**：
   - 皮肤与液态玻璃问题（含 LQ-7 待实测风险）、待视觉审查事项，见交接文档；
   - 已有专题计划的功能工作，见各计划文档。
@@ -33,6 +35,13 @@
 - **定位**：`lib/api-routes.js` 的普通 entries PUT（约 411 行）；repository 的 `saveEntry()`（约 2707 行）。
 - **处理方向**：先做目标词条级的 `updatedAt` 条件和明确的冲突反馈，模块保存随后按模块处理；短期不引入词典级 revision。
 
+### A15（P2）：形态模板组备注的旧值兜底使清空无效
+
+- **现状**：`app.js` 的 `collectMorphologyTemplateGroups()`（约 14168 行）用 `textarea.value || groupCard.dataset.groupNotes || ""` 采集备注；`createMorphologyGroupEditor()` 把已保存备注写入 dataset，而且始终渲染备注输入框。
+- **影响**：用户把非空备注清成空串后，采集结果恢复旧备注。`morphologyTablesFormIsDirty()` 因而可能认为没有修改；直接保存、离开确认和添加／调整表格时的表单重建都读取这一采集结果，清空不能生效。
+- **证据**：在 VM 中执行原采集函数，textarea 为 `""`、dataset 为 `"saved notes"` 时，输出备注仍是 `"saved notes"`。未做浏览器交互复现。
+- **处理方向**：直接采集保证存在的备注控件的 `.value`，保留空串；清理无消费者的 dataset 镜像。验收覆盖单独清空、保存后重读、离开确认，以及调整表格时不恢复旧备注。
+
 ## 2. 规则执行与算法
 
 ### A10：IPA 前后文条件：语义缺陷、静默降级与执行时间失控
@@ -51,9 +60,39 @@
 - 先单独修第 1、2 点再改语法，会让用户规则迁移两次。
 - 改动会改变已有规则的生成结果，需在 CHANGELOG 说明；如果改为受限语法，还需要设计已有规则的转换或提示。
 
+### A16（P1）：形态生成逐格重新规范化整套模板，形成平方级工作
+
+- **定位**：`lib/morphology-model.js` 的 `morphologyCellDefaultValue()`（约 324 行）、`morphologyTemplateGroups()` 与 `resolveCanonicalEntryMorphologyGroups()`；调用方包括 `morphologySearchValueRecords()`、repository 的形态搜索 projection 写入和前端 `renderMorphologyDisplay()`／覆写预览。
+- **现状**：每个非空且未覆写的单元格只需要函数配置，却调用 `normalizeMorphology(dictionary.morphology).functions`，复制全部模板组、表和单元格。自动匹配路径在解析模板组时还额外复制两次，尽管传入的是已规范化的当前模型。
+- **复杂度**：设全词典模板共有 T 格、当前词条生成 C 格，仅这部分重复遍历为 O(C×T)；一张全非空表且 C=T 时为 O(C²)，批量处理 N 个同类词条再乘 N。无关模板也会放大当前词条的生成成本。
+- **证据**：使用 `{lemma}s`、自动匹配、无覆写的已规范化模型，通过 `functions` getter 统计整套规范化次数：100／400／1600 格分别为 102／402／1602 次；预热后 3 次运行的中位数约为 0.99／32.38／471.21 ms。这里只调用一个词条的 `morphologySearchValueRecords()`，不含 SQLite 写入与 DOM。
+- **处理方向**：在输入边界规范化，内部解析与逐格求值共享同一份模板和函数配置；批量 projection 复用一次准备的上下文。无需先引入跨请求全局缓存。验收除生成值一致外，应断言批次内准备次数不随生成格数增长，并复测多模板及批量写入。
+
 ## 3. 无关的全量工作
 
-当前没有未解决项。A13（局部保存后整本重新规范化）与 A14（前端完整词典快照）已于 2026-10-19 处理，见 `CHANGELOG.md`。
+A13（局部保存后整本重新规范化）与 A14（前端完整词典快照）已于 2026-10-19 处理，见 `CHANGELOG.md`。以下为本轮发现的其他路径。
+
+### A17（P2）：功能结果视图增长未计入缓存字节预算
+
+- **定位**：`lib/feature-result-session-cache.js` 的 `getOrCreate()`／`set()`（约 67、94 行），`lib/analysis-feature-service.js` 的 `orderedViewIds()`（约 349 行），`lib/quality-result-service.js` 的 `orderedView()`（约 189 行）。
+- **现状**：会话在 `viewCache` 为空时只估算一次 `estimatedBytes`，加入缓存后，两个服务继续原地添加最多 12 个完整有序 ID／issue 索引数组，却不更新会话或全局 `totalBytes`。缓存访问只检查 TTL，不重新估算这些新增数据。
+- **影响**：实际按同一估算器计量的缓存内容能超过默认 32 MiB 上限而不触发驱逐，统计值也持续偏小。12 个视图限制仍有效，因此不能据此称为无限内存泄漏。
+- **证据**：真实 `QualityResultService`＋默认缓存，内存 repository 提供 40000 个各缺 IPA 的词条；构建后记账 16037990 字节，再用 all／low severity／ipa module 与四种合法排序构造 12 个词条视图。记账仍是 16037990 字节，但 `estimateValueBytes(session)` 已为 35938958 字节，超过 33554432 字节上限，会话仍被保留。此测试隔离了 repository，不代表数据库查询耗时或进程真实内存。
+- **处理方向**：视图增删应同步计入所属缓存的预算，并按更新后的总量驱逐；或给视图单独建立有字节预算的缓存。避免每次热命中都重新遍历整个会话。验收同时覆盖视图增加、替换、驱逐后的计数和两个服务的调用路径。
+
+### A18（P2）：语料关联编辑器重复线性成员查找，并为每层生成全量候选
+
+- **定位**：`app.js` 的 `renderCorpusLinkedUnits()`（约 13743–13767 行），由 `renderCorpusBlockEditor()` 为直属单元调用一次、再由每个 `renderCorpusLayerEditor()` 各调用一次。
+- **现状**：每次重新建立全部 U 个语料单元的 Map，并用 `corpus.units.filter(unit => !unitIds.includes(unit.id))` 求候选；当前父级有 L 个关联时，这一项为 O(U×L)。之后把所有候选写成 `<option>`，直属父级与每层分别重复；左侧语料列表的虚拟滚动不覆盖这个编辑区。
+- **证据**：抽取原函数，在 U=L=4000／8000／16000 的完整关联夹具中，等价成员查找的比较计数为 8002000／32004000／128008000；使用原生 `includes`、简化名称与转义桩时，预热后的 3 次运行中位数约 8.21／27.83／98.15 ms。这里只生成字符串，未计浏览器解析 DOM 和布局。源码还确认，20 个空层加直属父级、10000 个单元会生成 210000 个候选 option（不含占位项）。
+- **处理方向**：短期在一次渲染中共享单元索引，用当前父级 ID Set 做成员查找；大候选列表按搜索／选择时加载的方向单独设计，保持移动单元的现有语义。可与语料工作区计划协调，但不必等待存储拆表才消除 O(U×L)。验收需包含多层与大候选集合的真实浏览器渲染；现有隔离计时不能视为 UI 验收。
+
+### A19（P2）：词条关系读取逐个重建完整衍生词，随后仅返回摘要
+
+- **定位**：`lib/sqlite-dictionary-repository.js` 的 `directDerivedEntries()`（约 2225 行）和 `getEntryRelations()`（约 2451–2461 行）。
+- **现状**：一次查出全部直属衍生词后，对每行调用 `entryFromRow()`，每个词条分别读取 definitions（含例句、备注）、tags、sources、形态组和覆写，共五条 SQL。`getEntryRelations()` 随后只用 `entrySummary()`，丢弃上述大部分字段。已绑定来源也逐个完整重建后再取摘要。同文件已有批量 `entrySummariesFromRows()`，实际只需 tags 和 definition previews。
+- **证据**：临时 SQLite 中，单独调用 `directDerivedEntries()`，100／1000 个直属衍生词分别执行 501／5001 条 prepare／查询，耗时约 24.69／237.89 ms；不含拓扑构建与整个关系请求的其他工作。
+- **处理方向**：关系读取批量构造摘要，复用现有摘要路径并保留排序、来源顺序与消歧字段；不要把完整详情读出来再裁剪。这与 R03 的极大家族响应体积不同：不改变“返回全部”的语义也能消除逐词条的五次详情查询。验收比较 DTO 和排序，并统计批量查询次数。
 
 ## 4. 代码质量与清理
 
@@ -66,6 +105,20 @@ C09（数据库非空列与静态 DOM 兜底）与 C10（前端对服务端响�
 - 液态玻璃引擎的能力检测，按设计保留。
 
 处理方式同 C10：按数据来源判断，来自已校验的内部状态或服务端契约的兜底删除，外部输入与契约中的可选字段保留。
+
+### C11（P3）：前端仍为已迁出的分析构造旧形态表投影
+
+- **定位**：`app.js` 的 `normalizeMorphology()`（约 2482 行）、`legacyMorphologyTableViews()`（约 2516 行）、本地 `normalizeMorphologyCell()`。
+- **现状**：共享模型规范化后，前端额外生成 `morphology.tables`，把每个单元格从 `{sourceText}` 再复制为旧 `{mode, value}` 结构。注释声称数据分析仍在使用它，但当前分析读取服务端 feature result；检查 `app.js` 的全部表读取、页面脚本引用和测试后，没有找到这个扁平 tables 的消费者，实际读取均是 `templateGroups[].tables`。
+- **影响**：加载词典、形态保存响应、模板表单快照及重绘相关规范化，都产生无用的 O(T) 投影；形态保存序列化时还携带这份服务端会忽略的重复内容。旧字段和过时注释也掩盖了当前模型边界。
+- **处理方向**：移除无人消费的扁平投影和转换函数；本地 `normalizeMorphologyCell()` 在规则输入渲染中还有一个缺格兜底调用，不能直接按死函数删除，应改用当前单元格契约。旧 JSON 导入兼容继续留在 legacy migration，不因本项删除受支持的导入边界。验收模板编辑、保存、显示和分析结果。
+
+### C12（P3）：前端残留 19 个未调用的形态／IPA 函数
+
+- **定位与证据**：检查 `app.js` 的标识符引用、`index.html` 和脚本调用后，下列本地函数只有定义，无调用或事件绑定；同名共享模块的方法仍有生产或测试用途，不属于本项删除范围。
+- **形态 5 个**：`normalizeMorphologyOverrides`、`applyMorphologyRuleSyntax`、`morphologySearchStrings`、`extractMorphologyReferences`、`extractMorphologyFunctionCalls`。
+- **IPA 14 个**：`splitKeyboardSymbols`、`normalizeOnsetClusters`、`displayIpaStage`、`applyIpaMappings`、`ruleMatchesAt`、`conditionMatches`、`splitIntoSyllables`、`tokenizePhonemeUnits`、`matchingCodaCluster`、`matchingOnsetCluster`、`middleTokenBreak`、`syllabifyIpaOutput`、`defaultStressIndex`、`resolveIpaStressIndex`。
+- **影响与方向**：除未调用的旧 overrides 实现外，多数只是转调共享模块的包装，增加重复维护入口。删除这些本地定义即可；保留正在使用的 `ipaPipelinePreview`、规则表单规范化和共享模块 API，不为证明删除而增加墓碑测试。
 
 ## 5. 待测量或待决定的风险
 
@@ -89,9 +142,10 @@ C09（数据库非空列与静态 DOM 兜底）与 C10（前端对服务端响�
 
 ## 7. 建议处理顺序
 
-1. **A10**：由第 3 阶段规则引擎处理；可选先做锚点止血。
-2. **A04／A05**：明确联合保存与多窗口冲突契约，配合临时数据回归。
-3. **C09** 剩余部分随相关工作清理；R 类按测量结果或发布目标决定。
+1. **A15、A16**：分别修复空备注保存与形态逐格全量规范化；互相独立，避免捆绑规则语法重写。
+2. **A17、A19**：修正视图缓存预算和关系读取的重复详情查询；**A18** 先做局部集合查找优化，候选控件方案另行复评。
+3. **C11、C12**：清理无消费者的形态投影和本地死函数；**C09** 剩余部分随相关工作清理。
+4. **A10**：仍由第 3 阶段规则引擎处理，可选锚点止血；**A04／A05** 先明确联合保存与多窗口冲突契约。R 类按测量结果或发布目标决定。
 
 ## 8. 维护规则
 
