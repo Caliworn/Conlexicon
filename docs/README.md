@@ -15,6 +15,7 @@
 | [Advanced Filter Query Plan](ADVANCED_FILTER_QUERY_PLAN.md) | F0–F4 核心完成 / F5 已完成 | EntryFilter、轻量分析、IPA/形态 feature result，以及 Gloss/质量结果的后续边界。 |
 | [Feature Result Session Plan](FEATURE_RESULT_SESSION_PLAN.md) | F4b-0–F4b-3 已完成 | IPA/形态结果源、运行时会话、音系引擎边界和分阶段验收。 |
 | [Source Autocomplete Plan](SOURCE_AUTOCOMPLETE_PLAN.md) | 已实装（2026-09-30），界面验收部分待完成 | 来源补全复用 lemma 搜索 projection 的只读候选查询、消歧 DTO、异步 controller 与键盘契约。 |
+| [Entry Incremental Save Plan](ENTRY_INCREMENTAL_SAVE_PLAN.md) | 设计草案，未实施 | 审计 A20＋A05：词条写入只改动变化的主表列、子表和投影字段；`PUT` 基于 `updatedAt` 的条件保存与冲突确认。 |
 | [App Shell Specification](APP_SHELL_SPEC.md) | 阶段 A 已完成 | 响应式应用外壳：布局、外壳状态模型、DOM/CSS 边界、断点与验收。 |
 | [Touch, Focus and Accessibility Plan](TOUCH_FOCUS_A11Y_PLAN.md) | 阶段 A+ 未开始 | 触摸替代交互、输入能力判定、命中区域、焦点管理与无障碍验收。 |
 | [Example Corpus Link Plan](EXAMPLE_CORPUS_LINK_PLAN.md) | 阶段 C 未开始 | 词条例句迁移为语料单元引用的目标模型、自动迁移、编辑行为与验收。 |
