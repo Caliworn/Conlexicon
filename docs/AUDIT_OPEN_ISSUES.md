@@ -7,9 +7,13 @@
   - 2026-09-27 代码审查；
   - 2026-09-29 前端完整快照检查；
   - 2026-09-30 过度防御与重复代码复查（Claude 两轮扫描，GPT 复核并实测部分条目）；
-  - 2026-10-19 代码冗余、过度防御与计算复杂度复查。
+  - 2026-10-19 代码冗余、过度防御与计算复杂度复查；
+  - 2026-10-21 SQLite schema 字段与索引复查；
+  - 2026-10-22 词条增量持久化与形态模板时间戳补充复核。
 - **复核**：2026-10-01 对照当前代码（基准提交 `4618aad`）复核。文中“已复现”指当时的隔离或临时测试，不表示本次重新做了所有动态测试；未操作真实 `data/`。
 - **本轮范围与证据（2026-10-19，基准 `e5bcd11`）**：重点检查 `app.js`、共享形态／标签／搜索模型、SQLite 读取与保存、查询及功能结果缓存、质量结果服务；新增 A15–A19、C11–C12。A15 用抽取原函数的 VM 表单桩复现；A16 用真实共享模型计数和计时；A17 用真实质量服务与缓存、内存 repository 桩复现；A18 用抽取原函数的 VM 桩计数和计时；A19 用临时 SQLite 实测。计时环境为本机 Node 26.3.1，仅表示这些隔离夹具的耗时，不等于浏览器帧耗时或端到端请求耗时；A17 的字节数来自缓存自身的估算器，不是 RSS。`node scripts/check-all.js` 全部通过，但未覆盖这些新增场景。本轮未修改应用代码、未操作真实 `data/`，未做浏览器交互、堆快照或完整词典规模压测；旧条目不视为全部重新动态验证。
+- **本轮范围与证据（2026-10-21，基准 `0d401d9`）**：只读检查 `lib/sqlite-dictionary-repository.js` 的 `SQLITE_SCHEMA`、各列的读写点、查询使用的索引和连接 PRAGMA，以及 `app.js` 对相关 DTO 字段的消费；新增 C13–C14、R09–R11。结论全部来自代码阅读，未做 `EXPLAIN QUERY PLAN`、计时或大词典压测，未修改代码，也未操作真实 `data/`。
+- **补充范围与证据（2026-10-22，基准 `0d401d9`）**：复核 `patchEntries()`、`writeEntryProjection()`、两类词条搜索投影写入，以及模板表单采集、形态写入计划和时间戳落库；新增 A20，补充 C13。均为代码路径确认，未测量 SQL 写入量、保存延迟或大词典性能；仅更新文档，未修改应用代码或操作真实 `data/`。
 - **不在范围内**：
   - 皮肤与液态玻璃问题（含 LQ-7 待实测风险）、待视觉审查事项，见交接文档；
   - 已有专题计划的功能工作，见各计划文档。
@@ -94,6 +98,14 @@ A13（局部保存后整本重新规范化）与 A14（前端完整词典快照�
 - **证据**：临时 SQLite 中，单独调用 `directDerivedEntries()`，100／1000 个直属衍生词分别执行 501／5001 条 prepare／查询，耗时约 24.69／237.89 ms；不含拓扑构建与整个关系请求的其他工作。
 - **处理方向**：关系读取批量构造摘要，复用现有摘要路径并保留排序、来源顺序与消歧字段；不要把完整详情读出来再裁剪。这与 R03 的极大家族响应体积不同：不改变“返回全部”的语义也能消除逐词条的五次详情查询。验收比较 DTO 和排序，并统计批量查询次数。
 
+### A20（P2）：词条局部提交仍整条重建子记录与搜索投影
+
+- **定位**：`lib/sqlite-dictionary-repository.js` 的 `patchEntries()`、`batchUpdateEntries()`、`writeEntryProjection()`、`writeEntrySearchProjection()` 与 `writeEntryMorphologySearchProjection()`。
+- **现状**：保存已收窄到词条／模块级，但词条内部还没有按修改范围写入。`patchEntries()` 即使只接收 `pronunciation` 或 `tags`，仍先读取完整词条并合并，再调用通用 `writeEntryProjection()`。后者无条件删除并重插当前词条的 definitions、tags、sources、形态组和 override，重写全部核心字段，并重建该词条的静态搜索投影及形态搜索投影。普通完整 PUT 也走同一路径；批量生成 IPA／整理标签对每个目标词条重复这套流程。
+- **影响与边界**：单字段修改的工作量受该词条全部子记录和生成词形数量影响，产生无关写入与形态计算；形态计算还可能叠加 A16。范围是当前词条，不是每次重建整本词典；词形改名时更新引用方显示文本及其搜索投影属于必要的关联更新，不能一并取消。当前没有确认本项导致数据丢失；未来义项链接的级联风险另见 R11。
+- **证据级别**：上述调用和无条件 DELETE／INSERT 已由代码确认，未做 SQL 计数、计时或端到端压测，不把额外工作直接表述为已复现的交互卡顿。
+- **处理方向与验收**：先按字段依赖明确主表、子表和两类搜索投影的更新范围；局部 patch 只写受影响部分，完整 PUT 可按旧新值比较，保留未变子记录并按稳定身份增删改。无需先增加子对象 HTTP 端点或改变 schema。验收应同时检查保存后的 DTO／搜索结果，以及无关子表不执行写入、无依赖变化时不重新生成形态；覆盖单字段修改、义项排序与删除、词形改名的引用同步、批处理和事务失败回滚。与 R11 的义项外键设计协调，但无需等到阶段 C 才处理现有多余写入。
+
 ## 4. 代码质量与清理
 
 ### C09：剩余未逐个检查的读取兜底
@@ -120,6 +132,27 @@ C09（数据库非空列与静态 DOM 兜底）与 C10（前端对服务端响�
 - **IPA 14 个**：`splitKeyboardSymbols`、`normalizeOnsetClusters`、`displayIpaStage`、`applyIpaMappings`、`ruleMatchesAt`、`conditionMatches`、`splitIntoSyllables`、`tokenizePhonemeUnits`、`matchingCodaCluster`、`matchingOnsetCluster`、`middleTokenBreak`、`syllabifyIpaOutput`、`defaultStressIndex`、`resolveIpaStressIndex`。
 - **影响与方向**：除未调用的旧 overrides 实现外，多数只是转调共享模块的包装，增加重复维护入口。删除这些本地定义即可；保留正在使用的 `ipaPipelinePreview`、规则表单规范化和共享模块 API，不为证明删除而增加墓碑测试。
 
+### C13（P3）：SQLite 中只写不读或无消费者的列
+
+- **定位**：`lib/sqlite-dictionary-repository.js` 的 `SQLITE_SCHEMA`、`writeEntryProjection()`、`writeDictionaryToDatabase()`、`entriesFromRows()`；`app.js` 的 `collectMorphologyEntryState()`（约 11260 行）与 `renderEntrySearchSnippets()`（约 8187 行）。
+- **只写不读，可直接删除**：
+  - `definitions.updated_at`：写入值恒为所属词条的 `updatedAt`，没有任何查询读取，也不进入 DTO。
+  - `module_blobs.updated_at`：读取只选 `module, value_json`；词典级时间已由 `dictionary_meta.updated_at` 表达。
+- **只是数据往返，没有实际意义**：
+  - `entry_morphology_groups.created_at / updated_at`：进入词条 DTO，但前端 `collectMorphologyEntryState()` 采集可见形态组时不带这两个字段，服务端随即回填为词条自身的 `createdAt / updatedAt`；只有自动模式下未显示的旧 overlay 组会原样保留。编辑一次后它基本只是词条时间的副本，也没有显示或排序用途。删除时需同步词条 DTO、`docs/API_CONTRACT.md` 和 legacy migration 的输出。
+- **有契约、暂无消费者**：
+  - `entry_search_values.source_id`：作为 `searchHits[].sourceId` 返回，契约写明用于定位原始对象，但 `app.js` 只用 `sourceType` 和 `sourcePosition`。保留与否取决于是否打算用它定位，先不删。
+  - `morphology_template_groups / tables` 的 `created_at / updated_at`：前端只通过 dataset 原样带回，不显示也不排序。2026-10-22 补充复核：`collectMorphologyTemplateGroups()` 不生成新时间；`planMorphologyWrite()` 比较并传递旧时间，`writeMorphologyPlan()` 对非空 `updatedAt` 原样写入，只在空值时回填本次模块保存时间。因而已有非空更新时间的组／表即使修改名称或标题，也不会得到本次更新时间；只改单元格源码时，计划只更新 cell，所属组／表的时间也不会更新。`created_at` 同样原样保存，空值不会在此补成创建时间。这些列不能可靠代表当前模板的创建／修改历史。
+- **处理方向**：前两项直接删除。由于 `CREATE TABLE IF NOT EXISTS` 不会改动旧库，旧数据库仍保留这些列，但按列名插入不受影响，不需要重建表。第三项连同 DTO 和契约一起删除。`source_id` 等定位需求明确后再定；模板时间戳需先决定是否承诺对象级历史语义：没有需求则连同 DTO／dataset 清理，有需求则明确组、表和单元格变化如何更新时间并增加对应契约测试，不把原样往返视为已实现时间追踪。
+
+### C14（P3）：被主键前缀覆盖或没有查询使用的索引
+
+- **定位**：`SQLITE_SCHEMA` 末尾的 `CREATE INDEX` 列表。
+- **被主键前缀完全覆盖**：`idx_entry_morphology_groups_entry_id`（主键 `(entry_id, template_group_id)`）、`idx_entry_morphology_overrides_group`（主键以 `(entry_id, template_group_id, …)` 开头）、`idx_morphology_template_cells_table_id`（主键以 `(table_id, …)` 开头）。
+- **没有查询使用**：`idx_entries_lemma`。代码中没有 `lemma = ?` 一类的条件，所有排序都以 `sort_key` 或时间列开头。
+- **影响**：只增加写入和空间成本，不带来查询收益。
+- **处理方向**：从 schema 中移除，并在打开数据库时用 `DROP INDEX IF EXISTS` 清理旧库。这是无损操作，不需要迁移链。可以与 R09 的新索引一起做；先用 `EXPLAIN QUERY PLAN` 确认没有查询依赖它们。
+
 ## 5. 待测量或待决定的风险
 
 以下保留为后续评估，不标成已复现的数据丢失，也不作为必须立即重写的架构缺陷。
@@ -133,18 +166,24 @@ C09（数据库非空列与静态 DOM 兜底）与 C10（前端对服务端响�
 | R05：缓存 `index.json` | `requireDictionary()`（24 处调用）每个请求都读取并解析 `data/index.json`，并检查数据库文件是否存在。 | 本地开销小。索引一致性修复保留逐次读取，不加缓存；后续如需缓存，先测量收益并设计写入失败、增删词典和外部修改后的刷新语义。 |
 | R07：移动端适配：Mail 工具栏按钮尺寸 | 手机视口（<800px）下条目列表是宽 `min(380px, 100vw-32px)` 的抽屉，7 个 40px 按钮约需 336px 工具栏宽度，视口约 412px 以下就会换行；现按分组整体换行（菜单／词根／新建）。 | 可选方向：360–412px 区间用 `clamp` 把按钮缩到约 34–38px；把展开与收起合并为一个随状态变化的切换按钮（6 个按钮）。最小点击目标和相邻误触未用真机测过；Android 视口宽度不固定，需要真机或 DevTools 设备模拟的调试流程。 |
 | R08：同一数据目录的多个服务进程 | 索引修改只在单进程内串行，见 [索引写入与失败恢复](SQLITE_BACKEND_PLAN.md#索引写入与失败恢复)。Electron 外壳没有单实例锁，连开两次即有两个写者；外壳目前不维护。 | 记为运行约束：一个数据目录同一时间只允许一个服务进程写入。外壳恢复维护时评估单实例锁；不在服务端加跨进程锁文件。 |
+| R09：默认排序缺少复合索引 | 默认排序为 `sort_key, lemma, position, id`（`sqlOrderClause()`），但 `sort_key` 没有索引，不带筛选的词条列表每翻一页都要全表排序后再 `LIMIT/OFFSET`。按时间排序为 `created_at／updated_at, sort_key, lemma, position, id`，现有单列时间索引只覆盖首列。 | 先用临时大词典测量分页耗时和 `EXPLAIN QUERY PLAN`，再决定是否新增 `entries(sort_key, lemma, position, id)`，并把时间单列索引换成同序复合索引（活动日区间筛选仍可使用）。索引可以在打开数据库时用 `CREATE INDEX IF NOT EXISTS` 无损补建。深分页的 OFFSET 线性成本需改 keyset 游标才能消除，属于 API 改动，另行评估。 |
+| R10：约束与空值约定收紧 | ① `entry_tags` 主键为 `(entry_id, position)`，但 `normalizeTagList()` 已保证同一词条内标签不重复，数据库层没有对应的 `UNIQUE(entry_id, tag)`。② `morphology_template_tables.group_id`、`morphology_template_cells.table_id` 没有外键，父子删除靠 `writeMorphologyProjection()` 手工排序完成。词条形态组和 override 指向模板的 ID 允许悬空，由引用失效检测流程处理，不属于本项。③ `pronunciation`、`notes`、`created_at` 等列允许 NULL，但写入一律写空串，读取又到处 `COALESCE(x, '')`。④ 以复合主键为身份的子表（`entry_tags`、`entry_sources`、两张搜索投影、`entry_morphology_cell_overrides`、`morphology_template_cells`）可用 `WITHOUT ROWID`；运行时 SQLite 3.53.1 也支持 `STRICT`。⑤ 连接只设置 `foreign_keys = ON`，默认 rollback journal。 | ①–④ 都会改变表定义，旧库需显式重建表，按 AGENTS.md 须先取得用户确认，并与 R04 的数据库兼容方案一起决定。⑤ 单进程同步访问用不上 WAL 的并发优势，可能的收益只在自动保存这类高频小事务的 fsync 次数，实测后再定。 |
+| R11：义项拆行与阶段 C 例句链接 | 性能上，义项拆行目前只服务存在性和计数统计，没有按义项 ID 的独立查询或局部写入。阶段 C（[计划](EXAMPLE_CORPUS_LINK_PLAN.md)）的链接表可以用 `definitions(id)` 作外键目标，由数据库保证不指向已删除的义项。但 `writeEntryProjection()` 每次保存都对 `definitions` 整删重插：链接表若用 `ON DELETE CASCADE`，每次保存都会删光例句链接；若用 RESTRICT，保存会失败。语料仍是整块 blob（R06），单元一侧暂时没有外键落点。 | 阶段 C 复评时一起决定：义项写入改为按 ID diff／upsert，链接表的外键与级联策略，以及单元一侧的完整性由语料拆表还是后端检查保证。在此之前不要把 `definitions` 收回 blob。 |
 | R06：语料保存粒度 | 语料作为整块 JSON 保存。后端语料保存只检查内部 ID 重复；单元父级关系（多父级、引用不存在的单元、重复链接）只由前端语料编辑器校验（`corpusMultipleParents`、`corpusMissingUnit`、`corpusDuplicateLink`）。 | 评估是否先拆为块／单元级 changeset，再决定何时拆成 SQL 表；阶段 D 前定。拆表时父级关系由外键和唯一约束保证，不拆表则届时决定是否在后端补模块内父级检查。 |
 
 ## 6. 已评估、不处理
 
 - `RootTopologyCache` 的类型与参数检查：成本很低，且能明确报告调用错误。
+- `entries.position`：只记录导入／创建顺序，不进入 DTO，但用作所有排序的平局键、完整导出顺序，以及分析和质量 issue 的稳定顺序。旧 JSON 导入的 `createdAt` 可能为空或重复，隐式 rowid 在 VACUUM 后也不保证稳定，所以无法用它们替代。保留。
+- `morphology_template_tables.row_count / column_count`：可以由 labels 数组长度推出，但写入时已保证一致，删除收益很小。保留。
 - 普通词条与词根组的分窗加载函数（`loadEntryQueryWindowPage`、`loadRootGroupsWindowPage`）：结构约一半相同，但定位与展开细节差异较大，暂不合并。
 
 ## 7. 建议处理顺序
 
 1. **A15、A16**：分别修复空备注保存与形态逐格全量规范化；互相独立，避免捆绑规则语法重写。
 2. **A17、A19**：修正视图缓存预算和关系读取的重复详情查询；**A18** 先做局部集合查找优化，候选控件方案另行复评。
-3. **C11、C12**：清理无消费者的形态投影和本地死函数；**C09** 剩余部分随相关工作清理。
+   **A20** 单独处理词条内部的增量持久化，与 A16 的重复形态计算及 R11 的义项链接边界协调；先测量代表性单字段保存与批处理，再决定实施顺序。
+3. **C11、C12**：清理无消费者的形态投影和本地死函数；**C09** 剩余部分随相关工作清理。**C13、C14** 删除冗余列和索引，可与 R09 的排序索引测量一起做。
 4. **A10**：仍由第 3 阶段规则引擎处理，可选锚点止血；**A04／A05** 先明确联合保存与多窗口冲突契约。R 类按测量结果或发布目标决定。
 
 ## 8. 维护规则
