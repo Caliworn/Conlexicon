@@ -176,7 +176,7 @@ C09（数据库非空列与静态 DOM 兜底）与 C10（前端对服务端响�
 ## 6. 已评估、不处理
 
 - `RootTopologyCache` 的类型与参数检查：成本很低，且能明确报告调用错误。
-- `entries.position`：只记录导入／创建顺序，不进入 DTO，但用作所有排序的平局键、完整导出顺序，以及分析和质量 issue 的稳定顺序。旧 JSON 导入的 `createdAt` 可能为空或重复，隐式 rowid 在 VACUUM 后也不保证稳定，所以无法用它们替代。保留。
+- `entries.position`：只记录导入／创建顺序，不进入 DTO，但用作所有排序的平局键、完整导出顺序，以及分析和质量 issue 的稳定顺序。旧 JSON 导入的 `createdAt` 可能为空或重复，不能替代它。隐式 rowid 目前与它几乎等价：新建取 max+1，导入按插入顺序分配，upsert 保存不改 rowid。但 SQLite 对没有 `INTEGER PRIMARY KEY` 的表不保证 VACUUM 后 rowid 不变。代码目前不执行 VACUUM，风险来自两处：外部工具对词典文件执行压缩，以及将来重建表（如 R10）时没有按 `position` 保序复制。改用 rowid 会让导出和质量 issue 顺序隐式依赖一个 SQLite 不承诺的值。保留。
 - `morphology_template_tables.row_count / column_count`：可以由 labels 数组长度推出，但写入时已保证一致，删除收益很小。保留。
 - 普通词条与词根组的分窗加载函数（`loadEntryQueryWindowPage`、`loadRootGroupsWindowPage`）：结构约一半相同，但定位与展开细节差异较大，暂不合并。
 
