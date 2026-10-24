@@ -1,8 +1,8 @@
 # API Contract
 
-本文记录 Conlexicon 当前本地 HTTP API 的稳定约定。它描述前端可依赖的接口边界，而不是底层文件结构；后端运行期只使用 SQLite repository。旧 JSON 仅通过转换服务作为导入、导出和目录迁移格式，不再提供 JSON runtime repository。SQLite 后端设计见 [SQLite Backend Plan](SQLITE_BACKEND_PLAN.md)；JSON 兼容导入/导出和迁移设计见 [SQLite Migration Plan](SQLITE_MIGRATION_PLAN.md)。
+本文记录 Conlexicon 当前本地 HTTP API 的稳定约定。它描述前端可依赖的接口边界，而不是底层文件结构；后端运行期只使用 SQLite repository。旧 JSON 仅通过转换服务作为导入、导出和目录迁移格式，不再提供 JSON runtime repository。SQLite 后端见 [SQLite 后端规范](SQLITE_BACKEND_SPEC.md)；JSON 兼容导入/导出和迁移见 [导入导出规范](IMPORT_EXPORT_SPEC.md)。
 
-前端紧凑页面缓存、后端运行时查询会话、版本化 cursor 和纯滚动数据窗口的缓存身份、失效及窗口淘汰约定见 [Query Session Cache Plan](QUERY_SESSION_CACHE_PLAN.md)。尚未实装的 API 设想放在 [API Drafts](API_DRAFTS.md)，不属于本文契约。
+前端页面缓存、后端运行时查询会话和结果缓存的身份、失效、容量与重建规则见 [SQLite 后端规范](SQLITE_BACKEND_SPEC.md#7-查询会话与结果缓存)。尚未实装的 API 设想放在 [API Drafts](API_DRAFTS.md)，不属于本文契约。
 
 ## 通用约定
 
@@ -71,7 +71,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 
 ### 导入、导出与词典生命周期
 
-新建与导入先登记索引，再执行数据库事务；可捕获的写库失败会恢复原索引并清理本次新库，覆盖导入保留旧数据。补偿失败仍报错，不报告成功。删除在文件已删而索引更新失败时，由下次列表读取剪除残留登记。请求、响应和错误码沿用下表；持久化边界见 [索引写入与失败恢复](SQLITE_BACKEND_PLAN.md#索引写入与失败恢复)。
+新建与导入先登记索引，再执行数据库事务；可捕获的写库失败会恢复原索引并清理本次新库，覆盖导入保留旧数据。补偿失败仍报错，不报告成功。删除在文件已删而索引更新失败时，由下次列表读取剪除残留登记。请求、响应和错误码沿用下表；持久化边界见 [索引写入与失败恢复](SQLITE_BACKEND_SPEC.md#索引写入与失败恢复)。
 
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
@@ -314,6 +314,8 @@ GET /api/dictionaries/:id/entries?filter=&q=&fields=&fuzzyFields=&part=&tags=&ta
 
 前端普通列表以每窗 200 条读取，最多保留 5 个已加载窗口；未加载和已淘汰窗口使用等高占位，从而让原生滚动条始终代表完整结果集。请求失败时显示失败状态，不回退到前端完整词典快照。基准和诊断使用同一产品窗口，通过会话 `buildMs`、缓存统计和 cursor 窗口分别测量匹配构建与响应开销，不开放大页旁路。
 
+前端以 `QueryPageCache` 缓存成功的窗口响应（key 含词典 `updatedAt` 与规范化查询，只缓存成功响应，迟到但仍属于当前词典版本的响应也写入缓存），成功写入后按词典清空；单条详情 `/entries/:entryId` 使用独立的小型缓存，保存响应直接更新其中的当前词条。查询首窗或词条详情请求进行中采用两段式 stale-while-revalidate：开始后 200 ms 内保持旧内容，但旧详情立即设为 `inert`，不可再通过鼠标、键盘或辅助技术操作；超过 200 ms 后详情显示遮罩，列表保留旧内容并轻微变淡，二者用同一套覆盖式“正在更新”提示。首次加载没有旧内容时直接显示加载状态；滚动补载后续窗口只使用窗口局部占位。请求失败直接进入错误状态，不重试、不回滚，也不把旧内容冒充为成功结果；成功提交新内容后立即清除更新状态。词条切换只更新选中态、详情、词汇网络状态和必要的滚动状态，不重建未变化的列表窗口。
+
 编辑器选择状态不通过完整词典 snapshot 预检目标 ID。没有当前选择时，普通列表首窗的第一项可作为初始选择；搜索或筛选排除当前词条时仍保留既有详情。显式导航直接读取 `/entries/:entryId`，`entry_not_found` 时恢复导航前选择并提示。删除当前词条只从虚拟列表已加载顺序选择下一项或上一项，没有已加载候选时等待刷新后的普通首窗；删除未选中词条不改变选择。词汇网络内部导航只消费已加载节点 DTO，不为选择目标扫描完整词典。
 
 当前搜索输入采用 250ms debounce，连续输入会重置计时；前端用递增请求 ID 忽略迟到的旧响应。后端所有排序以词条 ID 作为最终稳定键，避免同词形或同时间记录跨窗口边界漂移。`nextCursor` 表示顺序下一页，最后一页为空；`windowCursor` 始终绑定同一结果集合的起点，即使当前响应来自最后一页也可继续用于任意 `windowOffset`。两类 cursor 都绑定当前服务进程 epoch、词典查询缓存 generation 和规范化查询 descriptor；会话被 TTL/LRU 淘汰时后端可重建查询并继续读取，服务重启、成功写入或查询条件变化则返回 `query_cursor_stale`。前端收到 stale cursor 后从首窗重建查询。
@@ -482,7 +484,7 @@ GET /api/dictionaries/:id/facets
 
 ##### 输入、补全与唯一性
 
-设计见 [后端来源自动补全设计](SOURCE_AUTOCOMPLETE_PLAN.md)。补全由后端候选端点与前端补全 controller 实现（单行候选、旧列表立即失效、输入法处理及下述键盘行为）；来源卡片同样改用词条 summary：已存来源取自 `entry-relations` 的 `matchedEntry`，新选来源取自候选项；同一输入框内有两张以上同形卡片时显示“词性 首条释义”区分信息（首条释义相同则改用第一条不同的释义，再无差异则用发音），悬停或聚焦卡片显示与词汇网络相同的词条摘要浮层（释义条数由“词条悬浮卡片的多义项显示”设置控制），界面不展示 ID，卡片标签不再读取前端快照。浏览态来源链接沿用同一浮层与同形区分规则；浏览态和完整编辑态的衍生词卡片也显示该浮层，完整编辑态卡片可聚焦但不跳转。
+补全由后端候选端点与前端补全 controller 实现（单行候选、旧列表立即失效、输入法处理及下述键盘行为）；来源卡片同样改用词条 summary：已存来源取自 `entry-relations` 的 `matchedEntry`，新选来源取自候选项；同一输入框内有两张以上同形卡片时显示“词性 首条释义”区分信息（首条释义相同则改用第一条不同的释义，再无差异则用发音），悬停或聚焦卡片显示与词汇网络相同的词条摘要浮层（释义条数由“词条悬浮卡片的多义项显示”设置控制），界面不展示 ID，卡片标签不再读取前端快照。浏览态来源链接沿用同一浮层与同形区分规则；浏览态和完整编辑态的衍生词卡片也显示该浮层，完整编辑态卡片可聚焦但不跳转。
 
 `POST /api/dictionaries/:id/source-candidates/query` 只读，不创建词条、不保存草稿、不更新词典时间：
 
@@ -494,6 +496,14 @@ GET /api/dictionaries/:id/facets
 - 排序由共享 `rankLemmaCandidates()` 完成：完全相等、前缀（长度差小者优先）、包含（位置靠前、长度差小者优先）、其余 fuzzy（分数降序），同层按原始词形与精确 ID 稳定排序。`items` 顺序即排序结果。
 - `items` 为词条摘要 DTO（与 `/entries` 列表项及 `entry-relations` 的 `matchedEntry` 同构），不附加字段；`total` 为排除后的全部匹配数，同形不同 ID 分别计数。
 - 请求体不是对象、字段类型错误或 `limit` 越界返回 400 `invalid_source_candidate_query`；词典不存在返回 404 `dictionary_not_found`；请求体超限沿用 413 `request_body_too_large`。
+- 不使用 cursor、翻页或查询会话缓存：候选随每次输入作废，固定上限加 `total` 提示即可。复用的是 `/entries` 下层的 projection、规范化和 matcher，不在列表端点上叠加补全特例；补全 fuzzy 开关独立于列表的逐字段 fuzzy 设置。
+
+前端补全 controller（每个来源输入框一个，替代共享的全局候选下标）：
+
+- 输入防抖 100 ms（30k 词条实测单次查询约 50–86 ms，连续输入不会在服务端排队）；输入期间保留上一批候选原位显示，请求超过 200 ms 才显示加载状态。加载中、失败可重试与无匹配是不同状态，失败不显示为无匹配，也不回退扫描本地数据。
+- 新请求取消旧请求；响应到达时核对请求序号、词典、草稿身份和当前文本项（以文本项位置区分相同文本的多次出现），过期响应丢弃。弹层关闭、词条切换、完整/局部编辑销毁时取消请求并释放 controller。
+- 候选每项一行：词形、弱化的词性和截断的首条释义，不显示 ID、发音或标签。当前可见候选中有词形与首条释义均相同的项时，这些项改为显示各自第一条不同的释义，仍无差异时显示发音；判断在前端基于候选 summary 完成，不发额外请求。列表限高可滚动，`total` 超过已返回项时底部提示“共 N 项，继续输入以缩小范围”。
+- 输入框采用 combobox／listbox 语义，维护 `aria-expanded`、`aria-controls`、`aria-activedescendant`；当前项以 `aria-selected` 作为唯一高亮，不另设 `:hover` 高亮，只有真实的指针移动（坐标确有变化、非触屏）才改变当前项，过期列表不响应悬停。点击、触屏与键盘确认走同一确认函数，确认前再次核对草稿、文本项与已选集合。
 
 - 点击来源标题、卡片之间或输入区域空白，只能聚焦输入，不得删除、重排或转换来源。删除仅由明确的删除操作触发；不得把删除按钮隐式关联为整个区域的 label 控件。
 - 从补全中选定词条时，只消费光标所在的对应文本项，将该目标引用追加到卡片组末尾，其他文本项及已有卡片顺序不变。只输入词形或失焦不等于确认绑定。
@@ -652,14 +662,14 @@ GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&so
 
 - repository 以独立 relation generation 缓存与搜索条件无关的 `rootId -> derivedIds` 稳定拓扑，并同时维护 `entryId -> rootIds`、`rootId -> group` 反向索引；词根查询会话进一步维护 `rootId -> resultIndex`。`/root-groups`、组内子项和 `/entry-relations/:entryId` 复用该拓扑，词典摘要计数不依赖它。拓扑组和查询结果位置的定位均为 O(1)，关系响应仍需按实际返回条目数读取并构建 DTO。词条增删、来源目标变化、整库替换和词典删除会使其失效；lemma 改名及其他普通词条保存/patch 仅同步轻量排序记录，其他模块保存不触碰拓扑。查询 session/cursor 的 cache generation 仍按查询一致性要求独立失效。
 - `/root-groups` 搜索直接从 `entry_search_values` / `entry_morphology_search_values` 获取命中 ID，再筛选稳定拓扑，不导出完整词典 snapshot。`entry-relations/:entryId` 复用同一拓扑的反向索引。质量检查的来源循环不读取该缓存，而是在自己的最小事实读取上调用同一 `etymology-graph-model`。
-- SQLite 后端用 `entry_sources(target_entry_id, entry_id)` 索引支持词根分组和词汇网络查询；`source_text` 保留显示/搜索文本，旧 JSON conversion 与 migration 不参与运行期查询。
+- SQLite 后端用 `entry_sources(target_entry_id)` 索引支持词根分组和词汇网络查询；`source_text` 保留显示/搜索文本，旧 JSON conversion 与 migration 不参与运行期查询。
 - 前端词根模式正常路径以 `/root-groups` 为准；请求失败时显示失败状态，不回退前端本地完整分组。父级未加载窗口以 `pageInfo.total` 和 `windowMetrics` 建立占位，因此滚动条可在折叠、搜索自动展开及全局展开状态下代表完整词根组集合。全局展开采用状态意图：父级页进入可见范围后才加载各组衍生词；单组收起作为例外保留到重新展开或“全部收起/全部展开”重置。组内衍生词不建立第二层分页窗口。
 
 ### 分析、功能结果与质量查询
 
 分层边界：
 
-- 稳定的标签、词性、字段存在性、来源有无与数量、日期和正写法条件通过 EntryFilter/EntrySearch 进入词条窗口；必须运行 IPA、形态或质量规则才能得到的结果属于 feature result 或质量 source。两者都由词条列表窗口消费，但 repository 不为普通 filter 反向调用分析或质量模块。高级筛选入口清点见 [Advanced Filter Query Plan](ADVANCED_FILTER_QUERY_PLAN.md)。
+- 稳定的标签、词性、字段存在性、来源有无与数量、日期和正写法条件通过 EntryFilter/EntrySearch 进入词条窗口；必须运行 IPA、形态或质量规则才能得到的结果属于 feature result 或质量 source。两者都由词条列表窗口消费，但 repository 不为普通 filter 反向调用分析或质量模块。各入口的归属见下文 [Filter descriptor](#filter-descriptor)。
 - 词根家族、基础关系统计和窗口读取由 SQLite repository 提供；不重新引入 repository 之外的完整词典扫描查询上下文作为兜底，也不恢复前端 materialized ID 列表。旧 JSON conversion 与 migration 不参与运行期查询。
 - 词典标题和词典管理的 `rootCount` 按“没有来源记录”计算，不依赖来源解析或拓扑。
 - 未解析来源和来源循环属于质量检查，不归入未来的诊断修复模块。
@@ -787,7 +797,7 @@ Widget 通过以下任务依赖生成：
 
 #### Feature result query
 
-IPA 自动比较（`ipaAutoCompare`）、IPA 分布（`ipaDistribution`）和形态分析（`morphologyAnalysis`）三个 source 共用以下端点，由 `AnalysisFeatureService`（`lib/analysis-feature-service.js`）实现，分析页与高级筛选都消费它；会话设计背景见 [Feature Result Session Plan](FEATURE_RESULT_SESSION_PLAN.md)：
+IPA 自动比较（`ipaAutoCompare`）、IPA 分布（`ipaDistribution`）和形态分析（`morphologyAnalysis`）三个 source 共用以下端点，由 `AnalysisFeatureService`（`lib/analysis-feature-service.js`）实现，分析页与高级筛选都消费它：
 
 ```text
 POST /api/dictionaries/:id/analysis/features/query
@@ -921,6 +931,29 @@ assignment 的两个计数互斥且和为 `inputEntryCount`；每个 mode 行的
 `ipaAutoCompare` items 形如 `{ entry: EntrySummary, feature: { outcome, generated, diagnostics } }`；`ipaDistribution` items 的 feature 形如 `{ category, value, occurrenceCount }`；`morphologyAnalysis` items 的 feature 形状见上。HTTP 响应和前端高级筛选 action 都不携带完整匹配 ID。`pageInfo` 返回 `total/limit/windowOffset/nextCursor/windowCursor/hasMore`。location 请求沿用同一 source/view/page，并增加 `entryId`；响应增加 `{ found, index, windowIndex, windowOffset }`。
 
 会话使用每词典最多 4 份、全局估算 32 MiB、空闲 2 分钟的有界进程缓存，并合并相同 descriptor 的并发构建。写入或 source 变化会产生新会话；`ipaAutoCompare` 另受完整 IPA 设置与引擎 ID/版本影响，`ipaDistribution` 只受复杂音素和音节分隔符影响，不调用音系引擎，也不因映射、重音或其他生成设置变化而产生不同 descriptor。`morphologyAnalysis` 只消费当前 generation 下的模板组元数据和词条形态分配/覆写事实，不依赖音系引擎、搜索 projection 或单元格生成配置摘要。淘汰或进程重启后由 descriptor 透明重建。cursor 绑定进程 epoch、generation、result key 和视图 identity，陈旧 cursor 返回 `query_cursor_stale`。当前简易 IPA 模型由 adapter 包装；自动生成值仍是可重建的运行时结果，不新增持久化列。
+
+音系引擎 adapter（`lib/phonology-engine.js`）是 `ipaAutoCompare` 与具体 IPA 生成器之间的唯一边界，feature service 只依赖它的契约，以后接入外部模块时只替换 adapter，同步或异步实现都不改变 source 的页面语义：
+
+```js
+{
+  id: "conlexicon-simple-ipa",
+  version: "1",
+  generate({ input: { orthography }, profile: { ipaSettings } }) {
+    return { status: "generated" | "unavailable", primary, alternatives: [], diagnostics: [] };
+  },
+  compare({ generated, observed, profile }) {
+    return { exact, equivalent };
+  }
+}
+```
+
+- 引擎正常返回但无法生成非空值时归入 `unavailable`；`generate` 或 `compare` 抛错、返回无效结果时归入 `failed`，并分别携带稳定诊断 code `phonology_engine_failed`、`invalid_phonology_engine_result` 或 `invalid_phonology_engine_comparison`。两者都进入 summary，不得归入 match/mismatch 或从总数中消失。
+- 引擎 ID 与版本进入 source 的基础会话身份；provenance 只随运行时结果存在，不写入词条。以后若批量写入自动 IPA，需另行定义人工值、生成值、引擎版本和 stale 状态。
+- 构建每 128 项让出一次事件循环。
+
+feature result 与质量结果都在请求内同步构建。只有满足任一条件时，才独立复评进程内 deferred execution（只增加 `deferred / running / failed` 状态、取消/去重和轮询或推送，进程重启后由 descriptor 重提）：代表性 10k 数据冷构建 p95 持续超过 500 ms；event-loop delay 持续超过 100 ms 并影响同进程保存或查询；外部音系引擎只能以长时 Promise、子进程或远程调用工作；用户导航或取消后仍须等待无用计算结束。`scripts/benchmark-feature-result-session.js` 测量 10k/30k 冷热耗时。
+
+不做：自动生成 IPA 的持久化列、派生表或历史版本；通用后台任务框架、持久化 job queue 与跨重启恢复；通用分析 DSL 或任意布尔 feature expression；会话的单词条增量维护（写入后按 generation 整体失效，重建成本成为真实瓶颈后再设计）。Gloss 不作为 feature source：当前只由质量规则读取，例句迁移为语料链接后按阶段 C 计划升级输入。
 
 source、version、options、response mode、category、分布 value、page 与搜索字段验证失败分别使用 `invalid_feature_result_source`、`unsupported_feature_result_source`、`invalid_feature_result_source_version`、`invalid_feature_result_source_options`、`invalid_feature_result_response_mode`、`invalid_feature_result_category`、`invalid_feature_result_value` 或既有 EntryQuery 校验码。summary 模式携带 `view` 或 `page` 时返回 `invalid_feature_result_summary_request`；location 缺少目标 ID 时返回 `invalid_feature_result_location_entry_id`。
 
@@ -1056,3 +1089,28 @@ activityDistribution
 ```
 
 点击分析行时，词条列表使用 descriptor 调用 `/entries` 获取匹配项。这样分析 API 只返回 `resultCount` 和可复用 filter spec，避免大词典下传递大量 ID。feature result 与质量结果改用可重建的 source descriptor 加 view，见上文两节。
+
+入口归属：
+
+| 类别 | 入口 | 结果 |
+| --- | --- | --- |
+| EntryFilter | 词性与无词性、标签与标签集合、释义/例句/词条备注/来源/IPA/标签的有无、来源数量与多来源、标签数量、新增/编辑日期、正写法（词长、首字符、字符、双字符）、词根与孤立词根 | 结构 descriptor 进入普通 `/entries` 窗口、会话、cursor、定位、排序与搜索 |
+| Feature result | IPA 自动比较、IPA 音素单元/首音/尾音/音节数、形态分配/模式/模板组/覆写 | `resultSource` 加 category/value 进入 feature query/location |
+| 质量结果 | 全部、按严重度、按模块 | `dictionaryQuality` source 加 selector 进入质量 entry 视图 |
+| 导航，不是筛选 | 词条总数与当前搜索命中、词根家族排行、override 排行 | 返回词条浏览页并保留普通查询状态，或定位单条词条 |
+
+数据分析中的词性行与标签频率中的词性标签使用标准 `part` filter，不创建另一种结果集。词根（没有任何来源记录）与孤立词根（另要求 `presence.derivedEntries: false`）与总览计数同一口径，与词根模式按拓扑分组的口径有意不同：只有纯文本来源的词条在拓扑里成组，在这里算衍生词。
+
+查询边界：
+
+- `filter` 只回答“哪些词条符合条件”；自由文本搜索、排序和窗口分别属于 `search`、`sort` 和 `page`，列表响应固定使用摘要 DTO。UI 标题、本地化文本、循环按钮位置和问题 tooltip 不属于查询身份。
+- 多个稳定条件按 AND 组合，标签自身保留 `any / all / exact`；不引入通用递归 `and/or/not` 表达式，出现真实的组合筛选界面后再评估。不能跨 source 求交：EntryFilter、feature result 与质量结果整体替换当前筛选。
+- 标签 descriptor 保存原始标签并按结构键精确比较，不保存显示替换，也不沿用自由文本的模糊规范化。
+
+前端筛选状态（`app.js`）：
+
+- 运行期只有一个 `activeFilter`：EntryFilter descriptor（可带 `searchScope`），或 `resultSource` 加 category/value（质量为 selector）。不保存匹配 ID、已翻译标题或问题 map；词性筛选同样是 `EntryFilter.part`，不再有独立的词性状态。
+- 标题使用独立于查询身份的语义化 `titleDescriptor`：固定标题保存 i18n key，字段值标题保存 label key 与原始值或 value key。切换界面语言只重新渲染标题，不失效列表、事实或功能结果缓存。
+- 循环变体只替换 filter 或 category/value。EntryFilter 变体的可用性来自按词典版本与规范化 filter 缓存的 `unknown / available / empty` 结构事实：进入筛选、事实失效或词条写入后由批量 `/entries/filter-facts` 补齐未知项；无搜索首窗的总数可直接写入精确事实，有搜索且有命中可证明结构非空，搜索零命中不判定结构为空。feature 与质量变体的可用性来自同一份 summary，不发存在性探针。
+- 搜索输入只重查当前 `Filter ∩ Search`，不为其他变体重复探测。刷新按钮只在当前远程查询失败时作为重试出现，只使当前查询及其定位缓存失效，保留同词典的其他查询、词根窗口和 facets。
+- 替换或清除筛选都保留当前搜索；清除不恢复进入筛选前的搜索、排序或词根模式快照。

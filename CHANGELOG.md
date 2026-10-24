@@ -4,6 +4,22 @@
 
 自 2026-09-19 起，日期表示变更实际完成日期，而非提交或发布日期；同日追加到同一日期段。更早历史日期和编号保留原样。
 
+## 2026-10-25
+
+### 文档
+
+- 按 `AGENTS.md` 的文档规则清理 `docs/`：删除已完成的 `QUERY_SESSION_CACHE_PLAN.md`、`ADVANCED_FILTER_QUERY_PLAN.md`、`FEATURE_RESULT_SESSION_PLAN.md` 与 `SOURCE_AUTOCOMPLETE_PLAN.md`，仍有效的契约对照当前代码后迁移。查询会话三层职责、查询身份、物化策略、失效（查询 generation 与词根 relation generation）、cursor 重建、容量参数和必测不变量迁入 SQLite 后端规范；前端页面缓存与两段式 stale-while-revalidate、高级筛选入口归属、查询边界与前端筛选状态、音系引擎 adapter（按 `lib/phonology-engine.js` 的实际接口改写，计划中的草图已过时）、后台执行的复评门槛与不做事项、来源补全 controller 与候选显示规则迁入 `docs/API_CONTRACT.md`。实施记录、分阶段验收与历史基准留在 Git 历史与本文件。
+- `docs/SQLITE_BACKEND_PLAN.md` 改名为 [SQLite 后端规范](docs/SQLITE_BACKEND_SPEC.md)，`docs/SQLITE_MIGRATION_PLAN.md` 改名为 [导入导出规范](docs/IMPORT_EXPORT_SPEC.md)，两者改写为现行规范：删去状态审计中的阶段流水、S3/S4 记录、默认切换清单、M0–M5 阶段和“反推 API 契约”愿望清单（其中 `/api/app`、`/summary` 等端点并不存在；现行接口见 API 契约，设想见 API Drafts），并更正过时描述：形态分析的前端旧表投影改指向审计 C11，§10.2 中“分析和质量检查仍由前端计算”，索引清单按当前 schema（`idx_entry_tags_tag_entry`），API 契约中 `entry_sources` 索引误写为 `(target_entry_id, entry_id)`。
+- 未完成项移入交接文档：筛选统一化（筛选面板目前只编辑词性）、同形词完全重复的质量规则想法，以及原生 SQLite／XLSX 导入导出与产品内迁移入口（记入“明确搁置”）。文档索引、交接、审计清单与 API 契约中的链接同步更新。
+
+## 2026-10-24
+
+### 文档
+
+- 新增 [Morphology Assignment Plan](docs/MORPHOLOGY_ASSIGNMENT_PLAN.md)：去掉形态组，表格以析取范式规则（行内"且"、行间"或"、可排除）直接匹配词条；每张表属于一个槽位（新建表时自动建独立槽位），不同槽位叠加生效，同一槽位内按 elsewhere condition 由更具体的规则胜出；槽位顺序就是显示顺序，槽位内顺序只决定平局时的先后；覆写改按"词条 + 表"记录。旧数据转换时每张表各成一个槽位，并为规则生成排除条件，每个词条的结果和显示顺序保持不变。模板页重做为槽位面板（竞争与具体程度关系）、试算面板（逐槽位解释选中原因）和影响范围（当前词条数、保存前的分配预览端点）。文档包含独立复评（否决了保留组的三种做法、无槽位的全局 elsewhere、可选槽位加全局顺序、自由文本槽位、手工指定覆盖关系和文本表达式）和三个待用户确认的决定点。仅为设计草案，未实施。
+- [Sense Tag Plan](docs/SENSE_TAG_PLAN.md) 的模板组匹配规则移入上述计划，义项标签计划只保留"每个义项一个匹配上下文（词条标签 ∪ 该义项标签）、结果合并去重"的契约，这一上下文设计本身改列为待确认的 D3。
+- 两份计划的决定点改为区分"用户已确定"和"代理拟定、待确认"，后者逐项列出（义项标签计划 S2–S14，形态分配计划 M1–M13），不再写成已定范围。义项标签计划的快速录入由"不改"改为用户选定的方案：释义行附带可选的义项标签输入。
+
 ## 2026-10-23
 
 ### 文档

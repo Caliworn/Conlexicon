@@ -6,17 +6,14 @@
 
 | 文档 | 状态 | 用途 |
 | --- | --- | --- |
-| [API Contract](API_CONTRACT.md) | 稳定契约 | 前后端 HTTP API、本地访问与静态资源边界、LAN 调试开关、错误结构、读取与保存边界；词根拓扑语义，质量检查规则集与 issue/summary 语义。 |
+| [API Contract](API_CONTRACT.md) | 稳定契约 | 前后端 HTTP API、本地访问与静态资源边界、LAN 调试开关、错误结构、读取与保存边界；列表窗口与前端缓存、EntryFilter 入口归属与前端筛选状态、feature result 与音系引擎边界、来源补全 controller、词根拓扑语义，质量检查规则集与 issue/summary 语义。 |
 | [API Drafts](API_DRAFTS.md) | 非现行契约 | 从 API Contract 移出的未实装设想：启动索引拆分端点、共享查询上下文与功能服务分层、共享关系任务、诊断修复模块、语料细粒度 changeset 与对象级乐观锁；采用前须复评。 |
 | [Audit Open Issues](AUDIT_OPEN_ISSUES.md) | 长期维护，2026-10-19 专项复查 | 审计、安全审计与技术债复查中所有未解决问题的唯一清单：保存一致性、规则执行与算法、无关全量工作、代码质量与待测风险，含处理顺序；不含皮肤与视觉问题。 |
-| [SQLite Backend Plan](SQLITE_BACKEND_PLAN.md) | 当前架构 | SQLite schema、repository 现状、索引串行与原子写入、失败恢复、查询层与后续优化。 |
-| [SQLite Migration Plan](SQLITE_MIGRATION_PLAN.md) | 当前架构 / 后续计划 | 旧 JSON 导入、SQLite 迁移、导出 profile、备份与回滚边界。 |
-| [Query Session Cache Plan](QUERY_SESSION_CACHE_PLAN.md) | 已实装设计参考 | 查询会话、cursor、缓存失效、窗口化和结果定位语义。 |
-| [Advanced Filter Query Plan](ADVANCED_FILTER_QUERY_PLAN.md) | F0–F4 核心完成 / F5 已完成 | EntryFilter、轻量分析、IPA/形态 feature result，以及 Gloss/质量结果的后续边界。 |
-| [Feature Result Session Plan](FEATURE_RESULT_SESSION_PLAN.md) | F4b-0–F4b-3 已完成 | IPA/形态结果源、运行时会话、音系引擎边界和分阶段验收。 |
-| [Source Autocomplete Plan](SOURCE_AUTOCOMPLETE_PLAN.md) | 已实装（2026-09-30），界面验收部分待完成 | 来源补全复用 lemma 搜索 projection 的只读候选查询、消歧 DTO、异步 controller 与键盘契约。 |
+| [SQLite Backend Specification](SQLITE_BACKEND_SPEC.md) | 当前规范 | SQLite 存储形态、索引串行与原子写入、repository 分层与能力边界、schema、搜索 projection、查询会话与结果缓存（身份、失效、cursor 重建、容量），以及基准前暂缓的优化。 |
+| [Import and Export Specification](IMPORT_EXPORT_SPEC.md) | 当前规范 | 旧 JSON 导入与转换服务、目录迁移脚本、导出 profile、备份与回滚；未实装的 SQLite／XLSX 交换与产品内迁移入口。 |
 | [Entry Incremental Save Plan](ENTRY_INCREMENTAL_SAVE_PLAN.md) | 设计草案，未实施 | 审计 A20＋A05：词条写入只改动变化的主表列、子表和投影字段；`PUT` 基于 `updatedAt` 的条件保存与冲突确认。 |
-| [Sense Tag Plan](SENSE_TAG_PLAN.md) | 设计草案，已复评，未实施 | 义项标签与多词性词条：义项可带标签、词条整体取并集（只向上继承）且按标签排序配置排列，模板组改用结构化匹配规则并按义项上下文分别匹配，分析页统计多词性词条与词性组合；存储、DTO、并集查询范围、界面与待确认决定点。 |
+| [Sense Tag Plan](SENSE_TAG_PLAN.md) | 设计草案，已复评，未实施 | 义项标签与多词性词条：义项可带标签、词条整体取并集（只向上继承）且按标签排序配置排列，形态按义项提供匹配上下文，分析页统计多词性词条与词性组合；存储、DTO、并集查询范围、界面与待确认决定点。 |
+| [Morphology Assignment Plan](MORPHOLOGY_ASSIGNMENT_PLAN.md) | 设计草案，已复评，未实施 | 形态分配重做：去掉形态组，表格以析取范式规则直接匹配；每张表属于一个槽位，槽位内按 elsewhere 由更具体者胜出、槽位间叠加，槽位顺序即显示顺序；覆写按表记录，旧数据转换结果不变；槽位面板、试算面板与影响范围的编辑界面。 |
 | [App Shell Specification](APP_SHELL_SPEC.md) | 阶段 A 已完成 | 响应式应用外壳：布局、外壳状态模型、DOM/CSS 边界、断点与验收。 |
 | [Touch, Focus and Accessibility Plan](TOUCH_FOCUS_A11Y_PLAN.md) | 阶段 A+ 未开始 | 触摸替代交互、输入能力判定、命中区域、焦点管理与无障碍验收。 |
 | [Example Corpus Link Plan](EXAMPLE_CORPUS_LINK_PLAN.md) | 阶段 C 未开始 | 词条例句迁移为语料单元引用的目标模型、自动迁移、编辑行为与验收。 |
@@ -31,9 +28,9 @@
 ## 推荐阅读顺序
 
 1. 修改前后端接口时先读 [API Contract](API_CONTRACT.md)。
-2. 修改存储、查询或索引时再读 [SQLite Backend Plan](SQLITE_BACKEND_PLAN.md)。
-3. 涉及旧 JSON、导入、导出或迁移时读 [SQLite Migration Plan](SQLITE_MIGRATION_PLAN.md)。
-4. 处理查询窗口、cursor 或筛选时分别补读查询缓存、高级筛选与功能结果会话专题文档。
+2. 修改存储、查询、索引或缓存时再读 [SQLite Backend Specification](SQLITE_BACKEND_SPEC.md)。
+3. 涉及旧 JSON、导入、导出或迁移时读 [Import and Export Specification](IMPORT_EXPORT_SPEC.md)。
+4. 处理查询窗口、cursor、筛选或功能结果时，读 API Contract 的“读取 API”与“分析、功能结果与质量查询”两节。
 5. 修改主题、材质或组件视觉时先读 [Style Skin Plan](STYLE_SKIN_PLAN.md)；实现层叠玻璃或液态玻璃时再读各自的皮肤规范。
 6. 开始阶段 A+、C 或 D 前，先读对应计划文档并按 `AGENTS.md` 做独立复评；追溯历史决策背景时再查 [Handoff History](archive/HANDOFF_HISTORY.md)。
 
