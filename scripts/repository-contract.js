@@ -1481,6 +1481,11 @@ function checkModelNormalization() {
     normalizeDictionary({ name: "Raw", settings: { filterMenuRawTagDisplay: 1 } }).settings.filterMenuRawTagDisplay,
     true,
   );
+  assert.equal(normalized.settings.entryHoverCardRawTagDisplay, false, "Entry hover cards default to display labels");
+  assert.equal(
+    normalizeDictionary({ name: "Raw", settings: { entryHoverCardRawTagDisplay: 1 } }).settings.entryHoverCardRawTagDisplay,
+    true,
+  );
   assert.deepEqual(normalized.settings.entrySectionOrder, ["notes", "derived", "definitions", "etymology", "morphology"]);
   assert.equal(normalized.settings.ipa.mappings[0].to, "ˈa");
 

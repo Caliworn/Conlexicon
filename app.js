@@ -653,6 +653,7 @@ const i18n = {
     entryListRawTagDisplay: "词条列表的标签行显示原始标签",
     entryListRawPartDisplay: "词条列表的词性文本（副标题和释义前）显示原始标签",
     filterMenuRawTagDisplay: "筛选菜单中显示原始标签",
+    entryHoverCardRawTagDisplay: "词条悬浮卡片中显示原始标签",
     rootModeNeedsNoFilter: "清除筛选后可用",
     entryListTagDisplayLimit: "词条列表中标签显示上限",
     entryListTagDisplayLimitHelp: "设为 n 时，超过 n 个标签会显示前 n-1 个和省略号。默认为 3。",
@@ -1271,6 +1272,7 @@ const i18n = {
     entryListRawTagDisplay: "Show raw tags in the entry list tag row",
     entryListRawPartDisplay: "Show raw tags for part-of-speech text in the entry list (subtitle and before definitions)",
     filterMenuRawTagDisplay: "Show raw tags in the filter menu",
+    entryHoverCardRawTagDisplay: "Show raw tags in entry hover cards",
     rootModeNeedsNoFilter: "Clear the filter to use it",
     entryListTagDisplayLimit: "Entry list tag display limit",
     entryListTagDisplayLimitHelp: "Set to n: entries with more than n tags show the first n-1 tags and an ellipsis. Default: 3.",
@@ -1702,6 +1704,7 @@ const elements = {
   entryListRawTagDisplayInput: document.querySelector("#entryListRawTagDisplayInput"),
   entryListRawPartDisplayInput: document.querySelector("#entryListRawPartDisplayInput"),
   filterMenuRawTagDisplayInput: document.querySelector("#filterMenuRawTagDisplayInput"),
+  entryHoverCardRawTagDisplayInput: document.querySelector("#entryHoverCardRawTagDisplayInput"),
   entryListTagDisplayLimitInput: document.querySelector("#entryListTagDisplayLimitInput"),
   entryListTagsIncludePartsInput: document.querySelector("#entryListTagsIncludePartsInput"),
   partOfSpeechTagsInput: document.querySelector("#partOfSpeechTagsInput"),
@@ -9000,13 +9003,14 @@ function networkTruncatedLabel(value, width, fontSize = 16) {
 // The single entry hover card shared by the lexical network, source links,
 // source cards and derived-entry cards.
 function entrySummaryTooltipHtml(entry) {
-  const partText = entryOwnPartText(entry);
+  const rawParts = dictionarySettings().entryHoverCardRawTagDisplay;
+  const partText = entryOwnPartText(entry, undefined, { raw: rawParts });
   return `
     <div class="network-tooltip-content">
       <b>${escapeHtml(entry.lemma || "")}</b>
       ${entry.pronunciation ? `<span>${escapeHtml(entry.pronunciation)}</span>` : ""}
       ${partText ? `<span>${escapeHtml(partText)}</span>` : ""}
-      ${renderNetworkMeaningHtml(entry)}
+      ${renderNetworkMeaningHtml(entry, { rawParts })}
     </div>
   `;
 }
@@ -9305,7 +9309,7 @@ function trimEntryRelationsCache(protectedKey = "") {
   }
 }
 
-function renderNetworkMeaningHtml(entry) {
+function renderNetworkMeaningHtml(entry, { rawParts = false } = {}) {
   const meanings = entryDefinitionMeanings(entry);
   const preview = entryDefinitionItems(entry).map((definition) => definition.meaning).find(Boolean) || "";
   if (!meanings.length && preview) {
@@ -9315,7 +9319,7 @@ function renderNetworkMeaningHtml(entry) {
     return "";
   }
   return `<div class="network-definition-list">${entryDefinitionSummaryItems(entry).map((item) => `
-    <p>${definitionSummaryItemHtml(item)}</p>
+    <p>${definitionSummaryItemHtml(item, { rawParts })}</p>
   `).join("")}</div>`;
 }
 
@@ -12566,6 +12570,7 @@ function fillSettingsForm(dictionary) {
   elements.entryListRawTagDisplayInput.checked = settings.entryListRawTagDisplay;
   elements.entryListRawPartDisplayInput.checked = settings.entryListRawPartDisplay;
   elements.filterMenuRawTagDisplayInput.checked = settings.filterMenuRawTagDisplay;
+  elements.entryHoverCardRawTagDisplayInput.checked = settings.entryHoverCardRawTagDisplay;
   elements.entryListTagDisplayLimitInput.value = settings.entryListTagDisplayLimit;
   elements.entryListTagsIncludePartsInput.checked = settings.entryListTagsIncludeParts;
   elements.tagListSeparatorStyleInput.value = settings.tagListSeparatorStyle;
@@ -12815,6 +12820,7 @@ function settingsFormSnapshot() {
     entryListRawTagDisplay: elements.entryListRawTagDisplayInput.checked,
     entryListRawPartDisplay: elements.entryListRawPartDisplayInput.checked,
     filterMenuRawTagDisplay: elements.filterMenuRawTagDisplayInput.checked,
+    entryHoverCardRawTagDisplay: elements.entryHoverCardRawTagDisplayInput.checked,
     entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(elements.entryListTagDisplayLimitInput.value),
     entryListTagsIncludeParts: elements.entryListTagsIncludePartsInput.checked,
     partOfSpeechTags: parseTagListText(elements.partOfSpeechTagsInput.value),
@@ -12852,6 +12858,7 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     entryListRawTagDisplay: settings.entryListRawTagDisplay,
     entryListRawPartDisplay: settings.entryListRawPartDisplay,
     filterMenuRawTagDisplay: settings.filterMenuRawTagDisplay,
+    entryHoverCardRawTagDisplay: settings.entryHoverCardRawTagDisplay,
     entryListTagDisplayLimit: settings.entryListTagDisplayLimit,
     entryListTagsIncludeParts: settings.entryListTagsIncludeParts,
     partOfSpeechTags: settings.partOfSpeechTags,
@@ -13009,6 +13016,7 @@ function collectDictionarySettingsFromForm(existing = {}) {
     entryListRawTagDisplay: elements.entryListRawTagDisplayInput.checked,
     entryListRawPartDisplay: elements.entryListRawPartDisplayInput.checked,
     filterMenuRawTagDisplay: elements.filterMenuRawTagDisplayInput.checked,
+    entryHoverCardRawTagDisplay: elements.entryHoverCardRawTagDisplayInput.checked,
     entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(elements.entryListTagDisplayLimitInput.value),
     entryListTagsIncludeParts: elements.entryListTagsIncludePartsInput.checked,
     partOfSpeechTags: parseTagListText(elements.partOfSpeechTagsInput.value),
