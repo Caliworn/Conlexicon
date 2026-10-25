@@ -1947,18 +1947,24 @@ label span {
   line-height: 1.25;
 }
 
-/* Provisional until the visual review (Definition Tag Plan U7): the line style
-   tells where a tag comes from; the tooltip and accessible name say it too. */
-:is(.part-badge-item, .outline-chip):is(.tag-source-definition, .tag-source-both, .tag-source-entry) {
-  border-color: color-mix(in srgb, var(--ui-text-muted) 75%, transparent);
+/* Provisional until the visual review (Definition Tag Plan U7): a dashed ring
+   outside the chip marks its layer state, grey for a tag from the definitions
+   and red for a repeat or mixed part-of-speech levels; the tooltip and
+   accessible name say it too. The ring leaves the chip's own border alone, so
+   it stays visible on red-highlighted tags; the margin keeps rings of
+   neighbouring chips apart. */
+.tag-state {
+  margin: 2px;
+  outline: 1.5px dashed var(--tag-state-color);
+  outline-offset: 2px;
 }
 
-:is(.part-badge-item, .outline-chip).tag-source-definition {
-  border-style: dashed;
+.tag-state-source {
+  --tag-state-color: var(--ui-text-muted);
 }
 
-:is(.part-badge-item, .outline-chip):is(.tag-source-both, .tag-source-entry) {
-  border-style: dotted;
+.tag-state-problem {
+  --tag-state-color: var(--ui-danger);
 }
 
 /* A definition's tags lead its meaning, sized like the header badges. */

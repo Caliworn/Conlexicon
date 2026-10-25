@@ -284,11 +284,31 @@ async function checkMorphologyInput(repository) {
 
 async function checkQualityAndBatch(repository) {
   const dictionaryId = "dict-split";
-  const issues = buildQualityIssues(repository.qualityInputRecords(dictionaryId));
+  const settings = repository.qualityInputSettings(dictionaryId);
+  assert.deepEqual(settings, { partOfSpeechTags: PARTS });
+  const issues = buildQualityIssues(repository.qualityInputRecords(dictionaryId), settings);
   assert.deepEqual(
     issues.filter((issue) => issue.code === "missing_tags").map((issue) => issue.entryId),
     ["bare"],
     "missing_tags reads effective tags",
+  );
+  // Parts of speech belong either on the entry alone or on every definition.
+  assert.deepEqual(
+    issues
+      .filter((issue) => [
+        "duplicate_definition_tag",
+        "mixed_part_of_speech_levels",
+        "missing_definition_part_of_speech",
+      ].includes(issue.code))
+      .map((issue) => [issue.code, issue.params.definitionId, issue.params.tag || issue.params.part || ""]),
+    [
+      ["mixed_part_of_speech_levels", "def-walk-0", "n"],
+      ["missing_definition_part_of_speech", "def-and-0", ""],
+      ["missing_definition_part_of_speech", "def-bare-0", ""],
+      ["mixed_part_of_speech_levels", "def-dup-0", "adj"],
+      ["duplicate_definition_tag", "def-dup-0", "n"],
+      ["mixed_part_of_speech_levels", "def-dup-1", "adj"],
+    ],
   );
 
   const dryRun = await repository.batchUpdateEntries(dictionaryId, { operation: "applyTagOrder", dryRun: true });

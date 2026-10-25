@@ -679,9 +679,10 @@ const i18n = {
     tagOrderApplied: "标签顺序已整理",
     tagOrderEmpty: "请先输入至少一个标签。",
     tagWithSource: "{tag}（{source}）",
-    tagSourceDefinition: "来自释义",
-    tagSourceBoth: "词条和释义都有",
-    tagSourceAlsoEntry: "词条也有此标签",
+    tagStateDefinition: "来自释义",
+    tagStateRepeatsDefinition: "与释义重复",
+    tagStateRepeatsEntry: "与词条重复",
+    tagStateMixedPart: "词性层级混用",
     saveAndApply: "保存并应用",
     applyTags: "应用",
     tagDisplaySettings: "标签突出显示",
@@ -1296,9 +1297,10 @@ const i18n = {
     tagOrderApplied: "Tag order arranged",
     tagOrderEmpty: "Enter at least one tag first.",
     tagWithSource: "{tag} ({source})",
-    tagSourceDefinition: "From definitions",
-    tagSourceBoth: "On the entry and its definitions",
-    tagSourceAlsoEntry: "The entry also has this tag",
+    tagStateDefinition: "From definitions",
+    tagStateRepeatsDefinition: "Repeats a definition tag",
+    tagStateRepeatsEntry: "Repeats an entry tag",
+    tagStateMixedPart: "Parts of speech on both levels",
     saveAndApply: "Save and Apply",
     applyTags: "Apply",
     tagDisplaySettings: "Tag Highlighting",
@@ -8442,50 +8444,65 @@ function renderEmptyDetail() {
   elements.openLexicalNetworkButton.hidden = true;
 }
 
-// Attributes of a detail tag element; a tag from another layer than where it is
-// shown names that source in its tooltip and accessible name.
-function detailTagAttributes(tag, index, source = "") {
+const DETAIL_TAG_STATE_TEXT_KEYS = {
+  definition: "tagStateDefinition",
+  repeatsDefinition: "tagStateRepeatsDefinition",
+  repeatsEntry: "tagStateRepeatsEntry",
+  mixedPart: "tagStateMixedPart",
+};
+
+// Attributes of a detail tag element; a tag with a layer state names it in its
+// tooltip and accessible name.
+function detailTagAttributes(tag, index, state = "") {
   const text = tagIdentityText(activeTagDisplayIdentity(tag));
-  const sourceKey = {
-    definition: "tagSourceDefinition",
-    both: "tagSourceBoth",
-    entry: "tagSourceAlsoEntry",
-  }[source];
-  const label = sourceKey ? formatText("tagWithSource", { tag: text, source: t(sourceKey) }) : text;
-  return `data-entry-tag-index="${index}" data-entry-tag-value="${escapeHtml(tag)}" aria-label="${escapeHtml(label)}"${sourceKey
-    ? ` data-app-tooltip="always" data-app-tooltip-label="${escapeHtml(t(sourceKey))}"`
+  const stateKey = DETAIL_TAG_STATE_TEXT_KEYS[state];
+  const label = stateKey ? formatText("tagWithSource", { tag: text, source: t(stateKey) }) : text;
+  return `data-entry-tag-index="${index}" data-entry-tag-value="${escapeHtml(tag)}" aria-label="${escapeHtml(label)}"${stateKey
+    ? ` data-app-tooltip="always" data-app-tooltip-label="${escapeHtml(t(stateKey))}"`
     : ""}`;
 }
 
-function detailTagHtml(tag, index, { source = "", highlight = false, fuzzy = false } = {}) {
+// Only "from definitions" is a plain source; every other state is a problem
+// the quality check reports as well.
+function detailTagHtml(tag, index, { state = "", highlight = false, fuzzy = false } = {}) {
   const identity = activeTagDisplayIdentity(tag);
   const classes = [
     tagIsPart(tag) ? "part-badge-item" : "outline-chip",
-    source ? `tag-source-${source}` : "",
+    state ? `tag-state ${state === "definition" ? "tag-state-source" : "tag-state-problem"}` : "",
     tagIsRedHighlighted(tag) ? "highlight-tag" : "",
   ].filter(Boolean).join(" ");
   const label = highlight ? highlightSearchText(identity.label, fuzzy) : escapeHtml(identity.label);
   const rawHtml = identity.rawLabel ? `<small class="tag-identity-raw">${escapeHtml(identity.rawLabel)}</small>` : "";
-  return `<span class="${classes}" ${detailTagAttributes(tag, index, source)}><span>${label}</span>${rawHtml}</span>`;
+  return `<span class="${classes}" ${detailTagAttributes(tag, index, state)}><span>${label}</span>${rawHtml}</span>`;
 }
 
-// Header parts of speech come from the effective tags; a part not only on the
-// entry is marked as coming from the definitions or from both layers.
-function entryHeaderPartSources(entry) {
+function definitionTagLayerStates(entry, dictionary = activeDictionary()) {
+  return tagModel.definitionTagLayerStates(entry, dictionarySettings(dictionary), {
+    normalizeText: searchNormalizationModel.normalizeStructuralKey,
+  });
+}
+
+// The header shows the effective tags. A tag not only on the entry comes from
+// the definitions, repeats a definition tag, or mixes part-of-speech levels.
+function entryHeaderTagStates(entry, layerStates) {
   const entryTags = new Set(entry.tags || []);
-  const definitionTags = new Set((entry.definitions || []).flatMap((definition) => definition.tags || []));
-  return entryParts(entry).map((tag) => ({
+  // A definition-only tag has the same layer state on every definition.
+  const definitionTagStates = new Map(layerStates.flatMap((definition) => (
+    definition.tags.map(({ tag, state }) => [tag, state])
+  )));
+  return entryEffectiveTags(entry).map((tag) => ({
     tag,
-    source: !definitionTags.has(tag) ? "" : (entryTags.has(tag) ? "both" : "definition"),
+    state: !definitionTagStates.has(tag)
+      ? ""
+      : (entryTags.has(tag) ? "repeatsDefinition" : (definitionTagStates.get(tag) || "definition")),
   }));
 }
 
-function definitionTagsHtml(entry, definition) {
-  const entryTags = new Set(entry.tags || []);
+function definitionTagsHtml(definitionState) {
   const { fields, fuzzyFields } = entrySearchQueryOptions();
-  return (definition.tags || [])
-    .map((tag, index) => detailTagHtml(tag, index, {
-      source: entryTags.has(tag) ? "entry" : "",
+  return definitionState.tags
+    .map(({ tag, state }, index) => detailTagHtml(tag, index, {
+      state: state === "duplicate" ? "repeatsEntry" : state,
       highlight: fields.has("tags"),
       fuzzy: fuzzyFields.has("tags"),
     }))
@@ -8494,25 +8511,26 @@ function definitionTagsHtml(entry, definition) {
 
 function renderEntryDisplay(entry) {
   const showEmptySections = dictionarySettings().showEmptyEntrySections;
-  const otherTags = (entry.tags || [])
-    .map((tag, index) => ({ tag, index }))
-    .filter(({ tag }) => !tagIsPart(tag));
+  const layerStates = definitionTagLayerStates(entry);
+  const definitionStates = new Map((entry.definitions || []).map((definition, index) => [definition, layerStates[index]]));
+  const headerTags = entryHeaderTagStates(entry, layerStates);
+  const partTags = headerTags.filter(({ tag }) => tagIsPart(tag));
+  const otherTags = headerTags.filter(({ tag }) => !tagIsPart(tag));
   elements.editEntryButton.hidden = false;
   elements.focusEntryListButton.hidden = false;
   elements.openLexicalNetworkButton.hidden = false;
   elements.displayLemma.textContent = entry.lemma;
   elements.displayPronunciation.textContent = entry.pronunciation;
   elements.displayPronunciation.hidden = !entry.pronunciation;
-  const partTags = entryHeaderPartSources(entry);
   elements.displayPart.innerHTML = partTags
-    .map(({ tag, source }, index) => detailTagHtml(tag, index, { source }))
+    .map(({ tag, state }, index) => detailTagHtml(tag, index, { state }))
     .join("");
   elements.displayPart.hidden = !partTags.length;
   elements.displayPart.classList.remove("highlight-tag");
   delete elements.displayPart.dataset.entryTagIndex;
   delete elements.displayPart.dataset.entryTagValue;
   elements.displayTags.innerHTML = otherTags
-    .map(({ tag, index }) => detailTagHtml(tag, index))
+    .map(({ tag, state }, index) => detailTagHtml(tag, index, { state }))
     .join("");
 
   elements.displayDefinitions.innerHTML = "";
@@ -8530,7 +8548,7 @@ function renderEntryDisplay(entry) {
       <div class="definition-number">${index + 1}</div>
       <div class="definition-content">
         <p class="definition-meaning">${(definition.tags || []).length
-          ? `<span class="definition-tags">${definitionTagsHtml(entry, definition)}</span>`
+          ? `<span class="definition-tags">${definitionTagsHtml(definitionStates.get(definition))}</span>`
           : ""}${escapeHtml(definition.meaning)}</p>
         ${definition.example ? `<div class="example-box"><span>${escapeHtml(t("example"))}</span>${renderExampleHtml(definition.example)}</div>` : ""}
         ${definition.note ? `<div class="definition-note"><span>${escapeHtml(t("definitionNote"))}</span><p>${escapeHtml(definition.note)}</p></div>` : ""}
@@ -10822,19 +10840,24 @@ function qualityIssueText(issue) {
     missing_ipa: ["缺少 IPA", "Missing IPA"],
     multiple_primary_stress: ["多个主重音", "Multiple primary stresses"],
     tag_too_long: ["标签过长", "Long tag"],
+    duplicate_definition_tag: ["释义标签与词条重复", "Definition tag repeats an entry tag"],
+    mixed_part_of_speech_levels: ["词性层级混用", "Parts of speech on both levels"],
+    missing_definition_part_of_speech: ["释义缺少词性", "Definition without part of speech"],
     source_unresolved: ["未解析来源", "Unresolved source"],
     source_cycle: ["词源循环引用", "Etymology cycle"],
   };
   const params = issue.params;
+  const definitionLabel = () => `${aText("释义", "Definition")} ${params.definitionPosition + 1}`;
   const details = {
     gloss_incomplete: () => `${aText("缺少", "Missing")}: ${params.missingFields.map((key) => `\\${key}`).join(", ")}`,
     gloss_alignment_mismatch: () => `\\gla ${params.glaCount} / \\glb ${params.glbCount}`,
     duplicate_lemma: () => params.lemmas.join(", "),
     near_duplicate_tags: () => params.forms.join(", "),
     multiple_primary_stress: () => `${aText("主重音数量", "Primary stress count")}: ${params.primaryStressCount}`,
-    tag_too_long: () => (params.definitionId
-      ? `${aText("释义", "Definition")} ${params.definitionPosition + 1}: ${params.tag}`
-      : params.tag),
+    tag_too_long: () => (params.definitionId ? `${definitionLabel()}: ${params.tag}` : params.tag),
+    duplicate_definition_tag: () => `${definitionLabel()}: ${params.tag}`,
+    mixed_part_of_speech_levels: () => `${definitionLabel()}: ${params.part}`,
+    missing_definition_part_of_speech: definitionLabel,
     source_unresolved: () => params.sourceText,
     source_cycle: () => params.cycleLemmas.join(" → "),
   };

@@ -60,8 +60,29 @@ function qualityFixture() {
     completeRecord("cycle-a", { sources: [{ entryId: "cycle-b", text: "cycle-b" }] }),
     completeRecord("cycle-b", { sources: [{ entryId: "cycle-a", text: "cycle-a" }] }),
     completeRecord("cycle-upstream", { sources: [{ entryId: "cycle-a", text: "cycle-a" }] }),
+    // Definition tags against the entry's own tags.
+    completeRecord("entry-layer-duplicate", {
+      tags: ["n", "rare"],
+      definitions: [{ id: "def-layer-duplicate", meaning: "meaning", example: "", tags: ["rare", "n"] }],
+    }),
+    completeRecord("entry-layer-mixed", {
+      tags: ["n"],
+      definitions: [
+        { id: "def-layer-mixed", meaning: "meaning", example: "", tags: ["v"] },
+        { id: "def-layer-entry-part", meaning: "meaning", example: "", tags: [] },
+      ],
+    }),
+    completeRecord("entry-layer-missing", {
+      tags: ["rare"],
+      definitions: [
+        { id: "def-layer-own-part", meaning: "meaning", example: "", tags: ["adj"] },
+        { id: "def-layer-no-part", meaning: "meaning", example: "", tags: [] },
+      ],
+    }),
   ];
 }
+
+const qualitySettings = { partOfSpeechTags: ["n", "v", "adj"] };
 
 const expectedDefinitions = {
   gloss_incomplete: { severity: "medium", module: "gloss", scope: "entry" },
@@ -74,11 +95,13 @@ const expectedDefinitions = {
   missing_ipa: { severity: "low", module: "ipa", scope: "entry" },
   multiple_primary_stress: { severity: "medium", module: "ipa", scope: "entry" },
   tag_too_long: { severity: "low", module: "tags", scope: "entry" },
+  duplicate_definition_tag: { severity: "low", module: "tags", scope: "entry" },
+  mixed_part_of_speech_levels: { severity: "medium", module: "tags", scope: "entry" },
+  missing_definition_part_of_speech: { severity: "medium", module: "tags", scope: "entry" },
   source_unresolved: { severity: "medium", module: "network", scope: "entry" },
   source_cycle: { severity: "high", module: "network", scope: "entry" },
 };
 
-assert.equal(qualityModel.QUALITY_RULESET_VERSION, 1);
 assert.deepEqual(qualityModel.QUALITY_ISSUE_DEFINITIONS, expectedDefinitions);
 assert.deepEqual(qualityModel.QUALITY_SEVERITY_KEYS, ["high", "medium", "low"]);
 assert.deepEqual(qualityModel.QUALITY_MODULE_KEYS, ["lemma", "tags", "ipa", "network", "gloss", "other"]);
@@ -90,7 +113,7 @@ assert.deepEqual(parseGloss("\\gla a b\n\\glb A B\n\\ft test"), { gla: ["a", "b"
 assert.equal(parseGloss("plain example"), null);
 
 const records = qualityFixture();
-const issues = qualityModel.buildQualityIssues(records);
+const issues = qualityModel.buildQualityIssues(records, qualitySettings);
 assert.deepEqual(new Set(issues.map((issue) => issue.code)), new Set(Object.keys(expectedDefinitions)));
 issues.forEach((issue) => {
   assert.equal(issue.severity, expectedDefinitions[issue.code].severity);
@@ -130,6 +153,29 @@ assert.deepEqual(issueFor("tag_too_long", "entry-definition-tags").params, {
   definitionPosition: 0,
 });
 assert.equal(issueFor("missing_tags", "entry-definition-tags"), undefined, "definition tags satisfy missing_tags");
+const layerIssues = (entryId) => issues
+  .filter((issue) => issue.entryId === entryId && [
+    "duplicate_definition_tag",
+    "mixed_part_of_speech_levels",
+    "missing_definition_part_of_speech",
+  ].includes(issue.code))
+  .map(({ code, params }) => ({ code, params }));
+assert.deepEqual(layerIssues("entry-layer-duplicate"), [
+  { code: "duplicate_definition_tag", params: { definitionId: "def-layer-duplicate", definitionPosition: 0, tag: "rare" } },
+  { code: "duplicate_definition_tag", params: { definitionId: "def-layer-duplicate", definitionPosition: 0, tag: "n" } },
+], "a duplicated part of speech is a duplicate, not a mixed level");
+assert.deepEqual(layerIssues("entry-layer-mixed"), [
+  { code: "mixed_part_of_speech_levels", params: { definitionId: "def-layer-mixed", definitionPosition: 0, part: "v" } },
+], "a definition without parts takes the entry's parts");
+assert.deepEqual(layerIssues("entry-layer-missing"), [
+  { code: "missing_definition_part_of_speech", params: { definitionId: "def-layer-no-part", definitionPosition: 1 } },
+]);
+assert.deepEqual(
+  qualityModel.buildQualityIssues(records)
+    .filter((issue) => ["mixed_part_of_speech_levels", "missing_definition_part_of_speech"].includes(issue.code)),
+  [],
+  "part-of-speech level rules need configured parts of speech",
+);
 assert.deepEqual(issueFor("source_unresolved").params, {
   sourceText: "missing-root",
   sourcePosition: 0,
@@ -150,9 +196,9 @@ assert.deepEqual(issueFor("source_cycle", "cycle-upstream").params, {
 });
 
 const summary = qualityModel.buildQualitySummary(issues, records.length);
-assert.equal(summary.inputEntryCount, 11);
+assert.equal(summary.inputEntryCount, 14);
 assert.equal(summary.issueCount, issues.length);
-assert.equal(summary.affectedEntryCount, 11);
+assert.equal(summary.affectedEntryCount, 14);
 assert.equal(summary.globalIssueCount, 1);
 assert.equal(
   summary.severities.reduce((total, row) => total + row.issueCount, 0),
@@ -164,13 +210,8 @@ assert.equal(
 );
 assert.deepEqual(
   summary.modules.find((row) => row.key === "tags"),
-  { key: "tags", issueCount: 4, entryCount: 5 },
+  { key: "tags", issueCount: 12, entryCount: 8 },
   "global issues count their related entries in the module entry count",
-);
-assert.equal(
-  qualityModel.qualityIssueIdentity(issueFor("gloss_incomplete")),
-  qualityModel.qualityIssueIdentity({ ...issueFor("gloss_incomplete"), severity: "low", module: "other" }),
-  "issue identity derives from ruleset version, code, entry and params only",
 );
 
 function sourceRecord(id, sourceIds = []) {
@@ -261,11 +302,12 @@ assert.equal(longCycleIssues[0].params, longCycleIssues[longCycleLength - 1].par
   let yields = 0;
   const asyncIssues = await qualityModel.buildQualityIssuesAsync(
     [...records, ...ladder],
+    qualitySettings,
     async () => {
       yields += 1;
     },
   );
-  assert.deepEqual(asyncIssues, qualityModel.buildQualityIssues([...records, ...ladder]));
+  assert.deepEqual(asyncIssues, qualityModel.buildQualityIssues([...records, ...ladder], qualitySettings));
   assert.ok(yields >= 2, "the async builder must yield between record batches");
   console.log("Quality rule contract checks passed.");
 })().catch((error) => {

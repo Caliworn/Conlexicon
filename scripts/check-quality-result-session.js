@@ -159,7 +159,8 @@ async function checkService(repository) {
   const dictionary = qualityDictionary();
   await repository.importDictionarySnapshot(dictionary);
   // Reference result from the exported entries, independent of the minimal input reader.
-  const snapshotEntries = (await repository.getDictionarySnapshot(DICTIONARY_ID)).entries;
+  const snapshot = await repository.getDictionarySnapshot(DICTIONARY_ID);
+  const snapshotEntries = snapshot.entries;
   const referenceIssues = qualityModel.buildQualityIssues(snapshotEntries.map((entry) => ({
     id: entry.id,
     lemma: entry.lemma,
@@ -167,7 +168,7 @@ async function checkService(repository) {
     tags: entry.tags,
     definitions: entry.definitions,
     sources: entry.etymology.sources,
-  })));
+  })), snapshot.settings);
   const report = {
     issues: referenceIssues,
     summary: qualityModel.buildQualitySummary(referenceIssues, snapshotEntries.length),
@@ -193,7 +194,6 @@ async function checkService(repository) {
   assert.equal(summary.diagnostics.cache, "miss");
   assert.equal(counts.context, 0, "summary requests must not load the dictionary query context");
   assert.deepEqual(summary.summary, report.summary);
-  assert.equal(summary.rulesetVersion, 1);
   assert.equal(Object.hasOwn(summary, "items"), false);
 
   const allIssues = await service.query(DICTIONARY_ID, issueRequest());

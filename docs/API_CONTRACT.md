@@ -121,7 +121,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `POST` | `/api/dictionaries/:id/analysis/query` | 按需读取轻量分析 widgets | `{ dictionaryId, generation, cacheKey, widgets, diagnostics }` | 同步聚合端点；多个 widget 由 planner 合并为共享 SQLite 任务，不读取或返回完整词典 snapshot。 |
 | `POST` | `/api/dictionaries/:id/analysis/features/query` | 读取派生功能结果摘要或窗口 | summary 模式返回 `{ dictionaryId, generation, resultKey, source, summary, diagnostics }`；items 模式另带 `{ items, pageInfo, searchSummary }` | 当前支持 `ipaAutoCompare`、`ipaDistribution` 和 `morphologyAnalysis` v1；基础算法结果保存在有界进程缓存中，分类、搜索、排序和窗口不触发功能算法重算。 |
 | `POST` | `/api/dictionaries/:id/analysis/features/location` | 定位词条在派生结果视图中的窗口 | feature query 响应加 `{ location }` | 请求额外携带 `entryId`；目标不属于当前分类或搜索结果时返回 `location.found: false`。 |
-| `POST` | `/api/dictionaries/:id/quality/query` | 读取质量检查摘要、问题窗口或受影响词条窗口 | summary 模式返回 `{ dictionaryId, generation, resultKey, source, rulesetVersion, summary, diagnostics }`；items 模式另带 `{ view, searchSummary, items, pageInfo }` | 详见 [Quality result query](#quality-result-query)；不读取完整 snapshot，问题 DTO 只含稳定字段。 |
+| `POST` | `/api/dictionaries/:id/quality/query` | 读取质量检查摘要、问题窗口或受影响词条窗口 | summary 模式返回 `{ dictionaryId, generation, resultKey, source, summary, diagnostics }`；items 模式另带 `{ view, searchSummary, items, pageInfo }` | 详见 [Quality result query](#quality-result-query)；不读取完整 snapshot，问题 DTO 只含稳定字段。 |
 | `POST` | `/api/dictionaries/:id/quality/location` | 定位词条在质量 entry 视图中的窗口 | quality items 响应加 `{ location }` | 只接受 `itemKind: "entry"`，请求额外携带 `entryId`。 |
 
 #### `GET /api/dictionaries/:id/entries` 查询参数补充
@@ -475,13 +475,13 @@ GET /api/dictionaries/:id/facets
 
 ### 释义标签与有效标签
 
-释义可以带标签。词条标签描述这个词，释义标签描述那条释义；释义不继承词条标签。需要"整个词"的答案时，取词条的**有效标签**：词条标签与全部释义标签的并集。词性放在哪一层是使用约定（多词性词条原则上放在各条释义上），程序不强制、不迁移、也不提示。
+释义可以带标签。词条标签描述这个词，释义标签描述那条释义；释义不继承词条标签。需要"整个词"的答案时，取词条的**有效标签**：词条标签与全部释义标签的并集。词性放在哪一层是使用约定：要么只挂在词条上，要么挂在每条释义上（多词性词条原则上放在各条释义上）。程序不强制、不迁移，但质量检查报告不符合约定的释义（见质量规则的"标签层级"）。
 
 - **存储与写入**：详情 DTO 的 `definitions[]` 带 `tags: string[]`；`POST` / `PUT /entries` 与 JSON 导入在边界把它按标签列表规范化（去首尾空白、去空、去重并保持顺序，非数组按空列表），缺省为 `[]`。一条释义可以只有标签，释义文字（`meaning`）、例句和备注都为空也合法，导入时不会被当作空释义丢弃。`PATCH /entries` 不接受释义标签。
 - **DTO**：详情 DTO 与摘要 DTO 的 `tags` 都只表示词条标签。摘要 DTO 另带 `effectiveTags`，`parts` 与 `partOfSpeech` 从它计算；摘要的 `definitionPreviews[]` 只多带 `parts`（该释义自己的标签中的词性，按 `tagSortOrder` 排序），供列表与悬浮卡片在每条释义前显示它自己的词性，不带其他标签。
 - **有效标签的顺序**：先按首次出现拼出并集（词条标签按存储顺序，然后按释义顺序、释义内顺序追加未出现过的标签），再按 `settings.tagSortOrder` 排序：列出的标签按其位置排在前面，其余保持首次出现顺序。有效标签只在读取时计算，不存储；共享实现为 `tagModel.effectiveEntryTags(entry, order)`，前后端共用。保存时排序（见下一条）不能代替这一步：两层各自有序，拼接后仍可能违反配置，例如词条 `[古语]` 加释义 `[n]` 拼成 `古语, n`，而配置要求词性在前。
 - **保存时的存储顺序**：运行期的每次词条写入（`POST` / `PUT /entries`、`PATCH /entries`、创建来源、绑定来源时改写的来源词条、整词典批处理）都在服务端把词条标签和每条释义的标签分别按 `settings.tagSortOrder` 排列，规则与 `applyTagOrder` 批处理相同；`PATCH` 同时附带 settings 时按将要保存的 settings 排列。`tagSortOrder` 为空时顺序不变。JSON 导入保持原有顺序，存量数据由 `applyTagOrder` 整理。前端在设置表单保存后，若 `tagSortOrder` 有变化且试运行发现顺序不一致的词条，弹出应用内确认，询问是否立即运行 `applyTagOrder`；离开页面时经"保存 / 放弃更改 / 取消"保存设置不弹出该确认。
-- **使用范围**：EntryFilter 的全部标签条件、facets、分析页的词性与标签统计、`missing_tags` 质量规则、`allowEmptyTags` 保存校验和自动形态匹配都按有效标签。`near_duplicate_tags` 与 `tag_too_long` 同时检查两层标签。标签显示替换与红色强调对两层同样生效。
+- **使用范围**：EntryFilter 的全部标签条件、facets、分析页的词性与标签统计、`missing_tags` 质量规则、`allowEmptyTags` 保存校验和自动形态匹配都按有效标签。`near_duplicate_tags` 与 `tag_too_long` 同时检查两层标签；`duplicate_definition_tag`、`mixed_part_of_speech_levels` 与 `missing_definition_part_of_speech` 检查两层之间的关系。标签显示替换与红色强调对两层同样生效。
 - **自动形态**：模板组匹配把有效标签作为唯一输入，规则不变（任一标签与组的 `matchTags` 相同即匹配，只取最前的组）。这是在形态分配重做（见 [Morphology Assignment Plan](MORPHOLOGY_ASSIGNMENT_PLAN.md) 的 D6）决定匹配上下文之前的默认行为；释义都没有标签时，结果与只用词条标签相同。
 - **搜索**：`tags` 字段同时投影释义标签，命中的 `sourceType` 为 `definitionTag`，`sourceId` 为释义 ID，`sourcePosition` 为该标签在释义内的位置。
 
@@ -977,7 +977,7 @@ source、version、options、response mode、category、分布 value、page 与�
 
 #### Quality result query
 
-质量检查的基本单位是 **issue**，不是布尔筛选条件。规则 code、严重度、模块、详情参数、问题级汇总和规则集版本由质量模型（`lib/quality-model.js`，仅服务端，不由静态服务公开）和 `QualityResultService`（`lib/quality-result-service.js`）负责；repository 只提供最小事实，不拥有质量政策。质量结果保持独立 API，不并入 `/analysis/features/query`，内部复用 feature result 的会话缓存与 cursor 原语。
+质量检查的基本单位是 **issue**，不是布尔筛选条件。规则 code、严重度、模块、详情参数和问题级汇总由质量模型（`lib/quality-model.js`，仅服务端，不由静态服务公开）和 `QualityResultService`（`lib/quality-result-service.js`）负责；repository 只提供最小事实，不拥有质量政策。质量结果保持独立 API，不并入 `/analysis/features/query`，内部复用 feature result 的会话缓存与 cursor 原语。
 
 前端质量页打开时才请求 summary 与 issue 窗口，同一词典 ID 加 `updatedAt` 只请求一次，失败显示重试；问题列表每次取 200 条，“再显示”按 cursor 追加，cursor 过期时从第一页重取。词条列表的质量筛选以 `resultSource: { type: "dictionaryQuality" }` 加 selector（`category` 为 `all / severity / module`，`value` 为分组值）作为 feature-result 筛选的一种，请求本端点的 entry 视图。端点：
 
@@ -988,7 +988,7 @@ POST /api/dictionaries/:id/quality/location
 
 source 固定为 `{ type: "dictionaryQuality", version: 1, options: {} }`，`responseMode` 省略时为 `items`。
 
-- **summary**：请求只接受 source，携带 `view` 或 `page` 返回 `invalid_quality_summary_request`。响应 `{ dictionaryId, generation, resultKey, source, rulesetVersion, summary, diagnostics }`；summary 区分 `inputEntryCount`、`issueCount`、`affectedEntryCount`、`globalIssueCount`，并按 severity（`high / medium / low`）和 module（`lemma / tags / ipa / network / gloss / other`）分别返回 `{ key, issueCount, entryCount }`。summary 不读取词典查询上下文，也不构建窗口。
+- **summary**：请求只接受 source，携带 `view` 或 `page` 返回 `invalid_quality_summary_request`。响应 `{ dictionaryId, generation, resultKey, source, summary, diagnostics }`；summary 区分 `inputEntryCount`、`issueCount`、`affectedEntryCount`、`globalIssueCount`，并按 severity（`high / medium / low`）和 module（`lemma / tags / ipa / network / gloss / other`）分别返回 `{ key, issueCount, entryCount }`。summary 不读取词典查询上下文，也不构建窗口。
 - **items**：`view` 必填：
 
 ```js
@@ -1001,20 +1001,20 @@ source 固定为 `{ type: "dictionaryQuality", version: 1, options: {} }`，`res
 ```
 
   `selector` 省略时为 `all`；`all` 不接受 value。`page` 沿用 EntryQuery 的 `{ limit, cursor, windowOffset }`，limit 为 1–200，默认 200。
-- **issue 视图**：按稳定问题顺序分页（词条按 `position, id` 排列后各规则依次产出，与规则集 v1 构建顺序一致），可返回 `entryId` 为空的全局问题；携带 `search` 或 `sort` 返回 `invalid_quality_issue_view`。item 为 `{ issue, entry }`：`issue` 只含 `{ id, code, severity, module, entryId, params }`，不返回本地化 title/detail；`entry` 是该问题主词条的 EntrySummary，全局问题为 `null`。
+- **issue 视图**：按稳定问题顺序分页（词条按 `position, id` 排列后各规则依次产出，与规则的构建顺序一致），可返回 `entryId` 为空的全局问题；携带 `search` 或 `sort` 返回 `invalid_quality_issue_view`。item 为 `{ issue, entry }`：`issue` 只含 `{ id, code, severity, module, entryId, params }`，不返回本地化 title/detail；`entry` 是该问题主词条的 EntrySummary，全局问题为 `null`。
 - **entry 视图**：按唯一受影响词条分页，复用 EntrySearch、sort、EntrySummary、`searchSummary` 和 cursor。item 为 `{ entry, issues }`，`issues` 只含当前 selector 命中、且影响该词条的问题；全局近似标签问题会附加到其关联词条上，与 summary 的 `entryCount` 语义一致。
 - 窗口响应在 summary 响应的字段之外附加 `{ view: { itemKind, selector }, searchSummary, items, pageInfo, diagnostics }`；`pageInfo` 与 feature result 相同。
 - **location**：请求额外携带 `entryId`，只接受 entry 视图（issue 视图返回 `invalid_quality_item_kind`），返回 entry 窗口加 `location: { found, index, windowIndex, windowOffset }`；目标词条不在当前 selector 与搜索结果中时 `found: false`、`items` 为空。
 
-基础会话以 `{ dictionaryId, generation, source, rulesetVersion, implementationVersion }` 为身份，同一 generation 下的 summary、全部 selector、搜索、排序、窗口和 location 共用一次规则构建；UI 语言不属于请求或身份。会话放在独立的有界 `FeatureResultSessionCache` 实例中（TTL/LRU、in-flight 合并），写入使 generation 前进后旧会话不再命中，旧 cursor 返回 `query_cursor_stale`。每个视图的有序成员在会话内按 LRU 缓存最多 12 个。
+基础会话以 `{ dictionaryId, generation, source }` 为身份，同一 generation 下的 summary、全部 selector、搜索、排序、窗口和 location 共用一次规则构建；UI 语言不属于请求或身份。会话放在独立的有界 `FeatureResultSessionCache` 实例中（TTL/LRU、in-flight 合并），写入使 generation 前进后旧会话不再命中，旧 cursor 返回 `query_cursor_stale`。每个视图的有序成员在会话内按 LRU 缓存最多 12 个。会话、issue `id` 和 cursor 都只在当前进程内有效（cursor 带进程纪元），规则改动随代码重启生效，因此身份里不带规则版本；以后若要把质量结果或 issue `id` 保存到进程之外，再另行设计版本或指纹。
 
-规则输入由 repository 的 `qualityInputRecords()` 一次同步读取：词条 `id / lemma / pronunciation`、有序标签、释义 `id / meaning / example`、有序来源 `entryId / text`（顺序与公开词条 DTO 相同）。不读取备注、词源描述、形态、语料、语言文档或完整 snapshot；repository 不生成质量 code、严重度或详情。HTTP 响应不携带全局问题的关联词条 ID 数组或任何完整匹配 ID 数组。
+规则输入由 repository 的 `qualityInputRecords()` 一次同步读取：词条 `id / lemma / pronunciation`、有序标签、释义 `id / meaning / example / tags`、有序来源 `entryId / text`（顺序与公开词条 DTO 相同）；紧接着由 `qualityInputSettings()` 读取规则用到的唯一设置 `partOfSpeechTags`。不读取备注、词源描述、形态、语料、语言文档或完整 snapshot；repository 不生成质量 code、严重度或详情。HTTP 响应不携带全局问题的关联词条 ID 数组或任何完整匹配 ID 数组。
 
 source、version、options、response mode、item kind、selector 与 issue 视图字段验证失败分别返回 `invalid_quality_source`、`unsupported_quality_source`、`invalid_quality_source_version`、`invalid_quality_source_options`、`invalid_quality_response_mode`、`invalid_quality_view`、`invalid_quality_item_kind`、`invalid_quality_selector`、`invalid_quality_issue_view`；请求体不是对象时返回 `invalid_quality_query_payload` 或 `invalid_quality_location_payload`，location 缺少目标 ID 时返回 `invalid_quality_location_entry_id`，page 与搜索字段沿用既有 EntryQuery 校验码。未知词典返回 `dictionary_not_found`。
 
-##### 规则集 v1
+##### 规则
 
-`QUALITY_RULESET_VERSION` 固定为 `1`。严重度顺序固定为 `high / medium / low`，模块顺序固定为 `lemma / tags / ipa / network / gloss / other`。
+严重度顺序固定为 `high / medium / low`，模块顺序固定为 `lemma / tags / ipa / network / gloss / other`。
 
 | Code | 严重度 | 模块 | 范围 | 稳定参数 |
 | --- | --- | --- | --- | --- |
@@ -1028,6 +1028,9 @@ source、version、options、response mode、item kind、selector 与 issue 视�
 | `missing_ipa` | low | ipa | entry | 无 |
 | `multiple_primary_stress` | medium | ipa | entry | `primaryStressCount` |
 | `tag_too_long` | low | tags | entry/tag | `tag`、`codePointLength`、`limit`；释义标签另带 `definitionId`、`definitionPosition` |
+| `duplicate_definition_tag` | low | tags | entry/definition | `definitionId`、`definitionPosition`、`tag` |
+| `mixed_part_of_speech_levels` | medium | tags | entry/definition | `definitionId`、`definitionPosition`、`part` |
+| `missing_definition_part_of_speech` | medium | tags | entry/definition | `definitionId`、`definitionPosition` |
 | `source_unresolved` | medium | network | entry/source | `sourceText`、`sourcePosition` |
 | `source_cycle` | high | network | entry/graph | `cycleEntryIds`、`cycleLemmas` |
 
@@ -1036,17 +1039,22 @@ source、version、options、response mode、item kind、selector 与 issue 视�
 ##### Issue 身份与本地化
 
 - 同一词条可以产生多个 issue，同一释义、标签或来源也可以分别产生 issue。
-- issue `id` 由规则集版本、`code`、`entryId` 和稳定参数派生并散列；`severity / module` 由 code 决定，本地化 `title / detail` 不参与。`id` 不持久化，不承诺跨规则集版本相同。
+- issue `id` 由 `code`、`entryId` 和稳定参数派生并散列；`severity / module` 由 code 决定，本地化 `title / detail` 不参与。`id` 不持久化，不承诺在规则改动后保持相同。
 - 服务端只返回稳定字段；前端（`app.js` 的 `qualityIssueText()`）按 code 与 params 生成标题和详情。UI 语言不属于质量计算身份：中英文只改变标题、详情和标签，不改变 code、参数、数量或成员；切换语言只重新渲染已取回的结果，不重新请求、不失效会话。
 - 词形、标签和来源匹配使用固定的服务端关系规范化基线，不读取自由文本搜索的 NFC、case folding 或自定义等价设置。
 
 ##### 规则边界行为
 
-- **Gloss**：规则集 v1 读取当前 `definitions.example` 中的 `\gla / \glb / \glc / \ft`（解析在 `lib/gloss-model.js`，前后端共用）。这只冻结质量检查语义，不为例句—语料链接建立存储契约；存储模型变化时必须升级输入 adapter 或规则集版本。
+- **Gloss**：规则读取当前 `definitions.example` 中的 `\gla / \glb / \glc / \ft`（解析在 `lib/gloss-model.js`，前后端共用）。这只冻结质量检查语义，不为例句—语料链接建立存储契约；存储模型变化时必须同步修改输入 adapter。
 - **来源循环**：来源链最终进入循环的词条也产生 `source_cycle`，issue 不只属于循环参与者；`cycleEntryIds / cycleLemmas` 只记录实际循环见证，并重复首节点闭合路径。实现消费 `etymology-graph-model` 的强连通分量，按分量拓扑序记忆化传播，O(V+E)：
   - 每个循环分量（成员数大于 1；保存校验拒绝自引用）只有一条规范见证：从分量内 ID 最小的成员出发，按来源位置顺序在分量内深度优先，第一条回到起点的边闭合见证；
   - 循环分量的成员都引用本分量的见证，其他词条按自身来源位置顺序，取第一个能到达循环的来源所继承的见证；
   - 见证只取决于词条集合与来源边，与词条排列顺序无关；到达同一循环的 issue 共用同一个 params 对象，调用方不得修改。
+- **标签层级**：三条规则共用 `tagModel.definitionTagLayerStates()`，前端详情的标签状态标注也用它。标签按原值比较（与有效标签相同），是否为词性按 `partOfSpeechTags` 的结构化规范化判断（与 `entryParts()` 相同）。
+  - `duplicate_definition_tag`：释义上有与词条相同的标签，词性和非词性都算，每个重复标签一个 issue。
+  - `mixed_part_of_speech_levels`：词条有词性，而释义有词条没有的词性，每个这样的词性一个 issue。词条和释义上有同一个词性时只报 `duplicate_definition_tag`。
+  - `missing_definition_part_of_speech`：词条没有词性，这条释义也没有，每条释义一个 issue。
+  - 合起来表达"词性要么只挂在词条上，要么挂在每条释义上"；没有配置词性时后两条不检查。没有释义的词条不产生这三种 issue。
 - **近似标签**：一个规范化紧凑形式对应多个不同 raw tag 时只产生一个全局 `near_duplicate_tags`（`entryId` 为空），词条标签和释义标签一起比较。`forms` 按稳定遇见顺序去重；受影响词条按唯一 ID 计入 tags 模块的 `entryCount`，并在 entry 视图中带问题标记出现，但 HTTP 不返回关联 ID 数组。
 
 ##### Summary 计数语义
