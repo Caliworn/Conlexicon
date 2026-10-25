@@ -89,7 +89,6 @@ const {
   normalizeDictionarySettings,
   normalizeDocs,
   normalizeEditPageSwitchAction,
-  normalizeEntryListPartDisplay,
   normalizeEntrySectionOrder,
   normalizeGlossFontFamily,
   normalizeGlossFontSize,
@@ -257,6 +256,10 @@ let analysisTagSetRenderState = {
   key: "",
   visibleCount: 100,
 };
+let analysisPartSetRenderState = {
+  key: "",
+  visibleCount: 100,
+};
 let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
 let draggedToolNavView = "";
@@ -288,6 +291,7 @@ const ANALYSIS_OVERVIEW_QUERY_WIDGETS = [
 ];
 const ANALYSIS_TAG_QUERY_WIDGETS = [
   { id: "parts", type: "partDistribution" },
+  { id: "partSets", type: "partSetDistribution" },
   { id: "tags", type: "tagFrequency" },
   { id: "tagSets", type: "tagSetDistribution" },
 ];
@@ -408,6 +412,8 @@ const i18n = {
     quickEntryFullEdit: "完整编辑",
     quickEntrySubmit: "提交",
     quickEntryDefinitionLabel: "释义 {n}",
+    quickEntryDefinitionTagsLabel: "释义 {n} 标签",
+    quickEntryDefinitionTagsLocked: "清空所有释义标签后才能关闭",
     quickEntryCreated: "已创建",
     quickEntryDefinitionCount: "{count} 条释义",
     quickEntryDefinitionCountOne: "1 条释义",
@@ -481,6 +487,8 @@ const i18n = {
     activeFilterHasTags: "有标签词条",
     activeFilterNoTags: "无标签词条",
     activeFilterMultiTagEntries: "多标签词条",
+    activeFilterMultiPartEntries: "多词性词条",
+    activeFilterPartCombination: "词性组合",
     activeFilterInitialLetter: "首字母",
     activeFilterWordLength: "词长",
     activeFilterOrthographicCharacter: "正写法字符",
@@ -642,16 +650,14 @@ const i18n = {
     entryTagSettings: "词条标签",
     tagDisplayReplacement: "标签显示替换",
     tagDisplayReplacementHelp: "每行一条，格式为“标签 = 显示文本”。只改变界面显示，不修改标签本身。",
-    entryListRawTagDisplay: "词条列表中显示原始标签",
+    entryListRawTagDisplay: "词条列表的标签行显示原始标签",
+    entryListRawPartDisplay: "词条列表的词性文本（副标题和释义前）显示原始标签",
     filterMenuRawTagDisplay: "筛选菜单中显示原始标签",
     rootModeNeedsNoFilter: "清除筛选后可用",
     entryListTagDisplayLimit: "词条列表中标签显示上限",
     entryListTagDisplayLimitHelp: "设为 n 时，超过 n 个标签会显示前 n-1 个和省略号。默认为 3。",
     entryListTagDisplayLimitInvalid: "词条列表标签显示上限必须是 2 到 10 之间的整数。",
-    entryListPartDisplay: "词条列表中词性显示位置",
-    entryListPartDisplaySubtitle: "副标题",
-    entryListPartDisplayChips: "标签区",
-    entryListPartDisplayBoth: "两者均显示",
+    entryListTagsIncludeParts: "词条列表的标签行包含词性标签",
     tagTooltipRawTag: "原始标签",
     tagTooltipDisplayReplacement: "显示替换",
     partOfSpeechTagSettings: "词性标签",
@@ -672,6 +678,10 @@ const i18n = {
     tagOrderUnsavedSettingsConfirm: "当前其他设置有未保存更改。请先保存设置后再自动整理标签顺序。",
     tagOrderApplied: "标签顺序已整理",
     tagOrderEmpty: "请先输入至少一个标签。",
+    tagWithSource: "{tag}（{source}）",
+    tagSourceDefinition: "来自释义",
+    tagSourceBoth: "词条和释义都有",
+    tagSourceAlsoEntry: "词条也有此标签",
     saveAndApply: "保存并应用",
     applyTags: "应用",
     tagDisplaySettings: "标签突出显示",
@@ -679,9 +689,6 @@ const i18n = {
     tagFilterSettings: "标签筛选",
     entryListTagFilteringHelp: "在词条列表中点击标签时启用筛选",
     displaySettings: "显示",
-    polysemyDisplay: "多义项显示",
-    entryListPolysemyDisplay: "词条列表的多义项显示",
-    networkPolysemyDisplay: "词条悬浮卡片的多义项显示",
     emptyEntrySections: "空栏目",
     showEmptyEntrySections: "在词条浏览界面显示空栏目",
     entrySectionOrder: "词条栏目排序",
@@ -724,6 +731,8 @@ const i18n = {
     meaning: "释义",
     example: "例句",
     definitionNote: "释义备注",
+    definitionTags: "释义标签",
+    definitionTagsHelp: "填写这条释义的标签，例如它的词性。多个标签可用半角逗号、全角逗号或顿号分隔。",
     removeDefinition: "删除释义",
     none: "无",
     requiredEntry: "请填写词形",
@@ -1020,6 +1029,8 @@ const i18n = {
     quickEntryFullEdit: "Full Edit",
     quickEntrySubmit: "Submit",
     quickEntryDefinitionLabel: "Definition {n}",
+    quickEntryDefinitionTagsLabel: "Definition {n} tags",
+    quickEntryDefinitionTagsLocked: "Clear all definition tags to turn this off",
     quickEntryCreated: "created",
     quickEntryDefinitionCount: "{count} definitions",
     quickEntryDefinitionCountOne: "1 definition",
@@ -1093,6 +1104,8 @@ const i18n = {
     activeFilterHasTags: "Tagged entries",
     activeFilterNoTags: "Untagged entries",
     activeFilterMultiTagEntries: "Multi-tag entries",
+    activeFilterMultiPartEntries: "Multi-POS entries",
+    activeFilterPartCombination: "POS combination",
     activeFilterInitialLetter: "Initial Letter",
     activeFilterWordLength: "Word Length",
     activeFilterOrthographicCharacter: "Orthographic Character",
@@ -1254,16 +1267,14 @@ const i18n = {
     entryTagSettings: "Entry Tags",
     tagDisplayReplacement: "Tag Display Replacement",
     tagDisplayReplacementHelp: "Enter one per line in the format “Tag = Display Text”. This changes only the interface display and does not modify the tag itself.",
-    entryListRawTagDisplay: "Show raw tags in the entry list",
+    entryListRawTagDisplay: "Show raw tags in the entry list tag row",
+    entryListRawPartDisplay: "Show raw tags for part-of-speech text in the entry list (subtitle and before definitions)",
     filterMenuRawTagDisplay: "Show raw tags in the filter menu",
     rootModeNeedsNoFilter: "Clear the filter to use it",
     entryListTagDisplayLimit: "Entry list tag display limit",
     entryListTagDisplayLimitHelp: "Set to n: entries with more than n tags show the first n-1 tags and an ellipsis. Default: 3.",
     entryListTagDisplayLimitInvalid: "Entry list tag display limit must be an integer from 2 to 10.",
-    entryListPartDisplay: "Part-of-speech position in entry list",
-    entryListPartDisplaySubtitle: "Subtitle",
-    entryListPartDisplayChips: "Tag area",
-    entryListPartDisplayBoth: "Both",
+    entryListTagsIncludeParts: "Include part-of-speech tags in the entry list tag row",
     tagTooltipRawTag: "Raw tag",
     tagTooltipDisplayReplacement: "Display",
     partOfSpeechTagSettings: "Part-of-Speech Tags",
@@ -1284,6 +1295,10 @@ const i18n = {
     tagOrderUnsavedSettingsConfirm: "Other Settings have unsaved changes. Save the settings before arranging tag order.",
     tagOrderApplied: "Tag order arranged",
     tagOrderEmpty: "Enter at least one tag first.",
+    tagWithSource: "{tag} ({source})",
+    tagSourceDefinition: "From definitions",
+    tagSourceBoth: "On the entry and its definitions",
+    tagSourceAlsoEntry: "The entry also has this tag",
     saveAndApply: "Save and Apply",
     applyTags: "Apply",
     tagDisplaySettings: "Tag Highlighting",
@@ -1291,9 +1306,6 @@ const i18n = {
     tagFilterSettings: "Tag Filtering",
     entryListTagFilteringHelp: "Enable filtering when clicking tags in the entry list",
     displaySettings: "Display",
-    polysemyDisplay: "Polysemy Display",
-    entryListPolysemyDisplay: "Entry list polysemy display",
-    networkPolysemyDisplay: "Entry hover-card polysemy display",
     emptyEntrySections: "Empty Sections",
     showEmptyEntrySections: "Show empty sections in the entry view",
     entrySectionOrder: "Entry Section Order",
@@ -1338,6 +1350,9 @@ const i18n = {
     definitionNote: "Definition Note",
     addExample: "Add Example",
     addDefinitionNote: "Add Definition Note",
+    addDefinitionTags: "Add Definition Tags",
+    definitionTags: "Definition Tags",
+    definitionTagsHelp: "Tags for this definition, such as its part of speech. Separate tags with halfwidth commas, fullwidth commas, or ideographic commas.",
     removeDefinition: "Remove Definition",
     none: "None",
     requiredEntry: "Fill lemma",
@@ -1534,6 +1549,7 @@ const i18n = {
 
 i18n.zh.addExample = "添加例句";
 i18n.zh.addDefinitionNote = "添加释义备注";
+i18n.zh.addDefinitionTags = "添加释义标签";
 i18n.zh.createSourceEntry = "新建来源词条：{source}";
 
 const elements = {
@@ -1682,9 +1698,10 @@ const elements = {
   entryExampleGlossAlignInput: document.querySelector("#entryExampleGlossAlignInput"),
   tagDisplayMapInput: document.querySelector("#tagDisplayMapInput"),
   entryListRawTagDisplayInput: document.querySelector("#entryListRawTagDisplayInput"),
+  entryListRawPartDisplayInput: document.querySelector("#entryListRawPartDisplayInput"),
   filterMenuRawTagDisplayInput: document.querySelector("#filterMenuRawTagDisplayInput"),
   entryListTagDisplayLimitInput: document.querySelector("#entryListTagDisplayLimitInput"),
-  entryListPartDisplayInput: document.querySelector("#entryListPartDisplayInput"),
+  entryListTagsIncludePartsInput: document.querySelector("#entryListTagsIncludePartsInput"),
   partOfSpeechTagsInput: document.querySelector("#partOfSpeechTagsInput"),
   tagListSeparatorStyleInput: document.querySelector("#tagListSeparatorStyleInput"),
   tagSortOrderInput: document.querySelector("#tagSortOrderInput"),
@@ -1692,8 +1709,6 @@ const elements = {
   tagOrderInfoButton: document.querySelector("#tagOrderInfoButton"),
   tagRedHighlightInput: document.querySelector("#tagRedHighlightInput"),
   entryListTagFilteringInput: document.querySelector("#entryListTagFilteringInput"),
-  entryListPolysemyInput: document.querySelector("#entryListPolysemyInput"),
-  networkPolysemyInput: document.querySelector("#networkPolysemyInput"),
   showEmptyEntrySectionsInput: document.querySelector("#showEmptyEntrySectionsInput"),
   searchFieldEnabledInputs: [...document.querySelectorAll("[data-search-enabled]")],
   searchFieldFuzzyInputs: [...document.querySelectorAll("[data-search-fuzzy]")],
@@ -1750,6 +1765,7 @@ const elements = {
   quickEntryPanel: document.querySelector("#quickEntryPanel"),
   quickEntryLog: document.querySelector("#quickEntryLog"),
   quickEntryFields: document.querySelector("#quickEntryFields"),
+  quickEntryDefinitionTagsInput: document.querySelector("#quickEntryDefinitionTagsInput"),
   quickEntryMessage: document.querySelector("#quickEntryMessage"),
   closeQuickEntryButton: document.querySelector("#closeQuickEntryButton"),
   quickEntryFullEditButton: document.querySelector("#quickEntryFullEditButton"),
@@ -2746,24 +2762,37 @@ function entryPart(entry) {
   return entryParts(entry)[0] || "";
 }
 
+// The entry as a whole: its own tags plus its definitions' tags. Summaries carry
+// the server's `effectiveTags`; detail entries compute them from definitions.
+function entryEffectiveTags(entry, dictionary = activeDictionary()) {
+  return Array.isArray(entry.effectiveTags)
+    ? entry.effectiveTags
+    : tagModel.effectiveEntryTags(entry, dictionarySettings(dictionary).tagSortOrder);
+}
+
 function entryParts(entry, dictionary = activeDictionary()) {
-  return tagModel.entryParts(entry, dictionarySettings(dictionary), {
+  return tagModel.entryParts({ tags: entryEffectiveTags(entry, dictionary) }, dictionarySettings(dictionary), {
     normalizeText: searchNormalizationModel.normalizeStructuralKey,
   });
 }
 
-function entryPartLabels(entry, dictionary = activeDictionary()) {
-  return entryParts(entry, dictionary).map((part) => tagIdentityText(activeTagDisplayIdentity(part, dictionary)));
+// Card subtitles show only the parts of speech on the entry itself; parts on
+// definitions lead their meanings instead.
+function entryOwnPartText(entry, dictionary = activeDictionary(), { raw = false } = {}) {
+  return entryParts({ tags: entry.tags || [] }, dictionary)
+    .map((part) => partLabelText(part, raw, dictionary))
+    .join(", ");
 }
 
-function entryPartText(entry, dictionary = activeDictionary()) {
-  return entryPartLabels(entry, dictionary).join(", ");
+// Part-of-speech text shows the display replacement unless the raw tag is asked for.
+function partLabelText(part, raw = false, dictionary = activeDictionary()) {
+  return raw ? part : tagIdentityText(activeTagDisplayIdentity(part, dictionary));
 }
 
-function entryTagIsPart(entry, tag, dictionary = activeDictionary()) {
-  return tagModel.entryTagIsPart(entry, tag, dictionarySettings(dictionary), {
+function tagIsPart(tag, dictionary = activeDictionary()) {
+  return tagModel.entryParts({ tags: [tag] }, dictionarySettings(dictionary), {
     normalizeText: searchNormalizationModel.normalizeStructuralKey,
-  });
+  }).length > 0;
 }
 
 function displayTag(tag, dictionary = activeDictionary()) {
@@ -5409,10 +5438,10 @@ function entryCardSettingsSizeSignature() {
   const settings = dictionarySettings();
   return [
     currentLanguage,
-    settings.entryListPolysemyDisplay,
     settings.entryListTagDisplayLimit,
-    settings.entryListPartDisplay,
+    settings.entryListTagsIncludeParts ? "chip-parts" : "no-chip-parts",
     settings.entryListRawTagDisplay ? "raw-tags" : "display-tags",
+    settings.entryListRawPartDisplay ? "raw-parts" : "display-parts",
     settings.entryListTagFiltering ? "tag-filtering" : "no-tag-filtering",
     entrySearchQuerySignature(),
     settings.partOfSpeechTags.join(","),
@@ -5427,13 +5456,14 @@ function entryCardContentSizeSignature(entry) {
     entry.updatedAt,
     entry.lemma,
     entry.pronunciation,
-    entryPartText(entry),
-    (entry.tags || []).join(","),
+    entryOwnPartText(entry),
+    entryEffectiveTags(entry).join(","),
     entryDefinitionItems(entry).map((definition) => [
       definition.id,
       definition.meaning,
       definition.example,
       definition.note,
+      definitionOwnParts(definition).join(","),
     ].map(virtualListSignaturePart).join("~")).join("^"),
   ].map(virtualListSignaturePart).join(";");
 }
@@ -6121,6 +6151,7 @@ function entrySummaryDto(entry, dictionary = activeDictionary()) {
       id: definition.id || "",
       position,
       meaning: definition.meaning || "",
+      parts: definitionOwnParts(definition, dictionary),
     })),
     createdAt: entry.createdAt || "",
     updatedAt: entry.updatedAt || "",
@@ -6793,7 +6824,8 @@ function renderEntryQueryTruncationNotice(row) {
 
 function createEntryCard(entry, options = {}) {
   const settings = dictionarySettings();
-  const partText = settings.entryListPartDisplay === "chips" ? "" : entryPartText(entry);
+  const rawParts = settings.entryListRawPartDisplay;
+  const partText = entryOwnPartText(entry, undefined, { raw: rawParts });
   const { fields: searchFields, fuzzyFields } = entrySearchQueryOptions();
   const lemmaSearchEnabled = searchFields.has("lemma");
   const pronunciationSearchEnabled = searchFields.has("pronunciation");
@@ -6803,10 +6835,10 @@ function createEntryCard(entry, options = {}) {
     entry.pronunciation ? highlightSearchText(entry.pronunciation, fuzzyFields.has("pronunciation"), pronunciationSearchEnabled) : "",
     partText ? highlightSearchText(partText, fuzzyFields.has("tags"), tagSearchEnabled) : "",
   ].filter(Boolean).join(" · ");
-  const meaningSummary = entryDefinitionSummary(entry, settings.entryListPolysemyDisplay);
+  const meaningSummary = entryDefinitionSummary(entry, { rawParts });
   const searchSnippets = renderEntrySearchSnippets(entry);
   const chipHtml = renderChips(entry, settings.entryListTagDisplayLimit, tagSearchEnabled, fuzzyFields.has("tags"), settings.entryListTagFiltering, {
-    includePartTags: settings.entryListPartDisplay !== "subtitle",
+    includePartTags: settings.entryListTagsIncludeParts,
   });
   const qualityIssueHtml = renderEntryQualityIssueBadges(options.qualityIssues || []);
   const compactEntryCard = shouldUseCompactEntryCard(entry, { meaningSummary, searchSnippets });
@@ -6838,7 +6870,12 @@ function createEntryCard(entry, options = {}) {
       ${subtitle ? `<small>${subtitle}</small>` : ""}
     </div>
     <div class="entry-card-body">
-      ${meaningSummary ? `<p>${highlightSearchText(meaningSummary, fuzzyFields.has("definitions"), definitionSearchEnabled)}</p>` : ""}
+      ${meaningSummary ? `<p>${entryDefinitionSummaryItems(entry)
+        .map((item) => definitionSummaryItemHtml(item, {
+          meaningHtml: (meaning) => highlightSearchText(meaning, fuzzyFields.has("definitions"), definitionSearchEnabled),
+          rawParts,
+        }))
+        .join("  ")}</p>` : ""}
       ${searchSnippets}
     </div>
     ${footerHtml ? `<div class="entry-card-footer">${footerHtml}</div>` : ""}
@@ -6886,8 +6923,7 @@ function renderEditorEntrySelection() {
 }
 
 function shouldUseCompactEntryCard(entry, options = {}) {
-  const settings = dictionarySettings();
-  const meaningSummary = options.meaningSummary ?? entryDefinitionSummary(entry, settings.entryListPolysemyDisplay);
+  const meaningSummary = options.meaningSummary ?? entryDefinitionSummary(entry, { rawParts: dictionarySettings().entryListRawPartDisplay });
   const searchSnippets = options.searchSnippets ?? renderEntrySearchSnippets(entry);
   return !meaningSummary && !searchSnippets;
 }
@@ -6922,12 +6958,12 @@ function estimateSearchSnippetCount(searchSnippets = "") {
 
 function estimateEntryCardHeight(entry, options = {}) {
   const settings = dictionarySettings();
-  const meaningSummary = options.meaningSummary ?? entryDefinitionSummary(entry, settings.entryListPolysemyDisplay);
+  const meaningSummary = options.meaningSummary ?? entryDefinitionSummary(entry, { rawParts: dictionarySettings().entryListRawPartDisplay });
   const searchSnippets = options.searchSnippets ?? renderEntrySearchSnippets(entry);
   const hasBody = Boolean(meaningSummary || searchSnippets);
-  const hasSubtitle = Boolean(entry.pronunciation || (settings.entryListPartDisplay !== "chips" && entryPartText(entry)));
+  const hasSubtitle = Boolean(entry.pronunciation || entryOwnPartText(entry, undefined, { raw: settings.entryListRawPartDisplay }));
   const hasTagFooter = Boolean(
-    entryListTagItems(entry, { includePartTags: settings.entryListPartDisplay !== "subtitle" }).length
+    entryListTagItems(entry, { includePartTags: settings.entryListTagsIncludeParts }).length
       && settings.entryListTagDisplayLimit > 0,
   );
   const qualityIssueLines = estimateEntryQualityIssueLines(options.qualityIssues || []);
@@ -7131,15 +7167,48 @@ function entryDefinitionItems(entry = {}) {
   return Array.isArray(entry.definitionPreviews) ? entry.definitionPreviews : [];
 }
 
-function entryDefinitionSummary(entry, showPolysemy = false) {
-  const meanings = entryDefinitionMeanings(entry);
-  if (!meanings.length) {
-    return "";
-  }
-  if (!showPolysemy || meanings.length === 1) {
-    return meanings[0];
-  }
-  return meanings.map((meaning, index) => `${index + 1}. ${meaning}`).join("  ");
+// A definition's own parts of speech in tag sort order. Previews carry them
+// from the server; full definitions derive them from their tags.
+function definitionOwnParts(definition, dictionary = activeDictionary()) {
+  return Array.isArray(definition.parts)
+    ? definition.parts
+    : entryParts({ tags: definition.tags || [] }, dictionary);
+}
+
+// Every meaning a summary shows, numbered when there are several, each led by
+// its definition's own parts of speech. Definitions without meaning text are left out.
+function entryDefinitionSummaryItems(entry, dictionary = activeDictionary()) {
+  const items = entryDefinitionItems(entry)
+    .map((definition) => ({ meaning: String(definition.meaning || "").trim(), definition }))
+    .filter((item) => item.meaning);
+  return items.map((item, index) => ({
+    meaning: item.meaning,
+    number: items.length > 1 ? index + 1 : 0,
+    parts: definitionOwnParts(item.definition, dictionary),
+  }));
+}
+
+function definitionSummaryPartsText(parts, rawParts = false) {
+  return parts.map((part) => partLabelText(part, rawParts)).join("/");
+}
+
+function entryDefinitionSummary(entry, { rawParts = false } = {}) {
+  return entryDefinitionSummaryItems(entry)
+    .map(({ meaning, number, parts }) => [
+      number ? `${number}.` : "",
+      parts.length ? definitionSummaryPartsText(parts, rawParts) : "",
+      meaning,
+    ].filter(Boolean).join(" "))
+    .join("  ");
+}
+
+// `meaningHtml` renders one meaning, e.g. with search highlighting.
+function definitionSummaryItemHtml({ meaning, number, parts }, { meaningHtml = escapeHtml, rawParts = false } = {}) {
+  return [
+    number ? `${number}.` : "",
+    parts.length ? `<span class="definition-summary-parts">${escapeHtml(definitionSummaryPartsText(parts, rawParts))}</span>` : "",
+    meaningHtml(meaning),
+  ].filter(Boolean).join(" ");
 }
 
 async function switchToEntry(entryId, options = {}) {
@@ -7855,7 +7924,7 @@ async function applyTagFilter(entry, tag) {
     return;
   }
 
-  if (entryTagIsPart(entry, tag, dictionary)) {
+  if (tagIsPart(tag, dictionary)) {
     await activateFilter({
       ...entryPartFilterAction(tag),
       preferredEntryId: entry.id,
@@ -8373,39 +8442,83 @@ function renderEmptyDetail() {
   elements.openLexicalNetworkButton.hidden = true;
 }
 
+// Attributes of a detail tag element; a tag from another layer than where it is
+// shown names that source in its tooltip and accessible name.
+function detailTagAttributes(tag, index, source = "") {
+  const text = tagIdentityText(activeTagDisplayIdentity(tag));
+  const sourceKey = {
+    definition: "tagSourceDefinition",
+    both: "tagSourceBoth",
+    entry: "tagSourceAlsoEntry",
+  }[source];
+  const label = sourceKey ? formatText("tagWithSource", { tag: text, source: t(sourceKey) }) : text;
+  return `data-entry-tag-index="${index}" data-entry-tag-value="${escapeHtml(tag)}" aria-label="${escapeHtml(label)}"${sourceKey
+    ? ` data-app-tooltip="always" data-app-tooltip-label="${escapeHtml(t(sourceKey))}"`
+    : ""}`;
+}
+
+function detailTagHtml(tag, index, { source = "", highlight = false, fuzzy = false } = {}) {
+  const identity = activeTagDisplayIdentity(tag);
+  const classes = [
+    tagIsPart(tag) ? "part-badge-item" : "outline-chip",
+    source ? `tag-source-${source}` : "",
+    tagIsRedHighlighted(tag) ? "highlight-tag" : "",
+  ].filter(Boolean).join(" ");
+  const label = highlight ? highlightSearchText(identity.label, fuzzy) : escapeHtml(identity.label);
+  const rawHtml = identity.rawLabel ? `<small class="tag-identity-raw">${escapeHtml(identity.rawLabel)}</small>` : "";
+  return `<span class="${classes}" ${detailTagAttributes(tag, index, source)}><span>${label}</span>${rawHtml}</span>`;
+}
+
+// Header parts of speech come from the effective tags; a part not only on the
+// entry is marked as coming from the definitions or from both layers.
+function entryHeaderPartSources(entry) {
+  const entryTags = new Set(entry.tags || []);
+  const definitionTags = new Set((entry.definitions || []).flatMap((definition) => definition.tags || []));
+  return entryParts(entry).map((tag) => ({
+    tag,
+    source: !definitionTags.has(tag) ? "" : (entryTags.has(tag) ? "both" : "definition"),
+  }));
+}
+
+function definitionTagsHtml(entry, definition) {
+  const entryTags = new Set(entry.tags || []);
+  const { fields, fuzzyFields } = entrySearchQueryOptions();
+  return (definition.tags || [])
+    .map((tag, index) => detailTagHtml(tag, index, {
+      source: entryTags.has(tag) ? "entry" : "",
+      highlight: fields.has("tags"),
+      fuzzy: fuzzyFields.has("tags"),
+    }))
+    .join("");
+}
+
 function renderEntryDisplay(entry) {
   const showEmptySections = dictionarySettings().showEmptyEntrySections;
-  const partTags = (entry.tags || [])
-    .map((tag, index) => ({ tag, index }))
-    .filter(({ tag }) => entryTagIsPart(entry, tag));
   const otherTags = (entry.tags || [])
     .map((tag, index) => ({ tag, index }))
-    .filter(({ tag }) => !entryTagIsPart(entry, tag));
+    .filter(({ tag }) => !tagIsPart(tag));
   elements.editEntryButton.hidden = false;
   elements.focusEntryListButton.hidden = false;
   elements.openLexicalNetworkButton.hidden = false;
   elements.displayLemma.textContent = entry.lemma;
   elements.displayPronunciation.textContent = entry.pronunciation;
   elements.displayPronunciation.hidden = !entry.pronunciation;
+  const partTags = entryHeaderPartSources(entry);
   elements.displayPart.innerHTML = partTags
-    .map(({ tag, index }) => {
-      const identity = activeTagDisplayIdentity(tag);
-      return `<span class="part-badge-item${tagIsRedHighlighted(tag) ? " highlight-tag" : ""}" data-entry-tag-index="${index}" data-entry-tag-value="${escapeHtml(tag)}" aria-label="${escapeHtml(tagIdentityText(identity))}">${tagIdentityHtml(identity)}</span>`;
-    })
+    .map(({ tag, source }, index) => detailTagHtml(tag, index, { source }))
     .join("");
   elements.displayPart.hidden = !partTags.length;
   elements.displayPart.classList.remove("highlight-tag");
   delete elements.displayPart.dataset.entryTagIndex;
   delete elements.displayPart.dataset.entryTagValue;
   elements.displayTags.innerHTML = otherTags
-    .map(({ tag, index }) => {
-      const identity = activeTagDisplayIdentity(tag);
-      return `<span class="outline-chip${tagIsRedHighlighted(tag) ? " highlight-tag" : ""}" data-entry-tag-index="${index}" data-entry-tag-value="${escapeHtml(tag)}" aria-label="${escapeHtml(tagIdentityText(identity))}">${tagIdentityHtml(identity)}</span>`;
-    })
+    .map(({ tag, index }) => detailTagHtml(tag, index))
     .join("");
 
   elements.displayDefinitions.innerHTML = "";
-  const visibleDefinitions = (entry.definitions || []).filter((definition) => definition.meaning || definition.example || definition.note);
+  const visibleDefinitions = (entry.definitions || []).filter((definition) => (
+    definition.meaning || definition.example || definition.note || (definition.tags || []).length
+  ));
   elements.displayDefinitionsSection.hidden = !visibleDefinitions.length && !showEmptySections;
   if (!visibleDefinitions.length) {
     elements.displayDefinitions.append(emptyState(t("missingDefinition"), ""));
@@ -8416,7 +8529,9 @@ function renderEntryDisplay(entry) {
     item.innerHTML = `
       <div class="definition-number">${index + 1}</div>
       <div class="definition-content">
-        <p class="definition-meaning">${escapeHtml(definition.meaning)}</p>
+        <p class="definition-meaning">${(definition.tags || []).length
+          ? `<span class="definition-tags">${definitionTagsHtml(entry, definition)}</span>`
+          : ""}${escapeHtml(definition.meaning)}</p>
         ${definition.example ? `<div class="example-box"><span>${escapeHtml(t("example"))}</span>${renderExampleHtml(definition.example)}</div>` : ""}
         ${definition.note ? `<div class="definition-note"><span>${escapeHtml(t("definitionNote"))}</span><p>${escapeHtml(definition.note)}</p></div>` : ""}
       </div>
@@ -8560,7 +8675,7 @@ function renderDerivedEntryList(container, derived = [], dictionary = activeDict
       card.type = "button";
     }
     card.className = interactive ? "derived-link" : "derived-link derived-readonly";
-    const partText = entryPartText(derivedEntry, dictionary);
+    const partText = entryOwnPartText(derivedEntry, dictionary);
     card.innerHTML = `
       <strong>${escapeHtml(derivedEntry.lemma)}</strong>
       ${partText ? `<span>${escapeHtml(partText)}</span>` : ""}
@@ -8867,14 +8982,13 @@ function networkTruncatedLabel(value, width, fontSize = 16) {
 // The single entry hover card shared by the lexical network, source links,
 // source cards and derived-entry cards.
 function entrySummaryTooltipHtml(entry) {
-  const partText = entryPartText(entry);
-  const settings = dictionarySettings();
+  const partText = entryOwnPartText(entry);
   return `
     <div class="network-tooltip-content">
       <b>${escapeHtml(entry.lemma || "")}</b>
       ${entry.pronunciation ? `<span>${escapeHtml(entry.pronunciation)}</span>` : ""}
       ${partText ? `<span>${escapeHtml(partText)}</span>` : ""}
-      ${renderNetworkMeaningHtml(entry, settings.networkPolysemyDisplay)}
+      ${renderNetworkMeaningHtml(entry)}
     </div>
   `;
 }
@@ -8910,7 +9024,7 @@ function updateLexicalNetworkNodeElement(group, node, position) {
   group.dataset.appTooltipVariant = "rich";
   group.dataset.appTooltipHtml = entrySummaryTooltipHtml(node.entry);
   const pronunciationText = String(node.entry.pronunciation || "");
-  const partText = entryPartText(node.entry);
+  const partText = entryOwnPartText(node.entry);
   group.setAttribute("aria-label", [node.entry.lemma, pronunciationText, partText].filter(Boolean).join(", "));
   group.classList.toggle("focus", node.role === "focus");
   group.classList.toggle("source", node.role === "source");
@@ -9173,7 +9287,7 @@ function trimEntryRelationsCache(protectedKey = "") {
   }
 }
 
-function renderNetworkMeaningHtml(entry, showPolysemy = false) {
+function renderNetworkMeaningHtml(entry) {
   const meanings = entryDefinitionMeanings(entry);
   const preview = entryDefinitionItems(entry).map((definition) => definition.meaning).find(Boolean) || "";
   if (!meanings.length && preview) {
@@ -9182,10 +9296,8 @@ function renderNetworkMeaningHtml(entry, showPolysemy = false) {
   if (!meanings.length) {
     return "";
   }
-  const visibleMeanings = showPolysemy ? meanings : meanings.slice(0, 1);
-  const numbered = showPolysemy && visibleMeanings.length > 1;
-  return `<div class="network-definition-list">${visibleMeanings.map((meaning, index) => `
-    <p>${escapeHtml(numbered ? `${index + 1}. ${meaning}` : meaning)}</p>
+  return `<div class="network-definition-list">${entryDefinitionSummaryItems(entry).map((item) => `
+    <p>${definitionSummaryItemHtml(item)}</p>
   `).join("")}</div>`;
 }
 
@@ -9238,9 +9350,9 @@ function renderSmallCaps(value) {
 }
 
 function entryListTagItems(entry, { includePartTags = true, dictionary = activeDictionary() } = {}) {
-  return (entry.tags || [])
+  return entryEffectiveTags(entry, dictionary)
     .map((tag, index) => ({ tag, index }))
-    .filter(({ tag }) => includePartTags || !entryTagIsPart(entry, tag, dictionary));
+    .filter(({ tag }) => includePartTags || !tagIsPart(tag, dictionary));
 }
 
 function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = false, clickable = false, { includePartTags = true } = {}) {
@@ -9252,7 +9364,7 @@ function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = false, 
     .map(({ tag, index }) => {
       const identity = entryListTagDisplayIdentity(tag);
       const text = tagIdentityText(identity);
-      const classes = ["chip", entryTagIsPart(entry, tag) ? "part-chip" : "", tagIsRedHighlighted(tag) ? "highlight-tag" : ""].filter(Boolean).join(" ");
+      const classes = ["chip", tagIsPart(tag) ? "part-chip" : "", tagIsRedHighlighted(tag) ? "highlight-tag" : ""].filter(Boolean).join(" ");
       const tagAttributes = clickable
         ? ` data-entry-tag-index="${index}" data-entry-tag-value="${escapeHtml(tag)}"`
         : "";
@@ -9269,7 +9381,7 @@ function renderChips(entry, limit = 4, highlight = false, fuzzyEnabled = false, 
     : "";
   const hiddenTagTooltipHtml = hasHiddenTags
     ? `<span class="app-tooltip-chip-list">${tags.slice(visibleLimit).map(({ tag }) => {
-      const classes = ["chip", entryTagIsPart(entry, tag) ? "part-chip" : "", tagIsRedHighlighted(tag) ? "highlight-tag" : ""].filter(Boolean).join(" ");
+      const classes = ["chip", tagIsPart(tag) ? "part-chip" : "", tagIsRedHighlighted(tag) ? "highlight-tag" : ""].filter(Boolean).join(" ");
       return `<span class="${classes}">${tagIdentityHtml(entryListTagDisplayIdentity(tag))}</span>`;
     }).join("")}</span>`
     : "";
@@ -10030,6 +10142,15 @@ function analysisNoPartFactRows(partWidget) {
   return [[t("noPart"), partWidget.noPartOfSpeechCount, analysisNoPartAction(partWidget)]];
 }
 
+// Shown on the tag page only; the overview keeps its single no-part row.
+function analysisMultiPartFactRow(partWidget) {
+  return [
+    aText("多词性词条", "Multi-POS entries"),
+    partWidget.multiPartEntryCount,
+    analysisQueryFilterAction(partWidget.multiPartAction, activeFilterTitleDescriptor("activeFilterMultiPartEntries")),
+  ];
+}
+
 function renderAnalysisOverviewQuery(response) {
   const { widgets } = response;
   const { lexicon } = widgets;
@@ -10262,18 +10383,65 @@ function analysisTagSetList(widget, queryKey) {
   `;
 }
 
+// Parts-of-speech combinations of multi-POS entries, drawn like tag sets.
+function analysisPartSetList(widget, queryKey) {
+  const { rows } = widget;
+  if (analysisPartSetRenderState.key !== queryKey) {
+    analysisPartSetRenderState = { key: queryKey, visibleCount: 100 };
+  }
+  const visibleRows = rows.slice(0, analysisPartSetRenderState.visibleCount);
+  const max = Math.max(...rows.map((row) => row.entryCount), 1);
+  const list = visibleRows.map((row) => {
+    const chips = row.parts.map((part) => {
+      const identity = tagModel.displayIdentity(part.value, part.displayLabel, part.displayAmbiguous);
+      return `<span class="analysis-tag-set-chip is-part">
+        <span>${escapeHtml(identity.label)}</span>
+        ${identity.rawLabel ? `<small>${escapeHtml(identity.rawLabel)}</small>` : ""}
+      </span>`;
+    }).join("");
+    const action = analysisQueryFilterAction(row.action, activeFilterTitleDescriptor("activeFilterFieldValue", {
+      labelKey: "activeFilterPartCombination",
+      valueType: "tagList",
+      values: row.parts.map((part) => part.value),
+    }));
+    return `
+      <button type="button" class="analysis-tag-set-row"${analysisActionAttributes(action)}>
+        <span class="analysis-tag-set-label">${chips}</span>
+        <span class="analysis-bar-track" aria-hidden="true"><span style="width: ${Math.max(4, (row.entryCount / max) * 100).toFixed(2)}%"></span></span>
+        <strong>${escapeHtml(row.entryCount)}</strong>
+      </button>
+    `;
+  }).join("");
+  const remaining = rows.length - visibleRows.length;
+  return `
+    ${analysisFactList([[aText("组合种类", "Combinations"), widget.partSetCount]])}
+    ${rows.length
+      ? `<div class="analysis-tag-set-list">${list}</div>`
+      : `<p class="muted-text">${escapeHtml(aText("暂无多词性词条", "No multi-POS entries"))}</p>`}
+    ${remaining > 0 ? `<button type="button" class="secondary-button analysis-tag-set-more" data-control-tone="neutral" data-analysis-part-sets-more>${escapeHtml(
+      aText("再显示 {count} 项", "Show {count} more").replace("{count}", Math.min(100, remaining)),
+    )}</button>` : ""}
+  `;
+}
+
 function renderAnalysisTagsQueryPage(queryState) {
   let body = "";
   if (queryState.status === "ready") {
     const rows = analysisTagPageRows(queryState.response);
     const partWidget = queryState.response.widgets.parts;
+    const partSetWidget = queryState.response.widgets.partSets;
     const tagSetWidget = queryState.response.widgets.tagSets;
     body = `<section class="analysis-detail-grid analysis-tags-grid">
       ${analysisCard(aText("词性分布", "Part-of-Speech Distribution"), `
         ${analysisFactList(analysisPartTypeFactRows(partWidget))}
         ${analysisBarList(rows.parts, { empty: aText("暂无词性标签", "No part-of-speech tags yet") })}
-        ${analysisFactList(analysisNoPartFactRows(partWidget))}
+        ${analysisFactList([...analysisNoPartFactRows(partWidget), analysisMultiPartFactRow(partWidget)])}
       `)}
+      ${analysisCard(
+        aText("词性组合", "Part-of-Speech Combinations"),
+        analysisPartSetList(partSetWidget, queryState.key),
+        { className: "analysis-tag-set-card" },
+      )}
       ${analysisCard(aText("其他标签分布", "Other Tag Distribution"), analysisBarList(rows.tags, { empty: aText("暂无其他标签", "No other tags yet") }))}
       ${analysisCard(
         aText("标签集合分布", "Tag Set Distribution"),
@@ -10664,7 +10832,9 @@ function qualityIssueText(issue) {
     duplicate_lemma: () => params.lemmas.join(", "),
     near_duplicate_tags: () => params.forms.join(", "),
     multiple_primary_stress: () => `${aText("主重音数量", "Primary stress count")}: ${params.primaryStressCount}`,
-    tag_too_long: () => params.tag,
+    tag_too_long: () => (params.definitionId
+      ? `${aText("释义", "Definition")} ${params.definitionPosition + 1}: ${params.tag}`
+      : params.tag),
     source_unresolved: () => params.sourceText,
     source_cycle: () => params.cycleLemmas.join(" → "),
   };
@@ -11333,13 +11503,16 @@ function renderPartialMorphologyControls(entry) {
 }
 
 function definitionFormStateFromCard(card) {
+  const tagsInput = card.querySelector('[data-field="tags"]');
   return {
     id: card.dataset.definitionId || uid("def"),
     meaning: card.querySelector('[data-field="meaning"]')?.value.trim() || "",
     example: card.querySelector('[data-field="example"]')?.value.trim() || "",
     note: card.querySelector('[data-field="note"]')?.value.trim() || "",
+    tags: tagsInput ? parseTagListText(tagsInput.value) : [],
     showExample: Boolean(card.querySelector('[data-field="example"]')),
     showNote: Boolean(card.querySelector('[data-field="note"]')),
+    showTags: Boolean(tagsInput),
   };
 }
 
@@ -11364,6 +11537,25 @@ function definitionOptionalActionHtml(field, labelKey) {
   return `<button class="secondary-button additive-button" data-control-tone="accent" data-control-emphasis="outline" type="button" data-action="add-definition-optional" data-optional-definition-field="${field}" data-i18n="${escapeHtml(labelKey)}">${escapeHtml(t(labelKey))}</button>`;
 }
 
+function definitionShowsTags(definition = {}) {
+  return Boolean((definition.tags || []).length || definition.showTags);
+}
+
+// The tags field sits above the meaning, the way tags precede a meaning in the
+// detail view; like the example and note, it appears on demand.
+function definitionTagsFieldHtml(definition = {}) {
+  if (!definitionShowsTags(definition)) {
+    return "";
+  }
+  return `
+    <label>
+      <span data-i18n="definitionTags">${escapeHtml(t("definitionTags"))}</span>
+      <input data-field="tags" maxlength="180" value="${escapeHtml(serializeTagList(definition.tags || []))}">
+      <small class="field-help" data-i18n="definitionTagsHelp">${escapeHtml(t("definitionTagsHelp"))}</small>
+    </label>
+  `;
+}
+
 function definitionOptionalFieldsHtml(definition = {}) {
   const example = definitionFormValue(definition, "example");
   const note = definitionFormValue(definition, "note");
@@ -11374,6 +11566,7 @@ function definitionOptionalFieldsHtml(definition = {}) {
     showNote ? definitionOptionalFieldHtml("note", "definitionNote", note) : "",
   ].filter(Boolean);
   const actions = [
+    definitionShowsTags(definition) ? "" : definitionOptionalActionHtml("tags", "addDefinitionTags"),
     showExample ? "" : definitionOptionalActionHtml("example", "addExample"),
     showNote ? "" : definitionOptionalActionHtml("note", "addDefinitionNote"),
   ].filter(Boolean);
@@ -11391,6 +11584,7 @@ function definitionFormCardHtml(definition, index, removeAction) {
   return `
     <span class="definition-number"><span class="visually-hidden" data-i18n="definitions">${escapeHtml(t("definitions"))}</span> ${index + 1}</span>
     <div class="definition-form-fields">
+      ${definitionTagsFieldHtml(definition)}
       <label>
         <span data-i18n="meaning">${escapeHtml(t("meaning"))}</span>
         <textarea data-field="meaning" rows="3">${escapeHtml(definitionFormValue(definition, "meaning"))}</textarea>
@@ -11437,6 +11631,8 @@ function renderDefinitionFormCardInPlace(card, fieldToShow) {
     definition.showExample = true;
   } else if (fieldToShow === "note") {
     definition.showNote = true;
+  } else if (fieldToShow === "tags") {
+    definition.showTags = true;
   }
   const index = [...list.querySelectorAll(".definition-form-card")].indexOf(card);
   card.innerHTML = definitionFormCardHtml(
@@ -11452,17 +11648,15 @@ function renderDefinitionFormCardInPlace(card, fieldToShow) {
   card.querySelector(`[data-field="${fieldToShow}"]`)?.focus();
 }
 
-// Definition tags have no form field yet, so each definition keeps the tags it
-// was saved with; a definition with only tags is not empty.
-function definitionsWithSavedTags(formStates, savedDefinitions = []) {
-  const savedTags = new Map(savedDefinitions.map((definition) => [definition.id, definition.tags]));
+// A definition with only tags is not empty.
+function definitionsFromFormStates(formStates) {
   return formStates
-    .map(({ id, meaning, example, note }) => ({ id, meaning, example, note, tags: savedTags.get(id) || [] }))
+    .map(({ id, meaning, example, note, tags }) => ({ id, meaning, example, note, tags }))
     .filter((definition) => definition.meaning || definition.example || definition.note || definition.tags.length);
 }
 
-function collectDefinitions(existing = selectedEntry()) {
-  return definitionsWithSavedTags(definitionFormStates(elements.definitionFormList), existing?.definitions);
+function collectDefinitions() {
+  return definitionsFromFormStates(definitionFormStates(elements.definitionFormList));
 }
 
 function entrySemanticSnapshot(entry = {}) {
@@ -11514,7 +11708,7 @@ function fullEntryFormCandidate(existing = selectedEntry()) {
     lemma,
     pronunciation: elements.pronunciationInput.value.trim(),
     tags,
-    definitions: collectDefinitions(existing),
+    definitions: collectDefinitions(),
     etymology: {
       sources: collectSourceInputReferences(elements.sourceEntryInput),
       description: elements.etymologyDescriptionInput.value.trim(),
@@ -12347,17 +12541,16 @@ function fillSettingsForm(dictionary) {
   elements.entryExampleGlossAlignInput.checked = settings.entryExampleGlossAlign;
   elements.tagDisplayMapInput.value = serializeTagDisplayMap(settings.tagDisplayMap);
   elements.entryListRawTagDisplayInput.checked = settings.entryListRawTagDisplay;
+  elements.entryListRawPartDisplayInput.checked = settings.entryListRawPartDisplay;
   elements.filterMenuRawTagDisplayInput.checked = settings.filterMenuRawTagDisplay;
   elements.entryListTagDisplayLimitInput.value = settings.entryListTagDisplayLimit;
-  elements.entryListPartDisplayInput.value = settings.entryListPartDisplay;
+  elements.entryListTagsIncludePartsInput.checked = settings.entryListTagsIncludeParts;
   elements.tagListSeparatorStyleInput.value = settings.tagListSeparatorStyle;
   updateTagListPlaceholders(settings.tagListSeparatorStyle);
   elements.partOfSpeechTagsInput.value = serializeTagList(settings.partOfSpeechTags, settings);
   elements.tagSortOrderInput.value = serializeTagList(settings.tagSortOrder, settings);
   elements.tagRedHighlightInput.value = serializeTagList(settings.redHighlightTags, settings);
   elements.entryListTagFilteringInput.checked = settings.entryListTagFiltering;
-  elements.entryListPolysemyInput.checked = settings.entryListPolysemyDisplay;
-  elements.networkPolysemyInput.checked = settings.networkPolysemyDisplay;
   elements.showEmptyEntrySectionsInput.checked = settings.showEmptyEntrySections;
   fillEntrySearchSettingsForm(settings.search);
   elements.searchHighlightInput.checked = settings.searchHighlight;
@@ -12597,16 +12790,15 @@ function settingsFormSnapshot() {
     docsAutoSave: elements.docsAutoSaveInput.checked,
     tagDisplayMap: normalizeTagDisplayMap(parseTagDisplayMap(elements.tagDisplayMapInput.value)),
     entryListRawTagDisplay: elements.entryListRawTagDisplayInput.checked,
+    entryListRawPartDisplay: elements.entryListRawPartDisplayInput.checked,
     filterMenuRawTagDisplay: elements.filterMenuRawTagDisplayInput.checked,
     entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(elements.entryListTagDisplayLimitInput.value),
-    entryListPartDisplay: normalizeEntryListPartDisplay(elements.entryListPartDisplayInput.value),
+    entryListTagsIncludeParts: elements.entryListTagsIncludePartsInput.checked,
     partOfSpeechTags: parseTagListText(elements.partOfSpeechTagsInput.value),
     tagSortOrder: parseTagListText(elements.tagSortOrderInput.value),
     redHighlightTags: parseTagListText(elements.tagRedHighlightInput.value),
     tagListSeparatorStyle: normalizeTagListSeparatorStyle(elements.tagListSeparatorStyleInput.value),
     entryListTagFiltering: elements.entryListTagFilteringInput.checked,
-    entryListPolysemyDisplay: elements.entryListPolysemyInput.checked,
-    networkPolysemyDisplay: elements.networkPolysemyInput.checked,
     showEmptyEntrySections: elements.showEmptyEntrySectionsInput.checked,
     entrySectionOrder: collectEntrySectionOrder(),
     search: collectEntrySearchSettingsForm(),
@@ -12635,16 +12827,15 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     docsAutoSave: settings.docsAutoSave,
     tagDisplayMap: settings.tagDisplayMap,
     entryListRawTagDisplay: settings.entryListRawTagDisplay,
+    entryListRawPartDisplay: settings.entryListRawPartDisplay,
     filterMenuRawTagDisplay: settings.filterMenuRawTagDisplay,
     entryListTagDisplayLimit: settings.entryListTagDisplayLimit,
-    entryListPartDisplay: settings.entryListPartDisplay,
+    entryListTagsIncludeParts: settings.entryListTagsIncludeParts,
     partOfSpeechTags: settings.partOfSpeechTags,
     tagSortOrder: settings.tagSortOrder,
     redHighlightTags: settings.redHighlightTags,
     tagListSeparatorStyle: settings.tagListSeparatorStyle,
     entryListTagFiltering: settings.entryListTagFiltering,
-    entryListPolysemyDisplay: settings.entryListPolysemyDisplay,
-    networkPolysemyDisplay: settings.networkPolysemyDisplay,
     showEmptyEntrySections: settings.showEmptyEntrySections,
     entrySectionOrder: settings.entrySectionOrder,
     search: settings.search,
@@ -12793,16 +12984,15 @@ function collectDictionarySettingsFromForm(existing = {}) {
     docsAutoSave: elements.docsAutoSaveInput.checked,
     tagDisplayMap: parseTagDisplayMap(elements.tagDisplayMapInput.value),
     entryListRawTagDisplay: elements.entryListRawTagDisplayInput.checked,
+    entryListRawPartDisplay: elements.entryListRawPartDisplayInput.checked,
     filterMenuRawTagDisplay: elements.filterMenuRawTagDisplayInput.checked,
     entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(elements.entryListTagDisplayLimitInput.value),
-    entryListPartDisplay: normalizeEntryListPartDisplay(elements.entryListPartDisplayInput.value),
+    entryListTagsIncludeParts: elements.entryListTagsIncludePartsInput.checked,
     partOfSpeechTags: parseTagListText(elements.partOfSpeechTagsInput.value),
     tagSortOrder: parseTagListText(elements.tagSortOrderInput.value),
     redHighlightTags: parseTagListText(elements.tagRedHighlightInput.value),
     tagListSeparatorStyle: normalizeTagListSeparatorStyle(elements.tagListSeparatorStyleInput.value),
     entryListTagFiltering: elements.entryListTagFilteringInput.checked,
-    entryListPolysemyDisplay: elements.entryListPolysemyInput.checked,
-    networkPolysemyDisplay: elements.networkPolysemyInput.checked,
     showEmptyEntrySections: elements.showEmptyEntrySectionsInput.checked,
     entrySectionOrder: collectEntrySectionOrder(),
     search: collectEntrySearchSettingsForm(),
@@ -14865,9 +15055,9 @@ function entryApiPayload(entry = {}, options = {}) {
   return createPayload;
 }
 
-function collectPartialDefinitions(entry = selectedEntry()) {
+function collectPartialDefinitions() {
   const list = partialEditBody()?.querySelector('[data-partial-definitions="true"]');
-  return definitionsWithSavedTags(definitionFormStates(list), entry?.definitions);
+  return definitionsFromFormStates(definitionFormStates(list));
 }
 
 function partialEntryFormCandidate(entry = selectedEntry(), body = partialEditBody()) {
@@ -14883,7 +15073,7 @@ function partialEntryFormCandidate(entry = selectedEntry(), body = partialEditBo
     };
   }
   if (partialEditSection === "definitions") {
-    return { ...entry, definitions: collectPartialDefinitions(entry) };
+    return { ...entry, definitions: collectPartialDefinitions() };
   }
   if (partialEditSection === "etymology") {
     return {
@@ -15092,12 +15282,27 @@ let quickEntryState = null;
 // Tags of the last entry created through the overlay, scoped to its dictionary.
 let quickEntryLastTags = { dictionaryId: "", tags: [] };
 
+// Whether definition tag rows are shown; kept for the page session only.
+let quickEntryDefinitionTagsShown = false;
+
+function createQuickEntryDefinition() {
+  return { meaning: "", tags: "" };
+}
+
 function createQuickEntryDraft() {
-  return { lemma: "", pronunciation: "", tags: "", definitions: [""] };
+  return { lemma: "", pronunciation: "", tags: "", definitions: [createQuickEntryDefinition()] };
 }
 
 function quickEntryIsOpen() {
   return !elements.quickEntryDialog.hidden;
+}
+
+function quickEntryDefinitionHasContent(definition) {
+  return Boolean(definition.meaning.trim() || definition.tags.trim());
+}
+
+function quickEntryHasDefinitionTags() {
+  return quickEntryState.draft.definitions.some((definition) => definition.tags.trim());
 }
 
 function quickEntryHasDraft() {
@@ -15106,27 +15311,61 @@ function quickEntryHasDraft() {
     draft.lemma.trim()
     || draft.pronunciation.trim()
     || draft.tags.trim()
-    || draft.definitions.some((meaning) => meaning.trim())
+    || draft.definitions.some(quickEntryDefinitionHasContent)
   ));
 }
 
+// With definition tags shown, each definition's tag row precedes its meaning.
 function quickEntryFields() {
   const draft = quickEntryState.draft;
   return [
     { key: "lemma", label: t("lemma"), maxLength: 80 },
     { key: "pronunciation", label: t("pronunciation"), maxLength: 120 },
     { key: "tags", label: t("tagsLabel"), maxLength: 180 },
-    ...draft.definitions.map((_, definitionIndex) => ({
-      key: "definition",
-      definitionIndex,
-      label: formatText("quickEntryDefinitionLabel", { n: definitionIndex + 1 }),
-    })),
+    ...draft.definitions.flatMap((_, definitionIndex) => [
+      ...(quickEntryDefinitionTagsShown ? [{
+        key: "definitionTags",
+        definitionIndex,
+        label: formatText("quickEntryDefinitionTagsLabel", { n: definitionIndex + 1 }),
+        maxLength: 180,
+      }] : []),
+      {
+        key: "definition",
+        definitionIndex,
+        label: formatText("quickEntryDefinitionLabel", { n: definitionIndex + 1 }),
+      },
+    ]),
   ];
 }
 
 function quickEntryFieldValue(field) {
   const draft = quickEntryState.draft;
-  return field.key === "definition" ? draft.definitions[field.definitionIndex] : draft[field.key];
+  if (field.key === "definition") {
+    return draft.definitions[field.definitionIndex].meaning;
+  }
+  if (field.key === "definitionTags") {
+    return draft.definitions[field.definitionIndex].tags;
+  }
+  return draft[field.key];
+}
+
+function setQuickEntryFieldValue(field, value) {
+  const draft = quickEntryState.draft;
+  if (field.key === "definition") {
+    draft.definitions[field.definitionIndex].meaning = value;
+  } else if (field.key === "definitionTags") {
+    draft.definitions[field.definitionIndex].tags = value;
+  } else {
+    draft[field.key] = value;
+  }
+}
+
+// The nearest non-empty tag row above; the first definition has no suggestion.
+function quickEntryDefinitionTagsSuggestion(definitionIndex) {
+  return quickEntryState.draft.definitions
+    .slice(0, definitionIndex)
+    .reverse()
+    .find((definition) => parseTagListText(definition.tags).length)?.tags || "";
 }
 
 function quickEntryFieldInputs() {
@@ -15149,8 +15388,13 @@ function quickEntryHint(field) {
   if (field.key === "tags" && !quickEntryState.draft.tags && lastTags.length) {
     return formatText("quickEntryHintTags", { tags: serializeTagList(lastTags) });
   }
+  if (field.key === "definitionTags" && !quickEntryFieldValue(field)) {
+    const suggestion = quickEntryDefinitionTagsSuggestion(field.definitionIndex);
+    return suggestion ? formatText("quickEntryHintTags", { tags: serializeTagList(parseTagListText(suggestion)) }) : "";
+  }
   if (field.key === "definition" && !quickEntryFieldValue(field)) {
-    return field.definitionIndex > 0 ? t("quickEntryHintRemoveDefinition") : "";
+    const tagsEmpty = !quickEntryState.draft.definitions[field.definitionIndex].tags.trim();
+    return field.definitionIndex > 0 && tagsEmpty ? t("quickEntryHintRemoveDefinition") : "";
   }
   if (field.key === "definition" && field.definitionIndex === quickEntryState.draft.definitions.length - 1) {
     return t("quickEntryHintSubmit");
@@ -15215,23 +15459,29 @@ function setQuickEntryMessage(message = "") {
   elements.quickEntryMessage.textContent = message;
 }
 
-// Extra definition rows left empty disappear once focus leaves them; the
-// first definition row always stays.
+// Extra definitions left empty (meaning and tags) disappear once focus leaves
+// them; the first definition always stays. Returns the kept field's new index.
 function pruneEmptyQuickEntryDefinitions(keepIndex) {
-  const firstDefinitionIndex = 3;
+  const keepField = quickEntryFields()[keepIndex];
   const definitions = quickEntryState.draft.definitions;
-  let removed = false;
-  for (let definitionIndex = definitions.length - 1; definitionIndex >= 1; definitionIndex -= 1) {
-    const fieldIndex = firstDefinitionIndex + definitionIndex;
-    if (fieldIndex !== keepIndex && !definitions[definitionIndex].trim()) {
-      definitions.splice(definitionIndex, 1);
-      if (keepIndex > fieldIndex) {
-        keepIndex -= 1;
-      }
-      removed = true;
-    }
+  const keepDefinition = definitions[keepField?.definitionIndex];
+  const remaining = definitions.filter((definition, definitionIndex) => (
+    definitionIndex === 0 || definition === keepDefinition || quickEntryDefinitionHasContent(definition)
+  ));
+  if (remaining.length === definitions.length) {
+    return { removed: false, keepIndex };
   }
-  return { removed, keepIndex };
+  quickEntryState.draft.definitions = remaining;
+  if (!keepDefinition) {
+    return { removed: true, keepIndex };
+  }
+  const definitionIndex = remaining.indexOf(keepDefinition);
+  return {
+    removed: true,
+    keepIndex: quickEntryFields().findIndex((field) => (
+      field.key === keepField.key && field.definitionIndex === definitionIndex
+    )),
+  };
 }
 
 function moveQuickEntryFocus(index) {
@@ -15256,9 +15506,13 @@ function quickEntryEntryDraft() {
     pronunciation: draft.pronunciation.trim(),
     tags: parseTagListText(draft.tags),
     definitions: draft.definitions
-      .map((meaning) => meaning.trim())
-      .filter(Boolean)
-      .map((meaning) => ({ meaning, example: "", note: "" })),
+      .map((definition) => ({
+        meaning: definition.meaning.trim(),
+        example: "",
+        note: "",
+        tags: parseTagListText(definition.tags),
+      }))
+      .filter((definition) => definition.meaning || definition.tags.length),
   });
 }
 
@@ -15277,12 +15531,15 @@ function fillQuickEntrySuggestion(field, input) {
     input.value = generateIpaFromLemma(lemma);
   } else if (field.key === "tags" && quickEntryLastTagsForActiveDictionary().length) {
     input.value = serializeTagList(quickEntryLastTagsForActiveDictionary());
+  } else if (field.key === "definitionTags" && quickEntryDefinitionTagsSuggestion(field.definitionIndex)) {
+    input.value = serializeTagList(parseTagListText(quickEntryDefinitionTagsSuggestion(field.definitionIndex)));
   } else {
     return false;
   }
-  quickEntryState.draft[field.key] = input.value;
+  setQuickEntryFieldValue(field, input.value);
   setQuickEntryMessage();
   updateQuickEntryRowState();
+  updateQuickEntryDefinitionTagsSwitch();
   return true;
 }
 
@@ -15296,16 +15553,67 @@ function handleQuickEntryFieldEnter(field, index) {
   }
   const definitions = quickEntryState.draft.definitions;
   if (field.definitionIndex === definitions.length - 1) {
-    definitions.push("");
+    definitions.push(createQuickEntryDefinition());
     renderQuickEntryFields();
   }
   moveQuickEntryFocus(index + 1);
 }
 
-function removeQuickEntryDefinition(field, index) {
+// Removes an empty extra definition with its tag row; focus goes to the field
+// before both.
+function removeQuickEntryDefinition(field) {
   quickEntryState.draft.definitions.splice(field.definitionIndex, 1);
   renderQuickEntryFields();
-  focusQuickEntryField(index - 1);
+  const fields = quickEntryFields();
+  const previous = field.definitionIndex - 1;
+  focusQuickEntryField(fields.findIndex((candidate) => (
+    candidate.key === "definition" && candidate.definitionIndex === previous
+  )));
+}
+
+function updateQuickEntryDefinitionTagsSwitch() {
+  const input = elements.quickEntryDefinitionTagsInput;
+  const locked = quickEntryDefinitionTagsShown && quickEntryHasDefinitionTags();
+  input.checked = quickEntryDefinitionTagsShown;
+  if (locked) {
+    input.setAttribute("aria-disabled", "true");
+    input.dataset.appTooltip = "always";
+    input.dataset.appTooltipLabel = t("quickEntryDefinitionTagsLocked");
+  } else {
+    input.removeAttribute("aria-disabled");
+    delete input.dataset.appTooltip;
+    delete input.dataset.appTooltipLabel;
+  }
+}
+
+// The shortcut keeps typing where it was: focus returns to the same field, or
+// to its meaning when that field's tag row was hidden.
+function toggleQuickEntryDefinitionTagsFromKeyboard() {
+  if (quickEntryDefinitionTagsShown && quickEntryHasDefinitionTags()) {
+    setQuickEntryMessage(t("quickEntryDefinitionTagsLocked"));
+    return;
+  }
+  toggleQuickEntryDefinitionTags();
+  focusQuickEntryField(quickEntryState.current);
+}
+
+// Turning the rows off only hides them, so it waits until every row is empty.
+function toggleQuickEntryDefinitionTags() {
+  if (quickEntryDefinitionTagsShown && quickEntryHasDefinitionTags()) {
+    return;
+  }
+  const currentField = quickEntryFields()[quickEntryState.current];
+  quickEntryDefinitionTagsShown = !quickEntryDefinitionTagsShown;
+  renderQuickEntryFields();
+  updateQuickEntryDefinitionTagsSwitch();
+  const fields = quickEntryFields();
+  const sameField = fields.findIndex((field) => (
+    field.key === currentField.key && field.definitionIndex === currentField.definitionIndex
+  ));
+  quickEntryState.current = sameField >= 0
+    ? sameField
+    : fields.findIndex((field) => field.key === "definition" && field.definitionIndex === currentField.definitionIndex);
+  updateQuickEntryRowState();
 }
 
 function appendQuickEntryLog(entry) {
@@ -15367,6 +15675,7 @@ async function submitQuickEntry() {
     quickEntryState.draft = createQuickEntryDraft();
     setQuickEntryMessage();
     renderQuickEntryFields();
+    updateQuickEntryDefinitionTagsSwitch();
     focusQuickEntryField(0);
     return true;
   } catch (error) {
@@ -15410,6 +15719,7 @@ async function openQuickEntry() {
   elements.quickEntryLog.hidden = true;
   setQuickEntryMessage();
   renderQuickEntryFields();
+  updateQuickEntryDefinitionTagsSwitch();
   elements.quickEntryDialog.hidden = false;
   focusQuickEntryField(0);
   return true;
@@ -15476,6 +15786,12 @@ function handleQuickEntryKeydown(event) {
     void submitQuickEntry();
     return;
   }
+  // Matches the "/" character, so layouts that type it with Shift work too.
+  if (modifier && event.key === "/") {
+    event.preventDefault();
+    toggleQuickEntryDefinitionTagsFromKeyboard();
+    return;
+  }
   if (event.key === "Escape") {
     event.preventDefault();
     void requestCloseQuickEntry();
@@ -15506,11 +15822,17 @@ function handleQuickEntryKeydown(event) {
       moveQuickEntryFocus(index + 1);
       return;
     }
-    if (event.key === "Backspace" && field.key === "definition" && field.definitionIndex > 0 && !input.value) {
+    if (
+      event.key === "Backspace"
+      && field.key === "definition"
+      && field.definitionIndex > 0
+      && !input.value
+      && !quickEntryState.draft.definitions[field.definitionIndex].tags.trim()
+    ) {
       event.preventDefault();
       // Holding Backspace to clear a definition must not keep deleting rows.
       if (!event.repeat) {
-        removeQuickEntryDefinition(field, index);
+        removeQuickEntryDefinition(field);
       }
       return;
     }
@@ -16680,14 +17002,19 @@ elements.quickEntryPanel.addEventListener("keydown", handleQuickEntryKeydown);
 elements.quickEntryFields.addEventListener("input", (event) => {
   const input = event.target.closest("[data-quick-entry-index]");
   const field = quickEntryFields()[quickEntryFieldIndex(input)];
-  if (field.key === "definition") {
-    quickEntryState.draft.definitions[field.definitionIndex] = input.value;
-  } else {
-    quickEntryState.draft[field.key] = input.value;
-  }
+  setQuickEntryFieldValue(field, input.value);
   setQuickEntryMessage();
   updateQuickEntryRowState();
+  updateQuickEntryDefinitionTagsSwitch();
 });
+// aria-disabled keeps the tooltip reachable; the click (also sent by Space)
+// is cancelled here.
+elements.quickEntryDefinitionTagsInput.addEventListener("click", (event) => {
+  if (elements.quickEntryDefinitionTagsInput.getAttribute("aria-disabled") === "true") {
+    event.preventDefault();
+  }
+});
+elements.quickEntryDefinitionTagsInput.addEventListener("change", toggleQuickEntryDefinitionTags);
 elements.quickEntryFields.addEventListener("focusin", (event) => {
   const index = quickEntryFieldIndex(event.target);
   if (index !== quickEntryState.current) {
@@ -16708,6 +17035,12 @@ elements.analysisPanel.addEventListener("click", (event) => {
   const tagSetsMoreButton = event.target.closest("[data-analysis-tag-sets-more]");
   if (tagSetsMoreButton) {
     analysisTagSetRenderState.visibleCount += 100;
+    renderAnalysis(activeDictionary());
+    return;
+  }
+  const partSetsMoreButton = event.target.closest("[data-analysis-part-sets-more]");
+  if (partSetsMoreButton) {
+    analysisPartSetRenderState.visibleCount += 100;
     renderAnalysis(activeDictionary());
     return;
   }

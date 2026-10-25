@@ -1947,6 +1947,49 @@ label span {
   line-height: 1.25;
 }
 
+/* Provisional until the visual review (Definition Tag Plan U7): the line style
+   tells where a tag comes from; the tooltip and accessible name say it too. */
+:is(.part-badge-item, .outline-chip):is(.tag-source-definition, .tag-source-both, .tag-source-entry) {
+  border-color: color-mix(in srgb, var(--ui-text-muted) 75%, transparent);
+}
+
+:is(.part-badge-item, .outline-chip).tag-source-definition {
+  border-style: dashed;
+}
+
+:is(.part-badge-item, .outline-chip):is(.tag-source-both, .tag-source-entry) {
+  border-style: dotted;
+}
+
+/* A definition's tags lead its meaning, sized like the header badges. */
+.definition-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-right: 8px;
+  vertical-align: middle;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.definition-tags .part-badge-item {
+  text-transform: uppercase;
+}
+
+.definition-tags .outline-chip {
+  letter-spacing: normal;
+}
+
+/* Parts of speech before each numbered meaning, weighted like the list subtitle. */
+.definition-summary-parts {
+  font-weight: 700;
+}
+
+.network-definition-list .definition-summary-parts {
+  color: var(--ui-text-muted);
+}
+
 .display-section {
   position: relative;
   display: grid;
@@ -2898,7 +2941,8 @@ span.pending-source {
 }
 
 .entry-card mark,
-.search-snippet mark {
+.search-snippet mark,
+.definition-tags mark {
   border-radius: 3px;
   padding: 0;
   background: color-mix(in srgb, var(--ui-highlight) 45%, transparent);
@@ -5697,6 +5741,11 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
   margin: 0 0 0 8px;
   border-color: color-mix(in srgb, currentColor 40%, transparent);
   font-weight: 400;
+}
+
+/* The switch label's gap already separates the hint. */
+.quick-entry-panel .switch-label .quick-entry-shortcut {
+  margin-left: 0;
 }
 
 @media (max-width: 640px), (pointer: coarse) {

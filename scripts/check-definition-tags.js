@@ -188,6 +188,16 @@ async function checkDtosAndPersistence(repository) {
   assert.deepEqual(redSummary.parts, ["n", "adj"]);
   assert.equal(redSummary.partOfSpeech, "n");
   assert.equal(redSummary.definitionPreviews[0].tags, undefined, "previews carry no tags");
+  assert.deepEqual(
+    redSummary.definitionPreviews.map((preview) => preview.parts),
+    [["adj"], ["n"]],
+    "previews carry each definition's own parts of speech only",
+  );
+  assert.deepEqual(
+    summaries.find((item) => item.id === "stone").definitionPreviews[0].parts,
+    [],
+    "a part of speech on the entry is not repeated on its definitions",
+  );
 
   const exported = await repository.exportDictionary(dictionaryId);
   assert.deepEqual(

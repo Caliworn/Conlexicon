@@ -667,8 +667,12 @@
                   <textarea id="tagDisplayMapInput" rows="6"></textarea>
                 </label>
                 <label class="toggle-row">
-                  <span data-i18n="entryListRawTagDisplay">词条列表中显示原始标签</span>
+                  <span data-i18n="entryListRawTagDisplay">词条列表的标签行显示原始标签</span>
                   <input id="entryListRawTagDisplayInput" type="checkbox">
+                </label>
+                <label class="toggle-row">
+                  <span data-i18n="entryListRawPartDisplay">词条列表的词性文本（副标题和释义前）显示原始标签</span>
+                  <input id="entryListRawPartDisplayInput" type="checkbox">
                 </label>
                 <label class="toggle-row">
                   <span data-i18n="filterMenuRawTagDisplay">筛选菜单中显示原始标签</span>
@@ -681,15 +685,9 @@
                   <span data-i18n="entryListTagDisplayLimitHelp">设为 n 时，超过 n 个标签会显示前 n-1 个和省略号。默认为 3。</span>
                   <input id="entryListTagDisplayLimitInput" type="text" inputmode="numeric" placeholder="3">
                 </label>
-                <div class="subsection-title">
-                  <h3 data-i18n="entryListPartDisplay">词条列表中词性显示位置</h3>
-                </div>
-                <label>
-                  <select id="entryListPartDisplayInput">
-                    <option value="subtitle" data-i18n="entryListPartDisplaySubtitle">副标题</option>
-                    <option value="chips" data-i18n="entryListPartDisplayChips">标签区</option>
-                    <option value="both" data-i18n="entryListPartDisplayBoth">两者均显示</option>
-                  </select>
+                <label class="toggle-row">
+                  <span data-i18n="entryListTagsIncludeParts">词条列表的标签行包含词性标签</span>
+                  <input id="entryListTagsIncludePartsInput" type="checkbox">
                 </label>
                 <div class="subsection-title tag-order-heading">
                   <h3 data-i18n="tagOrderSettings">自动整理标签顺序</h3>
@@ -721,19 +719,8 @@
                 <div class="form-heading compact-heading">
                   <div>
                     <p class="eyebrow" data-i18n="displaySettings">显示</p>
-                    <h3 data-i18n="polysemyDisplay">多义项显示</h3>
+                    <h3 data-i18n="emptyEntrySections">空栏目</h3>
                   </div>
-                </div>
-                <label class="toggle-row">
-                  <span data-i18n="entryListPolysemyDisplay">词条列表的多义项显示</span>
-                  <input id="entryListPolysemyInput" type="checkbox">
-                </label>
-                <label class="toggle-row">
-                  <span data-i18n="networkPolysemyDisplay">词条悬浮卡片的多义项显示</span>
-                  <input id="networkPolysemyInput" type="checkbox">
-                </label>
-                <div class="subsection-title">
-                  <h3 data-i18n="emptyEntrySections">空栏目</h3>
                 </div>
                 <label class="toggle-row">
                   <span data-i18n="showEmptyEntrySections">在词条浏览界面显示空栏目</span>
@@ -1230,6 +1217,11 @@
         <div class="quick-entry-fields" id="quickEntryFields"></div>
         <p class="quick-entry-message" id="quickEntryMessage" role="status"></p>
         <div class="quick-entry-footer">
+          <label class="switch-label">
+            <input id="quickEntryDefinitionTagsInput" class="switch" type="checkbox" role="switch" aria-keyshortcuts="Control+/ Meta+/">
+            <span data-i18n="definitionTags">释义标签</span>
+            <kbd class="quick-entry-shortcut">Ctrl /</kbd>
+          </label>
           <p class="quick-entry-keys">
             <span><kbd>Enter</kbd> <span data-i18n="quickEntryKeyNext">下一项</span></span>
             <span><kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="quickEntryKeyMove">切换</span></span>

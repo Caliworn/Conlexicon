@@ -1451,7 +1451,7 @@ function checkModelNormalization() {
     ],
     settings: {
       entryListTagDisplayLimit: 99,
-      entryListPartDisplay: "chips",
+      entryListTagsIncludeParts: false,
       entrySectionOrder: ["notes", "derived", "notes", "unknown"],
       ipa: { mappings: [{ from: "a", to: "ˈa" }] },
     },
@@ -1463,7 +1463,18 @@ function checkModelNormalization() {
   assert.deepEqual(normalized.entries[0].etymology.sources, [{ entryId: "", text: "entry-source" }]);
   assert.equal(normalized.entries[0].etymology.description, "source note");
   assert.equal(normalized.settings.entryListTagDisplayLimit, 10);
-  assert.equal(normalized.settings.entryListPartDisplay, "chips");
+  assert.equal(normalized.settings.entryListTagsIncludeParts, false);
+  assert.equal(
+    normalizeDictionary({ name: "Default" }).settings.entryListTagsIncludeParts,
+    true,
+    "the entry list tag row includes parts of speech by default",
+  );
+  // The old part-of-speech position maps to whether the tag row includes parts.
+  [["subtitle", false], ["chips", true], ["both", true]].forEach(([position, includeParts]) => {
+    const { dictionary } = migrateLegacyDictionary({ name: "Legacy", settings: { entryListPartDisplay: position } });
+    assert.equal(dictionary.settings.entryListTagsIncludeParts, includeParts, `legacy ${position}`);
+    assert.equal(Object.hasOwn(dictionary.settings, "entryListPartDisplay"), false);
+  });
   assert.equal(normalized.settings.showEmptyEntrySections, false);
   assert.equal(normalized.settings.filterMenuRawTagDisplay, false, "Filter menu tags default to their display labels");
   assert.equal(

@@ -362,7 +362,7 @@ GET /api/dictionaries/:id/entries/:entryId/location?filter=&q=&fields=&fuzzyFiel
       tags,            // 词条标签，与详情 DTO 的 tags 含义相同
       effectiveTags,   // 有效标签，按 settings.tagSortOrder 排序
       definitionPreviews: [
-        { id, position, meaning }
+        { id, position, meaning, parts }  // parts：该释义自己的词性，按 tagSortOrder 排序
       ],
       createdAt,
       updatedAt,
@@ -478,7 +478,7 @@ GET /api/dictionaries/:id/facets
 释义可以带标签。词条标签描述这个词，释义标签描述那条释义；释义不继承词条标签。需要"整个词"的答案时，取词条的**有效标签**：词条标签与全部释义标签的并集。词性放在哪一层是使用约定（多词性词条原则上放在各条释义上），程序不强制、不迁移、也不提示。
 
 - **存储与写入**：详情 DTO 的 `definitions[]` 带 `tags: string[]`；`POST` / `PUT /entries` 与 JSON 导入在边界把它按标签列表规范化（去首尾空白、去空、去重并保持顺序，非数组按空列表），缺省为 `[]`。一条释义可以只有标签，释义文字（`meaning`）、例句和备注都为空也合法，导入时不会被当作空释义丢弃。`PATCH /entries` 不接受释义标签。
-- **DTO**：详情 DTO 与摘要 DTO 的 `tags` 都只表示词条标签。摘要 DTO 另带 `effectiveTags`，`parts` 与 `partOfSpeech` 从它计算；摘要的 `definitionPreviews` 不带标签。
+- **DTO**：详情 DTO 与摘要 DTO 的 `tags` 都只表示词条标签。摘要 DTO 另带 `effectiveTags`，`parts` 与 `partOfSpeech` 从它计算；摘要的 `definitionPreviews[]` 只多带 `parts`（该释义自己的标签中的词性，按 `tagSortOrder` 排序），供列表与悬浮卡片在每条释义前显示它自己的词性，不带其他标签。
 - **有效标签的顺序**：先按首次出现拼出并集（词条标签按存储顺序，然后按释义顺序、释义内顺序追加未出现过的标签），再按 `settings.tagSortOrder` 排序：列出的标签按其位置排在前面，其余保持首次出现顺序。有效标签只在读取时计算，不存储；共享实现为 `tagModel.effectiveEntryTags(entry, order)`，前后端共用。保存时排序（见下一条）不能代替这一步：两层各自有序，拼接后仍可能违反配置，例如词条 `[古语]` 加释义 `[n]` 拼成 `古语, n`，而配置要求词性在前。
 - **保存时的存储顺序**：运行期的每次词条写入（`POST` / `PUT /entries`、`PATCH /entries`、创建来源、绑定来源时改写的来源词条、整词典批处理）都在服务端把词条标签和每条释义的标签分别按 `settings.tagSortOrder` 排列，规则与 `applyTagOrder` 批处理相同；`PATCH` 同时附带 settings 时按将要保存的 settings 排列。`tagSortOrder` 为空时顺序不变。JSON 导入保持原有顺序，存量数据由 `applyTagOrder` 整理。前端在设置表单保存后，若 `tagSortOrder` 有变化且试运行发现顺序不一致的词条，弹出应用内确认，询问是否立即运行 `applyTagOrder`；离开页面时经"保存 / 放弃更改 / 取消"保存设置不弹出该确认。
 - **使用范围**：EntryFilter 的全部标签条件、facets、分析页的词性与标签统计、`missing_tags` 质量规则、`allowEmptyTags` 保存校验和自动形态匹配都按有效标签。`near_duplicate_tags` 与 `tag_too_long` 同时检查两层标签。标签显示替换与红色强调对两层同样生效。
@@ -501,7 +501,7 @@ GET /api/dictionaries/:id/facets
 
 ##### 输入、补全与唯一性
 
-补全由后端候选端点与前端补全 controller 实现（单行候选、旧列表立即失效、输入法处理及下述键盘行为）；来源卡片同样改用词条 summary：已存来源取自 `entry-relations` 的 `matchedEntry`，新选来源取自候选项；同一输入框内有两张以上同形卡片时显示“词性 首条释义”区分信息（首条释义相同则改用第一条不同的释义，再无差异则用发音），悬停或聚焦卡片显示与词汇网络相同的词条摘要浮层（释义条数由“词条悬浮卡片的多义项显示”设置控制），界面不展示 ID，卡片标签不再读取前端快照。浏览态来源链接沿用同一浮层与同形区分规则；浏览态和完整编辑态的衍生词卡片也显示该浮层，完整编辑态卡片可聚焦但不跳转。
+补全由后端候选端点与前端补全 controller 实现（单行候选、旧列表立即失效、输入法处理及下述键盘行为）；来源卡片同样改用词条 summary：已存来源取自 `entry-relations` 的 `matchedEntry`，新选来源取自候选项；同一输入框内有两张以上同形卡片时显示“词性 首条释义”区分信息（首条释义相同则改用第一条不同的释义，再无差异则用发音），悬停或聚焦卡片显示与词汇网络相同的词条摘要浮层（列出全部释义），界面不展示 ID，卡片标签不再读取前端快照。浏览态来源链接沿用同一浮层与同形区分规则；浏览态和完整编辑态的衍生词卡片也显示该浮层，完整编辑态卡片可聚焦但不跳转。
 
 `POST /api/dictionaries/:id/source-candidates/query` 只读，不创建词条、不保存草稿、不更新词典时间：
 
