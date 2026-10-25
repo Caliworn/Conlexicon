@@ -101,11 +101,11 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | `{ items, pageInfo, searchSummary }`，其中 `items` 固定为词条摘要 DTO | 支持结构化 JSON `filter`，以及现有 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`sort`、`cursor`、`windowOffset`、`limit`。结构化 `filter` 不得与平铺筛选参数混用。无参数请求也使用默认排序和窗口大小，不返回完整词条数组。 |
 | `POST` | `/api/dictionaries/:id/entries/filter-facts` | 批量读取结构筛选是否存在候选 | `{ dictionaryId, generation, facts }` | 最多接受 16 个 filter descriptor；只返回按请求 ID 对应的 `available` 布尔值，不接受搜索、排序或分页语义。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId/location` | 定位词条在当前查询中的窗口 | `{ items, pageInfo, searchSummary, location }` | 接受与 `/entries` 相同的查询 descriptor 和 `limit`，但不接受客户端 cursor；目标存在但被查询排除时返回 `location.found: false`。 |
-| `POST` | `/api/dictionaries/:id/entries` | 新建词条 | `{ entry, summary }` | 客户端不得携带词条 ID；后端为每次请求生成一次 UUID，并在 `entry.id` 返回。新建为非覆盖式写入，ID 已存在时返回 409 `duplicate_entity_ids_scoped`；不做其他实体 ID 检查，义项 ID 冲突由主键约束拒绝并整体回滚。`summary` 是写入后的轻量词典计数。 |
+| `POST` | `/api/dictionaries/:id/entries` | 新建词条 | `{ entry, summary }` | 客户端不得携带词条 ID；后端为每次请求生成一次 UUID，并在 `entry.id` 返回。新建为非覆盖式写入，ID 已存在时返回 409 `duplicate_entity_ids_scoped`；不做其他实体 ID 检查，释义 ID 冲突由主键约束拒绝并整体回滚。`summary` 是写入后的轻量词典计数。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
-| `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存已有词条 | `{ entry, summary }` | 只更新已有词条，词条不存在时返回 404 `entry_not_found`，不按客户端 ID 新建。不做实体 ID 检查：义项 ID 重复（无论同一词条内还是撞到其他词条）由主键约束失败并整体回滚。`summary` 是写入后的轻量词典计数。 |
+| `PUT` | `/api/dictionaries/:id/entries/:entryId` | 保存已有词条 | `{ entry, summary }` | 只更新已有词条，词条不存在时返回 404 `entry_not_found`，不按客户端 ID 新建。不做实体 ID 检查：释义 ID 重复（无论同一词条内还是撞到其他词条）由主键约束失败并整体回滚。`summary` 是写入后的轻量词典计数。 |
 | `DELETE` | `/api/dictionaries/:id/entries/:entryId` | 删除单个词条 | `{ updatedAt, summary }` | 不因无关历史重复 ID 阻断删除；`summary` 是删除后的轻量词典计数。 |
-| `PATCH` | `/api/dictionaries/:id/entries` | 批量更新词条字段 | `{ id, updatedAt, entries, settings? }` | 当前仅允许 patch `tags` 和 `pronunciation`；`entries` 只包含本次更新的词条；可附带 `settings` 与本次更新一并保存，附带时与 `PUT /settings` 一样检查搜索自定义规则。 |
+| `PATCH` | `/api/dictionaries/:id/entries` | 批量更新词条字段 | `{ id, updatedAt, entries, settings? }` | 当前仅允许 patch `tags`（词条级标签）和 `pronunciation`，不接受释义标签；`entries` 只包含本次更新的词条；可附带 `settings` 与本次更新一并保存，附带时与 `PUT /settings` 一样检查搜索自定义规则。 |
 | `POST` | `/api/dictionaries/:id/entries/batch` | 按已保存设置批量改写整本词典 | 试运行：`{ operation, targetCount, dryRun: true }`；执行：`{ id, updatedAt, operation, targetCount, dryRun: false, summary }` | 见下方“整词典批处理”。 |
 
 ### 读取侧查询
@@ -132,6 +132,8 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
   ```js
   {
     part: "n",
+    partCount: { min: 2 },
+    partSet: ["adj", "n"],
     tags: { values: ["motion"], mode: "any" },
     presence: [
       { field: "definition", present: true },
@@ -144,7 +146,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
   }
   ```
 
-  所有字段均可省略。`tags.mode` 为 `any`、`all` 或 `exact`；`exact` 要求词条包含全部指定标签且不含任何额外标签。`presence.field` 支持 `definition`、`example`、`entryNote`、`source`、`derivedEntries`、`ipa`、`tag`；`source` 表示词条有任何来源记录（已绑定或纯文本），`derivedEntries` 表示有其他词条以已绑定来源引用它（即它有衍生词）；`tag` 表示词条是否至少有一个标签，`present: false` 编译为对 `entry_tags` 的不存在性查询。`sourceCount` 与 `tagCount` 都是包含边界的非负整数区间，`max` 可省略；前者统计来源记录，后者统计词条的标签数量。`activityDays.field` 支持 `created`、`updated`，日期按 UTC `YYYY-MM-DD` 的 `[dayStart, nextDayStart)` 半开范围比较。同一 presence 或日期字段不得给出冲突条件。`orthography` 是单一正写法结构条件，category 支持 `length`、`initial`、`character`、`bigram`；长度按整个 lemma 的 Unicode 码点数计算，首字符先 trim，字符忽略 Unicode 空白，双字符只统计空白分隔片段内部的相邻码点。该条件不执行 NFC、搜索规范化或字素簇合并。当前 `entryNote` 只表示词条级备注，不包含释义备注或形态组备注。
+  所有字段均可省略。所有标签条件（`part`、`partCount`、`partSet`、`tags`、`presence.tag`、`tagCount`）都按词条的**有效标签**判断，即词条标签与全部释义标签的并集，见[释义标签与有效标签](#释义标签与有效标签)；标签挂在哪一层不影响结果。`tags.mode` 为 `any`、`all` 或 `exact`；`exact` 要求词条包含全部指定标签且不含任何额外标签。`presence.field` 支持 `definition`、`example`、`entryNote`、`source`、`derivedEntries`、`ipa`、`tag`；`source` 表示词条有任何来源记录（已绑定或纯文本），`derivedEntries` 表示有其他词条以已绑定来源引用它（即它有衍生词）；`tag` 表示词条是否至少有一个有效标签。`sourceCount`、`tagCount` 与 `partCount` 都是包含边界的非负整数区间，`max` 可省略；`sourceCount` 统计来源记录，`tagCount` 统计不同有效标签的数量，`partCount` 统计词条的词性集合大小（有效标签中出现在 `settings.partOfSpeechTags` 里的不同标签）。`partSet` 是至少两个不同词性的数组，要求词条的词性集合恰好等于它，非词性标签不受限制；单个词性用 `part`。`partSet` 含未配置为词性的值时结果为空，与 `part` 处理未配置词性的方式相同；没有配置词性时 `partCount` 按 0 计算。`partCount` 区间非法返回 `invalid_entry_filter_part_count`，`partSet` 不是字符串数组或去重后只有一个值时返回 `invalid_entry_filter_part_set`。`activityDays.field` 支持 `created`、`updated`，日期按 UTC `YYYY-MM-DD` 的 `[dayStart, nextDayStart)` 半开范围比较。同一 presence 或日期字段不得给出冲突条件。`orthography` 是单一正写法结构条件，category 支持 `length`、`initial`、`character`、`bigram`；长度按整个 lemma 的 Unicode 码点数计算，首字符先 trim，字符忽略 Unicode 空白，双字符只统计空白分隔片段内部的相邻码点。该条件不执行 NFC、搜索规范化或字素簇合并。当前 `entryNote` 只表示词条级备注，不包含释义备注或形态组备注。
 - `fields`：逗号分隔的搜索字段白名单；当前支持 `lemma`、`pronunciation`、`tags`、`definitions`、`examples`、`notes`、`etymology`、`morphology`。为空或全部无效时搜索全部字段。
 - `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；仅对同时出现在 `fields` 中的字段生效。
 - 基础搜索逐个独立字段值匹配：一条释义、一个标签、一个来源或一段备注必须自行包含查询文本，查询不会跨多个值拼接命中；`notes` 中的词条备注、释义备注和每个词条形态组备注也分别作为独立值。多标签组合等条件应使用高级筛选。自由文本按当前词典的 `settings.search.normalization` 处理。SQLite 的严格及 fuzzy 查询均直接读取静态 `entry_search_values` 和按需读取形态 `entry_morphology_search_values`；fuzzy 通过连接级确定性函数复用共享搜索模型的评分语义。该路径支持 NFC、Unicode case folding 和自定义等价规则。结构键和词源关系键不套用该自由文本配置。
@@ -155,7 +157,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 前端不保存整本词条，需要遍历全部词条的编辑由服务端按**已保存**的设置完成。请求体：
 
 - `{ operation: "generateIpa", mode: "missing" | "all", dryRun? }`：为词形非空（去首尾空白后）的词条生成发音，`missing` 只处理发音为空的词条，`all` 覆盖全部；生成规则与前端相同，均由 `ipa-model` 的 `generateIpaFromLemma` 按 `settings.ipa` 计算。
-- `{ operation: "applyTagOrder", dryRun? }`：按 `settings.tagSortOrder` 重排每个词条的标签，列出的标签按其顺序排在前面（比较时忽略大小写），其余保持原有相对顺序；只写入顺序确有变化的词条。
+- `{ operation: "applyTagOrder", dryRun? }`：按 `settings.tagSortOrder` 重排每个词条的标签和每条释义内的标签，各个列表分别排序：列出的标签按其顺序排在前面（比较时忽略大小写），其余保持原有相对顺序；只写入有任一列表顺序确有变化的词条，`targetCount` 按词条计数。释义标签由批处理在服务端内部写入，`PATCH /entries` 的字段白名单不变。运行期保存本身已按该顺序写入标签（见[释义标签与有效标签](#释义标签与有效标签)），批处理用于整理导入的数据和修改 `tagSortOrder` 之后的存量词条。
 
 `dryRun: true` 只返回将写入的词条数 `targetCount`，不写入；前端用它在确认前判断是否无事可做。目标数为 0 时同样不写入，返回 `dryRun: false` 且不带 `updatedAt`／`summary`。实际写入复用批量 patch 的单事务路径（含搜索投影与词根拓扑排序记录的更新）。`operation` 不在上述两种、`generateIpa` 缺少合法 `mode` 或 `dryRun` 不是布尔值时返回 400 `invalid_entry_batch_payload`。
 
@@ -193,7 +195,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 - 实体 ID 由类型前缀加随机 UUID 组成，由服务端生成：新建词条和创建来源的 `POST` 不接受客户端 ID（`entry_id_not_allowed`），`PUT` 只更新已有词条。规范化只补齐缺失的 ID，不扫描已有 ID 防撞，也不重试。
 - 导入（含旧 JSON 转换）在边界执行全量实体 ID 唯一性检查，跨类型重复同样视为冲突，返回 `duplicate_entity_ids`。
 - 普通保存只检查数据库键无法拒绝的提交范围，重复返回 `duplicate_entity_ids_scoped`：
-  - 词条保存不做 ID 检查：义项 ID 重复由主键约束失败并整体回滚；新建撞上已有词条 ID 时返回 409，不覆盖。
+  - 词条保存不做 ID 检查：释义 ID 重复由主键约束失败并整体回滚；新建撞上已有词条 ID 时返回 409，不覆盖。
   - 形态保存在生成写入计划前拒绝提交内重复的组／表 ID：写入计划按 ID 建索引，重复会被静默合并。
   - 语料保存检查语料块、层和单元之间的重复：语料存为整块 JSON，没有主键约束。
   - IPA 映射没有实体 ID；元数据、普通设置和语言文档保存不做 ID 检查。
@@ -244,6 +246,8 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `conflicting_entry_filter_presence` | 同一字段同时要求存在与不存在。 |
 | `invalid_entry_filter_source_count` | 来源数量边界无效，或最大值小于最小值。 |
 | `invalid_entry_filter_tag_count` | 标签数量边界无效，或最大值小于最小值。 |
+| `invalid_entry_filter_part_count` | 词性数量边界无效，或最大值小于最小值。 |
+| `invalid_entry_filter_part_set` | 词性集合不是字符串数组，或去重后只有一个词性。 |
 | `invalid_entry_filter_activity_day` | 活动日期字段或 UTC 日期值无效。 |
 | `conflicting_entry_filter_activity_day` | 同一活动日期字段指定了不同日期。 |
 | `invalid_entry_filter_orthography` | 正写法筛选类别或值无效。 |
@@ -297,15 +301,15 @@ GET /api/dictionaries/:id/entries?filter=&q=&fields=&fuzzyFields=&part=&tags=&ta
 - `fields`：逗号分隔的搜索字段白名单；为空或全部无效时按默认全字段搜索。当前字段包括：
   - `lemma`：词形；
   - `pronunciation`：发音 / IPA；
-  - `tags`：原始标签、显示替换标签和按当前设置识别出的词性标签；
+  - `tags`：词条标签和释义标签的原始值与显示替换值（词性也是标签）；
   - `definitions`：释义文本；
   - `examples`：当前词条内嵌例句；后续例句升级为语料链接后，该字段应继续表示“与词条关联的例句文本”，来源可包含嵌入字段和链接语料；
   - `notes`：词条备注、释义备注和词条形态组备注；
   - `etymology`：词源描述和来源文本；
   - `morphology`：按当前形态表设置动态生成的形态形式，以及词条级形态 override。
 - `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；仅对 `fields` 中的字段生效。
-- `part`：词性筛选；按去除边缘空白后的原始标签精确匹配，特殊值 `__conlexicon_no_part__` 表示无词性。
-- `tags`：逗号分隔的原始标签列表；按去除边缘空白后的原始标签精确匹配。
+- `part`：词性筛选；按去除边缘空白后的原始标签精确匹配有效标签，特殊值 `__conlexicon_no_part__` 表示有效标签中没有词性。
+- `tags`：逗号分隔的原始标签列表；按去除边缘空白后的原始标签精确匹配有效标签。
 - `tagMode`：`any`、`all` 或 `exact`，默认 `any`；`exact` 用于完整标签集合匹配。
 - `sort`：`lemmaAsc`、`lemmaDesc`、`updatedAsc`、`updatedDesc`、`createdAsc`、`createdDesc`。
 - `cursor`：不透明查询游标，前端不得解析。顺序分页使用响应的 `pageInfo.nextCursor`；随机窗口读取使用 `pageInfo.windowCursor`。
@@ -355,14 +359,15 @@ GET /api/dictionaries/:id/entries/:entryId/location?filter=&q=&fields=&fuzzyFiel
       id,
       lemma,
       pronunciation,
-      tags,
+      tags,            // 词条标签，与详情 DTO 的 tags 含义相同
+      effectiveTags,   // 有效标签，按 settings.tagSortOrder 排序
       definitionPreviews: [
         { id, position, meaning }
       ],
       createdAt,
       updatedAt,
-      partOfSpeech,
-      parts
+      partOfSpeech,    // parts[0] 或空字符串
+      parts            // effectiveTags 中的词性，按 effectiveTags 的顺序
     }
   ],
   searchSummary: {
@@ -393,9 +398,9 @@ GET /api/dictionaries/:id/entries/:entryId/location?filter=&q=&fields=&fuzzyFiel
 {
   field,           // lemma / pronunciation / tags / definitions / examples / notes / etymology / morphology
   value,           // 原始显示文本，不是规范化文本
-  sourceType,      // entry / tag / definition / morphologyGroup / etymologySource / morphology
-  sourceId,        // 有稳定 ID 时填写；标签等无独立 ID 的对象为空字符串
-  sourcePosition,  // 该来源在所属词条中的零基位置
+  sourceType,      // entry / tag / definitionTag / definition / morphologyGroup / etymologySource / morphology
+  sourceId,        // 有稳定 ID 时填写；词条标签为空字符串，释义标签为所属释义 ID
+  sourcePosition,  // 该来源在所属词条中的零基位置；释义标签为它在所属释义内的位置
   valueType        // lemma / raw / display / meaning / example / note / description / source / generated 等
 }
 ```
@@ -420,7 +425,7 @@ SQLite projection 查询中，带 `q` 的分页结果会为每个命中词条附
 }
 ```
 
-`searchHits` 只返回当前查询实际命中的独立 records；同一来源定位与 `valueType` 的同一值最多返回一次，但不同义项包含相同文本时仍分别返回。它用于选择命中摘要、显示义项序号及定位原始对象，不代替前端基于共享 normalizer 的原文范围映射。无 `q` 时省略该字段；严格、fuzzy 和形态命中都通过该字段返回。
+`searchHits` 只返回当前查询实际命中的独立 records；同一来源定位与 `valueType` 的同一值最多返回一次，但不同释义包含相同文本时仍分别返回。它用于选择命中摘要、显示释义序号及定位原始对象，不代替前端基于共享 normalizer 的原文范围映射。无 `q` 时省略该字段；严格、fuzzy 和形态命中都通过该字段返回。
 
 `/root-groups` 带搜索时复用相同的静态/形态 projection 匹配 SQL，但只消费去重命中 ID，不执行普通词条列表所需的排序；命中集合随后映射到独立缓存的稳定词根拓扑。该路径不接受或物化一份来自拓扑的全词典候选 ID 数组。
 
@@ -457,7 +462,7 @@ GET /api/dictionaries/:id/facets
 }
 ```
 
-`identities` 只包含当前至少被一个词条使用的原始标签；`entryCount` 使用 `COUNT(DISTINCT entry_id)`，表示使用该身份的唯一词条数。多个原始标签映射为同一 `displayLabel` 时，相应 identity 的 `displayAmbiguous` 为 `true`，并在 `collisionGroups` 中列出完整原始值集合；该标记只要求界面补充原始值，不合并标签身份。`parts` 和 `tags` 是兼容现有消费者的派生视图，不执行第二次独立标签聚合。快照按词典 generation 缓存，词条或相关设置成功写入后与查询会话一起失效。
+`identities` 只包含当前至少被一个词条使用的原始标签，词条标签和释义标签都算；`entryCount` 表示有效标签中含该身份的唯一词条数，同一标签同时挂在词条和释义上、或挂在多条释义上时，该词条只计一次。`noPartOfSpeechCount` 同样按有效标签判断。多个原始标签映射为同一 `displayLabel` 时，相应 identity 的 `displayAmbiguous` 为 `true`，并在 `collisionGroups` 中列出完整原始值集合；该标记只要求界面补充原始值，不合并标签身份。`parts` 和 `tags` 是兼容现有消费者的派生视图，不执行第二次独立标签聚合。快照按词典 generation 缓存，词条或相关设置成功写入后与查询会话一起失效。
 
 该接口必须尊重：
 
@@ -467,6 +472,18 @@ GET /api/dictionaries/:id/facets
 - 原始标签显示设置不改变统计键，但可影响前端展示策略。
 
 词条列表控制栏中的具体词性选项以该接口的成功响应为唯一数据源。facets 加载中、请求失败或后端不可用时，前端不得扫描完整活动词典生成本地词性集合；若用户已有当前词性筛选，可以暂时保留这一个运行期选择，待成功响应返回后再按最新集合校验。
+
+### 释义标签与有效标签
+
+释义可以带标签。词条标签描述这个词，释义标签描述那条释义；释义不继承词条标签。需要"整个词"的答案时，取词条的**有效标签**：词条标签与全部释义标签的并集。词性放在哪一层是使用约定（多词性词条原则上放在各条释义上），程序不强制、不迁移、也不提示。
+
+- **存储与写入**：详情 DTO 的 `definitions[]` 带 `tags: string[]`；`POST` / `PUT /entries` 与 JSON 导入在边界把它按标签列表规范化（去首尾空白、去空、去重并保持顺序，非数组按空列表），缺省为 `[]`。一条释义可以只有标签，释义文字（`meaning`）、例句和备注都为空也合法，导入时不会被当作空释义丢弃。`PATCH /entries` 不接受释义标签。
+- **DTO**：详情 DTO 与摘要 DTO 的 `tags` 都只表示词条标签。摘要 DTO 另带 `effectiveTags`，`parts` 与 `partOfSpeech` 从它计算；摘要的 `definitionPreviews` 不带标签。
+- **有效标签的顺序**：先按首次出现拼出并集（词条标签按存储顺序，然后按释义顺序、释义内顺序追加未出现过的标签），再按 `settings.tagSortOrder` 排序：列出的标签按其位置排在前面，其余保持首次出现顺序。有效标签只在读取时计算，不存储；共享实现为 `tagModel.effectiveEntryTags(entry, order)`，前后端共用。保存时排序（见下一条）不能代替这一步：两层各自有序，拼接后仍可能违反配置，例如词条 `[古语]` 加释义 `[n]` 拼成 `古语, n`，而配置要求词性在前。
+- **保存时的存储顺序**：运行期的每次词条写入（`POST` / `PUT /entries`、`PATCH /entries`、创建来源、绑定来源时改写的来源词条、整词典批处理）都在服务端把词条标签和每条释义的标签分别按 `settings.tagSortOrder` 排列，规则与 `applyTagOrder` 批处理相同；`PATCH` 同时附带 settings 时按将要保存的 settings 排列。`tagSortOrder` 为空时顺序不变。JSON 导入保持原有顺序，存量数据由 `applyTagOrder` 整理。前端在设置表单保存后，若 `tagSortOrder` 有变化且试运行发现顺序不一致的词条，弹出应用内确认，询问是否立即运行 `applyTagOrder`；离开页面时经"保存 / 放弃更改 / 取消"保存设置不弹出该确认。
+- **使用范围**：EntryFilter 的全部标签条件、facets、分析页的词性与标签统计、`missing_tags` 质量规则、`allowEmptyTags` 保存校验和自动形态匹配都按有效标签。`near_duplicate_tags` 与 `tag_too_long` 同时检查两层标签。标签显示替换与红色强调对两层同样生效。
+- **自动形态**：模板组匹配把有效标签作为唯一输入，规则不变（任一标签与组的 `matchTags` 相同即匹配，只取最前的组）。这是在形态分配重做（见 [Morphology Assignment Plan](MORPHOLOGY_ASSIGNMENT_PLAN.md) 的 D6）决定匹配上下文之前的默认行为；释义都没有标签时，结果与只用词条标签相同。
+- **搜索**：`tags` 字段同时投影释义标签，命中的 `sourceType` 为 `definitionTag`，`sourceId` 为释义 ID，`sourcePosition` 为该标签在释义内的位置。
 
 ### 词源与词根关系
 
@@ -680,7 +697,7 @@ GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&so
 
 `POST /api/dictionaries/:id/analysis/query`
 
-支持 `entryCount`、`lexiconSummary`、`coverageBreakdown`、`partDistribution`、`tagFrequency`、`tagSetDistribution`、`orthographyDistribution`、`activityPreview`、`activityDistribution` 和 `rootFamilyRanking`。这些 widgets 在一次同步 HTTP 请求内完成；前端异步加载并显示独立的 loading/error/retry 状态。数据分析页未打开时不发起请求。
+支持 `entryCount`、`lexiconSummary`、`coverageBreakdown`、`partDistribution`、`partSetDistribution`、`tagFrequency`、`tagSetDistribution`、`orthographyDistribution`、`activityPreview`、`activityDistribution` 和 `rootFamilyRanking`。这些 widgets 在一次同步 HTTP 请求内完成；前端异步加载并显示独立的 loading/error/retry 状态。数据分析页未打开时不发起请求。
 
 请求：
 
@@ -700,7 +717,7 @@ GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&so
 ```
 
 - `widgets` 必须为非空数组，最多 16 项；`id` 在一次请求中必须唯一，只允许字母、数字、点、下划线和连字符，最长 80 字符。
-- `partDistribution`、`tagFrequency` 和 `tagSetDistribution` 接受可选 `limit`，范围为 1–50；省略时返回完整排行。`activityPreview` 的 `limit` 默认为 6，范围同样为 1–50。`activityDistribution` 返回完整日期桶且不接受 `limit`；包括 `rootFamilyRanking` 在内的其他 widget 同样不接受 `limit`。
+- `partDistribution`、`partSetDistribution`、`tagFrequency` 和 `tagSetDistribution` 接受可选 `limit`，范围为 1–50；省略时返回完整排行。`activityPreview` 的 `limit` 默认为 6，范围同样为 1–50。`activityDistribution` 返回完整日期桶且不接受 `limit`；包括 `rootFamilyRanking` 在内的其他 widget 同样不接受 `limit`。
 - `options.includeActions` 默认为 `true`。设为 `false` 时省略 action descriptor。
 
 响应返回结构化 widget data，不返回 HTML：
@@ -780,6 +797,7 @@ Widget 通过以下任务依赖生成：
 | `lexiconSummary` | `entryStats` |
 | `coverageBreakdown` | `entryStats` |
 | `partDistribution` | `partStats` |
+| `partSetDistribution` | `partSetStats` |
 | `tagFrequency` | `tagStats` |
 | `tagSetDistribution` | `tagSetStats` |
 | `orthographyDistribution` | `orthographyStats` |
@@ -787,7 +805,7 @@ Widget 通过以下任务依赖生成：
 | `activityDistribution` | `activityStats` |
 | `rootFamilyRanking` | `rootTopology` |
 
-同一任务在一次请求中只执行一次；只有 `activityPreview` 时使用请求中的最大 limit 读取日期桶，再分别裁剪；请求包含 `activityDistribution` 时读取完整日期桶，并继续按各自 limit 裁剪预览 widget。`lexiconSummary.rootEntryCount` 严格表示没有任何来源记录的词条数，`derivedEntryCount` 表示至少有一条来源记录的词条数；`isolatedRootEntryCount` 是词根中没有任何词条以已绑定来源引用它的部分（孤立词根），对应的 `isolatedRootAction` 筛选为 `presence: [{ field: "source", present: false }, { field: "derivedEntries", present: false }]`。三者都按来源记录严格计算，不建立词根拓扑：只有纯文本来源的词条算衍生词，既不是词根也不是孤立词根（词根模式的拓扑把它当作词根）。`partDistribution.rows[].entryCount`、`tagFrequency.rows[].entryCount`、`tagSetDistribution.rows[].entryCount`、`orthographyDistribution` 各分布行和两类活动 widget 的 `created/updated[].entryCount` 均为唯一词条数。词性、其他标签和标签集合行同时返回来自活跃标签身份快照的 `displayLabel` 与 `displayAmbiguous`，不同 widget 不得按自身截断后的局部行重新推断显示碰撞。`partDistribution` 另返回 `partTypeCount`、`noPartOfSpeechCount` 和对应的 `noPartAction`；`tagFrequency` 从共享标签身份快照排除当前 `partOfSpeechTags` 中的所有标签，并返回 `tagTypeCount` 及结构化标签筛选 action。`tagSetDistribution` 以无序的完整原始标签集合为身份，返回非空集合的 `tagSetCount`、`taggedEntryCount`、`untaggedEntryCount`、`multiTagEntryCount` 和结构化 `tags`；`taggedAction`、`untaggedAction`、`multiTagAction` 分别使用 `presence.tag: true`、`presence.tag: false`、`tagCount.min: 2` 进入普通词条查询。无标签词条不作为空集合混入排行，集合种类没有词条结果 action。显示替换和显示顺序不改变集合身份，每个非空集合行的 action 使用 `tags.mode: "exact"`，因此单标签集合表示“仅有该标签”，多标签集合也不会把带额外标签的超集纳入结果。`orthographyDistribution` 从最小 `id + lemma` 输入返回 `lemmaEntryCount`、`wordLengths`、`initials`、`characters` 和 `bigrams`；字符与双字符行同时返回 `occurrenceCount` 和 `entryCount`，每行 action 使用相同共享模型生成的单一 `orthography` 结构筛选。所有 `entryFilter` action 使用 `resultCount` 表示目标结果词条数。`coverageBreakdown.rows[].field` 支持 `definition`、`example`、`entryNote`、`ipa`；每行使用 `coveredEntryCount`、`missingEntryCount`，释义和例句行另带项目单位的 `itemCount`。词性分布 action 使用 `{ part }` descriptor，无词性行使用保留值 `__conlexicon_no_part__`。
+同一任务在一次请求中只执行一次；只有 `activityPreview` 时使用请求中的最大 limit 读取日期桶，再分别裁剪；请求包含 `activityDistribution` 时读取完整日期桶，并继续按各自 limit 裁剪预览 widget。`lexiconSummary.rootEntryCount` 严格表示没有任何来源记录的词条数，`derivedEntryCount` 表示至少有一条来源记录的词条数；`isolatedRootEntryCount` 是词根中没有任何词条以已绑定来源引用它的部分（孤立词根），对应的 `isolatedRootAction` 筛选为 `presence: [{ field: "source", present: false }, { field: "derivedEntries", present: false }]`。三者都按来源记录严格计算，不建立词根拓扑：只有纯文本来源的词条算衍生词，既不是词根也不是孤立词根（词根模式的拓扑把它当作词根）。`partDistribution.rows[].entryCount`、`tagFrequency.rows[].entryCount`、`tagSetDistribution.rows[].entryCount`、`orthographyDistribution` 各分布行和两类活动 widget 的 `created/updated[].entryCount` 均为唯一词条数。词性、其他标签和标签集合行同时返回来自活跃标签身份快照的 `displayLabel` 与 `displayAmbiguous`，不同 widget 不得按自身截断后的局部行重新推断显示碰撞。所有词性与标签统计都按[有效标签](#释义标签与有效标签)计算，标签挂在词条上还是释义上，结果相同。`partDistribution` 另返回 `partTypeCount`、`noPartOfSpeechCount`、`multiPartEntryCount`（词性集合至少有两个词性的词条数，没有配置词性时为 0）和对应的 `noPartAction`、`multiPartAction`（`partCount.min: 2`）；多词性词条会在多个词性行中各计一次，`multiPartEntryCount` 解释行计数之和为何大于词条数。`partSetDistribution` 只统计至少两个词性的词性集合（单个词性的分布由 `partDistribution` 给出），返回 `partSetCount`、与 `partDistribution` 相同的 `multiPartEntryCount` 和 `rows: [{ parts: [{ value, displayLabel, displayAmbiguous }], entryCount, action? }]`；行内词性按 `tagSortOrder` 排序，行按词条数降序、同数时按以 ` + ` 连接的显示名排序；行 action 使用 `{ partSet }` 筛选，因此带非词性标签的词条也会计入，但带额外词性的不会。`partSetDistribution` 当前只由"词汇 > 标签"页请求。`tagFrequency` 从共享标签身份快照排除当前 `partOfSpeechTags` 中的所有标签，并返回 `tagTypeCount` 及结构化标签筛选 action。`tagSetDistribution` 以无序的完整原始标签集合为身份，返回非空集合的 `tagSetCount`、`taggedEntryCount`、`untaggedEntryCount`、`multiTagEntryCount` 和结构化 `tags`；`taggedAction`、`untaggedAction`、`multiTagAction` 分别使用 `presence.tag: true`、`presence.tag: false`、`tagCount.min: 2` 进入普通词条查询。无标签词条不作为空集合混入排行，集合种类没有词条结果 action。显示替换和显示顺序不改变集合身份，每个非空集合行的 action 使用 `tags.mode: "exact"`，因此单标签集合表示“仅有该标签”，多标签集合也不会把带额外标签的超集纳入结果。`orthographyDistribution` 从最小 `id + lemma` 输入返回 `lemmaEntryCount`、`wordLengths`、`initials`、`characters` 和 `bigrams`；字符与双字符行同时返回 `occurrenceCount` 和 `entryCount`，每行 action 使用相同共享模型生成的单一 `orthography` 结构筛选。所有 `entryFilter` action 使用 `resultCount` 表示目标结果词条数。`coverageBreakdown.rows[].field` 支持 `definition`、`example`、`entryNote`、`ipa`；每行使用 `coveredEntryCount`、`missingEntryCount`，释义和例句行另带项目单位的 `itemCount`。词性分布 action 使用 `{ part }` descriptor，无词性行使用保留值 `__conlexicon_no_part__`。
 
 `rootFamilyRanking` 按衍生词数量降序、词根词形升序返回全部非空词根家族，同时返回家族总数 `familyCount`。每行固定为 `{ rootId, lemma, derivedEntryCount, action? }`，其中 action 定位词根词条；不会返回家族成员或 `derivedIds`。该任务直接消费与 `/root-groups`、词汇网络共享的稳定 `RootTopologyCache`，同一词典的拓扑已存在时不重新解析来源关系；多来源词条可以分别计入其所属家族，因此不能累加排行得到全局衍生词数量。
 
@@ -990,7 +1008,7 @@ source 固定为 `{ type: "dictionaryQuality", version: 1, options: {} }`，`res
 
 基础会话以 `{ dictionaryId, generation, source, rulesetVersion, implementationVersion }` 为身份，同一 generation 下的 summary、全部 selector、搜索、排序、窗口和 location 共用一次规则构建；UI 语言不属于请求或身份。会话放在独立的有界 `FeatureResultSessionCache` 实例中（TTL/LRU、in-flight 合并），写入使 generation 前进后旧会话不再命中，旧 cursor 返回 `query_cursor_stale`。每个视图的有序成员在会话内按 LRU 缓存最多 12 个。
 
-规则输入由 repository 的 `qualityInputRecords()` 一次同步读取：词条 `id / lemma / pronunciation`、有序标签、义项 `id / meaning / example`、有序来源 `entryId / text`（顺序与公开词条 DTO 相同）。不读取备注、词源描述、形态、语料、语言文档或完整 snapshot；repository 不生成质量 code、严重度或详情。HTTP 响应不携带全局问题的关联词条 ID 数组或任何完整匹配 ID 数组。
+规则输入由 repository 的 `qualityInputRecords()` 一次同步读取：词条 `id / lemma / pronunciation`、有序标签、释义 `id / meaning / example`、有序来源 `entryId / text`（顺序与公开词条 DTO 相同）。不读取备注、词源描述、形态、语料、语言文档或完整 snapshot；repository 不生成质量 code、严重度或详情。HTTP 响应不携带全局问题的关联词条 ID 数组或任何完整匹配 ID 数组。
 
 source、version、options、response mode、item kind、selector 与 issue 视图字段验证失败分别返回 `invalid_quality_source`、`unsupported_quality_source`、`invalid_quality_source_version`、`invalid_quality_source_options`、`invalid_quality_response_mode`、`invalid_quality_view`、`invalid_quality_item_kind`、`invalid_quality_selector`、`invalid_quality_issue_view`；请求体不是对象时返回 `invalid_quality_query_payload` 或 `invalid_quality_location_payload`，location 缺少目标 ID 时返回 `invalid_quality_location_entry_id`，page 与搜索字段沿用既有 EntryQuery 校验码。未知词典返回 `dictionary_not_found`。
 
@@ -1005,11 +1023,11 @@ source、version、options、response mode、item kind、selector 与 issue 视�
 | `duplicate_lemma` | high | lemma | entry/cross-entry | `lemmas`、`duplicateEntryCount` |
 | `near_duplicate_tags` | low | tags | global | `forms`；会话内部另保存受影响词条集合 |
 | `missing_lemma` | high | lemma | entry | 无 |
-| `missing_tags` | high | tags | entry | 无 |
+| `missing_tags` | high | tags | entry | 无；有效标签（词条标签与释义标签的并集）为空才报 |
 | `missing_definition` | high | other | entry | 无 |
 | `missing_ipa` | low | ipa | entry | 无 |
 | `multiple_primary_stress` | medium | ipa | entry | `primaryStressCount` |
-| `tag_too_long` | low | tags | entry/tag | `tag`、`codePointLength`、`limit` |
+| `tag_too_long` | low | tags | entry/tag | `tag`、`codePointLength`、`limit`；释义标签另带 `definitionId`、`definitionPosition` |
 | `source_unresolved` | medium | network | entry/source | `sourceText`、`sourcePosition` |
 | `source_cycle` | high | network | entry/graph | `cycleEntryIds`、`cycleLemmas` |
 
@@ -1017,7 +1035,7 @@ source、version、options、response mode、item kind、selector 与 issue 视�
 
 ##### Issue 身份与本地化
 
-- 同一词条可以产生多个 issue，同一义项、标签或来源也可以分别产生 issue。
+- 同一词条可以产生多个 issue，同一释义、标签或来源也可以分别产生 issue。
 - issue `id` 由规则集版本、`code`、`entryId` 和稳定参数派生并散列；`severity / module` 由 code 决定，本地化 `title / detail` 不参与。`id` 不持久化，不承诺跨规则集版本相同。
 - 服务端只返回稳定字段；前端（`app.js` 的 `qualityIssueText()`）按 code 与 params 生成标题和详情。UI 语言不属于质量计算身份：中英文只改变标题、详情和标签，不改变 code、参数、数量或成员；切换语言只重新渲染已取回的结果，不重新请求、不失效会话。
 - 词形、标签和来源匹配使用固定的服务端关系规范化基线，不读取自由文本搜索的 NFC、case folding 或自定义等价设置。
@@ -1029,7 +1047,7 @@ source、version、options、response mode、item kind、selector 与 issue 视�
   - 每个循环分量（成员数大于 1；保存校验拒绝自引用）只有一条规范见证：从分量内 ID 最小的成员出发，按来源位置顺序在分量内深度优先，第一条回到起点的边闭合见证；
   - 循环分量的成员都引用本分量的见证，其他词条按自身来源位置顺序，取第一个能到达循环的来源所继承的见证；
   - 见证只取决于词条集合与来源边，与词条排列顺序无关；到达同一循环的 issue 共用同一个 params 对象，调用方不得修改。
-- **近似标签**：一个规范化紧凑形式对应多个不同 raw tag 时只产生一个全局 `near_duplicate_tags`（`entryId` 为空）。`forms` 按稳定遇见顺序去重；受影响词条按唯一 ID 计入 tags 模块的 `entryCount`，并在 entry 视图中带问题标记出现，但 HTTP 不返回关联 ID 数组。
+- **近似标签**：一个规范化紧凑形式对应多个不同 raw tag 时只产生一个全局 `near_duplicate_tags`（`entryId` 为空），词条标签和释义标签一起比较。`forms` 按稳定遇见顺序去重；受影响词条按唯一 ID 计入 tags 模块的 `entryCount`，并在 entry 视图中带问题标记出现，但 HTTP 不返回关联 ID 数组。
 
 ##### Summary 计数语义
 
@@ -1094,7 +1112,7 @@ activityDistribution
 
 | 类别 | 入口 | 结果 |
 | --- | --- | --- |
-| EntryFilter | 词性与无词性、标签与标签集合、释义/例句/词条备注/来源/IPA/标签的有无、来源数量与多来源、标签数量、新增/编辑日期、正写法（词长、首字符、字符、双字符）、词根与孤立词根 | 结构 descriptor 进入普通 `/entries` 窗口、会话、cursor、定位、排序与搜索 |
+| EntryFilter | 词性与无词性、多词性与词性组合、标签与标签集合、释义/例句/词条备注/来源/IPA/标签的有无、来源数量与多来源、标签数量、新增/编辑日期、正写法（词长、首字符、字符、双字符）、词根与孤立词根 | 结构 descriptor 进入普通 `/entries` 窗口、会话、cursor、定位、排序与搜索 |
 | Feature result | IPA 自动比较、IPA 音素单元/首音/尾音/音节数、形态分配/模式/模板组/覆写 | `resultSource` 加 category/value 进入 feature query/location |
 | 质量结果 | 全部、按严重度、按模块 | `dictionaryQuality` source 加 selector 进入质量 entry 视图 |
 | 导航，不是筛选 | 词条总数与当前搜索命中、词根家族排行、override 排行 | 返回词条浏览页并保留普通查询状态，或定位单条词条 |

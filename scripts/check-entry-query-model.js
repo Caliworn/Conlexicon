@@ -25,6 +25,8 @@ function checkLegacyTransportNormalization() {
   assert.deepEqual(query, {
     filter: {
       part: "N",
+      partCount: null,
+      partSet: [],
       tags: { values: ["motion", "n"], mode: "all" },
       presence: [],
       sourceCount: null,
@@ -51,6 +53,8 @@ function checkLegacyTransportNormalization() {
 function checkCanonicalFilterNormalization() {
   const filter = normalizeEntryFilter({
     part: "v",
+    partCount: { min: 2 },
+    partSet: [" v ", "adj", "v"],
     tags: { values: ["motion", "derived", "motion"], mode: "any" },
     presence: { definition: true, ipa: false, tag: false },
     sourceCount: { min: 2, max: 4 },
@@ -63,6 +67,8 @@ function checkCanonicalFilterNormalization() {
   });
   assert.deepEqual(filter, {
     part: "v",
+    partCount: { min: 2, max: null },
+    partSet: ["adj", "v"],
     tags: { values: ["derived", "motion"], mode: "any" },
     presence: [
       { field: "definition", present: true },
@@ -145,6 +151,19 @@ function checkValidation() {
     (error) => error instanceof EntryQueryValidationError && error.code === "invalid_entry_filter_tag_count",
   );
   assert.throws(
+    () => normalizeEntryFilter({ partCount: { min: 3, max: 2 } }),
+    (error) => error instanceof EntryQueryValidationError && error.code === "invalid_entry_filter_part_count",
+  );
+  assert.throws(
+    () => normalizeEntryFilter({ partSet: ["n", "n"] }),
+    (error) => error instanceof EntryQueryValidationError && error.code === "invalid_entry_filter_part_set",
+    "a part set needs two distinct parts; one part is the part filter",
+  );
+  assert.throws(
+    () => normalizeEntryFilter({ partSet: "n,v" }),
+    (error) => error instanceof EntryQueryValidationError && error.code === "invalid_entry_filter_part_set",
+  );
+  assert.throws(
     () => normalizeEntryQuery({ windowOffset: "not-a-number" }),
     (error) => error instanceof EntryQueryValidationError && error.code === "invalid_query_window_offset",
   );
@@ -187,6 +206,8 @@ function checkFilterFactsNormalization() {
         id: "missing-ipa",
         filter: {
           part: "",
+          partCount: null,
+          partSet: [],
           tags: { values: [], mode: "any" },
           presence: [{ field: "ipa", present: false }],
           sourceCount: null,

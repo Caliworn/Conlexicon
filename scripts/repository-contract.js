@@ -93,9 +93,21 @@ async function checkWorkspaceAndEntryBatchContract(repository) {
   const entry = async (entryId) => (await callApi(repository, "GET", `${dictionaryPath}/entries/${entryId}`)).body;
   const before = await repository.getDictionaryMeta(dictionary.id);
 
-  let result = await batch({ operation: "generateIpa", mode: "missing", dryRun: true });
-  assert.deepEqual(result.body, { operation: "generateIpa", targetCount: 1, dryRun: true }, "blank lemmas and existing IPA are skipped");
+  // Imported tags keep their order until the batch arranges them: saved order
+  // first (matched without case), the rest in their original order; entries
+  // already in order are not written.
+  let result = await batch({ operation: "applyTagOrder", dryRun: true });
+  assert.deepEqual(result.body, { operation: "applyTagOrder", targetCount: 1, dryRun: true });
   assert.equal((await repository.getDictionaryMeta(dictionary.id)).updatedAt, before.updatedAt, "a dry run writes nothing");
+  result = await batch({ operation: "applyTagOrder" });
+  assert.equal(result.body.targetCount, 1);
+  assert.deepEqual((await entry("entry-batch-missing")).tags, ["n", "root", "x"]);
+  assert.deepEqual((await entry("entry-batch-present")).tags, ["n", "root"]);
+  result = await batch({ operation: "applyTagOrder" });
+  assert.deepEqual(result.body, { operation: "applyTagOrder", targetCount: 0, dryRun: false }, "nothing left to reorder");
+
+  result = await batch({ operation: "generateIpa", mode: "missing", dryRun: true });
+  assert.deepEqual(result.body, { operation: "generateIpa", targetCount: 1, dryRun: true }, "blank lemmas and existing IPA are skipped");
 
   result = await batch({ operation: "generateIpa", mode: "missing" });
   assert.equal(result.body.targetCount, 1);
@@ -107,19 +119,67 @@ async function checkWorkspaceAndEntryBatchContract(repository) {
   assert.equal(result.body.targetCount, 2);
   assert.equal((await entry("entry-batch-present")).pronunciation, ipaModel.generateIpaFromLemma("taba", ipaSettings));
 
-  // Saved order first (matched without case), the rest in their original order;
-  // entries already in order are not written.
-  result = await batch({ operation: "applyTagOrder" });
-  assert.equal(result.body.targetCount, 1);
-  assert.deepEqual((await entry("entry-batch-missing")).tags, ["n", "root", "x"]);
-  assert.deepEqual((await entry("entry-batch-present")).tags, ["n", "root"]);
-  result = await batch({ operation: "applyTagOrder" });
-  assert.deepEqual(result.body, { operation: "applyTagOrder", targetCount: 0, dryRun: false }, "nothing left to reorder");
-
   for (const body of [{}, { operation: "generateIpa" }, { operation: "generateIpa", mode: "some" }, { operation: "applyTagOrder", dryRun: "yes" }]) {
     const error = await assertRejectStatus(batch(body), 400, `invalid batch ${JSON.stringify(body)}`);
     assert.equal(error.code, "invalid_entry_batch_payload");
   }
+  await repository.deleteDictionary(dictionary.id);
+}
+
+// Runtime saves store tags in the configured order: entry tags and each
+// definition's tags, listed tags first, the rest in their given order.
+// Imports keep the order they were given.
+async function checkTagOrderOnSaveContract(repository) {
+  const dictionary = await repository.createDictionary(normalizeDictionary({
+    id: "dict-tag-order-save-contract",
+    name: "Tag Order On Save",
+    settings: { tagSortOrder: ["n", "v", "archaic"] },
+    entries: [{
+      id: "entry-tag-order-imported",
+      lemma: "imported",
+      tags: ["x", "archaic", "n"],
+      definitions: [{ id: "def-tag-order-imported", meaning: "kept", tags: ["v", "n"] }],
+    }],
+  }));
+  const entriesPath = `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`;
+  const entry = async (entryId) => (await callApi(repository, "GET", `${entriesPath}/${entryId}`)).body;
+  const tagLists = (value) => [value.tags, ...value.definitions.map((definition) => definition.tags)];
+
+  assert.deepEqual(
+    tagLists(await entry("entry-tag-order-imported")),
+    [["x", "archaic", "n"], ["v", "n"]],
+    "imports keep the given order",
+  );
+
+  const created = await callApi(repository, "POST", entriesPath, {
+    lemma: "created",
+    tags: ["x", "archaic", "y", "n"],
+    definitions: [{ meaning: "one", tags: ["z", "v", "n"] }],
+  });
+  assert.equal(created.statusCode, 201);
+  assert.deepEqual(tagLists(created.body.entry), [["n", "archaic", "x", "y"], ["n", "v", "z"]]);
+
+  const updated = await callApi(repository, "PUT", `${entriesPath}/entry-tag-order-imported`, {
+    ...(await entry("entry-tag-order-imported")),
+    lemma: "imported, then saved",
+  });
+  assert.deepEqual(tagLists(updated.body.entry), [["n", "archaic", "x"], ["n", "v"]], "any save arranges every tag list");
+
+  const patched = await callApi(repository, "PATCH", entriesPath, {
+    updates: [{ id: created.body.entry.id, patch: { tags: ["y", "v"] } }],
+  });
+  assert.deepEqual(patched.body.entries[0].tags, ["v", "y"]);
+
+  // Entries saved with new settings follow the settings being saved.
+  const patchedWithSettings = await callApi(repository, "PATCH", entriesPath, {
+    settings: { tagSortOrder: ["y"] },
+    updates: [{ id: created.body.entry.id, patch: { tags: ["v", "y"] } }],
+  });
+  assert.deepEqual(patchedWithSettings.body.entries[0].tags, ["y", "v"]);
+
+  await repository.updateSettings(dictionary.id, { tagSortOrder: [] });
+  const unordered = await callApi(repository, "POST", entriesPath, { lemma: "free", tags: ["v", "n"] });
+  assert.deepEqual(unordered.body.entry.tags, ["v", "n"], "an empty tagSortOrder keeps the given order");
   await repository.deleteDictionary(dictionary.id);
 }
 
@@ -2458,6 +2518,7 @@ async function runRepositoryContractTests(options = {}) {
 
     await checkEntityIdSaveScopeInvariants(repository);
     await checkWorkspaceAndEntryBatchContract(repository);
+    await checkTagOrderOnSaveContract(repository);
     await checkEntryFilterFactsContract(repository);
     await checkAnalysisQueryContract(repository);
     await checkTagSetAnalysisContract(repository);

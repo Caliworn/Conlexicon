@@ -25,7 +25,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - **Corpus**: ordered blocks, speaker/modality layers, standalone units, inherited attributes, ID and parent-link validation, and gloss-based unit names.
 - **Gloss rendering**: `\gla`, `\glb`, `\glc`, and `\ft`, with separate settings for corpus unit cards, unit headings, and entry examples, plus per-line font, size, bold, italic, and `\glb` small caps.
 - **Data analysis**: an on-demand overview of lexicon size, coverage, parts of speech, and editing activity, plus tag and tag-set rankings, root families, orthography, IPA checks and distributions, and morphology statistics. Most figures open the matching entries. Quality checks have their own page, grouped by priority and module.
-- **Settings**: per-dictionary options for parts of speech, tag separators and display replacements (the entry list and the filter menu can each show raw tags instead), search defaults, gloss rendering, polysemy display, how unsaved edits are handled when navigating, auto-save, IPA keyboard symbols, and navigation order.
+- **Settings**: per-dictionary options for parts of speech, tag separators and display replacements (the entry list and the filter menu can each show raw tags instead), a tag order that every entry save applies (Apply arranges existing entries; after the order changes, saving the settings offers to do so), search defaults, gloss rendering, polysemy display, how unsaved edits are handled when navigating, auto-save, IPA keyboard symbols, and navigation order.
 - **Appearance**: Classic, Layered Glass, and Liquid Glass skins, light and dark themes, and Chinese or English UI; the global skin, theme, and language are remembered in `data/index.json`. Liquid Glass is still being tuned and falls back to plain materials when its optics are unavailable or accessibility modes are on.
 - **Layout**: a responsive shell with collapsible navigation and entry list, and mobile drawers. The + button in the entry-list toolbar (also beside the list toggle when the list is collapsed, and in the mobile top bar) opens quick entry: an overlay that asks for lemma, pronunciation, tags and definitions one line at a time, submits an entry, and starts a fresh draft without leaving the current entry. Its Full Edit button carries the draft into the full editor for sources, examples, notes or morphology. Other pages return to the editor through the navigation.
 
@@ -44,7 +44,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - **语料库**：有序语料块、发言人／模态语料层、独立语料单元、属性继承、ID 与父级链接校验，以及基于 Gloss 的单元名。
 - **Gloss 渲染**：支持 `\gla`、`\glb`、`\glc`、`\ft`；语料单元卡片、单元标题和词条例句分别设置，并可逐行配置字体、字号、粗体、斜体以及 `\glb` small caps。
 - **数据分析**：按需加载的总览（词汇规模、资料覆盖、词性分布、编辑活动），以及标签与标签集合排行、词根家族、正写法、IPA 检查与分布、形态统计；多数统计项可直接打开对应词条。质量检查有独立页面，按优先度和检查模块分组。
-- **设置**：词典级的词性、标签分隔符与显示替换（词条列表和筛选菜单可分别改为显示原始标签）、默认搜索方式、Gloss 渲染、多义项显示、导航时未保存编辑的处理方式、自动保存、IPA 键盘符号和导航排序。
+- **设置**：词典级的词性、标签分隔符与显示替换（词条列表和筛选菜单可分别改为显示原始标签）、标签顺序（每次保存词条时按此排列；“应用”整理已有词条，修改顺序后保存设置时会询问是否整理）、默认搜索方式、Gloss 渲染、多义项显示、导航时未保存编辑的处理方式、自动保存、IPA 键盘符号和导航排序。
 - **外观**：经典、层叠玻璃和液态玻璃三套皮肤，浅色与深色主题，中英文界面；全局皮肤、主题和语言记忆在 `data/index.json` 中。液态玻璃仍在调校中，光学效果不可用或开启辅助模式时会退回普通材质。
 - **布局**：响应式外壳，导航和词条列表均可收起，移动端使用抽屉。词条列表工具栏的“+”（列表收起时在列表开关旁，移动端在顶栏）打开快速录入：浮层中逐行填写词形、发音、标签和释义，提交后留在浮层并开始下一条草稿，不离开当前词条；“完整编辑”把草稿带入完整编辑器，用于补充来源、例句、备注或形态学。其他页面通过导航返回词条编辑。
 
@@ -123,9 +123,13 @@ data/dictionaries/*.sqlite   one file per dictionary: content and settings
 
 The `data/` directory is ignored by Git so personal dictionaries are never committed.
 
+The SQLite schema is not versioned or upgraded at startup during development. When an update changes it (as the definition-tag update of 2026-10-25 did), export each dictionary as JSON with the previous version first, then re-import the JSON after updating.
+
 Run only one server process per data directory at a time. Index reads and updates are serialized within that process, and writes use atomic file replacement; this does not coordinate multiple server processes.
 
 `data/index.json` 保存词典索引、当前词典及全局界面语言、主题和皮肤；每个词典的内容与设置保存在 `data/dictionaries/*.sqlite`。`data/` 已被 Git 忽略，个人词库不会被提交。
+
+开发期间 SQLite schema 没有版本号，启动时也不升级旧库。更新改动了 schema 时（例如 2026-10-25 的释义标签更新），请先用旧版本把每本词典导出为 JSON，更新后再导入。
 
 同一数据目录同一时间只允许一个服务进程写入。索引读取和更新在该进程内串行执行，写入通过原子替换文件发布，不协调多个服务进程。
 

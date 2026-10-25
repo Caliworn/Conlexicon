@@ -77,7 +77,7 @@ data/dictionaries/<dictionary-id>.sqlite
 - 模块记录缺失时保留当前默认值；合法的 `{}` 仍可读取与保存。不对合法 JSON 新增顶层类型校验，也不缓存模块解析结果。
 - 词条关系、facets，以及轻量分析的 `partStats`／`tagStats`／`tagSetStats` 只依赖词典 ID 与 settings，通过 `dictionaryQueryContext()` 获取配置；docs、corpus 或形态模块损坏不影响这些只读结果。完整快照与导出读取全部模块，损坏时显式失败。
 - 普通保存只读取 settings 与实际用到的模块：词条保存、批量 patch 和 settings 保存读取形态配置（用于形态校验与形态搜索 projection），形态保存读取形态配置，语料保存读取 corpus；metadata、IPA、docs 保存和删除词条只读 settings。docs 或 corpus 损坏不影响词条保存。
-- 普通保存不扫描无关实体类型，只在数据库无法拒绝的提交范围内检查重复：词条保存不做 ID 检查，义项 ID 重复由主键约束失败并整体回滚；形态保存在生成写入计划之前拒绝提交内重复的组／表 ID（写入计划按 ID 建索引，重复会被静默合并）；语料保存检查语料内部 ID 重复。重复返回 `duplicate_entity_ids_scoped`。全局唯一由服务端生成 ID（新建词条只走 `POST`，`PUT` 只更新已有词条）、导入边界的完整检查和数据库主键共同保证。
+- 普通保存不扫描无关实体类型，只在数据库无法拒绝的提交范围内检查重复：词条保存不做 ID 检查，释义 ID 重复由主键约束失败并整体回滚；形态保存在生成写入计划之前拒绝提交内重复的组／表 ID（写入计划按 ID 建索引，重复会被静默合并）；语料保存检查语料内部 ID 重复。重复返回 `duplicate_entity_ids_scoped`。全局唯一由服务端生成 ID（新建词条只走 `POST`，`PUT` 只更新已有词条）、导入边界的完整检查和数据库主键共同保证。
 - `NOT NULL` 列、主键和 `COUNT` 结果按写入值直接读取，不在读取处补默认值；可空列（如 `pronunciation`、`notes`、释义字段、`target_entry_id`、时间戳）保留 `NULL` → `""` 的转换。形态子表的 `row_count`／`column_count` 由写入前的形态规范化保证不小于 1（保存与导入都经过它），读取和写入计划都不再兜底。
 
 ### 共享数据规则
@@ -150,6 +150,15 @@ entry_tags(
   PRIMARY KEY(entry_id, position)
 )
 
+definition_tags(
+  definition_id TEXT NOT NULL,
+  entry_id TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  tag TEXT NOT NULL,
+  PRIMARY KEY(definition_id, position),
+  FOREIGN KEY(definition_id, entry_id) REFERENCES definitions(id, entry_id) ON DELETE CASCADE
+)
+
 entry_sources(
   entry_id TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
   position INTEGER NOT NULL,
@@ -160,11 +169,15 @@ entry_sources(
 
 ```
 
-schema 不含 `entries.entry_json`：SQLite 不保存完整词条 JSON 副本，而是从 `entries`、`definitions`、`entry_tags`、`entry_sources` 和形态学结构化表组装 entry object。
+schema 不含 `entries.entry_json`：SQLite 不保存完整词条 JSON 副本，而是从 `entries`、`definitions`、`entry_tags`、`definition_tags`、`entry_sources` 和形态学结构化表组装 entry object。
+
+`definition_tags` 冗余存一份 `entry_id`，让有效标签（词条标签 ∪ 释义标签，语义见 [API Contract](API_CONTRACT.md#释义标签与有效标签)）的查询不必连接 `definitions`，索引形状也与 `entry_tags` 一致；复合外键保证它与释义的实际归属一致，前提是释义不在词条之间移动（当前没有这种功能）。删除释义或词条时经级联删除。
+
+有效标签只在读取时计算，不存储。repository 用两段不相交的行表示它：`entry_tags` 的行，加上释义上有、词条自身没有的 `(entry_id, tag)`（每个词条一行）。词条标签在词条内已去重，所以两段合起来每个 `(entry_id, tag)` 恰好一行，计数与"恰好等于"判断不需要 `UNION` 去重，常用路径仍走 `entry_tags` 原有的覆盖索引，释义标签只作小量修正；标签身份快照和标签集合统计由两次读取在 JavaScript 中合并。顺序由共享的 `tagModel.effectiveEntryTags()` 计算，SQL 只回答集合与计数。不建持久化 VIEW：VIEW 定义变化时 `CREATE VIEW IF NOT EXISTS` 不会更新它。
 
 SQL 列名沿用表语义：`entries.notes` 映射词条对象的 `entry.notes`，`definitions.notes` 映射单条释义对象的 `definition.note`。运行期对象只使用 `note`，不接受旧 `definition.notes` 别名；旧字段转换仅由 legacy migration 处理。
 
-普通词条编辑走单词条 `POST` / `PUT` / `DELETE`；删除在同一事务中级联删除释义、标签、来源、词条形态组和 override。词条写入目前仍整条重建子记录与搜索投影，按变化范围写入的设计见审计 A20 与 [Entry Incremental Save Plan](ENTRY_INCREMENTAL_SAVE_PLAN.md)。JSON 导入写入这些 SQL 表，JSON 导出从 SQL 表重新组装完整词典对象。子对象需要独立编辑或更强一致性时，继续在 SQL 主结构上扩展，不恢复完整词条 JSON 存储。
+普通词条编辑走单词条 `POST` / `PUT` / `DELETE`；删除在同一事务中级联删除释义、释义标签、标签、来源、词条形态组和 override。词条写入目前仍整条重建子记录与搜索投影，按变化范围写入的设计见审计 A20 与 [Entry Incremental Save Plan](ENTRY_INCREMENTAL_SAVE_PLAN.md)。JSON 导入写入这些 SQL 表，JSON 导出从 SQL 表重新组装完整词典对象。子对象需要独立编辑或更强一致性时，继续在 SQL 主结构上扩展，不恢复完整词条 JSON 存储。
 
 ### 5.3 暂缓 SQL 化的模块
 
@@ -283,9 +296,12 @@ idx_entries_lemma                        entries(lemma)
 idx_entries_created_at                   entries(created_at)
 idx_entries_updated_at                   entries(updated_at)
 idx_entry_tags_tag_entry                 entry_tags(tag, entry_id)
+idx_definition_tags_tag_entry            definition_tags(tag, entry_id)
+idx_definition_tags_entry_tag            definition_tags(entry_id, tag)
 idx_entry_sources_target_entry_id        entry_sources(target_entry_id)
 idx_entry_search_values_field            entry_search_values(field, entry_id)
 idx_definitions_entry_id                 definitions(entry_id)
+idx_definitions_id_entry                 definitions(id, entry_id) UNIQUE
 idx_morphology_template_tables_group_id  morphology_template_tables(group_id)
 idx_morphology_template_cells_table_id   morphology_template_cells(table_id)
 idx_entry_morphology_groups_entry_id     entry_morphology_groups(entry_id)
@@ -299,7 +315,7 @@ entry_search_values(entry_id, field, source_type, source_id, source_position, va
 entry_morphology_search_values(entry_id, position, template_group_id, template_table_id, row_index, column_index, raw_value, normalized_value)
 ```
 
-新增派生索引、关系表或结果缓存表，必须由真实查询需求和基准证明，并满足 `AGENTS.md` 的 SQL 化必要性判断。数据分析、功能结果和质量结果当前只使用进程内会话缓存（见第 7 节），不建 SQLite 派生结果表。冗余索引与默认排序复合索引的待定事项见[审计清单](AUDIT_OPEN_ISSUES.md) C14、R09。
+`definition_tags` 的两条索引分别服务按标签找词条（筛选与 facet）和按词条读标签（标签数量、"恰好等于"与存在性等逐词条子查询）；`idx_definitions_id_entry` 是复合外键的父键。新增派生索引、关系表或结果缓存表，必须由真实查询需求和基准证明，并满足 `AGENTS.md` 的 SQL 化必要性判断。数据分析、功能结果和质量结果当前只使用进程内会话缓存（见第 7 节），不建 SQLite 派生结果表。冗余索引与默认排序复合索引的待定事项见[审计清单](AUDIT_OPEN_ISSUES.md) C14、R09。
 
 ## 7. 查询会话与结果缓存
 
@@ -371,7 +387,7 @@ cursor 由 `lib/result-window-cursor.js` 编码，绑定 process epoch、`cacheG
 
 | 范围 | 当前实现 | 是否组装完整词典 | 后续方向 |
 |---|---|---|---|
-| Schema 初始化 | `.sqlite` 文件、`dictionary_meta`、`module_blobs`、`entries`、`definitions`、`entry_tags`、`entry_sources`、两张搜索 projection、`morphology_template_groups/tables/cells`、`entry_morphology_groups/cell_overrides` 和第 6 节索引；`entries` 投影 `etymology_description`，不含 `entry_json` | 否 | 旧库兼容见审计 R04；冗余列与索引见 C13、C14 |
+| Schema 初始化 | `.sqlite` 文件、`dictionary_meta`、`module_blobs`、`entries`、`definitions`、`entry_tags`、`definition_tags`、`entry_sources`、两张搜索 projection、`morphology_template_groups/tables/cells`、`entry_morphology_groups/cell_overrides` 和第 6 节索引；`entries` 投影 `etymology_description`，不含 `entry_json` | 否 | 旧库兼容见审计 R04；冗余列与索引见 C13、C14 |
 | JSON 导入 / 导出 | 受支持当前字段的 JSON → SQLite projection/blob 写入，以及 SQLite → 当前 JSON profile 导出 | 是，这是预期的交换能力；未知字段不承诺 roundtrip | 保留为导入、导出和迁移边界 |
 | 词典生命周期 | 创建、导入、导出、激活、删除、偏好保存、`hasDictionary()`、`requireDictionary()` | 仅导入和导出 | 产品内迁移入口暂缓，见[导入导出规范](IMPORT_EXPORT_SPEC.md) |
 | `readState()` / `listDictionaries()` / `getDictionaryMeta()` | 只返回 `dictionary_meta` 与 summary；`entryCount` 和严格 `rootCount` 由轻量 SQL 计算，不写入 metadata | 否，也不建立词根拓扑 | — |
@@ -381,11 +397,11 @@ cursor 由 `lib/result-window-cursor.js` 编码，绑定 process epoch、`cacheG
 | `saveDocs()` | 直接更新 `module_blobs.docs` 并返回 `{ id, updatedAt, docs }` | 否 | — |
 | `saveMorphology()` | 保留形态语法校验；旧 `leftV/rightV` 函数对象设置写入 `module_blobs.morphology`，模板组/子表/单元格写入 SQL 表；同一事务内按受影响范围重建形态搜索 projection（第 10 节），并做提交内实体 ID 检查 | 否；只返回 `{ id, updatedAt, morphology }` | DSL v2 时移除旧函数对象设置 |
 | `saveCorpusChanges()` | 直接更新 `module_blobs.corpus` 并返回 `{ id, updatedAt, corpus }`；检查语料内部 ID 重复 | 否；语料内容整块保存 | 不提供伪细粒度读取；语料升级阶段按正式 SQL 模型设计 HTTP API（审计 R06） |
-| `saveEntry()` / `deleteEntry()` / `patchEntries()` | 按词条写入目标 entry、definitions、tags、sources、词条形态组/override 和两张搜索 projection，删除经外键级联；`patchEntries()` 可附带 settings；返回 `{ id, updatedAt, entry }`、`{ id, updatedAt }` 或 `{ id, updatedAt, entries, settings? }` | 否 | 词条内部仍整条重建子记录与搜索投影（审计 A20） |
+| `saveEntry()` / `deleteEntry()` / `patchEntries()` | 按词条写入目标 entry、definitions、释义标签、tags、sources、词条形态组/override 和两张搜索 projection，删除经外键级联；`patchEntries()` 只接受词条级字段，可附带 settings；整词典批处理经内部的 `writeEntryEdits()` 写入，可改写释义标签；返回 `{ id, updatedAt, entry }`、`{ id, updatedAt }` 或 `{ id, updatedAt, entries, settings? }` | 否 | 词条内部仍整条重建子记录与搜索投影（审计 A20） |
 | `getEntry()` | 按 `entries.id` 读取 SQL 表并组装完整 entry | 否 | — |
-| `queryEntries()` | 始终返回摘要 DTO 分页对象。无搜索时完全下推到 SQL：词性与标签 `any/all` 由 `(tag, entry_id)` 索引驱动的候选集合实现，无词性反向查询复用标签候选集；词性只由词典显式配置的词性标签决定，不读取标签位置；活动日期使用 UTC 半开范围，来源数量上下界共享一次计数 | 否；完整词条只通过 `getEntry()` 按需读取 | 按真实基准继续优化查询形状；默认排序索引见审计 R09 |
+| `queryEntries()` | 始终返回摘要 DTO 分页对象。无搜索时完全下推到 SQL，标签条件都按有效标签：词性与标签 `any/all` 由两张标签表 `(tag, entry_id)` 索引驱动的候选集合实现，无词性反向查询复用标签候选集；词性只由词典显式配置的词性标签决定，不读取标签位置；活动日期使用 UTC 半开范围，来源数量上下界共享一次计数 | 否；完整词条只通过 `getEntry()` 按需读取 | 按真实基准继续优化查询形状；默认排序索引见审计 R09 |
 | 严格 / fuzzy / 形态搜索 | 按字段读取两张 projection（第 9、10 节），首次查询建立有序命中 ID 会话，总数、窗口和定位复用同一结果；统一返回 `searchHits`；fuzzy 通过连接级确定性函数复用共享评分 | 否；fuzzy 线性扫描所选 projection records | 候选索引见第 11 节 |
-| `getEntryFacets()` | SQL 聚合活跃标签身份、词性、标签频率和无词性计数 | 否 | — |
+| `getEntryFacets()` | SQL 聚合活跃标签身份、词性、标签频率和无词性计数，按有效标签每个词条计一次 | 否 | — |
 | `getEntryRelations()` | 用 `entry_sources`/`entries` 查询来源和直接衍生，并复用稳定词根拓扑的反向索引组装同根组 | 否 | 衍生词逐个读取完整详情再取摘要（审计 A19） |
 | `queryRootGroups()` | 词根拓扑按 relation generation 稳定缓存，查询只生成排序/匹配视图，搜索命中直接读取两张 projection | 否 | 极大单个家族的响应体积见审计 R03 |
 | 数据分析 / 功能结果 / 质量检查 | `/analysis/query` 直接查询 SQLite 聚合与稳定拓扑；IPA 与形态 feature result、质量结果分别由服务从最小事实读取（如 `qualityInputRecords()`）构建会话 | 否 | 30k 质量冷构建的同步读取约阻塞 380 ms，复评门槛见 API Contract |
@@ -410,18 +426,21 @@ CREATE TABLE entry_search_values (
     entry_id,
     field,
     source_type,
+    source_id,
     source_position,
     value_type
   )
 );
 ```
 
+主键含 `source_id`：释义标签的 `sourcePosition` 是释义内的位置，不同释义的同位置标签靠 `source_id`（释义 ID）区分。
+
 该表是可从当前主数据重建的派生 projection，不分配独立实体 ID，也不进入跨实体 ID 防撞。它只包括 `lemma`、`pronunciation`、`tags`、`definitions`、`examples`、`notes`、`etymology`；`morphology` 使用下节的独立派生表和失效边界。
 
 写入与失效边界：
 
 - 导入和整库覆盖同步写入；`saveEntry()` / `patchEntries()` 只重建目标词条的 records，删除词条通过外键级联删除。
-- 标签显示替换变化时重建 `tags` records。
+- 标签显示替换变化时重建 `tags` records，词条标签与释义标签一起重建。
 - NFC、case folding 或自定义等价规则变化时，在同一事务内重建全部静态 `normalized_value`。
 - 搜索字段启用状态和 fuzzy 开关只影响查询，不影响 projection 内容，切换它们不需要重建。
 - 该 projection 不替代原始表，也不参与 JSON 导出；`raw_value` 只用于返回命中摘要和来源定位。不做 schema 版本检测、回填或查询 fallback。
@@ -466,7 +485,7 @@ CREATE TABLE entry_morphology_search_values (
 
 - **候选索引**（FTS、ngram 等）：fuzzy 仍线性扫描所选 projection records，只有真实词典基准确认它成为主要瓶颈后再选型。
 - **语料 SQL 化**：语料库进入独立升级阶段（[阶段 D](CORPUS_WORKSPACE_PLAN.md)）后，再把 `module_blobs.corpus` 拆成正式 SQL 表及块/单元级 API；保存粒度的待定事项见审计 R06。
-- **例句语料链接**：见[阶段 C 计划](EXAMPLE_CORPUS_LINK_PLAN.md)；义项外键与级联策略见审计 R11。
+- **例句语料链接**：见[阶段 C 计划](EXAMPLE_CORPUS_LINK_PLAN.md)；释义外键与级联策略见审计 R11。
 - 自定义滚动条、首字母/全局导航地图和 marker/overview 交互；现有原生滚动条、数据窗口与虚拟列表继续保留。
 - 高级形态分析或自动 gloss 系统。
 - 面向多窗口实时协同的 revision 机制；单词条条件保存见审计 A05 与 [Entry Incremental Save Plan](ENTRY_INCREMENTAL_SAVE_PLAN.md)。

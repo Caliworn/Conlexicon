@@ -76,9 +76,10 @@ Legacy JSON 导入应分为几个明确阶段：
 2. legacy 兼容迁移。
    - 由 `lib/legacy-dictionary-migration.js` 处理旧字段，例如旧释义/例句字段、旧来源文本字段、旧 corpus 字段、旧 IPA `stressMappings`、旧设置字段，以及旧形态 `morphology.tables` / `entry.morphology` 结构。
    - 记录发生过的 legacy 字段转换。
+   - 迁移会移除旧的空释义；判断"空"时也看释义标签 `definitions[].tags`，因此当前格式中只有标签的释义会保留。旧 JSON 没有释义标签。
 3. 规范化。
    - 补齐缺失 ID。
-   - 规范化当前形状的 settings、docs、corpus、morphology、IPA、entries、definitions、sources、tags。
+   - 规范化当前形状的 settings、docs、corpus、morphology、IPA、entries、definitions（含可选的释义标签 `tags`，缺省为 `[]`）、sources、tags。
    - 对错误词典 ID 提供“作为新词典导入并重新生成 ID”的路径。
 4. 校验。
    - 完整实体 ID 唯一性。

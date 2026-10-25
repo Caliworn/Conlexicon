@@ -8,7 +8,7 @@ function completeRecord(id, options = {}) {
     lemma: options.lemma ?? id,
     pronunciation: options.pronunciation ?? "/a/",
     tags: options.tags ?? ["n"],
-    definitions: options.definitions ?? [{ id: `def-${id}`, meaning: "meaning", example: "" }],
+    definitions: options.definitions ?? [{ id: `def-${id}`, meaning: "meaning", example: "", tags: [] }],
     sources: options.sources ?? [],
   };
 }
@@ -33,6 +33,7 @@ function qualityFixture() {
         id: "def-mixed",
         meaning: "meaning",
         example: "\\gla a b\n\\glb A B",
+        tags: [],
       }],
       sources: [{ entryId: "", text: "missing-root" }],
     }),
@@ -41,10 +42,21 @@ function qualityFixture() {
         id: "def-gloss-mismatch",
         meaning: "meaning",
         example: "\\gla a b\n\\glb A\n\\ft test",
+        tags: [],
       }],
     }),
     completeRecord("entry-near-tag-a", { tags: ["proper noun"] }),
     completeRecord("entry-near-tag-b", { tags: ["proper-noun"] }),
+    // Definition tags count as the entry's tags and are checked like entry tags.
+    completeRecord("entry-definition-tags", {
+      tags: [],
+      definitions: [{
+        id: "def-tagged",
+        meaning: "meaning",
+        example: "",
+        tags: ["y".repeat(25), "proper_noun"],
+      }],
+    }),
     completeRecord("cycle-a", { sources: [{ entryId: "cycle-b", text: "cycle-b" }] }),
     completeRecord("cycle-b", { sources: [{ entryId: "cycle-a", text: "cycle-a" }] }),
     completeRecord("cycle-upstream", { sources: [{ entryId: "cycle-a", text: "cycle-a" }] }),
@@ -110,6 +122,14 @@ assert.deepEqual(issueFor("tag_too_long").params, {
   codePointLength: 25,
   limit: 24,
 });
+assert.deepEqual(issueFor("tag_too_long", "entry-definition-tags").params, {
+  tag: "y".repeat(25),
+  codePointLength: 25,
+  limit: 24,
+  definitionId: "def-tagged",
+  definitionPosition: 0,
+});
+assert.equal(issueFor("missing_tags", "entry-definition-tags"), undefined, "definition tags satisfy missing_tags");
 assert.deepEqual(issueFor("source_unresolved").params, {
   sourceText: "missing-root",
   sourcePosition: 0,
@@ -117,11 +137,11 @@ assert.deepEqual(issueFor("source_unresolved").params, {
 
 const nearDuplicateTags = issueFor("near_duplicate_tags");
 assert.equal(nearDuplicateTags.entryId, "");
-assert.deepEqual(nearDuplicateTags.params, { forms: ["proper noun", "proper-noun"] });
-assert.deepEqual(nearDuplicateTags.relatedEntryIds, ["entry-near-tag-a", "entry-near-tag-b"]);
+assert.deepEqual(nearDuplicateTags.params, { forms: ["proper noun", "proper-noun", "proper_noun"] });
+assert.deepEqual(nearDuplicateTags.relatedEntryIds, ["entry-near-tag-a", "entry-near-tag-b", "entry-definition-tags"]);
 assert.deepEqual(
   qualityModel.qualityIssueAffectedEntryIds(nearDuplicateTags),
-  ["entry-near-tag-a", "entry-near-tag-b"],
+  ["entry-near-tag-a", "entry-near-tag-b", "entry-definition-tags"],
 );
 
 assert.deepEqual(issueFor("source_cycle", "cycle-upstream").params, {
@@ -130,9 +150,9 @@ assert.deepEqual(issueFor("source_cycle", "cycle-upstream").params, {
 });
 
 const summary = qualityModel.buildQualitySummary(issues, records.length);
-assert.equal(summary.inputEntryCount, 10);
+assert.equal(summary.inputEntryCount, 11);
 assert.equal(summary.issueCount, issues.length);
-assert.equal(summary.affectedEntryCount, 10);
+assert.equal(summary.affectedEntryCount, 11);
 assert.equal(summary.globalIssueCount, 1);
 assert.equal(
   summary.severities.reduce((total, row) => total + row.issueCount, 0),
@@ -144,7 +164,7 @@ assert.equal(
 );
 assert.deepEqual(
   summary.modules.find((row) => row.key === "tags"),
-  { key: "tags", issueCount: 3, entryCount: 4 },
+  { key: "tags", issueCount: 4, entryCount: 5 },
   "global issues count their related entries in the module entry count",
 );
 assert.equal(

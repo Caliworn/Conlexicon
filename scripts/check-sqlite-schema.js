@@ -1,5 +1,6 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
+const { normalizeEntryQuery } = require("../lib/entry-query-model");
 const { planMorphologyWrite } = require("../lib/morphology-write-plan");
 
 const {
@@ -197,6 +198,7 @@ async function runSqliteSchemaCheck() {
       "entries",
       "definitions",
       "entry_tags",
+      "definition_tags",
       "entry_sources",
       "entry_search_values",
       "entry_morphology_search_values",
@@ -219,6 +221,12 @@ async function runSqliteSchemaCheck() {
     ["entry_id", "position", "tag"].forEach((column) => assert.equal(entryTagColumns.has(column), true, `missing entry_tags column: ${column}`));
     const entryTagIndexes = new Set(db.prepare("PRAGMA index_list(entry_tags)").all().map((row) => row.name));
     assert.equal(entryTagIndexes.has("idx_entry_tags_tag_entry"), true);
+    const definitionTagColumns = new Set(db.prepare("PRAGMA table_info(definition_tags)").all().map((row) => row.name));
+    ["definition_id", "entry_id", "position", "tag"]
+      .forEach((column) => assert.equal(definitionTagColumns.has(column), true, `missing definition_tags column: ${column}`));
+    const definitionTagIndexes = new Set(db.prepare("PRAGMA index_list(definition_tags)").all().map((row) => row.name));
+    ["idx_definition_tags_tag_entry", "idx_definition_tags_entry_tag"]
+      .forEach((index) => assert.equal(definitionTagIndexes.has(index), true, `missing definition_tags index: ${index}`));
     const entrySearchValueColumns = new Set(db.prepare("PRAGMA table_info(entry_search_values)").all().map((row) => row.name));
     ["entry_id", "field", "source_type", "source_id", "source_position", "value_type", "raw_value", "normalized_value"]
       .forEach((column) => assert.equal(entrySearchValueColumns.has(column), true, `missing entry_search_values column: ${column}`));
@@ -239,17 +247,18 @@ async function runSqliteSchemaCheck() {
     await repository.importDictionarySnapshot(sourceDictionary);
     await checkIncrementalMorphologyWrites(repository);
     const projectionDb = repository.openDictionaryDatabase(sourceDictionary.id);
+    // The part filter reads effective tags through the (tag, entry_id) index of both tag tables.
+    const partFilter = repository.entryQueryWhereClauses(
+      projectionDb,
+      repository.dictionaryQueryContext(sourceDictionary.id),
+      normalizeEntryQuery({ filter: { part: "n" } }),
+    );
     const partPlan = projectionDb.prepare(`
       EXPLAIN QUERY PLAN
-      SELECT e.id
-      FROM entries e
-      WHERE e.id IN (
-        SELECT part_tags.entry_id
-        FROM entry_tags part_tags
-        WHERE part_tags.tag = ?
-      )
-    `).all("n").map((row) => row.detail || "").join("\n");
+      SELECT e.id FROM entries e WHERE ${partFilter.clauses.join(" AND ")}
+    `).all(...partFilter.params).map((row) => row.detail || "").join("\n");
     assert.match(partPlan, /idx_entry_tags_tag_entry/);
+    assert.match(partPlan, /idx_definition_tags_tag_entry/);
     const importedSearchRows = projectionDb.prepare(`
       SELECT field, source_type AS sourceType, source_id AS sourceId, source_position AS sourcePosition,
         value_type AS valueType, raw_value AS rawValue, normalized_value AS normalizedValue

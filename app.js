@@ -662,10 +662,13 @@ const i18n = {
     tagListSeparatorFullwidthComma: "全角逗号（n，v）",
     tagListSeparatorIdeographicComma: "顿号（n、v）",
     tagOrderSettings: "自动整理标签顺序",
-    tagOrderHelp: "按此顺序整理每个词条的标签；未列出的标签保留在末尾。请填写标签本身，不要填写显示替换文本。",
+    tagOrderHelp: "保存词条时按此顺序排列标签，词条标签和各条释义的标签分别排列；未列出的标签保留在末尾。“应用”按此顺序整理所有已有词条。请填写标签本身，不要填写显示替换文本。",
     tagOrderInfo: "查看标签排序逻辑",
-    tagOrderInfoBody: "点击“应用”后，系统会按输入框中的统一顺序重排每个词条的标签。统一顺序里有而某个词条没有的标签会被跳过；某个词条里有但统一顺序里没有的标签会保留在末尾，多个额外标签保持原始相对顺序。这里应填写标签本身；显示替换只影响界面显示，不参与匹配。",
-    tagOrderConfirm: "将按照当前输入的统一顺序重排当前词典中所有词条的标签，并立即保存。继续吗？",
+    tagOrderInfoBody: "保存词条时，系统会按输入框中的统一顺序排列这个词条的标签，词条标签和每条释义的标签分别排列；点击“应用”会对所有已有词条做同样的整理。统一顺序里有而某个词条没有的标签会被跳过；某个词条里有但统一顺序里没有的标签会保留在末尾，多个额外标签保持原始相对顺序。导入的词典保持原有顺序，直到该词条再次保存或点击“应用”。这里应填写标签本身；显示替换只影响界面显示，不参与匹配。",
+    tagOrderConfirm: "将按照当前输入的统一顺序重排当前词典中所有词条的标签（含释义标签），并立即保存。继续吗？",
+    tagOrderChangedConfirm: "标签顺序已更改，之后保存的词条会按新顺序排列。另有 {count} 个已有词条的标签与新顺序不一致，现在整理吗？",
+    tagOrderArrangeNow: "现在整理",
+    tagOrderArrangeLater: "稍后",
     tagOrderUnsavedSettingsConfirm: "当前其他设置有未保存更改。请先保存设置后再自动整理标签顺序。",
     tagOrderApplied: "标签顺序已整理",
     tagOrderEmpty: "请先输入至少一个标签。",
@@ -1271,10 +1274,13 @@ const i18n = {
     tagListSeparatorFullwidthComma: "Fullwidth comma (n，v)",
     tagListSeparatorIdeographicComma: "Ideographic comma (n、v)",
     tagOrderSettings: "Auto Arrange Tag Order",
-    tagOrderHelp: "Arrange each entry's tags in this order; unlisted tags remain at the end. Enter tag values, not display replacements.",
+    tagOrderHelp: "Saved entries arrange their tags in this order, entry tags and each definition's tags separately; unlisted tags remain at the end. Apply arranges all existing entries. Enter tag values, not display replacements.",
     tagOrderInfo: "Show tag ordering logic",
-    tagOrderInfoBody: "After you click Apply, each entry's tags are reordered by the unified order in this field. Tags in the unified order that an entry does not have are skipped. Tags on an entry that are not in the unified order are kept at the end, and multiple extra tags keep their original relative order. Enter tag values here; display replacements only affect how tags are shown.",
-    tagOrderConfirm: "This will reorder tags for every entry in the current dictionary using the current unified order and save immediately. Continue?",
+    tagOrderInfoBody: "When an entry is saved, its tags are arranged by the unified order in this field, entry tags and each definition's tags separately; Apply does the same for every existing entry. Tags in the unified order that an entry does not have are skipped. Tags on an entry that are not in the unified order are kept at the end, and multiple extra tags keep their original relative order. Imported dictionaries keep their order until an entry is saved again or you click Apply. Enter tag values here; display replacements only affect how tags are shown.",
+    tagOrderConfirm: "This will reorder tags for every entry in the current dictionary, including definition tags, using the current unified order and save immediately. Continue?",
+    tagOrderChangedConfirm: "Tag order changed; entries saved from now on use the new order. Existing entries not yet in this order: {count}. Arrange them now?",
+    tagOrderArrangeNow: "Arrange Now",
+    tagOrderArrangeLater: "Later",
     tagOrderUnsavedSettingsConfirm: "Other Settings have unsaved changes. Save the settings before arranging tag order.",
     tagOrderApplied: "Tag order arranged",
     tagOrderEmpty: "Enter at least one tag first.",
@@ -6103,12 +6109,14 @@ function recordFeatureResultSummary(result) {
 }
 
 function entrySummaryDto(entry, dictionary = activeDictionary()) {
-  const parts = entryParts(entry, dictionary);
+  const effectiveTags = tagModel.effectiveEntryTags(entry, dictionarySettings(dictionary).tagSortOrder);
+  const parts = entryParts({ tags: effectiveTags }, dictionary);
   return {
     id: entry.id,
     lemma: entry.lemma || "",
     pronunciation: entry.pronunciation || "",
     tags: Array.isArray(entry.tags) ? [...entry.tags] : [],
+    effectiveTags,
     definitionPreviews: (entry.definitions || []).map((definition, position) => ({
       id: definition.id || "",
       position,
@@ -11444,10 +11452,17 @@ function renderDefinitionFormCardInPlace(card, fieldToShow) {
   card.querySelector(`[data-field="${fieldToShow}"]`)?.focus();
 }
 
-function collectDefinitions() {
-  return definitionFormStates(elements.definitionFormList)
-    .map(({ id, meaning, example, note }) => ({ id, meaning, example, note }))
-    .filter((definition) => definition.meaning || definition.example || definition.note);
+// Definition tags have no form field yet, so each definition keeps the tags it
+// was saved with; a definition with only tags is not empty.
+function definitionsWithSavedTags(formStates, savedDefinitions = []) {
+  const savedTags = new Map(savedDefinitions.map((definition) => [definition.id, definition.tags]));
+  return formStates
+    .map(({ id, meaning, example, note }) => ({ id, meaning, example, note, tags: savedTags.get(id) || [] }))
+    .filter((definition) => definition.meaning || definition.example || definition.note || definition.tags.length);
+}
+
+function collectDefinitions(existing = selectedEntry()) {
+  return definitionsWithSavedTags(definitionFormStates(elements.definitionFormList), existing?.definitions);
 }
 
 function entrySemanticSnapshot(entry = {}) {
@@ -11462,8 +11477,9 @@ function entrySemanticSnapshot(entry = {}) {
         meaning: String(definition?.meaning || "").trim(),
         example: String(definition?.example || "").trim(),
         note: String(definition?.note || "").trim(),
+        tags: normalizeTagList(definition?.tags),
       }))
-      .filter((definition) => definition.meaning || definition.example || definition.note),
+      .filter((definition) => definition.meaning || definition.example || definition.note || definition.tags.length),
     etymology: {
       sources: sourceReferenceModel.orderSourceReferences(entry.etymology?.sources || []).map((source) => source.entryId
         ? { entryId: source.entryId } : { entryId: "", text: source.text.trim() }),
@@ -11498,7 +11514,7 @@ function fullEntryFormCandidate(existing = selectedEntry()) {
     lemma,
     pronunciation: elements.pronunciationInput.value.trim(),
     tags,
-    definitions: collectDefinitions(),
+    definitions: collectDefinitions(existing),
     etymology: {
       sources: collectSourceInputReferences(elements.sourceEntryInput),
       description: elements.etymologyDescriptionInput.value.trim(),
@@ -12849,6 +12865,7 @@ async function saveSettings(event, options = {}) {
   if (!settings.corpusAutoSave) {
     clearTimeout(corpusSaveTimer);
   }
+  const previousTagSortOrder = dictionarySettings(dictionary).tagSortOrder;
   try {
     const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/settings`, {
       method: "PUT",
@@ -12860,10 +12877,39 @@ async function saveSettings(event, options = {}) {
     if (options.showToast !== false) {
       showToast(t("dictionarySaved"));
     }
-    return true;
   } catch (error) {
     showApiErrorToast(error, "dictionarySaveFailed");
     return false;
+  }
+  if (options.offerTagOrder && stableJson(settings.tagSortOrder) !== stableJson(previousTagSortOrder)) {
+    await offerTagOrderForExistingEntries(activeDictionary());
+  }
+  return true;
+}
+
+// Saves arrange tags from now on; existing entries change only when the user
+// runs the batch, so a changed order offers it when anything is out of order.
+async function offerTagOrderForExistingEntries(dictionary) {
+  if (!dictionarySettings(dictionary).tagSortOrder.length) {
+    return;
+  }
+  try {
+    const preview = await runEntryBatch(dictionary, { operation: "applyTagOrder", dryRun: true });
+    if (!preview.targetCount) {
+      return;
+    }
+    const confirmed = await appConfirm(formatText("tagOrderChangedConfirm", { count: preview.targetCount }), {
+      title: t("tagOrderSettings"),
+      confirmText: t("tagOrderArrangeNow"),
+      cancelText: t("tagOrderArrangeLater"),
+    });
+    if (!confirmed) {
+      return;
+    }
+    const applied = await runEntryBatch(dictionary, { operation: "applyTagOrder" });
+    showToast(`${t("tagOrderApplied")}${applied.targetCount ? ` · ${applied.targetCount} ${t("entries")}` : ""}`);
+  } catch (error) {
+    showApiErrorToast(error, "saveFailed");
   }
 }
 
@@ -14788,7 +14834,7 @@ function entryBasicRequirementMessages(entry, dictionary = activeDictionary()) {
   if (!settings.allowEmptyPronunciation && !entry.pronunciation?.trim()) {
     messages.push(t("requiredPronunciation"));
   }
-  if (!settings.allowEmptyTags && !(entry.tags || []).length) {
+  if (!settings.allowEmptyTags && !tagModel.effectiveEntryTags(entry).length) {
     messages.push(t("requiredTags"));
   }
   return messages;
@@ -14819,11 +14865,9 @@ function entryApiPayload(entry = {}, options = {}) {
   return createPayload;
 }
 
-function collectPartialDefinitions() {
+function collectPartialDefinitions(entry = selectedEntry()) {
   const list = partialEditBody()?.querySelector('[data-partial-definitions="true"]');
-  return definitionFormStates(list)
-    .map(({ id, meaning, example, note }) => ({ id, meaning, example, note }))
-    .filter((definition) => definition.meaning || definition.example || definition.note);
+  return definitionsWithSavedTags(definitionFormStates(list), entry?.definitions);
 }
 
 function partialEntryFormCandidate(entry = selectedEntry(), body = partialEditBody()) {
@@ -14839,7 +14883,7 @@ function partialEntryFormCandidate(entry = selectedEntry(), body = partialEditBo
     };
   }
   if (partialEditSection === "definitions") {
-    return { ...entry, definitions: collectPartialDefinitions() };
+    return { ...entry, definitions: collectPartialDefinitions(entry) };
   }
   if (partialEditSection === "etymology") {
     return {
@@ -16840,7 +16884,7 @@ elements.entryMorphologyControls.addEventListener("click", async (event) => {
   current.morphologyMode = "manual";
   renderMorphologyEntryControls(elements.entryMorphologyControls, { ...baseEntry, ...current }, { full: true });
 });
-elements.settingsForm.addEventListener("submit", saveSettings);
+elements.settingsForm.addEventListener("submit", (event) => saveSettings(event, { offerTagOrder: true }));
 elements.tagListSeparatorStyleInput.addEventListener("change", () => {
   updateTagListPlaceholders(elements.tagListSeparatorStyleInput.value);
 });

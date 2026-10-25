@@ -2,6 +2,13 @@
 
 设计日期：2026-10-22。状态：设计草案，未实施。实施前须按 `AGENTS.md` 做独立复评；完成后把仍然有效的契约迁入 `docs/API_CONTRACT.md`，本文删除，`docs/AUDIT_OPEN_ISSUES.md` 中的 A20、A05 随之删除。
 
+**2026-10-25 释义标签阶段 1 先于本计划实施**（[Definition Tag Plan](DEFINITION_TAG_PLAN.md) 7.6），下文第 1 节的事实和依赖清单尚未据此修订。实施前须吸收：
+
+- 释义有了标签，存于 `definition_tags`，随释义写入、经外键级联删除；释义子表的差异比较要包含释义标签。
+- 自动形态改按有效标签（词条标签 ∪ 释义标签）匹配，所以只改释义标签也可能改变形态结果；形态生成键里的"自动模式下的标签集合"应改为有效标签集合（或按形态分配计划 D6 的上下文），或直接用解析出的模板 ID 列表。
+- 搜索投影的 `tags` records 包含释义标签，`entry_search_values` 主键加入了 `source_id`。
+- `batchUpdateEntries()` 不再调用 `patchEntries()`，两者共用内部的 `writeEntryEdits()`；整理标签顺序也会改写释义标签。
+
 ## 1. 当前事实
 
 以下内容都对照了基准提交 `7cf1ea3` 的代码。
@@ -24,8 +31,8 @@
 - 静态搜索投影由 `entrySearchValueRecords(entry, dictionary, { fields: STATIC_ENTRY_SEARCH_FIELDS })` 生成，按 `field` 分组。各字段的来源：
   - `lemma`、`pronunciation`：同名属性；
   - `tags`：标签原值，以及按 `tagDisplayMap` 得到的显示值；
-  - `definitions`、`examples`：义项的释义和例句；
-  - `notes`：词条备注、义项备注、形态组备注三者合并；
+  - `definitions`、`examples`：各条释义的释义文字和例句；
+  - `notes`：词条备注、释义备注、形态组备注三者合并；
   - `etymology`：词源描述和来源文本。
 - 形态搜索投影由 `morphologySearchValueRecords(entry, dictionary)` 生成。它依赖的词条输入只有：
   - `lemma`；
@@ -33,7 +40,7 @@
   - 形态组的 `templateGroupId` 与 `overrides`；
   - 自动模式下的标签**集合**：`resolveAutomaticTemplateGroups()` 先把标签转成 Set，再按模板组顺序取第一个匹配项，因此与标签顺序无关。
 
-  它不依赖 `pronunciation`、义项、备注、形态组的 `title / notes`，也不依赖词源。
+  它不依赖 `pronunciation`、释义、备注、形态组的 `title / notes`，也不依赖词源。
 
 **版本与冲突**
 
@@ -88,13 +95,13 @@ writeEntryChanges(db, previous, next, position, dictionary, options)
 
 **definitions：按 ID 比较**
 
-- 先按 `previous` 中的义项 ID 把 `next` 的义项分成三类：
+- 先按 `previous` 中的释义 ID 把 `next` 的释义分成三类：
   - 已有，且位置和内容都没变：跳过；
   - 已有，但位置或内容变了：`UPDATE … WHERE id = ? AND entry_id = ?`；
-  - 新的 ID：普通 `INSERT`。这样撞上其他词条的义项 ID 时，仍由主键约束拒绝并整体回滚，`API_CONTRACT` 中的现有语义不变。
+  - 新的 ID：普通 `INSERT`。这样撞上其他词条的释义 ID 时，仍由主键约束拒绝并整体回滚，`API_CONTRACT` 中的现有语义不变。
 - `previous` 中有、`next` 中没有的 ID：`DELETE`。
-- **不能**用 `INSERT … ON CONFLICT(id) DO UPDATE`。否则 `next` 里如果带着别的词条的义项 ID，会把那条义项改挂到当前词条上。
-- 这样做同时满足 R11 的前提：保存时保留未变的义项行，将来给例句链接加外键时不会被级联删除。
+- **不能**用 `INSERT … ON CONFLICT(id) DO UPDATE`。否则 `next` 里如果带着别的词条的释义 ID，会把那条释义改挂到当前词条上。
+- 这样做同时满足 R11 的前提：保存时保留未变的释义行，将来给例句链接加外键时不会被级联删除。
 - `definitions.updated_at` 在 C13 删除之前，只在插入和更新的行里写入词条的 `updatedAt`。
 
 **tags、sources、形态组与 override：整组比较**
@@ -121,7 +128,7 @@ writeEntryChanges(db, previous, next, position, dictionary, options)
   - `morphologyMode`；
   - 有序的 `[templateGroupId, overrides]`；
   - 仅自动模式下：与 `resolveAutomaticTemplateGroups()` 使用同一规范化方式得到的排序后标签集合。
-- 两边生成键相同时跳过形态生成。这样单改 `pronunciation`、义项、备注、词源或调整标签顺序时，都不会重新生成词形。
+- 两边生成键相同时跳过形态生成。这样单改 `pronunciation`、释义、备注、词源或调整标签顺序时，都不会重新生成词形。
 - 风险：生成键漏掉某个依赖时，投影会**静默过期**。缓解措施见 §6 的一致性验收：每轮编辑后，把增量结果与全量重建结果逐行比较。
 
 ### 3.5 lemma 改名时的关联更新
@@ -204,7 +211,7 @@ writeEntryChanges(db, previous, next, position, dictionary, options)
 
 **5.1 为什么 definitions 按 ID 比较，其他子表整组比较**
 
-单看 A20，整组比较就够了。但义项是每条词条中最大的子列表，而且 R11 需要保存时保留义项行。分类所需的 ID 集合已经在 `previous` 里，额外的复杂度只是一条 UPDATE 分支，所以保留按 ID 比较。其他子表没有这类需求，保持简单。
+单看 A20，整组比较就够了。但释义是每条词条中最大的子列表，而且 R11 需要保存时保留释义行。分类所需的 ID 集合已经在 `previous` 里，额外的复杂度只是一条 UPDATE 分支，所以保留按 ID 比较。其他子表没有这类需求，保持简单。
 
 **5.2 为什么静态投影用"重新计算后比较"，形态投影用生成键**
 
@@ -230,16 +237,16 @@ PATCH 是把指定字段合并到数据库的最新状态上，不会把整条�
 ## 6. 实施步骤与验收
 
 1. **基线测量**：在临时数据目录（`CONLEXICON_DATA_DIR`）里构造以下场景，记录耗时和各表写入行数：
-   - 单个词条：10 个义项，手动模式下 2 张 10×10 的形态表；
-   - 对该词条分别单改 `pronunciation`、单改一个义项、改 lemma，各保存一次；
+   - 单个词条：10 条释义，手动模式下 2 张 10×10 的形态表；
+   - 对该词条分别单改 `pronunciation`、单改一条释义、改 lemma，各保存一次；
    - 5000 个词条的批量 IPA 生成，词条属于自动形态模板。
 
    写入行数用临时触发器（`CREATE TEMP TRIGGER`）记录，不改动生产代码。测量脚本放在 scratchpad，不提交；数字写进 CHANGELOG。
 2. **A20 仓库改动**：按 §3 实施，并新增 `scripts/check-entry-incremental-save.js`，同时加入 `check-all` 清单。验收内容：
    - **DTO 一致**：同一组编辑序列分别用新写入器和全量重建执行，保存后的 DTO 完全一致；
-   - **投影一致**：每步编辑后，增量投影与 `rebuildEntrySearchProjection()`、`rebuildEntryMorphologySearchProjection()` 的全量结果逐行一致。编辑序列至少覆盖：单字段、义项增删和排序、标签增删和换序、自动与手动模式切换、override、lemma 改名及引用方同步、来源增删；
+   - **投影一致**：每步编辑后，增量投影与 `rebuildEntrySearchProjection()`、`rebuildEntryMorphologySearchProjection()` 的全量结果逐行一致。编辑序列至少覆盖：单字段、释义增删和排序、标签增删和换序、自动与手动模式切换、override、lemma 改名及引用方同步、来源增删；
    - **没有多余写入**：用临时触发器断言单改 `pronunciation` 时不写 definitions、tags、sources、形态表和形态投影，调整标签顺序时不重新生成形态；
-   - **约束和回滚**：撞上其他词条的义项 ID 仍然整体回滚；`created_at` 不被请求覆盖；事务失败时全部回滚；
+   - **约束和回滚**：撞上其他词条的释义 ID 仍然整体回滚；`created_at` 不被请求覆盖；事务失败时全部回滚；
    - **批处理**：结果与原实现一致。
 3. **A05 服务端**：repository 选项、HTTP 校验和错误码，同步 `docs/API_CONTRACT.md`，包括 PUT 行、错误码表，以及更新时保留 `created_at` 的说明。测试覆盖：
    - 基准匹配时保存成功；

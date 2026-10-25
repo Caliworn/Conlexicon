@@ -6,17 +6,38 @@
 
 ## 2026-10-25
 
+### 新增
+
+- 保存词条时自动按"标签顺序"设置排列标签。服务端在每次运行期写入时，把词条标签和每条释义的标签分别按 `settings.tagSortOrder` 排列，规则与"整理标签顺序"相同；覆盖完整编辑、局部编辑、快速录入、`PATCH /entries`、创建与绑定来源和整词典批处理，`PATCH` 同时保存设置时按新设置排列。JSON 导入保持原有顺序，`tagSortOrder` 为空时不改变顺序；不设开关。"整理标签顺序"批处理保留，用于存量数据。在设置页保存时若标签顺序有变化，前端先试运行批处理，有顺序不一致的词条时用应用内确认框询问"现在整理 / 稍后"；离开页面时经"保存 / 放弃更改 / 取消"保存设置不弹出这一确认。设置页的说明与提示文案同步更新。
+  - 验收：`repository-contract.js` 新增保存顺序契约（新建、更新、PATCH、PATCH 附带设置、导入不排序、空顺序不排序），原批处理契约改为先测整理再测 IPA，因为 IPA 批处理本身也是一次保存，会顺带排好标签；`node scripts/check-all.js` 通过。临时数据实例（4174）浏览器中用真实键盘操作：完整编辑追加标签后保存，词条与释义标签都按顺序写入，详情头部随之更新；设置页改顺序后按 Enter 保存，没有不一致词条时不弹框，有时弹出确认框（中英文文案、按钮与焦点正确），Esc 选"稍后"不改数据，Enter 选"现在整理"运行批处理并提示；离开设置页时选"保存"不弹出该确认。确认框在 320px 下中英文均无溢出（直接调用函数打开测得）。未检查：暗色主题与其他皮肤（确认框为既有组件，本次只改文案）、480／768／1024／1440px、读屏。整理完成提示沿用既有文案，英文为"1 entries"，单复数问题早于本次改动。
+- 释义标签阶段 1：存储、API 与查询（[Definition Tag Plan](docs/DEFINITION_TAG_PLAN.md) 第 8 节）。界面还没有释义标签的输入和显示，留待阶段 2。
+  - 释义可以带标签，存入新表 `definition_tags`。详情 DTO 的 `definitions[]` 带 `tags`；`POST` / `PUT /entries` 与 JSON 导入在边界规范化，缺省为 `[]`；`PATCH /entries` 仍只接受词条级字段。
+  - 词条整体按**有效标签**（词条标签 ∪ 释义标签）处理，标签放在哪一层结果都一样：EntryFilter 的词性、无词性、标签 `any / all / exact`、标签有无与数量，facets，分析页的词性、标签频率和标签组合统计，`missing_tags` 质量规则，以及前端的 `allowEmptyTags` 保存校验。`near_duplicate_tags`、`tag_too_long` 同时检查两层，释义标签的 `tag_too_long` 带 `definitionId`、`definitionPosition`。
+  - 摘要 DTO 的 `tags` 仍是词条标签，新增 `effectiveTags`：先按首次出现拼出并集，再按 `tagSortOrder` 排序；`parts` 与 `partOfSpeech` 改为从它计算。共享函数 `tagModel.effectiveEntryTags()` 前后端共用。
+  - 多词性分析：EntryFilter 新增 `partCount`（词性集合大小）和 `partSet`（词性集合恰好等于，至少两个词性）；`partDistribution` 新增 `multiPartEntryCount` 与 `multiPartAction`；新增 widget `partSetDistribution`，统计至少两个词性的组合，行 action 使用 `partSet`。新错误码 `invalid_entry_filter_part_count`、`invalid_entry_filter_part_set`。
+  - 搜索的 `tags` 字段也投影释义标签，命中为 `sourceType: "definitionTag"`，`sourceId` 是释义 ID，`sourcePosition` 是释义内位置；`entry_search_values` 主键因此加入 `source_id`。
+  - 自动形态按有效标签匹配模板组，规则不变；这是形态分配计划 D6 决定匹配上下文之前的暂定行为（S1）。
+  - "整理标签顺序"批处理同时整理每条释义内的标签，通过内部写入路径完成，`PATCH` 白名单不变。
+  - 前端只做了与数据模型对齐的最小改动：保存后重算摘要时同样计算 `effectiveTags`；完整编辑与局部编辑的释义表单还没有标签字段，保存时按释义 ID 保留原有释义标签，只有标签的释义不再被当作空释义丢弃。
+  - 验收：新增 `scripts/check-definition-tags.js`，用"全部挂在词条上"和"分散在释义上"两种布局比较 17 种筛选、facets 与三个分析 widget 的结果，并覆盖 DTO、导出、增量与全量搜索投影一致、形态输入与模板变更后的重算、质量规则、批处理排序、级联删除和 JSON 导入；`check-sqlite-schema.js` 改为检查 repository 实际生成的词性筛选 SQL 同时用到两张标签表的 `(tag, entry_id)` 索引。`node scripts/check-all.js` 通过。改动前从提交 `dbee923` 记录了基线：形态验收词典与 10k／30k 压力词典导出为 JSON 后，改动前后各导入一次比较，筛选结果、facets、标签频率与标签组合、质量问题、形态分配、形态分析输入、静态与形态搜索投影全部相同，`partDistribution` 只多出两个新字段。临时数据实例（4174）中经 HTTP 导入带释义标签的词典，再在浏览器里用真实输入和 `Ctrl` + `S` 完整编辑保存两个词条：改动的释义写入，两条释义的标签（含只有标签的释义）保留，前端重算的摘要与服务端一致；在 `allowEmptyTags` 关闭的词典里，只有释义标签的词条可以保存。局部编辑的释义分区与完整编辑共用同一函数，未单独在浏览器中操作。
+  - 性能（30k 压力词典，冷查询中位数，旧代码 → 新代码，没有释义标签）：词性与标签筛选、facets、标签组合与标签搜索变化在 0–4 ms 内（facets 49.8 → 50.4 ms，标签组合 143 → 150 ms）；`tagCount` 筛选 45 → 51 ms；`partDistribution` 49 → 63 ms，多出的是新增的多词性计数。另造一个约 20% 词条把词性移到释义上的变体：`tagCount` 筛选约 82 ms、`partDistribution` 约 94 ms、标签组合约 183 ms，其余筛选在 60 ms 内；查询计划中 `definition_tags` 都走索引，没有全表扫描。实现上，有效标签用"词条标签 + 只在释义上有的标签"两段不相交的行表示，避免 `UNION` 去重；初版用 `UNION` 时 facets 与标签组合慢了 2–3 倍。
+
+### 安全与兼容性
+
+- 释义标签改动了 SQLite schema（新表 `definition_tags`，`entry_search_values` 主键加入 `source_id`）。按当前开发期规则不做旧库检测或升级：已有数据库须先用旧版本导出 JSON，更新后再导入。实测旧库在新代码下照常读取和保存，但给两条以上释义保存标签时会因旧主键冲突而失败，事务整体回滚。README 的数据存储一节已补充这一步骤。
+- 旧 JSON 迁移判断空释义时也看释义标签，当前格式中只有标签的释义导入时不再被丢弃；旧 JSON 没有释义标签，迁移结果不变。
+
 ### 文档
 
-- [Sense Tag Plan](docs/SENSE_TAG_PLAN.md) 按用户逐项确认修订：
-  - 新增义项不再自动预填，快速录入的义项标签行改为与词条标签、读音一样，为空时按 `Tab` 填入建议；
-  - 快速录入用快捷键加按钮切换义项标签行，有内容时不能关闭，开关状态只存在内存中；
-  - 详情头部按"只在词条 / 只在义项 / 两层都有"区分词性来源，义项卡片标出词条也有的标签；
+- [Definition Tag Plan](docs/DEFINITION_TAG_PLAN.md) 按用户逐项确认修订：
+  - 新增释义不再自动预填，快速录入的释义标签行改为与词条标签、读音一样，为空时按 `Tab` 填入建议；
+  - 快速录入用快捷键加按钮切换释义标签行，有内容时不能关闭，开关状态只存在内存中；
+  - 详情头部按"只在词条 / 只在释义 / 两层都有"区分词性来源，释义卡片标出词条也有的标签；
   - S5–S14 按原方案确认。
-  - 随后确认的细节：完整编辑不加 `Tab` 填充；`Tab` 建议取上方最近的义项标签；开关用底栏左侧的切换按钮；快捷键在阶段 2 实测后定；标签行放在释义之前；来源样式纳入视觉定稿；编辑器不显示来源标记。
+  - 随后确认的细节：完整编辑不加 `Tab` 填充；`Tab` 建议取上方最近的释义标签；开关用底栏左侧的切换按钮；快捷键在阶段 2 实测后定；标签行放在释义之前；来源样式纳入视觉定稿；编辑器不显示来源标记。
   - D2 确认：有效标签对所有词条都按 `tagSortOrder` 排序；S1 暂定，等形态分配计划的 D6。仅为设计草案，未实施。
 - 交接文档记录用户提出的"保存时自动应用标签顺序"想法：保存时按 `tagSortOrder` 排列标签，保留手动批处理；列出设计前要确认的问题，尚未设计。
-- 形态匹配上下文的决定从 [Sense Tag Plan](docs/SENSE_TAG_PLAN.md) 移到 [Morphology Assignment Plan](docs/MORPHOLOGY_ASSIGNMENT_PLAN.md)：后者新增 3.7，比较"只用有效标签一个上下文"和"每个义项一个上下文"两种方案，列为待确认的 D6。义项标签计划第 5 节改为只让形态解析读得到义项标签，并默认按有效标签并集匹配，这一默认列为待确认的 S1。仅为设计草案，未实施。
+- 形态匹配上下文的决定从 [Definition Tag Plan](docs/DEFINITION_TAG_PLAN.md) 移到 [Morphology Assignment Plan](docs/MORPHOLOGY_ASSIGNMENT_PLAN.md)：后者新增 3.7，比较"只用有效标签一个上下文"和"每条释义一个上下文"两种方案，列为待确认的 D6。释义标签计划第 5 节改为只让形态解析读得到释义标签，并默认按有效标签并集匹配，这一默认列为待确认的 S1。仅为设计草案，未实施。
 - 按 `AGENTS.md` 的文档规则清理 `docs/`：删除已完成的 `QUERY_SESSION_CACHE_PLAN.md`、`ADVANCED_FILTER_QUERY_PLAN.md`、`FEATURE_RESULT_SESSION_PLAN.md` 与 `SOURCE_AUTOCOMPLETE_PLAN.md`，仍有效的契约对照当前代码后迁移。查询会话三层职责、查询身份、物化策略、失效（查询 generation 与词根 relation generation）、cursor 重建、容量参数和必测不变量迁入 SQLite 后端规范；前端页面缓存与两段式 stale-while-revalidate、高级筛选入口归属、查询边界与前端筛选状态、音系引擎 adapter（按 `lib/phonology-engine.js` 的实际接口改写，计划中的草图已过时）、后台执行的复评门槛与不做事项、来源补全 controller 与候选显示规则迁入 `docs/API_CONTRACT.md`。实施记录、分阶段验收与历史基准留在 Git 历史与本文件。
 - `docs/SQLITE_BACKEND_PLAN.md` 改名为 [SQLite 后端规范](docs/SQLITE_BACKEND_SPEC.md)，`docs/SQLITE_MIGRATION_PLAN.md` 改名为 [导入导出规范](docs/IMPORT_EXPORT_SPEC.md)，两者改写为现行规范：删去状态审计中的阶段流水、S3/S4 记录、默认切换清单、M0–M5 阶段和“反推 API 契约”愿望清单（其中 `/api/app`、`/summary` 等端点并不存在；现行接口见 API 契约，设想见 API Drafts），并更正过时描述：形态分析的前端旧表投影改指向审计 C11，§10.2 中“分析和质量检查仍由前端计算”，索引清单按当前 schema（`idx_entry_tags_tag_entry`），API 契约中 `entry_sources` 索引误写为 `(target_entry_id, entry_id)`。
 - 未完成项移入交接文档：筛选统一化（筛选面板目前只编辑词性）、同形词完全重复的质量规则想法，以及原生 SQLite／XLSX 导入导出与产品内迁移入口（记入“明确搁置”）。文档索引、交接、审计清单与 API 契约中的链接同步更新。
@@ -26,15 +47,15 @@
 ### 文档
 
 - 新增 [Morphology Assignment Plan](docs/MORPHOLOGY_ASSIGNMENT_PLAN.md)：去掉形态组，表格以析取范式规则（行内"且"、行间"或"、可排除）直接匹配词条；每张表属于一个槽位（新建表时自动建独立槽位），不同槽位叠加生效，同一槽位内按 elsewhere condition 由更具体的规则胜出；槽位顺序就是显示顺序，槽位内顺序只决定平局时的先后；覆写改按"词条 + 表"记录。旧数据转换时每张表各成一个槽位，并为规则生成排除条件，每个词条的结果和显示顺序保持不变。模板页重做为槽位面板（竞争与具体程度关系）、试算面板（逐槽位解释选中原因）和影响范围（当前词条数、保存前的分配预览端点）。文档包含独立复评（否决了保留组的三种做法、无槽位的全局 elsewhere、可选槽位加全局顺序、自由文本槽位、手工指定覆盖关系和文本表达式）和三个待用户确认的决定点。仅为设计草案，未实施。
-- [Sense Tag Plan](docs/SENSE_TAG_PLAN.md) 的模板组匹配规则移入上述计划，义项标签计划只保留"每个义项一个匹配上下文（词条标签 ∪ 该义项标签）、结果合并去重"的契约，这一上下文设计本身改列为待确认的 D3。
+- [Definition Tag Plan](docs/DEFINITION_TAG_PLAN.md) 的模板组匹配规则移入上述计划，义项标签计划只保留"每个义项一个匹配上下文（词条标签 ∪ 该义项标签）、结果合并去重"的契约，这一上下文设计本身改列为待确认的 D3。
 - 两份计划的决定点改为区分"用户已确定"和"代理拟定、待确认"，后者逐项列出（义项标签计划 S2–S14，形态分配计划 M1–M13），不再写成已定范围。义项标签计划的快速录入由"不改"改为用户选定的方案：释义行附带可选的义项标签输入。
 
 ## 2026-10-23
 
 ### 文档
 
-- 新增 [Sense Tag Plan](docs/SENSE_TAG_PLAN.md)：义项可以带标签，义项不继承词条标签，词条整体取两层的并集；多词性词条原则上把词性放到义项上，单词性词条保持现状。计划同时让自动形态按义项分别匹配（每个义项的上下文是词条标签加该义项标签，匹配规则不变），所以现有数据的形态结果不变；有效标签在首次出现顺序之上按 `tagSortOrder` 排序；schema 变更后旧数据库须经 JSON 重新导入；分析页新增"多词性词条"计数和"词性组合"卡片，并配套新增 `partCount`、`partSet` 词条筛选。文档包含独立复评和两个待用户确认的决定点。仅为设计草案，未实施。
-- [Sense Tag Plan](docs/SENSE_TAG_PLAN.md) 补充模板组匹配规则：把现行的"任一标签相同即匹配"改为结构化的 `matchRules`。行内"且"、行间"或"、每行可以排除标签，多个组都匹配时仍只取最前。旧 `matchTags` 逐项转换为单标签行，结果不变。新增校验错误码 `invalid_morphology_match_rule`，存储列改为 `match_rules_json`。复评否决了子集或超集判断、"任一 / 全部"开关和文本表达式。仅为设计草案，未实施。
+- 新增 [Definition Tag Plan](docs/DEFINITION_TAG_PLAN.md)：义项可以带标签，义项不继承词条标签，词条整体取两层的并集；多词性词条原则上把词性放到义项上，单词性词条保持现状。计划同时让自动形态按义项分别匹配（每个义项的上下文是词条标签加该义项标签，匹配规则不变），所以现有数据的形态结果不变；有效标签在首次出现顺序之上按 `tagSortOrder` 排序；schema 变更后旧数据库须经 JSON 重新导入；分析页新增"多词性词条"计数和"词性组合"卡片，并配套新增 `partCount`、`partSet` 词条筛选。文档包含独立复评和两个待用户确认的决定点。仅为设计草案，未实施。
+- [Definition Tag Plan](docs/DEFINITION_TAG_PLAN.md) 补充模板组匹配规则：把现行的"任一标签相同即匹配"改为结构化的 `matchRules`。行内"且"、行间"或"、每行可以排除标签，多个组都匹配时仍只取最前。旧 `matchTags` 逐项转换为单标签行，结果不变。新增校验错误码 `invalid_morphology_match_rule`，存储列改为 `match_rules_json`。复评否决了子集或超集判断、"任一 / 全部"开关和文本表达式。仅为设计草案，未实施。
 
 ## 2026-10-22
 
