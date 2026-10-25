@@ -13,7 +13,7 @@
 | [Import and Export Specification](IMPORT_EXPORT_SPEC.md) | 当前规范 | 旧 JSON 导入与转换服务、目录迁移脚本、导出 profile、备份与回滚；未实装的 SQLite／XLSX 交换与产品内迁移入口。 |
 | [Entry Incremental Save Plan](ENTRY_INCREMENTAL_SAVE_PLAN.md) | 设计草案，未实施 | 审计 A20＋A05：词条写入只改动变化的主表列、子表和投影字段；`PUT` 基于 `updatedAt` 的条件保存与冲突确认。 |
 | [Definition Tag Plan](DEFINITION_TAG_PLAN.md) | 阶段 1（存储与查询）、阶段 2（界面）已实施（2026-10-25），S1 待形态分配计划 D6 确认 | 释义标签与多词性词条：释义可带标签、词条整体取并集（只向上继承）且按标签排序配置排列，形态默认按有效标签匹配，分析页统计多词性词条与词性组合；已实施部分的契约见 API 契约"释义标签与有效标签"，本文保留界面设计、决定点与实施出入。 |
-| [Tag Management Plan](TAG_MANAGEMENT_PLAN.md) | 设计草案，已复评，未实施 | 以有序的标签登记表（词性区在前、普通区在后）取代词性、排序、显示替换、红色强调四项设置；新标签写入时自动登记、只增不减；独立的标签管理页即时保存；筛选与分析统一按登记表排序；旧格式转换。 |
+| [Tag Management Plan](TAG_MANAGEMENT_PLAN.md) | 设计草案，已复评，决定点已确认，未实施 | 以有序的标签登记表（词性区在前、普通区在后）取代词性、排序、显示替换、红色强调四项设置；新标签写入时自动登记、只增不减；独立的"标签"导航目的地即时保存，并接管其他标签显示偏好；筛选与分析统一按登记表排序；旧格式转换。 |
 | [Morphology Assignment Plan](MORPHOLOGY_ASSIGNMENT_PLAN.md) | 设计草案，已复评，未实施 | 形态分配重做：去掉形态组，表格以析取范式规则直接匹配；每张表属于一个槽位，槽位内按 elsewhere 由更具体者胜出、槽位间叠加，槽位顺序即显示顺序；覆写按表记录，旧数据转换结果不变；槽位面板、试算面板与影响范围的编辑界面。 |
 | [App Shell Specification](APP_SHELL_SPEC.md) | 阶段 A 已完成 | 响应式应用外壳：布局、外壳状态模型、DOM/CSS 边界、断点与验收。 |
 | [Touch, Focus and Accessibility Plan](TOUCH_FOCUS_A11Y_PLAN.md) | 阶段 A+ 未开始 | 触摸替代交互、输入能力判定、命中区域、焦点管理与无障碍验收。 |
