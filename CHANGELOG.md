@@ -8,6 +8,15 @@
 
 ### 文档
 
+- [Sense Tag Plan](docs/SENSE_TAG_PLAN.md) 按用户逐项确认修订：
+  - 新增义项不再自动预填，快速录入的义项标签行改为与词条标签、读音一样，为空时按 `Tab` 填入建议；
+  - 快速录入用快捷键加按钮切换义项标签行，有内容时不能关闭，开关状态只存在内存中；
+  - 详情头部按"只在词条 / 只在义项 / 两层都有"区分词性来源，义项卡片标出词条也有的标签；
+  - S5–S14 按原方案确认。
+  - 随后确认的细节：完整编辑不加 `Tab` 填充；`Tab` 建议取上方最近的义项标签；开关用底栏左侧的切换按钮；快捷键在阶段 2 实测后定；标签行放在释义之前；来源样式纳入视觉定稿；编辑器不显示来源标记。
+  - D2 确认：有效标签对所有词条都按 `tagSortOrder` 排序；S1 暂定，等形态分配计划的 D6。仅为设计草案，未实施。
+- 交接文档记录用户提出的"保存时自动应用标签顺序"想法：保存时按 `tagSortOrder` 排列标签，保留手动批处理；列出设计前要确认的问题，尚未设计。
+- 形态匹配上下文的决定从 [Sense Tag Plan](docs/SENSE_TAG_PLAN.md) 移到 [Morphology Assignment Plan](docs/MORPHOLOGY_ASSIGNMENT_PLAN.md)：后者新增 3.7，比较"只用有效标签一个上下文"和"每个义项一个上下文"两种方案，列为待确认的 D6。义项标签计划第 5 节改为只让形态解析读得到义项标签，并默认按有效标签并集匹配，这一默认列为待确认的 S1。仅为设计草案，未实施。
 - 按 `AGENTS.md` 的文档规则清理 `docs/`：删除已完成的 `QUERY_SESSION_CACHE_PLAN.md`、`ADVANCED_FILTER_QUERY_PLAN.md`、`FEATURE_RESULT_SESSION_PLAN.md` 与 `SOURCE_AUTOCOMPLETE_PLAN.md`，仍有效的契约对照当前代码后迁移。查询会话三层职责、查询身份、物化策略、失效（查询 generation 与词根 relation generation）、cursor 重建、容量参数和必测不变量迁入 SQLite 后端规范；前端页面缓存与两段式 stale-while-revalidate、高级筛选入口归属、查询边界与前端筛选状态、音系引擎 adapter（按 `lib/phonology-engine.js` 的实际接口改写，计划中的草图已过时）、后台执行的复评门槛与不做事项、来源补全 controller 与候选显示规则迁入 `docs/API_CONTRACT.md`。实施记录、分阶段验收与历史基准留在 Git 历史与本文件。
 - `docs/SQLITE_BACKEND_PLAN.md` 改名为 [SQLite 后端规范](docs/SQLITE_BACKEND_SPEC.md)，`docs/SQLITE_MIGRATION_PLAN.md` 改名为 [导入导出规范](docs/IMPORT_EXPORT_SPEC.md)，两者改写为现行规范：删去状态审计中的阶段流水、S3/S4 记录、默认切换清单、M0–M5 阶段和“反推 API 契约”愿望清单（其中 `/api/app`、`/summary` 等端点并不存在；现行接口见 API 契约，设想见 API Drafts），并更正过时描述：形态分析的前端旧表投影改指向审计 C11，§10.2 中“分析和质量检查仍由前端计算”，索引清单按当前 schema（`idx_entry_tags_tag_entry`），API 契约中 `entry_sources` 索引误写为 `(target_entry_id, entry_id)`。
 - 未完成项移入交接文档：筛选统一化（筛选面板目前只编辑词性）、同形词完全重复的质量规则想法，以及原生 SQLite／XLSX 导入导出与产品内迁移入口（记入“明确搁置”）。文档索引、交接、审计清单与 API 契约中的链接同步更新。
