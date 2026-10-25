@@ -295,6 +295,26 @@
       max-height: none !important;
     }
 
+    .cg-switch-labels {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      align-items: flex-start;
+    }
+
+    .cg-switch-labels > figure {
+      display: grid;
+      gap: 8px;
+      width: 240px;
+      max-width: 100%;
+      margin: 0;
+    }
+
+    .cg-switch-labels figcaption {
+      font-size: 12.5px;
+      font-weight: 700;
+    }
+
     .cg-cards {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 220px));
@@ -400,6 +420,12 @@
     </section>
 
     <section>
+      <h2>开关的标签</h2>
+      <p class="cg-note">开关是带 <code>role="switch"</code> 的原生复选框，总带可见文字：行内用 <code>.switch-label</code>，设置行用 <code>.toggle-row</code>（文字在左、开关在右）。整个标签都是点击目标，悬浮与按下转发给开关；触屏下标签行高至少 44px。<code>aria-disabled</code> 只改外观，由使用方取消点击（禁用的原生控件收不到鼠标事件，需要 tooltip 说明原因时用它）；本节样本都可实际操作，不参与自检。</p>
+      <div class="cg-switch-labels" id="cgSwitchLabels"></div>
+    </section>
+
+    <section>
       <h2>导航</h2>
       <p class="cg-note">产品导航外壳里的目的地按钮（经典为深色实底，两套玻璃为玻璃导航；液态玻璃中是 Q3 光学外壳）。导航内的焦点环取各皮肤的导航文字色 <code>--material-navigation-text</code>（深色导航为浅色环），目的地按钮用内偏移，避免被可滚动的导航列裁掉。</p>
       <div class="cg-nav-row">
@@ -482,13 +508,13 @@
       // focus, disabled, live); null leaves a column empty. The off/on and
       // closed/open rows share one specimen group, so checks compare across them,
       // and only the first row carries the live specimen, which toggles itself.
-      const persistentStates = (prefix, label, attribute, value, live) => [
-        [prefix, label, { [attribute]: value }],
-        [`${prefix}-hover`, `${label}悬浮`, { [attribute]: value, "data-cg-hover": "" }],
-        [`${prefix}-pressed`, `${label}按下`, { [attribute]: value, "data-cg-hover": "", "data-cg-active": "" }],
-        [`${prefix}-focus`, `${label}焦点`, { [attribute]: value, "data-cg-focus": "" }],
-        [`${prefix}-disabled`, `${label}禁用`, { [attribute]: value, disabled: "" }],
-        live ? ["live", "实时（点击切换）", { [attribute]: value }] : null,
+      const persistentStates = (prefix, label, state, live) => [
+        [prefix, label, state],
+        [`${prefix}-hover`, `${label}悬浮`, { ...state, "data-cg-hover": "" }],
+        [`${prefix}-pressed`, `${label}按下`, { ...state, "data-cg-hover": "", "data-cg-active": "" }],
+        [`${prefix}-focus`, `${label}焦点`, { ...state, "data-cg-focus": "" }],
+        [`${prefix}-disabled`, `${label}禁用`, { ...state, disabled: "" }],
+        live ? ["live", "实时（点击切换）", state] : null,
       ];
 
       const ROWS = [
@@ -502,15 +528,24 @@
           id: "selection",
           groupLabel: "neutral 选中／未选中",
           label: `neutral ${label}`,
-          states: persistentStates(prefix, label, "aria-pressed", value, live),
+          states: persistentStates(prefix, label, { "aria-pressed": value }, live),
           build: () => controlButton({ tone: "neutral", className: "secondary-button", text: "词根模式", selection: true }),
         })),
         ...[["closed", "收起", "false", true], ["open", "展开", "true", false]].map(([prefix, label, value, live]) => ({
           id: "disclosure",
           groupLabel: "neutral 展开／收起",
           label: `neutral ${label}`,
-          states: persistentStates(prefix, label, "aria-expanded", value, live),
+          states: persistentStates(prefix, label, { "aria-expanded": value }, live),
           build: disclosureButton,
+        })),
+        // A native check box: `checked` sets its initial state, and the live one
+        // toggles itself.
+        ...[["off", "关", {}, true], ["on", "开", { checked: "" }, false]].map(([prefix, label, state, live]) => ({
+          id: "switch",
+          groupLabel: "开关 开／关",
+          label: `开关 ${label}`,
+          states: persistentStates(prefix, label, state, live),
+          build: () => switchInput("示例开关"),
         })),
       ];
 
@@ -563,6 +598,13 @@
         ["disclosure", "closed-hover", "closed-pressed", "收起按下相对悬浮"],
         ["disclosure", "open", "open-hover", "展开悬浮相对展开"],
         ["disclosure", "open-hover", "open-pressed", "展开按下相对悬浮"],
+        ["switch", "off", "off-hover", "关悬浮相对关"],
+        ["switch", "off-hover", "off-pressed", "关按下相对悬浮"],
+        ["switch", "off", "on", "开相对关"],
+        ["switch", "off-hover", "on-hover", "开悬浮相对关悬浮"],
+        ["switch", "on", "on-hover", "开悬浮相对开"],
+        ["switch", "on-hover", "on-pressed", "开按下相对悬浮"],
+        ["switch", "off-disabled", "on-disabled", "开禁用相对关禁用"],
       ];
 
       const elements = {
@@ -612,6 +654,15 @@
         return button;
       }
 
+      function switchInput(name) {
+        const input = document.createElement("input");
+        input.type = "checkbox";
+        input.className = "switch";
+        input.setAttribute("role", "switch");
+        input.setAttribute("aria-label", name);
+        return input;
+      }
+
       // The product's content disclosure (morphology tables, root folding), as app.js
       // writes it: the chevron turns with aria-expanded.
       function disclosureButton() {
@@ -648,6 +699,29 @@
           for (let index = row.states.length; index < columns; index += 1) {
             container.append(document.createElement("div"));
           }
+        });
+      }
+
+      // Switch labels as a product page would write them; all live.
+      function buildSwitchLabels(container) {
+        [
+          ["行内", "switch-label", "释义标签", {}],
+          ["行内 · 英文", "switch-label", "Definition tags", { checked: "" }],
+          ["行内 · 长文字", "switch-label", "在词条列表中点击标签时启用筛选，并在筛选菜单中显示原始标签", {}],
+          ["行内 · aria-disabled（开）", "switch-label", "释义标签（清空所有释义标签后才能关闭）", { checked: "", "aria-disabled": "true" }],
+          ["行内 · disabled（关）", "switch-label", "释义标签", { disabled: "" }],
+          ["设置行 · 长文字", "toggle-row", "Show the raw tag instead of its display replacement in the entry list", {}],
+        ].forEach(([caption, className, text, attributes]) => {
+          const label = document.createElement("label");
+          label.className = className;
+          const span = document.createElement("span");
+          span.textContent = text;
+          const input = setAttributes(switchInput(text), attributes);
+          input.removeAttribute("aria-label");
+          input.dataset.cgLive = "";
+          if (className === "toggle-row") label.append(span, input);
+          else label.append(input, span);
+          container.append(figure(caption, label));
         });
       }
 
@@ -974,10 +1048,14 @@
           transform: computed.transform,
           textContrast: contrast(color, background),
           // Icon-only controls are non-text graphics: WCAG 1.4.11 asks 3:1, not 4.5:1.
-          inkThreshold: element.matches("input, select, textarea") || element.textContent.trim() ? 4.5 : 3,
+          // A switch's thumb is a state graphic, not text, so it also takes 3:1.
+          inkThreshold: element.matches(".switch") ? 3
+            : element.matches("input, select, textarea") || element.textContent.trim() ? 4.5 : 3,
           // A disclosure's state shows in its turning chevron, not in its own box.
           iconTransform: [...element.querySelectorAll("svg")].map((icon) => getComputedStyle(icon).transform).join(" "),
           focusContrast: focusColor ? contrast(over(focusColor, backdrop), backdrop) : null,
+          // A switch's track edge marks the control against its surroundings (WCAG 1.4.11).
+          edgeContrast: contrast(border, backdrop),
           disabled: element.matches(":disabled"),
         };
       }
@@ -1036,7 +1114,8 @@
           metric.dataset.level = reading.disabled ? "info" : value === null || value < threshold ? "fail" : "ok";
           metric.title = focus
             ? "焦点环或聚焦边框与背后底色的对比度（≥ 3）"
-            : reading.inkThreshold === 3 ? "图标与底色的对比度（≥ 3）" : "文字与底色的对比度（≥ 4.5）";
+            : element.matches(".switch") ? "滑块与轨道的对比度（≥ 3）；轨道边界与背后底色另需 ≥ 3，见自检"
+              : reading.inkThreshold === 3 ? "图标与底色的对比度（≥ 3）" : "文字与底色的对比度（≥ 4.5）";
         });
       }
 
@@ -1079,7 +1158,10 @@
               push("fail", where, "焦点环对比度", reading.focusContrast.toFixed(2));
             }
           } else if (!reading.disabled && reading.textContrast < reading.inkThreshold) {
-            push("fail", where, reading.inkThreshold === 3 ? "图标对比度" : "文字对比度", reading.textContrast.toFixed(2));
+            push("fail", where, row === "switch" ? "滑块对比度" : reading.inkThreshold === 3 ? "图标对比度" : "文字对比度", reading.textContrast.toFixed(2));
+          }
+          if (row === "switch" && !reading.disabled && !state.endsWith("focus") && reading.edgeContrast < 3) {
+            push("fail", where, "轨道边界对比度", reading.edgeContrast.toFixed(2));
           }
         });
         const contexts = [...new Set([...readings.keys()].map((id) => id.split("/")[0]))];
@@ -1212,11 +1294,18 @@
       buildSearchFields(document.getElementById("cgSearchFields"));
       buildNav(document.getElementById("cgNavList"));
       buildSpecials(elements.specials);
+      buildSwitchLabels(document.getElementById("cgSwitchLabels"));
       // Fixed-state specimens ignore the pointer and keyboard, so moving the mouse
       // never changes a column and Tab reaches only the live column.
       document.querySelectorAll("[data-cg-specimen]:not([data-cg-live])").forEach((element) => { element.inert = true; });
       // Live specimens flip their own persistent state, as the product component would.
       document.addEventListener("click", (event) => {
+        // aria-disabled only changes the paint; its owner cancels the toggle.
+        const label = event.target.closest("label");
+        if (label?.querySelector(':scope > .switch[aria-disabled="true"]') || event.target.matches('.switch[aria-disabled="true"]')) {
+          event.preventDefault();
+          return;
+        }
         const live = event.target.closest("[data-cg-live]");
         if (!live) return;
         for (const name of ["aria-pressed", "aria-expanded", "aria-checked"]) {

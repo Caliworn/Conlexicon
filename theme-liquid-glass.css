@@ -628,6 +628,56 @@ body[data-ui-skin="liquid-glass"] .segmented-control > button[data-control-selec
   --control-selected-color: var(--control-glass-solid-color);
 }
 
+/* Switch: a recessed glass groove that fills with the same tinted glass ink as
+   solid buttons when on, under a lifted thumb with a top sheen. No backdrop blur:
+   at 20px tall it would not show, and it would add a backdrop root inside glass
+   owners. Forced colors keep the shared system-color recipe. */
+@media not (forced-colors: active) {
+  body[data-ui-skin="liquid-glass"] input[type="checkbox"].switch {
+    --switch-glass-ink: color-mix(in srgb, var(--ui-accent) 80%, black);
+    --switch-background: rgba(255, 255, 255, 0.34);
+    --switch-hover-background: rgba(255, 255, 255, 0.56);
+    --switch-pressed-background: color-mix(in srgb, var(--ui-text) 14%, transparent);
+    --switch-checked-background: color-mix(in srgb, var(--switch-glass-ink) 80%, transparent);
+    --switch-checked-border: var(--switch-checked-background);
+    --switch-checked-hover-background: color-mix(in srgb, var(--switch-glass-ink) 92%, transparent);
+    --switch-checked-hover-border: var(--switch-checked-hover-background);
+    --switch-checked-pressed-background: color-mix(in srgb, var(--switch-glass-ink) 90%, black);
+    --switch-checked-thumb: var(--ui-text-on-solid);
+    --switch-track-shadow: inset 0 1px 2px rgba(20, 43, 51, 0.16), inset 0 -1px 0 rgba(255, 255, 255, 0.7);
+    --switch-thumb-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 60%);
+    --switch-thumb-shadow: 0 1px 3px rgba(9, 44, 45, 0.32), inset 0 -1px 1px rgba(9, 44, 45, 0.12);
+  }
+
+  body.dark-theme[data-ui-skin="liquid-glass"] input[type="checkbox"].switch {
+    /* Lighter than the solid buttons' dark ink: the track edge must hold 3:1
+       against dark glass, and the white thumb 3:1 against the track. */
+    --switch-glass-ink: color-mix(in srgb, var(--ui-accent) 80%, black);
+    --switch-background: rgba(255, 255, 255, 0.06);
+    --switch-hover-background: rgba(255, 255, 255, 0.12);
+    --switch-pressed-background: color-mix(in srgb, var(--ui-text) 24%, transparent);
+    --switch-checked-background: color-mix(in srgb, var(--switch-glass-ink) 76%, transparent);
+    --switch-checked-hover-background: color-mix(in srgb, var(--switch-glass-ink) 90%, transparent);
+    --switch-checked-pressed-background: color-mix(in srgb, var(--switch-glass-ink) 96%, white);
+    --switch-track-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.36), inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+    --switch-thumb-sheen: linear-gradient(180deg, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0) 60%);
+    --switch-thumb-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), inset 0 -1px 1px rgba(0, 0, 0, 0.16);
+  }
+}
+
+/* Without transparency the groove and the ink become opaque, as solid buttons do. */
+@media (prefers-reduced-transparency: reduce) and (not (forced-colors: active)) {
+  body[data-ui-skin="liquid-glass"] input[type="checkbox"].switch,
+  body.dark-theme[data-ui-skin="liquid-glass"] input[type="checkbox"].switch {
+    --switch-background: var(--ui-canvas-bg);
+    --switch-hover-background: color-mix(in srgb, var(--ui-canvas-bg) 92%, var(--ui-text));
+    --switch-pressed-background: color-mix(in srgb, var(--ui-canvas-bg) 85%, var(--ui-text));
+    --switch-checked-background: var(--switch-glass-ink);
+    --switch-checked-hover-background: color-mix(in srgb, var(--switch-glass-ink) 90%, black);
+    --switch-checked-pressed-background: color-mix(in srgb, var(--switch-glass-ink) 80%, black);
+  }
+}
+
 @media (prefers-reduced-transparency: reduce) {
   body[data-ui-skin="liquid-glass"] :is(button, label)[data-control-tone],
   body.dark-theme[data-ui-skin="liquid-glass"] :is(button, label)[data-control-tone] {

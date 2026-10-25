@@ -5088,6 +5088,168 @@ textarea.ipa-single-line::-webkit-scrollbar {
   flex: 0 0 auto;
 }
 
+/* Switch: a native check box with role="switch", drawn as a track and a thumb.
+   The input paints the track and its ink (color) is the thumb, so the state comes
+   only from :checked, :disabled and aria-disabled. Skins override the recipe
+   inputs; the rules below resolve them into --switch-current-*. Like other inline
+   controls it casts no outer shadow and joins no optical surface. aria-disabled only changes
+   the paint: the owner must still cancel the click. */
+input[type="checkbox"].switch {
+  --switch-background: transparent;
+  --switch-border: var(--ui-text-muted);
+  --switch-thumb: var(--ui-text-muted);
+  --switch-hover-background: var(--material-inset-background);
+  --switch-hover-border: var(--ui-text);
+  --switch-hover-thumb: var(--ui-text);
+  --switch-pressed-background: color-mix(in srgb, var(--material-inset-background) 85%, var(--ui-text));
+  --switch-checked-background: var(--ui-accent);
+  --switch-checked-border: var(--ui-accent);
+  --switch-checked-thumb: var(--ui-canvas-bg);
+  --switch-checked-hover-background: var(--ui-accent-hover);
+  --switch-checked-hover-border: var(--ui-accent-hover);
+  --switch-checked-pressed-background: color-mix(in srgb, var(--ui-accent-hover) 75%, var(--ui-text));
+  --switch-disabled-background: transparent;
+  --switch-disabled-border: var(--ui-border);
+  --switch-disabled-thumb: var(--ui-border-strong);
+  --switch-checked-disabled-background: var(--ui-accent-soft);
+  --switch-checked-disabled-border: var(--ui-accent);
+  --switch-checked-disabled-thumb: var(--ui-text-muted);
+  /* Material depth: an inset groove on the track and a sheen and lift on the thumb.
+     They hold in every state; the default skin keeps the switch flat. */
+  --switch-track-shadow: none;
+  --switch-thumb-sheen: none;
+  --switch-thumb-shadow: none;
+  --switch-current-background: var(--switch-background);
+  --switch-current-border: var(--switch-border);
+  --switch-current-thumb: var(--switch-thumb);
+  position: relative;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 20px;
+  margin: 0;
+  border: 1px solid var(--switch-current-border);
+  border-radius: var(--radius-pill);
+  background: var(--switch-current-background);
+  box-shadow: var(--switch-track-shadow);
+  color: var(--switch-current-thumb);
+  appearance: none;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+input[type="checkbox"].switch::before {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--switch-thumb-sheen) currentColor;
+  box-shadow: var(--switch-thumb-shadow);
+  content: "";
+  transition: transform 140ms ease, width 140ms ease;
+}
+
+input[type="checkbox"].switch:checked::before {
+  transform: translateX(16px);
+}
+
+/* A wrapping label forwards hover and press, since clicking its text toggles too. */
+input[type="checkbox"].switch:not(:checked):is(:hover, label:hover > .switch):enabled:not([aria-disabled="true"]) {
+  --switch-current-background: var(--switch-hover-background);
+  --switch-current-border: var(--switch-hover-border);
+  --switch-current-thumb: var(--switch-hover-thumb);
+}
+
+input[type="checkbox"].switch:not(:checked):is(:active, label:active > .switch):enabled:not([aria-disabled="true"]) {
+  --switch-current-background: var(--switch-pressed-background);
+  --switch-current-border: var(--switch-hover-border);
+  --switch-current-thumb: var(--switch-hover-thumb);
+}
+
+input[type="checkbox"].switch:checked {
+  --switch-current-background: var(--switch-checked-background);
+  --switch-current-border: var(--switch-checked-border);
+  --switch-current-thumb: var(--switch-checked-thumb);
+}
+
+input[type="checkbox"].switch:checked:is(:hover, label:hover > .switch):enabled:not([aria-disabled="true"]) {
+  --switch-current-background: var(--switch-checked-hover-background);
+  --switch-current-border: var(--switch-checked-hover-border);
+}
+
+input[type="checkbox"].switch:checked:is(:active, label:active > .switch):enabled:not([aria-disabled="true"]) {
+  --switch-current-background: var(--switch-checked-pressed-background);
+  --switch-current-border: var(--switch-checked-pressed-background);
+}
+
+/* Pressing stretches the thumb toward the far side, keeping its outer edge. */
+input[type="checkbox"].switch:is(:active, label:active > .switch):enabled:not([aria-disabled="true"])::before {
+  width: 18px;
+}
+
+input[type="checkbox"].switch:checked:is(:active, label:active > .switch):enabled:not([aria-disabled="true"])::before {
+  transform: translateX(12px);
+}
+
+input[type="checkbox"].switch:is(:disabled, [aria-disabled="true"]) {
+  --switch-current-background: var(--switch-disabled-background);
+  --switch-current-border: var(--switch-disabled-border);
+  --switch-current-thumb: var(--switch-disabled-thumb);
+  cursor: not-allowed;
+}
+
+/* A disabled switch keeps showing that it is on. */
+input[type="checkbox"].switch:checked:is(:disabled, [aria-disabled="true"]) {
+  --switch-current-background: var(--switch-checked-disabled-background);
+  --switch-current-border: var(--switch-checked-disabled-border);
+  --switch-current-thumb: var(--switch-checked-disabled-thumb);
+}
+
+/* A switch always has visible text: inline next to it, or a .toggle-row. */
+.switch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.switch-label:has(> .switch:is(:disabled, [aria-disabled="true"])) {
+  cursor: not-allowed;
+}
+
+/* The track is smaller than a touch target; the label row is the target. */
+@media (pointer: coarse) {
+  :is(.switch-label, .toggle-row):has(> .switch) {
+    min-height: 44px;
+  }
+}
+
+@media (forced-colors: active) {
+  input[type="checkbox"].switch {
+    forced-color-adjust: none;
+    --switch-background: Canvas;
+    --switch-border: ButtonText;
+    --switch-thumb: ButtonText;
+    --switch-hover-background: Canvas;
+    --switch-hover-border: Highlight;
+    --switch-hover-thumb: Highlight;
+    --switch-pressed-background: Canvas;
+    --switch-checked-background: Highlight;
+    --switch-checked-border: Highlight;
+    --switch-checked-thumb: HighlightText;
+    --switch-checked-hover-background: Highlight;
+    --switch-checked-hover-border: Highlight;
+    --switch-checked-pressed-background: Highlight;
+    --switch-disabled-background: Canvas;
+    --switch-disabled-border: GrayText;
+    --switch-disabled-thumb: GrayText;
+    --switch-checked-disabled-background: GrayText;
+    --switch-checked-disabled-border: GrayText;
+    --switch-checked-disabled-thumb: Canvas;
+  }
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -6286,6 +6448,11 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
   .network-svg-node,
   .network-edge,
   .network-svg-node rect {
+    transition: none;
+  }
+
+  input[type="checkbox"].switch,
+  input[type="checkbox"].switch::before {
     transition: none;
   }
 }

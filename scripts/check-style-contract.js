@@ -110,6 +110,42 @@ assert(
   !/(?:fetch\s*\(|XMLHttpRequest|localStorage|sessionStorage|indexedDB|\/api\/)/.test(controlGallery),
   "The control gallery must not access product data, APIs, or persistent browser storage",
 );
+// The switch is a native check box whose state comes only from :checked,
+// :disabled and aria-disabled; skins override recipe inputs, and the shared
+// rules resolve them. Forced colors and reduced motion need their own paths
+// because the track and thumb are drawn, not native.
+const switchBase = scopedBlock(styles, 'input[type="checkbox"].switch');
+assert(
+  switchBase
+    && /border: 1px solid var\(--switch-current-border\);/.test(switchBase[1])
+    && /background: var\(--switch-current-background\);/.test(switchBase[1])
+    && /color: var\(--switch-current-thumb\);/.test(switchBase[1])
+    && /appearance: none;/.test(switchBase[1])
+    && /input\[type="checkbox"\]\.switch::before \{[^}]*background: var\(--switch-thumb-sheen\) currentColor;/.test(styles),
+  "The switch paints its track from --switch-current-* and its thumb from its ink",
+);
+// Liquid Glass glazes the switch through recipe inputs only, and leaves forced
+// colors to the shared system-color recipe.
+assert(
+  /@media not \(forced-colors: active\) \{\n  body\[data-ui-skin="liquid-glass"\] input\[type="checkbox"\]\.switch \{/.test(liquidGlass)
+    && ![...liquidGlass.matchAll(/\.switch[^{]*\{([^}]*)\}/g)]
+      .some((match) => /(?:^|[;\s])(?:background|border|color|box-shadow)\s*:/.test(match[1])),
+  "Liquid Glass styles the switch through --switch-* inputs outside forced colors",
+);
+assert(
+  /input\[type="checkbox"\]\.switch:is\(:disabled, \[aria-disabled="true"\]\) \{/.test(styles)
+    && /input\[type="checkbox"\]\.switch:checked:is\(:disabled, \[aria-disabled="true"\]\) \{/.test(styles),
+  "Native and ARIA-disabled switches share one disabled recipe that keeps the on state visible",
+);
+assert(
+  /@media \(forced-colors: active\) \{\n  input\[type="checkbox"\]\.switch \{\n    forced-color-adjust: none;/.test(styles)
+    && /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?input\[type="checkbox"\]\.switch::before \{\n    transition: none;/.test(styles),
+  "The drawn switch needs a forced-colors recipe and no motion under reduced motion",
+);
+assert(
+  controlGallery.includes('id: "switch"') && controlGallery.includes('["switch", "off", "on", "开相对关"]'),
+  "The control gallery must show and check the switch states",
+);
 assert(
   liquidGlassLab.includes('new URL("control-gallery.html?probe", window.location.href)')
     && !liquidGlassLab.includes("srcdoc")
