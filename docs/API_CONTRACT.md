@@ -91,7 +91,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `PUT` | `/api/dictionaries/:id/docs` | 保存语言文档 | `{ id, updatedAt, docs }` | 不做实体 ID 检查。 |
 | `PUT` | `/api/dictionaries/:id/corpus` | 保存语料库模块 | `{ id, updatedAt, corpus }` | 检查语料内部实体 ID 重复，不查词条与形态。 |
 | `PUT` | `/api/dictionaries/:id/morphology` | 保存自动形态学模块 | `{ id, updatedAt, morphology }` | 请求仍表示完整替换形态模块；后端检查提交内组与表 ID 不重复（不查词条与语料）、规则语法和函数配置，并按稳定组/表 ID 增量写入模板。纯名称、说明、表格标题或行列标签变化不重建生成投影；规则、函数、表结构或自动分配变化只重建实际受影响词条的形态搜索 projection。完全相同的规范化 payload 作为 no-op 返回既有 `updatedAt`。删除组、删除/移动表格或缩小表格会使既有词条形态组或覆写悬空时返回 `morphology_references_in_use`。 |
-| `PUT` | `/api/dictionaries/:id/settings/ipa` | 保存自动 IPA 设置 | `{ id, updatedAt, settings }` | IPA 映射是按顺序保存的纯文本规则 `{ from, to, before, after }`，没有实体 ID，也不参与实体 ID 防撞。 |
+| `PUT` | `/api/dictionaries/:id/settings/ipa` | 保存自动 IPA 设置 | `{ id, updatedAt, settings }` | IPA 映射是按顺序保存的纯文本规则 `{ from, to, before, after }`，没有实体 ID，也不参与实体 ID 防撞。`syllable.vowels`、`onsetClusters`、`codaClusters`、`complexPhonemes` 都是字符串数组；写入字符串或含分隔符的数组项时，按空白、逗号、顿号拆开。 |
 | `POST` | `/api/dictionaries/:id/autosave` | 页面卸载时保存文档/语料草稿 | `{ id, updatedAt, docs?, corpus? }` | 当前只分发 `docs` 和 `corpus`；请求至少须携带其中一个有效对象，否则返回 `invalid_autosave_payload`。 |
 
 ### 词条读取与保存
@@ -895,7 +895,7 @@ IPA 分布使用以下 source 和 view：
 
 summary 模式同样只传 `source` 与 `responseMode: "summary"`。`summary.distributions` 一次返回 `units`、`initials`、`finals` 和 `syllableCounts` 全部桶，每行形如 `{ value, occurrenceCount, entryCount }`。音素单元的 `occurrenceCount` 是总出现次数，`entryCount` 是至少包含一次该单元的唯一词条数；其余三类每个词条只贡献一次，因此两者相同。summary 另含全部词条数 `dictionaryEntryCount`、实际参与 IPA 分布的非空 IPA 词条数 `ipaEntryCount`、`unitOccurrenceCount`、`syllableEntryCount`、`syllableOccurrenceCount` 和按两位小数舍入的数值型 `averageSyllablesPerIpaEntry`。
 
-分布解析先移除 IPA 包裹符和重音符，再按空白、传统 `.` 及当前 IPA 设置中的音节分隔符切分；音素单元切分复用 `ipa-model` 的 `complexPhonemes` 最长优先规则。桶查询的搜索语义为 `Distribution(category, value) ∩ EntrySearch`，不会重跑分布计算。items 中的 source-specific feature 为 `{ category, value, occurrenceCount }`；其中 unit 的 `occurrenceCount` 是该词条内出现次数，其余类别为 1。
+分布解析先移除 IPA 包裹符和重音符，再按空白、传统 `.` 及当前 IPA 设置中的音节分隔符切分；音素单元切分复用 `ipa-model` 的 `tokenizePhonemeUnits`：连续的调字母算一个单元，其余按 `phonemeUnits`（`complexPhonemes` 与多字符元音）最长优先。桶查询的搜索语义为 `Distribution(category, value) ∩ EntrySearch`，不会重跑分布计算。items 中的 source-specific feature 为 `{ category, value, occurrenceCount }`；其中 unit 的 `occurrenceCount` 是该词条内出现次数，其余类别为 1。
 
 形态分析使用以下 source 和 view：
 
@@ -961,7 +961,7 @@ assignment 的两个计数互斥且和为 `inputEntryCount`；每个 mode 行的
 
 `ipaAutoCompare` items 形如 `{ entry: EntrySummary, feature: { outcome, generated, diagnostics } }`；`ipaDistribution` items 的 feature 形如 `{ category, value, occurrenceCount }`；`morphologyAnalysis` items 的 feature 形状见上。HTTP 响应和前端高级筛选 action 都不携带完整匹配 ID。`pageInfo` 返回 `total/limit/windowOffset/nextCursor/windowCursor/hasMore`。location 请求沿用同一 source/view/page，并增加 `entryId`；响应增加 `{ found, index, windowIndex, windowOffset }`。
 
-会话使用每词典最多 4 份、全局估算 32 MiB、空闲 2 分钟的有界进程缓存，并合并相同 descriptor 的并发构建。写入或 source 变化会产生新会话；`ipaAutoCompare` 另受完整 IPA 设置与引擎 ID/版本影响，`ipaDistribution` 只受复杂音素和音节分隔符影响，不调用音系引擎，也不因映射、重音或其他生成设置变化而产生不同 descriptor。`morphologyAnalysis` 只消费当前 generation 下的模板组元数据和词条形态分配/覆写事实，不依赖音系引擎、搜索 projection 或单元格生成配置摘要。淘汰或进程重启后由 descriptor 透明重建。cursor 绑定进程 epoch、generation、result key 和视图 identity，陈旧 cursor 返回 `query_cursor_stale`。当前简易 IPA 模型由 adapter 包装；自动生成值仍是可重建的运行时结果，不新增持久化列。
+会话使用每词典最多 4 份、全局估算 32 MiB、空闲 2 分钟的有界进程缓存，并合并相同 descriptor 的并发构建。写入或 source 变化会产生新会话；`ipaAutoCompare` 另受完整 IPA 设置与引擎 ID/版本影响，`ipaDistribution` 只受多字符音位、多字符元音和音节分隔符影响，不调用音系引擎，也不因映射、重音或其他生成设置变化而产生不同 descriptor。`morphologyAnalysis` 只消费当前 generation 下的模板组元数据和词条形态分配/覆写事实，不依赖音系引擎、搜索 projection 或单元格生成配置摘要。淘汰或进程重启后由 descriptor 透明重建。cursor 绑定进程 epoch、generation、result key 和视图 identity，陈旧 cursor 返回 `query_cursor_stale`。当前简易 IPA 模型由 adapter 包装；自动生成值仍是可重建的运行时结果，不新增持久化列。
 
 音系引擎 adapter（`lib/phonology-engine.js`）是 `ipaAutoCompare` 与具体 IPA 生成器之间的唯一边界，feature service 只依赖它的契约，以后接入外部模块时只替换 adapter，同步或异步实现都不改变 source 的页面语义：
 

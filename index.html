@@ -814,7 +814,7 @@
                   <span data-i18n="ipaKeyboardSymbols">键盘符号</span>
                   <textarea id="ipaKeyboardInput" rows="3"></textarea>
                 </label>
-                <p class="field-help" data-i18n="ipaKeyboardHelp">以空格、逗号或换行分隔。新词典默认包含 ˈ 和 ˌ。</p>
+                <p class="field-help" data-i18n="ipaKeyboardHelp">以空格、逗号或换行分隔。新词典默认包含 ˈ、ˌ 和 t͡s 里的连接符。</p>
               </section>
               <div class="form-actions">
                 <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" type="submit" data-i18n="saveConfig">保存配置</button>
@@ -1115,7 +1115,7 @@
                 <div class="form-grid">
                   <label>
                     <span data-i18n="vowels">元音音位</span>
-                    <textarea class="ipa-single-line" id="ipaVowelsInput" rows="1" maxlength="120"></textarea>
+                    <textarea class="ipa-single-line" id="ipaVowelsInput" rows="1" maxlength="220"></textarea>
                   </label>
                   <label>
                     <span data-i18n="syllableSeparator">音节分隔符</span>
@@ -1130,7 +1130,7 @@
                     <textarea class="ipa-single-line" id="ipaCodaClustersInput" rows="1" maxlength="220"></textarea>
                   </label>
                   <label>
-                    <span data-i18n="complexPhonemes">复杂音位</span>
+                    <span data-i18n="complexPhonemes">多字符音位</span>
                     <textarea class="ipa-single-line" id="ipaComplexPhonemesInput" rows="1" maxlength="220"></textarea>
                   </label>
                 </div>

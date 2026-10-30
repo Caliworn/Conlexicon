@@ -1120,6 +1120,43 @@ function checkModelNormalization() {
     ["t͡ʃ", "a"],
   );
   assert.deepEqual(
+    ipaModel.tokenizePhonemeUnits("ma˨˩˦t͡sa꜌˥", ["t͡s", "˩˦"]).map((token) => token.value),
+    ["m", "a", "˨˩˦", "t͡s", "a", "꜌˥"],
+    "a run of tone letters is one unit without registration",
+  );
+  assert.deepEqual(ipaModel.normalizeClusterList("t͡s t͡ɕʰ, t͡s、˥˧"), ["t͡ɕʰ", "t͡s", "˥˧"]);
+  assert.deepEqual(ipaModel.normalizeClusterList(["t͡s t͡ɕʰ"]), ["t͡ɕʰ", "t͡s"]);
+  assert.deepEqual(ipaModel.normalizeVowelList("o, ə̃、ai  o"), ["o", "ə̃", "ai"]);
+  assert.deepEqual(ipaModel.normalizeIpaSettings().syllable.vowels, ["a", "e", "i", "o", "u"]);
+  assert.deepEqual(ipaModel.normalizeIpaKeyboard(), ["ˈ", "ˌ", "͡"]);
+  assert.deepEqual(ipaModel.normalizeIpaKeyboard("ɤ, ͡"), ["ɤ", "͡"]);
+  const syllabifiedIpa = (lemma, syllable = {}, defaultStress = 0) => ipaModel.generateIpaFromLemma(lemma, {
+    syllable: { vowels: "a i ə ə̃ ai", separator: ".", complexPhonemes: "t͡ɕ", ...syllable },
+    defaultStress,
+    unstressMonosyllables: true,
+  });
+  assert.equal(syllabifiedIpa("ka t͡ɕa˧˥"), "/ka t͡ɕa˧˥/", "a space is a word boundary and takes no separator");
+  assert.equal(syllabifiedIpa("kata t͡ɕa"), "/ka.ta t͡ɕa/");
+  assert.equal(syllabifiedIpa("ka.ta tata"), "/ka.ta ta.ta/", "a written separator only affects its own word");
+  assert.equal(syllabifiedIpa("kata ta", {}, -2), "/ka.ˈta ta/", "an entry with spaces keeps one default stress");
+  assert.equal(syllabifiedIpa("taika"), "/tai.ka/", "a multi-character vowel is one nucleus");
+  assert.equal(syllabifiedIpa("kə̃tə̃"), "/kə̃.tə̃/");
+  assert.equal(syllabifiedIpa("man˧˥ta"), "/man˧˥.ta/", "tone letters stay with the preceding syllable");
+  assert.equal(syllabifiedIpa("mant˥˧ka"), "/mant˥˧.ka/");
+  assert.equal(syllabifiedIpa("man꜓ta"), "/man꜓.ta/", "left-stem tone letters count as tone letters");
+  assert.equal(syllabifiedIpa("man꜌ta"), "/man꜌.ta/", "dotted tone letters count as tone letters");
+  assert.equal(syllabifiedIpa("man³⁵ta"), "/man³.⁵ta/", "superscript digits are not tone letters");
+  assert.equal(syllabifiedIpa("mansta", { codaClusters: "ns" }), "/mans.ta/");
+  assert.deepEqual(
+    ipaModel.ipaPipelinePreview("kata t͡ɕa", { syllable: { vowels: "a", complexPhonemes: "t͡ɕ" }, defaultStress: 0 }),
+    { mapped: "kata t͡ɕa", syllables: "ka.ta t͡ɕa", final: "/ka.ta t͡ɕa/" },
+  );
+  assert.deepEqual(
+    ipaModel.phonemeUnits({ vowels: "a ə̃", complexPhonemes: ["t͡s"] }),
+    ["t͡s", "ə̃"],
+    "multi-character vowels tokenize like multi-character phonemes",
+  );
+  assert.deepEqual(
     morphologyModel.extractMorphologyReferences("{lemma}-{a=o}"),
     [
       { body: "lemma", unterminated: false },
@@ -1444,7 +1481,10 @@ function checkModelNormalization() {
       },
     ],
     settings: {
-      ipa: { stressMappings: [{ id: "ipa-legacy", from: "a", to: "a" }] },
+      ipa: {
+        stressMappings: [{ id: "ipa-legacy", from: "a", to: "a" }],
+        syllable: { vowels: "aə̃õ i" },
+      },
       toolNavOrder: ["editor", "morphology", "settings"],
       glossFontFamily: "sans",
       corpusGlossAlign: false,
@@ -1465,6 +1505,7 @@ function checkModelNormalization() {
   assert.equal(legacyConvertedImport.dictionary.settings.ipa.mappings[0].to, "ˈa");
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings.ipa.mappings[0], "id"), false);
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings.ipa, "stressMappings"), false);
+  assert.deepEqual(legacyConvertedImport.dictionary.settings.ipa.syllable.vowels, ["a", "ə̃", "õ", "i"]);
   assert.equal(legacyConvertedImport.dictionary.settings.glossStyles.gla.fontFamily, "sans");
   assert.equal(legacyConvertedImport.dictionary.settings.corpusUnitCardGlossAlign, false);
   assert.equal(legacyConvertedImport.dictionary.settings.partialEditPageSwitchAction, "save");

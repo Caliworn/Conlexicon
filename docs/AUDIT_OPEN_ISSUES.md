@@ -175,7 +175,7 @@ C09（数据库非空列与静态 DOM 兜底）与 C10（前端对服务端响�
 
 - **定位与证据**：检查 `app.js` 的标识符引用、`index.html` 和脚本调用后，下列本地函数只有定义，无调用或事件绑定；同名共享模块的方法仍有生产或测试用途，不属于本项删除范围。
 - **形态 5 个**：`normalizeMorphologyOverrides`、`applyMorphologyRuleSyntax`、`morphologySearchStrings`、`extractMorphologyReferences`、`extractMorphologyFunctionCalls`。
-- **IPA 14 个**：`splitKeyboardSymbols`、`normalizeOnsetClusters`、`displayIpaStage`、`applyIpaMappings`、`ruleMatchesAt`、`conditionMatches`、`splitIntoSyllables`、`tokenizePhonemeUnits`、`matchingCodaCluster`、`matchingOnsetCluster`、`middleTokenBreak`、`syllabifyIpaOutput`、`defaultStressIndex`、`resolveIpaStressIndex`。
+- **IPA 14 个**：`splitSymbolList`（原 `splitKeyboardSymbols`）、`normalizeOnsetClusters`、`displayIpaStage`、`applyIpaMappings`、`ruleMatchesAt`、`conditionMatches`、`splitIntoSyllables`、`tokenizePhonemeUnits`、`matchingCodaCluster`、`matchingOnsetCluster`、`middleTokenBreak`、`syllabifyIpaOutput`、`defaultStressIndex`、`resolveIpaStressIndex`。
 - **影响与方向**：除未调用的旧 overrides 实现外，多数只是转调共享模块的包装，增加重复维护入口。删除这些本地定义即可；保留正在使用的 `ipaPipelinePreview`、规则表单规范化和共享模块 API，不为证明删除而增加墓碑测试。
 
 ### C13（P3）：SQLite 中只写不读或无消费者的列

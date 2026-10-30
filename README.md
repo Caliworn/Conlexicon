@@ -19,7 +19,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - **Browsing and filtering**: large lists and root mode load in windows behind one continuous scrollbar. Search supports per-field strict or fuzzy matching, optional NFC and case folding, and custom equivalence rules. Part-of-speech, analysis, and quality-check filters share one filter bar and keep the current search, sort, and position.
 - **Root mode**: derived entries are grouped under their roots, with per-group and global expand/collapse and quick derived-entry creation.
 - **Lexical network**: a layered SVG view of sources and derived entries, with animated refocusing, hover details, keyboard support, and a vertical layout on narrow screens.
-- **Auto IPA**: mapping, syllabification, onset/coda clusters, complex phonemes, stress settings, a sandbox, and batch generation.
+- **Auto IPA**: mapping, syllabification, onset/coda clusters, multi-character phonemes, stress settings, a sandbox, and batch generation.
 - **Auto morphology**: template groups with multiple tables, automatic or manual group selection per entry, rule syntax, function objects, overrides, and searchable generated forms.
 - **Language documentation**: Markdown with split, edit-only, and preview-only modes.
 - **Corpus**: ordered blocks, speaker/modality layers, standalone units, inherited attributes, ID and parent-link validation, and gloss-based unit names.
@@ -39,7 +39,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - **浏览与筛选**：大型列表和词根模式分窗加载，保持一条连续滚动条。搜索支持逐字段严格或模糊匹配、可选 NFC 与大小写折叠，以及自定义等价规则。词性、数据分析和质量检查产生的筛选共用一个筛选栏，并保留当前搜索、排序和位置。
 - **词根模式**：衍生词按词根分组显示，支持单组和全局展开／收起，以及快速新建衍生词。
 - **词汇网络**：以分层 SVG 展示来源与衍生关系，切换焦点时连续过渡，支持悬浮详情、键盘操作和窄屏纵向布局。
-- **自动 IPA**：映射、音节划分、音节首／尾辅音簇、复杂音位、重音设置、沙盒测试和批量生成。
+- **自动 IPA**：映射、音节划分、音节首／尾辅音簇、多字符音位、重音设置、沙盒测试和批量生成。
 - **自动形态学**：模板组及组内多个表格、词条级自动或手动选择形态组、规则语法、函数识别对象、覆盖项，以及可搜索的生成形式。
 - **语言文档**：Markdown，支持分栏、纯编辑和纯预览模式。
 - **语料库**：有序语料块、发言人／模态语料层、独立语料单元、属性继承、ID 与父级链接校验，以及基于 Gloss 的单元名。
@@ -125,11 +125,15 @@ data/dictionaries/*.sqlite   one file per dictionary: content and settings
 
 The `data/` directory is ignored by Git so personal dictionaries are never committed.
 
+Since 2026-10-30, Auto IPA vowel phonemes must be separated by spaces or commas. Legacy JSON is converted on import; for an existing dictionary, retype the vowels on the Auto IPA page (for example `a e i o u`), otherwise the joined vowels count as one item and nothing is syllabified.
+
 The SQLite schema is not versioned or upgraded at startup during development. When an update changes it (as the definition-tag update of 2026-10-25 did), export each dictionary as JSON with the previous version first, then re-import the JSON after updating.
 
 Run only one server process per data directory at a time. Index reads and updates are serialized within that process, and writes use atomic file replacement; this does not coordinate multiple server processes.
 
 `data/index.json` 保存词典索引、当前词典及全局界面语言、主题和皮肤；每个词典的内容与设置保存在 `data/dictionaries/*.sqlite`。`data/` 已被 Git 忽略，个人词库不会被提交。
+
+2026-10-30 起，自动 IPA 的元音音位必须用空格、逗号或顿号分隔。旧 JSON 导入时会自动转换；已有词典要在自动 IPA 页重新输入一次元音（例如 `a e i o u`），否则连在一起的元音会算成一项，音节不再切分。
 
 开发期间 SQLite schema 没有版本号，启动时也不升级旧库。更新改动了 schema 时（例如 2026-10-30 的标签登记表更新），请先用旧版本把每本词典导出为 JSON，更新后再导入。
 

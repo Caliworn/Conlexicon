@@ -727,7 +727,7 @@ const i18n = {
     entrySectionOrderHelp: "拖动卡片以调整词条详情和完整编辑中栏目顺序。衍生词只在有内容时显示，且不可在完整编辑中修改。",
     ipaKeyboardSettings: "IPA 虚拟键盘",
     ipaKeyboardSymbols: "键盘符号",
-    ipaKeyboardHelp: "以空格、逗号或换行分隔。新词典默认包含 ˈ 和 ˌ。",
+    ipaKeyboardHelp: "以空格、逗号或换行分隔。新词典默认包含 ˈ、ˌ 和 t͡s 里的连接符。",
     toolNavigationOrder: "工具导航排序",
     toolNavigationOrderHelp: "拖动卡片来调整左侧导航栏顺序。该顺序保存到当前词典文件中。",
     cancel: "取消",
@@ -840,12 +840,12 @@ const i18n = {
     syllableRules: "音节规则",
     ipaSyllableHelpTitle: "音节划分逻辑",
     ipaSyllableHelpInfo: "查看音节划分逻辑",
-    ipaSyllableHelpBody: "自动 IPA 会先执行正写法映射。映射后的结果会按复杂音位切成单位；复杂音位始终作为一个单位参与后续判断。\n\n随后系统用元音音位寻找音节核心。两个元音核心之间的辅音串会被分配到相邻音节边界。\n\n优先级为：复杂音位分词 → 寻找元音核心 → 检查合法音节首辅音簇 → 检查合法音节尾辅音簇 → 默认中间切分。\n\n音节首辅音簇用于把匹配到的末段辅音串整体分给后一个音节；音节尾辅音簇用于把匹配到的前段辅音串整体留给前一个音节。若无法命中配置，就按默认逻辑把中间辅音串尽量居中切开。\n\n音节分隔符只影响输出显示，不改变内部识别单位。重音标注在音节划分之后执行。",
+    ipaSyllableHelpBody: "自动 IPA 会先执行正写法映射。映射后的结果按空格分成词，每个词单独划分音节；空格本身就是词的边界，不再加音节分隔符。\n\n每个词会切成单位：多字符音位、多字符元音和连续的调字母始终作为一个单位参与后续判断。\n\n随后系统用元音音位寻找音节核心。两个元音核心之间的辅音串会被分配到相邻音节边界；其中最后一个调字母及它之前的内容都留给前一个音节，只有其后的辅音串继续往下判断。\n\n优先级为：按空格分词 → 多字符单位分词 → 寻找元音核心 → 调字母归前一音节 → 检查合法音节尾辅音簇 → 检查合法音节首辅音簇 → 默认中间切分。\n\n音节首辅音簇用于把匹配到的末段辅音串整体分给后一个音节；音节尾辅音簇用于把匹配到的前段辅音串整体留给前一个音节。若无法命中配置，就按默认逻辑把中间辅音串尽量居中切开。\n\n音节分隔符只影响输出显示，不改变内部识别单位。重音标注在音节划分之后执行，含空格的词条整体只算一个默认重音。\n\n填写方式：元音音位、音节首／尾辅音簇和多字符音位都用空格分隔；也可以输入逗号或顿号，离开输入框时会统一成空格。多字符音位是用多个字符书写、但算作一个音位的符号，例如 t͡s、t͡ɕʰ。多字符元音（例如 ə̃、ai）写进元音音位即可，不用再写进多字符音位。\n\n调字母不用登记：˥ ˦ ˧ ˨ ˩、左竖线形式 ꜒ ꜓ ꜔ ꜕ ꜖ 和带点形式 ꜈ ꜉ ꜊ ꜋ ꜌ ꜍ ꜎ ꜏ ꜐ ꜑ 都会自动识别。连续的调字母算一个单位，例如 ˥˧，IPA 分布也按一个单位统计；它们始终留在前一个音节。数字和上标数字不算调字母，需要先映射成调字母。",
     vowels: "元音音位",
     syllableSeparator: "音节分隔符",
     onsetClusters: "音节首辅音簇",
     codaClusters: "音节尾辅音簇",
-    complexPhonemes: "复杂音位",
+    complexPhonemes: "多字符音位",
     defaultStressPosition: "默认重音位置",
     stressRules: "重音规则",
     defaultStressHelp: "整数。正数为正数第几音节，负数为倒数第几音节；0 表示不标默认重音。词更短时落在可达到的最远位置。",
@@ -1366,7 +1366,7 @@ const i18n = {
     entrySectionOrderHelp: "Drag cards to reorder sections in entry display and full editing. Derived entries appear only when present and remain read-only in full editing.",
     ipaKeyboardSettings: "IPA Virtual Keyboard",
     ipaKeyboardSymbols: "Keyboard Symbols",
-    ipaKeyboardHelp: "Separate symbols with spaces, commas, or line breaks. New dictionaries include ˈ and ˌ by default.",
+    ipaKeyboardHelp: "Separate symbols with spaces, commas, or line breaks. New dictionaries include ˈ, ˌ, and the tie bar used in t͡s by default.",
     toolNavigationOrder: "Tool Navigation Order",
     toolNavigationOrderHelp: "Drag cards to reorder the left navigation. The order is saved in the current dictionary file.",
     cancel: "Cancel",
@@ -1483,12 +1483,12 @@ const i18n = {
     syllableRules: "Syllabification Rules",
     ipaSyllableHelpTitle: "Syllabification Logic",
     ipaSyllableHelpInfo: "Show syllabification logic",
-    ipaSyllableHelpBody: "Auto IPA runs orthographic mapping first. The mapped result is then tokenized by complex phonemes; a complex phoneme always stays as one unit for later decisions.\n\nThe system then finds syllable nuclei using vowel phonemes. Consonant strings between two vowel nuclei are assigned across the syllable boundary.\n\nPriority: complex phoneme tokenization → vowel nucleus detection → legal onset cluster check → legal coda cluster check → default midpoint split.\n\nOnset clusters assign the matching final part of the consonant string to the following syllable. Coda clusters keep the matching initial part with the preceding syllable. If no configured cluster applies, the fallback splits the intervening consonant string as close to the middle as possible.\n\nThe syllable separator only affects output display; it does not change internal units. Stress is applied after syllabification.",
+    ipaSyllableHelpBody: "Auto IPA runs orthographic mapping first. The mapped result is then divided into words at spaces, and each word is syllabified on its own; a space is already a word boundary, so no syllable separator is added there.\n\nEach word is tokenized into units: multi-character phonemes, multi-character vowels, and runs of tone letters always stay as one unit for later decisions.\n\nThe system then finds syllable nuclei using vowel phonemes. Consonant strings between two vowel nuclei are assigned across the syllable boundary; the last tone letter and everything before it stay with the preceding syllable, and only the consonants after it go through the remaining checks.\n\nPriority: word division at spaces → multi-character tokenization → vowel nucleus detection → tone letters stay with the preceding syllable → legal coda cluster check → legal onset cluster check → default midpoint split.\n\nOnset clusters assign the matching final part of the consonant string to the following syllable. Coda clusters keep the matching initial part with the preceding syllable. If no configured cluster applies, the fallback splits the intervening consonant string as close to the middle as possible.\n\nThe syllable separator only affects output display; it does not change internal units. Stress is applied after syllabification, and an entry containing spaces still gets one default stress overall.\n\nEntering lists: separate vowel phonemes, onset and coda clusters, and multi-character phonemes with spaces. Commas also work and become spaces when you leave the field. A multi-character phoneme is written with several characters but counts as one phoneme, such as t͡s or t͡ɕʰ. Multi-character vowels such as ə̃ or ai go under vowel phonemes and do not need to be listed as multi-character phonemes too.\n\nTone letters need no registration: ˥ ˦ ˧ ˨ ˩, the left-stem forms ꜒ ꜓ ꜔ ꜕ ꜖, and the dotted forms ꜈ ꜉ ꜊ ꜋ ꜌ ꜍ ꜎ ꜏ ꜐ ꜑ are all recognized automatically. A run of tone letters counts as one unit, such as ˥˧, including in the IPA distribution, and always stays with the preceding syllable. Digits and superscript digits are not tone letters; map them to tone letters first.",
     vowels: "Vowel Phonemes",
     syllableSeparator: "Syllable Separator",
     onsetClusters: "Onset Clusters",
     codaClusters: "Coda Clusters",
-    complexPhonemes: "Complex Phonemes",
+    complexPhonemes: "Multi-character Phonemes",
     defaultStressPosition: "Default Stress Position",
     stressRules: "Stress Rules",
     defaultStressHelp: "Integer. Positive counts from the start; negative counts from the end; 0 adds no default stress. Shorter words clamp to the farthest reachable syllable.",
@@ -2565,8 +2565,8 @@ function normalizeIpaKeyboard(symbols) {
   return ipaModel.normalizeIpaKeyboard(symbols);
 }
 
-function splitKeyboardSymbols(value) {
-  return ipaModel.splitKeyboardSymbols(value);
+function splitSymbolList(value) {
+  return ipaModel.splitSymbolList(value);
 }
 
 function normalizeIpaSettings(ipa = {}) {
@@ -9429,13 +9429,13 @@ const ANALYSIS_QUERIES = {
   ipaDistribution: {
     endpoint: "features/query",
     body: () => analysisFeatureSummaryBody("ipaDistribution"),
-    // Only these two settings change the distribution.
+    // Only these settings change the distribution.
     key: (dictionary) => {
       const { syllable } = dictionarySettings(dictionary).ipa;
       return stableJson({
         dictionaryId: dictionary.id,
         updatedAt: dictionary.updatedAt,
-        complexPhonemes: syllable.complexPhonemes,
+        phonemeUnits: ipaModel.phonemeUnits(syllable),
         separator: syllable.separator,
       });
     },
@@ -12620,11 +12620,11 @@ function insertSymbolIntoInput(symbol, input) {
 function fillIpaForm(dictionary) {
   const ipa = dictionarySettings(dictionary).ipa;
   renderIpaRuleList(elements.ipaMappingList, ipa.mappings);
-  elements.ipaVowelsInput.value = ipa.syllable.vowels;
+  elements.ipaVowelsInput.value = ipa.syllable.vowels.join(" ");
   elements.ipaSyllableSeparatorInput.value = ipa.syllable.separator;
-  elements.ipaOnsetClustersInput.value = ipa.syllable.onsetClusters.join(", ");
-  elements.ipaCodaClustersInput.value = ipa.syllable.codaClusters.join(", ");
-  elements.ipaComplexPhonemesInput.value = ipa.syllable.complexPhonemes.join(", ");
+  elements.ipaOnsetClustersInput.value = ipa.syllable.onsetClusters.join(" ");
+  elements.ipaCodaClustersInput.value = ipa.syllable.codaClusters.join(" ");
+  elements.ipaComplexPhonemesInput.value = ipa.syllable.complexPhonemes.join(" ");
   elements.ipaDefaultStressInput.value = ipa.defaultStress;
   elements.ipaUnstressMonosyllablesInput.checked = ipa.unstressMonosyllables;
 }
@@ -12772,7 +12772,7 @@ function ipaFormSnapshot() {
   const ipa = normalizeIpaSettings({
     mappings: collectIpaRuleList(elements.ipaMappingList),
     syllable: {
-      vowels: elements.ipaVowelsInput.value.trim() || "aeiouAEIOU",
+      vowels: elements.ipaVowelsInput.value,
       separator: elements.ipaSyllableSeparatorInput.value.trim() || ".",
       onsetClusters: normalizeClusterList(elements.ipaOnsetClustersInput.value),
       codaClusters: normalizeClusterList(elements.ipaCodaClustersInput.value),
@@ -15107,7 +15107,7 @@ function ipaSettingsFromForm() {
   return normalizeIpaSettings({
     mappings: collectIpaRuleList(elements.ipaMappingList),
     syllable: {
-      vowels: elements.ipaVowelsInput.value.trim() || "aeiouAEIOU",
+      vowels: elements.ipaVowelsInput.value,
       separator: elements.ipaSyllableSeparatorInput.value.trim() || ".",
       onsetClusters: normalizeClusterList(elements.ipaOnsetClustersInput.value),
       codaClusters: normalizeClusterList(elements.ipaCodaClustersInput.value),
@@ -18201,6 +18201,17 @@ elements.docsModeControl.addEventListener("click", (event) => {
   renderLanguageDocs(activeDictionary());
 });
 elements.ipaForm.addEventListener("submit", saveIpaSettings);
+[
+  elements.ipaVowelsInput,
+  elements.ipaOnsetClustersInput,
+  elements.ipaCodaClustersInput,
+  elements.ipaComplexPhonemesInput,
+].forEach((input) => {
+  input.addEventListener("blur", () => {
+    input.value = splitSymbolList(input.value).join(" ");
+  });
+});
+
 elements.ipaSyllableHelpButton.addEventListener("click", () => {
   appInfoDialog(t("ipaSyllableHelpTitle"), {
     text: t("ipaSyllableHelpBody"),

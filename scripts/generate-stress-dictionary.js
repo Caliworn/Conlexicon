@@ -284,7 +284,7 @@ function buildDictionary(entryCount = DEFAULT_ENTRY_COUNT) {
           { id: deterministicId("ipa", 1, 4), from: "q", to: "ʔ", before: "", after: "" },
         ],
         syllable: {
-          vowels: "aeiouə",
+          vowels: ["a", "e", "i", "o", "u", "ə"],
           separator: ".",
           onsetClusters: [],
           codaClusters: [],
