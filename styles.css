@@ -3398,6 +3398,23 @@ span.pending-source {
   display: none;
 }
 
+#tagManagerViewControl {
+  flex: none;
+}
+
+#tagManagerViewControl button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  padding: 0;
+}
+
+#tagManagerViewControl .nav-icon {
+  width: 20px;
+  height: 20px;
+}
+
 .tag-manager-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(240px, 280px);
@@ -3469,7 +3486,7 @@ span.pending-source {
   background: var(--material-inset-background);
 }
 
-.tag-row:focus-visible {
+:is(.tag-row, .tag-tile):focus-visible {
   outline: 2px solid var(--ui-focus);
   outline-offset: 1px;
 }
@@ -3478,7 +3495,7 @@ span.pending-source {
   background: var(--ui-accent-soft);
 }
 
-.tag-row.dragging {
+:is(.tag-row, .tag-tile).dragging {
   opacity: 0.5;
 }
 
@@ -3587,6 +3604,73 @@ span.pending-source {
 .tag-add-row .tag-row-note {
   grid-column: 1;
   color: var(--ui-danger);
+}
+
+.tag-zone-list.is-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-zone-list.is-compact > .tag-add-row {
+  flex: 1 1 100%;
+}
+
+.tag-tile-item {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* The drop marker sits in the gap outside the tile, so the tile cannot clip; its
+   label does the ellipsis. */
+.tag-tile {
+  position: relative;
+  max-width: 150px;
+  min-height: 28px;
+  border: 0;
+  padding: 3px 10px;
+  font-size: 0.85rem;
+  overflow: visible;
+}
+
+.tag-tile[draggable="true"] {
+  cursor: grab;
+}
+
+/* Outlines are left to focus and highlighting, which a tile also has to show. */
+.tag-tile.is-unused:not(.highlight-tag) {
+  background: transparent;
+  color: var(--ui-text-muted);
+  box-shadow: inset 0 0 0 1px var(--ui-border);
+}
+
+.tag-tile.is-highlighted {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 1px;
+}
+
+.tag-tile.drop-before::before,
+.tag-zone.drop-end .tag-tile-item:last-child > .tag-tile::after {
+  position: absolute;
+  inset-block: 0;
+  width: 2px;
+  background: var(--ui-accent);
+  content: "";
+}
+
+.tag-tile.drop-before::before {
+  inset-inline-start: -4px;
+}
+
+.tag-zone.drop-end .tag-tile-item:last-child > .tag-tile::after {
+  inset-inline-end: -4px;
+}
+
+@media (pointer: coarse) {
+  .tag-tile {
+    min-height: 44px;
+  }
 }
 
 .tag-display-panel {

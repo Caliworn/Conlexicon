@@ -204,6 +204,7 @@ let tagManagerState = {
   highlighted: new Set(),
   pendingReveal: "",
   displayOpen: false,
+  view: "list",
 };
 let tagManagerRenderedSignature = "";
 let tagManagerChangeQueue = Promise.resolve();
@@ -664,6 +665,10 @@ const i18n = {
     tagTooltipDisplayReplacement: "显示替换",
     tagManager: "标签",
     tagManagerSearch: "搜索标签",
+    tagManagerViewLabel: "标签视图",
+    tagManagerViewList: "列表",
+    tagManagerViewCompact: "压缩",
+    tagManagerViewEntries: "查看 {count} 个词条",
     tagManagerAdd: "添加标签",
     tagManagerAddPlaceholder: "新标签",
     tagManagerAddSeparator: "标签不能包含逗号或顿号。",
@@ -1299,6 +1304,10 @@ const i18n = {
     tagTooltipDisplayReplacement: "Display",
     tagManager: "Tags",
     tagManagerSearch: "Search tags",
+    tagManagerViewLabel: "Tag view",
+    tagManagerViewList: "List",
+    tagManagerViewCompact: "Compact",
+    tagManagerViewEntries: "View Entries ({count})",
     tagManagerAdd: "Add Tag",
     tagManagerAddPlaceholder: "New tag",
     tagManagerAddSeparator: "Tags cannot contain commas or ideographic commas.",
@@ -1812,6 +1821,7 @@ const elements = {
   tagsOpenDictionaryManagerButton: document.querySelector("#tagsOpenDictionaryManagerButton"),
   tagManagerSummary: document.querySelector("#tagManagerSummary"),
   tagManagerSearchInput: document.querySelector("#tagManagerSearchInput"),
+  tagManagerViewControl: document.querySelector("#tagManagerViewControl"),
   tagManagerAddButton: document.querySelector("#tagManagerAddButton"),
   tagManagerDisplayToggle: document.querySelector("#tagManagerDisplayToggle"),
   tagManagerDisplayPanel: document.querySelector("#tagManagerDisplayPanel"),
@@ -4012,6 +4022,9 @@ function renderAvailability() {
   elements.tagsNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "tags";
   elements.tagsPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "tags";
   elements.tagManagerSearchInput.disabled = !backendAvailable || !hasDictionary;
+  elements.tagManagerViewControl.querySelectorAll("button").forEach((button) => {
+    button.disabled = !backendAvailable || !hasDictionary;
+  });
   elements.tagManagerAddButton.disabled = !backendAvailable || !hasDictionary;
   elements.tagManagerDisplayToggle.disabled = !backendAvailable || !hasDictionary;
   elements.batchIpaAllButton.disabled = !backendAvailable || !hasDictionary;
@@ -6915,7 +6928,8 @@ function showEntryContextMenu(event, entry, options = {}) {
 }
 
 // An action with `disabledReason` stays in the menu and says why it cannot run.
-function showContextMenu(event, label, actions) {
+// `returnFocus` takes the focus back when Esc closes the menu.
+function showContextMenu(event, label, actions, { returnFocus = null } = {}) {
   closeEntryContextMenu();
   const menu = document.createElement("div");
   menu.className = "entry-context-menu";
@@ -6959,6 +6973,7 @@ function showContextMenu(event, label, actions) {
   const closeOnKeydown = (keyEvent) => {
     if (keyEvent.key === "Escape") {
       closeEntryContextMenu();
+      returnFocus?.focus();
     }
   };
   const closeOnScroll = () => closeEntryContextMenu();
@@ -12985,13 +13000,16 @@ function tagShownText(row) {
   return row.displayLabel || row.tag;
 }
 
+function tagChipClasses(row) {
+  return ["chip", row.partOfSpeech ? "part-chip" : "", row.color === "red" ? "highlight-tag" : ""]
+    .filter(Boolean)
+    .join(" ");
+}
+
 function tagRowHtml(row, rows, activeTag) {
   const active = row.tag === activeTag;
   const controlTabIndex = active ? "" : ' tabindex="-1"';
   const tag = escapeHtml(row.tag);
-  const chipClasses = ["chip", row.partOfSpeech ? "part-chip" : "", row.color === "red" ? "highlight-tag" : ""]
-    .filter(Boolean)
-    .join(" ");
   const conflicts = row.displayAmbiguous
     ? rows.filter((other) => other !== row && tagShownText(other) === tagShownText(row))
     : [];
@@ -13004,7 +13022,7 @@ function tagRowHtml(row, rows, activeTag) {
   return `
     <li class="${rowClasses}" data-tag="${tag}" tabindex="${active ? 0 : -1}" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown">
       <button class="ipa-rule-drag-handle tag-drag-handle" type="button" data-tag-control="handle"${dragDisabled ? ' aria-disabled="true"' : ' draggable="true"'}${controlTabIndex} data-app-tooltip="always" aria-label="${escapeHtml(t(dragDisabled ? "tagManagerDragDisabled" : "tagManagerDrag"))}">⋮⋮</button>
-      <span class="tag-row-chip"><span class="${chipClasses}" data-app-tooltip="overflow" aria-label="${tag}"><span>${escapeHtml(tagShownText(row))}</span>${row.displayLabel ? `<small class="tag-identity-raw">${tag}</small>` : ""}</span></span>
+      <span class="tag-row-chip"><span class="${tagChipClasses(row)}" data-app-tooltip="overflow" aria-label="${tag}"><span>${escapeHtml(tagShownText(row))}</span>${row.displayLabel ? `<small class="tag-identity-raw">${tag}</small>` : ""}</span></span>
       <input class="tag-label-input" type="text" data-tag-control="label" value="${escapeHtml(row.displayLabel)}" placeholder="${tag}"${controlTabIndex} aria-label="${escapeHtml(formatText("tagManagerLabelFor", { tag: row.tag }))}">
       <button class="secondary-button tag-count-button" type="button" data-control-tone="neutral" data-tag-control="count"${row.entryCount ? "" : " disabled"}${controlTabIndex} aria-label="${escapeHtml(formatText("tagManagerCountFor", { tag: row.tag, count: row.entryCount }))}">${row.entryCount}</button>
       <label class="switch-label tag-color-switch"><input class="switch" type="checkbox" role="switch" data-tag-control="color"${row.color === "red" ? " checked" : ""}${controlTabIndex}><span>${escapeHtml(t("tagManagerRed"))}</span></label>
@@ -13014,7 +13032,25 @@ function tagRowHtml(row, rows, activeTag) {
   `;
 }
 
+// The compact view is for ordering. The tile is the row: it takes the row's
+// focus, drag and menu, so those paths need not know which view is showing.
+function tagTileHtml(row, activeTag) {
+  const tag = escapeHtml(row.tag);
+  const classes = [
+    tagChipClasses(row),
+    "tag-tile",
+    row.entryCount ? "" : "is-unused",
+    tagManagerState.highlighted.has(row.tag) ? "is-highlighted" : "",
+  ].filter(Boolean).join(" ");
+  return `
+    <li class="tag-tile-item">
+      <button class="${classes}" type="button" data-tag="${tag}" data-tag-control="more" tabindex="${row.tag === activeTag ? 0 : -1}"${tagManagerState.query ? "" : ' draggable="true"'} aria-haspopup="menu" aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight" aria-label="${escapeHtml(formatText("tagManagerMoreFor", { tag: row.tag }))}" data-app-tooltip="overflow" data-app-tooltip-label="${tag}"><span class="chip-label" data-tooltip-overflow>${tag}</span></button>
+    </li>
+  `;
+}
+
 function tagZoneHtml(partOfSpeech, rows, visibleRows) {
+  const compact = tagManagerState.view === "compact";
   const zoneRows = visibleRows.filter((row) => row.partOfSpeech === partOfSpeech);
   const activeTag = tagManagerActiveTag(zoneRows, partOfSpeech);
   const addRow = !partOfSpeech && tagManagerState.adding
@@ -13035,7 +13071,7 @@ function tagZoneHtml(partOfSpeech, rows, visibleRows) {
         <p class="field-help">${escapeHtml(t(partOfSpeech ? "tagManagerPartZoneHelp" : "tagManagerGeneralZoneHelp"))}</p>
       </div>
       ${empty}
-      <ul class="tag-zone-list">${zoneRows.map((row) => tagRowHtml(row, rows, activeTag)).join("")}${addRow}</ul>
+      <ul class="tag-zone-list${compact ? " is-compact" : ""}">${zoneRows.map((row) => (compact ? tagTileHtml(row, activeTag) : tagRowHtml(row, rows, activeTag))).join("")}${addRow}</ul>
     </section>
   `;
 }
@@ -13047,11 +13083,12 @@ function renderTagManagerSummary(rows) {
 
 function tagManagerZonesSignature() {
   const { status, rows } = tagUsageState;
-  const { query, adding, addError, highlighted, activeTags } = tagManagerState;
+  const { view, query, adding, addError, highlighted, activeTags } = tagManagerState;
   return stableJson({
     currentLanguage,
     status,
     rows,
+    view,
     query,
     adding,
     addError,
@@ -13133,10 +13170,20 @@ function renderTagManagerDisplayToggle() {
   elements.tagManagerDisplayPanel.classList.toggle("is-open", open);
 }
 
+function renderTagManagerViewControl() {
+  elements.tagManagerViewControl.querySelectorAll("[data-tag-view]").forEach((button) => {
+    const selected = button.dataset.tagView === tagManagerState.view;
+    button.classList.toggle("active", selected);
+    button.setAttribute("aria-checked", String(selected));
+    button.tabIndex = selected ? 0 : -1;
+  });
+}
+
 function renderTagManager(dictionary) {
   startTagUsageCheck(dictionary);
   fillTagDisplayPanel(dictionary);
   renderTagManagerDisplayToggle();
+  renderTagManagerViewControl();
   renderTagManagerZones();
 }
 
@@ -13206,19 +13253,23 @@ function setActiveTagRow(row) {
   tagManagerRenderedSignature = tagManagerZonesSignature();
 }
 
-function revealTagRow(tag) {
+function focusTagRow(tag) {
   const row = tagRowElement(tag);
   if (row) {
     setActiveTagRow(row);
-    row.scrollIntoView({ block: "nearest" });
     row.focus({ preventScroll: true });
   }
 }
 
-function openTagRowMenu(button) {
-  const { tag } = button.closest("[data-tag]").dataset;
+function revealTagRow(tag) {
+  tagRowElement(tag)?.scrollIntoView({ block: "nearest" });
+  focusTagRow(tag);
+}
+
+// Opened by the ⋯ button, a click on a tile, or a right click at `position`.
+function openTagRowMenu(trigger, position) {
+  const { tag } = trigger.closest("[data-tag]").dataset;
   const row = tagManagerRows().find((item) => item.tag === tag);
-  const rect = button.getBoundingClientRect();
   const moves = [
     ["tagManagerMoveTop", tagModel.tagMoveToIndex(tagManagerRows(), tag, row.partOfSpeech, 0)],
     ["tagManagerMoveBottom", tagModel.tagMoveToIndex(tagManagerRows(), tag, row.partOfSpeech, Number.POSITIVE_INFINITY)],
@@ -13227,11 +13278,23 @@ function openTagRowMenu(button) {
       tagModel.tagMoveToIndex(tagManagerRows(), tag, !row.partOfSpeech, Number.POSITIVE_INFINITY),
     ],
   ];
-  showContextMenu({ clientX: rect.left, clientY: rect.bottom + 4 }, formatText("tagManagerMoreFor", { tag }), [
+  // The compact view has no count button, so the way to the entries moves here.
+  const entries = tagManagerState.view === "compact" && row.entryCount
+    ? [{
+      key: "entries",
+      label: formatText("tagManagerViewEntries", { count: row.entryCount }),
+      handler: () => openTagEntries(tag),
+    }]
+    : [];
+  showContextMenu(position, formatText("tagManagerMoreFor", { tag }), [
+    ...entries,
     ...moves.map(([key, change]) => ({
       key,
       label: t(key),
-      handler: () => moveTagRow(change),
+      handler: async () => {
+        await moveTagRow(change);
+        focusTagRow(tag);
+      },
     })),
     {
       key: "delete",
@@ -13240,7 +13303,7 @@ function openTagRowMenu(button) {
       disabledReason: row.entryCount ? t("tagManagerDeleteInUse") : "",
       handler: () => deleteTagRow(tag),
     },
-  ]);
+  ], { returnFocus: trigger });
 }
 
 async function deleteTagRow(tag) {
@@ -13356,17 +13419,42 @@ async function openTagEntries(tag) {
 
 // Row positions are read once when a drag starts. Nothing moves during the drag,
 // so each dragover only compares numbers and touches the page when the target
-// changes. Offsets are from the zone's top, which stays right if the page scrolls.
+// changes. Offsets are from the zone's corner, which stays right if the page scrolls.
 function tagDragZones(tag) {
   return new Map([...elements.tagManagerZones.querySelectorAll("[data-tag-zone]")].map((zone) => {
-    const zoneTop = zone.getBoundingClientRect().top;
+    const origin = zone.getBoundingClientRect();
     const rows = [...zone.querySelectorAll("[data-tag]")].filter((row) => row.dataset.tag !== tag);
-    const midpoints = rows.map((row) => {
+    const slots = rows.map((row) => {
       const rect = row.getBoundingClientRect();
-      return rect.top + rect.height / 2 - zoneTop;
+      return {
+        top: rect.top - origin.top,
+        bottom: rect.bottom - origin.top,
+        middleX: rect.left + rect.width / 2 - origin.left,
+        middleY: rect.top + rect.height / 2 - origin.top,
+      };
     });
-    return [zone, { rows, midpoints }];
+    return [zone, { rows, slots }];
   }));
+}
+
+// Slots run in tag order, so the first one past the pointer can be searched for.
+// Tiles wrap: one is past the pointer if its line is lower, or if it is further
+// along the pointer's line. Past a line's end is the start of the next line.
+function tagDropIndex(slots, x, y) {
+  const isPastPointer = tagManagerState.view === "compact"
+    ? (slot) => y < slot.top || (y < slot.bottom && x < slot.middleX)
+    : (slot) => y < slot.middleY;
+  let low = 0;
+  let high = slots.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (isPastPointer(slots[middle])) {
+      high = middle;
+    } else {
+      low = middle + 1;
+    }
+  }
+  return low;
 }
 
 function tagDropTarget(event) {
@@ -13374,23 +13462,14 @@ function tagDropTarget(event) {
   if (!zone) {
     return null;
   }
-  const { rows, midpoints } = tagDragState.zones.get(zone);
-  const offset = event.clientY - zone.getBoundingClientRect().top;
-  let low = 0;
-  let high = midpoints.length;
-  while (low < high) {
-    const middle = Math.floor((low + high) / 2);
-    if (offset < midpoints[middle]) {
-      high = middle;
-    } else {
-      low = middle + 1;
-    }
-  }
+  const { rows, slots } = tagDragState.zones.get(zone);
+  const origin = zone.getBoundingClientRect();
+  const index = tagDropIndex(slots, event.clientX - origin.left, event.clientY - origin.top);
   return {
     zone,
     partOfSpeech: zone.dataset.tagZone === "part",
-    index: low,
-    beforeRow: rows[low] || null,
+    index,
+    beforeRow: rows[index] || null,
   };
 }
 
@@ -13410,7 +13489,7 @@ function finishTagDrag() {
     return;
   }
   setTagDropMarker(null);
-  elements.tagManagerZones.querySelector(".tag-row.dragging")?.classList.remove("dragging");
+  elements.tagManagerZones.querySelector("[data-tag].dragging")?.classList.remove("dragging");
   tagDragState = null;
 }
 
@@ -13444,12 +13523,15 @@ function handleTagZoneKeydown(event) {
     }
     return;
   }
-  if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) {
+  // Tiles wrap in tag order, so both axes step through that order.
+  const key = (tagManagerState.view === "compact"
+    && { ArrowLeft: "ArrowUp", ArrowRight: "ArrowDown" }[event.key]) || event.key;
+  if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(key)) {
     return;
   }
-  if (event.altKey && ["ArrowUp", "ArrowDown"].includes(event.key)) {
+  if (event.altKey && ["ArrowUp", "ArrowDown"].includes(key)) {
     event.preventDefault();
-    const change = tagModel.tagMoveStep(tagManagerRows(), row.dataset.tag, event.key === "ArrowUp" ? -1 : 1);
+    const change = tagModel.tagMoveStep(tagManagerRows(), row.dataset.tag, key === "ArrowUp" ? -1 : 1);
     if (change) {
       moveTagRow(change);
     }
@@ -13466,7 +13548,7 @@ function handleTagZoneKeydown(event) {
     ArrowDown: rows[index + 1],
     Home: rows[0],
     End: rows.at(-1),
-  }[event.key];
+  }[key];
   if (target) {
     revealTagRow(target.dataset.tag);
   }
@@ -17324,6 +17406,15 @@ elements.tagManagerSearchInput.addEventListener("input", () => {
   tagManagerState.query = elements.tagManagerSearchInput.value;
   renderTagManagerZones();
 });
+elements.tagManagerViewControl.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-tag-view]");
+  if (!button) {
+    return;
+  }
+  tagManagerState.view = button.dataset.tagView;
+  renderTagManagerViewControl();
+  renderTagManagerZones();
+});
 elements.tagManagerAddButton.addEventListener("click", openTagAddRow);
 elements.tagManagerDisplayToggle.addEventListener("click", () => {
   tagManagerState.displayOpen = !tagManagerState.displayOpen;
@@ -17357,9 +17448,18 @@ elements.tagManagerZones.addEventListener("click", (event) => {
   if (control.dataset.tagControl === "count") {
     openTagEntries(tag);
   } else if (control.dataset.tagControl === "more") {
-    openTagRowMenu(control);
+    const rect = control.getBoundingClientRect();
+    openTagRowMenu(control, { clientX: rect.left, clientY: rect.bottom + 4 });
   } else if (control.dataset.tagControl === "conflict") {
     revealTagRow(control.dataset.tagTarget);
+  }
+});
+// The display name input keeps the browser's own menu, for paste and input methods.
+elements.tagManagerZones.addEventListener("contextmenu", (event) => {
+  const row = event.target.closest("[data-tag]");
+  if (row && !event.target.matches('[data-tag-control="label"]')) {
+    event.preventDefault();
+    openTagRowMenu(row, event);
   }
 });
 elements.tagManagerZones.addEventListener("change", (event) => {
@@ -17383,7 +17483,7 @@ elements.tagManagerZones.addEventListener("focusout", (event) => {
 });
 elements.tagManagerZones.addEventListener("keydown", handleTagZoneKeydown);
 elements.tagManagerZones.addEventListener("dragstart", (event) => {
-  const handle = event.target.closest(".tag-drag-handle");
+  const handle = event.target.closest(".tag-drag-handle, .tag-tile");
   if (!handle || handle.getAttribute("aria-disabled") === "true") {
     event.preventDefault();
     return;

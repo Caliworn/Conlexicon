@@ -639,7 +639,7 @@ body[data-ui-skin="liquid-glass"] :is([data-control-tone="neutral"]:not([data-co
   --control-pressed-shadow: var(--liquid-glass-compact-control-shadow);
 }
 
-body[data-ui-skin="liquid-glass"] :is(.dictionary-panel, .mobile-app-bar, .entry-search-control, .entry-mail-tools, .tag-manager-search, #docsModeControl, #corpusModeControl) {
+body[data-ui-skin="liquid-glass"] :is(.dictionary-panel, .mobile-app-bar, .entry-search-control, .entry-mail-tools, .tag-manager-search, #docsModeControl, #corpusModeControl, #tagManagerViewControl) {
   --liquid-glass-compact-control-shadow: none;
 }
 
