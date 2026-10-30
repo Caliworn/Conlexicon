@@ -339,7 +339,7 @@ PRIMARY KEY(entry_id, field, source_type, source_id, source_position, value_type
 初稿打算把摘要 DTO 的 `tags` 直接改成并集。复评改为新增 `effectiveTags`：
 
 - 同一个字段名在摘要和详情里含义不同，容易出错；
-- 前端在保存后会从详情实体重算摘要（`updateEntrySummaryDtoAfterSave()`），字段含义一致才不容易写错。
+- 前端在保存后会从详情实体重算摘要（`updateEntrySummaryDtoAfterSave()`，已于 2026-10-30 删除），字段含义一致才不容易写错。
 
 ### 7.6 耦合与顺序
 

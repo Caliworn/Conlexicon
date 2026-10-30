@@ -196,10 +196,6 @@ let entryQueryState = {
   updateToken: 0,
 };
 let tagManagerState = {
-  key: "",
-  status: "idle",
-  rows: [],
-  requestId: 0,
   query: "",
   adding: false,
   addError: "",
@@ -212,11 +208,12 @@ let tagManagerState = {
 let tagManagerRenderedSignature = "";
 let tagManagerChangeQueue = Promise.resolve();
 let tagDragState = null;
+// The registry with usage counts. The filter menu's parts and the tag manager
+// read the same rows.
 let tagUsageState = {
   key: "",
   status: "idle",
-  parts: [],
-  error: null,
+  rows: [],
   requestId: 0,
 };
 let rootGroupsQueryState = {
@@ -6142,71 +6139,6 @@ function recordFeatureResultSummary(result) {
   activeFilter.resultCount = resultCountForVariant(activeFilter);
 }
 
-function entrySummaryDto(entry, dictionary = activeDictionary()) {
-  const effectiveTags = tagModel.effectiveEntryTags(entry);
-  return {
-    id: entry.id,
-    lemma: entry.lemma || "",
-    pronunciation: entry.pronunciation || "",
-    tags: Array.isArray(entry.tags) ? [...entry.tags] : [],
-    effectiveTags,
-    definitionPreviews: (entry.definitions || []).map((definition, position) => ({
-      id: definition.id || "",
-      position,
-      meaning: definition.meaning || "",
-      parts: definitionOwnParts(definition, dictionary),
-    })),
-    createdAt: entry.createdAt || "",
-    updatedAt: entry.updatedAt || "",
-    parts: entryParts({ tags: effectiveTags }, dictionary),
-  };
-}
-
-function updateEntrySummaryDtoAfterSave(dictionary, entry) {
-  if (!dictionary || !entry?.id) {
-    return;
-  }
-  const summary = entrySummaryDto(entry, dictionary);
-  if (entryQueryState.status === "success") {
-    entryQueryState.pages.forEach((page) => {
-      if (page.status === "success") {
-        page.items = page.items.map((item) => (
-          item.id === entry.id
-            ? {
-              ...summary,
-              ...(Array.isArray(item.searchHits) ? { searchHits: item.searchHits } : {}),
-              ...(item.qualityIssues ? { qualityIssues: item.qualityIssues } : {}),
-            }
-            : item
-        ));
-      }
-    });
-    syncEntryQueryWindowState();
-    if (!rootMode && (!activeFilter || activeFilterUsesRemoteQuery())) {
-      renderEntryRows(entryQueryState.items, {
-        pageInfo: entryQueryState.pageInfo,
-        windowPages: entryQueryState.pages,
-        onRangeChange: (range) => handleEntryQueryWindowRange(dictionary, range),
-      });
-    }
-  }
-  rootGroupsQueryState.pages.forEach((page) => {
-    if (page.status === "success") {
-      page.items = page.items.map((group) => (
-        group.root.id === entry.id ? { ...group, root: summary } : group
-      ));
-    }
-  });
-  syncRootGroupsQueryWindowState();
-  rootGroupDerivedStates.forEach((derivedState) => {
-    if (derivedState.status === "success") {
-      derivedState.items = derivedState.items.map((item) => (
-        item.id === entry.id ? { ...summary, rootGroupMatch: item.rootGroupMatch } : item
-      ));
-    }
-  });
-}
-
 function resetEntryQueryState() {
   entryQueryState = {
     key: "",
@@ -6587,13 +6519,20 @@ function tagUsageApiKey(dictionary = activeDictionary()) {
 }
 
 function compactTagUsageResult(result) {
-  return {
-    parts: result.tags.filter((row) => row.partOfSpeech && row.entryCount > 0).map((row) => row.tag),
-  };
+  return { rows: result.tags };
 }
 
 function resetTagUsageState() {
-  tagUsageState = { key: "", status: "idle", parts: [], error: null, requestId: tagUsageState.requestId + 1 };
+  tagUsageState = { key: "", status: "idle", rows: [], requestId: tagUsageState.requestId + 1 };
+}
+
+function setTagUsageRows(dictionary, rows) {
+  tagUsageState = {
+    key: tagUsageApiKey(dictionary),
+    status: "success",
+    rows,
+    requestId: tagUsageState.requestId + 1,
+  };
 }
 
 function tagUsagePartsForRender(dictionary) {
@@ -6601,7 +6540,14 @@ function tagUsagePartsForRender(dictionary) {
   if (tagUsageState.status !== "success" || tagUsageState.key !== key) {
     return null;
   }
-  return tagUsageState.parts;
+  return tagUsageState.rows.filter((row) => row.partOfSpeech && row.entryCount > 0).map((row) => row.tag);
+}
+
+function renderAfterTagUsageLoad() {
+  renderPartFilter();
+  if (state.activeView === "tags") {
+    renderTagManagerZones();
+  }
 }
 
 function startTagUsageCheck(dictionary) {
@@ -6621,10 +6567,10 @@ function startTagUsageCheck(dictionary) {
   const cacheKey = queryPageCacheKey("tag-usage", key);
   const cached = queryPageCache.get(cacheKey);
   if (cached) {
-    tagUsageState = { key, status: "success", parts: cached.parts, error: null, requestId };
+    tagUsageState = { key, status: "success", rows: cached.rows, requestId };
     return;
   }
-  tagUsageState = { key, status: "loading", parts: [], error: null, requestId };
+  tagUsageState = { key, status: "loading", rows: [], requestId };
 
   queryPageCache.load({
     key: cacheKey,
@@ -6636,16 +6582,16 @@ function startTagUsageCheck(dictionary) {
       if (tagUsageState.requestId !== requestId || tagUsageApiKey(activeDictionary()) !== key) {
         return;
       }
-      tagUsageState = { key, status: "success", parts: result.parts, error: null, requestId };
-      renderPartFilter();
+      tagUsageState = { key, status: "success", rows: result.rows, requestId };
+      renderAfterTagUsageLoad();
     })
     .catch((error) => {
       if (tagUsageState.requestId !== requestId) {
         return;
       }
-      tagUsageState = { key, status: "error", parts: [], error, requestId };
+      tagUsageState = { key, status: "error", rows: [], requestId };
       console.error(error);
-      renderPartFilter();
+      renderAfterTagUsageLoad();
     });
 }
 
@@ -10173,7 +10119,7 @@ function renderAnalysisOverviewQuery(response) {
   const parts = partWidget.rows
     .filter((row) => row.part !== NO_PART_FILTER_VALUE)
     .map((row) => {
-      const identity = tagModel.displayIdentity(row.part, row.displayLabel, row.displayAmbiguous);
+      const identity = activeTagDisplayIdentity(row.part);
       return {
         label: identity.label,
         secondaryLabel: identity.rawLabel,
@@ -10259,7 +10205,7 @@ function analysisTagPageRows(response) {
   const parts = widgets.parts.rows
     .filter((row) => row.part !== NO_PART_FILTER_VALUE)
     .map((row) => {
-      const identity = tagModel.displayIdentity(row.part, row.displayLabel, row.displayAmbiguous);
+      const identity = activeTagDisplayIdentity(row.part);
       return {
         label: identity.label,
         secondaryLabel: identity.rawLabel,
@@ -10276,7 +10222,7 @@ function analysisTagPageRows(response) {
       };
     });
   const tags = widgets.tags.rows.map((row) => {
-    const identity = tagModel.displayIdentity(row.tag, row.displayLabel, row.displayAmbiguous);
+    const identity = activeTagDisplayIdentity(row.tag);
     return {
       label: identity.label,
       secondaryLabel: identity.rawLabel,
@@ -10295,7 +10241,7 @@ function analysisTagSetTitleDescriptor(tags) {
   return activeFilterTitleDescriptor("activeFilterFieldValue", {
     labelKey: "activeFilterTagCombination",
     valueType: "tagList",
-    values: tags.map((tag) => tag.value),
+    values: tags,
   });
 }
 
@@ -10309,8 +10255,8 @@ function analysisTagSetList(widget, queryKey) {
   const list = visibleRows.map((row) => {
     const { tags } = row;
     const chips = tags.map((tag) => {
-      const identity = tagModel.displayIdentity(tag.value, tag.displayLabel, tag.displayAmbiguous);
-      return `<span class="analysis-tag-set-chip${tag.isPartOfSpeech ? " is-part" : ""}">
+      const identity = activeTagDisplayIdentity(tag);
+      return `<span class="analysis-tag-set-chip${tagIsPart(tag) ? " is-part" : ""}">
         <span>${escapeHtml(identity.label)}</span>
         ${identity.rawLabel ? `<small>${escapeHtml(identity.rawLabel)}</small>` : ""}
       </span>`;
@@ -10364,7 +10310,7 @@ function analysisPartSetList(widget, queryKey) {
   const max = Math.max(...rows.map((row) => row.entryCount), 1);
   const list = visibleRows.map((row) => {
     const chips = row.parts.map((part) => {
-      const identity = tagModel.displayIdentity(part.value, part.displayLabel, part.displayAmbiguous);
+      const identity = activeTagDisplayIdentity(part);
       return `<span class="analysis-tag-set-chip is-part">
         <span>${escapeHtml(identity.label)}</span>
         ${identity.rawLabel ? `<small>${escapeHtml(identity.rawLabel)}</small>` : ""}
@@ -10373,7 +10319,7 @@ function analysisPartSetList(widget, queryKey) {
     const action = analysisQueryFilterAction(row.action, activeFilterTitleDescriptor("activeFilterFieldValue", {
       labelKey: "activeFilterPartCombination",
       valueType: "tagList",
-      values: row.parts.map((part) => part.value),
+      values: row.parts,
     }));
     return `
       <button type="button" class="analysis-tag-set-row"${analysisActionAttributes(action)}>
@@ -13016,7 +12962,7 @@ async function saveSettings(event, options = {}) {
 // rendering and the moves it asks for stay apart: tagModel.tagMoveToIndex and
 // tagMoveStep work on tag order alone, whatever the rows look like.
 function tagManagerRows() {
-  return tagManagerState.rows;
+  return tagUsageState.rows;
 }
 
 function tagManagerVisibleRows(rows = tagManagerRows()) {
@@ -13100,7 +13046,8 @@ function renderTagManagerSummary(rows) {
 }
 
 function tagManagerZonesSignature() {
-  const { status, rows, query, adding, addError, highlighted, activeTags } = tagManagerState;
+  const { status, rows } = tagUsageState;
+  const { query, adding, addError, highlighted, activeTags } = tagManagerState;
   return stableJson({
     currentLanguage,
     status,
@@ -13147,10 +13094,10 @@ function renderTagManagerZones() {
     const focused = focusedTagControl();
     const rows = tagManagerRows();
     const visibleRows = tagManagerVisibleRows(rows);
-    renderTagManagerSummary(rows);
-    if (tagManagerState.status === "error") {
+    if (tagUsageState.status === "error") {
       elements.tagManagerZones.innerHTML = `<div class="tag-zone-error"><p class="muted-text">${escapeHtml(t("tagManagerLoadFailed"))}</p><button class="secondary-button" type="button" data-control-tone="neutral" data-tag-retry>${escapeHtml(t("sourceCandidatesRetry"))}</button></div>`;
-    } else if (tagManagerState.status === "success") {
+    } else if (tagUsageState.status === "success") {
+      renderTagManagerSummary(rows);
       elements.tagManagerZones.innerHTML = `${tagZoneHtml(true, rows, visibleRows)}${tagZoneHtml(false, rows, visibleRows)}`;
       restoreTagControlFocus(focused);
     }
@@ -13166,29 +13113,6 @@ function renderTagManagerZones() {
     tagManagerState.focusAdd = false;
     document.querySelector("#tagManagerAddInput")?.focus();
   }
-}
-
-function startTagManagerLoad(dictionary) {
-  const key = tagUsageApiKey(dictionary);
-  if (tagManagerState.key === key && ["loading", "success"].includes(tagManagerState.status)) {
-    return;
-  }
-  const requestId = tagManagerState.requestId + 1;
-  tagManagerState = { ...tagManagerState, key, status: "loading", requestId };
-  api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/tag-registry`)
-    .then((result) => {
-      if (tagManagerState.requestId === requestId) {
-        tagManagerState = { ...tagManagerState, status: "success", rows: result.tags };
-        renderTagManagerZones();
-      }
-    })
-    .catch((error) => {
-      if (tagManagerState.requestId === requestId) {
-        tagManagerState = { ...tagManagerState, status: "error" };
-        console.error(error);
-        renderTagManagerZones();
-      }
-    });
 }
 
 function fillTagDisplayPanel(dictionary) {
@@ -13210,7 +13134,7 @@ function renderTagManagerDisplayToggle() {
 }
 
 function renderTagManager(dictionary) {
-  startTagManagerLoad(dictionary);
+  startTagUsageCheck(dictionary);
   fillTagDisplayPanel(dictionary);
   renderTagManagerDisplayToggle();
   renderTagManagerZones();
@@ -13234,13 +13158,8 @@ function changeTagRegistry(change) {
         updatedAt: saved.updatedAt,
         tagRegistry: tagRegistryWithoutCounts(saved.tagRegistry),
       });
-      tagManagerState = {
-        ...tagManagerState,
-        key: tagUsageApiKey(updated),
-        status: "success",
-        rows: saved.tagRegistry,
-      };
       resetEntryReadStateAfterSave();
+      setTagUsageRows(updated, saved.tagRegistry);
       render();
       return true;
     } catch (error) {
@@ -13395,9 +13314,10 @@ async function saveTagPreference(field, value) {
       method: "PUT",
       body: JSON.stringify({ [field]: value }),
     });
+    const rows = tagManagerRows();
     applyDictionaryModulePayload(saved);
     resetEntryReadStateAfterSave();
-    tagManagerState.key = tagUsageApiKey(activeDictionary());
+    setTagUsageRows(activeDictionary(), rows);
     render();
   } catch (error) {
     showApiErrorToast(error, "saveFailed");
@@ -15514,7 +15434,6 @@ async function savePartialEdit(event) {
     });
     state.selectedEntryId = savedEntry.id;
     cacheSavedEntryDetail(dictionary.id, savedEntry);
-    updateEntrySummaryDtoAfterSave(activeDictionary(), savedEntry);
     cancelPartialEdit();
     resetEntryReadStateAfterSave();
     render();
@@ -16338,13 +16257,11 @@ function applySavedEntryResponse(dictionaryId, saved, { select = false } = {}) {
   });
   if (saved.ownerEntry) {
     cacheSavedEntryDetail(dictionaryId, saved.ownerEntry);
-    updateEntrySummaryDtoAfterSave(activeDictionary(), saved.ownerEntry);
   }
   if (select) {
     state.selectedEntryId = savedEntry.id;
   }
   cacheSavedEntryDetail(dictionaryId, savedEntry);
-  updateEntrySummaryDtoAfterSave(activeDictionary(), savedEntry);
   return savedEntry;
 }
 
@@ -17397,7 +17314,7 @@ elements.tagManagerDisplayPanel.addEventListener("keydown", (event) => {
 });
 elements.tagManagerZones.addEventListener("click", (event) => {
   if (event.target.closest("[data-tag-retry]")) {
-    tagManagerState.status = "idle";
+    resetTagUsageState();
     renderTagManager(activeDictionary());
     return;
   }

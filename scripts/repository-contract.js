@@ -380,7 +380,6 @@ async function checkAnalysisQueryContract(repository) {
 
     const parts = Object.fromEntries(result.body.widgets.parts.rows.map((row) => [row.part, row]));
     assert.equal(parts.n.entryCount, 2);
-    assert.equal(parts.n.displayLabel, "Noun");
     assert.equal(parts.v.entryCount, 1);
     assert.equal(parts[NO_PART_FILTER_VALUE].entryCount, 1);
     assert.deepEqual(parts.n.action.filter, { part: "n" });
@@ -564,9 +563,11 @@ async function checkTagSetAnalysisContract(repository) {
       ],
     });
     assert.deepEqual(distributions.diagnostics.computedTasks, ["partStats", "tagStats"]);
-    assert.equal(distributions.widgets.parts.rows.find((row) => row.part === "n")?.displayAmbiguous, false);
-    assert.equal(distributions.widgets.tags.rows.find((row) => row.tag === "topic")?.displayAmbiguous, true);
-    assert.equal(distributions.widgets.tags.rows.find((row) => row.tag === "alias")?.displayAmbiguous, true);
+    assert.deepEqual(
+      Object.keys(distributions.widgets.tags.rows[0]).sort(),
+      ["action", "entryCount", "tag"],
+      "rows carry raw tags; the app looks up how to show them",
+    );
 
     const response = await repository.queryAnalysis(dictionary.id, {
       widgets: [{ id: "sets", type: "tagSetDistribution" }],
@@ -580,24 +581,21 @@ async function checkTagSetAnalysisContract(repository) {
     assert.equal(widget.multiTagEntryCount, 5);
     assert.equal(widget.rows.length, 5);
     assert.ok(
-      widget.rows.some((row) => row.tags.length === 1 && row.tags[0].value === "v"),
+      widget.rows.some((row) => row.tags.length === 1 && row.tags[0] === "v"),
       "single-tag entries should form a tag set",
     );
 
     const topicSet = widget.rows.find((row) => (
-      row.tags.map((tag) => tag.value).sort().join(",") === "n,topic"
+      [...row.tags].sort().join(",") === "n,topic"
     ));
     assert.equal(topicSet.entryCount, 2, "tag order should not change set identity");
-    assert.deepEqual(topicSet.tags.map((tag) => tag.value), ["n", "topic"]);
-    assert.equal(topicSet.tags[0].isPartOfSpeech, true);
-    assert.equal(topicSet.tags[1].displayLabel, "Shared");
-    assert.equal(topicSet.tags[1].displayAmbiguous, true);
+    assert.deepEqual(topicSet.tags, ["n", "topic"]);
     assert.equal(topicSet.action.resultCount, 2);
     assert.deepEqual(topicSet.action.filter, {
       tags: { values: ["n", "topic"], mode: "exact" },
     });
     assert.ok(
-      widget.rows.some((row) => row.tags.some((tag) => tag.value === "alias")),
+      widget.rows.some((row) => row.tags.includes("alias")),
       "raw tags with the same display label must remain distinct",
     );
     assert.equal(widget.untaggedAction.resultCount, 1);

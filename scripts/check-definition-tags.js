@@ -156,7 +156,7 @@ async function checkPlacementIndependence(repository) {
   assert.equal(partSets.multiPartEntryCount, parts.multiPartEntryCount);
   assert.equal(partSets.partSetCount, 3);
   assert.deepEqual(
-    partSets.rows.map((row) => [row.parts.map((part) => part.value), row.entryCount]),
+    partSets.rows.map((row) => [row.parts, row.entryCount]),
     [[["n", "adj"], 2], [["v", "n"], 1], [["v", "n", "adj"], 1]],
     "rows order by entry count, parts by registry rank",
   );

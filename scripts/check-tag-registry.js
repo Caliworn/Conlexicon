@@ -210,9 +210,12 @@ async function checkDownstreamEffects(repository) {
       [["v", 2], ["n", 1], ["prep", 0]],
       "parts of speech without entries still show",
     );
+    const { partTypeCount, rows } = (await analysis()).parts;
+    assert.equal(partTypeCount, 2, "a part of speech without entries is not counted as a kind in use");
+    assert.equal(Object.hasOwn(rows.find((row) => row.part === "prep"), "action"), false, "an empty row has nothing to filter");
 
     // Combinations follow the registry, the same rank entries display with.
-    const combination = async () => (await analysis()).sets.rows.find((row) => row.tags.length === 3).tags.map((tag) => tag.value);
+    const combination = async () => (await analysis()).sets.rows.find((row) => row.tags.length === 3).tags;
     assert.deepEqual(await combination(), ["n", "v", "archaic"]);
     await change({ op: "move", tag: "v", partOfSpeech: true, before: "n" });
     assert.deepEqual(await combination(), ["v", "n", "archaic"]);

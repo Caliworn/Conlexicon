@@ -3389,6 +3389,7 @@ span.pending-source {
   display: grid;
   gap: 18px;
   min-width: 0;
+  container: tag-zones / inline-size;
 }
 
 .tag-zone-heading {
@@ -5443,6 +5444,10 @@ input[type="checkbox"].switch {
   position: relative;
   flex: 0 0 auto;
   width: 36px;
+  /* The track is a fixed part of the component: the global input limits would
+     otherwise narrow it with its parent and leave the thumb outside. */
+  min-width: 36px;
+  max-width: 36px;
   height: 20px;
   margin: 0;
   border: 1px solid var(--switch-current-border);
@@ -6411,9 +6416,10 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
   }
 }
 
-@media (max-width: 480px) {
+/* By the width the rows actually get: the navigation can take 300px of a wide window. */
+@container tag-zones (max-width: 560px) {
   .tag-row {
-    grid-template-columns: 32px minmax(0, 1fr) auto 40px;
+    grid-template-columns: 32px minmax(0, 1fr) auto 48px;
   }
 
   .tag-row-chip {

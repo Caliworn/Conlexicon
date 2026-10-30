@@ -116,6 +116,10 @@ assert(
 // because the track and thumb are drawn, not native.
 const switchBase = scopedBlock(styles, 'input[type="checkbox"].switch');
 assert(
+  /min-width: 36px;/.test(switchBase) && /max-width: 36px;/.test(switchBase),
+  "The switch track must keep its width: the shared input max-width would shrink it with its parent",
+);
+assert(
   switchBase
     && /border: 1px solid var\(--switch-current-border\);/.test(switchBase[1])
     && /background: var\(--switch-current-background\);/.test(switchBase[1])

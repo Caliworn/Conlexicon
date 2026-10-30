@@ -729,7 +729,8 @@ GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&so
 ```
 
 - `widgets` 必须为非空数组，最多 16 项；`id` 在一次请求中必须唯一，只允许字母、数字、点、下划线和连字符，最长 80 字符。
-- `partDistribution`、`partSetDistribution`、`tagFrequency` 和 `tagSetDistribution` 接受可选 `limit`，范围为 1–50；省略时返回完整排行。`activityPreview` 的 `limit` 默认为 6，范围同样为 1–50。`activityDistribution` 返回完整日期桶且不接受 `limit`；包括 `rootFamilyRanking` 在内的其他 widget 同样不接受 `limit`。
+- `partDistribution`、`partSetDistribution`、`tagFrequency` 和 `tagSetDistribution` 的行只带原始标签和计数（`part`／`parts`／`tag`／`tags`、`entryCount`、`action`），显示名、歧义和是否为词性由前端查[标签登记表](#标签登记表)。组合行里的标签按登记表排名排列。`partDistribution` 列出词性区全部标签，使用数为 0 的行不带 `action`，`partTypeCount` 只计使用数大于 0 的词性。
+- 这四个 widget 接受可选 `limit`，范围为 1–50；省略时返回完整排行。`activityPreview` 的 `limit` 默认为 6，范围同样为 1–50。`activityDistribution` 返回完整日期桶且不接受 `limit`；包括 `rootFamilyRanking` 在内的其他 widget 同样不接受 `limit`。
 - `options.includeActions` 默认为 `true`。设为 `false` 时省略 action descriptor。
 
 响应返回结构化 widget data，不返回 HTML：
