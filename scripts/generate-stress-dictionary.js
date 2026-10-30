@@ -116,6 +116,16 @@ function pronounce(lemma) {
   return `/${withStress.join(".")}/`;
 }
 
+const partDisplayLabels = {
+  n: "noun",
+  v: "verb",
+  adj: "adjective",
+  adv: "adverb",
+  propn: "proper noun",
+  postp: "postposition",
+  clf: "classifier",
+};
+
 function makeDefinitions(index, lemma, partOfSpeech) {
   const domain = pick(semanticDomains);
   const definitions = [{
@@ -249,19 +259,15 @@ function buildDictionary(entryCount = DEFAULT_ENTRY_COUNT) {
     name: `Morphology Stress Test ${formatEntryCount(entryCount)}`,
     language: "Synthetic",
     description: `Deterministic ${formatEntryCount(entryCount)}-entry dictionary with morphology data for UI stress testing.`,
+    tagRegistry: [
+      ...partsOfSpeech.map((tag) => ({ tag, partOfSpeech: true, displayLabel: partDisplayLabels[tag] || "" })),
+      ...[...lexicalTags, ...semanticDomains].map((tag) => ({
+        tag,
+        partOfSpeech: false,
+        color: tag === "review" ? "red" : "",
+      })),
+    ],
     settings: {
-      partOfSpeechTags: partsOfSpeech,
-      tagSortOrder: [...partsOfSpeech, ...lexicalTags, ...semanticDomains],
-      tagDisplayMap: {
-        n: "noun",
-        v: "verb",
-        adj: "adjective",
-        adv: "adverb",
-        propn: "proper noun",
-        postp: "postposition",
-        clf: "classifier",
-      },
-      redHighlightTags: ["review"],
       search: {
         etymologyAutocomplete: { fuzzy: true },
       },

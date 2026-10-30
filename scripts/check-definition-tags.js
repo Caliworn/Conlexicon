@@ -11,6 +11,7 @@ const { createTempSqliteRepository, requireSqliteRuntime } = require("./sqlite-c
 
 const NO_PART = "__conlexicon_no_part__";
 const PARTS = ["n", "v", "adj"];
+const PART_RANK = ["v", "n", "adj"];
 
 // Each entry spec lists its tags and the tags of each definition. The "flat"
 // layout puts every tag on the entry; the "split" layout stores them as given.
@@ -32,10 +33,7 @@ function layoutDictionary(id, layout) {
   return normalizeDictionary({
     id,
     name: id,
-    settings: {
-      partOfSpeechTags: PARTS,
-      tagSortOrder: ["v", "n", "adj"],
-    },
+    tagRegistry: PART_RANK.map((tag) => ({ tag, partOfSpeech: true })),
     morphology: {
       templateGroups: [{
         id: "morph-noun",
@@ -130,15 +128,14 @@ async function checkPlacementIndependence(repository) {
   });
   assert.deepEqual(facts.facts, { multi: { available: true }, none: { available: false } });
 
-  const stripGeneration = ({ generation: _generation, ...rest }) => rest;
+  const usage = async (dictionaryId) => (await repository.getTagRegistry(dictionaryId)).tags
+    .map(({ tag, entryCount }) => [tag, entryCount])
+    .sort();
+  assert.deepEqual(await usage("dict-split"), await usage("dict-flat"), "each entry counts once per effective tag");
   assert.deepEqual(
-    stripGeneration(await repository.getEntryFacets("dict-split")),
-    stripGeneration(await repository.getEntryFacets("dict-flat")),
-    "facets count each entry once per effective tag",
+    (await usage("dict-split")).find(([tag]) => tag === "n"),
+    ["n", 5],
   );
-  const facets = await repository.getEntryFacets("dict-split");
-  assert.equal(facets.tags.find((tag) => tag.tag === "n").entryCount, 5);
-  assert.equal(facets.noPartOfSpeechCount, 2);
 
   const analysisQuery = {
     widgets: [
@@ -152,6 +149,7 @@ async function checkPlacementIndependence(repository) {
   assert.deepEqual(splitAnalysis.widgets, flatAnalysis.widgets, "analysis must not depend on the tag layer");
 
   const { parts, partSets, tagSets } = splitAnalysis.widgets;
+  assert.equal(parts.noPartOfSpeechCount, 2);
   assert.equal(parts.multiPartEntryCount, 4);
   assert.deepEqual(parts.multiPartAction.filter, { partCount: { min: 2 } });
   assert.equal(parts.multiPartAction.resultCount, EXPECTED_IDS.multiPart.length);
@@ -160,7 +158,7 @@ async function checkPlacementIndependence(repository) {
   assert.deepEqual(
     partSets.rows.map((row) => [row.parts.map((part) => part.value), row.entryCount]),
     [[["n", "adj"], 2], [["v", "n"], 1], [["v", "n", "adj"], 1]],
-    "rows order by entry count, parts by tagSortOrder",
+    "rows order by entry count, parts by registry rank",
   );
   for (const row of partSets.rows) {
     const ids = await resultIds(repository, "dict-split", row.action.filter);
@@ -175,18 +173,17 @@ async function checkDtosAndPersistence(repository) {
   const dictionaryId = "dict-split";
   const red = await repository.getEntry(dictionaryId, "red");
   assert.deepEqual(red.tags, ["archaic"], "detail tags stay entry tags");
-  assert.deepEqual(red.definitions.map((definition) => definition.tags), [["adj"], ["n", "color"]]);
+  assert.deepEqual(red.definitions.map((definition) => definition.tags), [["adj"], ["color", "n"]]);
 
   const summaries = (await repository.queryEntries(dictionaryId, { limit: 200 })).items;
   const redSummary = summaries.find((item) => item.id === "red");
   assert.deepEqual(redSummary.tags, ["archaic"], "summary tags stay entry tags");
   assert.deepEqual(
     redSummary.effectiveTags,
-    ["n", "adj", "archaic", "color"],
-    "effective tags: first occurrence, then tagSortOrder",
+    ["archaic", "adj", "color", "n"],
+    "effective tags: entry tags, then each definition's new tags, in canonical order",
   );
-  assert.deepEqual(redSummary.parts, ["n", "adj"]);
-  assert.equal(redSummary.partOfSpeech, "n");
+  assert.deepEqual(redSummary.parts, ["adj", "n"]);
   assert.equal(redSummary.definitionPreviews[0].tags, undefined, "previews carry no tags");
   assert.deepEqual(
     redSummary.definitionPreviews.map((preview) => preview.parts),
@@ -282,10 +279,10 @@ async function checkMorphologyInput(repository) {
   );
 }
 
-async function checkQualityAndBatch(repository) {
+async function checkQuality(repository) {
   const dictionaryId = "dict-split";
   const settings = repository.qualityInputSettings(dictionaryId);
-  assert.deepEqual(settings, { partOfSpeechTags: PARTS });
+  assert.deepEqual(settings.tagRegistry.filter((row) => row.partOfSpeech).map((row) => row.tag), PART_RANK);
   const issues = buildQualityIssues(repository.qualityInputRecords(dictionaryId), settings);
   assert.deepEqual(
     issues.filter((issue) => issue.code === "missing_tags").map((issue) => issue.entryId),
@@ -311,17 +308,6 @@ async function checkQualityAndBatch(repository) {
     ],
   );
 
-  const dryRun = await repository.batchUpdateEntries(dictionaryId, { operation: "applyTagOrder", dryRun: true });
-  assert.equal(dryRun.targetCount, 2, "definition tag lists out of order count as targets");
-  await repository.batchUpdateEntries(dictionaryId, { operation: "applyTagOrder" });
-  assert.deepEqual(
-    (await repository.getEntry(dictionaryId, "who")).definitions.map((definition) => definition.tags),
-    [["n", "adj"], ["v"]],
-  );
-  assert.deepEqual(
-    (await repository.getEntry(dictionaryId, "dup")).definitions.map((definition) => definition.tags),
-    [["n", "adj"], ["adj"]],
-  );
   await assert.rejects(
     repository.patchEntries(dictionaryId, [{ id: "who", patch: { definitions: [] } }]),
     (error) => error.code === "unsupported_entry_patch_fields",
@@ -361,7 +347,7 @@ async function main() {
     await checkPlacementIndependence(repository);
     await checkSearch(repository);
     await checkMorphologyInput(repository);
-    await checkQualityAndBatch(repository);
+    await checkQuality(repository);
     await checkDtosAndPersistence(repository);
     await checkJsonImport(repository);
   } finally {

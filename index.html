@@ -94,6 +94,10 @@
             <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 10v4M7 7v10M11 4v16M15 8v8M19 6v12M23 10v4"></path></svg></span>
             <span class="tool-label" data-i18n="ipaConfig">自动 IPA 标注</span>
           </button>
+          <button class="tool-button" type="button" data-view="tags" data-i18n-aria-label="tagManager">
+            <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4Z"></path><circle cx="7.5" cy="7.5" r="1"></circle></svg></span>
+            <span class="tool-label" data-i18n="tagManager">标签</span>
+          </button>
           <button class="tool-button" type="button" data-view="morphology-functions" data-i18n-aria-label="morphologyFunctions">
             <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M4 6h6M4 18h6M14 4v16M14 8h6M14 16h6"></path><circle cx="10" cy="6" r="1"></circle><circle cx="10" cy="18" r="1"></circle></svg></span>
             <span class="tool-label" data-i18n="morphologyFunctions">形态函数</span>
@@ -640,88 +644,6 @@
               <section class="settings-section">
                 <div class="form-heading compact-heading">
                   <div>
-                    <p class="eyebrow" data-i18n="entryTagSettings">词条标签</p>
-                    <h3 data-i18n="partOfSpeechTagSettings">词性标签</h3>
-                  </div>
-                </div>
-                <label>
-                  <span data-i18n="partOfSpeechTagsHelp">只有这里列出的标签会被识别为词性；留空表示此词典不使用词性。多个标签可用半角逗号、全角逗号或顿号分隔。</span>
-                  <input id="partOfSpeechTagsInput" type="text">
-                </label>
-                <div class="subsection-title">
-                  <h3 data-i18n="tagListSeparator">标签列表分隔符</h3>
-                </div>
-                <label>
-                  <span data-i18n="tagListSeparatorHelp">选择各标签输入框显示多个标签时使用的分隔符。无论选择哪项，输入时均可使用半角逗号、全角逗号或顿号。</span>
-                  <select id="tagListSeparatorStyleInput">
-                    <option value="commaSpace" data-i18n="tagListSeparatorCommaSpace">半角逗号和空格（n, v）</option>
-                    <option value="fullwidthComma" data-i18n="tagListSeparatorFullwidthComma">全角逗号（n，v）</option>
-                    <option value="ideographicComma" data-i18n="tagListSeparatorIdeographicComma">顿号（n、v）</option>
-                  </select>
-                </label>
-                <div class="subsection-title">
-                  <h3 data-i18n="tagDisplayReplacement">标签显示替换</h3>
-                </div>
-                <label>
-                  <span data-i18n="tagDisplayReplacementHelp">每行一条，格式为“标签 = 显示文本”。只改变界面显示，不修改标签本身。</span>
-                  <textarea id="tagDisplayMapInput" rows="6"></textarea>
-                </label>
-                <label class="toggle-row">
-                  <span data-i18n="entryListRawTagDisplay">词条列表的标签行显示原始标签</span>
-                  <input id="entryListRawTagDisplayInput" type="checkbox">
-                </label>
-                <label class="toggle-row">
-                  <span data-i18n="entryListRawPartDisplay">词条列表的词性文本（副标题和释义前）显示原始标签</span>
-                  <input id="entryListRawPartDisplayInput" type="checkbox">
-                </label>
-                <label class="toggle-row">
-                  <span data-i18n="filterMenuRawTagDisplay">筛选菜单中显示原始标签</span>
-                  <input id="filterMenuRawTagDisplayInput" type="checkbox">
-                </label>
-                <label class="toggle-row">
-                  <span data-i18n="entryHoverCardRawTagDisplay">词条悬浮卡片中显示原始标签</span>
-                  <input id="entryHoverCardRawTagDisplayInput" type="checkbox">
-                </label>
-                <div class="subsection-title">
-                  <h3 data-i18n="entryListTagDisplayLimit">词条列表中标签显示上限</h3>
-                </div>
-                <label>
-                  <span data-i18n="entryListTagDisplayLimitHelp">设为 n 时，超过 n 个标签会显示前 n-1 个和省略号。默认为 3。</span>
-                  <input id="entryListTagDisplayLimitInput" type="text" inputmode="numeric" placeholder="3">
-                </label>
-                <label class="toggle-row">
-                  <span data-i18n="entryListTagsIncludeParts">词条列表的标签行包含词性标签</span>
-                  <input id="entryListTagsIncludePartsInput" type="checkbox">
-                </label>
-                <div class="subsection-title tag-order-heading">
-                  <h3 data-i18n="tagOrderSettings">自动整理标签顺序</h3>
-                  <button class="info-button" id="tagOrderInfoButton" data-control-tone="neutral" type="button" data-app-tooltip="always" data-i18n-aria-label="tagOrderInfo" aria-label="标签排序逻辑">i</button>
-                </div>
-                <label>
-                  <span data-i18n="tagOrderHelp">保存词条时按此顺序排列标签，词条标签和各条释义的标签分别排列；未列出的标签保留在末尾。“应用”按此顺序整理所有已有词条。请填写标签本身，不要填写显示替换文本。</span>
-                  <div class="inline-field-action tag-order-control">
-                    <input id="tagSortOrderInput" type="text">
-                    <button class="secondary-button" id="applyTagSortOrderButton" data-control-tone="neutral" type="button" data-i18n="applyTags">应用</button>
-                  </div>
-                </label>
-                <div class="subsection-title">
-                  <h3 data-i18n="tagDisplaySettings">标签突出显示</h3>
-                </div>
-                <label>
-                  <span data-i18n="tagRedHighlightHelp">这里列出的标签会在词条列表和词条详情中以红色显示。请填写标签本身，不要填写显示替换文本。</span>
-                  <input id="tagRedHighlightInput" type="text">
-                </label>
-                <div class="subsection-title">
-                  <h3 data-i18n="tagFilterSettings">标签筛选</h3>
-                </div>
-                <label class="toggle-row">
-                  <span data-i18n="entryListTagFilteringHelp">在词条列表中点击标签时启用筛选</span>
-                  <input id="entryListTagFilteringInput" type="checkbox">
-                </label>
-              </section>
-              <section class="settings-section">
-                <div class="form-heading compact-heading">
-                  <div>
                     <p class="eyebrow" data-i18n="displaySettings">显示</p>
                     <h3 data-i18n="emptyEntrySections">空栏目</h3>
                   </div>
@@ -1046,6 +968,90 @@
                 <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" type="submit" data-i18n="saveConfig">保存配置</button>
               </div>
             </form>
+          </section>
+        </section>
+
+        <section class="view" id="tagsView" data-i18n-aria-label="tagManager" aria-label="标签">
+          <section class="top-bar">
+            <div>
+              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <h2 data-i18n="tagManager">标签</h2>
+              <p class="tag-manager-summary" id="tagManagerSummary"></p>
+            </div>
+            <div class="top-actions tag-manager-actions">
+              <input id="tagManagerSearchInput" type="search" data-i18n-placeholder="tagManagerSearch" data-i18n-aria-label="tagManagerSearch" placeholder="搜索标签" aria-label="搜索标签">
+              <button class="secondary-button tag-manager-display-toggle" id="tagManagerDisplayToggle" data-control-tone="neutral" data-control-disclosure type="button" aria-expanded="false" aria-controls="tagManagerDisplayPanel" data-i18n="tagManagerDisplayOptions">显示选项</button>
+              <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="tagManagerAddButton" type="button" data-i18n="tagManagerAdd">添加标签</button>
+            </div>
+          </section>
+
+          <section class="notice-panel" id="tagsNoDictionaryNotice" hidden>
+            <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
+            <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
+            <p data-i18n="tagManagerNeedDictionary">标签登记表会保存到当前词典文件中。</p>
+            <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="tagsOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
+          </section>
+
+          <section class="editor-panel tag-manager-layout tool-config-panel" id="tagsPanel">
+            <div class="tag-manager-main" id="tagManagerZones"></div>
+            <aside class="settings-section tag-display-panel" id="tagManagerDisplayPanel" data-i18n-aria-label="tagManagerDisplay" aria-label="显示">
+              <div class="form-heading compact-heading">
+                <div>
+                  <h3 data-i18n="tagManagerDisplay">显示</h3>
+                </div>
+              </div>
+              <div class="tag-display-group">
+                <h4 data-i18n="tagDisplayGroupInput">输入</h4>
+                <label>
+                  <span data-i18n="tagListSeparator">标签列表分隔符</span>
+                  <select id="tagListSeparatorStyleInput" data-tag-pref="tagListSeparatorStyle">
+                    <option value="commaSpace" data-i18n="tagListSeparatorCommaSpace">半角逗号和空格（n, v）</option>
+                    <option value="fullwidthComma" data-i18n="tagListSeparatorFullwidthComma">全角逗号（n，v）</option>
+                    <option value="ideographicComma" data-i18n="tagListSeparatorIdeographicComma">顿号（n、v）</option>
+                  </select>
+                  <small class="field-help" data-i18n="tagListSeparatorHelp">选择各标签输入框显示多个标签时使用的分隔符。</small>
+                </label>
+              </div>
+              <div class="tag-display-group">
+                <h4 data-i18n="tagDisplayGroupList">词条列表</h4>
+                <label>
+                  <span data-i18n="tagDisplayLimit">标签显示上限</span>
+                  <input id="entryListTagDisplayLimitInput" data-tag-pref="entryListTagDisplayLimit" type="text" inputmode="numeric" placeholder="3">
+                  <small class="field-help" data-i18n="entryListTagDisplayLimitHelp">设为 n 时，超过 n 个标签会显示前 n-1 个和省略号。默认为 3。</small>
+                  <small class="tag-display-hint" id="entryListTagDisplayLimitHint" role="status" data-i18n="entryListTagDisplayLimitInvalid" hidden>词条列表标签显示上限必须是 2 到 10 之间的整数。</small>
+                </label>
+                <label class="toggle-row">
+                  <span data-i18n="tagDisplayIncludeParts">标签行包含词性</span>
+                  <input class="switch" type="checkbox" role="switch" data-tag-pref="entryListTagsIncludeParts">
+                </label>
+                <label class="toggle-row">
+                  <span data-i18n="tagDisplayFiltering">点击标签时筛选</span>
+                  <input class="switch" type="checkbox" role="switch" data-tag-pref="entryListTagFiltering">
+                </label>
+                <label class="toggle-row">
+                  <span data-i18n="tagDisplayRawTags">标签行显示原始标签</span>
+                  <input class="switch" type="checkbox" role="switch" data-tag-pref="entryListRawTagDisplay">
+                </label>
+                <label class="toggle-row">
+                  <span data-i18n="tagDisplayRawParts">词性文本显示原始标签</span>
+                  <input class="switch" type="checkbox" role="switch" data-tag-pref="entryListRawPartDisplay">
+                </label>
+              </div>
+              <div class="tag-display-group">
+                <h4 data-i18n="tagDisplayGroupFilter">筛选菜单</h4>
+                <label class="toggle-row">
+                  <span data-i18n="tagDisplayRaw">显示原始标签</span>
+                  <input class="switch" type="checkbox" role="switch" data-tag-pref="filterMenuRawTagDisplay">
+                </label>
+              </div>
+              <div class="tag-display-group">
+                <h4 data-i18n="tagDisplayGroupHover">词条悬浮卡片</h4>
+                <label class="toggle-row">
+                  <span data-i18n="tagDisplayRaw">显示原始标签</span>
+                  <input class="switch" type="checkbox" role="switch" data-tag-pref="entryHoverCardRawTagDisplay">
+                </label>
+              </div>
+            </aside>
           </section>
         </section>
 

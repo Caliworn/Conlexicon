@@ -218,11 +218,11 @@ async function runSqliteSchemaCheck() {
     assert.equal(entryIndexes.has("idx_entries_created_at"), true);
     assert.equal(entryIndexes.has("idx_entries_updated_at"), true);
     const entryTagColumns = new Set(db.prepare("PRAGMA table_info(entry_tags)").all().map((row) => row.name));
-    ["entry_id", "position", "tag"].forEach((column) => assert.equal(entryTagColumns.has(column), true, `missing entry_tags column: ${column}`));
+    ["entry_id", "tag"].forEach((column) => assert.equal(entryTagColumns.has(column), true, `missing entry_tags column: ${column}`));
     const entryTagIndexes = new Set(db.prepare("PRAGMA index_list(entry_tags)").all().map((row) => row.name));
     assert.equal(entryTagIndexes.has("idx_entry_tags_tag_entry"), true);
     const definitionTagColumns = new Set(db.prepare("PRAGMA table_info(definition_tags)").all().map((row) => row.name));
-    ["definition_id", "entry_id", "position", "tag"]
+    ["definition_id", "entry_id", "tag"]
       .forEach((column) => assert.equal(definitionTagColumns.has(column), true, `missing definition_tags column: ${column}`));
     const definitionTagIndexes = new Set(db.prepare("PRAGMA index_list(definition_tags)").all().map((row) => row.name));
     ["idx_definition_tags_tag_entry", "idx_definition_tags_entry_tag"]
@@ -320,7 +320,6 @@ async function runSqliteSchemaCheck() {
 
     const normalizedSearchSettings = await repository.updateSettings(sourceDictionary.id, {
       ...savedSettings.settings,
-      tagDisplayMap: { n: "NounLabel" },
       search: {
         ...savedSettings.settings.search,
         normalization: {
@@ -330,7 +329,6 @@ async function runSqliteSchemaCheck() {
         },
       },
     });
-    assert.equal(normalizedSearchSettings.settings.tagDisplayMap.n, "NounLabel");
     const rebuiltLemmaSearchRow = projectionDb.prepare(`
       SELECT raw_value AS rawValue, normalized_value AS normalizedValue
       FROM entry_search_values
@@ -340,13 +338,8 @@ async function runSqliteSchemaCheck() {
     assert.equal(projectionDb.prepare(`
       SELECT COUNT(*) AS count
       FROM entry_search_values
-      WHERE entry_id = 'entry-root' AND field = 'tags' AND value_type = 'display' AND raw_value = 'NounLabel'
-    `).get().count, 1);
-    assert.equal(projectionDb.prepare(`
-      SELECT COUNT(*) AS count
-      FROM entry_search_values
       WHERE entry_id = 'entry-root' AND field = 'tags' AND value_type = 'display' AND raw_value = 'noun'
-    `).get().count, 0);
+    `).get().count, 1);
     assert.equal(projectionDb.prepare(`
       SELECT normalized_value AS normalizedValue
       FROM entry_morphology_search_values

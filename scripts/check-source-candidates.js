@@ -19,7 +19,7 @@ function candidateDictionary() {
   return normalizeDictionary({
     id: DICTIONARY_ID,
     name: "Source Candidates",
-    settings: { partOfSpeechTags: ["n", "v"] },
+    tagRegistry: ["n", "v"].map((tag) => ({ tag, partOfSpeech: true })),
     entries: [
       entry("tala-v", "tala", ["v"], ["to fell"]),
       entry("tala-n", "tala", ["n", "plant"], ["tree", "timber"], "ˈta.la"),

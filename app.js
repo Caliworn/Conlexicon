@@ -195,13 +195,26 @@ let entryQueryState = {
   windowCursor: "",
   updateToken: 0,
 };
-let entryFacetsState = {
+let tagManagerState = {
   key: "",
   status: "idle",
-  generation: 0,
-  identities: [],
-  identityByValue: new Map(),
-  collisionGroups: [],
+  rows: [],
+  requestId: 0,
+  query: "",
+  adding: false,
+  addError: "",
+  focusAdd: false,
+  activeTags: { part: "", general: "" },
+  highlighted: new Set(),
+  pendingReveal: "",
+  displayOpen: false,
+};
+let tagManagerRenderedSignature = "";
+let tagManagerChangeQueue = Promise.resolve();
+let tagDragState = null;
+let tagUsageState = {
+  key: "",
+  status: "idle",
   parts: [],
   error: null,
   requestId: 0,
@@ -647,49 +660,64 @@ const i18n = {
     unsavedCorpusConfirm: "语料库中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
     unsavedDocsConfirm: "语言文档中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
     tags: "标签",
-    entryTagSettings: "词条标签",
-    tagDisplayReplacement: "标签显示替换",
-    tagDisplayReplacementHelp: "每行一条，格式为“标签 = 显示文本”。只改变界面显示，不修改标签本身。",
-    entryListRawTagDisplay: "词条列表的标签行显示原始标签",
-    entryListRawPartDisplay: "词条列表的词性文本（副标题和释义前）显示原始标签",
-    filterMenuRawTagDisplay: "筛选菜单中显示原始标签",
-    entryHoverCardRawTagDisplay: "词条悬浮卡片中显示原始标签",
     rootModeNeedsNoFilter: "清除筛选后可用",
-    entryListTagDisplayLimit: "词条列表中标签显示上限",
     entryListTagDisplayLimitHelp: "设为 n 时，超过 n 个标签会显示前 n-1 个和省略号。默认为 3。",
     entryListTagDisplayLimitInvalid: "词条列表标签显示上限必须是 2 到 10 之间的整数。",
-    entryListTagsIncludeParts: "词条列表的标签行包含词性标签",
     tagTooltipRawTag: "原始标签",
     tagTooltipDisplayReplacement: "显示替换",
-    partOfSpeechTagSettings: "词性标签",
-    partOfSpeechTagsHelp: "只有这里列出的标签会被识别为词性；留空表示此词典不使用词性。多个标签可用半角逗号、全角逗号或顿号分隔。",
+    tagManager: "标签",
+    tagManagerSearch: "搜索标签",
+    tagManagerAdd: "添加标签",
+    tagManagerAddPlaceholder: "新标签",
+    tagManagerAddSeparator: "标签不能包含逗号或顿号。",
+    tagManagerDisplay: "显示",
+    tagManagerDisplayOptions: "显示选项",
+    tagManagerNeedDictionary: "标签登记表会保存到当前词典文件中。",
+    tagManagerSummary: "共 {count} 个标签 · {unused} 个未使用",
+    tagManagerPartZone: "词性",
+    tagManagerPartZoneHelp: "放在这里的标签会被识别为词性。",
+    tagManagerPartZoneEmpty: "拖到这里设为词性",
+    tagManagerGeneralZone: "普通标签",
+    tagManagerGeneralZoneHelp: "新出现的标签会添加到末尾。",
+    tagManagerGeneralZoneEmpty: "还没有普通标签",
+    tagManagerNoMatch: "没有匹配的标签",
+    tagManagerLoadFailed: "无法加载标签。",
+    tagManagerDrag: "拖动调整顺序",
+    tagManagerDragDisabled: "搜索时不能拖动",
+    tagManagerLabelFor: "{tag} 的显示名",
+    tagManagerCountFor: "查看使用 {tag} 的 {count} 个词条",
+    tagManagerMoreFor: "{tag} 的更多操作",
+    tagManagerRed: "红色",
+    tagManagerSameDisplay: "与标签「{tag}」显示相同",
+    tagManagerMoveTop: "移到顶部",
+    tagManagerMoveBottom: "移到底部",
+    tagManagerMoveToParts: "设为词性",
+    tagManagerMoveOutOfParts: "移出词性",
+    tagManagerDeleteInUse: "有词条在使用这个标签，不能删除。",
+    tagManagerDeleteTitle: "删除标签",
+    tagManagerDeleteConfirm: "确定从登记表删除标签「{tag}」吗？",
+    tagManagerViewInManager: "在标签管理中查看",
+    tagDisplayGroupInput: "输入",
+    tagDisplayGroupList: "词条列表",
+    tagDisplayGroupFilter: "筛选菜单",
+    tagDisplayGroupHover: "词条悬浮卡片",
+    tagDisplayLimit: "标签显示上限",
+    tagDisplayIncludeParts: "标签行包含词性",
+    tagDisplayFiltering: "点击标签时筛选",
+    tagDisplayRawTags: "标签行显示原始标签",
+    tagDisplayRawParts: "词性文本显示原始标签",
+    tagDisplayRaw: "显示原始标签",
     tagListSeparator: "标签列表分隔符",
     tagListSeparatorHelp: "选择各标签输入框显示多个标签时使用的分隔符。无论选择哪项，输入时均可使用半角逗号、全角逗号或顿号。",
     tagListSeparatorCommaSpace: "半角逗号和空格（n, v）",
     tagListSeparatorFullwidthComma: "全角逗号（n，v）",
     tagListSeparatorIdeographicComma: "顿号（n、v）",
-    tagOrderSettings: "自动整理标签顺序",
-    tagOrderHelp: "保存词条时按此顺序排列标签，词条标签和各条释义的标签分别排列；未列出的标签保留在末尾。“应用”按此顺序整理所有已有词条。请填写标签本身，不要填写显示替换文本。",
-    tagOrderInfo: "查看标签排序逻辑",
-    tagOrderInfoBody: "保存词条时，系统会按输入框中的统一顺序排列这个词条的标签，词条标签和每条释义的标签分别排列；点击“应用”会对所有已有词条做同样的整理。统一顺序里有而某个词条没有的标签会被跳过；某个词条里有但统一顺序里没有的标签会保留在末尾，多个额外标签保持原始相对顺序。导入的词典保持原有顺序，直到该词条再次保存或点击“应用”。这里应填写标签本身；显示替换只影响界面显示，不参与匹配。",
-    tagOrderConfirm: "将按照当前输入的统一顺序重排当前词典中所有词条的标签（含释义标签），并立即保存。继续吗？",
-    tagOrderChangedConfirm: "标签顺序已更改，之后保存的词条会按新顺序排列。另有 {count} 个已有词条的标签与新顺序不一致，现在整理吗？",
-    tagOrderArrangeNow: "现在整理",
-    tagOrderArrangeLater: "稍后",
-    tagOrderUnsavedSettingsConfirm: "当前其他设置有未保存更改。请先保存设置后再自动整理标签顺序。",
-    tagOrderApplied: "标签顺序已整理",
-    tagOrderEmpty: "请先输入至少一个标签。",
     tagWithSource: "{tag}（{source}）",
     tagStateDefinition: "来自释义",
     tagStateRepeatsDefinition: "与释义重复",
     tagStateRepeatsEntry: "与词条重复",
     tagStateMixedPart: "词性层级混用",
     saveAndApply: "保存并应用",
-    applyTags: "应用",
-    tagDisplaySettings: "标签突出显示",
-    tagRedHighlightHelp: "这里列出的标签会在词条列表和词条详情中以红色显示。请填写标签本身，不要填写显示替换文本。",
-    tagFilterSettings: "标签筛选",
-    entryListTagFilteringHelp: "在词条列表中点击标签时启用筛选",
     displaySettings: "显示",
     emptyEntrySections: "空栏目",
     showEmptyEntrySections: "在词条浏览界面显示空栏目",
@@ -772,6 +800,7 @@ const i18n = {
     apiErrorDictionaryIdExists: "词典 ID 已存在，需要确认覆盖",
     apiErrorDuplicateEntityIds: "词典中存在重复 ID",
     apiErrorDuplicateEntityIdsScoped: "当前保存范围存在重复 ID",
+    apiErrorInvalidTagRegistry: "文件中的标签登记表无效",
     apiErrorInvalidEntryPayload: "词条保存请求格式无效",
     apiErrorInvalidEntryUpdatesPayload: "批量词条更新格式无效",
     apiErrorEntryNotFound: "词条不存在或已被删除",
@@ -1266,49 +1295,64 @@ const i18n = {
     unsavedCorpusConfirm: "Corpus has unsaved changes. Save them, discard them, or cancel the current action.",
     unsavedDocsConfirm: "Language Docs has unsaved changes. Save them, discard them, or cancel the current action.",
     tags: "Tags",
-    entryTagSettings: "Entry Tags",
-    tagDisplayReplacement: "Tag Display Replacement",
-    tagDisplayReplacementHelp: "Enter one per line in the format “Tag = Display Text”. This changes only the interface display and does not modify the tag itself.",
-    entryListRawTagDisplay: "Show raw tags in the entry list tag row",
-    entryListRawPartDisplay: "Show raw tags for part-of-speech text in the entry list (subtitle and before definitions)",
-    filterMenuRawTagDisplay: "Show raw tags in the filter menu",
-    entryHoverCardRawTagDisplay: "Show raw tags in entry hover cards",
     rootModeNeedsNoFilter: "Clear the filter to use it",
-    entryListTagDisplayLimit: "Entry list tag display limit",
     entryListTagDisplayLimitHelp: "Set to n: entries with more than n tags show the first n-1 tags and an ellipsis. Default: 3.",
     entryListTagDisplayLimitInvalid: "Entry list tag display limit must be an integer from 2 to 10.",
-    entryListTagsIncludeParts: "Include part-of-speech tags in the entry list tag row",
     tagTooltipRawTag: "Raw tag",
     tagTooltipDisplayReplacement: "Display",
-    partOfSpeechTagSettings: "Part-of-Speech Tags",
-    partOfSpeechTagsHelp: "Only tags listed here are recognized as parts of speech; leave this empty if the dictionary does not use parts of speech. Separate multiple tags with halfwidth commas, fullwidth commas, or ideographic commas.",
+    tagManager: "Tags",
+    tagManagerSearch: "Search tags",
+    tagManagerAdd: "Add Tag",
+    tagManagerAddPlaceholder: "New tag",
+    tagManagerAddSeparator: "Tags cannot contain commas or ideographic commas.",
+    tagManagerDisplay: "Display",
+    tagManagerDisplayOptions: "Display Options",
+    tagManagerNeedDictionary: "The tag registry is saved in the current dictionary file.",
+    tagManagerSummary: "{count} tags · {unused} unused",
+    tagManagerPartZone: "Parts of Speech",
+    tagManagerPartZoneHelp: "Tags placed here are recognized as parts of speech.",
+    tagManagerPartZoneEmpty: "Drag a tag here to make it a part of speech",
+    tagManagerGeneralZone: "General Tags",
+    tagManagerGeneralZoneHelp: "New tags are added at the end.",
+    tagManagerGeneralZoneEmpty: "No general tags yet",
+    tagManagerNoMatch: "No matching tags",
+    tagManagerLoadFailed: "Could not load tags.",
+    tagManagerDrag: "Drag to reorder",
+    tagManagerDragDisabled: "Dragging is off while searching",
+    tagManagerLabelFor: "Display name of {tag}",
+    tagManagerCountFor: "View {count} entries using {tag}",
+    tagManagerMoreFor: "More actions for {tag}",
+    tagManagerRed: "Red",
+    tagManagerSameDisplay: "Shown the same as “{tag}”",
+    tagManagerMoveTop: "Move to Top",
+    tagManagerMoveBottom: "Move to Bottom",
+    tagManagerMoveToParts: "Make Part of Speech",
+    tagManagerMoveOutOfParts: "Remove from Parts of Speech",
+    tagManagerDeleteInUse: "Entries use this tag, so it cannot be deleted.",
+    tagManagerDeleteTitle: "Delete Tag",
+    tagManagerDeleteConfirm: "Delete the tag “{tag}” from the registry?",
+    tagManagerViewInManager: "View in Tags",
+    tagDisplayGroupInput: "Input",
+    tagDisplayGroupList: "Entry List",
+    tagDisplayGroupFilter: "Filter Menu",
+    tagDisplayGroupHover: "Entry Hover Card",
+    tagDisplayLimit: "Tag display limit",
+    tagDisplayIncludeParts: "Include parts of speech in the tag row",
+    tagDisplayFiltering: "Filter when a tag is clicked",
+    tagDisplayRawTags: "Show raw tags in the tag row",
+    tagDisplayRawParts: "Show raw tags in part-of-speech text",
+    tagDisplayRaw: "Show raw tags",
     tagListSeparator: "Tag List Separator",
     tagListSeparatorHelp: "Choose the separator used to display multiple tags in tag input fields. Regardless of this choice, input accepts halfwidth commas, fullwidth commas, or ideographic commas.",
     tagListSeparatorCommaSpace: "Comma and space (n, v)",
     tagListSeparatorFullwidthComma: "Fullwidth comma (n，v)",
     tagListSeparatorIdeographicComma: "Ideographic comma (n、v)",
-    tagOrderSettings: "Auto Arrange Tag Order",
-    tagOrderHelp: "Saved entries arrange their tags in this order, entry tags and each definition's tags separately; unlisted tags remain at the end. Apply arranges all existing entries. Enter tag values, not display replacements.",
-    tagOrderInfo: "Show tag ordering logic",
-    tagOrderInfoBody: "When an entry is saved, its tags are arranged by the unified order in this field, entry tags and each definition's tags separately; Apply does the same for every existing entry. Tags in the unified order that an entry does not have are skipped. Tags on an entry that are not in the unified order are kept at the end, and multiple extra tags keep their original relative order. Imported dictionaries keep their order until an entry is saved again or you click Apply. Enter tag values here; display replacements only affect how tags are shown.",
-    tagOrderConfirm: "This will reorder tags for every entry in the current dictionary, including definition tags, using the current unified order and save immediately. Continue?",
-    tagOrderChangedConfirm: "Tag order changed; entries saved from now on use the new order. Existing entries not yet in this order: {count}. Arrange them now?",
-    tagOrderArrangeNow: "Arrange Now",
-    tagOrderArrangeLater: "Later",
-    tagOrderUnsavedSettingsConfirm: "Other Settings have unsaved changes. Save the settings before arranging tag order.",
-    tagOrderApplied: "Tag order arranged",
-    tagOrderEmpty: "Enter at least one tag first.",
     tagWithSource: "{tag} ({source})",
     tagStateDefinition: "From definitions",
     tagStateRepeatsDefinition: "Repeats a definition tag",
     tagStateRepeatsEntry: "Repeats an entry tag",
     tagStateMixedPart: "Parts of speech on both levels",
     saveAndApply: "Save and Apply",
-    applyTags: "Apply",
-    tagDisplaySettings: "Tag Highlighting",
-    tagRedHighlightHelp: "Tags listed here are shown in red in the entry list and entry details. Enter tag values, not display replacements.",
-    tagFilterSettings: "Tag Filtering",
-    entryListTagFilteringHelp: "Enable filtering when clicking tags in the entry list",
     displaySettings: "Display",
     emptyEntrySections: "Empty Sections",
     showEmptyEntrySections: "Show empty sections in the entry view",
@@ -1394,6 +1438,7 @@ const i18n = {
     apiErrorDictionaryIdExists: "Dictionary ID already exists and needs overwrite confirmation",
     apiErrorDuplicateEntityIds: "The dictionary contains duplicate IDs",
     apiErrorDuplicateEntityIdsScoped: "The current save scope contains duplicate IDs",
+    apiErrorInvalidTagRegistry: "The tag registry in this file is invalid",
     apiErrorInvalidEntryPayload: "Invalid entry save request",
     apiErrorInvalidEntryUpdatesPayload: "Invalid batch entry update request",
     apiErrorEntryNotFound: "Entry not found or already deleted",
@@ -1700,20 +1745,6 @@ const elements = {
   corpusUnitGlossAlignInput: document.querySelector("#corpusUnitGlossAlignInput"),
   entryExampleRenderPatternInput: document.querySelector("#entryExampleRenderPatternInput"),
   entryExampleGlossAlignInput: document.querySelector("#entryExampleGlossAlignInput"),
-  tagDisplayMapInput: document.querySelector("#tagDisplayMapInput"),
-  entryListRawTagDisplayInput: document.querySelector("#entryListRawTagDisplayInput"),
-  entryListRawPartDisplayInput: document.querySelector("#entryListRawPartDisplayInput"),
-  filterMenuRawTagDisplayInput: document.querySelector("#filterMenuRawTagDisplayInput"),
-  entryHoverCardRawTagDisplayInput: document.querySelector("#entryHoverCardRawTagDisplayInput"),
-  entryListTagDisplayLimitInput: document.querySelector("#entryListTagDisplayLimitInput"),
-  entryListTagsIncludePartsInput: document.querySelector("#entryListTagsIncludePartsInput"),
-  partOfSpeechTagsInput: document.querySelector("#partOfSpeechTagsInput"),
-  tagListSeparatorStyleInput: document.querySelector("#tagListSeparatorStyleInput"),
-  tagSortOrderInput: document.querySelector("#tagSortOrderInput"),
-  applyTagSortOrderButton: document.querySelector("#applyTagSortOrderButton"),
-  tagOrderInfoButton: document.querySelector("#tagOrderInfoButton"),
-  tagRedHighlightInput: document.querySelector("#tagRedHighlightInput"),
-  entryListTagFilteringInput: document.querySelector("#entryListTagFilteringInput"),
   showEmptyEntrySectionsInput: document.querySelector("#showEmptyEntrySectionsInput"),
   searchFieldEnabledInputs: [...document.querySelectorAll("[data-search-enabled]")],
   searchFieldFuzzyInputs: [...document.querySelectorAll("[data-search-fuzzy]")],
@@ -1778,6 +1809,17 @@ const elements = {
   ipaNoDictionaryNotice: document.querySelector("#ipaNoDictionaryNotice"),
   ipaOpenDictionaryManagerButton: document.querySelector("#ipaOpenDictionaryManagerButton"),
   ipaPanel: document.querySelector("#ipaPanel"),
+  tagsView: document.querySelector("#tagsView"),
+  tagsPanel: document.querySelector("#tagsPanel"),
+  tagsNoDictionaryNotice: document.querySelector("#tagsNoDictionaryNotice"),
+  tagsOpenDictionaryManagerButton: document.querySelector("#tagsOpenDictionaryManagerButton"),
+  tagManagerSummary: document.querySelector("#tagManagerSummary"),
+  tagManagerSearchInput: document.querySelector("#tagManagerSearchInput"),
+  tagManagerAddButton: document.querySelector("#tagManagerAddButton"),
+  tagManagerDisplayToggle: document.querySelector("#tagManagerDisplayToggle"),
+  tagManagerDisplayPanel: document.querySelector("#tagManagerDisplayPanel"),
+  tagManagerZones: document.querySelector("#tagManagerZones"),
+  entryListTagDisplayLimitHint: document.querySelector("#entryListTagDisplayLimitHint"),
   ipaForm: document.querySelector("#ipaForm"),
   ipaMappingList: document.querySelector("#ipaMappingList"),
   addIpaMappingButton: document.querySelector("#addIpaMappingButton"),
@@ -2058,6 +2100,7 @@ const API_ERROR_TOAST_KEYS = {
   self_source_reference: "selfSourceReference",
   source_binding_conflict: "sourceBindingConflict",
   invalid_source_binding: "apiErrorInvalidEntryPayload",
+  invalid_tag_registry: "apiErrorInvalidTagRegistry",
   invalid_entry_updates_payload: "apiErrorInvalidEntryUpdatesPayload",
   entry_not_found: "apiErrorEntryNotFound",
   invalid_settings_payload: "apiErrorInvalidSettingsPayload",
@@ -2286,6 +2329,7 @@ function normalizeDictionary(dictionary) {
     language: dictionary.language || "",
     description: dictionary.description || "",
     settings: normalizeDictionarySettings(dictionary.settings),
+    tagRegistry: dictionary.tagRegistry,
     docs: normalizeDocs(dictionary.docs),
     corpus: normalizeCorpus(dictionary.corpus),
     morphology: normalizeMorphology(dictionary.morphology),
@@ -2423,16 +2467,13 @@ function toolNavLabel(view) {
     analysis: t("analysis"),
     quality: t("qualityCheck"),
     ipa: t("ipaConfig"),
+    tags: t("tagManager"),
     "morphology-functions": t("morphologyFunctions"),
     "morphology-tables": t("morphologyTables"),
     settings: t("otherSettings"),
     manager: t("dictionaryManager"),
   };
   return labels[view] || view;
-}
-
-function normalizeTagDisplayMap(map = {}) {
-  return tagModel.normalizeTagDisplayMap(map);
 }
 
 function normalizeTagList(value) {
@@ -2450,60 +2491,6 @@ function normalizeTagListSeparatorStyle(value) {
 function serializeTagList(value, dictionaryOrSettings = activeDictionary()) {
   const settings = dictionaryOrSettings?.settings || dictionaryOrSettings || {};
   return tagModel.serializeTagList(value, settings.tagListSeparatorStyle);
-}
-
-function updateTagListPlaceholders(style = elements.tagListSeparatorStyleInput.value) {
-  const separatorStyle = normalizeTagListSeparatorStyle(style);
-  elements.partOfSpeechTagsInput.placeholder = tagModel.serializeTagList(
-    ["n", "v", "adj"],
-    separatorStyle,
-  );
-  elements.tagSortOrderInput.placeholder = tagModel.serializeTagList(
-    ["n", "v", "adj", "root"],
-    separatorStyle,
-  );
-}
-
-function normalizeEntryListTagDisplayLimit(value) {
-  return tagModel.normalizeEntryListTagDisplayLimit(value);
-}
-
-function entryListTagDisplayLimitInputIsValid() {
-  const raw = elements.entryListTagDisplayLimitInput.value.trim();
-  if (!raw) {
-    return true;
-  }
-  if (!/^\d+$/.test(raw)) {
-    return false;
-  }
-  const value = Number.parseInt(raw, 10);
-  return value >= MIN_ENTRY_LIST_TAG_DISPLAY_LIMIT && value <= MAX_ENTRY_LIST_TAG_DISPLAY_LIMIT;
-}
-
-function parseTagDisplayMap(value) {
-  const map = {};
-  String(value || "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .forEach((line) => {
-      const match = line.match(/^(.+?)(?:\s*=\s*|\s*:\s*|\t+)(.+)$/);
-      if (!match) {
-        return;
-      }
-      const key = match[1].trim();
-      const replacement = match[2].trim();
-      if (key && replacement) {
-        map[key] = replacement;
-      }
-    });
-  return map;
-}
-
-function serializeTagDisplayMap(map = {}) {
-  return Object.entries(normalizeTagDisplayMap(map))
-    .map(([key, value]) => `${key} = ${value}`)
-    .join("\n");
 }
 
 function normalizeMorphology(morphology = {}) {
@@ -2763,22 +2750,39 @@ function selectedDictionaryConfig() {
   return state.dictionaries.find((dictionary) => dictionary.id === state.selectedDictionaryConfigId) || null;
 }
 
-function entryPart(entry) {
-  return entryParts(entry)[0] || "";
+function tagRegistry(dictionary = activeDictionary()) {
+  return dictionary?.tagRegistry;
 }
 
-// The entry as a whole: its own tags plus its definitions' tags. Summaries carry
-// the server's `effectiveTags`; detail entries compute them from definitions.
+function arrangedTags(tags, dictionary = activeDictionary()) {
+  return tagModel.arrangeTags(tags, tagRegistry(dictionary));
+}
+
+// Changes when anything a tag shows or sorts by changes. Serialized once per
+// registry array: arrays are replaced, never changed in place.
+const tagRegistrySignatures = new WeakMap();
+function tagRegistrySignature(dictionary = activeDictionary()) {
+  const registry = tagRegistry(dictionary);
+  if (!registry) {
+    return "";
+  }
+  if (!tagRegistrySignatures.has(registry)) {
+    tagRegistrySignatures.set(registry, stableJson(registry));
+  }
+  return tagRegistrySignatures.get(registry);
+}
+
+// The entry as a whole, in registry order: its own tags plus its definitions'
+// tags. Summaries carry the server's `effectiveTags`; detail entries compute them.
 function entryEffectiveTags(entry, dictionary = activeDictionary()) {
-  return Array.isArray(entry.effectiveTags)
-    ? entry.effectiveTags
-    : tagModel.effectiveEntryTags(entry, dictionarySettings(dictionary).tagSortOrder);
+  return arrangedTags(
+    Array.isArray(entry.effectiveTags) ? entry.effectiveTags : tagModel.effectiveEntryTags(entry),
+    dictionary,
+  );
 }
 
 function entryParts(entry, dictionary = activeDictionary()) {
-  return tagModel.entryParts({ tags: entryEffectiveTags(entry, dictionary) }, dictionarySettings(dictionary), {
-    normalizeText: searchNormalizationModel.normalizeStructuralKey,
-  });
+  return tagModel.entryParts({ tags: entryEffectiveTags(entry, dictionary) }, tagRegistry(dictionary));
 }
 
 // Card subtitles show only the parts of speech on the entry itself; parts on
@@ -2795,30 +2799,17 @@ function partLabelText(part, raw = false, dictionary = activeDictionary()) {
 }
 
 function tagIsPart(tag, dictionary = activeDictionary()) {
-  return tagModel.entryParts({ tags: [tag] }, dictionarySettings(dictionary), {
-    normalizeText: searchNormalizationModel.normalizeStructuralKey,
-  }).length > 0;
+  return tagModel.tagIsPart(tag, tagRegistry(dictionary));
 }
 
 function displayTag(tag, dictionary = activeDictionary()) {
-  return tagModel.displayTag(tag, dictionarySettings(dictionary));
+  return tagModel.displayTag(tag, tagRegistry(dictionary));
 }
 
 function activeTagDisplayIdentity(tag, dictionary = activeDictionary()) {
   const value = String(tag || "");
-  const fallbackLabel = displayTag(value, dictionary);
-  if (
-    entryFacetsState.status !== "success"
-    || entryFacetsState.key !== entryFacetsApiKey(dictionary)
-  ) {
-    return tagModel.displayIdentity(value, fallbackLabel, false);
-  }
-  const identity = entryFacetsState.identityByValue.get(value);
-  return tagModel.displayIdentity(
-    value,
-    identity?.displayLabel || fallbackLabel,
-    Boolean(identity?.displayAmbiguous),
-  );
+  const row = tagModel.tagRegistryIndex(tagRegistry(dictionary)).get(value);
+  return tagModel.displayIdentity(value, row?.displayLabel, row?.displayAmbiguous);
 }
 
 function entryListTagDisplayIdentity(tag, dictionary = activeDictionary()) {
@@ -2840,9 +2831,7 @@ function tagIdentityHtml(identity) {
 }
 
 function tagIsRedHighlighted(tag, dictionary = activeDictionary()) {
-  return tagModel.tagIsRedHighlighted(tag, dictionarySettings(dictionary), {
-    normalizeText: searchNormalizationModel.normalizeStructuralKey,
-  });
+  return tagModel.tagColor(tag, tagRegistry(dictionary)) === "red";
 }
 
 function normalize(value) {
@@ -2945,6 +2934,10 @@ function renderActiveView(options = {}) {
     renderIpaSandbox();
     return;
   }
+  if (state.activeView === "tags") {
+    renderTagManager(dictionary);
+    return;
+  }
   if (state.activeView === "analysis") {
     renderAnalysis(dictionary);
     return;
@@ -2981,6 +2974,10 @@ function renderLocaleActiveView() {
   }
   if (state.activeView === "ipa") {
     renderIpaSandbox();
+    return;
+  }
+  if (state.activeView === "tags") {
+    renderTagManagerZones();
     return;
   }
   if (state.activeView === "analysis") {
@@ -3103,7 +3100,7 @@ function ensureValidAppState() {
     state.selectedDictionaryConfigId = state.activeDictionaryId;
   }
 
-  if (!["editor", "manager", "analysis", "quality", "settings", "docs", "corpus", "morphology-functions", "morphology-tables", "ipa"].includes(state.activeView)) {
+  if (!["editor", "manager", "analysis", "quality", "settings", "docs", "corpus", "morphology-functions", "morphology-tables", "ipa", "tags"].includes(state.activeView)) {
     state.activeView = "editor";
   }
 
@@ -4015,6 +4012,11 @@ function renderAvailability() {
   elements.morphologyTablesPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "morphology-tables";
   elements.ipaNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "ipa";
   elements.ipaPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "ipa";
+  elements.tagsNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "tags";
+  elements.tagsPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "tags";
+  elements.tagManagerSearchInput.disabled = !backendAvailable || !hasDictionary;
+  elements.tagManagerAddButton.disabled = !backendAvailable || !hasDictionary;
+  elements.tagManagerDisplayToggle.disabled = !backendAvailable || !hasDictionary;
   elements.batchIpaAllButton.disabled = !backendAvailable || !hasDictionary;
   elements.batchIpaMissingButton.disabled = !backendAvailable || !hasDictionary;
   elements.editorTopBar.hidden = !backendAvailable || !hasDictionary;
@@ -4042,6 +4044,7 @@ function renderView() {
   elements.morphologyFunctionsView.classList.toggle("active", state.activeView === "morphology-functions");
   elements.morphologyTablesView.classList.toggle("active", state.activeView === "morphology-tables");
   elements.ipaView.classList.toggle("active", state.activeView === "ipa");
+  elements.tagsView.classList.toggle("active", state.activeView === "tags");
 }
 
 function renderToolNav() {
@@ -4251,14 +4254,14 @@ function renderPartFilter() {
   if (activeFilterUsesEntryQuery()) {
     refreshActiveFilterFacts(dictionary);
   }
-  startEntryFacetsApiCheck(dictionary);
-  const usedParts = entryFacetsPartsForRender(dictionary);
+  startTagUsageCheck(dictionary);
+  const usedParts = tagUsagePartsForRender(dictionary);
   renderPartFilterControls(dictionary, usedParts);
 }
 
 function renderPartFilterLocale() {
   const dictionary = activeDictionary();
-  const usedParts = entryFacetsPartsForRender(dictionary);
+  const usedParts = tagUsagePartsForRender(dictionary);
   renderPartFilterControls(dictionary, usedParts);
 }
 
@@ -4305,9 +4308,9 @@ function setPartFilterDraft(value, { focus = false } = {}) {
 
 function renderPartFilterControls(dictionary, usedParts = null) {
   const current = currentEntryPartFilter();
-  const facetsReady = Array.isArray(usedParts);
-  const pendingSelection = !facetsReady && current && current !== NO_PART_FILTER_VALUE ? [current] : [];
-  const options = ["", NO_PART_FILTER_VALUE, ...(facetsReady ? usedParts : pendingSelection)];
+  const usageReady = Array.isArray(usedParts);
+  const pendingSelection = !usageReady && current && current !== NO_PART_FILTER_VALUE ? [current] : [];
+  const options = ["", NO_PART_FILTER_VALUE, ...(usageReady ? usedParts : pendingSelection)];
 
   const rawTags = dictionarySettings(dictionary).filterMenuRawTagDisplay;
   elements.partFilter.innerHTML = options
@@ -5449,9 +5452,7 @@ function entryCardSettingsSizeSignature() {
     settings.entryListRawPartDisplay ? "raw-parts" : "display-parts",
     settings.entryListTagFiltering ? "tag-filtering" : "no-tag-filtering",
     entrySearchQuerySignature(),
-    settings.partOfSpeechTags.join(","),
-    stableJson(settings.tagDisplayMap),
-    stableJson(settings.redHighlightTags),
+    tagRegistrySignature(),
   ].map(virtualListSignaturePart).join(";");
 }
 
@@ -6057,8 +6058,6 @@ function entryQueryApiKey(dictionary = activeDictionary()) {
     activeFilterUsesFeatureQuery() ? activeFilter.value : "",
     activeFilterUsesFeatureQuery() ? activeFilter.scope : "",
     entrySort,
-    stableJson(settings.tagDisplayMap),
-    settings.partOfSpeechTags.join(","),
     entrySearchQuerySignature(dictionary),
   ].join("|");
 }
@@ -6144,8 +6143,7 @@ function recordFeatureResultSummary(result) {
 }
 
 function entrySummaryDto(entry, dictionary = activeDictionary()) {
-  const effectiveTags = tagModel.effectiveEntryTags(entry, dictionarySettings(dictionary).tagSortOrder);
-  const parts = entryParts({ tags: effectiveTags }, dictionary);
+  const effectiveTags = tagModel.effectiveEntryTags(entry);
   return {
     id: entry.id,
     lemma: entry.lemma || "",
@@ -6160,8 +6158,7 @@ function entrySummaryDto(entry, dictionary = activeDictionary()) {
     })),
     createdAt: entry.createdAt || "",
     updatedAt: entry.updatedAt || "",
-    partOfSpeech: parts[0] || "",
-    parts,
+    parts: entryParts({ tags: effectiveTags }, dictionary),
   };
 }
 
@@ -6585,134 +6582,68 @@ function startEntryQueryApiCheck(dictionary) {
   loadEntryQueryWindowPage(dictionary, firstPage);
 }
 
-function entryFacetsCanUseApi(dictionary = activeDictionary()) {
-  return Boolean(backendAvailable && dictionary);
+function tagUsageApiKey(dictionary = activeDictionary()) {
+  return dictionary ? [dictionary.id, dictionary.updatedAt || ""].join("|") : "";
 }
 
-function entryFacetsApiKey(dictionary = activeDictionary()) {
-  if (!dictionary) {
-    return "";
-  }
-  const settings = dictionarySettings(dictionary);
-  return [
-    dictionary.id,
-    dictionary.updatedAt || "",
-    stableJson(settings.tagDisplayMap),
-    settings.partOfSpeechTags.join(","),
-  ].join("|");
-}
-
-function compactEntryFacetsResult(result) {
-  const { identities } = result;
+function compactTagUsageResult(result) {
   return {
-    generation: result.generation,
-    identities,
-    collisionGroups: result.collisionGroups,
-    parts: identities
-      .filter((identity) => identity.isPartOfSpeech)
-      .map((identity) => identity.value)
-      .sort((a, b) => a.localeCompare(b, "zh-CN")),
+    parts: result.tags.filter((row) => row.partOfSpeech && row.entryCount > 0).map((row) => row.tag),
   };
 }
 
-function entryFacetsSuccessState(key, requestId, result) {
-  return {
-    key,
-    status: "success",
-    generation: result.generation,
-    identities: result.identities,
-    identityByValue: new Map(result.identities.map((identity) => [identity.value, identity])),
-    collisionGroups: result.collisionGroups,
-    parts: result.parts,
-    error: null,
-    requestId,
-  };
+function resetTagUsageState() {
+  tagUsageState = { key: "", status: "idle", parts: [], error: null, requestId: tagUsageState.requestId + 1 };
 }
 
-function resetEntryFacetsState() {
-  entryFacetsState = {
-    key: "",
-    status: "idle",
-    generation: 0,
-    identities: [],
-    identityByValue: new Map(),
-    collisionGroups: [],
-    parts: [],
-    error: null,
-    requestId: entryFacetsState.requestId + 1,
-  };
-}
-
-function entryFacetsPartsForRender(dictionary) {
-  const key = entryFacetsApiKey(dictionary);
-  if (entryFacetsState.status !== "success" || entryFacetsState.key !== key) {
+function tagUsagePartsForRender(dictionary) {
+  const key = tagUsageApiKey(dictionary);
+  if (tagUsageState.status !== "success" || tagUsageState.key !== key) {
     return null;
   }
-  return entryFacetsState.parts;
+  return tagUsageState.parts;
 }
 
-function startEntryFacetsApiCheck(dictionary) {
-  if (!entryFacetsCanUseApi(dictionary)) {
-    if (entryFacetsState.status !== "idle") {
-      resetEntryFacetsState();
+function startTagUsageCheck(dictionary) {
+  if (!backendAvailable || !dictionary) {
+    if (tagUsageState.status !== "idle") {
+      resetTagUsageState();
     }
     return;
   }
 
-  const key = entryFacetsApiKey(dictionary);
-  if (entryFacetsState.key === key && ["loading", "success", "error"].includes(entryFacetsState.status)) {
+  const key = tagUsageApiKey(dictionary);
+  if (tagUsageState.key === key && ["loading", "success", "error"].includes(tagUsageState.status)) {
     return;
   }
 
-  const requestId = entryFacetsState.requestId + 1;
-  const cacheKey = queryPageCacheKey("facets", key);
+  const requestId = tagUsageState.requestId + 1;
+  const cacheKey = queryPageCacheKey("tag-usage", key);
   const cached = queryPageCache.get(cacheKey);
   if (cached) {
-    entryFacetsState = entryFacetsSuccessState(key, requestId, cached);
+    tagUsageState = { key, status: "success", parts: cached.parts, error: null, requestId };
     return;
   }
-  entryFacetsState = {
-    key,
-    status: "loading",
-    generation: 0,
-    identities: [],
-    identityByValue: new Map(),
-    collisionGroups: [],
-    parts: [],
-    error: null,
-    requestId,
-  };
+  tagUsageState = { key, status: "loading", parts: [], error: null, requestId };
 
   queryPageCache.load({
     key: cacheKey,
     dictionaryId: dictionary.id,
-    load: () => api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/facets`),
-    transform: compactEntryFacetsResult,
+    load: () => api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/tag-registry`),
+    transform: compactTagUsageResult,
   })
     .then((result) => {
-      if (entryFacetsState.requestId !== requestId || entryFacetsApiKey(activeDictionary()) !== key) {
+      if (tagUsageState.requestId !== requestId || tagUsageApiKey(activeDictionary()) !== key) {
         return;
       }
-      entryFacetsState = entryFacetsSuccessState(key, requestId, result);
+      tagUsageState = { key, status: "success", parts: result.parts, error: null, requestId };
       renderPartFilter();
-      renderEntries({ allowQueryStart: false });
-      renderDetail({ preserveEditorForm: true });
     })
     .catch((error) => {
-      if (entryFacetsState.requestId !== requestId) {
+      if (tagUsageState.requestId !== requestId) {
         return;
       }
-      entryFacetsState = {
-        key,
-        status: "error",
-        generation: 0,
-        identities: [],
-        identityByValue: new Map(),
-        collisionGroups: [],
-        parts: [],
-        error,
-        requestId,
-      };
+      tagUsageState = { key, status: "error", parts: [], error, requestId };
       console.error(error);
       renderPartFilter();
     });
@@ -7017,12 +6948,7 @@ function positionEntryContextMenu(menu, x, y) {
 }
 
 function showEntryContextMenu(event, entry, options = {}) {
-  closeEntryContextMenu();
-  const menu = document.createElement("div");
-  menu.className = "entry-context-menu";
-  menu.setAttribute("role", "menu");
-  menu.setAttribute("aria-label", t("entryContextMenu"));
-  const actions = [
+  showContextMenu(event, t("entryContextMenu"), [
     {
       key: "edit",
       label: t("editEntry"),
@@ -7039,7 +6965,16 @@ function showEntryContextMenu(event, entry, options = {}) {
       danger: true,
       handler: () => deleteEntryById(entry),
     },
-  ];
+  ]);
+}
+
+// An action with `disabledReason` stays in the menu and says why it cannot run.
+function showContextMenu(event, label, actions) {
+  closeEntryContextMenu();
+  const menu = document.createElement("div");
+  menu.className = "entry-context-menu";
+  menu.setAttribute("role", "menu");
+  menu.setAttribute("aria-label", label);
   actions.forEach((action) => {
     if (action.danger) {
       const separator = document.createElement("div");
@@ -7053,7 +6988,15 @@ function showEntryContextMenu(event, entry, options = {}) {
     button.className = action.danger ? "danger" : "";
     button.setAttribute("role", "menuitem");
     button.textContent = action.label;
+    if (action.disabledReason) {
+      button.setAttribute("aria-disabled", "true");
+      button.dataset.appTooltip = "always";
+      button.dataset.appTooltipLabel = action.disabledReason;
+    }
     button.addEventListener("click", async () => {
+      if (action.disabledReason) {
+        return;
+      }
       closeEntryContextMenu();
       await action.handler();
     });
@@ -7176,7 +7119,7 @@ function entryDefinitionItems(entry = {}) {
 // from the server; full definitions derive them from their tags.
 function definitionOwnParts(definition, dictionary = activeDictionary()) {
   return Array.isArray(definition.parts)
-    ? definition.parts
+    ? arrangedTags(definition.parts, dictionary)
     : entryParts({ tags: definition.tags || [] }, dictionary);
 }
 
@@ -8480,9 +8423,13 @@ function detailTagHtml(tag, index, { state = "", highlight = false, fuzzy = fals
 }
 
 function definitionTagLayerStates(entry, dictionary = activeDictionary()) {
-  return tagModel.definitionTagLayerStates(entry, dictionarySettings(dictionary), {
-    normalizeText: searchNormalizationModel.normalizeStructuralKey,
-  });
+  return tagModel.definitionTagLayerStates({
+    ...entry,
+    definitions: (entry.definitions || []).map((definition) => ({
+      ...definition,
+      tags: arrangedTags(definition.tags || [], dictionary),
+    })),
+  }, tagRegistry(dictionary));
 }
 
 // The header shows the effective tags. A tag not only on the entry comes from
@@ -10317,6 +10264,7 @@ function analysisTagPageRows(response) {
         label: identity.label,
         secondaryLabel: identity.rawLabel,
         value: row.entryCount,
+        tag: row.part,
         action: analysisQueryFilterAction(
           row.action,
           activeFilterValueTitleDescriptor(
@@ -10333,6 +10281,7 @@ function analysisTagPageRows(response) {
       label: identity.label,
       secondaryLabel: identity.rawLabel,
       value: row.entryCount,
+      tag: row.tag,
       action: analysisQueryFilterAction(
         row.action,
         activeFilterValueTitleDescriptor("tags", row.tag, { valueType: "tag" }),
@@ -10819,6 +10768,7 @@ function qualityIssueList(items) {
   }
   return `<ul class="analysis-issue-list">${items.map(({ issue, entry }) => {
     const { title, detail } = qualityIssueText(issue);
+    const tags = issue.params.forms || (issue.code === "tag_too_long" ? [issue.params.tag] : null);
     return `
     <li class="analysis-issue ${escapeHtml(issue.severity)}"${entry ? ` data-entry-id="${escapeHtml(entry.id)}"` : ""}>
       <span>${escapeHtml(issue.severity)}</span>
@@ -10827,6 +10777,7 @@ function qualityIssueList(items) {
         <strong>${escapeHtml(title)}</strong>
         ${detail ? `<small>${escapeHtml(detail)}</small>` : ""}
       </div>
+      ${tags ? tagManagerLinkHtml(tags, "quality-tag-link") : ""}
     </li>
   `;
   }).join("")}</ul>`;
@@ -10838,6 +10789,7 @@ function qualityIssueText(issue) {
     gloss_alignment_mismatch: ["Gloss 对齐数量不一致", "Gloss alignment mismatch"],
     duplicate_lemma: ["重复词形", "Duplicate lemma"],
     near_duplicate_tags: ["近似标签可能不一致", "Near-duplicate tags"],
+    display_label_conflict: ["标签显示相同", "Tags shown alike"],
     missing_lemma: ["缺少词形", "Missing lemma"],
     missing_tags: ["缺少标签", "Missing tags"],
     missing_definition: ["缺少释义", "Missing definition"],
@@ -10857,8 +10809,9 @@ function qualityIssueText(issue) {
     gloss_alignment_mismatch: () => `\\gla ${params.glaCount} / \\glb ${params.glbCount}`,
     duplicate_lemma: () => params.lemmas.join(", "),
     near_duplicate_tags: () => params.forms.join(", "),
+    display_label_conflict: () => `${params.displayLabel}: ${params.forms.join(", ")}`,
     multiple_primary_stress: () => `${aText("主重音数量", "Primary stress count")}: ${params.primaryStressCount}`,
-    tag_too_long: () => (params.definitionId ? `${definitionLabel()}: ${params.tag}` : params.tag),
+    tag_too_long: () => params.tag,
     duplicate_definition_tag: () => `${definitionLabel()}: ${params.tag}`,
     mixed_part_of_speech_levels: () => `${definitionLabel()}: ${params.part}`,
     missing_definition_part_of_speech: definitionLabel,
@@ -11051,7 +11004,7 @@ function analysisBarList(items, options = {}) {
     ? { label: item[0], value: item[1], action: item[2], valueText: "", secondaryLabel: "" }
     : item));
   const max = Math.max(...rows.map((item) => item.value), 1);
-  return `<div class="analysis-bars">${rows.map(({ label, value, action, valueText = "", secondaryLabel = "" }) => {
+  return `<div class="analysis-bars">${rows.map(({ label, value, action, valueText = "", secondaryLabel = "", tag = "" }) => {
     const attrs = analysisActionAttributes(action);
     const labelTag = attrs ? "button" : "span";
     const labelAttrs = attrs ? ` type="button"` : "";
@@ -11059,13 +11012,18 @@ function analysisBarList(items, options = {}) {
       ? `<span>${escapeHtml(label)}</span><small>${escapeHtml(secondaryLabel)}</small>`
       : escapeHtml(label);
     return `
-    <div class="analysis-bar-row${valueText ? " has-wide-value" : ""}"${attrs}>
+    <div class="analysis-bar-row${valueText ? " has-wide-value" : ""}${tag ? " has-tag-link" : ""}"${attrs}>
       <${labelTag} class="analysis-bar-label${secondaryLabel ? " has-secondary" : ""}"${labelAttrs}>${labelContent}</${labelTag}>
       <div class="analysis-bar-track"><span style="width: ${Math.max(4, (value / max) * 100).toFixed(2)}%"></span></div>
       <strong>${escapeHtml(valueText || value)}</strong>
+      ${tag ? tagManagerLinkHtml([tag], "analysis-tag-link") : ""}
     </div>
   `;
   }).join("")}</div>`;
+}
+
+function tagManagerLinkHtml(tags, className) {
+  return `<button type="button" class="${className}" data-tag-manager-tags="${escapeHtml(JSON.stringify(tags))}" data-app-tooltip="always" aria-label="${escapeHtml(t("tagManagerViewInManager"))}"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4Z"></path><circle cx="7.5" cy="7.5" r="1"></circle></svg></button>`;
 }
 
 function analysisCoverageList(rows) {
@@ -11355,7 +11313,7 @@ function fillEntryForm(entry) {
   elements.entryId.value = formEntry.id || "";
   elements.lemmaInput.value = formEntry.lemma || "";
   elements.pronunciationInput.value = formEntry.pronunciation || "";
-  elements.tagsInput.value = serializeTagList(formEntry.tags);
+  elements.tagsInput.value = serializeTagList(arrangedTags(formEntry.tags));
   elements.notesInput.value = formEntry.notes || "";
   setSourceInputReferences(elements.sourceEntryInput, formEntry.etymology?.sources || []);
   elements.etymologyDescriptionInput.value = formEntry.etymology?.description || "";
@@ -11577,7 +11535,7 @@ function definitionTagsFieldHtml(definition = {}) {
   return `
     <label>
       <span data-i18n="definitionTags">${escapeHtml(t("definitionTags"))}</span>
-      <input data-field="tags" maxlength="180" value="${escapeHtml(serializeTagList(definition.tags || []))}">
+      <input data-field="tags" maxlength="180" value="${escapeHtml(serializeTagList(arrangedTags(definition.tags || [])))}">
       <small class="field-help" data-i18n="definitionTagsHelp">${escapeHtml(t("definitionTagsHelp"))}</small>
     </label>
   `;
@@ -11686,19 +11644,24 @@ function collectDefinitions() {
   return definitionsFromFormStates(definitionFormStates(elements.definitionFormList));
 }
 
+// Tags are a set: reordering them in an input is not an edit.
+function tagSetSnapshot(tags) {
+  return normalizeTagList(tags).sort();
+}
+
 function entrySemanticSnapshot(entry = {}) {
   const morphologyState = morphologyModel.normalizeEntryMorphologyState(entry);
   return {
     lemma: String(entry.lemma || "").trim(),
     pronunciation: String(entry.pronunciation || "").trim(),
-    tags: normalizeTagList(entry.tags),
+    tags: tagSetSnapshot(entry.tags),
     definitions: (entry.definitions || [])
       .map((definition) => ({
         id: String(definition?.id || ""),
         meaning: String(definition?.meaning || "").trim(),
         example: String(definition?.example || "").trim(),
         note: String(definition?.note || "").trim(),
-        tags: normalizeTagList(definition?.tags),
+        tags: tagSetSnapshot(definition?.tags),
       }))
       .filter((definition) => definition.meaning || definition.example || definition.note || definition.tags.length),
     etymology: {
@@ -11786,7 +11749,7 @@ function sourceSummaryGloss(summary, peers = []) {
 }
 
 function sourceSummaryParts(summary) {
-  return serializeTagList((summary.parts || []).map((part) => tagIdentityText(activeTagDisplayIdentity(part))));
+  return serializeTagList(arrangedTags(summary.parts || []).map((part) => tagIdentityText(activeTagDisplayIdentity(part))));
 }
 
 function sourceCompletionController(input) {
@@ -12566,19 +12529,6 @@ function fillSettingsForm(dictionary) {
   elements.corpusUnitGlossAlignInput.checked = settings.corpusUnitGlossAlign;
   elements.entryExampleRenderPatternInput.value = settings.entryExampleRenderPattern;
   elements.entryExampleGlossAlignInput.checked = settings.entryExampleGlossAlign;
-  elements.tagDisplayMapInput.value = serializeTagDisplayMap(settings.tagDisplayMap);
-  elements.entryListRawTagDisplayInput.checked = settings.entryListRawTagDisplay;
-  elements.entryListRawPartDisplayInput.checked = settings.entryListRawPartDisplay;
-  elements.filterMenuRawTagDisplayInput.checked = settings.filterMenuRawTagDisplay;
-  elements.entryHoverCardRawTagDisplayInput.checked = settings.entryHoverCardRawTagDisplay;
-  elements.entryListTagDisplayLimitInput.value = settings.entryListTagDisplayLimit;
-  elements.entryListTagsIncludePartsInput.checked = settings.entryListTagsIncludeParts;
-  elements.tagListSeparatorStyleInput.value = settings.tagListSeparatorStyle;
-  updateTagListPlaceholders(settings.tagListSeparatorStyle);
-  elements.partOfSpeechTagsInput.value = serializeTagList(settings.partOfSpeechTags, settings);
-  elements.tagSortOrderInput.value = serializeTagList(settings.tagSortOrder, settings);
-  elements.tagRedHighlightInput.value = serializeTagList(settings.redHighlightTags, settings);
-  elements.entryListTagFilteringInput.checked = settings.entryListTagFiltering;
   elements.showEmptyEntrySectionsInput.checked = settings.showEmptyEntrySections;
   fillEntrySearchSettingsForm(settings.search);
   elements.searchHighlightInput.checked = settings.searchHighlight;
@@ -12816,18 +12766,6 @@ function settingsFormSnapshot() {
     entryExampleGlossAlign: elements.entryExampleGlossAlignInput.checked,
     corpusAutoSave: elements.corpusAutoSaveInput.checked,
     docsAutoSave: elements.docsAutoSaveInput.checked,
-    tagDisplayMap: normalizeTagDisplayMap(parseTagDisplayMap(elements.tagDisplayMapInput.value)),
-    entryListRawTagDisplay: elements.entryListRawTagDisplayInput.checked,
-    entryListRawPartDisplay: elements.entryListRawPartDisplayInput.checked,
-    filterMenuRawTagDisplay: elements.filterMenuRawTagDisplayInput.checked,
-    entryHoverCardRawTagDisplay: elements.entryHoverCardRawTagDisplayInput.checked,
-    entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(elements.entryListTagDisplayLimitInput.value),
-    entryListTagsIncludeParts: elements.entryListTagsIncludePartsInput.checked,
-    partOfSpeechTags: parseTagListText(elements.partOfSpeechTagsInput.value),
-    tagSortOrder: parseTagListText(elements.tagSortOrderInput.value),
-    redHighlightTags: parseTagListText(elements.tagRedHighlightInput.value),
-    tagListSeparatorStyle: normalizeTagListSeparatorStyle(elements.tagListSeparatorStyleInput.value),
-    entryListTagFiltering: elements.entryListTagFilteringInput.checked,
     showEmptyEntrySections: elements.showEmptyEntrySectionsInput.checked,
     entrySectionOrder: collectEntrySectionOrder(),
     search: collectEntrySearchSettingsForm(),
@@ -12854,18 +12792,6 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     entryExampleGlossAlign: settings.entryExampleGlossAlign,
     corpusAutoSave: settings.corpusAutoSave,
     docsAutoSave: settings.docsAutoSave,
-    tagDisplayMap: settings.tagDisplayMap,
-    entryListRawTagDisplay: settings.entryListRawTagDisplay,
-    entryListRawPartDisplay: settings.entryListRawPartDisplay,
-    filterMenuRawTagDisplay: settings.filterMenuRawTagDisplay,
-    entryHoverCardRawTagDisplay: settings.entryHoverCardRawTagDisplay,
-    entryListTagDisplayLimit: settings.entryListTagDisplayLimit,
-    entryListTagsIncludeParts: settings.entryListTagsIncludeParts,
-    partOfSpeechTags: settings.partOfSpeechTags,
-    tagSortOrder: settings.tagSortOrder,
-    redHighlightTags: settings.redHighlightTags,
-    tagListSeparatorStyle: settings.tagListSeparatorStyle,
-    entryListTagFiltering: settings.entryListTagFiltering,
     showEmptyEntrySections: settings.showEmptyEntrySections,
     entrySectionOrder: settings.entrySectionOrder,
     search: settings.search,
@@ -13012,18 +12938,6 @@ function collectDictionarySettingsFromForm(existing = {}) {
     entryExampleGlossAlign: elements.entryExampleGlossAlignInput.checked,
     corpusAutoSave: elements.corpusAutoSaveInput.checked,
     docsAutoSave: elements.docsAutoSaveInput.checked,
-    tagDisplayMap: parseTagDisplayMap(elements.tagDisplayMapInput.value),
-    entryListRawTagDisplay: elements.entryListRawTagDisplayInput.checked,
-    entryListRawPartDisplay: elements.entryListRawPartDisplayInput.checked,
-    filterMenuRawTagDisplay: elements.filterMenuRawTagDisplayInput.checked,
-    entryHoverCardRawTagDisplay: elements.entryHoverCardRawTagDisplayInput.checked,
-    entryListTagDisplayLimit: normalizeEntryListTagDisplayLimit(elements.entryListTagDisplayLimitInput.value),
-    entryListTagsIncludeParts: elements.entryListTagsIncludePartsInput.checked,
-    partOfSpeechTags: parseTagListText(elements.partOfSpeechTagsInput.value),
-    tagSortOrder: parseTagListText(elements.tagSortOrderInput.value),
-    redHighlightTags: parseTagListText(elements.tagRedHighlightInput.value),
-    tagListSeparatorStyle: normalizeTagListSeparatorStyle(elements.tagListSeparatorStyleInput.value),
-    entryListTagFiltering: elements.entryListTagFilteringInput.checked,
     showEmptyEntrySections: elements.showEmptyEntrySectionsInput.checked,
     entrySectionOrder: collectEntrySectionOrder(),
     search: collectEntrySearchSettingsForm(),
@@ -13053,12 +12967,6 @@ async function saveSettings(event, options = {}) {
     return true;
   }
 
-  if (!entryListTagDisplayLimitInputIsValid()) {
-    showToast(t("entryListTagDisplayLimitInvalid"));
-    elements.entryListTagDisplayLimitInput.focus();
-    return false;
-  }
-
   const entrySearchSettings = collectEntrySearchSettingsForm();
   if (!entrySearchModel.searchSettingsHaveEnabledField(entrySearchSettings)) {
     showToast(t("searchFieldRequired"));
@@ -13086,7 +12994,6 @@ async function saveSettings(event, options = {}) {
   if (!settings.corpusAutoSave) {
     clearTimeout(corpusSaveTimer);
   }
-  const previousTagSortOrder = dictionarySettings(dictionary).tagSortOrder;
   try {
     const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/settings`, {
       method: "PUT",
@@ -13102,94 +13009,516 @@ async function saveSettings(event, options = {}) {
     showApiErrorToast(error, "dictionarySaveFailed");
     return false;
   }
-  if (options.offerTagOrder && stableJson(settings.tagSortOrder) !== stableJson(previousTagSortOrder)) {
-    await offerTagOrderForExistingEntries(activeDictionary());
-  }
   return true;
 }
 
-// Saves arrange tags from now on; existing entries change only when the user
-// runs the batch, so a changed order offers it when anything is out of order.
-async function offerTagOrderForExistingEntries(dictionary) {
-  if (!dictionarySettings(dictionary).tagSortOrder.length) {
+// Tag manager: one row per registry tag, every change saved at once. Row
+// rendering and the moves it asks for stay apart: tagModel.tagMoveToIndex and
+// tagMoveStep work on tag order alone, whatever the rows look like.
+function tagManagerRows() {
+  return tagManagerState.rows;
+}
+
+function tagManagerVisibleRows(rows = tagManagerRows()) {
+  const query = normalize(tagManagerState.query);
+  if (!query) {
+    return rows;
+  }
+  return rows.filter((row) => (
+    normalize(row.tag).includes(query) || normalize(row.displayLabel).includes(query)
+  ));
+}
+
+function tagManagerActiveTag(rows, partOfSpeech) {
+  const zoneRows = rows.filter((row) => row.partOfSpeech === partOfSpeech);
+  const active = tagManagerState.activeTags[partOfSpeech ? "part" : "general"];
+  return zoneRows.some((row) => row.tag === active) ? active : zoneRows[0]?.tag;
+}
+
+function tagShownText(row) {
+  return row.displayLabel || row.tag;
+}
+
+function tagRowHtml(row, rows, activeTag) {
+  const active = row.tag === activeTag;
+  const controlTabIndex = active ? "" : ' tabindex="-1"';
+  const tag = escapeHtml(row.tag);
+  const chipClasses = ["chip", row.partOfSpeech ? "part-chip" : "", row.color === "red" ? "highlight-tag" : ""]
+    .filter(Boolean)
+    .join(" ");
+  const conflicts = row.displayAmbiguous
+    ? rows.filter((other) => other !== row && tagShownText(other) === tagShownText(row))
+    : [];
+  const rowClasses = [
+    "tag-row",
+    row.entryCount ? "" : "is-unused",
+    tagManagerState.highlighted.has(row.tag) ? "is-highlighted" : "",
+  ].filter(Boolean).join(" ");
+  const dragDisabled = Boolean(tagManagerState.query);
+  return `
+    <li class="${rowClasses}" data-tag="${tag}" tabindex="${active ? 0 : -1}" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown">
+      <button class="ipa-rule-drag-handle tag-drag-handle" type="button" data-tag-control="handle"${dragDisabled ? ' aria-disabled="true"' : ' draggable="true"'}${controlTabIndex} data-app-tooltip="always" aria-label="${escapeHtml(t(dragDisabled ? "tagManagerDragDisabled" : "tagManagerDrag"))}">⋮⋮</button>
+      <span class="tag-row-chip"><span class="${chipClasses}" data-app-tooltip="overflow" aria-label="${tag}"><span>${escapeHtml(tagShownText(row))}</span>${row.displayLabel ? `<small class="tag-identity-raw">${tag}</small>` : ""}</span></span>
+      <input class="tag-label-input" type="text" data-tag-control="label" value="${escapeHtml(row.displayLabel)}" placeholder="${tag}"${controlTabIndex} aria-label="${escapeHtml(formatText("tagManagerLabelFor", { tag: row.tag }))}">
+      <button class="secondary-button tag-count-button" type="button" data-control-tone="neutral" data-tag-control="count"${row.entryCount ? "" : " disabled"}${controlTabIndex} aria-label="${escapeHtml(formatText("tagManagerCountFor", { tag: row.tag, count: row.entryCount }))}">${row.entryCount}</button>
+      <label class="switch-label tag-color-switch"><input class="switch" type="checkbox" role="switch" data-tag-control="color"${row.color === "red" ? " checked" : ""}${controlTabIndex}><span>${escapeHtml(t("tagManagerRed"))}</span></label>
+      <button class="secondary-button icon-button tag-more-button" type="button" data-control-tone="neutral" data-tag-control="more" aria-haspopup="menu"${controlTabIndex} data-app-tooltip="always" aria-label="${escapeHtml(formatText("tagManagerMoreFor", { tag: row.tag }))}">⋯</button>
+      ${conflicts.length ? `<p class="tag-row-note">${conflicts.map((other) => `<button type="button" data-tag-control="conflict" data-tag-target="${escapeHtml(other.tag)}"${controlTabIndex}>${escapeHtml(formatText("tagManagerSameDisplay", { tag: other.tag }))}</button>`).join("")}</p>` : ""}
+    </li>
+  `;
+}
+
+function tagZoneHtml(partOfSpeech, rows, visibleRows) {
+  const zoneRows = visibleRows.filter((row) => row.partOfSpeech === partOfSpeech);
+  const activeTag = tagManagerActiveTag(zoneRows, partOfSpeech);
+  const addRow = !partOfSpeech && tagManagerState.adding
+    ? `
+      <li class="tag-row tag-add-row">
+        <input id="tagManagerAddInput" type="text" data-tag-add placeholder="${escapeHtml(t("tagManagerAddPlaceholder"))}" aria-label="${escapeHtml(t("tagManagerAdd"))}" aria-describedby="tagManagerAddError">
+        <p class="tag-row-note" id="tagManagerAddError" role="status">${escapeHtml(tagManagerState.addError)}</p>
+      </li>
+    `
+    : "";
+  const empty = !zoneRows.length && !addRow
+    ? `<p class="tag-zone-empty">${escapeHtml(t(tagManagerState.query ? "tagManagerNoMatch" : (partOfSpeech ? "tagManagerPartZoneEmpty" : "tagManagerGeneralZoneEmpty")))}</p>`
+    : "";
+  return `
+    <section class="settings-section tag-zone" data-tag-zone="${partOfSpeech ? "part" : "general"}">
+      <div class="tag-zone-heading">
+        <h3>${escapeHtml(t(partOfSpeech ? "tagManagerPartZone" : "tagManagerGeneralZone"))}</h3>
+        <p class="field-help">${escapeHtml(t(partOfSpeech ? "tagManagerPartZoneHelp" : "tagManagerGeneralZoneHelp"))}</p>
+      </div>
+      ${empty}
+      <ul class="tag-zone-list">${zoneRows.map((row) => tagRowHtml(row, rows, activeTag)).join("")}${addRow}</ul>
+    </section>
+  `;
+}
+
+function renderTagManagerSummary(rows) {
+  const unused = rows.filter((row) => !row.entryCount).length;
+  elements.tagManagerSummary.textContent = formatText("tagManagerSummary", { count: rows.length, unused });
+}
+
+function tagManagerZonesSignature() {
+  const { status, rows, query, adding, addError, highlighted, activeTags } = tagManagerState;
+  return stableJson({
+    currentLanguage,
+    status,
+    rows,
+    query,
+    adding,
+    addError,
+    highlighted: [...highlighted],
+    activeTags,
+  });
+}
+
+// A rebuild keeps the focused control, and what was typed in it. Rows change
+// from elsewhere too: focus leaving a display name saves it after Tab has
+// already moved on.
+function focusedTagControl() {
+  const active = document.activeElement;
+  const row = elements.tagManagerZones.contains(active) ? active.closest("[data-tag]") : null;
+  return row
+    ? { tag: row.dataset.tag, control: active.dataset.tagControl || "", value: active.value }
+    : null;
+}
+
+function restoreTagControlFocus(focused) {
+  const row = focused ? tagRowElement(focused.tag) : null;
+  if (!row) {
     return;
   }
-  try {
-    const preview = await runEntryBatch(dictionary, { operation: "applyTagOrder", dryRun: true });
-    if (!preview.targetCount) {
-      return;
-    }
-    const confirmed = await appConfirm(formatText("tagOrderChangedConfirm", { count: preview.targetCount }), {
-      title: t("tagOrderSettings"),
-      confirmText: t("tagOrderArrangeNow"),
-      cancelText: t("tagOrderArrangeLater"),
-    });
-    if (!confirmed) {
-      return;
-    }
-    const applied = await runEntryBatch(dictionary, { operation: "applyTagOrder" });
-    showToast(`${t("tagOrderApplied")}${applied.targetCount ? ` · ${applied.targetCount} ${t("entries")}` : ""}`);
-  } catch (error) {
-    showApiErrorToast(error, "saveFailed");
+  const control = focused.control ? row.querySelector(`[data-tag-control="${focused.control}"]`) : row;
+  (control || row).focus({ preventScroll: true });
+  if (focused.control === "label") {
+    control.value = focused.value;
   }
 }
 
-async function applyTagSortOrder() {
-  let dictionary = activeDictionary();
-  if (!dictionary) {
-    showToast(t("createDictionaryFirstToast"));
-    return;
-  }
+function tagRowElement(tag) {
+  return [...elements.tagManagerZones.querySelectorAll("[data-tag]")].find((row) => row.dataset.tag === tag) || null;
+}
 
-  let order = parseTagListText(elements.tagSortOrderInput.value);
-  if (!order.length) {
-    await appConfirm(t("tagOrderEmpty"), {
-      title: t("tagOrderSettings"),
-      alert: true,
-    });
-    elements.tagSortOrderInput.focus();
-    return;
-  }
-
-  const invalidRenderPatternInput = invalidSettingsRenderPatternInput();
-  if (invalidRenderPatternInput) {
-    await appConfirm(t("invalidCorpusRenderPattern"), {
-      title: t("corpusRenderError"),
-      alert: true,
-    });
-    invalidRenderPatternInput.focus();
-    return;
-  }
-
-  if (settingsFormIsDirty()) {
-    const shouldSave = await appConfirm(t("tagOrderUnsavedSettingsConfirm"), {
-      title: t("tagOrderSettings"),
-      confirmText: t("saveAndApply"),
-      cancelText: t("cancel"),
-    });
-    if (!shouldSave) {
-      return;
+function renderTagManagerZones() {
+  const signature = tagManagerZonesSignature();
+  if (signature !== tagManagerRenderedSignature) {
+    tagManagerRenderedSignature = signature;
+    const focused = focusedTagControl();
+    const rows = tagManagerRows();
+    const visibleRows = tagManagerVisibleRows(rows);
+    renderTagManagerSummary(rows);
+    if (tagManagerState.status === "error") {
+      elements.tagManagerZones.innerHTML = `<div class="tag-zone-error"><p class="muted-text">${escapeHtml(t("tagManagerLoadFailed"))}</p><button class="secondary-button" type="button" data-control-tone="neutral" data-tag-retry>${escapeHtml(t("sourceCandidatesRetry"))}</button></div>`;
+    } else if (tagManagerState.status === "success") {
+      elements.tagManagerZones.innerHTML = `${tagZoneHtml(true, rows, visibleRows)}${tagZoneHtml(false, rows, visibleRows)}`;
+      restoreTagControlFocus(focused);
     }
-    const saved = await saveSettings({ preventDefault() {} }, { showToast: false });
-    if (!saved) {
-      return;
-    }
-    dictionary = activeDictionary();
-    order = dictionarySettings(dictionary).tagSortOrder;
   }
+  if (tagManagerState.pendingReveal) {
+    const row = tagRowElement(tagManagerState.pendingReveal);
+    if (row) {
+      tagManagerState.pendingReveal = "";
+      row.scrollIntoView({ block: "center" });
+    }
+  }
+  if (tagManagerState.adding && tagManagerState.focusAdd) {
+    tagManagerState.focusAdd = false;
+    document.querySelector("#tagManagerAddInput")?.focus();
+  }
+}
 
-  const confirmed = await appConfirm(t("tagOrderConfirm"), {
-    title: t("tagOrderSettings"),
+function startTagManagerLoad(dictionary) {
+  const key = tagUsageApiKey(dictionary);
+  if (tagManagerState.key === key && ["loading", "success"].includes(tagManagerState.status)) {
+    return;
+  }
+  const requestId = tagManagerState.requestId + 1;
+  tagManagerState = { ...tagManagerState, key, status: "loading", requestId };
+  api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/tag-registry`)
+    .then((result) => {
+      if (tagManagerState.requestId === requestId) {
+        tagManagerState = { ...tagManagerState, status: "success", rows: result.tags };
+        renderTagManagerZones();
+      }
+    })
+    .catch((error) => {
+      if (tagManagerState.requestId === requestId) {
+        tagManagerState = { ...tagManagerState, status: "error" };
+        console.error(error);
+        renderTagManagerZones();
+      }
+    });
+}
+
+function fillTagDisplayPanel(dictionary) {
+  const settings = dictionarySettings(dictionary);
+  elements.tagManagerDisplayPanel.querySelectorAll("[data-tag-pref]").forEach((input) => {
+    if (input.type === "checkbox") {
+      input.checked = settings[input.dataset.tagPref];
+    } else if (document.activeElement !== input) {
+      input.value = settings[input.dataset.tagPref];
+    }
   });
-  if (!confirmed) {
+  elements.entryListTagDisplayLimitHint.hidden = true;
+}
+
+function renderTagManagerDisplayToggle() {
+  const open = tagManagerState.displayOpen;
+  elements.tagManagerDisplayToggle.setAttribute("aria-expanded", String(open));
+  elements.tagManagerDisplayPanel.classList.toggle("is-open", open);
+}
+
+function renderTagManager(dictionary) {
+  startTagManagerLoad(dictionary);
+  fillTagDisplayPanel(dictionary);
+  renderTagManagerDisplayToggle();
+  renderTagManagerZones();
+}
+
+function tagRegistryWithoutCounts(rows) {
+  return rows.map(({ entryCount: _entryCount, ...row }) => row);
+}
+
+// Changes run one at a time, so a quick second drag moves from the first one's
+// result, not from the order it started with.
+function changeTagRegistry(change) {
+  const dictionary = activeDictionary();
+  tagManagerChangeQueue = tagManagerChangeQueue.then(async () => {
+    try {
+      const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/tag-registry/changes`, {
+        method: "POST",
+        body: JSON.stringify(change),
+      });
+      const updated = updateLoadedDictionary(dictionary.id, {
+        updatedAt: saved.updatedAt,
+        tagRegistry: tagRegistryWithoutCounts(saved.tagRegistry),
+      });
+      tagManagerState = {
+        ...tagManagerState,
+        key: tagUsageApiKey(updated),
+        status: "success",
+        rows: saved.tagRegistry,
+      };
+      resetEntryReadStateAfterSave();
+      render();
+      return true;
+    } catch (error) {
+      showApiErrorToast(error, "saveFailed");
+      renderTagManagerZones();
+      return false;
+    }
+  });
+  return tagManagerChangeQueue;
+}
+
+async function moveTagRow(change) {
+  const row = tagManagerRows().find((item) => item.tag === change.tag);
+  const zone = tagManagerRows().filter((item) => item.partOfSpeech === change.partOfSpeech);
+  const next = zone[zone.indexOf(row) + 1]?.tag ?? null;
+  if (row.partOfSpeech === change.partOfSpeech && next === change.before) {
     return;
   }
+  const moved = await changeTagRegistry({ op: "move", ...change });
+  if (moved) {
+    tagManagerState.activeTags[change.partOfSpeech ? "part" : "general"] = change.tag;
+    tagManagerRenderedSignature = "";
+    renderTagManagerZones();
+  }
+}
 
+function setActiveTagRow(row) {
+  const zoneKey = row.closest("[data-tag-zone]").dataset.tagZone;
+  if (tagManagerState.activeTags[zoneKey] === row.dataset.tag) {
+    return;
+  }
+  tagManagerState.activeTags[zoneKey] = row.dataset.tag;
+  row.closest("[data-tag-zone]").querySelectorAll("[data-tag]").forEach((item) => {
+    const active = item === row;
+    item.tabIndex = active ? 0 : -1;
+    item.querySelectorAll("[data-tag-control]").forEach((control) => {
+      if (active) {
+        control.removeAttribute("tabindex");
+      } else {
+        control.tabIndex = -1;
+      }
+    });
+  });
+  tagManagerRenderedSignature = tagManagerZonesSignature();
+}
+
+function revealTagRow(tag) {
+  const row = tagRowElement(tag);
+  if (row) {
+    setActiveTagRow(row);
+    row.scrollIntoView({ block: "nearest" });
+    row.focus({ preventScroll: true });
+  }
+}
+
+function openTagRowMenu(button) {
+  const { tag } = button.closest("[data-tag]").dataset;
+  const row = tagManagerRows().find((item) => item.tag === tag);
+  const rect = button.getBoundingClientRect();
+  const moves = [
+    ["tagManagerMoveTop", tagModel.tagMoveToIndex(tagManagerRows(), tag, row.partOfSpeech, 0)],
+    ["tagManagerMoveBottom", tagModel.tagMoveToIndex(tagManagerRows(), tag, row.partOfSpeech, Number.POSITIVE_INFINITY)],
+    [
+      row.partOfSpeech ? "tagManagerMoveOutOfParts" : "tagManagerMoveToParts",
+      tagModel.tagMoveToIndex(tagManagerRows(), tag, !row.partOfSpeech, Number.POSITIVE_INFINITY),
+    ],
+  ];
+  showContextMenu({ clientX: rect.left, clientY: rect.bottom + 4 }, formatText("tagManagerMoreFor", { tag }), [
+    ...moves.map(([key, change]) => ({
+      key,
+      label: t(key),
+      handler: () => moveTagRow(change),
+    })),
+    {
+      key: "delete",
+      label: t("delete"),
+      danger: true,
+      disabledReason: row.entryCount ? t("tagManagerDeleteInUse") : "",
+      handler: () => deleteTagRow(tag),
+    },
+  ]);
+}
+
+async function deleteTagRow(tag) {
+  const confirmed = await appConfirm(formatText("tagManagerDeleteConfirm", { tag }), {
+    title: t("tagManagerDeleteTitle"),
+    danger: true,
+    confirmText: t("delete"),
+  });
+  if (confirmed) {
+    await changeTagRegistry({ op: "delete", tag });
+  }
+}
+
+function commitTagLabel(input) {
+  const { tag } = input.closest("[data-tag]").dataset;
+  const row = tagManagerRows().find((item) => item.tag === tag);
+  const displayLabel = input.value.trim();
+  if (row && displayLabel !== row.displayLabel) {
+    changeTagRegistry({ op: "update", tag, displayLabel });
+  }
+}
+
+function openTagAddRow() {
+  tagManagerState.adding = true;
+  tagManagerState.addError = "";
+  tagManagerState.focusAdd = true;
+  tagManagerState.query = "";
+  elements.tagManagerSearchInput.value = "";
+  renderTagManagerZones();
+}
+
+function closeTagAddRow() {
+  tagManagerState.adding = false;
+  tagManagerState.addError = "";
+  renderTagManagerZones();
+}
+
+async function commitTagAdd(input) {
+  const tag = input.value.trim();
+  if (!tag) {
+    closeTagAddRow();
+    return;
+  }
+  if (tagModel.tagHasSeparator(tag)) {
+    tagManagerState.addError = t("tagManagerAddSeparator");
+    const value = input.value;
+    tagManagerState.focusAdd = true;
+    renderTagManagerZones();
+    document.querySelector("#tagManagerAddInput").value = value;
+    return;
+  }
+  if (tagManagerRows().some((row) => row.tag === tag)) {
+    closeTagAddRow();
+    revealTagRow(tag);
+    return;
+  }
+  tagManagerState.addError = "";
+  if (await changeTagRegistry({ op: "add", tag, partOfSpeech: false })) {
+    tagManagerState.focusAdd = true;
+    tagManagerRenderedSignature = "";
+    renderTagManagerZones();
+  }
+}
+
+// Called with a saved preference: other settings are not sent, and the server
+// keeps them.
+async function saveTagPreference(field, value) {
+  const dictionary = activeDictionary();
   try {
-    const saved = await runEntryBatch(dictionary, { operation: "applyTagOrder" });
-    showToast(`${t("tagOrderApplied")}${saved.targetCount ? ` · ${saved.targetCount} ${t("entries")}` : ""}`);
+    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/settings`, {
+      method: "PUT",
+      body: JSON.stringify({ [field]: value }),
+    });
+    applyDictionaryModulePayload(saved);
+    resetEntryReadStateAfterSave();
+    tagManagerState.key = tagUsageApiKey(activeDictionary());
+    render();
   } catch (error) {
     showApiErrorToast(error, "saveFailed");
+    fillTagDisplayPanel(activeDictionary());
+  }
+}
+
+function commitTagDisplayLimit(input) {
+  const raw = input.value.trim();
+  const value = Number.parseInt(raw, 10);
+  const valid = /^\d+$/.test(raw)
+    && value >= MIN_ENTRY_LIST_TAG_DISPLAY_LIMIT
+    && value <= MAX_ENTRY_LIST_TAG_DISPLAY_LIMIT;
+  const saved = dictionarySettings().entryListTagDisplayLimit;
+  input.value = valid ? value : saved;
+  elements.entryListTagDisplayLimitHint.hidden = valid;
+  if (valid && value !== saved) {
+    saveTagPreference("entryListTagDisplayLimit", value);
+  }
+}
+
+async function openTagManager(tags) {
+  tagManagerState.highlighted = new Set(tags);
+  tagManagerState.pendingReveal = tags[0] || "";
+  tagManagerState.query = "";
+  elements.tagManagerSearchInput.value = "";
+  await showView("tags");
+}
+
+async function openTagEntries(tag) {
+  await showView("editor");
+  if (state.activeView === "editor") {
+    await applyTagFilter({}, tag);
+  }
+}
+
+function tagDropTarget(event) {
+  const zone = event.target.closest("[data-tag-zone]");
+  if (!zone) {
+    return null;
+  }
+  const rows = [...zone.querySelectorAll("[data-tag]")].filter((row) => row.dataset.tag !== tagDragState.tag);
+  const index = rows.findIndex((row) => {
+    const rect = row.getBoundingClientRect();
+    return event.clientY < rect.top + rect.height / 2;
+  });
+  return {
+    zone,
+    partOfSpeech: zone.dataset.tagZone === "part",
+    index: index < 0 ? rows.length : index,
+    beforeRow: rows[index] || null,
+  };
+}
+
+function clearTagDropMarker() {
+  elements.tagManagerZones.querySelectorAll(".drop-before, .drop-end").forEach((item) => {
+    item.classList.remove("drop-before", "drop-end");
+  });
+}
+
+function finishTagDrag() {
+  clearTagDropMarker();
+  elements.tagManagerZones.querySelector(".tag-row.dragging")?.classList.remove("dragging");
+  tagDragState = null;
+}
+
+function handleTagZoneKeydown(event) {
+  const row = event.target.closest("[data-tag]");
+  if (event.target.matches("[data-tag-add]")) {
+    if (event.isComposing) {
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitTagAdd(event.target);
+    } else if (event.key === "Escape") {
+      closeTagAddRow();
+    }
+    return;
+  }
+  if (!row) {
+    return;
+  }
+  if (event.target.matches('[data-tag-control="label"]')) {
+    if (event.isComposing) {
+      return;
+    }
+    if (event.key === "Enter") {
+      event.preventDefault();
+      commitTagLabel(event.target);
+    } else if (event.key === "Escape") {
+      const saved = tagManagerRows().find((item) => item.tag === row.dataset.tag);
+      event.target.value = saved.displayLabel;
+    }
+    return;
+  }
+  if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) {
+    return;
+  }
+  if (event.altKey && ["ArrowUp", "ArrowDown"].includes(event.key)) {
+    event.preventDefault();
+    const change = tagModel.tagMoveStep(tagManagerRows(), row.dataset.tag, event.key === "ArrowUp" ? -1 : 1);
+    if (change) {
+      moveTagRow(change);
+    }
+    return;
+  }
+  if (event.target !== row) {
+    return;
+  }
+  event.preventDefault();
+  const rows = [...row.closest("[data-tag-zone]").querySelectorAll("[data-tag]")];
+  const index = rows.indexOf(row);
+  const target = {
+    ArrowUp: rows[index - 1],
+    ArrowDown: rows[index + 1],
+    Home: rows[0],
+    End: rows.at(-1),
+  }[event.key];
+  if (target) {
+    revealTagRow(target.dataset.tag);
   }
 }
 
@@ -14959,7 +15288,7 @@ async function openPartialEdit(section) {
       <div class="ipa-keyboard partial-ipa-keyboard"></div>
       <label>
         <span data-i18n="tagsLabel">${escapeHtml(t("tagsLabel"))}</span>
-        <input data-field="tags" maxlength="180" value="${escapeHtml(serializeTagList(entry.tags))}">
+        <input data-field="tags" maxlength="180" value="${escapeHtml(serializeTagList(arrangedTags(entry.tags)))}">
         <small class="field-help" data-i18n="tagsHelp">${escapeHtml(t("tagsHelp"))}</small>
       </label>
     `;
@@ -15178,7 +15507,11 @@ async function savePartialEdit(event) {
       body: JSON.stringify(entryApiPayload(nextEntry)),
     });
     const savedEntry = saved.entry;
-    applyEntryWriteToDictionary(dictionary.id, { updatedAt: savedEntry.updatedAt, summary: saved.summary });
+    applyEntryWriteToDictionary(dictionary.id, {
+      updatedAt: savedEntry.updatedAt,
+      summary: saved.summary,
+      tagRegistry: saved.tagRegistry,
+    });
     state.selectedEntryId = savedEntry.id;
     cacheSavedEntryDetail(dictionary.id, savedEntry);
     updateEntrySummaryDtoAfterSave(activeDictionary(), savedEntry);
@@ -15701,7 +16034,7 @@ async function submitQuickEntry() {
     const savedEntry = applySavedEntryResponse(dictionary.id, saved);
     resetEntryReadStateAfterSave();
     render({ preserveEditorSurface: Boolean(editorMode === "edit" || partialEditForm()) });
-    quickEntryLastTags = { dictionaryId: dictionary.id, tags: savedEntry.tags };
+    quickEntryLastTags = { dictionaryId: dictionary.id, tags: arrangedTags(savedEntry.tags) };
     appendQuickEntryLog(savedEntry);
     quickEntryState.draft = createQuickEntryDraft();
     setQuickEntryMessage();
@@ -15998,7 +16331,11 @@ async function saveEntry(event) {
 // `select` makes the saved entry current before its detail is cached.
 function applySavedEntryResponse(dictionaryId, saved, { select = false } = {}) {
   const savedEntry = saved.entry;
-  applyEntryWriteToDictionary(dictionaryId, { updatedAt: savedEntry.updatedAt, summary: saved.summary });
+  applyEntryWriteToDictionary(dictionaryId, {
+    updatedAt: savedEntry.updatedAt,
+    summary: saved.summary,
+    tagRegistry: saved.tagRegistry,
+  });
   if (saved.ownerEntry) {
     cacheSavedEntryDetail(dictionaryId, saved.ownerEntry);
     updateEntrySummaryDtoAfterSave(activeDictionary(), saved.ownerEntry);
@@ -16210,13 +16547,17 @@ function applyDictionaryModulePayload(payload) {
 
 // Entry writes change the dictionary's time and counts; the entries themselves
 // live in the query and detail caches, which the update invalidates.
-function applyEntryWriteToDictionary(dictionaryId, { updatedAt, summary }) {
-  return updateLoadedDictionary(dictionaryId, { updatedAt, summary: normalizeDictionarySummary(summary) });
+function applyEntryWriteToDictionary(dictionaryId, { updatedAt, summary, tagRegistry: registry }) {
+  return updateLoadedDictionary(dictionaryId, {
+    updatedAt,
+    summary: normalizeDictionarySummary(summary),
+    ...(registry ? { tagRegistry: registry } : {}),
+  });
 }
 
 function resetEntryReadStateAfterSave() {
   resetEntryQueryState();
-  resetEntryFacetsState();
+  resetTagUsageState();
   resetRootGroupsQueryState();
   entryRelationsCache.clear();
   rootGroupDerivedStates.clear();
@@ -16414,7 +16755,7 @@ async function refreshState() {
     activeView: state.activeView,
   });
   resetEntryQueryState();
-  resetEntryFacetsState();
+  resetTagUsageState();
   render();
 }
 
@@ -16428,6 +16769,9 @@ async function showView(view) {
     if (!ready) {
       return;
     }
+  }
+  if (view !== "tags") {
+    tagManagerState.highlighted = new Set();
   }
   state.activeView = view;
   render();
@@ -17027,6 +17371,109 @@ elements.corpusOpenDictionaryManagerButton.addEventListener("click", () => showV
 elements.morphologyFunctionsOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.morphologyTablesOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
 elements.ipaOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
+elements.tagsOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
+elements.tagManagerSearchInput.addEventListener("input", () => {
+  tagManagerState.query = elements.tagManagerSearchInput.value;
+  renderTagManagerZones();
+});
+elements.tagManagerAddButton.addEventListener("click", openTagAddRow);
+elements.tagManagerDisplayToggle.addEventListener("click", () => {
+  tagManagerState.displayOpen = !tagManagerState.displayOpen;
+  renderTagManagerDisplayToggle();
+});
+elements.tagManagerDisplayPanel.addEventListener("change", (event) => {
+  const field = event.target.dataset.tagPref;
+  if (field === "entryListTagDisplayLimit") {
+    commitTagDisplayLimit(event.target);
+  } else if (field) {
+    saveTagPreference(field, event.target.type === "checkbox" ? event.target.checked : event.target.value);
+  }
+});
+elements.tagManagerDisplayPanel.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && event.target.dataset.tagPref === "entryListTagDisplayLimit") {
+    event.preventDefault();
+    commitTagDisplayLimit(event.target);
+  }
+});
+elements.tagManagerZones.addEventListener("click", (event) => {
+  if (event.target.closest("[data-tag-retry]")) {
+    tagManagerState.status = "idle";
+    renderTagManager(activeDictionary());
+    return;
+  }
+  const control = event.target.closest("[data-tag-control]");
+  if (!control) {
+    return;
+  }
+  const { tag } = control.closest("[data-tag]").dataset;
+  if (control.dataset.tagControl === "count") {
+    openTagEntries(tag);
+  } else if (control.dataset.tagControl === "more") {
+    openTagRowMenu(control);
+  } else if (control.dataset.tagControl === "conflict") {
+    revealTagRow(control.dataset.tagTarget);
+  }
+});
+elements.tagManagerZones.addEventListener("change", (event) => {
+  if (event.target.dataset.tagControl === "color") {
+    const { tag } = event.target.closest("[data-tag]").dataset;
+    changeTagRegistry({ op: "update", tag, color: event.target.checked ? "red" : "" });
+  }
+});
+elements.tagManagerZones.addEventListener("focusin", (event) => {
+  const row = event.target.closest("[data-tag]");
+  if (row) {
+    setActiveTagRow(row);
+  }
+});
+elements.tagManagerZones.addEventListener("focusout", (event) => {
+  if (event.target.dataset.tagControl === "label") {
+    commitTagLabel(event.target);
+  } else if (event.target.matches("[data-tag-add]") && !event.target.value.trim()) {
+    closeTagAddRow();
+  }
+});
+elements.tagManagerZones.addEventListener("keydown", handleTagZoneKeydown);
+elements.tagManagerZones.addEventListener("dragstart", (event) => {
+  const handle = event.target.closest(".tag-drag-handle");
+  if (!handle || handle.getAttribute("aria-disabled") === "true") {
+    event.preventDefault();
+    return;
+  }
+  const row = handle.closest("[data-tag]");
+  tagDragState = { tag: row.dataset.tag, target: null };
+  row.classList.add("dragging");
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("application/x-conlexicon-tag", row.dataset.tag);
+});
+elements.tagManagerZones.addEventListener("dragover", (event) => {
+  if (!tagDragState) {
+    return;
+  }
+  const target = tagDropTarget(event);
+  clearTagDropMarker();
+  tagDragState.target = target;
+  if (!target) {
+    return;
+  }
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+  if (target.beforeRow) {
+    target.beforeRow.classList.add("drop-before");
+  } else {
+    target.zone.classList.add("drop-end");
+  }
+});
+elements.tagManagerZones.addEventListener("drop", (event) => {
+  if (!tagDragState?.target) {
+    return;
+  }
+  event.preventDefault();
+  const { tag, target } = tagDragState;
+  finishTagDrag();
+  moveTagRow(tagModel.tagMoveToIndex(tagManagerRows(), tag, target.partOfSpeech, target.index));
+});
+elements.tagManagerZones.addEventListener("dragend", finishTagDrag);
 elements.collapsedNewEntryButton.addEventListener("click", () => openQuickEntry());
 elements.entryListNewEntryButton.addEventListener("click", () => openQuickEntry());
 elements.quickEntryPanel.addEventListener("keydown", handleQuickEntryKeydown);
@@ -17063,6 +17510,12 @@ elements.quickEntryFullEditButton.addEventListener("click", () => transferQuickE
 elements.quickEntrySubmitButton.addEventListener("click", () => submitQuickEntry());
 elements.editEntryButton.addEventListener("click", beginEditEntry);
 elements.analysisPanel.addEventListener("click", (event) => {
+  const tagManagerLink = event.target.closest("[data-tag-manager-tags]");
+  if (tagManagerLink) {
+    event.preventDefault();
+    openTagManager(JSON.parse(tagManagerLink.dataset.tagManagerTags));
+    return;
+  }
   const tagSetsMoreButton = event.target.closest("[data-analysis-tag-sets-more]");
   if (tagSetsMoreButton) {
     analysisTagSetRenderState.visibleCount += 100;
@@ -17140,6 +17593,12 @@ elements.analysisPanel.addEventListener("click", (event) => {
   void navigateToEntryFromReport(target.dataset.entryId);
 });
 elements.qualityPanel.addEventListener("click", (event) => {
+  const tagManagerLink = event.target.closest("[data-tag-manager-tags]");
+  if (tagManagerLink) {
+    event.preventDefault();
+    openTagManager(JSON.parse(tagManagerLink.dataset.tagManagerTags));
+    return;
+  }
   const qualityInfoButton = event.target.closest('[data-action="quality-filter-info"]');
   if (qualityInfoButton) {
     appInfoDialog(t("qualityFilterInfoTitle"), {
@@ -17248,10 +17707,7 @@ elements.entryMorphologyControls.addEventListener("click", async (event) => {
   current.morphologyMode = "manual";
   renderMorphologyEntryControls(elements.entryMorphologyControls, { ...baseEntry, ...current }, { full: true });
 });
-elements.settingsForm.addEventListener("submit", (event) => saveSettings(event, { offerTagOrder: true }));
-elements.tagListSeparatorStyleInput.addEventListener("change", () => {
-  updateTagListPlaceholders(elements.tagListSeparatorStyleInput.value);
-});
+elements.settingsForm.addEventListener("submit", saveSettings);
 elements.searchFieldEnabledInputs.forEach((input) => {
   input.addEventListener("change", syncEntrySearchSettingsControls);
 });
@@ -17265,12 +17721,6 @@ elements.searchNormalizationRuleList.addEventListener("click", (event) => {
     event.target.closest(".search-normalization-rule-card")?.remove();
   }
 });
-elements.tagOrderInfoButton.addEventListener("click", () => {
-  appInfoDialog(t("tagOrderSettings"), {
-    text: t("tagOrderInfoBody"),
-  });
-});
-elements.applyTagSortOrderButton.addEventListener("click", applyTagSortOrder);
 elements.toolNavOrderList.addEventListener("dragstart", (event) => {
   const card = event.target.closest(".tool-order-card");
   if (!card) {

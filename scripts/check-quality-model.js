@@ -82,19 +82,26 @@ function qualityFixture() {
   ];
 }
 
-const qualitySettings = { partOfSpeechTags: ["n", "v", "adj"] };
+const qualitySettings = {
+  tagRegistry: ["n", "v", "adj"].map((tag) => ({ tag, partOfSpeech: true, displayLabel: "" }))
+    .concat([
+      { tag: "shown-a", partOfSpeech: false, displayLabel: "shared" },
+      { tag: "shown-b", partOfSpeech: false, displayLabel: "shared" },
+    ]),
+};
 
 const expectedDefinitions = {
   gloss_incomplete: { severity: "medium", module: "gloss", scope: "entry" },
   gloss_alignment_mismatch: { severity: "medium", module: "gloss", scope: "entry" },
   duplicate_lemma: { severity: "high", module: "lemma", scope: "entry" },
   near_duplicate_tags: { severity: "low", module: "tags", scope: "global" },
+  display_label_conflict: { severity: "low", module: "tags", scope: "global" },
   missing_lemma: { severity: "high", module: "lemma", scope: "entry" },
   missing_tags: { severity: "high", module: "tags", scope: "entry" },
   missing_definition: { severity: "high", module: "other", scope: "entry" },
   missing_ipa: { severity: "low", module: "ipa", scope: "entry" },
   multiple_primary_stress: { severity: "medium", module: "ipa", scope: "entry" },
-  tag_too_long: { severity: "low", module: "tags", scope: "entry" },
+  tag_too_long: { severity: "low", module: "tags", scope: "global" },
   duplicate_definition_tag: { severity: "low", module: "tags", scope: "entry" },
   mixed_part_of_speech_levels: { severity: "medium", module: "tags", scope: "entry" },
   missing_definition_part_of_speech: { severity: "medium", module: "tags", scope: "entry" },
@@ -140,18 +147,36 @@ assert.deepEqual(issueFor("duplicate_lemma", "entry-duplicate-a").params, {
   duplicateEntryCount: 2,
 });
 assert.deepEqual(issueFor("multiple_primary_stress").params, { primaryStressCount: 2 });
-assert.deepEqual(issueFor("tag_too_long").params, {
-  tag: "x".repeat(25),
-  codePointLength: 25,
-  limit: 24,
-});
-assert.deepEqual(issueFor("tag_too_long", "entry-definition-tags").params, {
-  tag: "y".repeat(25),
-  codePointLength: 25,
-  limit: 24,
-  definitionId: "def-tagged",
-  definitionPosition: 0,
-});
+const longTagIssues = issues.filter((issue) => issue.code === "tag_too_long");
+assert.deepEqual(longTagIssues.map((issue) => issue.params.tag), ["x".repeat(25), "y".repeat(25)], "one issue per tag");
+assert.deepEqual(longTagIssues[1].params, { tag: "y".repeat(25), codePointLength: 25, limit: 24 });
+assert.equal(longTagIssues[1].entryId, "", "a long tag is a property of the tag");
+assert.deepEqual(longTagIssues[1].relatedEntryIds, ["entry-definition-tags"]);
+{
+  const repeatedLongTag = "z".repeat(25);
+  const conflicts = qualityModel.buildQualityIssues([
+    { id: "entry-a", lemma: "a", pronunciation: "a", tags: [repeatedLongTag, "n"], definitions: [], sources: [] },
+    { id: "entry-b", lemma: "b", pronunciation: "b", tags: [repeatedLongTag, "noun"], definitions: [], sources: [] },
+  ], {
+    tagRegistry: [
+      { tag: "n", partOfSpeech: false, displayLabel: "noun" },
+      { tag: "noun", partOfSpeech: false, displayLabel: "" },
+      { tag: "unused", partOfSpeech: false, displayLabel: "shared" },
+      { tag: "unused-too", partOfSpeech: false, displayLabel: "shared" },
+    ],
+  });
+  assert.equal(conflicts.filter((issue) => issue.code === "tag_too_long").length, 1, "a shared long tag reports once");
+  assert.deepEqual(
+    conflicts
+      .filter((issue) => issue.code === "display_label_conflict")
+      .map((issue) => [issue.params.displayLabel, issue.params.forms, issue.relatedEntryIds]),
+    [
+      ["noun", ["n", "noun"], ["entry-a", "entry-b"]],
+      ["shared", ["unused", "unused-too"], []],
+    ],
+    "tags shown alike report whether or not entries use them",
+  );
+}
 assert.equal(issueFor("missing_tags", "entry-definition-tags"), undefined, "definition tags satisfy missing_tags");
 const layerIssues = (entryId) => issues
   .filter((issue) => issue.entryId === entryId && [
@@ -199,7 +224,7 @@ const summary = qualityModel.buildQualitySummary(issues, records.length);
 assert.equal(summary.inputEntryCount, 14);
 assert.equal(summary.issueCount, issues.length);
 assert.equal(summary.affectedEntryCount, 14);
-assert.equal(summary.globalIssueCount, 1);
+assert.equal(summary.globalIssueCount, 4);
 assert.equal(
   summary.severities.reduce((total, row) => total + row.issueCount, 0),
   summary.issueCount,
@@ -210,7 +235,7 @@ assert.equal(
 );
 assert.deepEqual(
   summary.modules.find((row) => row.key === "tags"),
-  { key: "tags", issueCount: 12, entryCount: 8 },
+  { key: "tags", issueCount: 13, entryCount: 8 },
   "global issues count their related entries in the module entry count",
 );
 

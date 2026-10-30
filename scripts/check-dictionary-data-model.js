@@ -39,8 +39,6 @@ function checkSettingsPreservation() {
     allowEmptyTags: false,
     entryExampleRenderPattern: "",
     corpusUnitCardRenderPattern: "",
-    partOfSpeechTags: [],
-    tagDisplayMap: {},
   });
   assert.deepEqual(settings.futureOption, { nested: true }, "unknown settings fields pass through");
   assert.equal(settings.corpusAutoSave, false);
@@ -49,8 +47,6 @@ function checkSettingsPreservation() {
   assert.equal(settings.allowEmptyTags, false);
   assert.equal(settings.entryExampleRenderPattern, "", "an explicit empty pattern is not replaced by the default");
   assert.equal(settings.corpusUnitCardRenderPattern, "");
-  assert.deepEqual(settings.partOfSpeechTags, []);
-  assert.deepEqual(settings.tagDisplayMap, {});
 
   const defaults = normalizeDictionarySettings();
   assert.equal(defaults.corpusAutoSave, true);
@@ -64,7 +60,6 @@ function checkStability() {
     toolNavOrder: ["ipa", "ipa", "x"],
     entrySectionOrder: ["notes"],
     glossStyles: { gla: { fontFamily: "mono", fontSize: "huge" } },
-    partOfSpeechTags: [" n ", "n"],
     search: { fields: { lemma: { enabled: true, fuzzy: true } } },
   };
   const once = normalizeDictionarySettings(raw);

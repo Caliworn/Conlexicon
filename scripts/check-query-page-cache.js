@@ -69,11 +69,11 @@ async function checkPrefixInvalidation() {
   const cache = new QueryPageCache();
   cache.set("entries\0query-a\0page-0", { ids: ["entry-a"] }, { dictionaryId: "dict-a" });
   cache.set("entries\0query-b\0page-0", { ids: ["entry-b"] }, { dictionaryId: "dict-a" });
-  cache.set("facets\0dict-a", { parts: ["n"] }, { dictionaryId: "dict-a" });
+  cache.set("tag-usage\0dict-a", { parts: ["n"] }, { dictionaryId: "dict-a" });
   assert.equal(cache.invalidatePrefix("entries\0query-a\0", { dictionaryId: "dict-a" }), 1);
   assert.equal(cache.get("entries\0query-a\0page-0"), undefined);
   assert.deepEqual(cache.get("entries\0query-b\0page-0"), { ids: ["entry-b"] });
-  assert.deepEqual(cache.get("facets\0dict-a"), { parts: ["n"] });
+  assert.deepEqual(cache.get("tag-usage\0dict-a"), { parts: ["n"] });
 
   let resolveOldLoad;
   const oldLoad = cache.load({

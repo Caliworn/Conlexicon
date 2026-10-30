@@ -43,7 +43,7 @@ async function checkSqliteJsonReads() {
     const isJsonParseError = (error) => serializeApiError(error).error.code === "system_json_parse";
     const originalSettings = readModule("settings");
     const expectedRelations = await repository.getEntryRelations(dictionary.id, "entry-derived");
-    const expectedFacets = await repository.getEntryFacets(dictionary.id);
+    const expectedRegistry = await repository.getTagRegistry(dictionary.id);
     const analysisQuery = {
       widgets: [
         { id: "parts", type: "partDistribution" },
@@ -54,11 +54,11 @@ async function checkSqliteJsonReads() {
     const expectedAnalysis = await repository.queryAnalysis(dictionary.id, analysisQuery);
 
     // Reopen after direct SQL edits so cached query results cannot mask damaged data.
-    for (const damagedSettings of ['{"partOfSpeechTags":', ""]) {
+    for (const damagedSettings of ['{"search":', ""]) {
       writeModule("settings", damagedSettings);
       reopenRepository();
       await assert.rejects(
-        () => repository.getEntryFacets(dictionary.id),
+        () => repository.getTagRegistry(dictionary.id),
         isJsonParseError,
         "damaged settings must surface system_json_parse on reads",
       );
@@ -93,9 +93,9 @@ async function checkSqliteJsonReads() {
       "relations must remain available with damaged corpus data",
     );
     assert.deepEqual(
-      await repository.getEntryFacets(dictionary.id),
-      expectedFacets,
-      "facets must remain available with damaged corpus data",
+      await repository.getTagRegistry(dictionary.id),
+      expectedRegistry,
+      "the tag registry must remain available with damaged corpus data",
     );
     assert.deepEqual(
       (await repository.queryAnalysis(dictionary.id, analysisQuery)).widgets,

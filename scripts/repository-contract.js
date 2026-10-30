@@ -71,7 +71,7 @@ async function checkWorkspaceAndEntryBatchContract(repository) {
   const dictionary = await repository.createDictionary(normalizeDictionary({
     id: "dict-entry-batch-contract",
     name: "Entry Batch Contract",
-    settings: { ipa: ipaSettings, tagSortOrder: ["N", "root"] },
+    settings: { ipa: ipaSettings },
     docs: { markdown: "# Docs" },
     entries: [
       { id: "entry-batch-missing", lemma: "bata", tags: ["root", "x", "n"] },
@@ -85,28 +85,18 @@ async function checkWorkspaceAndEntryBatchContract(repository) {
   const workspace = (await callApi(repository, "GET", dictionaryPath)).body;
   assert.equal(Object.hasOwn(workspace, "entries"), false);
   assert.equal(workspace.docs.markdown, "# Docs");
-  assert.deepEqual(workspace.settings.tagSortOrder, ["N", "root"]);
+  assert.deepEqual(
+    workspace.tagRegistry.map((row) => row.tag),
+    ["root", "x", "n"],
+    "the workspace carries the registry in rank order",
+  );
   assert.ok(workspace.corpus && workspace.morphology);
   assert.deepEqual(workspace.summary, { entryCount: 3, rootCount: 3 });
 
   const batch = (body) => callApi(repository, "POST", `${dictionaryPath}/entries/batch`, body);
   const entry = async (entryId) => (await callApi(repository, "GET", `${dictionaryPath}/entries/${entryId}`)).body;
-  const before = await repository.getDictionaryMeta(dictionary.id);
 
-  // Imported tags keep their order until the batch arranges them: saved order
-  // first (matched without case), the rest in their original order; entries
-  // already in order are not written.
-  let result = await batch({ operation: "applyTagOrder", dryRun: true });
-  assert.deepEqual(result.body, { operation: "applyTagOrder", targetCount: 1, dryRun: true });
-  assert.equal((await repository.getDictionaryMeta(dictionary.id)).updatedAt, before.updatedAt, "a dry run writes nothing");
-  result = await batch({ operation: "applyTagOrder" });
-  assert.equal(result.body.targetCount, 1);
-  assert.deepEqual((await entry("entry-batch-missing")).tags, ["n", "root", "x"]);
-  assert.deepEqual((await entry("entry-batch-present")).tags, ["n", "root"]);
-  result = await batch({ operation: "applyTagOrder" });
-  assert.deepEqual(result.body, { operation: "applyTagOrder", targetCount: 0, dryRun: false }, "nothing left to reorder");
-
-  result = await batch({ operation: "generateIpa", mode: "missing", dryRun: true });
+  let result = await batch({ operation: "generateIpa", mode: "missing", dryRun: true });
   assert.deepEqual(result.body, { operation: "generateIpa", targetCount: 1, dryRun: true }, "blank lemmas and existing IPA are skipped");
 
   result = await batch({ operation: "generateIpa", mode: "missing" });
@@ -119,67 +109,10 @@ async function checkWorkspaceAndEntryBatchContract(repository) {
   assert.equal(result.body.targetCount, 2);
   assert.equal((await entry("entry-batch-present")).pronunciation, ipaModel.generateIpaFromLemma("taba", ipaSettings));
 
-  for (const body of [{}, { operation: "generateIpa" }, { operation: "generateIpa", mode: "some" }, { operation: "applyTagOrder", dryRun: "yes" }]) {
+  for (const body of [{}, { operation: "generateIpa" }, { operation: "generateIpa", mode: "some" }, { operation: "generateIpa", mode: "all", dryRun: "yes" }]) {
     const error = await assertRejectStatus(batch(body), 400, `invalid batch ${JSON.stringify(body)}`);
     assert.equal(error.code, "invalid_entry_batch_payload");
   }
-  await repository.deleteDictionary(dictionary.id);
-}
-
-// Runtime saves store tags in the configured order: entry tags and each
-// definition's tags, listed tags first, the rest in their given order.
-// Imports keep the order they were given.
-async function checkTagOrderOnSaveContract(repository) {
-  const dictionary = await repository.createDictionary(normalizeDictionary({
-    id: "dict-tag-order-save-contract",
-    name: "Tag Order On Save",
-    settings: { tagSortOrder: ["n", "v", "archaic"] },
-    entries: [{
-      id: "entry-tag-order-imported",
-      lemma: "imported",
-      tags: ["x", "archaic", "n"],
-      definitions: [{ id: "def-tag-order-imported", meaning: "kept", tags: ["v", "n"] }],
-    }],
-  }));
-  const entriesPath = `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries`;
-  const entry = async (entryId) => (await callApi(repository, "GET", `${entriesPath}/${entryId}`)).body;
-  const tagLists = (value) => [value.tags, ...value.definitions.map((definition) => definition.tags)];
-
-  assert.deepEqual(
-    tagLists(await entry("entry-tag-order-imported")),
-    [["x", "archaic", "n"], ["v", "n"]],
-    "imports keep the given order",
-  );
-
-  const created = await callApi(repository, "POST", entriesPath, {
-    lemma: "created",
-    tags: ["x", "archaic", "y", "n"],
-    definitions: [{ meaning: "one", tags: ["z", "v", "n"] }],
-  });
-  assert.equal(created.statusCode, 201);
-  assert.deepEqual(tagLists(created.body.entry), [["n", "archaic", "x", "y"], ["n", "v", "z"]]);
-
-  const updated = await callApi(repository, "PUT", `${entriesPath}/entry-tag-order-imported`, {
-    ...(await entry("entry-tag-order-imported")),
-    lemma: "imported, then saved",
-  });
-  assert.deepEqual(tagLists(updated.body.entry), [["n", "archaic", "x"], ["n", "v"]], "any save arranges every tag list");
-
-  const patched = await callApi(repository, "PATCH", entriesPath, {
-    updates: [{ id: created.body.entry.id, patch: { tags: ["y", "v"] } }],
-  });
-  assert.deepEqual(patched.body.entries[0].tags, ["v", "y"]);
-
-  // Entries saved with new settings follow the settings being saved.
-  const patchedWithSettings = await callApi(repository, "PATCH", entriesPath, {
-    settings: { tagSortOrder: ["y"] },
-    updates: [{ id: created.body.entry.id, patch: { tags: ["v", "y"] } }],
-  });
-  assert.deepEqual(patchedWithSettings.body.entries[0].tags, ["y", "v"]);
-
-  await repository.updateSettings(dictionary.id, { tagSortOrder: [] });
-  const unordered = await callApi(repository, "POST", entriesPath, { lemma: "free", tags: ["v", "n"] });
-  assert.deepEqual(unordered.body.entry.tags, ["v", "n"], "an empty tagSortOrder keeps the given order");
   await repository.deleteDictionary(dictionary.id);
 }
 
@@ -305,10 +238,10 @@ async function checkAnalysisQueryContract(repository) {
   const dictionary = await repository.createDictionary(normalizeDictionary({
     id: "dict-analysis-query-contract",
     name: "Analysis Query Contract",
-    settings: {
-      partOfSpeechTags: ["n", "v"],
-      tagDisplayMap: { n: "Noun", v: "Verb" },
-    },
+    tagRegistry: [
+      { tag: "n", partOfSpeech: true, displayLabel: "Noun" },
+      { tag: "v", partOfSpeech: true, displayLabel: "Verb" },
+    ],
     entries: [
       {
         id: "entry-analysis-alpha",
@@ -593,11 +526,13 @@ async function checkTagSetAnalysisContract(repository) {
   const dictionary = await repository.createDictionary(normalizeDictionary({
     id: "dict-tag-set-analysis-contract",
     name: "Tag Set Analysis Contract",
-    settings: {
-      partOfSpeechTags: ["n", "v"],
-      tagDisplayMap: { n: "Noun", topic: "Shared", alias: "Shared" },
-      tagSortOrder: ["n", "topic", "alias", "extra"],
-    },
+    tagRegistry: [
+      { tag: "n", partOfSpeech: true, displayLabel: "Noun" },
+      { tag: "v", partOfSpeech: true },
+      { tag: "topic", partOfSpeech: false, displayLabel: "Shared" },
+      { tag: "alias", partOfSpeech: false, displayLabel: "Shared" },
+      { tag: "extra", partOfSpeech: false },
+    ],
     entries: [
       { id: "tag-set-a", lemma: "a", tags: ["n", "topic"] },
       { id: "tag-set-b", lemma: "b", tags: ["topic", "n"] },
@@ -609,29 +544,18 @@ async function checkTagSetAnalysisContract(repository) {
     ],
   }));
   try {
-    const facets = await repository.getEntryFacets(dictionary.id);
-    assert.equal(Number.isSafeInteger(facets.generation), true);
-    assert.deepEqual(facets.collisionGroups, [{
-      displayLabel: "Shared",
-      values: ["alias", "topic"],
-    }]);
+    const registry = await repository.getTagRegistry(dictionary.id);
+    assert.equal(Number.isSafeInteger(registry.generation), true);
     assert.deepEqual(
-      facets.identities.map((identity) => [
-        identity.value,
-        identity.entryCount,
-        identity.isPartOfSpeech,
-        identity.displayAmbiguous,
-      ]),
+      registry.tags.map((row) => [row.tag, row.entryCount, row.partOfSpeech, row.displayAmbiguous]),
       [
+        ["n", 4, true, false],
+        ["v", 2, true, false],
+        ["topic", 3, false, true],
         ["alias", 1, false, true],
         ["extra", 2, false, false],
-        ["n", 4, true, false],
-        ["topic", 3, false, true],
-        ["v", 2, true, false],
       ],
     );
-    assert.equal(facets.parts.find((part) => part.tag === "n")?.displayAmbiguous, false);
-    assert.equal(facets.tags.find((tag) => tag.tag === "topic")?.displayAmbiguous, true);
 
     const distributions = await repository.queryAnalysis(dictionary.id, {
       widgets: [
@@ -732,12 +656,12 @@ async function checkTagSetAnalysisContract(repository) {
 
     const aliasEntry = await repository.getEntry(dictionary.id, "tag-set-d");
     await repository.saveEntry(dictionary.id, { ...aliasEntry, tags: ["n", "new-tag"] });
-    const refreshedFacets = await repository.getEntryFacets(dictionary.id);
-    assert.equal(refreshedFacets.generation, facets.generation + 1);
-    assert.equal(refreshedFacets.identities.some((identity) => identity.value === "alias"), false);
-    assert.equal(refreshedFacets.identities.find((identity) => identity.value === "topic")?.displayAmbiguous, false);
-    assert.equal(refreshedFacets.identities.find((identity) => identity.value === "new-tag")?.entryCount, 1);
-    assert.deepEqual(refreshedFacets.collisionGroups, []);
+    const refreshed = await repository.getTagRegistry(dictionary.id);
+    assert.equal(refreshed.generation, registry.generation + 1);
+    const refreshedRow = (tag) => refreshed.tags.find((row) => row.tag === tag);
+    assert.equal(refreshedRow("alias").entryCount, 0, "an unused tag stays registered");
+    assert.equal(refreshedRow("topic").displayAmbiguous, true, "unused rows still count toward ambiguity");
+    assert.equal(refreshedRow("new-tag").entryCount, 1);
   } finally {
     await repository.deleteDictionary(dictionary.id);
   }
@@ -747,9 +671,7 @@ async function checkEntryFilterFactsContract(repository) {
   const dictionary = await repository.createDictionary(normalizeDictionary({
     id: "dict-entry-filter-facts-contract",
     name: "Entry Filter Facts Contract",
-    settings: {
-      partOfSpeechTags: ["n", "v"],
-    },
+    tagRegistry: ["n", "v"].map((tag) => ({ tag, partOfSpeech: true })),
     entries: [
       {
         id: "entry-filter-facts-alpha",
@@ -853,22 +775,8 @@ function testNormalize(value) {
   return String(value || "").trim().toLocaleLowerCase("zh-CN");
 }
 
-function testDisplayTag(tag, dictionary = {}) {
-  const value = String(tag || "");
-  return dictionary.settings?.tagDisplayMap?.[value] || value;
-}
-
 function testEntryParts(entry = {}, dictionary = {}) {
-  const tags = Array.isArray(entry.tags) ? entry.tags : [];
-  if (!tags.length) {
-    return [];
-  }
-  const settings = dictionary.settings || {};
-  const configuredParts = new Set((settings.partOfSpeechTags || []).map(testNormalize));
-  if (!configuredParts.size) {
-    return [];
-  }
-  return tags.filter((tag) => configuredParts.has(testNormalize(tag)));
+  return tagModel.entryParts(entry, dictionary.tagRegistry);
 }
 
 function testEntryMatches(entry, dictionary, query = {}) {
@@ -1042,9 +950,12 @@ function checkModelNormalization() {
   assert.deepEqual(tagModel.displayIdentity("n", "Noun", false), { label: "Noun", rawLabel: "", ambiguous: false });
   const normalizedTagLists = normalizeDictionary({
     entries: [{ lemma: "entry", tags: [" n ", null, "n", "null"] }],
+    tagRegistry: [
+      { tag: " n ", partOfSpeech: false, displayLabel: "n" },
+      { tag: "n", partOfSpeech: true },
+      { tag: "proper noun", partOfSpeech: true, displayLabel: " Proper ", color: "red" },
+    ],
     settings: {
-      partOfSpeechTags: [" n ", "n"],
-      redHighlightTags: ["proper noun", "proper noun"],
       tagListSeparatorStyle: "ideographicComma",
     },
     corpus: {
@@ -1055,20 +966,30 @@ function checkModelNormalization() {
     },
   });
   assert.deepEqual(normalizedTagLists.entries[0].tags, ["n", "null"]);
-  assert.deepEqual(normalizedTagLists.settings.partOfSpeechTags, ["n"]);
-  assert.deepEqual(normalizedTagLists.settings.redHighlightTags, ["proper noun"]);
+  assert.deepEqual(normalizedTagLists.tagRegistry, [
+    { tag: "proper noun", partOfSpeech: true, displayLabel: "Proper", color: "red" },
+    { tag: "n", partOfSpeech: false, displayLabel: "", color: "" },
+    { tag: "null", partOfSpeech: false, displayLabel: "", color: "" },
+  ], "the first row of a tag wins, parts of speech come first, entry tags are registered");
   assert.equal(normalizedTagLists.settings.tagListSeparatorStyle, "ideographicComma");
   assert.deepEqual(normalizedTagLists.corpus.blocks[0].tags, ["corpus"]);
   assert.deepEqual(normalizedTagLists.morphology.templateGroups[0].matchTags, ["n"]);
+  const registry = [
+    { tag: "n", partOfSpeech: true, displayLabel: "noun", color: "" },
+    { tag: "v", partOfSpeech: true, displayLabel: "", color: "" },
+    { tag: "topic", partOfSpeech: false, displayLabel: "", color: "red" },
+  ];
+  assert.deepEqual(tagModel.entryParts({ tags: ["topic", "n", "v"] }, registry), ["n", "v"]);
+  assert.deepEqual(tagModel.entryParts({ tags: ["topic", "n"] }, []), []);
+  assert.equal(tagModel.displayTag("n", registry), "noun");
+  assert.equal(tagModel.displayTag("draft", registry), "draft");
+  assert.equal(tagModel.tagColor("topic", registry), "red");
+  assert.equal(tagModel.tagColor("N", registry), "", "lookups compare characters exactly");
   assert.deepEqual(
-    tagModel.entryParts(
-      { tags: ["topic", "n", "v"] },
-      { partOfSpeechTags: ["n", "v"] },
-    ),
-    ["n", "v"],
+    tagModel.arrangeTags(["draft-b", "topic", "v", "draft-a", "n"], registry),
+    ["n", "v", "topic", "draft-b", "draft-a"],
+    "unregistered tags follow registered ones in input order",
   );
-  assert.deepEqual(tagModel.entryParts({ tags: ["topic", "n"] }, { partOfSpeechTags: [] }), []);
-  assert.equal(tagModel.displayTag("n", { tagDisplayMap: { n: "noun" } }), "noun");
   assert.deepEqual([...entrySearchModel.normalizeSearchFields("lemma,unknown,tags")], ["lemma", "tags"]);
   assert.deepEqual([...entrySearchModel.normalizeFuzzyFields("")], []);
   assert.deepEqual([...entrySearchModel.normalizeFuzzyFields("definitions,tags,unknown")], ["definitions", "tags"]);
@@ -1152,7 +1073,7 @@ function checkModelNormalization() {
   assert.equal(
     entrySearchModel.entryMatchesSearchText(
       { lemma: "acar", tags: ["n"], definitions: [{ meaning: "mirror meaning" }] },
-      { settings: { tagDisplayMap: { n: "Noun Display" } } },
+      { tagRegistry: [{ tag: "n", partOfSpeech: false, displayLabel: "Noun Display", color: "" }] },
       "mrmeaning",
       { fuzzyFields: "definitions", normalizeText: testNormalize },
     ),
@@ -1161,7 +1082,7 @@ function checkModelNormalization() {
   assert.equal(
     entrySearchModel.entryMatchesSearchText(
       { lemma: "acar", tags: ["n"], definitions: [{ meaning: "mirror meaning" }] },
-      { settings: { tagDisplayMap: { n: "Noun Display" } } },
+      { tagRegistry: [{ tag: "n", partOfSpeech: false, displayLabel: "Noun Display", color: "" }] },
       "nd",
       { fuzzyFields: "definitions", normalizeText: testNormalize },
     ),
@@ -1825,14 +1746,12 @@ async function checkReadApiConsistency(repository) {
   const dictionary = await repository.createDictionary(normalizeDictionary({
     id: "dict-read-api-consistency",
     name: "Read API Consistency",
-    settings: {
-      partOfSpeechTags: ["n", "v", "adj"],
-      tagDisplayMap: {
-        n: "Noun Display",
-        v: "Verb Display",
-        motion: "Motion Display",
-      },
-    },
+    tagRegistry: [
+      { tag: "n", partOfSpeech: true, displayLabel: "Noun Display" },
+      { tag: "v", partOfSpeech: true, displayLabel: "Verb Display" },
+      { tag: "adj", partOfSpeech: true },
+      { tag: "motion", partOfSpeech: false, displayLabel: "Motion Display" },
+    ],
     morphology: {
       functions: { leftV: "a,e,i,o,u", rightV: "a,e,i,o,u" },
       templateGroups: [
@@ -2026,11 +1945,11 @@ async function checkReadApiConsistency(repository) {
     await assertRootGroupQueryConsistency(repository, dictionary, { q: "mrmeaning", fuzzyFields: "definitions" });
     await assertRootGroupQueryConsistency(repository, dictionary, { sort: "lemmaDesc" });
 
-    let apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/facets`);
+    let apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/tag-registry`);
     assert.equal(apiResult.statusCode, 200);
-    assert.deepEqual(apiResult.body.parts.map((part) => part.tag), expectedParts(dictionary));
-    assert.equal(apiResult.body.parts.find((part) => part.tag === "n")?.displayLabel, "Noun Display");
-    assert.equal(apiResult.body.noPartOfSpeechCount, 3);
+    const usedParts = apiResult.body.tags.filter((row) => row.partOfSpeech && row.entryCount > 0);
+    assert.deepEqual(usedParts.map((row) => row.tag).sort(), expectedParts(dictionary));
+    assert.equal(usedParts.find((row) => row.tag === "n")?.displayLabel, "Noun Display");
 
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries?sort=lemmaAsc&limit=3`);
     assert.equal(apiResult.statusCode, 200);
@@ -2177,9 +2096,7 @@ async function checkReadApiConsistency(repository) {
   const noConfiguredPartDictionary = await repository.createDictionary(normalizeDictionary({
     id: "dict-read-api-no-configured-part",
     name: "Read API No Configured Part",
-    settings: {
-      tagDisplayMap: { topic: "Topic Display" },
-    },
+    tagRegistry: [{ tag: "topic", partOfSpeech: false, displayLabel: "Topic Display" }],
     entries: [
       { id: "entry-topic-first", lemma: "topic first", tags: ["topic", "n"], definitions: [{ id: "def-topic", meaning: "topic" }] },
       { id: "entry-n-first", lemma: "noun first", tags: ["n", "topic"], definitions: [{ id: "def-n", meaning: "noun" }] },
@@ -2188,10 +2105,9 @@ async function checkReadApiConsistency(repository) {
 
   try {
     await assertEntryQueryConsistency(repository, noConfiguredPartDictionary, { part: "topic" });
-    let apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(noConfiguredPartDictionary.id)}/facets`);
+    const apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(noConfiguredPartDictionary.id)}/tag-registry`);
     assert.equal(apiResult.statusCode, 200);
-    assert.deepEqual(apiResult.body.parts, []);
-    assert.equal(apiResult.body.noPartOfSpeechCount, 2);
+    assert.deepEqual(apiResult.body.tags.filter((row) => row.partOfSpeech), []);
   } finally {
     await repository.deleteDictionary(noConfiguredPartDictionary.id);
     if (previousState.activeDictionaryId) {
@@ -2231,7 +2147,7 @@ async function runRepositoryContractTests(options = {}) {
     const first = await repository.createDictionary(normalizeDictionary({
       name: "First",
       language: "one",
-      settings: { partOfSpeechTags: ["n", "v"] },
+      tagRegistry: ["n", "v"].map((tag) => ({ tag, partOfSpeech: true })),
     }));
     const second = await repository.createDictionary(normalizeDictionary({ name: "Second", language: "two" }));
 
@@ -2297,7 +2213,7 @@ async function runRepositoryContractTests(options = {}) {
     });
     assert.equal(savedWithNewEntry.id, first.id);
     assert.equal(savedWithNewEntry.entry.lemma, "new entry");
-    assert.deepEqual(savedWithNewEntry.entry.tags, ["tag", "null"]);
+    assert.deepEqual(savedWithNewEntry.entry.tags, ["null", "tag"]);
     const repositoryEntryId = savedWithNewEntry.entry.id;
     assert.equal((await repository.getEntry(first.id, repositoryEntryId)).lemma, "new entry");
 
@@ -2366,11 +2282,11 @@ async function runRepositoryContractTests(options = {}) {
     assert.ok(apiResult.body.pageInfo.nextCursor);
     assert.ok(apiResult.body.pageInfo.windowCursor);
 
-    apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/facets`);
+    apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/tag-registry`);
     assert.equal(apiResult.statusCode, 200);
-    assert.equal(apiResult.body.parts.some((part) => part.tag === "n" && part.entryCount === 1), true);
-    assert.equal(apiResult.body.parts.some((part) => part.tag === "v" && part.entryCount === 1), true);
-    assert.equal(apiResult.body.tags.some((tag) => tag.tag === "derived" && tag.entryCount === 1), true);
+    assert.equal(apiResult.body.tags.some((row) => row.tag === "n" && row.partOfSpeech && row.entryCount === 1), true);
+    assert.equal(apiResult.body.tags.some((row) => row.tag === "v" && row.partOfSpeech && row.entryCount === 1), true);
+    assert.equal(apiResult.body.tags.some((row) => row.tag === "derived" && row.entryCount === 1), true);
 
     apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/entry-relations/${encodeURIComponent(rootEntryId)}`);
     assert.equal(apiResult.statusCode, 200);
@@ -2534,7 +2450,6 @@ async function runRepositoryContractTests(options = {}) {
 
     await checkEntityIdSaveScopeInvariants(repository);
     await checkWorkspaceAndEntryBatchContract(repository);
-    await checkTagOrderOnSaveContract(repository);
     await checkEntryFilterFactsContract(repository);
     await checkAnalysisQueryContract(repository);
     await checkTagSetAnalysisContract(repository);

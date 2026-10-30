@@ -112,7 +112,8 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/dictionaries/:id/facets` | 读取活跃标签身份快照、词性和标签统计 | `{ generation, identities, collisionGroups, parts, tags, noPartOfSpeechCount }` | 尊重当前词典的词性标签设置和标签显示替换。前端标签显示消歧和词性筛选选项只消费该 API 的成功结果；加载、失败或后端不可用时不扫描完整词典快照重算。 |
+| `GET` | `/api/dictionaries/:id/tag-registry` | 读取标签登记表与使用数 | `{ id, generation, tags }` | 见[标签登记表](#标签登记表)。 |
+| `POST` | `/api/dictionaries/:id/tag-registry/changes` | 修改标签登记表，一次一个操作 | `{ id, updatedAt, tagRegistry }` | 见[标签登记表](#标签登记表)。 |
 | `GET` | `/api/dictionaries/:id/entry-relations/:entryId` | 读取词源/衍生/同根关系 | `{ entryId, sources, derivedEntries, rootGroup }` | SQLite 路径复用稳定词根拓扑的反向索引，并按需读取关系 DTO；来源只按精确目标 ID 匹配，不按同名 lemma 猜测。 |
 | `POST` | `/api/dictionaries/:id/source-candidates/query` | 来源补全候选（只读） | `{ items, total, limit }`，其中 `items` 固定为词条摘要 DTO | 请求体 `{ q, ownerEntryId?, excludeEntryIds?, limit? }`。复用 lemma 搜索 projection、查询规范化和共享 matcher，由 `settings.search.etymologyAutocomplete.fuzzy` 决定是否启用 fuzzy；不使用 cursor，详见[输入、补全与唯一性](#输入补全与唯一性)。 |
 | `GET` | `/api/dictionaries/:id/root-groups` | 读取词根模式分组 | `{ items, pageInfo, searchSummary }` | 支持 `q`、`fields`、`fuzzyFields`、`sort`、`cursor`、`windowOffset`、`limit`。前端词根模式正常路径以该 API 为准，并按窗口加载。 |
@@ -157,7 +158,6 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 前端不保存整本词条，需要遍历全部词条的编辑由服务端按**已保存**的设置完成。请求体：
 
 - `{ operation: "generateIpa", mode: "missing" | "all", dryRun? }`：为词形非空（去首尾空白后）的词条生成发音，`missing` 只处理发音为空的词条，`all` 覆盖全部；生成规则与前端相同，均由 `ipa-model` 的 `generateIpaFromLemma` 按 `settings.ipa` 计算。
-- `{ operation: "applyTagOrder", dryRun? }`：按 `settings.tagSortOrder` 重排每个词条的标签和每条释义内的标签，各个列表分别排序：列出的标签按其顺序排在前面（比较时忽略大小写），其余保持原有相对顺序；只写入有任一列表顺序确有变化的词条，`targetCount` 按词条计数。释义标签由批处理在服务端内部写入，`PATCH /entries` 的字段白名单不变。运行期保存本身已按该顺序写入标签（见[释义标签与有效标签](#释义标签与有效标签)），批处理用于整理导入的数据和修改 `tagSortOrder` 之后的存量词条。
 
 `dryRun: true` 只返回将写入的词条数 `targetCount`，不写入；前端用它在确认前判断是否无事可做。目标数为 0 时同样不写入，返回 `dryRun: false` 且不带 `updatedAt`／`summary`。实际写入复用批量 patch 的单事务路径（含搜索投影与词根拓扑排序记录的更新）。`operation` 不在上述两种、`generateIpa` 缺少合法 `mode` 或 `dryRun` 不是布尔值时返回 400 `invalid_entry_batch_payload`。
 
@@ -276,7 +276,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 
 ## 读取 API
 
-本节规定 `/entries`、`/facets`、`/entry-relations`、`/root-groups`、EntryFilter、`/analysis/query`、feature result 与质量查询的形状，以及它们共用的窗口、cursor 和目标定位语义。运行期后端只有 SQLite；新增读取能力优先考虑 SQLite 索引、SQL 查询或现有 repository 查询边界。
+本节规定 `/entries`、`/tag-registry`、`/entry-relations`、`/root-groups`、EntryFilter、`/analysis/query`、feature result 与质量查询的形状，以及它们共用的窗口、cursor 和目标定位语义。运行期后端只有 SQLite；新增读取能力优先考虑 SQLite 索引、SQL 查询或现有 repository 查询边界。
 
 ### 启动与词典索引
 
@@ -360,14 +360,13 @@ GET /api/dictionaries/:id/entries/:entryId/location?filter=&q=&fields=&fuzzyFiel
       lemma,
       pronunciation,
       tags,            // 词条标签，与详情 DTO 的 tags 含义相同
-      effectiveTags,   // 有效标签，按 settings.tagSortOrder 排序
+      effectiveTags,   // 有效标签，见“有效标签的顺序”
       definitionPreviews: [
-        { id, position, meaning, parts }  // parts：该释义自己的词性，按 tagSortOrder 排序
+        { id, position, meaning, parts }  // parts：该释义自己的词性
       ],
       createdAt,
       updatedAt,
-      partOfSpeech,    // parts[0] 或空字符串
-      parts            // effectiveTags 中的词性，按 effectiveTags 的顺序
+      parts            // effectiveTags 中的词性
     }
   ],
   searchSummary: {
@@ -435,53 +434,66 @@ SQLite projection 查询中，带 `q` 的分页结果会为每个命中词条附
 
 上述结果写入独立的 `entry_morphology_search_values` 派生 projection。它保存真实模板组、子表和单元格坐标以及原始/规范化值，不进入 JSON，也不替代形态主数据。词条 lemma、形态匹配标签、模式、显式组或 override 变化时局部重建；形态模板/函数变化或搜索规范化变化时全量重建。严格及 fuzzy 的形态单字段查询以及静态+形态混合查询均直接读取两张 projection，并把形态单元格映射为 `sourceType: "morphology"`、`sourceId: <templateTableId>`、`sourcePosition: <求值顺序>`、`valueType: "generated"`。每个 SQLite 连接注册确定性的 `conlexicon_fuzzy_match(normalized_value, normalized_query)`，使 fuzzy projection 查询复用共享 matcher。带结构筛选的词条搜索在同一 SQL 中将候选关系连接到两张 projection；无结构条件时直接扫描目标 projection。SQL 只返回最终命中 ID，不再读取完整 snapshot、动态生成形态、把所有候选 records 返回 Node.js，或在 JavaScript 中对候选集合与投射命中集合求交。
 
-### 词条 facets
+### 标签登记表
 
-```text
-GET /api/dictionaries/:id/facets
-```
+登记表是标签信息的唯一来源：是否为词性、显示名、颜色和顺序都存在这里。它分词性区和普通区，词性区永远排在前面；放进词性区的标签就是词性。
 
-返回当前词典 generation 与设置语义下的活跃标签身份快照，以及由同一快照派生的词性和标签统计：
+#### 不变量
+
+- 词条标签和释义标签的每个值都已登记，由外键保证。运行期写入在写标签行之前把新值登记到普通区末尾，同一次写入里的多个新标签按输入顺序：词条标签在前，然后按释义顺序。新标签一律进普通区。
+- 除了 `delete` 操作，任何操作都不删除登记行；不再被使用的标签留在表中，`entryCount` 为 0。
+- 标签身份是去首尾空白后的原始字符串，逐字符比较，不做大小写折叠或 Unicode 规范化。
+- 语料块、语料层、语料单元的标签不进入登记表。形态模板组的 `matchTags` 不写入登记表，也不计入使用数。
+
+#### 读取
+
+`GET /api/dictionaries/:id` 的响应带 `tagRegistry`，按排名排列（数组顺序即顺序，不暴露内部位置）：
 
 ```js
-{
-  generation,
-  identities: [
-    { value, displayLabel, entryCount, isPartOfSpeech, displayAmbiguous }
-  ],
-  collisionGroups: [
-    { displayLabel, values }
-  ],
-  parts: [
-    { tag, displayLabel, entryCount, displayAmbiguous }
-  ],
-  tags: [
-    { tag, displayLabel, entryCount, isPartOfSpeech, displayAmbiguous }
-  ],
-  noPartOfSpeechCount
-}
+tagRegistry: [{ tag, partOfSpeech, displayLabel, color, displayAmbiguous }]
 ```
 
-`identities` 只包含当前至少被一个词条使用的原始标签，词条标签和释义标签都算；`entryCount` 表示有效标签中含该身份的唯一词条数，同一标签同时挂在词条和释义上、或挂在多条释义上时，该词条只计一次。`noPartOfSpeechCount` 同样按有效标签判断。多个原始标签映射为同一 `displayLabel` 时，相应 identity 的 `displayAmbiguous` 为 `true`，并在 `collisionGroups` 中列出完整原始值集合；该标记只要求界面补充原始值，不合并标签身份。`parts` 和 `tags` 是兼容现有消费者的派生视图，不执行第二次独立标签聚合。快照按词典 generation 缓存，词条或相关设置成功写入后与查询会话一起失效。
+`displayLabel` 为空表示显示原始值；与标签自身相同的显示名按空保存。`color` 是颜色名，空表示默认样式，当前合法值只有 `red`。`displayAmbiguous` 表示另一行显示相同的文本（显示名或原始值），在整张登记表范围内计算，含未使用的行。
 
-该接口必须尊重：
+`GET /api/dictionaries/:id/tag-registry` 返回 `{ id, generation, tags }`，行与上述字段相同，另加 `entryCount`：有效标签中含该标签的唯一词条数，同一标签同时挂在词条和释义上、或挂在多条释义上时，该词条只计一次。标签配置随词典状态给出；使用数随每次词条保存变化，按查询会话 generation 缓存。
 
-- 显式配置的词性标签列表；只有列表中的原始标签会被识别为词性；
-- 词性标签列表为空时，`parts` 为空，`noPartOfSpeechCount` 等于词条总数；
-- 标签显示替换；
-- 原始标签显示设置不改变统计键，但可影响前端展示策略。
+词条列表控制栏中的具体词性选项是词性区中 `entryCount > 0` 的行，以该接口的成功响应为唯一数据源。加载中、请求失败或后端不可用时，前端不得扫描完整活动词典生成本地词性集合；若用户已有当前词性筛选，可以暂时保留这一个运行期选择，待成功响应返回后再按最新集合校验。
 
-词条列表控制栏中的具体词性选项以该接口的成功响应为唯一数据源。facets 加载中、请求失败或后端不可用时，前端不得扫描完整活动词典生成本地词性集合；若用户已有当前词性筛选，可以暂时保留这一个运行期选择，待成功响应返回后再按最新集合校验。
+#### 修改
+
+`POST /api/dictionaries/:id/tag-registry/changes`，请求体是单个操作，返回 `{ id, updatedAt, tagRegistry }`，`tagRegistry` 的行与读取端点相同，含 `entryCount`：
+
+| 操作 | 请求体 | 说明 |
+| --- | --- | --- |
+| 添加 | `{ op: "add", tag, partOfSpeech }` | 加到该区末尾 |
+| 移动 | `{ op: "move", tag, partOfSpeech, before }` | `before` 为目标区的另一个标签，`null` 表示该区末尾；跨区移动即改变是否为词性 |
+| 修改 | `{ op: "update", tag, displayLabel?, color? }` | 只改给出的字段，至少给出一个 |
+| 删除 | `{ op: "delete", tag }` | 只允许删除没有词条使用的标签 |
+
+| 错误码 | 状态 | 含义 |
+| --- | --- | --- |
+| `invalid_tag_registry_change` | 400 | 请求体格式无效，包括不合法的颜色名 |
+| `tag_registry_invalid_tag` | 400 | 添加的标签为空或含半角逗号、全角逗号、顿号 |
+| `tag_registry_tag_exists` | 409 | 添加的标签已登记 |
+| `tag_registry_tag_not_found` | 404 | 标签未登记 |
+| `tag_registry_anchor_not_found` | 404 | `before` 不在目标区 |
+| `tag_registry_tag_in_use` | 409 | 删除在用标签，`details.entryCount` 为使用词条数 |
+
+每次修改都推进词典 `updatedAt`，不改写任何词条。添加、删除、移动和修改显示名使查询会话失效；只改颜色不失效，因为颜色只影响前端显示。修改显示名时，同一事务内更新用到该标签的词条的搜索记录，不重建整个投影。
+
+#### 其他端点
+
+词条写入类端点（`POST` / `PUT /entries`、`PATCH /entries`、`POST /entries/create-source`）在本次写入登记了新标签时，响应额外带 `tagRegistry`（不含 `entryCount`），前端整体替换状态中的登记表；没有新标签时不带。
 
 ### 释义标签与有效标签
 
 释义可以带标签。词条标签描述这个词，释义标签描述那条释义；释义不继承词条标签。需要"整个词"的答案时，取词条的**有效标签**：词条标签与全部释义标签的并集。词性放在哪一层是使用约定：要么只挂在词条上，要么挂在每条释义上（多词性词条原则上放在各条释义上）。程序不强制、不迁移，但质量检查报告不符合约定的释义（见质量规则的"标签层级"）。
 
 - **存储与写入**：详情 DTO 的 `definitions[]` 带 `tags: string[]`；`POST` / `PUT /entries` 与 JSON 导入在边界把它按标签列表规范化（去首尾空白、去空、去重并保持顺序，非数组按空列表），缺省为 `[]`。一条释义可以只有标签，释义文字（`meaning`）、例句和备注都为空也合法，导入时不会被当作空释义丢弃。`PATCH /entries` 不接受释义标签。
-- **DTO**：详情 DTO 与摘要 DTO 的 `tags` 都只表示词条标签。摘要 DTO 另带 `effectiveTags`，`parts` 与 `partOfSpeech` 从它计算；摘要的 `definitionPreviews[]` 只多带 `parts`（该释义自己的标签中的词性，按 `tagSortOrder` 排序），供列表与悬浮卡片在每条释义前显示它自己的词性，不带其他标签。
-- **有效标签的顺序**：先按首次出现拼出并集（词条标签按存储顺序，然后按释义顺序、释义内顺序追加未出现过的标签），再按 `settings.tagSortOrder` 排序：列出的标签按其位置排在前面，其余保持首次出现顺序。有效标签只在读取时计算，不存储；共享实现为 `tagModel.effectiveEntryTags(entry, order)`，前后端共用。保存时排序（见下一条）不能代替这一步：两层各自有序，拼接后仍可能违反配置，例如词条 `[古语]` 加释义 `[n]` 拼成 `古语, n`，而配置要求词性在前。
-- **保存时的存储顺序**：运行期的每次词条写入（`POST` / `PUT /entries`、`PATCH /entries`、创建来源、绑定来源时改写的来源词条、整词典批处理）都在服务端把词条标签和每条释义的标签分别按 `settings.tagSortOrder` 排列，规则与 `applyTagOrder` 批处理相同；`PATCH` 同时附带 settings 时按将要保存的 settings 排列。`tagSortOrder` 为空时顺序不变。JSON 导入保持原有顺序，存量数据由 `applyTagOrder` 整理。前端在设置表单保存后，若 `tagSortOrder` 有变化且试运行发现顺序不一致的词条，弹出应用内确认，询问是否立即运行 `applyTagOrder`；离开页面时经"保存 / 放弃更改 / 取消"保存设置不弹出该确认。
-- **使用范围**：EntryFilter 的全部标签条件、facets、分析页的词性与标签统计、`missing_tags` 质量规则、`allowEmptyTags` 保存校验和自动形态匹配都按有效标签。`near_duplicate_tags` 与 `tag_too_long` 同时检查两层标签；`duplicate_definition_tag`、`mixed_part_of_speech_levels` 与 `missing_definition_part_of_speech` 检查两层之间的关系。标签显示替换与红色强调对两层同样生效。
+- **DTO**：详情 DTO 与摘要 DTO 的 `tags` 都只表示词条标签。摘要 DTO 另带 `effectiveTags`，`parts` 从它计算；摘要的 `definitionPreviews[]` 只多带 `parts`（该释义自己的标签中的词性），供列表与悬浮卡片在每条释义前显示它自己的词性，不带其他标签。
+- **规范序**：标签在词条和释义中是集合，不存储顺序。响应里的标签数组（详情、摘要、保存响应、`PATCH` 响应）一律按标签值的二进制序，`effectiveTags` 是词条标签后接各释义新增的标签，保存响应与之后读取的结果相同。规范序没有业务含义，不用于显示。
+- **显示顺序**：标签的先后只由登记表决定：词性区在前，区内按登记顺序。比较函数是共享模型的 `tagRank`，前端在渲染时用 `arrangeTags` 排列所有标签，已保存词条和草稿共用；服务端只在需要最终顺序的地方用它，即 JSON 导出和分析页的组合。这样登记表移动后，前端已缓存的列表页不会显示过期的顺序。尚未登记的标签（只在未保存的草稿中出现）排在所有已登记标签之后，保持输入顺序。
+- **使用范围**：EntryFilter 的全部标签条件、`/tag-registry` 的使用数、分析页的词性与标签统计、`missing_tags` 质量规则、`allowEmptyTags` 保存校验和自动形态匹配都按有效标签。`near_duplicate_tags` 与 `tag_too_long` 同时检查两层标签；`duplicate_definition_tag`、`mixed_part_of_speech_levels` 与 `missing_definition_part_of_speech` 检查两层之间的关系。标签显示替换与红色强调对两层同样生效。
 - **自动形态**：模板组匹配把有效标签作为唯一输入，规则不变（任一标签与组的 `matchTags` 相同即匹配，只取最前的组）。这是在形态分配重做（见 [Morphology Assignment Plan](MORPHOLOGY_ASSIGNMENT_PLAN.md) 的 D6）决定匹配上下文之前的默认行为；释义都没有标签时，结果与只用词条标签相同。
 - **搜索**：`tags` 字段同时投影释义标签，命中的 `sourceType` 为 `definitionTag`，`sourceId` 为释义 ID，`sourcePosition` 为该标签在释义内的位置。
 
@@ -1022,12 +1034,13 @@ source、version、options、response mode、item kind、selector 与 issue 视�
 | `gloss_alignment_mismatch` | medium | gloss | entry/definition | `definitionId`、`definitionPosition`、`glaCount`、`glbCount` |
 | `duplicate_lemma` | high | lemma | entry/cross-entry | `lemmas`、`duplicateEntryCount` |
 | `near_duplicate_tags` | low | tags | global | `forms`；会话内部另保存受影响词条集合 |
+| `display_label_conflict` | low | tags | global | `displayLabel`、`forms`；会话内部另保存受影响词条集合 |
 | `missing_lemma` | high | lemma | entry | 无 |
 | `missing_tags` | high | tags | entry | 无；有效标签（词条标签与释义标签的并集）为空才报 |
 | `missing_definition` | high | other | entry | 无 |
 | `missing_ipa` | low | ipa | entry | 无 |
 | `multiple_primary_stress` | medium | ipa | entry | `primaryStressCount` |
-| `tag_too_long` | low | tags | entry/tag | `tag`、`codePointLength`、`limit`；释义标签另带 `definitionId`、`definitionPosition` |
+| `tag_too_long` | low | tags | global | `tag`、`codePointLength`、`limit`；会话内部另保存受影响词条集合 |
 | `duplicate_definition_tag` | low | tags | entry/definition | `definitionId`、`definitionPosition`、`tag` |
 | `mixed_part_of_speech_levels` | medium | tags | entry/definition | `definitionId`、`definitionPosition`、`part` |
 | `missing_definition_part_of_speech` | medium | tags | entry/definition | `definitionId`、`definitionPosition` |
@@ -1050,11 +1063,13 @@ source、version、options、response mode、item kind、selector 与 issue 视�
   - 每个循环分量（成员数大于 1；保存校验拒绝自引用）只有一条规范见证：从分量内 ID 最小的成员出发，按来源位置顺序在分量内深度优先，第一条回到起点的边闭合见证；
   - 循环分量的成员都引用本分量的见证，其他词条按自身来源位置顺序，取第一个能到达循环的来源所继承的见证；
   - 见证只取决于词条集合与来源边，与词条排列顺序无关；到达同一循环的 issue 共用同一个 params 对象，调用方不得修改。
-- **标签层级**：三条规则共用 `tagModel.definitionTagLayerStates()`，前端详情的标签状态标注也用它。标签按原值比较（与有效标签相同），是否为词性按 `partOfSpeechTags` 的结构化规范化判断（与 `entryParts()` 相同）。
+- **标签层级**：三条规则共用 `tagModel.definitionTagLayerStates()`，前端详情的标签状态标注也用它。标签按原值比较（与有效标签相同），是否为词性按标签是否在登记表词性区判断（与 `entryParts()` 相同）。
   - `duplicate_definition_tag`：释义上有与词条相同的标签，词性和非词性都算，每个重复标签一个 issue。
   - `mixed_part_of_speech_levels`：词条有词性，而释义有词条没有的词性，每个这样的词性一个 issue。词条和释义上有同一个词性时只报 `duplicate_definition_tag`。
   - `missing_definition_part_of_speech`：词条没有词性，这条释义也没有，每条释义一个 issue。
-  - 合起来表达"词性要么只挂在词条上，要么挂在每条释义上"；没有配置词性时后两条不检查。没有释义的词条不产生这三种 issue。
+  - 合起来表达"词性要么只挂在词条上，要么挂在每条释义上"；词性区为空时后两条不检查。没有释义的词条不产生这三种 issue。
+- **标签过长**：一个标签只产生一个全局 `tag_too_long`（`entryId` 为空），词条标签和释义标签一起检查。
+- **显示相同**：登记表中显示文本相同的每组标签产生一个全局 `display_label_conflict`（`entryId` 为空），含未使用的标签；重复无法在词条保存时阻止（自动登记不能拒绝保存），所以由质量检查报告。
 - **近似标签**：一个规范化紧凑形式对应多个不同 raw tag 时只产生一个全局 `near_duplicate_tags`（`entryId` 为空），词条标签和释义标签一起比较。`forms` 按稳定遇见顺序去重；受影响词条按唯一 ID 计入 tags 模块的 `entryCount`，并在 entry 视图中带问题标记出现，但 HTTP 不返回关联 ID 数组。
 
 ##### Summary 计数语义

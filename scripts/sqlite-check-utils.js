@@ -49,10 +49,10 @@ function sampleSqliteDictionary() {
     name: "SQLite Roundtrip",
     language: "test-lang",
     description: "roundtrip check",
-    settings: {
-      partOfSpeechTags: ["n", "v"],
-      tagDisplayMap: { n: "noun" },
-    },
+    tagRegistry: [
+      { tag: "n", partOfSpeech: true, displayLabel: "noun" },
+      { tag: "v", partOfSpeech: true },
+    ],
     docs: { markdown: "# Notes" },
     corpus: { units: [{ id: "corpus-unit-roundtrip", content: "unit" }] },
     morphology: {

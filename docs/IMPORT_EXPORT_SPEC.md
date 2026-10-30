@@ -77,14 +77,17 @@ Legacy JSON 导入应分为几个明确阶段：
    - 由 `lib/legacy-dictionary-migration.js` 处理旧字段，例如旧释义/例句字段、旧来源文本字段、旧 corpus 字段、旧 IPA `stressMappings`、旧设置字段，以及旧形态 `morphology.tables` / `entry.morphology` 结构。
    - 记录发生过的 legacy 字段转换。
    - 迁移会移除旧的空释义；判断"空"时也看释义标签 `definitions[].tags`，因此当前格式中只有标签的释义会保留。旧 JSON 没有释义标签。
+   - 文件没有 `tagRegistry` 时，由 `partOfSpeechTags`、`tagSortOrder`、`tagDisplayMap`、`redHighlightTags` 和词典中实际在用的标签生成登记表，并从 settings 移除这四项（见 5.1）。
 3. 规范化。
    - 补齐缺失 ID。
    - 规范化当前形状的 settings、docs、corpus、morphology、IPA、entries、definitions（含可选的释义标签 `tags`，缺省为 `[]`）、sources、tags。
+   - 规范化标签登记表：同一标签保留首行，词性区排在普通区之前，与自身相同的显示名按空保存；文件中在用但未登记的标签按首次出现追加到普通区末尾。
    - 对错误词典 ID 提供“作为新词典导入并重新生成 ID”的路径。
 4. 校验。
    - 完整实体 ID 唯一性。
    - 语料父子关系、顺序字段、模块结构。
    - 形态语法、IPA 映射规则等已有模块校验。
+   - `tagRegistry` 是数组，每行标签非空且不重复，`partOfSpeech` 是布尔值，`displayLabel` 是字符串，`color` 是合法颜色名；不合规返回 `invalid_tag_registry`，整次拒绝。不校验分隔符：数组形式的写入和导入本来就不拆分，已有数据可能含这类标签，校验会让导出的文件无法再导入。
 5. 写入 SQLite。
    - 创建或覆盖目标 `.sqlite`。
    - 写入 module blobs、词条结构表、形态结构表和索引。
@@ -96,6 +99,19 @@ Legacy JSON 导入应分为几个明确阶段：
    - 失败项和错误码。
 
 导入相同词典 ID 时仍必须保留“导入并覆盖 / 取消”确认，不能静默覆盖。
+
+### 5.1 旧标签设置转换
+
+旧格式用四个列表描述标签，各自按不同规则匹配。`legacyTagRegistry()` 把它们合成一张登记表：
+
+1. **词性区**：`partOfSpeechTags` 中的标签。先按在 `tagSortOrder` 中的位置，未列出的按 `partOfSpeechTags` 原顺序排在后面。
+2. **普通区**：`tagSortOrder` 中的非词性项按原顺序；其余在用标签按首次出现（词条顺序，词条标签在前、释义标签在后）。
+3. **大小写**：旧排序忽略大小写，词性和红色强调区分大小写。一项旧排序配置匹配到多个在用值时，这些值共享该位置，按首次出现排列。
+4. **红色强调**：旧配置可能写的是显示替换文本，按"原始值或显示文本"解析，对应行写入 `color: "red"`。
+5. **只出现在旧配置里的值**登记为未使用的行，保留原有设置，不丢弃。
+6. 词条和释义中标签数组的顺序只用于第 2 条的"首次出现"，不写入标签表。
+
+可见变化：原排序把非词性标签排在词性前面的词典，转换后词性移到最前；原先没列进 `tagSortOrder`、按存储顺序显示的标签，转换后在每个词条中都按登记表顺序显示。
 
 ## 6. 正式迁移流程
 
@@ -167,6 +183,8 @@ GET /api/export?dictionaryId=...&format=xlsx
 ```
 
 导出 profile 的输出结构可以与旧内部 JSON 不完全一致，但必须有文档和版本号。
+
+JSON 导出顶层带 `tagRegistry`（含未使用的行，不含 `displayAmbiguous`），词条和释义的 `tags` 数组按登记表排序；导入时只取其中的集合，往返后登记表与标签集合不变。
 
 ## 8. `index.json` 的职责
 

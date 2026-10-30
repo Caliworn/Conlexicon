@@ -32,8 +32,8 @@ function buildMorphologyTestDictionary() {
     name: "Morphology Acceptance Fixture",
     language: "Synthetic",
     description: "Small current-schema dictionary for manually and automatically testing morphology groups, subtables, overrides, and empty cells.",
+    tagRegistry: ["n", "v", "adj"].map((tag) => ({ tag, partOfSpeech: true })),
     settings: {
-      partOfSpeechTags: ["n", "v", "adj"],
       showEmptyEntrySections: false,
       allowEmptyPronunciation: true,
       allowEmptyTags: true,

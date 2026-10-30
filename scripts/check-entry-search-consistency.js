@@ -72,7 +72,7 @@ function expectedEntryIds(dictionary, query = {}) {
       })) {
         return false;
       }
-      const parts = tagModel.entryParts(entry, dictionary);
+      const parts = tagModel.entryParts(entry, dictionary.tagRegistry);
       if (query.part) {
         if (query.part === NO_PART_FILTER_VALUE ? parts.length : !parts.some((part) => (
           searchNormalizationModel.normalizeStructuralKey(part)
@@ -126,10 +126,11 @@ function searchConsistencyDictionary() {
   return normalizeDictionary({
     id: "dict-entry-search-consistency",
     name: "Entry Search Consistency",
-    settings: {
-      partOfSpeechTags: ["n", "v"],
-      tagDisplayMap: { "internal-tag": "DisplayTagToken" },
-    },
+    tagRegistry: [
+      { tag: "n", partOfSpeech: true },
+      { tag: "v", partOfSpeech: true },
+      { tag: "internal-tag", partOfSpeech: false, displayLabel: "DisplayTagToken" },
+    ],
     morphology: {
       templateGroups: [
         {
@@ -251,15 +252,16 @@ async function main() {
       },
       "definition search values must retain a stable definition locator",
     );
+    const tagPosition = alphaSearchRecords.find((record) => record.value === "internal-tag").sourcePosition;
     assert.deepEqual(
-      alphaSearchRecords.filter((record) => record.field === "tags" && record.sourcePosition === 2),
+      alphaSearchRecords.filter((record) => record.field === "tags" && record.sourcePosition === tagPosition),
       [
         {
           field: "tags",
           value: "internal-tag",
           sourceType: "tag",
           sourceId: "",
-          sourcePosition: 2,
+          sourcePosition: tagPosition,
           valueType: "raw",
         },
         {
@@ -267,7 +269,7 @@ async function main() {
           value: "DisplayTagToken",
           sourceType: "tag",
           sourceId: "",
-          sourcePosition: 2,
+          sourcePosition: tagPosition,
           valueType: "display",
         },
       ],

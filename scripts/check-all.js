@@ -37,6 +37,7 @@ const CHECK_GROUPS = [
       "check-source-candidates.js",
       "check-sqlite-contract.js",
       "check-definition-tags.js",
+      "check-tag-registry.js",
       "check-query-session-cache.js",
       "check-feature-result-session.js",
       "check-quality-result-session.js",
