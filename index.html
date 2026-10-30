@@ -283,7 +283,7 @@
             </div>
 
             <section class="entry-detail-panel" id="entryDetailPanel" data-i18n-aria-label="entryDetail" aria-label="词条详情">
-              <article class="entry-display" id="entryDisplay" hidden>
+              <article class="entry-display" data-surface="content-shell" id="entryDisplay" hidden>
                 <div class="entry-display-header" data-edit-section="basic">
                   <div>
                     <div class="entry-title-row">
@@ -341,7 +341,7 @@
                 </section>
               </article>
 
-              <form class="editor-panel" id="entryForm" autocomplete="off" novalidate hidden>
+              <form class="editor-panel" data-surface="content-shell" id="entryForm" autocomplete="off" novalidate hidden>
                 <input id="entryId" type="hidden">
                 <div class="entry-editor-header">
                   <p class="eyebrow" id="entryMode">新建</p>
@@ -531,7 +531,7 @@
 
           <section class="editor-panel tool-config-panel" id="settingsPanel">
             <form id="settingsForm" autocomplete="off" novalidate>
-              <section class="settings-section">
+              <section class="settings-section" data-surface="content-shell">
                 <div class="form-heading compact-heading">
                   <div>
                     <p class="eyebrow" data-i18n="corpus">语料库</p>
@@ -641,7 +641,7 @@
                   </div>
                 </div>
               </section>
-              <section class="settings-section">
+              <section class="settings-section" data-surface="content-shell">
                 <div class="form-heading compact-heading">
                   <div>
                     <p class="eyebrow" data-i18n="displaySettings">显示</p>
@@ -663,7 +663,7 @@
                 <p class="muted-text" data-i18n="toolNavigationOrderHelp">拖动卡片来调整左侧导航栏顺序。该顺序保存到当前词典文件中。</p>
                 <div class="tool-order-list" id="toolNavOrderList"></div>
               </section>
-              <section class="settings-section">
+              <section class="settings-section" data-surface="content-shell">
                 <div class="form-heading compact-heading">
                   <div>
                     <p class="eyebrow" data-i18n="searchSettings">搜索</p>
@@ -753,7 +753,7 @@
                   <input id="searchHighlightInput" type="checkbox">
                 </label>
               </section>
-              <section class="settings-section">
+              <section class="settings-section" data-surface="content-shell">
                 <div class="form-heading compact-heading">
                   <div>
                     <p class="eyebrow" data-i18n="save">保存</p>
@@ -803,7 +803,7 @@
                   <input id="docsAutoSaveInput" type="checkbox">
                 </label>
               </section>
-              <section class="settings-section">
+              <section class="settings-section" data-surface="content-shell">
                 <div class="form-heading compact-heading">
                   <div>
                     <p class="eyebrow">IPA</p>
@@ -915,22 +915,20 @@
 
           <section class="editor-panel tool-config-panel" id="morphologyFunctionsPanel">
             <form id="morphologyFunctionsForm" autocomplete="off">
-              <section class="settings-section morphology-function-section">
+              <section class="settings-section morphology-function-section" data-surface="content-shell">
                 <div class="form-heading compact-heading">
                   <div>
                     <h3 data-i18n="morphologyFunctionObjects">函数识别对象</h3>
                   </div>
                 </div>
-                <div class="form-grid">
-                  <label>
-                    <span data-i18n="morphologyLeftVObjects">leftV 识别对象</span>
-                    <input id="morphologyLeftVObjectsInput">
-                  </label>
-                  <label>
-                    <span data-i18n="morphologyRightVObjects">rightV 识别对象</span>
-                    <input id="morphologyRightVObjectsInput">
-                  </label>
-                </div>
+                <label>
+                  <span data-i18n="morphologyLeftVObjects">leftV 识别对象</span>
+                  <input id="morphologyLeftVObjectsInput">
+                </label>
+                <label>
+                  <span data-i18n="morphologyRightVObjects">rightV 识别对象</span>
+                  <input id="morphologyRightVObjectsInput">
+                </label>
                 <p class="field-help" data-i18n="morphologyFunctionObjectsHelp">为 leftV/rightV 配置它们会识别的对象。多个对象用逗号分隔。</p>
               </section>
               <div class="form-actions">
@@ -979,7 +977,10 @@
               <p class="tag-manager-summary" id="tagManagerSummary"></p>
             </div>
             <div class="top-actions tag-manager-actions">
-              <input id="tagManagerSearchInput" type="search" data-i18n-placeholder="tagManagerSearch" data-i18n-aria-label="tagManagerSearch" placeholder="搜索标签" aria-label="搜索标签">
+              <div class="tag-manager-search">
+                <div class="tag-manager-search-surface" aria-hidden="true"></div>
+                <input id="tagManagerSearchInput" type="search" data-i18n-placeholder="tagManagerSearch" data-i18n-aria-label="tagManagerSearch" placeholder="搜索标签" aria-label="搜索标签">
+              </div>
               <button class="secondary-button tag-manager-display-toggle" id="tagManagerDisplayToggle" data-control-tone="neutral" data-control-disclosure type="button" aria-expanded="false" aria-controls="tagManagerDisplayPanel" data-i18n="tagManagerDisplayOptions">显示选项</button>
               <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="tagManagerAddButton" type="button" data-i18n="tagManagerAdd">添加标签</button>
             </div>
@@ -994,7 +995,7 @@
 
           <section class="editor-panel tag-manager-layout tool-config-panel" id="tagsPanel">
             <div class="tag-manager-main" id="tagManagerZones"></div>
-            <aside class="settings-section tag-display-panel" id="tagManagerDisplayPanel" data-i18n-aria-label="tagManagerDisplay" aria-label="显示">
+            <aside class="settings-section tag-display-panel" data-surface="content-shell" id="tagManagerDisplayPanel" data-i18n-aria-label="tagManagerDisplay" aria-label="显示">
               <div class="form-heading compact-heading">
                 <div>
                   <h3 data-i18n="tagManagerDisplay">显示</h3>
@@ -1077,7 +1078,7 @@
           <section class="editor-panel ipa-layout tool-config-panel" id="ipaPanel">
             <div class="ipa-config-column">
               <form id="ipaForm" autocomplete="off" novalidate>
-              <section class="settings-section">
+              <section class="settings-section" data-surface="content-shell">
                 <div class="form-heading compact-heading">
                   <div>
                     <p class="eyebrow" data-i18n="orthographyModule">正写法识别</p>
@@ -1097,7 +1098,7 @@
                 <div class="ipa-rule-list" id="ipaMappingList"></div>
               </section>
 
-              <section class="settings-section">
+              <section class="settings-section" data-surface="content-shell">
                 <div class="form-heading compact-heading">
                   <div>
                     <p class="eyebrow" data-i18n="syllabification">音节划分</p>
@@ -1131,7 +1132,7 @@
                 </div>
               </section>
 
-              <section class="settings-section">
+              <section class="settings-section" data-surface="content-shell">
                 <div class="form-heading compact-heading">
                   <div>
                     <p class="eyebrow" data-i18n="defaultStressPosition">默认重音位置</p>
@@ -1153,7 +1154,7 @@
               </div>
               </form>
             </div>
-            <aside class="settings-section ipa-sandbox-panel">
+            <aside class="settings-section ipa-sandbox-panel" data-surface="content-shell">
               <div class="form-heading compact-heading">
                 <div>
                   <p class="eyebrow">Sandbox</p>

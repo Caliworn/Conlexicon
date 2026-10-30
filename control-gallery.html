@@ -393,7 +393,7 @@
     <section>
       <h2>Q1 外壳</h2>
       <p class="cg-note">使用产品的词条详情外壳 <code>.entry-display</code>（液态玻璃中为固定 Q1 磨砂面板）。弹窗与浮层的内部按钮属于同一类情形。</p>
-      <article class="entry-display cg-context-q1">
+      <article class="entry-display cg-context-q1" data-surface="content-shell">
         <div class="cg-scroll"><div class="cg-matrix" data-cg-context="q1"></div></div>
       </article>
     </section>
@@ -411,7 +411,7 @@
       <h2>文本框</h2>
       <p class="cg-note">文本框激活即显示聚焦样式（<code>:focus</code>，鼠标点进去也会出现），按钮只在键盘导航时显示焦点环（<code>:focus-visible</code>）。“聚焦”列下方的数字是聚焦边框与背后底色的对比度。文本框聚焦用强调色边框（<code>--ui-field-focus</code>）加 <code>--ui-field-focus-ring</code>：经典与层叠玻璃为淡外光晕，液态玻璃为边缘提亮（玻璃变亮、内侧强调色辉光、外沿亮色细线），不加外轮廓。</p>
       <div class="cg-scroll"><div class="cg-matrix" data-cg-context="page" data-cg-rows="fields"></div></div>
-      <article class="entry-display cg-context-q1">
+      <article class="entry-display cg-context-q1" data-surface="content-shell">
         <div class="cg-scroll"><div class="cg-matrix" data-cg-context="q1" data-cg-rows="fields"></div></div>
       </article>
       <h3 class="cg-subhead">词条列表搜索框</h3>
@@ -442,8 +442,8 @@
         <figure><figcaption>导航</figcaption><aside class="dictionary-panel app-nav" data-nav-state="expanded" data-cg-role="navigation"></aside></figure>
         <figure data-cg-mobile><figcaption>导航抽屉</figcaption><aside class="dictionary-panel app-nav" data-nav-state="drawer" data-cg-role="navigation-drawer"></aside></figure>
         <figure data-cg-mobile><figcaption>移动顶栏</figcaption><header class="mobile-app-bar" data-cg-role="mobile-bar"></header></figure>
-        <figure><figcaption>详情外壳</figcaption><article class="entry-display" data-cg-role="focus-display"></article></figure>
-        <figure><figcaption>编辑外壳</figcaption><form class="editor-panel" id="entryForm" data-cg-role="focus-editor"></form></figure>
+        <figure><figcaption>详情外壳</figcaption><article class="entry-display" data-surface="content-shell" data-cg-role="focus-display"></article></figure>
+        <figure><figcaption>编辑外壳</figcaption><form class="editor-panel" data-surface="content-shell" id="entryForm" data-cg-role="focus-editor"></form></figure>
         <figure><figcaption>浮层菜单</figcaption><div class="entry-search-config-menu" data-cg-role="floating"></div></figure>
         <figure><figcaption>富 tooltip</figcaption><div class="app-tooltip rich-tooltip" data-cg-role="rich-tooltip"></div></figure>
         <figure><figcaption>质量 tooltip</figcaption><span class="entry-quality-issue low" data-cg-hover><span class="entry-quality-issue-tooltip" role="tooltip" data-cg-role="quality-tooltip"></span></span></figure>
@@ -871,6 +871,7 @@
 
         const detail = document.createElement("article");
         detail.className = "entry-display";
+        detail.dataset.surface = "content-shell";
         const tags = document.createElement("div");
         tags.className = "chip-row";
         [["part-badge", "default", "默认", {}], ["part-badge", "hover", "悬浮", { "data-cg-hover": "" }], ["part-badge", "live", "实时", {}],

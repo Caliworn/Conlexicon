@@ -720,7 +720,7 @@ assert(
     )),
   "Liquid Glass navigation must remain one optical surface with flat rows and a non-optical active state",
 );
-const repeatedSurfaceSelectorPattern = /(?:^|[\s,>+~])(?:\.entry-card|\.analysis-card|\.table-row|td|th)(?:$|[\s,:.#\[>+~])/i;
+const repeatedSurfaceSelectorPattern = /(?:^|[\s,>+~])(?:\.entry-card|\.table-row|td|th)(?:$|[\s,:.#\[>+~])/i;
 assert.deepEqual(
   liquidGlassStyleBlocks
     .filter(({ selector, declarations }) => (
@@ -807,11 +807,11 @@ for (const definition of liquidGlassSurfaceDefinitions) {
 const liquidGlassContinuousDefinitions = liquidGlassSurfaceDefinitions.filter(({ role }) => role === "continuous");
 assert.deepEqual(
   new Set(liquidGlassContinuousDefinitions.map(({ selector }) => selector)),
-  new Set([".dictionary-panel", ".mobile-app-bar", ".entry-mail-search-surface", ".entry-mail-tools-surface"]),
+  new Set([".dictionary-panel", ".mobile-app-bar", ".entry-mail-search-surface", ".entry-mail-tools-surface", ".tag-manager-search-surface"]),
   "Continuous navigation and Mail search/tools backgrounds must remain independent optical surfaces",
 );
 assert(
-  ["entry-mail-search-surface", "entry-mail-tools-surface"].every((name) => index.includes(`<div class="${name}" aria-hidden="true"></div>`)),
+  ["entry-mail-search-surface", "entry-mail-tools-surface", "tag-manager-search-surface"].every((name) => index.includes(`<div class="${name}" aria-hidden="true"></div>`)),
   "Mail optical surfaces must be decorative leaves, not backdrop-filter ancestors of popup menus",
 );
 assert(
@@ -864,7 +864,7 @@ for (const role of ["continuous", "focus", "floating", "modal"]) {
   );
 }
 for (const [materialToken, surfaceTintToken] of [
-  ["--material-entry-detail-background", "--liquid-glass-focus-surface-tint"],
+  ["--material-content-shell-background", "--liquid-glass-focus-surface-tint"],
   ["--material-floating-background", "--liquid-glass-floating-surface-tint"],
   ["--material-mobile-bar-background", "--liquid-glass-mobile-bar-surface-tint"],
   ["--material-navigation-background", "--liquid-glass-navigation-surface-tint"],
@@ -890,7 +890,7 @@ for (const role of new Set(
   );
 }
 for (const materialToken of [
-  "--material-entry-detail-background",
+  "--material-content-shell-background",
   "--material-entry-detail-mobile-background",
   "--material-floating-background",
   "--material-mobile-bar-background",
@@ -966,13 +966,13 @@ const liquidGlassFocusDefinition = liquidGlassSurfaceDefinitions.find(({ role })
 assert(
   liquidGlassFocusDefinition?.registration === "css"
     && liquidGlassFocusDefinition.sampleBackdrop === false
-    && liquidGlassFocusDefinition.selector.includes(".entry-display")
-    && liquidGlassFocusDefinition.selector.includes("#entryForm")
-    && liquidGlass.includes(':is(.entry-display, #entryForm)')
-    && /:where\(#entryForm\)\s*\{[\s\S]*?background:\s*var\(--material-entry-detail-background\);[\s\S]*?backdrop-filter:\s*var\(--material-entry-detail-filter\);/.test(liquidGlass),
-  "Entry display and primary form must share focus Q1 material without runtime optical registration",
+    && liquidGlassFocusDefinition.selector === '[data-surface="content-shell"]'
+    && index.includes('<article class="entry-display" data-surface="content-shell"')
+    && index.includes('<form class="editor-panel" data-surface="content-shell"')
+    && /\[data-surface="content-shell"\] \{[\s\S]*?background:\s*var\(--material-content-shell-background\);[\s\S]*?backdrop-filter:\s*var\(--material-content-shell-filter\);/.test(liquidGlass),
+  "Entry display, primary form and tool cards must share focus Q1 material without runtime optical registration",
 );
-for (const selector of [".entry-display", "#entryForm"]) {
+for (const selector of ['[data-surface="content-shell"]']) {
   const element = { matches: (selectors) => selectors.split(",").map((item) => item.trim()).includes(selector) };
   assert.equal(liquidGlassEngineApi.surfaceRoleDefinition(element, { includeCssOnly: true }), liquidGlassFocusDefinition);
   assert.equal(

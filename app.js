@@ -10910,7 +10910,7 @@ function analysisCard(title, body, options = {}) {
     ? `<button type="button" class="analysis-card-navigation" data-control-tone="neutral" data-analysis-destination-page="${escapeHtml(options.destinationPage)}"${options.destinationSubpage ? ` data-analysis-destination-subpage="${escapeHtml(options.destinationSubpage)}"` : ""}><span>${escapeHtml(aText("详情", "Details"))}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button>`
     : "";
   const className = ["analysis-card", options.className].filter(Boolean).join(" ");
-  return `<article class="${escapeHtml(className)}"><header class="analysis-card-header"><h3>${escapeHtml(title)}</h3>${destination}</header>${body}</article>`;
+  return `<article class="${escapeHtml(className)}" data-surface="content-shell"><header class="analysis-card-header"><h3>${escapeHtml(title)}</h3>${destination}</header>${body}</article>`;
 }
 
 function analysisOverviewPrimaryStat(value, unit) {
@@ -13029,7 +13029,7 @@ function tagZoneHtml(partOfSpeech, rows, visibleRows) {
     ? `<p class="tag-zone-empty">${escapeHtml(t(tagManagerState.query ? "tagManagerNoMatch" : (partOfSpeech ? "tagManagerPartZoneEmpty" : "tagManagerGeneralZoneEmpty")))}</p>`
     : "";
   return `
-    <section class="settings-section tag-zone" data-tag-zone="${partOfSpeech ? "part" : "general"}">
+    <section class="settings-section tag-zone" data-surface="content-shell" data-tag-zone="${partOfSpeech ? "part" : "general"}">
       <div class="tag-zone-heading">
         <h3>${escapeHtml(t(partOfSpeech ? "tagManagerPartZone" : "tagManagerGeneralZone"))}</h3>
         <p class="field-help">${escapeHtml(t(partOfSpeech ? "tagManagerPartZoneHelp" : "tagManagerGeneralZoneHelp"))}</p>
@@ -14584,6 +14584,7 @@ function renderMorphologyTablesConfig(dictionary) {
 function createMorphologyGroupEditor(group, index) {
   const card = document.createElement("section");
   card.className = "morphology-group-card";
+  card.dataset.surface = "content-shell";
   card.dataset.templateGroupId = group.id;
   card.dataset.groupName = group.name;
   card.dataset.groupNotes = group.notes || "";

@@ -46,11 +46,15 @@ body[data-ui-skin="liquid-glass"] {
   --material-panel-soft-shadow: 0 15px 34px rgba(20, 43, 51, 0.09), inset 0 1px 0 rgba(255, 255, 255, 0.76), inset 0 -1px 0 rgba(58, 94, 103, 0.08);
   --material-card-shadow: 0 9px 24px rgba(20, 43, 51, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.72);
   --material-panel-filter: none;
-  --material-entry-detail-background: var(--liquid-glass-focus-surface-tint);
+  --material-entry-detail-background: var(--material-content-shell-background);
+  --material-entry-detail-border: var(--material-content-shell-border);
+  --material-entry-detail-shadow: var(--material-content-shell-shadow);
+  --material-entry-detail-filter: var(--material-content-shell-filter);
+  --material-content-shell-background: var(--liquid-glass-focus-surface-tint);
   --material-entry-detail-mobile-background: var(--liquid-glass-focus-surface-tint);
-  --material-entry-detail-border: rgba(255, 255, 255, 0.78);
-  --material-entry-detail-shadow: 0 26px 68px rgba(14, 39, 48, 0.18), 0 4px 14px rgba(14, 39, 48, 0.1);
-  --material-entry-detail-filter: var(--liquid-glass-q1-focus-filter);
+  --material-content-shell-border: rgba(255, 255, 255, 0.78);
+  --material-content-shell-shadow: 0 26px 68px rgba(14, 39, 48, 0.18), 0 4px 14px rgba(14, 39, 48, 0.1);
+  --material-content-shell-filter: var(--liquid-glass-q1-focus-filter);
   --material-entry-detail-mobile-filter: var(--liquid-glass-q1-focus-filter);
   --material-entry-detail-section-background: rgba(249, 252, 252, 0.9);
   --material-entry-detail-section-border: rgba(65, 99, 108, 0.18);
@@ -180,10 +184,13 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-panel-shadow: 0 24px 60px rgba(0, 0, 0, 0.38), 0 4px 16px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.17), inset 0 -1px 0 rgba(0, 0, 0, 0.28);
   --material-panel-soft-shadow: 0 16px 38px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   --material-card-shadow: 0 10px 26px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.09);
-  --material-entry-detail-background: var(--liquid-glass-focus-surface-tint);
+  --material-entry-detail-background: var(--material-content-shell-background);
+  --material-entry-detail-border: var(--material-content-shell-border);
+  --material-entry-detail-shadow: var(--material-content-shell-shadow);
+  --material-content-shell-background: var(--liquid-glass-focus-surface-tint);
   --material-entry-detail-mobile-background: var(--liquid-glass-focus-surface-tint);
-  --material-entry-detail-border: rgba(230, 255, 251, 0.22);
-  --material-entry-detail-shadow: 0 30px 78px rgba(0, 0, 0, 0.48), 0 5px 18px rgba(0, 0, 0, 0.28);
+  --material-content-shell-border: rgba(230, 255, 251, 0.22);
+  --material-content-shell-shadow: 0 30px 78px rgba(0, 0, 0, 0.48), 0 5px 18px rgba(0, 0, 0, 0.28);
   --material-entry-detail-section-background: rgba(24, 36, 42, 0.9);
   --material-entry-detail-section-border: rgba(221, 248, 244, 0.15);
   --material-entry-detail-header-divider: transparent;
@@ -427,8 +434,18 @@ body[data-ui-skin="liquid-glass"] :where(input:not([type="checkbox"]):not([type=
   --material-control-filter: none;
 }
 
+/* The pane is the field. The focus ring's fill and glow suit small inputs; across
+   a whole page of text they read as a white flash. */
+body[data-ui-skin="liquid-glass"] .docs-editor-pane textarea:focus {
+  box-shadow: none;
+}
+
+body[data-ui-skin="liquid-glass"] .docs-editor-pane:focus-within {
+  border-color: var(--ui-field-focus);
+}
+
 /* Two independent decorative leaves; popup ancestors stay unfiltered. */
-body[data-ui-skin="liquid-glass"] :is(.entry-mail-search-surface, .entry-mail-tools-surface) {
+body[data-ui-skin="liquid-glass"] :is(.entry-mail-search-surface, .entry-mail-tools-surface, .tag-manager-search-surface) {
   --liquid-glass-surface-tint: var(--material-mobile-bar-background);
   --liquid-glass-surface-q1-filter: var(--material-mobile-bar-filter);
   display: block;
@@ -442,6 +459,19 @@ body[data-ui-skin="liquid-glass"] :is(.entry-mail-search-surface, .entry-mail-to
   box-shadow: var(--material-mobile-bar-shadow);
   backdrop-filter: var(--liquid-glass-surface-q1-filter);
   -webkit-backdrop-filter: var(--liquid-glass-surface-q1-filter);
+}
+
+/* The leaf paints the glass; the input stays clear on top of it. */
+body[data-ui-skin="liquid-glass"] .tag-manager-search {
+  isolation: isolate;
+}
+
+body[data-ui-skin="liquid-glass"] .tag-manager-search > input {
+  --material-control-background: transparent;
+  --material-control-border: transparent;
+  --material-control-shadow: none;
+  --material-control-filter: none;
+  border-radius: inherit;
 }
 
 body[data-ui-skin="liquid-glass"] .entry-list-toolbar #rootModeToggleButton {
@@ -492,17 +522,16 @@ body[data-ui-skin="liquid-glass"] .mobile-app-bar {
   --liquid-glass-surface-q1-filter: var(--liquid-glass-q1-continuous-filter);
 }
 
-body[data-ui-skin="liquid-glass"] :is(.entry-display, #entryForm) {
+/* Content shells: page-level panels that hold a tool's or an entry's content,
+   declared with data-surface. Everything that treats them alike reads that. */
+body[data-ui-skin="liquid-glass"] [data-surface="content-shell"] {
   --liquid-glass-surface-tint: var(--liquid-glass-focus-surface-tint);
   --liquid-glass-surface-q1-filter: var(--liquid-glass-q1-focus-filter);
-}
-
-body[data-ui-skin="liquid-glass"] :where(#entryForm) {
-  border-color: var(--material-entry-detail-border);
-  background: var(--material-entry-detail-background);
-  box-shadow: var(--material-entry-detail-shadow);
-  backdrop-filter: var(--material-entry-detail-filter);
-  -webkit-backdrop-filter: var(--material-entry-detail-filter);
+  border-color: var(--material-content-shell-border);
+  background: var(--material-content-shell-background);
+  box-shadow: var(--material-content-shell-shadow);
+  backdrop-filter: var(--material-content-shell-filter);
+  -webkit-backdrop-filter: var(--material-content-shell-filter);
 }
 
 body[data-ui-skin="liquid-glass"] :is(
@@ -610,7 +639,7 @@ body[data-ui-skin="liquid-glass"] :is([data-control-tone="neutral"]:not([data-co
   --control-pressed-shadow: var(--liquid-glass-compact-control-shadow);
 }
 
-body[data-ui-skin="liquid-glass"] :is(.dictionary-panel, .mobile-app-bar, .entry-search-control, .entry-mail-tools, #docsModeControl, #corpusModeControl) {
+body[data-ui-skin="liquid-glass"] :is(.dictionary-panel, .mobile-app-bar, .entry-search-control, .entry-mail-tools, .tag-manager-search, #docsModeControl, #corpusModeControl) {
   --liquid-glass-compact-control-shadow: none;
 }
 
@@ -827,8 +856,8 @@ body[data-ui-skin="liquid-glass"]:not(.dark-theme) :is(
   .mobile-app-bar,
   .entry-mail-search-surface,
   .entry-mail-tools-surface,
-  .entry-display,
-  #entryForm,
+  .tag-manager-search-surface,
+  [data-surface="content-shell"],
   .entry-search-config-menu,
   .entry-filter-menu,
   .source-suggestions,
@@ -882,9 +911,9 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
   body[data-ui-skin="liquid-glass"] {
     background: var(--ui-canvas-bg);
     --material-panel-background: #f8fbfb;
-    --material-entry-detail-background: #f8fbfb;
+    --material-content-shell-background: #f8fbfb;
     --material-entry-detail-mobile-background: #f8fbfb;
-    --material-entry-detail-filter: none;
+    --material-content-shell-filter: none;
     --material-entry-detail-mobile-filter: none;
     --material-entry-detail-section-background: #ffffff;
     --material-control-background: #f7fbfb;
@@ -906,7 +935,7 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
 
   body.dark-theme[data-ui-skin="liquid-glass"] {
     --material-panel-background: #172228;
-    --material-entry-detail-background: #172228;
+    --material-content-shell-background: #172228;
     --material-entry-detail-mobile-background: #172228;
     --material-entry-detail-section-background: #1c2a30;
     --material-control-background: #1d2b31;
@@ -927,9 +956,9 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
   body[data-ui-skin="liquid-glass"] {
     background: var(--ui-canvas-bg);
     --material-panel-background: #f8fbfb;
-    --material-entry-detail-background: #f8fbfb;
+    --material-content-shell-background: #f8fbfb;
     --material-entry-detail-mobile-background: #f8fbfb;
-    --material-entry-detail-filter: none;
+    --material-content-shell-filter: none;
     --material-entry-detail-mobile-filter: none;
     --material-entry-detail-section-background: #ffffff;
     --material-control-background: #f7fbfb;
@@ -951,7 +980,7 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
 
   body.dark-theme[data-ui-skin="liquid-glass"] {
     --material-panel-background: #172228;
-    --material-entry-detail-background: #172228;
+    --material-content-shell-background: #172228;
     --material-entry-detail-mobile-background: #172228;
     --material-entry-detail-section-background: #1c2a30;
     --material-control-background: #1d2b31;
@@ -966,8 +995,8 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
     --material-overlay-panel-background: #102027;
   }
 
-  body[data-ui-skin="liquid-glass"] :is(.entry-display, #entryForm) {
-    box-shadow: var(--material-entry-detail-shadow);
+  body[data-ui-skin="liquid-glass"] [data-surface="content-shell"] {
+    box-shadow: var(--material-content-shell-shadow);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
@@ -1033,11 +1062,11 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
     --material-panel-shadow: none;
     --material-panel-soft-shadow: none;
     --material-card-shadow: none;
-    --material-entry-detail-background: Canvas;
+    --material-content-shell-background: Canvas;
     --material-entry-detail-mobile-background: Canvas;
-    --material-entry-detail-border: CanvasText;
-    --material-entry-detail-shadow: none;
-    --material-entry-detail-filter: none;
+    --material-content-shell-border: CanvasText;
+    --material-content-shell-shadow: none;
+    --material-content-shell-filter: none;
     --material-entry-detail-mobile-filter: none;
     --material-entry-detail-section-background: Canvas;
     --material-entry-detail-section-border: CanvasText;
@@ -1129,8 +1158,7 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
   }
 
   body[data-ui-skin="liquid-glass"] :is(
-    .entry-display,
-    #entryForm,
+    [data-surface="content-shell"],
     .mobile-app-bar,
     .entry-search-config-menu,
     .entry-filter-menu,

@@ -34,11 +34,15 @@ body[data-ui-skin="layered-glass"] {
   --material-panel-soft-shadow: 0 12px 30px rgba(20, 42, 45, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.7);
   --material-card-shadow: 0 8px 22px rgba(20, 42, 45, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.58);
   --material-panel-filter: none;
-  --material-entry-detail-background: linear-gradient(135deg, rgba(255, 255, 255, 0.38) 0%, rgba(255, 255, 255, 0.1) 24%, transparent 48%), linear-gradient(315deg, rgba(93, 167, 154, 0.07) 0%, transparent 44%), rgba(250, 252, 251, 0.7);
+  --material-entry-detail-background: var(--material-content-shell-background);
+  --material-entry-detail-border: var(--material-content-shell-border);
+  --material-entry-detail-shadow: var(--material-content-shell-shadow);
+  --material-entry-detail-filter: var(--material-content-shell-filter);
+  --material-content-shell-background: linear-gradient(135deg, rgba(255, 255, 255, 0.38) 0%, rgba(255, 255, 255, 0.1) 24%, transparent 48%), linear-gradient(315deg, rgba(93, 167, 154, 0.07) 0%, transparent 44%), rgba(250, 252, 251, 0.7);
   --material-entry-detail-mobile-background: linear-gradient(135deg, rgba(255, 255, 255, 0.38) 0%, rgba(255, 255, 255, 0.1) 24%, transparent 48%), linear-gradient(315deg, rgba(93, 167, 154, 0.07) 0%, transparent 44%), rgba(250, 252, 251, 0.78);
-  --material-entry-detail-border: rgba(74, 96, 99, 0.28);
-  --material-entry-detail-shadow: 0 18px 42px rgba(20, 42, 45, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.88), inset 0 -1px 0 rgba(87, 118, 116, 0.08);
-  --material-entry-detail-filter: blur(18px) saturate(1.08);
+  --material-content-shell-border: rgba(74, 96, 99, 0.28);
+  --material-content-shell-shadow: 0 18px 42px rgba(20, 42, 45, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.88), inset 0 -1px 0 rgba(87, 118, 116, 0.08);
+  --material-content-shell-filter: blur(18px) saturate(1.08);
   --material-entry-detail-mobile-filter: blur(12px) saturate(1.06);
   --material-entry-detail-section-background: rgba(255, 255, 255, 0.46);
   --material-entry-detail-section-border: rgba(74, 96, 99, 0.2);
@@ -155,10 +159,13 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --material-panel-shadow: 0 20px 48px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 0 rgba(0, 0, 0, 0.18);
   --material-panel-soft-shadow: 0 14px 34px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   --material-card-shadow: 0 8px 22px rgba(0, 0, 0, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.07);
-  --material-entry-detail-background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.03) 26%, transparent 50%), linear-gradient(315deg, rgba(71, 168, 155, 0.07) 0%, transparent 46%), rgba(28, 38, 42, 0.74);
+  --material-entry-detail-background: var(--material-content-shell-background);
+  --material-entry-detail-border: var(--material-content-shell-border);
+  --material-entry-detail-shadow: var(--material-content-shell-shadow);
+  --material-content-shell-background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.03) 26%, transparent 50%), linear-gradient(315deg, rgba(71, 168, 155, 0.07) 0%, transparent 46%), rgba(28, 38, 42, 0.74);
   --material-entry-detail-mobile-background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.03) 26%, transparent 50%), linear-gradient(315deg, rgba(71, 168, 155, 0.07) 0%, transparent 46%), rgba(28, 38, 42, 0.82);
-  --material-entry-detail-border: rgba(222, 244, 239, 0.2);
-  --material-entry-detail-shadow: 0 20px 48px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(0, 0, 0, 0.2);
+  --material-content-shell-border: rgba(222, 244, 239, 0.2);
+  --material-content-shell-shadow: 0 20px 48px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 rgba(0, 0, 0, 0.2);
   --material-entry-detail-section-background: rgba(255, 255, 255, 0.06);
   --material-entry-detail-section-border: rgba(222, 244, 239, 0.15);
   --material-entry-detail-section-edge: inset 0 1px 0 rgba(255, 255, 255, 0.1);
@@ -388,9 +395,9 @@ body[data-ui-skin="layered-glass"] [data-layered-glass-pointer="active"] {
   body[data-ui-skin="layered-glass"] {
     background: var(--ui-canvas-bg);
     --material-panel-background: #fafcfb;
-    --material-entry-detail-background: #fafcfb;
+    --material-content-shell-background: #fafcfb;
     --material-entry-detail-mobile-background: #fafcfb;
-    --material-entry-detail-filter: none;
+    --material-content-shell-filter: none;
     --material-entry-detail-mobile-filter: none;
     --material-entry-detail-section-background: #ffffff;
     --material-entry-detail-section-outline: var(--material-entry-detail-section-border);
@@ -419,7 +426,7 @@ body[data-ui-skin="layered-glass"] [data-layered-glass-pointer="active"] {
 
   body.dark-theme[data-ui-skin="layered-glass"] {
     --material-panel-background: #1c262a;
-    --material-entry-detail-background: #1c262a;
+    --material-content-shell-background: #1c262a;
     --material-entry-detail-mobile-background: #1c262a;
     --material-entry-detail-section-background: #202b2f;
     --material-entry-detail-section-outline: var(--material-entry-detail-section-border);
@@ -445,9 +452,9 @@ body[data-ui-skin="layered-glass"] [data-layered-glass-pointer="active"] {
   body[data-ui-skin="layered-glass"] {
     background: var(--ui-canvas-bg);
     --material-panel-background: #fafcfb;
-    --material-entry-detail-background: #fafcfb;
+    --material-content-shell-background: #fafcfb;
     --material-entry-detail-mobile-background: #fafcfb;
-    --material-entry-detail-filter: none;
+    --material-content-shell-filter: none;
     --material-entry-detail-mobile-filter: none;
     --material-entry-detail-section-background: #ffffff;
     --material-entry-detail-section-outline: var(--material-entry-detail-section-border);
@@ -476,7 +483,7 @@ body[data-ui-skin="layered-glass"] [data-layered-glass-pointer="active"] {
 
   body.dark-theme[data-ui-skin="layered-glass"] {
     --material-panel-background: #1c262a;
-    --material-entry-detail-background: #1c262a;
+    --material-content-shell-background: #1c262a;
     --material-entry-detail-mobile-background: #1c262a;
     --material-entry-detail-section-background: #202b2f;
     --material-entry-detail-section-outline: var(--material-entry-detail-section-border);
@@ -516,11 +523,11 @@ body[data-ui-skin="layered-glass"] [data-layered-glass-pointer="active"] {
     --material-panel-shadow: none;
     --material-panel-soft-shadow: none;
     --material-card-shadow: none;
-    --material-entry-detail-background: Canvas;
+    --material-content-shell-background: Canvas;
     --material-entry-detail-mobile-background: Canvas;
-    --material-entry-detail-border: CanvasText;
-    --material-entry-detail-shadow: none;
-    --material-entry-detail-filter: none;
+    --material-content-shell-border: CanvasText;
+    --material-content-shell-shadow: none;
+    --material-content-shell-filter: none;
     --material-entry-detail-mobile-filter: none;
     --material-entry-detail-section-background: Canvas;
     --material-entry-detail-section-border: CanvasText;
