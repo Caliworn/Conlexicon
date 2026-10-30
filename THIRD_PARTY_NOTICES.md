@@ -1,5 +1,19 @@
 # Third-party notices
 
+## Fonts
+
+The application serves two font families, unmodified, as official TrueType
+files. Both are licensed under the SIL Open Font License, Version 1.1
+(https://scripts.sil.org/OFL). The full license text is in the `OFL.txt` beside
+each family's files.
+
+- `assets/fonts/noto-sans/` — Noto Sans 2.015, Regular and Bold (unhinted).
+  Copyright 2022 The Noto Project Authors
+  (https://github.com/notofonts/latin-greek-cyrillic).
+- `assets/fonts/charis-sil/` — Charis SIL 6.101, Regular, Bold, Italic and
+  Bold Italic. Copyright (c) 1997-2022 SIL International (http://www.sil.org/)
+  with Reserved Font Names "Charis" and "SIL".
+
 ## Liquid Glass Lab photos
 
 The five photographs in `assets/liquid-glass-lab/` are distributed only as

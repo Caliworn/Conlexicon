@@ -1,4 +1,54 @@
+@font-face {
+  font-family: "Charis SIL";
+  src: url("assets/fonts/charis-sil/CharisSIL-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Charis SIL";
+  src: url("assets/fonts/charis-sil/CharisSIL-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Charis SIL";
+  src: url("assets/fonts/charis-sil/CharisSIL-Italic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Charis SIL";
+  src: url("assets/fonts/charis-sil/CharisSIL-BoldItalic.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Noto Sans";
+  src: url("assets/fonts/noto-sans/NotoSans-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Noto Sans";
+  src: url("assets/fonts/noto-sans/NotoSans-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
+  --font-ui: "Noto Sans", "Segoe UI", "Microsoft YaHei", sans-serif;
+  --font-phonetic: "Charis SIL", "Times New Roman", serif;
   --layer-mobile-app-bar: 80;
   --layer-drawer-backdrop: 82;
   --layer-drawer: 90;
@@ -7,7 +57,7 @@
   --layer-app-tooltip: 100;
   --layer-toast: 110;
   --layer-modal-overlay: 120;
-  font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-ui);
 }
 
 * {
@@ -1871,7 +1921,7 @@ label span {
 
 .entry-title-row h3 {
   margin: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-phonetic);
   font-size: clamp(2rem, 4vw, 3.2rem);
   line-height: 1.16;
   letter-spacing: 0;
@@ -1896,6 +1946,7 @@ label span {
 
 .pronunciation-pill {
   color: var(--ui-text-muted);
+  font-family: var(--font-phonetic);
   font-size: 1.1rem;
 }
 
@@ -2349,12 +2400,12 @@ span.pending-source {
 }
 
 .gloss-font-serif {
-  --gloss-font-family: Georgia, "Times New Roman", "Noto Serif", "Source Serif Pro", serif;
+  --gloss-font-family: var(--font-phonetic);
   font-family: var(--gloss-font-family);
 }
 
 .gloss-font-sans {
-  --gloss-font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+  --gloss-font-family: var(--font-ui);
   font-family: var(--gloss-font-family);
 }
 
@@ -3335,7 +3386,7 @@ span.pending-source {
   min-height: 0;
   height: auto;
   padding: 6px 12px;
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-phonetic);
   font-size: clamp(1.6rem, 3vw, 2.4rem);
   font-weight: 700;
   line-height: 1.2;
@@ -3743,7 +3794,7 @@ span.pending-source {
   padding: 10px 12px;
   background: var(--material-panel-background);
   color: var(--ui-text);
-  font-family: "Segoe UI", "Noto Sans", sans-serif;
+  font-family: var(--font-phonetic);
   font-weight: 800;
   overflow-wrap: anywhere;
 }
@@ -3832,6 +3883,7 @@ span.pending-source {
   border: 1px solid;
   border-radius: var(--radius-control);
   padding: 0 10px;
+  font-family: var(--font-phonetic);
   font-size: 1rem;
   font-weight: 900;
 }
@@ -5285,6 +5337,15 @@ button.analysis-bar-label:hover,
   height: 44px;
 }
 
+textarea.ipa-single-line,
+#ipaKeyboardInput {
+  font-family: var(--font-phonetic);
+}
+
+textarea.ipa-single-line::placeholder {
+  font-family: var(--font-ui);
+}
+
 textarea.ipa-single-line {
   min-height: 50px;
   height: 50px;
@@ -6311,7 +6372,7 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
 
 .network-section-label {
   fill: var(--ui-text-muted);
-  font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-ui);
   font-size: 0.76rem;
   font-weight: 900;
   letter-spacing: 0;
@@ -6365,7 +6426,7 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
 
 .network-node-lemma {
   fill: var(--ui-text);
-  font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-ui);
   font-size: 1rem;
   font-weight: 900;
 }
@@ -6377,7 +6438,7 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
 .network-node-pronunciation,
 .network-node-part {
   fill: var(--ui-text-muted);
-  font-family: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-ui);
   font-size: 0.74rem;
   font-weight: 800;
 }

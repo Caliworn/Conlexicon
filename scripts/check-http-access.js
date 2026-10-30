@@ -131,7 +131,7 @@ async function checkWrites(port) {
 async function checkStaticResources(port) {
   const expectedTypes = {
     ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
-    ".js": "text/javascript; charset=utf-8", ".jpg": "image/jpeg",
+    ".js": "text/javascript; charset=utf-8", ".jpg": "image/jpeg", ".ttf": "font/ttf",
   };
   for (const file of PUBLIC_STATIC_FILES) {
     const content = await fs.readFile(path.join(ROOT_DIR, file));
@@ -164,7 +164,7 @@ async function checkPublicResourceContract() {
   // file must be referenced by another public file or be an entry page.
   const files = new Set(PUBLIC_STATIC_FILES);
   const entryPages = new Set(["index.html", "liquid-glass-lab.html", "control-gallery.html"]);
-  const staticPath = /["'`(]((?:\.\/)?(?:[\w-]+\/)*[\w.-]+\.(?:js|css|html|png|jpe?g|svg|json|woff2?))["'`)]/g;
+  const staticPath = /["'`(]((?:\.\/)?(?:[\w-]+\/)*[\w.-]+\.(?:js|css|html|png|jpe?g|svg|json|ttf))["'`)]/g;
   const referenced = new Set();
   for (const file of PUBLIC_STATIC_FILES.filter((name) => /\.(?:html|js|css)$/.test(name))) {
     const text = await fs.readFile(path.join(ROOT_DIR, file), "utf8");
