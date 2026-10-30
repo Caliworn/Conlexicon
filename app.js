@@ -13354,32 +13354,62 @@ async function openTagEntries(tag) {
   }
 }
 
+// Row positions are read once when a drag starts. Nothing moves during the drag,
+// so each dragover only compares numbers and touches the page when the target
+// changes. Offsets are from the zone's top, which stays right if the page scrolls.
+function tagDragZones(tag) {
+  return new Map([...elements.tagManagerZones.querySelectorAll("[data-tag-zone]")].map((zone) => {
+    const zoneTop = zone.getBoundingClientRect().top;
+    const rows = [...zone.querySelectorAll("[data-tag]")].filter((row) => row.dataset.tag !== tag);
+    const midpoints = rows.map((row) => {
+      const rect = row.getBoundingClientRect();
+      return rect.top + rect.height / 2 - zoneTop;
+    });
+    return [zone, { rows, midpoints }];
+  }));
+}
+
 function tagDropTarget(event) {
   const zone = event.target.closest("[data-tag-zone]");
   if (!zone) {
     return null;
   }
-  const rows = [...zone.querySelectorAll("[data-tag]")].filter((row) => row.dataset.tag !== tagDragState.tag);
-  const index = rows.findIndex((row) => {
-    const rect = row.getBoundingClientRect();
-    return event.clientY < rect.top + rect.height / 2;
-  });
+  const { rows, midpoints } = tagDragState.zones.get(zone);
+  const offset = event.clientY - zone.getBoundingClientRect().top;
+  let low = 0;
+  let high = midpoints.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (offset < midpoints[middle]) {
+      high = middle;
+    } else {
+      low = middle + 1;
+    }
+  }
   return {
     zone,
     partOfSpeech: zone.dataset.tagZone === "part",
-    index: index < 0 ? rows.length : index,
-    beforeRow: rows[index] || null,
+    index: low,
+    beforeRow: rows[low] || null,
   };
 }
 
-function clearTagDropMarker() {
-  elements.tagManagerZones.querySelectorAll(".drop-before, .drop-end").forEach((item) => {
-    item.classList.remove("drop-before", "drop-end");
-  });
+function setTagDropMarker(target) {
+  const { marked, markedClass } = tagDragState;
+  marked?.classList.remove(markedClass);
+  const next = target?.beforeRow || target?.zone || null;
+  const nextClass = target?.beforeRow ? "drop-before" : "drop-end";
+  next?.classList.add(nextClass);
+  tagDragState.marked = next;
+  tagDragState.markedClass = nextClass;
+  tagDragState.target = target;
 }
 
 function finishTagDrag() {
-  clearTagDropMarker();
+  if (!tagDragState) {
+    return;
+  }
+  setTagDropMarker(null);
   elements.tagManagerZones.querySelector(".tag-row.dragging")?.classList.remove("dragging");
   tagDragState = null;
 }
@@ -17358,7 +17388,7 @@ elements.tagManagerZones.addEventListener("dragstart", (event) => {
     return;
   }
   const row = handle.closest("[data-tag]");
-  tagDragState = { tag: row.dataset.tag, target: null };
+  tagDragState = { tag: row.dataset.tag, target: null, zones: tagDragZones(row.dataset.tag) };
   row.classList.add("dragging");
   event.dataTransfer.effectAllowed = "move";
   event.dataTransfer.setData("application/x-conlexicon-tag", row.dataset.tag);
@@ -17368,17 +17398,15 @@ elements.tagManagerZones.addEventListener("dragover", (event) => {
     return;
   }
   const target = tagDropTarget(event);
-  clearTagDropMarker();
-  tagDragState.target = target;
   if (!target) {
+    setTagDropMarker(null);
     return;
   }
   event.preventDefault();
   event.dataTransfer.dropEffect = "move";
-  if (target.beforeRow) {
-    target.beforeRow.classList.add("drop-before");
-  } else {
-    target.zone.classList.add("drop-end");
+  const previous = tagDragState.target;
+  if (previous?.zone !== target.zone || previous.index !== target.index) {
+    setTagDropMarker(target);
   }
 });
 elements.tagManagerZones.addEventListener("drop", (event) => {
