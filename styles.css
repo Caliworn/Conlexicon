@@ -2248,13 +2248,11 @@ label span {
 .source-reference-remove:focus-visible {
   outline-offset: 1px;
 }
-.source-reference-card.dragging { opacity: 0.5; }
 .source-reference-insertion {
   position: absolute;
-  width: 3px;
+  width: 2px;
   transform: translateX(-50%);
   background: var(--ui-accent);
-  border-radius: 2px;
   pointer-events: none;
 }
 
@@ -2619,15 +2617,8 @@ span.pending-source {
   border: 1px solid var(--ui-border);
   border-radius: 10px;
   background: color-mix(in srgb, var(--material-inset-background) 76%, var(--material-panel-background));
-  transition: border-color 140ms ease, opacity 140ms ease;
+  transition: opacity 140ms ease;
   container-type: inline-size;
-}
-
-.morphology-group-card.dragging,
-.morphology-config-card.dragging {
-  border-color: var(--ui-accent);
-  border-style: dashed;
-  opacity: 0.45;
 }
 
 .morphology-group-header,
@@ -2796,7 +2787,7 @@ span.pending-source {
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-panel);
   background: var(--material-panel-background);
-  transition: border-color 140ms ease, opacity 140ms ease;
+  transition: opacity 140ms ease;
 }
 
 .morphology-config-card.is-collapsed {
@@ -3546,10 +3537,6 @@ span.pending-source {
   background: var(--ui-accent-soft);
 }
 
-:is(.tag-row, .tag-tile).dragging {
-  opacity: 0.5;
-}
-
 .tag-row.drop-before::before,
 .tag-zone.drop-end .tag-row:last-child::after {
   position: absolute;
@@ -4007,6 +3994,10 @@ span.pending-source {
   gap: 8px;
 }
 
+.tool-order-reset {
+  justify-self: start;
+}
+
 .tool-order-card {
   display: flex;
   align-items: center;
@@ -4025,8 +4016,23 @@ span.pending-source {
   cursor: grabbing;
 }
 
-.tool-order-card.dragging {
-  opacity: 0.45;
+/* Drag sorting: the card dims in place and a line shows where it will land. */
+:is(.tool-order-card, .ipa-rule-card, .morphology-group-card, .morphology-config-card, .tag-row, .tag-tile, .source-reference-card).dragging {
+  opacity: 0.5;
+}
+
+:is(.tool-order-list, .ipa-rule-list, .morphology-table-list, .morphology-group-table-list) {
+  position: relative;
+}
+
+.list-drop-marker {
+  position: absolute;
+  z-index: 1;
+  inset-inline: 0;
+  height: 2px;
+  transform: translateY(-50%);
+  background: var(--ui-accent);
+  pointer-events: none;
 }
 
 .tool-order-handle {
@@ -5317,13 +5323,7 @@ button.analysis-bar-label:hover,
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-panel);
   background: var(--material-panel-background);
-  transition: border-color 140ms ease, opacity 140ms ease;
-}
-
-.ipa-rule-card.dragging {
-  border-color: var(--ui-accent);
-  border-style: dashed;
-  opacity: 0.45;
+  transition: opacity 140ms ease;
 }
 
 .ipa-rule-grid {

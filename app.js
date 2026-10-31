@@ -273,10 +273,6 @@ let analysisPartSetRenderState = {
 };
 let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
-let draggedToolNavView = "";
-let draggedEntrySectionId = "";
-let draggedMorphologyGroupId = "";
-let draggedMorphologyTableId = "";
 let entryCardScrollRequestId = 0;
 let pendingEntryCardScroll = null;
 let entryBrowserHeightFrame = 0;
@@ -598,6 +594,7 @@ const i18n = {
     searchFieldMatchLoading: "正在统计命中词条",
     searchFieldMatchUnavailable: "暂无当前搜索统计",
     restoreSearchDefaults: "恢复词典默认值",
+    restoreDefaultOrder: "恢复默认顺序",
     searchSettingsSummary: "搜索范围：{fields}；{matching}",
     searchSettingsAllFields: "全部字段",
     searchSettingsFieldCount: "{count} 个字段",
@@ -1237,6 +1234,7 @@ const i18n = {
     searchFieldMatchLoading: "Counting matching entries",
     searchFieldMatchUnavailable: "No current search count",
     restoreSearchDefaults: "Restore Dictionary Defaults",
+    restoreDefaultOrder: "Restore Default Order",
     searchSettingsSummary: "Search scope: {fields}; {matching}",
     searchSettingsAllFields: "All fields",
     searchSettingsFieldCount: "{count} fields",
@@ -1647,7 +1645,9 @@ const elements = {
   toolList: document.querySelector(".tool-list"),
   toolButtons: document.querySelectorAll(".tool-button"),
   toolNavOrderList: document.querySelector("#toolNavOrderList"),
+  toolNavOrderResetButton: document.querySelector("#toolNavOrderResetButton"),
   entrySectionOrderList: document.querySelector("#entrySectionOrderList"),
+  entrySectionOrderResetButton: document.querySelector("#entrySectionOrderResetButton"),
   dictionaryManagerList: document.querySelector("#dictionaryManagerList"),
   dictionaryMeta: document.querySelector("#dictionaryMeta"),
   dictionaryTitle: document.querySelector("#dictionaryTitle"),
@@ -12519,6 +12519,7 @@ function renderToolNavOrderEditor(order = DEFAULT_TOOL_NAV_ORDER) {
     `;
     elements.toolNavOrderList.append(card);
   });
+  syncToolNavOrderReset();
 }
 
 function renderEntrySectionOrderEditor(order = DEFAULT_ENTRY_SECTION_ORDER) {
@@ -12534,6 +12535,7 @@ function renderEntrySectionOrderEditor(order = DEFAULT_ENTRY_SECTION_ORDER) {
     `;
     elements.entrySectionOrderList.append(card);
   });
+  syncEntrySectionOrderReset();
 }
 
 function collectToolNavOrder() {
@@ -12546,28 +12548,12 @@ function collectEntrySectionOrder() {
     .map((card) => card.dataset.entrySection));
 }
 
-function toolOrderInsertBefore(y) {
-  const cards = [...elements.toolNavOrderList.querySelectorAll(".tool-order-card:not(.dragging)")];
-  return cards.reduce((closest, card) => {
-    const box = card.getBoundingClientRect();
-    const offset = y - box.top - box.height / 2;
-    if (offset < 0 && offset > closest.offset) {
-      return { offset, card };
-    }
-    return closest;
-  }, { offset: Number.NEGATIVE_INFINITY, card: null }).card;
+function syncToolNavOrderReset() {
+  elements.toolNavOrderResetButton.disabled = String(collectToolNavOrder()) === String(DEFAULT_TOOL_NAV_ORDER);
 }
 
-function entrySectionOrderInsertBefore(y) {
-  const cards = [...elements.entrySectionOrderList.querySelectorAll(".tool-order-card:not(.dragging)")];
-  return cards.reduce((closest, card) => {
-    const box = card.getBoundingClientRect();
-    const offset = y - box.top - box.height / 2;
-    if (offset < 0 && offset > closest.offset) {
-      return { offset, card };
-    }
-    return closest;
-  }, { offset: Number.NEGATIVE_INFINITY, card: null }).card;
+function syncEntrySectionOrderReset() {
+  elements.entrySectionOrderResetButton.disabled = String(collectEntrySectionOrder()) === String(DEFAULT_ENTRY_SECTION_ORDER);
 }
 
 function renderIpaKeyboard(dictionary = activeDictionary()) {
@@ -12650,23 +12636,6 @@ function createIpaRuleCard(rule = normalizeIpaRule()) {
     </div>
   `;
   return card;
-}
-
-function ipaRuleInsertBefore(container, y) {
-  const cards = [...container.querySelectorAll(".ipa-rule-card:not(.dragging)")];
-  return cards.reduce((closest, card) => {
-    const box = card.getBoundingClientRect();
-    const offset = y - box.top - box.height / 2;
-    if (offset < 0 && offset > closest.offset) {
-      return { offset, card };
-    }
-    return closest;
-  }, { offset: Number.NEGATIVE_INFINITY, card: null }).card;
-}
-
-function finishIpaRuleDrag() {
-  elements.ipaMappingList.querySelector(".ipa-rule-card.dragging")?.classList.remove("dragging");
-  renderIpaSandbox();
 }
 
 function collectIpaRuleList(container) {
@@ -13417,6 +13386,115 @@ async function openTagEntries(tag) {
   }
 }
 
+// Slots run in list order, so the first one past the pointer can be searched for.
+function firstSlotPast(slots, isPastPointer) {
+  let low = 0;
+  let high = slots.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (isPastPointer(slots[middle])) {
+      high = middle;
+    } else {
+      low = middle + 1;
+    }
+  }
+  return low;
+}
+
+// Sorts a card within its parent list, previewing the drop with an insertion line.
+// The list stays put until the drop, so a cancelled drag keeps the order. Card
+// positions are read once when a drag starts, so each dragover only compares numbers
+// and touches the page when the target changes. Offsets are from the list's corner,
+// which stays right if the page scrolls.
+function setupListDragSort(root, { item, handle = item, onMove }) {
+  const marker = document.createElement("div");
+  marker.className = "list-drop-marker";
+  let drag = null;
+
+  function setDropIndex(index) {
+    drag.index = index;
+    if (index === null) {
+      marker.remove();
+      return;
+    }
+    marker.style.top = `${drag.lines[index]}px`;
+    if (marker.parentElement !== drag.list) {
+      drag.list.append(marker);
+    }
+  }
+
+  function finishDrag() {
+    drag?.card.classList.remove("dragging");
+    marker.remove();
+    drag = null;
+  }
+
+  root.addEventListener("dragstart", (event) => {
+    const card = event.target.closest(handle)?.closest(item);
+    if (!card) {
+      event.preventDefault();
+      return;
+    }
+    const list = card.parentElement;
+    const origin = list.getBoundingClientRect();
+    const halfGap = (Number.parseFloat(getComputedStyle(list).rowGap) || 0) / 2;
+    const rows = [...list.children].filter((row) => row !== card && row.matches(item));
+    const slots = rows.map((row) => {
+      const rect = row.getBoundingClientRect();
+      return {
+        top: rect.top - origin.top,
+        middle: rect.top + rect.height / 2 - origin.top,
+      };
+    });
+    drag = {
+      card,
+      list,
+      rows,
+      slots,
+      lines: [...slots.map((slot) => slot.top - halfGap), origin.height + halfGap],
+      index: null,
+    };
+    card.classList.add("dragging");
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("application/x-conlexicon-list-item", "move");
+  });
+  root.addEventListener("dragover", (event) => {
+    if (!drag) {
+      return;
+    }
+    if (!drag.list.contains(event.target)) {
+      setDropIndex(null);
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    const y = event.clientY - drag.list.getBoundingClientRect().top;
+    const index = firstSlotPast(drag.slots, (slot) => y < slot.middle);
+    if (index !== drag.index) {
+      setDropIndex(index);
+    }
+  });
+  root.addEventListener("dragleave", (event) => {
+    if (drag && !drag.list.contains(event.relatedTarget)) {
+      setDropIndex(null);
+    }
+  });
+  root.addEventListener("drop", (event) => {
+    if (!drag) {
+      return;
+    }
+    event.preventDefault();
+    const { card, list, rows, index } = drag;
+    finishDrag();
+    const before = rows[index] || null;
+    if (index !== null && card.nextElementSibling !== before) {
+      list.insertBefore(card, before);
+      onMove?.();
+    }
+  });
+  root.addEventListener("dragend", finishDrag);
+}
+
 // Row positions are read once when a drag starts. Nothing moves during the drag,
 // so each dragover only compares numbers and touches the page when the target
 // changes. Offsets are from the zone's corner, which stays right if the page scrolls.
@@ -13437,24 +13515,12 @@ function tagDragZones(tag) {
   }));
 }
 
-// Slots run in tag order, so the first one past the pointer can be searched for.
 // Tiles wrap: one is past the pointer if its line is lower, or if it is further
 // along the pointer's line. Past a line's end is the start of the next line.
 function tagDropIndex(slots, x, y) {
-  const isPastPointer = tagManagerState.view === "compact"
+  return firstSlotPast(slots, tagManagerState.view === "compact"
     ? (slot) => y < slot.top || (y < slot.bottom && x < slot.middleX)
-    : (slot) => y < slot.middleY;
-  let low = 0;
-  let high = slots.length;
-  while (low < high) {
-    const middle = Math.floor((low + high) / 2);
-    if (isPastPointer(slots[middle])) {
-      high = middle;
-    } else {
-      low = middle + 1;
-    }
-  }
-  return low;
+    : (slot) => y < slot.middleY);
 }
 
 function tagDropTarget(event) {
@@ -17767,70 +17833,10 @@ elements.searchNormalizationRuleList.addEventListener("click", (event) => {
     event.target.closest(".search-normalization-rule-card")?.remove();
   }
 });
-elements.toolNavOrderList.addEventListener("dragstart", (event) => {
-  const card = event.target.closest(".tool-order-card");
-  if (!card) {
-    return;
-  }
-  draggedToolNavView = card.dataset.view || "";
-  card.classList.add("dragging");
-  event.dataTransfer.effectAllowed = "move";
-  event.dataTransfer.setData("text/plain", draggedToolNavView);
-});
-elements.toolNavOrderList.addEventListener("dragover", (event) => {
-  event.preventDefault();
-  const dragging = elements.toolNavOrderList.querySelector(".tool-order-card.dragging");
-  if (!dragging) {
-    return;
-  }
-  const before = toolOrderInsertBefore(event.clientY);
-  if (before) {
-    elements.toolNavOrderList.insertBefore(dragging, before);
-  } else {
-    elements.toolNavOrderList.append(dragging);
-  }
-});
-elements.toolNavOrderList.addEventListener("dragend", () => {
-  elements.toolNavOrderList.querySelector(".tool-order-card.dragging")?.classList.remove("dragging");
-  draggedToolNavView = "";
-});
-elements.toolNavOrderList.addEventListener("drop", (event) => {
-  event.preventDefault();
-  elements.toolNavOrderList.querySelector(".tool-order-card.dragging")?.classList.remove("dragging");
-  draggedToolNavView = "";
-});
-elements.entrySectionOrderList.addEventListener("dragstart", (event) => {
-  const card = event.target.closest(".tool-order-card");
-  if (!card) {
-    return;
-  }
-  draggedEntrySectionId = card.dataset.entrySection || "";
-  card.classList.add("dragging");
-  event.dataTransfer.effectAllowed = "move";
-  event.dataTransfer.setData("text/plain", draggedEntrySectionId);
-});
-elements.entrySectionOrderList.addEventListener("dragover", (event) => {
-  event.preventDefault();
-  const dragging = elements.entrySectionOrderList.querySelector(".tool-order-card.dragging");
-  if (!dragging) {
-    return;
-  }
-  const before = entrySectionOrderInsertBefore(event.clientY);
-  if (before) {
-    elements.entrySectionOrderList.insertBefore(dragging, before);
-  } else {
-    elements.entrySectionOrderList.append(dragging);
-  }
-});
-elements.entrySectionOrderList.addEventListener("dragend", () => {
-  elements.entrySectionOrderList.querySelector(".tool-order-card.dragging")?.classList.remove("dragging");
-  draggedEntrySectionId = "";
-});
-elements.entrySectionOrderList.addEventListener("drop", (event) => {
-  event.preventDefault();
-  elements.entrySectionOrderList.querySelector(".tool-order-card.dragging")?.classList.remove("dragging");
-  draggedEntrySectionId = "";
-});
+setupListDragSort(elements.toolNavOrderList, { item: ".tool-order-card", onMove: syncToolNavOrderReset });
+setupListDragSort(elements.entrySectionOrderList, { item: ".tool-order-card", onMove: syncEntrySectionOrderReset });
+elements.toolNavOrderResetButton.addEventListener("click", () => renderToolNavOrderEditor());
+elements.entrySectionOrderResetButton.addEventListener("click", () => renderEntrySectionOrderEditor());
 elements.corpusModeControl.addEventListener("click", (event) => {
   const button = event.target.closest("[data-corpus-mode]");
   if (!button) {
@@ -18119,78 +18125,10 @@ elements.morphologyTableList.addEventListener("click", (event) => {
     applyMorphologyTableSizeChanges();
   }
 });
-elements.morphologyTableList.addEventListener("dragstart", (event) => {
-  const tableHandle = event.target.closest('[data-action="drag-morphology-table"]');
-  if (tableHandle) {
-    const tableCard = tableHandle.closest(".morphology-config-card");
-    if (!tableCard) {
-      event.preventDefault();
-      return;
-    }
-    draggedMorphologyTableId = tableCard.dataset.templateTableId || "";
-    tableCard.classList.add("dragging");
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", draggedMorphologyTableId);
-    event.stopPropagation();
-    return;
-  }
-  const groupHandle = event.target.closest('[data-action="drag-morphology-group"]');
-  const groupCard = groupHandle?.closest(".morphology-group-card");
-  if (!groupCard) {
-    event.preventDefault();
-    return;
-  }
-  draggedMorphologyGroupId = groupCard.dataset.templateGroupId || "";
-  groupCard.classList.add("dragging");
-  event.dataTransfer.effectAllowed = "move";
-  event.dataTransfer.setData("text/plain", draggedMorphologyGroupId);
-});
-elements.morphologyTableList.addEventListener("dragover", (event) => {
-  if (draggedMorphologyTableId) {
-    const dragging = elements.morphologyTableList.querySelector(".morphology-config-card.dragging");
-    const target = event.target.closest(".morphology-config-card");
-    const targetList = event.target.closest(".morphology-group-table-list");
-    if (!dragging || !targetList || dragging.parentElement !== targetList || target === dragging) {
-      return;
-    }
-    event.preventDefault();
-    if (target) {
-      const bounds = target.getBoundingClientRect();
-      targetList.insertBefore(dragging, event.clientY < bounds.top + bounds.height / 2 ? target : target.nextSibling);
-    } else {
-      targetList.append(dragging);
-    }
-    return;
-  }
-  if (!draggedMorphologyGroupId) {
-    return;
-  }
-  const dragging = elements.morphologyTableList.querySelector(".morphology-group-card.dragging");
-  const target = event.target.closest(".morphology-group-card");
-  const targetList = event.target.closest(".morphology-table-list");
-  if (!dragging || !targetList || target === dragging) {
-    return;
-  }
-  event.preventDefault();
-  if (target) {
-    const bounds = target.getBoundingClientRect();
-    targetList.insertBefore(dragging, event.clientY < bounds.top + bounds.height / 2 ? target : target.nextSibling);
-  } else {
-    targetList.append(dragging);
-  }
-});
-elements.morphologyTableList.addEventListener("dragend", () => {
-  elements.morphologyTableList.querySelectorAll(".morphology-group-card.dragging, .morphology-config-card.dragging")
-    .forEach((card) => card.classList.remove("dragging"));
-  draggedMorphologyGroupId = "";
-  draggedMorphologyTableId = "";
-});
-elements.morphologyTableList.addEventListener("drop", (event) => {
-  event.preventDefault();
-  elements.morphologyTableList.querySelectorAll(".morphology-group-card.dragging, .morphology-config-card.dragging")
-    .forEach((card) => card.classList.remove("dragging"));
-  draggedMorphologyGroupId = "";
-  draggedMorphologyTableId = "";
+// A table only moves within its group; each handle resolves to its nearest card.
+setupListDragSort(elements.morphologyTableList, {
+  item: ".morphology-config-card, .morphology-group-card",
+  handle: '[data-action="drag-morphology-table"], [data-action="drag-morphology-group"]',
 });
 elements.docsModeControl.addEventListener("click", (event) => {
   const button = event.target.closest("[data-doc-mode]");
@@ -18223,36 +18161,11 @@ elements.addIpaMappingButton.addEventListener("click", () => {
   addIpaRule(elements.ipaMappingList);
   renderIpaSandbox();
 });
-elements.ipaMappingList.addEventListener("dragstart", (event) => {
-  const handle = event.target.closest(".ipa-rule-drag-handle");
-  const card = handle?.closest(".ipa-rule-card");
-  if (!card) {
-    event.preventDefault();
-    return;
-  }
-  card.classList.add("dragging");
-  event.dataTransfer.effectAllowed = "move";
-  event.dataTransfer.setData("text/plain", "ipa-rule");
+setupListDragSort(elements.ipaMappingList, {
+  item: ".ipa-rule-card",
+  handle: ".ipa-rule-drag-handle",
+  onMove: renderIpaSandbox,
 });
-elements.ipaMappingList.addEventListener("dragover", (event) => {
-  const dragging = elements.ipaMappingList.querySelector(".ipa-rule-card.dragging");
-  if (!dragging) {
-    return;
-  }
-  event.preventDefault();
-  event.dataTransfer.dropEffect = "move";
-  const before = ipaRuleInsertBefore(elements.ipaMappingList, event.clientY);
-  if (before) {
-    elements.ipaMappingList.insertBefore(dragging, before);
-  } else {
-    elements.ipaMappingList.append(dragging);
-  }
-});
-elements.ipaMappingList.addEventListener("drop", (event) => {
-  event.preventDefault();
-  finishIpaRuleDrag();
-});
-elements.ipaMappingList.addEventListener("dragend", finishIpaRuleDrag);
 elements.ipaSandboxInput.addEventListener("input", renderIpaSandbox);
 elements.ipaForm.addEventListener("input", renderIpaSandbox);
 elements.ipaForm.addEventListener("click", (event) => {
