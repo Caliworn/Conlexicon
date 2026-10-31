@@ -1151,6 +1151,42 @@ function checkModelNormalization() {
     ipaModel.ipaPipelinePreview("kata t͡ɕa", { syllable: { vowels: "a", complexPhonemes: "t͡ɕ" }, defaultStress: 0 }),
     { mapped: "kata t͡ɕa", syllables: "ka.ta t͡ɕa", final: "/ka.ta t͡ɕa/" },
   );
+  const mappedIpa = (lemma, mappings, defaultStress = 0) => ipaModel.applyIpaMappings(lemma, { mappings, defaultStress }).output;
+  assert.equal(
+    mappedIpa("chat", [{ from: "c", to: "k" }, { from: "ch", to: "tɕ" }]),
+    "tɕat",
+    "the longest input wins regardless of list order",
+  );
+  assert.equal(
+    mappedIpa("ana", [{ from: "n", to: "n" }, { from: "n", to: "ŋ", after: "a" }]),
+    "aŋa",
+    "a rule with a context beats the same input without one",
+  );
+  assert.equal(
+    mappedIpa("anan", [{ from: "an", to: "X", after: "x" }, { from: "a", to: "A" }]),
+    "AnAn",
+    "a longer input whose context fails falls back to a shorter input",
+  );
+  assert.equal(
+    mappedIpa("ana", [{ from: "n", to: "1", before: "a" }, { from: "n", to: "2", after: "a" }]),
+    "a1a",
+    "list order decides only between rules that both have contexts",
+  );
+  const stressedIpa = (lemma, to, syllable = {}) => ipaModel.generateIpaFromLemma(lemma, {
+    mappings: [{ from: "X", to }],
+    syllable: { vowels: "a", separator: ".", ...syllable },
+    defaultStress: 0,
+    unstressMonosyllables: false,
+  });
+  assert.equal(stressedIpa("kaXka", "taˈ"), "/ka.ˈta.ka/", "a trailing mark stays on the rule's own syllable");
+  assert.equal(stressedIpa("kaXkkkka", "taˈ"), "/ka.ˈtakk.kka/");
+  assert.equal(stressedIpa("kaXkka", "taˈ", { onsetClusters: "kk" }), "/ka.ˈta.kka/");
+  assert.equal(stressedIpa("kaXa", "tanˈ"), "/ka.ˈta.na/", "the mark anchors on the nucleus, not a consonant that moves on");
+  assert.equal(stressedIpa("kaXka", "tˈa"), "/ka.ˈta.ka/");
+  assert.equal(stressedIpa("kaXa", "taˈka"), "/ka.ta.ˈka.a/", "a mark inside the output keeps its position");
+  const reusedIpaSettings = { mappings: [{ from: "a", to: "o" }], syllable: { vowels: "a o" }, defaultStress: 0 };
+  assert.equal(ipaModel.generateIpaFromLemma("ta", reusedIpaSettings), "/to/");
+  assert.equal(ipaModel.generateIpaFromLemma("ta", ipaModel.normalizeIpaSettings(reusedIpaSettings)), "/to/");
   assert.deepEqual(
     ipaModel.phonemeUnits({ vowels: "a ə̃", complexPhonemes: ["t͡s"] }),
     ["t͡s", "ə̃"],

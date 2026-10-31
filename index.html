@@ -1094,7 +1094,7 @@
                   </div>
                   <button class="secondary-button" data-control-tone="accent" data-control-emphasis="outline" id="addIpaMappingButton" type="button" data-i18n="addMapping">添加映射</button>
                 </div>
-                <p class="field-help" data-i18n="mappingRuleHelp">规则从上到下匹配；输入与前后条件始终只读取原始词形，生成结果不会被后续规则再次读取。较前规则消耗的字符不会再参与后续匹配，可拖动规则调整优先级。输出中写入 ˈ 或以 ' 开头，可将该音节标为重读并覆盖默认重音。</p>
+                <p class="field-help" data-i18n="mappingRuleHelp">匹配时从词形左侧开始，优先使用输入最长的规则；输入相同时，带前后条件的规则优先，都带条件时才按列表顺序。输入与前后条件始终只读取原始词形，生成结果不会被后续规则再次读取，已匹配的字符也不会再参与匹配。输出中写入 ˈ 或以 ' 开头，可将该音节标为重读并覆盖默认重音；ˈ 写在输出末尾时，重读落在这条规则自己的元音所在音节。</p>
                 <div class="ipa-rule-header" aria-hidden="true">
                   <span></span>
                   <span data-i18n="ruleFrom">输入</span>
