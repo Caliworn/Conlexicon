@@ -483,7 +483,7 @@
         <section class="view" id="analysisView" data-i18n-aria-label="analysis" aria-label="数据分析">
           <section class="top-bar">
             <div>
-              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <p class="eyebrow dictionary-name-eyebrow" data-active-dictionary-name></p>
               <h2 data-i18n="analysis">数据分析</h2>
             </div>
           </section>
@@ -501,7 +501,7 @@
         <section class="view" id="qualityView" data-i18n-aria-label="qualityCheck" aria-label="质量检查">
           <section class="top-bar">
             <div>
-              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <p class="eyebrow dictionary-name-eyebrow" data-active-dictionary-name></p>
               <h2 data-i18n="qualityCheck">质量检查</h2>
             </div>
           </section>
@@ -519,7 +519,7 @@
         <section class="view" id="settingsView" data-i18n-aria-label="otherSettings" aria-label="其他设置">
           <section class="top-bar">
             <div>
-              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <p class="eyebrow dictionary-name-eyebrow" data-active-dictionary-name></p>
               <h2 data-i18n="otherSettings">其他设置</h2>
             </div>
           </section>
@@ -817,7 +817,7 @@
         <section class="view" id="docsView" data-i18n-aria-label="languageDocs" aria-label="语言文档">
           <section class="top-bar">
             <div>
-              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <p class="eyebrow dictionary-name-eyebrow" data-active-dictionary-name></p>
               <h2 data-i18n="languageDocs">语言文档</h2>
             </div>
             <div class="top-actions">
@@ -848,7 +848,7 @@
         <section class="view" id="corpusView" data-i18n-aria-label="corpus" aria-label="语料库">
           <section class="top-bar">
             <div>
-              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <p class="eyebrow dictionary-name-eyebrow" data-active-dictionary-name></p>
               <h2 data-i18n="corpus">语料库</h2>
             </div>
             <div class="top-actions">
@@ -892,7 +892,7 @@
         <section class="view" id="morphologyFunctionsView" data-i18n-aria-label="morphologyFunctions" aria-label="形态函数">
           <section class="top-bar">
             <div>
-              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <p class="eyebrow dictionary-name-eyebrow" data-active-dictionary-name></p>
               <h2 data-i18n="morphologyFunctions">形态函数</h2>
             </div>
           </section>
@@ -932,7 +932,7 @@
         <section class="view" id="morphologyTablesView" data-i18n-aria-label="morphologyTables" aria-label="形态表格">
           <section class="top-bar">
             <div>
-              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <p class="eyebrow dictionary-name-eyebrow" data-active-dictionary-name></p>
               <div class="heading-line morphology-page-title">
                 <h2 data-i18n="morphologyTables">形态表格</h2>
                 <button class="info-button" id="morphologySyntaxButton" data-control-tone="neutral" type="button" data-app-tooltip="always" data-i18n-aria-label="morphologySyntaxInfo" aria-label="形态语法">i</button>
@@ -963,7 +963,7 @@
         <section class="view" id="tagsView" data-i18n-aria-label="tagManager" aria-label="标签">
           <section class="top-bar">
             <div>
-              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <p class="eyebrow dictionary-name-eyebrow" data-active-dictionary-name></p>
               <h2 data-i18n="tagManager">标签</h2>
               <p class="tag-manager-summary" id="tagManagerSummary"></p>
             </div>
@@ -997,9 +997,9 @@
                 </div>
               </div>
               <div class="tag-display-group">
-                <h4 data-i18n="tagDisplayGroupInput">输入</h4>
+                <h4 data-i18n="tagDisplayGroupInput">标签输入</h4>
                 <label>
-                  <span data-i18n="tagListSeparator">标签列表分隔符</span>
+                  <span data-i18n="tagListSeparator">分隔符</span>
                   <select id="tagListSeparatorStyleInput" data-tag-pref="tagListSeparatorStyle">
                     <option value="commaSpace" data-i18n="tagListSeparatorCommaSpace">半角逗号和空格（n, v）</option>
                     <option value="fullwidthComma" data-i18n="tagListSeparatorFullwidthComma">全角逗号（n，v）</option>
@@ -1054,7 +1054,7 @@
         <section class="view" id="ipaView" data-i18n-aria-label="ipaConfig" aria-label="IPA">
           <section class="top-bar">
             <div>
-              <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
+              <p class="eyebrow dictionary-name-eyebrow" data-active-dictionary-name></p>
               <h2 data-i18n="ipaConfig">IPA</h2>
             </div>
             <div class="top-actions">
@@ -1076,7 +1076,6 @@
               <section class="settings-section" data-surface="content-shell">
                 <div class="form-heading compact-heading">
                   <div>
-                    <p class="eyebrow" data-i18n="orthographyModule">正写法识别</p>
                     <div class="heading-line">
                       <h3 data-i18n="mappingRules">映射规则</h3>
                       <button class="info-button" id="ipaMappingHelpButton" data-control-tone="neutral" type="button" data-app-tooltip="always" data-i18n-aria-label="ipaMappingHelpInfo" aria-label="查看映射规则说明">i</button>
@@ -1098,7 +1097,6 @@
               <section class="settings-section" data-surface="content-shell">
                 <div class="form-heading compact-heading">
                   <div>
-                    <p class="eyebrow" data-i18n="syllabification">音节划分</p>
                     <div class="heading-line">
                       <h3 data-i18n="syllableRules">音节规则</h3>
                       <button class="info-button" id="ipaSyllableHelpButton" data-control-tone="neutral" type="button" data-app-tooltip="always" data-i18n-aria-label="ipaSyllableHelpInfo" aria-label="音节划分逻辑">i</button>
@@ -1133,14 +1131,14 @@
                 <section class="settings-section" data-surface="content-shell">
                   <div class="form-heading compact-heading">
                     <div>
-                      <p class="eyebrow" data-i18n="defaultStressPosition">默认重音位置</p>
                       <h3 data-i18n="stressRules">重音规则</h3>
                     </div>
                   </div>
                   <label>
-                    <span data-i18n="defaultStressHelp">整数。正数为正数第几音节，负数为倒数第几音节；0 表示不标默认重音。词更短时落在可达到的最远位置。</span>
-                    <input id="ipaDefaultStressInput" type="text" inputmode="numeric">
+                    <span data-i18n="defaultStressPosition">默认重音位置</span>
+                    <input id="ipaDefaultStressInput" type="text" inputmode="numeric" aria-describedby="ipaDefaultStressHelp">
                   </label>
+                  <p class="field-help" id="ipaDefaultStressHelp" data-i18n="defaultStressHelp">整数。正数为正数第几音节，负数为倒数第几音节；0 表示不标默认重音。词更短时落在可达到的最远位置。</p>
                   <label class="toggle-row">
                     <span data-i18n="unstressMonosyllables">单音节词不标重音</span>
                     <input id="ipaUnstressMonosyllablesInput" type="checkbox">
@@ -1149,15 +1147,11 @@
                 <section class="settings-section" data-surface="content-shell">
                   <div class="form-heading compact-heading">
                     <div>
-                      <p class="eyebrow">IPA</p>
                       <h3 data-i18n="ipaKeyboardSettings">IPA 虚拟键盘</h3>
                     </div>
                   </div>
-                  <label>
-                    <span data-i18n="ipaKeyboardSymbols">键盘符号</span>
-                    <textarea id="ipaKeyboardInput" rows="3"></textarea>
-                  </label>
-                  <p class="field-help" data-i18n="ipaKeyboardHelp">以空格、逗号或换行分隔。新词典默认包含 ˈ、ˌ 和 t͡s 里的连接符。</p>
+                  <textarea id="ipaKeyboardInput" rows="3" data-i18n-aria-label="ipaKeyboardSymbols" aria-label="键盘符号" aria-describedby="ipaKeyboardHelp"></textarea>
+                  <p class="field-help" id="ipaKeyboardHelp" data-i18n="ipaKeyboardHelp">以空格、逗号或换行分隔。</p>
                 </section>
               </div>
 
@@ -1169,7 +1163,6 @@
             <aside class="settings-section ipa-sandbox-panel" data-surface="content-shell">
               <div class="form-heading compact-heading">
                 <div>
-                  <p class="eyebrow">Sandbox</p>
                   <h3 data-i18n="ipaSandbox">IPA 沙盒</h3>
                 </div>
               </div>

@@ -57,7 +57,7 @@
 
 ## 5. 显示面板
 
-面板编辑八项标签显示偏好（`tagListSeparatorStyle`、`entryListTagDisplayLimit`、`entryListTagsIncludeParts`、`entryListTagFiltering`、`entryListRawTagDisplay`、`entryListRawPartDisplay`、`filterMenuRawTagDisplay`、`entryHoverCardRawTagDisplay`），它们存于 settings，不是逐个标签的数据。
+面板分为标签输入、词条列表、筛选菜单和词条悬浮卡片四组，分组之间用分隔线隔开。面板编辑八项标签显示偏好（`tagListSeparatorStyle`、`entryListTagDisplayLimit`、`entryListTagsIncludeParts`、`entryListTagFiltering`、`entryListRawTagDisplay`、`entryListRawPartDisplay`、`filterMenuRawTagDisplay`、`entryHoverCardRawTagDisplay`），它们存于 settings，不是逐个标签的数据。
 
 - 开关和下拉框改动后立即保存，以 `PUT /settings` 发送只含该字段的请求体。
 - 标签显示上限按 `Enter` 或失焦保存，超出 2–10 时就地提示并还原。

@@ -336,6 +336,11 @@ body.english-locale .brand-row h1 {
   text-transform: uppercase;
 }
 
+.dictionary-name-eyebrow {
+  overflow-wrap: anywhere;
+  text-transform: none;
+}
+
 .dictionary-panel .eyebrow {
   color: var(--material-navigation-muted);
 }
@@ -3723,10 +3728,16 @@ span.pending-source {
   min-width: 0;
 }
 
+.tag-display-group + .tag-display-group {
+  padding-top: 14px;
+  border-top: 1px solid var(--ui-border);
+}
+
 .tag-display-group h4 {
-  margin: 4px 0 0;
-  color: var(--ui-text-muted);
-  font-size: 0.9rem;
+  margin: 0;
+  color: var(--ui-text);
+  font-size: 0.95rem;
+  font-weight: 800;
 }
 
 .tag-display-group label {

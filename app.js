@@ -559,7 +559,6 @@ const i18n = {
     sourceBindingConflict: "原来源已变化或已删除，未创建词条。请返回原词条后重新发起。",
     addSource: "输入或搜索来源",
     etymologyDescription: "说明",
-    dictionarySettingsEyebrow: "当前词典",
     settingsNeedDictionary: "其他设置会保存到当前词典文件中。",
     corpusRendering: "渲染",
     corpusRenderPattern: "渲染对象",
@@ -696,7 +695,7 @@ const i18n = {
     tagManagerDeleteTitle: "删除标签",
     tagManagerDeleteConfirm: "确定从登记表删除标签「{tag}」吗？",
     tagManagerViewInManager: "在标签管理中查看",
-    tagDisplayGroupInput: "输入",
+    tagDisplayGroupInput: "标签输入",
     tagDisplayGroupList: "词条列表",
     tagDisplayGroupFilter: "筛选菜单",
     tagDisplayGroupHover: "词条悬浮卡片",
@@ -706,7 +705,7 @@ const i18n = {
     tagDisplayRawTags: "标签行显示原始标签",
     tagDisplayRawParts: "词性文本显示原始标签",
     tagDisplayRaw: "显示原始标签",
-    tagListSeparator: "标签列表分隔符",
+    tagListSeparator: "分隔符",
     tagListSeparatorHelp: "选择各标签输入框显示多个标签时使用的分隔符。无论选择哪项，输入时均可使用半角逗号、全角逗号或顿号。",
     tagListSeparatorCommaSpace: "半角逗号和空格（n, v）",
     tagListSeparatorFullwidthComma: "全角逗号（n，v）",
@@ -724,7 +723,7 @@ const i18n = {
     entrySectionOrderHelp: "拖动卡片，或聚焦卡片后按 Alt+↑/↓，以调整词条详情和完整编辑中栏目顺序。衍生词只在有内容时显示，且不可在完整编辑中修改。",
     ipaKeyboardSettings: "IPA 虚拟键盘",
     ipaKeyboardSymbols: "键盘符号",
-    ipaKeyboardHelp: "以空格、逗号或换行分隔。新词典默认包含 ˈ、ˌ 和 t͡s 里的连接符。",
+    ipaKeyboardHelp: "以空格、逗号或换行分隔。",
     toolNavigationOrder: "工具导航排序",
     toolNavigationOrderHelp: "拖动卡片，或聚焦卡片后按 Alt+↑/↓，来调整左侧导航栏顺序。该顺序保存到当前词典文件中。",
     cancel: "取消",
@@ -829,13 +828,11 @@ const i18n = {
     source: "来源",
     derivedEntries: "衍生",
     ipaNeedDictionary: "IPA 设置会保存到当前词典文件中。",
-    orthographyModule: "正写法识别",
     mappingRules: "映射规则",
     addMapping: "添加映射",
     ipaMappingHelpTitle: "映射规则说明",
     ipaMappingHelpInfo: "查看映射规则说明",
     ipaMappingHelpBody: "匹配顺序：从词形左侧开始，优先使用输入最长的规则；输入相同时，带前后条件的规则优先；都带条件时才按列表顺序。已匹配的字符不会再参与匹配，没有规则匹配的字符原样保留。\n\n读取范围：输入与前后条件始终只读取原始词形，生成结果不会被后续规则再次读取。\n\n前后条件：支持正则表达式，内容紧贴规则位置匹配。例如 a|b 或 [ab] 表示 a 或 b，(?!a) 表示后面不是 a；前接条件写 ^ 表示词形开头，后接条件写 $ 表示词形结尾。前后条件都填写时必须同时满足。正则写错时按普通文字匹配。\n\n重音写法：在规则输出中写入 ˈ，或让输出以 ' 开头，可把对应音节标为重读，并覆盖默认重音。只有规则的输出才算：词形里直接写的 ˈ 不算，不在开头的 ' 是普通字符，次重音 ˌ 不处理。\n\n重音位置：标记不影响音节切分，切分完成后 ˈ 写在目标音节开头。ˈ 永远标它后面那个字符所在的音节，这个字符可以不属于这条规则；后面没有字符时标最后一个音节。\n\n重音数量：一个词条只有一个重音，有多处标记时取第一处，含空格的词条也一样。开启“单音节词不标重音”后，单音节词条不标重音，规则里写的重音也会被忽略。",
-    syllabification: "音节划分",
     syllableRules: "音节规则",
     ipaSyllableHelpTitle: "音节划分逻辑",
     ipaSyllableHelpInfo: "查看音节划分逻辑",
@@ -1201,7 +1198,6 @@ const i18n = {
     sourceBindingConflict: "The original source changed or was deleted. No entry was created. Return to the original entry and try again.",
     addSource: "Type or search for a source",
     etymologyDescription: "Description",
-    dictionarySettingsEyebrow: "Current Dictionary",
     settingsNeedDictionary: "Settings are saved in the current dictionary file.",
     corpusRendering: "Rendering",
     corpusRenderPattern: "Render Objects",
@@ -1338,7 +1334,7 @@ const i18n = {
     tagManagerDeleteTitle: "Delete Tag",
     tagManagerDeleteConfirm: "Delete the tag “{tag}” from the registry?",
     tagManagerViewInManager: "View in Tags",
-    tagDisplayGroupInput: "Input",
+    tagDisplayGroupInput: "Tag Input",
     tagDisplayGroupList: "Entry List",
     tagDisplayGroupFilter: "Filter Menu",
     tagDisplayGroupHover: "Entry Hover Card",
@@ -1348,7 +1344,7 @@ const i18n = {
     tagDisplayRawTags: "Show raw tags in the tag row",
     tagDisplayRawParts: "Show raw tags in part-of-speech text",
     tagDisplayRaw: "Show raw tags",
-    tagListSeparator: "Tag List Separator",
+    tagListSeparator: "Separator",
     tagListSeparatorHelp: "Choose the separator used to display multiple tags in tag input fields. Regardless of this choice, input accepts halfwidth commas, fullwidth commas, or ideographic commas.",
     tagListSeparatorCommaSpace: "Comma and space (n, v)",
     tagListSeparatorFullwidthComma: "Fullwidth comma (n，v)",
@@ -1366,7 +1362,7 @@ const i18n = {
     entrySectionOrderHelp: "Drag cards, or focus one and press Alt+Up/Down, to reorder sections in entry display and full editing. Derived entries appear only when present and remain read-only in full editing.",
     ipaKeyboardSettings: "IPA Virtual Keyboard",
     ipaKeyboardSymbols: "Keyboard Symbols",
-    ipaKeyboardHelp: "Separate symbols with spaces, commas, or line breaks. New dictionaries include ˈ, ˌ, and the tie bar used in t͡s by default.",
+    ipaKeyboardHelp: "Separate symbols with spaces, commas, or line breaks.",
     toolNavigationOrder: "Tool Navigation Order",
     toolNavigationOrderHelp: "Drag cards, or focus one and press Alt+Up/Down, to reorder the left navigation. The order is saved in the current dictionary file.",
     cancel: "Cancel",
@@ -1475,13 +1471,11 @@ const i18n = {
     createSourceEntry: "Create Source Entry: {source}",
     derivedEntries: "Derived",
     ipaNeedDictionary: "IPA settings are saved in the current dictionary file.",
-    orthographyModule: "Orthography Recognition",
     mappingRules: "Mapping Rules",
     addMapping: "Add Mapping",
     ipaMappingHelpTitle: "Mapping Rules",
     ipaMappingHelpInfo: "Show mapping rule details",
     ipaMappingHelpBody: "Matching order: matching starts at the left of the lemma and prefers the rule with the longest input. For equal inputs, rules with contexts come first, and list order only decides between rules that both have contexts. Matched characters are not matched again, and characters no rule matches stay as they are.\n\nWhat rules read: inputs and contexts always read the original lemma; generated output is never fed into later rules.\n\nContexts: contexts are regular expressions matched right next to the rule's position. For example, a|b or [ab] means a or b, and (?!a) means not followed by a. Use ^ in the preceding context for the start of the lemma, and $ in the following context for its end. When both contexts are filled in, both must match. An invalid expression is matched as plain text.\n\nStress marks: put ˈ in a rule's output, or start the output with ', to mark the matching syllable as stressed and override default stress. Only rule outputs count: a ˈ typed in the lemma does not, a ' anywhere but the start is an ordinary character, and secondary stress ˌ is not processed.\n\nStress position: marks do not affect syllabification, and ˈ is written at the start of the target syllable afterwards. A ˈ always marks the syllable of the character after it, even when that character comes from outside the rule; with nothing after it, ˈ marks the last syllable.\n\nNumber of stresses: an entry has one stress, and the first mark wins, including in entries with spaces. With “Do not mark stress on monosyllables” on, single-syllable entries take no stress, even when a rule marks one.",
-    syllabification: "Syllabification",
     syllableRules: "Syllabification Rules",
     ipaSyllableHelpTitle: "Syllabification Logic",
     ipaSyllableHelpInfo: "Show syllabification logic",
@@ -4078,6 +4072,10 @@ function renderToolNav() {
 function renderHeader() {
   const dictionary = activeDictionary();
   elements.entryListNewEntryButton.disabled = !dictionary;
+  document.querySelectorAll("[data-active-dictionary-name]").forEach((eyebrow) => {
+    eyebrow.textContent = dictionary?.name || "";
+    eyebrow.hidden = !dictionary;
+  });
 
   if (!backendAvailable) {
     elements.dictionaryTitle.textContent = t("backendOffline");
