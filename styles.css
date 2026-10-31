@@ -3757,6 +3757,16 @@ span.pending-source {
   min-width: 0;
 }
 
+.ipa-compact-sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 18px;
+}
+
+.ipa-compact-sections .settings-section {
+  align-content: start;
+}
+
 .ipa-sandbox-panel {
   position: sticky;
   top: 24px;
@@ -3781,7 +3791,6 @@ span.pending-source {
   padding: 10px 12px;
   background: var(--material-panel-background);
   color: var(--ui-text);
-  font-family: var(--font-phonetic);
   font-weight: 800;
   overflow-wrap: anywhere;
 }
@@ -5342,12 +5351,14 @@ button.analysis-bar-label:hover,
   height: 44px;
 }
 
-textarea.ipa-single-line,
-#ipaKeyboardInput {
+#pronunciationInput,
+.inline-partial-edit-form [data-field="pronunciation"],
+#ipaView textarea,
+.ipa-sandbox-output output {
   font-family: var(--font-phonetic);
 }
 
-textarea.ipa-single-line::placeholder {
+#ipaView textarea::placeholder {
   font-family: var(--font-ui);
 }
 

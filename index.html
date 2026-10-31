@@ -94,7 +94,7 @@
           </button>
           <button class="tool-button" type="button" data-view="ipa" data-i18n-aria-label="ipaConfig">
             <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 10v4M7 7v10M11 4v16M15 8v8M19 6v12M23 10v4"></path></svg></span>
-            <span class="tool-label" data-i18n="ipaConfig">自动 IPA 标注</span>
+            <span class="tool-label" data-i18n="ipaConfig">IPA</span>
           </button>
           <button class="tool-button" type="button" data-view="tags" data-i18n-aria-label="tagManager">
             <span class="tool-icon" aria-hidden="true"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.7 8.7a2.4 2.4 0 0 0 3.4 0l6.6-6.6a2.4 2.4 0 0 0 0-3.4Z"></path><circle cx="7.5" cy="7.5" r="1"></circle></svg></span>
@@ -807,19 +807,6 @@
                   <input id="docsAutoSaveInput" type="checkbox">
                 </label>
               </section>
-              <section class="settings-section" data-surface="content-shell">
-                <div class="form-heading compact-heading">
-                  <div>
-                    <p class="eyebrow">IPA</p>
-                    <h3 data-i18n="ipaKeyboardSettings">IPA 虚拟键盘</h3>
-                  </div>
-                </div>
-                <label>
-                  <span data-i18n="ipaKeyboardSymbols">键盘符号</span>
-                  <textarea id="ipaKeyboardInput" rows="3"></textarea>
-                </label>
-                <p class="field-help" data-i18n="ipaKeyboardHelp">以空格、逗号或换行分隔。新词典默认包含 ˈ、ˌ 和 t͡s 里的连接符。</p>
-              </section>
               <div class="form-actions">
                 <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" type="submit" data-i18n="saveConfig">保存配置</button>
               </div>
@@ -1064,11 +1051,11 @@
           </section>
         </section>
 
-        <section class="view" id="ipaView" data-i18n-aria-label="ipaConfig" aria-label="自动 IPA 标注">
+        <section class="view" id="ipaView" data-i18n-aria-label="ipaConfig" aria-label="IPA">
           <section class="top-bar">
             <div>
               <p class="eyebrow" data-i18n="dictionarySettingsEyebrow">当前词典</p>
-              <h2 data-i18n="ipaConfig">自动 IPA 标注</h2>
+              <h2 data-i18n="ipaConfig">IPA</h2>
             </div>
             <div class="top-actions">
               <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="batchIpaMissingButton" type="button" data-i18n="batchIpaMissing">补全空发音</button>
@@ -1079,7 +1066,7 @@
           <section class="notice-panel" id="ipaNoDictionaryNotice" hidden>
             <p class="eyebrow" data-i18n="noDictionary">尚未创建词典</p>
             <h3 data-i18n="createDictionaryFirst">先创建一个词典</h3>
-            <p data-i18n="ipaNeedDictionary">自动 IPA 标注规则会保存到当前词典文件中。</p>
+            <p data-i18n="ipaNeedDictionary">IPA 设置会保存到当前词典文件中。</p>
             <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="ipaOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
           </section>
 
@@ -1090,11 +1077,13 @@
                 <div class="form-heading compact-heading">
                   <div>
                     <p class="eyebrow" data-i18n="orthographyModule">正写法识别</p>
-                    <h3 data-i18n="mappingRules">映射规则</h3>
+                    <div class="heading-line">
+                      <h3 data-i18n="mappingRules">映射规则</h3>
+                      <button class="info-button" id="ipaMappingHelpButton" data-control-tone="neutral" type="button" data-app-tooltip="always" data-i18n-aria-label="ipaMappingHelpInfo" aria-label="查看映射规则说明">i</button>
+                    </div>
                   </div>
                   <button class="secondary-button" data-control-tone="accent" data-control-emphasis="outline" id="addIpaMappingButton" type="button" data-i18n="addMapping">添加映射</button>
                 </div>
-                <p class="field-help" data-i18n="mappingRuleHelp">匹配时从词形左侧开始，优先使用输入最长的规则；输入相同时，带前后条件的规则优先，都带条件时才按列表顺序。输入与前后条件始终只读取原始词形，生成结果不会被后续规则再次读取，已匹配的字符也不会再参与匹配。输出中写入 ˈ 或以 ' 开头，可将该音节标为重读并覆盖默认重音；ˈ 写在输出末尾时，重读落在这条规则自己的元音所在音节。</p>
                 <div class="ipa-rule-header" aria-hidden="true">
                   <span></span>
                   <span data-i18n="ruleFrom">输入</span>
@@ -1140,22 +1129,37 @@
                 </div>
               </section>
 
-              <section class="settings-section" data-surface="content-shell">
-                <div class="form-heading compact-heading">
-                  <div>
-                    <p class="eyebrow" data-i18n="defaultStressPosition">默认重音位置</p>
-                    <h3 data-i18n="stressRules">重音规则</h3>
+              <div class="ipa-compact-sections">
+                <section class="settings-section" data-surface="content-shell">
+                  <div class="form-heading compact-heading">
+                    <div>
+                      <p class="eyebrow" data-i18n="defaultStressPosition">默认重音位置</p>
+                      <h3 data-i18n="stressRules">重音规则</h3>
+                    </div>
                   </div>
-                </div>
-                <label>
-                  <span data-i18n="defaultStressHelp">整数。正数为正数第几音节，负数为倒数第几音节；0 表示不标默认重音。词更短时落在可达到的最远位置。</span>
-                  <input id="ipaDefaultStressInput" type="text" inputmode="numeric">
-                </label>
-                <label class="toggle-row">
-                  <span data-i18n="unstressMonosyllables">单音节词不标重音</span>
-                  <input id="ipaUnstressMonosyllablesInput" type="checkbox">
-                </label>
-              </section>
+                  <label>
+                    <span data-i18n="defaultStressHelp">整数。正数为正数第几音节，负数为倒数第几音节；0 表示不标默认重音。词更短时落在可达到的最远位置。</span>
+                    <input id="ipaDefaultStressInput" type="text" inputmode="numeric">
+                  </label>
+                  <label class="toggle-row">
+                    <span data-i18n="unstressMonosyllables">单音节词不标重音</span>
+                    <input id="ipaUnstressMonosyllablesInput" type="checkbox">
+                  </label>
+                </section>
+                <section class="settings-section" data-surface="content-shell">
+                  <div class="form-heading compact-heading">
+                    <div>
+                      <p class="eyebrow">IPA</p>
+                      <h3 data-i18n="ipaKeyboardSettings">IPA 虚拟键盘</h3>
+                    </div>
+                  </div>
+                  <label>
+                    <span data-i18n="ipaKeyboardSymbols">键盘符号</span>
+                    <textarea id="ipaKeyboardInput" rows="3"></textarea>
+                  </label>
+                  <p class="field-help" data-i18n="ipaKeyboardHelp">以空格、逗号或换行分隔。新词典默认包含 ˈ、ˌ 和 t͡s 里的连接符。</p>
+                </section>
+              </div>
 
               <div class="form-actions">
                 <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" type="submit" data-i18n="saveConfig">保存配置</button>

@@ -19,7 +19,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - **Browsing and filtering**: large lists and root mode load in windows behind one continuous scrollbar. Search supports per-field strict or fuzzy matching, optional NFC and case folding, and custom equivalence rules. Part-of-speech, analysis, and quality-check filters share one filter bar and keep the current search, sort, and position.
 - **Root mode**: derived entries are grouped under their roots, with per-group and global expand/collapse and quick derived-entry creation.
 - **Lexical network**: a layered SVG view of sources and derived entries, with animated refocusing, hover details, keyboard support, and a vertical layout on narrow screens.
-- **Auto IPA**: mapping, syllabification, onset/coda clusters, multi-character phonemes, stress settings, a sandbox, and batch generation.
+- **Auto IPA**: mapping, syllabification, onset/coda clusters, multi-character phonemes, stress settings, the IPA keyboard, a sandbox, and batch generation.
 - **Auto morphology**: template groups with multiple tables, automatic or manual group selection per entry, rule syntax, function objects, overrides, and searchable generated forms.
 - **Language documentation**: Markdown with split, edit-only, and preview-only modes.
 - **Corpus**: ordered blocks, speaker/modality layers, standalone units, inherited attributes, ID and parent-link validation, and gloss-based unit names.
@@ -41,14 +41,14 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - **词根模式**：衍生词按词根分组显示，支持单组和全局展开／收起，以及快速新建衍生词。
 - **词汇网络**：以分层 SVG 展示来源与衍生关系，切换焦点时连续过渡，支持悬浮详情、键盘操作和窄屏纵向布局。
 - **字体**：界面使用随项目附带的 Noto Sans，词条详情、编辑框和 Gloss 的衬线选项使用随项目附带的 Charis SIL，音标和调字母在任何系统上显示一致。两者都采用 SIL Open Font License，见 `assets/fonts/` 下各目录的 `OFL.txt`。
-- **自动 IPA**：映射、音节划分、音节首／尾辅音簇、多字符音位、重音设置、沙盒测试和批量生成。
+- **自动 IPA**：映射、音节划分、音节首／尾辅音簇、多字符音位、重音设置、IPA 虚拟键盘、沙盒测试和批量生成。
 - **自动形态学**：模板组及组内多个表格、词条级自动或手动选择形态组、规则语法、函数识别对象、覆盖项，以及可搜索的生成形式。
 - **语言文档**：Markdown，支持分栏、纯编辑和纯预览模式。
 - **语料库**：有序语料块、发言人／模态语料层、独立语料单元、属性继承、ID 与父级链接校验，以及基于 Gloss 的单元名。
 - **Gloss 渲染**：支持 `\gla`、`\glb`、`\glc`、`\ft`；语料单元卡片、单元标题和词条例句分别设置，并可逐行配置字体、字号、粗体、斜体以及 `\glb` small caps。
 - **数据分析**：按需加载的总览（词汇规模、资料覆盖、词性分布、编辑活动），以及标签与标签集合排行、多词性词条与词性组合、词根家族、正写法、IPA 检查与分布、形态统计；多数统计项可直接打开对应词条。质量检查有独立页面，按优先度和检查模块分组。
 - **标签**：独立的标签管理页，用一张有序的登记表管理词性、显示名、红色强调和所有标签的顺序，每次改动立即保存。标签很多时可切换到压缩视图，一行显示多个标签，专门用来拖动排序；每个标签的操作在右键菜单或 ⋯ 按钮里。词性区永远在普通标签之前；新标签保存词条时自动登记，未使用的标签显示为灰色，在用标签不能删除。词条列表、筛选菜单和悬浮卡片的标签显示选项也在这一页。
-- **设置**：默认搜索方式、Gloss 渲染、导航时未保存编辑的处理方式、自动保存、IPA 键盘符号和导航排序。
+- **设置**：默认搜索方式、Gloss 渲染、导航时未保存编辑的处理方式、自动保存和导航排序。
 - **外观**：经典、层叠玻璃和液态玻璃三套皮肤，浅色与深色主题，中英文界面；全局皮肤、主题和语言记忆在 `data/index.json` 中。液态玻璃仍在调校中，光学效果不可用或开启辅助模式时会退回普通材质。
 - **布局**：响应式外壳，导航和词条列表均可收起，移动端使用抽屉。词条列表工具栏的“+”（列表收起时在列表开关旁，移动端在顶栏）打开快速录入：浮层中逐行填写词形、发音、标签和释义（底栏的“释义标签”开关可在每条释义前加一行释义标签），提交后留在浮层并开始下一条草稿，不离开当前词条；“完整编辑”把草稿带入完整编辑器，用于补充来源、例句、备注或形态学。其他页面通过导航返回词条编辑。
 
@@ -129,7 +129,7 @@ data/dictionaries/*.sqlite   one file per dictionary: content and settings
 
 The `data/` directory is ignored by Git so personal dictionaries are never committed.
 
-Since 2026-10-30, Auto IPA vowel phonemes must be separated by spaces or commas. Legacy JSON is converted on import; for an existing dictionary, retype the vowels on the Auto IPA page (for example `a e i o u`), otherwise the joined vowels count as one item and nothing is syllabified.
+Since 2026-10-30, Auto IPA vowel phonemes must be separated by spaces or commas. Legacy JSON is converted on import; for an existing dictionary, retype the vowels on the IPA page (for example `a e i o u`), otherwise the joined vowels count as one item and nothing is syllabified.
 
 The SQLite schema is not versioned or upgraded at startup during development. When an update changes it (as the definition-tag update of 2026-10-25 did), export each dictionary as JSON with the previous version first, then re-import the JSON after updating.
 
@@ -137,7 +137,7 @@ Run only one server process per data directory at a time. Index reads and update
 
 `data/index.json` 保存词典索引、当前词典及全局界面语言、主题和皮肤；每个词典的内容与设置保存在 `data/dictionaries/*.sqlite`。`data/` 已被 Git 忽略，个人词库不会被提交。
 
-2026-10-30 起，自动 IPA 的元音音位必须用空格、逗号或顿号分隔。旧 JSON 导入时会自动转换；已有词典要在自动 IPA 页重新输入一次元音（例如 `a e i o u`），否则连在一起的元音会算成一项，音节不再切分。
+2026-10-30 起，自动 IPA 的元音音位必须用空格、逗号或顿号分隔。旧 JSON 导入时会自动转换；已有词典要在 IPA 页重新输入一次元音（例如 `a e i o u`），否则连在一起的元音会算成一项，音节不再切分。
 
 开发期间 SQLite schema 没有版本号，启动时也不升级旧库。更新改动了 schema 时（例如 2026-10-30 的标签登记表更新），请先用旧版本把每本词典导出为 JSON，更新后再导入。
 

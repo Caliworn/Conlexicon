@@ -1172,18 +1172,20 @@ function checkModelNormalization() {
     "a1a",
     "list order decides only between rules that both have contexts",
   );
+  assert.equal(mappedIpa("acnx", [{ from: "n", to: "N", before: "a|b" }]), "acnx", "every branch of a context stays anchored");
+  assert.equal(mappedIpa("bnx", [{ from: "n", to: "N", before: "a|b" }]), "bNx");
+  assert.equal(mappedIpa("xncb", [{ from: "n", to: "N", after: "a|b" }]), "xncb");
+  assert.equal(mappedIpa("xnbc", [{ from: "n", to: "N", after: "a|b" }]), "xNbc");
   const stressedIpa = (lemma, to, syllable = {}) => ipaModel.generateIpaFromLemma(lemma, {
     mappings: [{ from: "X", to }],
     syllable: { vowels: "a", separator: ".", ...syllable },
     defaultStress: 0,
     unstressMonosyllables: false,
   });
-  assert.equal(stressedIpa("kaXka", "taˈ"), "/ka.ˈta.ka/", "a trailing mark stays on the rule's own syllable");
-  assert.equal(stressedIpa("kaXkkkka", "taˈ"), "/ka.ˈtakk.kka/");
-  assert.equal(stressedIpa("kaXkka", "taˈ", { onsetClusters: "kk" }), "/ka.ˈta.kka/");
-  assert.equal(stressedIpa("kaXa", "tanˈ"), "/ka.ˈta.na/", "the mark anchors on the nucleus, not a consonant that moves on");
   assert.equal(stressedIpa("kaXka", "tˈa"), "/ka.ˈta.ka/");
-  assert.equal(stressedIpa("kaXa", "taˈka"), "/ka.ta.ˈka.a/", "a mark inside the output keeps its position");
+  assert.equal(stressedIpa("kaXka", "taˈ"), "/ka.ta.ˈka/", "a mark marks the syllable of the next character, even past the rule");
+  assert.equal(stressedIpa("kaXkkkka", "taˈ"), "/ka.ˈtakk.kka/");
+  assert.equal(stressedIpa("kakaX", "ˈ"), "/ka.ˈka/", "a mark with no next character marks the last syllable");
   const reusedIpaSettings = { mappings: [{ from: "a", to: "o" }], syllable: { vowels: "a o" }, defaultStress: 0 };
   assert.equal(ipaModel.generateIpaFromLemma("ta", reusedIpaSettings), "/to/");
   assert.equal(ipaModel.generateIpaFromLemma("ta", ipaModel.normalizeIpaSettings(reusedIpaSettings)), "/to/");
@@ -2478,6 +2480,22 @@ async function runRepositoryContractTests(options = {}) {
     });
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.settings.ipa.mappings[0].to, "ɑ");
+    apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/settings/ipa`, {
+      mappings: [{ from: "a", to: "ɐ" }],
+      ipaKeyboard: ["ɐ", "ˈ"],
+    });
+    assert.equal(apiResult.body.settings.ipa.mappings[0].to, "ɐ");
+    assert.deepEqual(apiResult.body.settings.ipaKeyboard, ["ɐ", "ˈ"], "one IPA save carries the keyboard with the rules");
+    assert.equal(Object.hasOwn(apiResult.body.settings.ipa, "ipaKeyboard"), false);
+    apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/settings/ipa`, {
+      mappings: [{ from: "a", to: "ɑ" }],
+    });
+    assert.deepEqual(apiResult.body.settings.ipaKeyboard, ["ɐ", "ˈ"], "omitting ipaKeyboard keeps the saved keyboard");
+    apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/settings/ipa`, {
+      ipa: { mappings: [{ from: "a", to: "ɑ" }] },
+      ipaKeyboard: ["ˈ", "ɑ"],
+    });
+    assert.deepEqual(apiResult.body.settings.ipaKeyboard, ["ˈ", "ɑ"], "a wrapped ipa body still carries the keyboard");
     if (shouldStopAfter("modules")) {
       return { completedStage: "modules" };
     }

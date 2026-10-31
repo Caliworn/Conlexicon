@@ -342,7 +342,7 @@ const i18n = {
     docsModeLabel: "文档模式",
     corpusModeLabel: "语料类型",
     current: "当前",
-    ipaConfig: "自动 IPA 标注",
+    ipaConfig: "IPA",
     analysis: "数据分析",
     qualityCheck: "质量检查",
     languageDocs: "语言文档",
@@ -649,7 +649,7 @@ const i18n = {
     requiredTags: "请填写至少一个标签",
     requiredDefinition: "请填写至少一条释义",
     unsavedSettingsConfirm: "其他设置中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
-    unsavedIpaConfirm: "自动 IPA 标注中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
+    unsavedIpaConfirm: "IPA 设置中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
     unsavedDictionaryConfirm: "词典设置中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
     unsavedMorphologyConfirm: "自动形态学中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
     unsavedCorpusConfirm: "语料库中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
@@ -828,11 +828,13 @@ const i18n = {
     updatedAt: "修订日期",
     source: "来源",
     derivedEntries: "衍生",
-    ipaNeedDictionary: "自动 IPA 标注规则会保存到当前词典文件中。",
+    ipaNeedDictionary: "IPA 设置会保存到当前词典文件中。",
     orthographyModule: "正写法识别",
     mappingRules: "映射规则",
     addMapping: "添加映射",
-    mappingRuleHelp: "匹配时从词形左侧开始，优先使用输入最长的规则；输入相同时，带前后条件的规则优先，都带条件时才按列表顺序。输入与前后条件始终只读取原始词形，生成结果不会被后续规则再次读取，已匹配的字符也不会再参与匹配。输出中写入 ˈ 或以 ' 开头，可将该音节标为重读并覆盖默认重音；ˈ 写在输出末尾时，重读落在这条规则自己的元音所在音节。",
+    ipaMappingHelpTitle: "映射规则说明",
+    ipaMappingHelpInfo: "查看映射规则说明",
+    ipaMappingHelpBody: "匹配顺序：从词形左侧开始，优先使用输入最长的规则；输入相同时，带前后条件的规则优先；都带条件时才按列表顺序。已匹配的字符不会再参与匹配，没有规则匹配的字符原样保留。\n\n读取范围：输入与前后条件始终只读取原始词形，生成结果不会被后续规则再次读取。\n\n前后条件：支持正则表达式，内容紧贴规则位置匹配。例如 a|b 或 [ab] 表示 a 或 b，(?!a) 表示后面不是 a；前接条件写 ^ 表示词形开头，后接条件写 $ 表示词形结尾。前后条件都填写时必须同时满足。正则写错时按普通文字匹配。\n\n重音写法：在规则输出中写入 ˈ，或让输出以 ' 开头，可把对应音节标为重读，并覆盖默认重音。只有规则的输出才算：词形里直接写的 ˈ 不算，不在开头的 ' 是普通字符，次重音 ˌ 不处理。\n\n重音位置：标记不影响音节切分，切分完成后 ˈ 写在目标音节开头。ˈ 永远标它后面那个字符所在的音节，这个字符可以不属于这条规则；后面没有字符时标最后一个音节。\n\n重音数量：一个词条只有一个重音，有多处标记时取第一处，含空格的词条也一样。开启“单音节词不标重音”后，单音节词条不标重音，规则里写的重音也会被忽略。",
     syllabification: "音节划分",
     syllableRules: "音节规则",
     ipaSyllableHelpTitle: "音节划分逻辑",
@@ -851,7 +853,7 @@ const i18n = {
     batchIpaMissing: "补全空发音",
     batchIpaAllConfirm: "将为当前词典所有有词形的词条重新生成发音，并覆盖已有发音。确定继续吗？",
     batchIpaMissingConfirm: "将为当前词典所有尚未填写发音且有词形的词条生成发音。确定继续吗？",
-    batchIpaUnsavedSettingsConfirm: "当前自动 IPA 设置有未保存更改。请先保存设置后再批量生成。",
+    batchIpaUnsavedSettingsConfirm: "当前 IPA 设置有未保存更改。请先保存设置后再批量生成。",
     saveAndGenerate: "保存并生成",
     batchIpaUpdated: "已更新发音",
     batchIpaNoMissing: "当前词典无发音为空的条目",
@@ -861,7 +863,7 @@ const i18n = {
     ruleAfter: "后接条件",
     reorderIpaRule: "拖动或按 Alt+↑/↓ 调整规则顺序",
     removeRule: "删除规则",
-    ipaSaved: "IPA 配置已保存",
+    ipaSaved: "IPA 设置已保存",
     ipaGenerated: "已生成 IPA",
     ipaNeedsLemma: "请先填写词形",
     ipaDefaultStressInvalid: "默认重音必须是整数",
@@ -982,7 +984,7 @@ const i18n = {
     docsModeLabel: "Document view mode",
     corpusModeLabel: "Corpus item type",
     current: "Current",
-    ipaConfig: "Auto IPA",
+    ipaConfig: "IPA",
     analysis: "Analytics",
     qualityCheck: "Quality Checks",
     languageDocs: "Language Docs",
@@ -1289,7 +1291,7 @@ const i18n = {
     requiredTags: "Fill at least one tag",
     requiredDefinition: "Fill at least one definition",
     unsavedSettingsConfirm: "Other Settings has unsaved changes. Save them, discard them, or cancel the current action.",
-    unsavedIpaConfirm: "Auto IPA has unsaved changes. Save them, discard them, or cancel the current action.",
+    unsavedIpaConfirm: "IPA settings have unsaved changes. Save them, discard them, or cancel the current action.",
     unsavedDictionaryConfirm: "Dictionary settings has unsaved changes. Save them, discard them, or cancel the current action.",
     unsavedMorphologyConfirm: "Auto Morphology has unsaved changes. Save them, discard them, or cancel the current action.",
     unsavedCorpusConfirm: "Corpus has unsaved changes. Save them, discard them, or cancel the current action.",
@@ -1472,11 +1474,13 @@ const i18n = {
     source: "Source",
     createSourceEntry: "Create Source Entry: {source}",
     derivedEntries: "Derived",
-    ipaNeedDictionary: "Auto IPA rules are saved in the current dictionary file.",
+    ipaNeedDictionary: "IPA settings are saved in the current dictionary file.",
     orthographyModule: "Orthography Recognition",
     mappingRules: "Mapping Rules",
     addMapping: "Add Mapping",
-    mappingRuleHelp: "Matching starts at the left of the lemma and prefers the rule with the longest input. For equal inputs, rules with contexts come first, and list order only decides between rules that both have contexts. Inputs and contexts always read the original lemma; generated output is never fed into later rules, and matched characters are not matched again. Put ˈ in the output, or start it with ', to mark that syllable as stressed and override default stress. A ˈ at the end of an output marks the syllable of that rule's own vowel.",
+    ipaMappingHelpTitle: "Mapping Rules",
+    ipaMappingHelpInfo: "Show mapping rule details",
+    ipaMappingHelpBody: "Matching order: matching starts at the left of the lemma and prefers the rule with the longest input. For equal inputs, rules with contexts come first, and list order only decides between rules that both have contexts. Matched characters are not matched again, and characters no rule matches stay as they are.\n\nWhat rules read: inputs and contexts always read the original lemma; generated output is never fed into later rules.\n\nContexts: contexts are regular expressions matched right next to the rule's position. For example, a|b or [ab] means a or b, and (?!a) means not followed by a. Use ^ in the preceding context for the start of the lemma, and $ in the following context for its end. When both contexts are filled in, both must match. An invalid expression is matched as plain text.\n\nStress marks: put ˈ in a rule's output, or start the output with ', to mark the matching syllable as stressed and override default stress. Only rule outputs count: a ˈ typed in the lemma does not, a ' anywhere but the start is an ordinary character, and secondary stress ˌ is not processed.\n\nStress position: marks do not affect syllabification, and ˈ is written at the start of the target syllable afterwards. A ˈ always marks the syllable of the character after it, even when that character comes from outside the rule; with nothing after it, ˈ marks the last syllable.\n\nNumber of stresses: an entry has one stress, and the first mark wins, including in entries with spaces. With “Do not mark stress on monosyllables” on, single-syllable entries take no stress, even when a rule marks one.",
     syllabification: "Syllabification",
     syllableRules: "Syllabification Rules",
     ipaSyllableHelpTitle: "Syllabification Logic",
@@ -1495,7 +1499,7 @@ const i18n = {
     batchIpaMissing: "Fill Missing Pronunciations",
     batchIpaAllConfirm: "Regenerate pronunciations for every entry with a lemma in the current dictionary, overwriting existing pronunciations. Continue?",
     batchIpaMissingConfirm: "Generate pronunciations for entries with a lemma and no pronunciation in the current dictionary. Continue?",
-    batchIpaUnsavedSettingsConfirm: "Auto IPA settings have unsaved changes. Save the settings before batch generation.",
+    batchIpaUnsavedSettingsConfirm: "IPA settings have unsaved changes. Save the settings before batch generation.",
     saveAndGenerate: "Save and Generate",
     batchIpaUpdated: "Pronunciations updated",
     batchIpaNoMissing: "No entries with empty pronunciation in the current dictionary",
@@ -1505,7 +1509,7 @@ const i18n = {
     ruleAfter: "After",
     reorderIpaRule: "Drag or press Alt+Up/Down to reorder rule",
     removeRule: "Remove Rule",
-    ipaSaved: "IPA config saved",
+    ipaSaved: "IPA settings saved",
     ipaGenerated: "IPA generated",
     ipaNeedsLemma: "Fill the lemma first",
     ipaDefaultStressInvalid: "Default stress must be an integer",
@@ -1830,6 +1834,7 @@ const elements = {
   ipaForm: document.querySelector("#ipaForm"),
   ipaMappingList: document.querySelector("#ipaMappingList"),
   addIpaMappingButton: document.querySelector("#addIpaMappingButton"),
+  ipaMappingHelpButton: document.querySelector("#ipaMappingHelpButton"),
   ipaSyllableHelpButton: document.querySelector("#ipaSyllableHelpButton"),
   ipaVowelsInput: document.querySelector("#ipaVowelsInput"),
   ipaSyllableSeparatorInput: document.querySelector("#ipaSyllableSeparatorInput"),
@@ -12500,7 +12505,6 @@ function fillSettingsForm(dictionary) {
   elements.allowEmptyPronunciationInput.checked = settings.allowEmptyPronunciation;
   elements.allowEmptyTagsInput.checked = settings.allowEmptyTags;
   elements.allowEmptyDefinitionsInput.checked = settings.allowEmptyDefinitions;
-  elements.ipaKeyboardInput.value = normalizeIpaKeyboard(settings.ipaKeyboard).join(" ");
   renderEntrySectionOrderEditor(settings.entrySectionOrder);
   renderToolNavOrderEditor(settings.toolNavOrder);
   setupMasonryLayout(elements.settingsForm, ".settings-section, .form-actions", 18);
@@ -12619,6 +12623,7 @@ function fillIpaForm(dictionary) {
   elements.ipaComplexPhonemesInput.value = ipa.syllable.complexPhonemes.join(" ");
   elements.ipaDefaultStressInput.value = ipa.defaultStress;
   elements.ipaUnstressMonosyllablesInput.checked = ipa.unstressMonosyllables;
+  elements.ipaKeyboardInput.value = dictionarySettings(dictionary).ipaKeyboard.join(" ");
 }
 
 function renderIpaRuleList(container, rules) {
@@ -12711,7 +12716,6 @@ function settingsFormSnapshot() {
     allowEmptyPronunciation: elements.allowEmptyPronunciationInput.checked,
     allowEmptyTags: elements.allowEmptyTagsInput.checked,
     allowEmptyDefinitions: elements.allowEmptyDefinitionsInput.checked,
-    ipaKeyboard: normalizeIpaKeyboard(elements.ipaKeyboardInput.value),
     toolNavOrder: collectToolNavOrder(),
   };
 }
@@ -12737,7 +12741,6 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     allowEmptyPronunciation: settings.allowEmptyPronunciation,
     allowEmptyTags: settings.allowEmptyTags,
     allowEmptyDefinitions: settings.allowEmptyDefinitions,
-    ipaKeyboard: settings.ipaKeyboard,
     toolNavOrder: settings.toolNavOrder,
   };
 }
@@ -12761,6 +12764,7 @@ function ipaFormSnapshot() {
     syllable: ipa.syllable,
     defaultStress: defaultStressRaw,
     unstressMonosyllables: ipa.unstressMonosyllables,
+    ipaKeyboard: normalizeIpaKeyboard(elements.ipaKeyboardInput.value),
   };
 }
 
@@ -12780,12 +12784,13 @@ function savedMorphologySnapshot(dictionary = activeDictionary()) {
 }
 
 function savedIpaSnapshot(dictionary = activeDictionary()) {
-  const ipa = dictionarySettings(dictionary).ipa;
+  const { ipa, ipaKeyboard } = dictionarySettings(dictionary);
   return {
     mappings: ipa.mappings,
     syllable: ipa.syllable,
     defaultStress: String(ipa.defaultStress),
     unstressMonosyllables: ipa.unstressMonosyllables,
+    ipaKeyboard,
   };
 }
 
@@ -12883,7 +12888,6 @@ function collectDictionarySettingsFromForm(existing = {}) {
     allowEmptyPronunciation: elements.allowEmptyPronunciationInput.checked,
     allowEmptyTags: elements.allowEmptyTagsInput.checked,
     allowEmptyDefinitions: elements.allowEmptyDefinitionsInput.checked,
-    ipaKeyboard: normalizeIpaKeyboard(elements.ipaKeyboardInput.value),
     toolNavOrder: collectToolNavOrder(),
   };
 }
@@ -15174,7 +15178,7 @@ async function saveIpaSettings(event, options = {}) {
   try {
     const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/settings/ipa`, {
       method: "PUT",
-      body: JSON.stringify(ipa),
+      body: JSON.stringify({ ...ipa, ipaKeyboard: normalizeIpaKeyboard(elements.ipaKeyboardInput.value) }),
     });
     applyDictionaryModulePayload(saved);
     resetEntryReadStateAfterSave();
@@ -18175,6 +18179,11 @@ elements.ipaForm.addEventListener("submit", saveIpaSettings);
   });
 });
 
+elements.ipaMappingHelpButton.addEventListener("click", () => {
+  appInfoDialog(t("ipaMappingHelpTitle"), {
+    text: t("ipaMappingHelpBody"),
+  });
+});
 elements.ipaSyllableHelpButton.addEventListener("click", () => {
   appInfoDialog(t("ipaSyllableHelpTitle"), {
     text: t("ipaSyllableHelpBody"),
