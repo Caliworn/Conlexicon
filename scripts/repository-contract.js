@@ -1521,7 +1521,7 @@ function checkModelNormalization() {
     settings: {
       ipa: {
         stressMappings: [{ id: "ipa-legacy", from: "a", to: "a" }],
-        syllable: { vowels: "aə̃õ i" },
+        syllable: { vowels: "aə̃õi" },
       },
       toolNavOrder: ["editor", "morphology", "settings"],
       glossFontFamily: "sans",
@@ -1544,6 +1544,14 @@ function checkModelNormalization() {
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings.ipa.mappings[0], "id"), false);
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings.ipa, "stressMappings"), false);
   assert.deepEqual(legacyConvertedImport.dictionary.settings.ipa.syllable.vowels, ["a", "ə̃", "õ", "i"]);
+  const importedVowels = (vowels) => conversionService.importDictionaryFromJsonPayload({
+    name: "Vowels",
+    entries: [],
+    settings: { ipa: { syllable: { vowels } } },
+  }).dictionary.settings.ipa.syllable.vowels;
+  assert.deepEqual(importedVowels("a e、ai"), ["a", "e", "ai"], "separators keep multi-character vowels whole");
+  assert.deepEqual(importedVowels(" aei "), ["a", "e", "i"], "surrounding space is not a separator");
+  assert.deepEqual(importedVowels(["a", "ai"]), ["a", "ai"]);
   assert.equal(legacyConvertedImport.dictionary.settings.glossStyles.gla.fontFamily, "sans");
   assert.equal(legacyConvertedImport.dictionary.settings.corpusUnitCardGlossAlign, false);
   assert.equal(legacyConvertedImport.dictionary.settings.partialEditPageSwitchAction, "save");
