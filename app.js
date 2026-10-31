@@ -376,8 +376,8 @@ const i18n = {
     removeTable: "删除表格",
     removeMorphologyTableGroup: "删除表格组",
     emptyMorphologyTableGroup: "此表格组暂无表格。",
-    dragMorphologyTableGroup: "拖动以调整表格组排序",
-    dragMorphologyTable: "拖动以调整表格排序",
+    dragMorphologyTableGroup: "拖动或按 Alt+↑/↓ 调整表格组顺序",
+    dragMorphologyTable: "拖动或按 Alt+↑/↓ 调整表格顺序",
     morphologyAuto: "自动匹配",
     morphologyManual: "手动配置",
     switchToManualMorphology: "改为手动配置",
@@ -721,12 +721,12 @@ const i18n = {
     emptyEntrySections: "空栏目",
     showEmptyEntrySections: "在词条浏览界面显示空栏目",
     entrySectionOrder: "词条栏目排序",
-    entrySectionOrderHelp: "拖动卡片以调整词条详情和完整编辑中栏目顺序。衍生词只在有内容时显示，且不可在完整编辑中修改。",
+    entrySectionOrderHelp: "拖动卡片，或聚焦卡片后按 Alt+↑/↓，以调整词条详情和完整编辑中栏目顺序。衍生词只在有内容时显示，且不可在完整编辑中修改。",
     ipaKeyboardSettings: "IPA 虚拟键盘",
     ipaKeyboardSymbols: "键盘符号",
     ipaKeyboardHelp: "以空格、逗号或换行分隔。新词典默认包含 ˈ、ˌ 和 t͡s 里的连接符。",
     toolNavigationOrder: "工具导航排序",
-    toolNavigationOrderHelp: "拖动卡片来调整左侧导航栏顺序。该顺序保存到当前词典文件中。",
+    toolNavigationOrderHelp: "拖动卡片，或聚焦卡片后按 Alt+↑/↓，来调整左侧导航栏顺序。该顺序保存到当前词典文件中。",
     cancel: "取消",
     confirm: "确认",
     confirmTitle: "确认操作",
@@ -859,7 +859,7 @@ const i18n = {
     ruleTo: "输出",
     ruleBefore: "前接条件",
     ruleAfter: "后接条件",
-    reorderIpaRule: "拖动调整规则顺序",
+    reorderIpaRule: "拖动或按 Alt+↑/↓ 调整规则顺序",
     removeRule: "删除规则",
     ipaSaved: "IPA 配置已保存",
     ipaGenerated: "已生成 IPA",
@@ -1016,8 +1016,8 @@ const i18n = {
     removeTable: "Delete Table",
     removeMorphologyTableGroup: "Delete Table Group",
     emptyMorphologyTableGroup: "This table group has no tables yet.",
-    dragMorphologyTableGroup: "Drag to reorder table groups",
-    dragMorphologyTable: "Drag to reorder tables",
+    dragMorphologyTableGroup: "Drag or press Alt+Up/Down to reorder table groups",
+    dragMorphologyTable: "Drag or press Alt+Up/Down to reorder tables",
     morphologyAuto: "Auto Match",
     morphologyManual: "Manual Configuration",
     switchToManualMorphology: "Switch to Manual",
@@ -1361,12 +1361,12 @@ const i18n = {
     emptyEntrySections: "Empty Sections",
     showEmptyEntrySections: "Show empty sections in the entry view",
     entrySectionOrder: "Entry Section Order",
-    entrySectionOrderHelp: "Drag cards to reorder sections in entry display and full editing. Derived entries appear only when present and remain read-only in full editing.",
+    entrySectionOrderHelp: "Drag cards, or focus one and press Alt+Up/Down, to reorder sections in entry display and full editing. Derived entries appear only when present and remain read-only in full editing.",
     ipaKeyboardSettings: "IPA Virtual Keyboard",
     ipaKeyboardSymbols: "Keyboard Symbols",
     ipaKeyboardHelp: "Separate symbols with spaces, commas, or line breaks. New dictionaries include ˈ, ˌ, and the tie bar used in t͡s by default.",
     toolNavigationOrder: "Tool Navigation Order",
-    toolNavigationOrderHelp: "Drag cards to reorder the left navigation. The order is saved in the current dictionary file.",
+    toolNavigationOrderHelp: "Drag cards, or focus one and press Alt+Up/Down, to reorder the left navigation. The order is saved in the current dictionary file.",
     cancel: "Cancel",
     confirm: "Confirm",
     confirmTitle: "Confirm Action",
@@ -1503,7 +1503,7 @@ const i18n = {
     ruleTo: "Output",
     ruleBefore: "Before",
     ruleAfter: "After",
-    reorderIpaRule: "Drag to reorder rule",
+    reorderIpaRule: "Drag or press Alt+Up/Down to reorder rule",
     removeRule: "Remove Rule",
     ipaSaved: "IPA config saved",
     ipaGenerated: "IPA generated",
@@ -12512,6 +12512,9 @@ function renderToolNavOrderEditor(order = DEFAULT_TOOL_NAV_ORDER) {
     const card = document.createElement("article");
     card.className = "tool-order-card";
     card.draggable = true;
+    card.tabIndex = 0;
+    card.setAttribute("role", "listitem");
+    card.setAttribute("aria-keyshortcuts", "Alt+ArrowUp Alt+ArrowDown");
     card.dataset.view = view;
     card.innerHTML = `
       <span class="tool-order-handle" aria-hidden="true">⋮⋮</span>
@@ -12528,6 +12531,9 @@ function renderEntrySectionOrderEditor(order = DEFAULT_ENTRY_SECTION_ORDER) {
     const card = document.createElement("article");
     card.className = "tool-order-card";
     card.draggable = true;
+    card.tabIndex = 0;
+    card.setAttribute("role", "listitem");
+    card.setAttribute("aria-keyshortcuts", "Alt+ArrowUp Alt+ArrowDown");
     card.dataset.entrySection = section;
     card.innerHTML = `
       <span class="tool-order-handle" aria-hidden="true">⋮⋮</span>
@@ -12627,7 +12633,7 @@ function createIpaRuleCard(rule = normalizeIpaRule()) {
   card.className = "ipa-rule-card";
   card.innerHTML = `
     <div class="ipa-rule-grid">
-      <button class="ipa-rule-drag-handle" type="button" draggable="true" data-app-tooltip="always" data-i18n-aria-label="reorderIpaRule" aria-label="${escapeHtml(t("reorderIpaRule"))}">⋮⋮</button>
+      <button class="ipa-rule-drag-handle" type="button" draggable="true" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" data-app-tooltip="always" data-i18n-aria-label="reorderIpaRule" aria-label="${escapeHtml(t("reorderIpaRule"))}">⋮⋮</button>
       <textarea class="ipa-single-line" rows="1" data-field="from" data-i18n-aria-label="ruleFrom" data-i18n-placeholder="ruleFrom" aria-label="${escapeHtml(t("ruleFrom"))}" placeholder="${escapeHtml(t("ruleFrom"))}">${escapeHtml(rule.from)}</textarea>
       <textarea class="ipa-single-line" rows="1" data-field="to" data-i18n-aria-label="ruleTo" data-i18n-placeholder="ruleTo" aria-label="${escapeHtml(t("ruleTo"))}" placeholder="${escapeHtml(t("ruleTo"))}">${escapeHtml(rule.to)}</textarea>
       <textarea class="ipa-single-line" rows="1" data-field="before" data-i18n-aria-label="ruleBefore" data-i18n-placeholder="ruleBefore" aria-label="${escapeHtml(t("ruleBefore"))}" placeholder="${escapeHtml(t("ruleBefore"))}">${escapeHtml(rule.before)}</textarea>
@@ -13405,7 +13411,7 @@ function firstSlotPast(slots, isPastPointer) {
 // The list stays put until the drop, so a cancelled drag keeps the order. Card
 // positions are read once when a drag starts, so each dragover only compares numbers
 // and touches the page when the target changes. Offsets are from the list's corner,
-// which stays right if the page scrolls.
+// which stays right if the page scrolls. Alt+Up/Down on a focused handle moves one place.
 function setupListDragSort(root, { item, handle = item, onMove }) {
   const marker = document.createElement("div");
   marker.className = "list-drop-marker";
@@ -13493,6 +13499,25 @@ function setupListDragSort(root, { item, handle = item, onMove }) {
     }
   });
   root.addEventListener("dragend", finishDrag);
+  root.addEventListener("keydown", (event) => {
+    if (!event.altKey || !["ArrowUp", "ArrowDown"].includes(event.key) || !event.target.matches(handle)) {
+      return;
+    }
+    event.preventDefault();
+    const card = event.target.closest(item);
+    const list = card.parentElement;
+    const rows = [...list.children].filter((row) => row.matches(item));
+    const up = event.key === "ArrowUp";
+    const neighbor = rows[rows.indexOf(card) + (up ? -1 : 1)];
+    if (!neighbor) {
+      return;
+    }
+    // The neighbor moves instead of the card, so the card never loses focus.
+    list.insertBefore(neighbor, up ? card.nextSibling : card);
+    hideAppTooltip();
+    event.target.scrollIntoView({ block: "nearest" });
+    onMove?.();
+  });
 }
 
 // Row positions are read once when a drag starts. Nothing moves during the drag,
@@ -14743,7 +14768,7 @@ function createMorphologyGroupEditor(group, index) {
       <div class="morphology-group-primary-fields">
         <div class="morphology-group-header">
           <div class="morphology-group-title-row">
-            <button class="morphology-drag-handle" type="button" draggable="true" data-action="drag-morphology-group" data-i18n-aria-label="dragMorphologyTableGroup" aria-label="${escapeHtml(t("dragMorphologyTableGroup"))}">⋮⋮</button>
+            <button class="morphology-drag-handle" type="button" draggable="true" data-action="drag-morphology-group" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" data-app-tooltip="always" data-i18n-aria-label="dragMorphologyTableGroup" aria-label="${escapeHtml(t("dragMorphologyTableGroup"))}">⋮⋮</button>
             <div>
               <p class="eyebrow"><span data-i18n="morphologyTableGroup">${escapeHtml(t("morphologyTableGroup"))}</span> ${index + 1}</p>
               <input data-field="name" value="${escapeHtml(group.name)}" data-i18n-aria-label="morphologyTableGroupName" aria-label="${escapeHtml(t("morphologyTableGroupName"))}">
@@ -14796,7 +14821,7 @@ function createMorphologyTableEditor(table) {
   card.innerHTML = `
     <div class="morphology-card-header">
       <div class="morphology-table-title-row">
-        <button class="morphology-drag-handle" type="button" draggable="true" data-action="drag-morphology-table" data-i18n-aria-label="dragMorphologyTable" aria-label="${escapeHtml(t("dragMorphologyTable"))}">⋮⋮</button>
+        <button class="morphology-drag-handle" type="button" draggable="true" data-action="drag-morphology-table" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" data-app-tooltip="always" data-i18n-aria-label="dragMorphologyTable" aria-label="${escapeHtml(t("dragMorphologyTable"))}">⋮⋮</button>
         <div>
           <div class="morphology-card-title-row">
             <input data-field="title" value="${escapeHtml(table.title)}" data-i18n-aria-label="tableName" aria-label="${escapeHtml(t("tableName"))}">

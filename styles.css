@@ -4025,6 +4025,11 @@ span.pending-source {
   position: relative;
 }
 
+/* Room for the focus ring when Alt+arrows scroll a moved card into view. */
+:is(.tool-order-card, .ipa-rule-drag-handle, .morphology-drag-handle) {
+  scroll-margin-block: 16px;
+}
+
 .list-drop-marker {
   position: absolute;
   z-index: 1;

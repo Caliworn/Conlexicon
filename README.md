@@ -58,12 +58,14 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - `Ctrl`/`Cmd` + `Enter`: open quick entry when focus is not in an editable field. `Ctrl`/`Cmd` + `Shift` + `Enter` opens the full editor for a new entry instead; unsaved edits go through the usual save / discard / cancel prompt first.
 - In quick entry: `Enter` moves to the next field (on a definition it starts another definition; an empty definition does nothing); `Tab` in an empty field fills the suggestion (auto IPA for pronunciation, the tags of the previous quick entry for tags, the nearest filled definition tag line above for definition tags) and otherwise moves focus, which stays inside the overlay; `↑`/`↓` move between fields; `Backspace` on an empty extra definition removes it, with its empty tag line; `Ctrl`/`Cmd` + `Enter` or `Ctrl`/`Cmd` + `S` submits; `Ctrl`/`Cmd` + `Shift` + `Enter` moves the draft into the full editor; `Ctrl`/`Cmd` + `/` shows or hides the definition tag lines (they cannot be hidden while any has content); `Esc` closes, asking first if the draft is not empty.
 - `Esc` in a local (section) edit: cancel it; with unsaved changes, the save / discard / cancel prompt appears first.
+- `Alt` + `↑`/`↓` on a focused sort card or drag handle: move it one place. This covers tool navigation, entry sections, IPA rules, morphology tables and table groups, and tag rows; tag tiles use `Alt` + `←`/`→` and source cards take all four arrows.
 - In a source field: `↑`/`↓` move the current suggestion; `Enter` links it, and with no current suggestion keeps the text and never submits the form; `Tab` only moves focus; `Esc` closes the suggestions and keeps the text.
 
 - `Ctrl`/`Cmd` + `S`：在当前表单或模块支持保存时执行保存。
 - `Ctrl`/`Cmd` + `Enter`：焦点不在可编辑区域时打开快速录入。`Ctrl`/`Cmd` + `Shift` + `Enter` 改为在完整编辑器中新建词条；有未保存编辑时先走“保存 / 放弃 / 取消”确认。
 - 快速录入中：`Enter` 进入下一项（在释义上新起一条释义，空释义不动作）；`Tab` 在空字段上填入建议（发音填自动 IPA，标签沿用上一条快速录入的标签，释义标签沿用上方最近一行有内容的释义标签），否则移动焦点，焦点始终留在浮层内；`↑`/`↓` 在字段间移动；空的多余释义上按 `Backspace` 删除该行及其空的释义标签行；`Ctrl`/`Cmd` + `Enter` 或 `Ctrl`/`Cmd` + `S` 提交；`Ctrl`/`Cmd` + `Shift` + `Enter` 把草稿转入完整编辑器；`Ctrl`/`Cmd` + `/` 显示或隐藏释义标签行（有任何一行有内容时不能隐藏）；`Esc` 关闭，草稿非空时先确认。
 - 局部编辑中按 `Esc`：取消局部编辑；有未保存改动时先弹出“保存 / 放弃 / 取消”确认。
+- 聚焦排序卡片或拖动把手后按 `Alt` + `↑`/`↓`：移动一位。适用于工具导航、词条栏目、IPA 规则、形态表格和表格组，以及标签行；压缩视图的标签块用 `Alt` + `←`/`→`，来源卡片四个方向都可用。
 - 来源输入框内：`↑`/`↓` 移动当前候选；`Enter` 绑定当前候选，没有当前候选时保留文本且不提交表单；`Tab` 只移动焦点；`Esc` 关闭候选并保留文本。
 
 ## Run Locally / 本地运行
