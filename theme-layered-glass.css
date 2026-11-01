@@ -23,9 +23,9 @@ body[data-ui-skin="layered-glass"] {
   --ui-warning-badge-text: #805300;
   --ui-danger: #b43f46;
   --ui-danger-soft: rgba(250, 229, 230, 0.9);
-  --ui-focus: var(--ui-text);
+  --ui-focus: var(--ui-field-focus);
   --ui-highlight: #d9a937;
-  --ui-field-focus: var(--ui-accent-hover);
+  --ui-field-focus: var(--ui-accent);
   --ui-field-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ui-field-focus) 22%, transparent);
 
   --material-panel-background: rgba(250, 252, 251, 0.82);
@@ -86,6 +86,7 @@ body[data-ui-skin="layered-glass"] {
   --material-navigation-drawer-background: #22313a;
   --material-navigation-drawer-filter: none;
   --material-navigation-text: #f7fbfa;
+  --material-navigation-focus: #65c7b8;
   --material-navigation-muted: #c2d0ce;
   --material-navigation-control-background: rgba(255, 255, 255, 0.1);
   --material-navigation-control-hover-background: rgba(255, 255, 255, 0.18);
@@ -149,7 +150,7 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --ui-warning-badge-text: #ffd36f;
   --ui-danger: #ee7c84;
   --ui-danger-soft: rgba(62, 34, 38, 0.92);
-  --ui-focus: var(--ui-text);
+  --ui-focus: var(--ui-field-focus);
   --ui-highlight: #d2aa4b;
   --ui-field-focus: var(--ui-accent-hover);
   --ui-field-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ui-field-focus) 26%, transparent);
@@ -563,6 +564,7 @@ body[data-ui-skin="layered-glass"] [data-layered-glass-pointer="active"] {
     --material-navigation-drawer-background: Canvas;
     --material-navigation-drawer-filter: none;
     --material-navigation-text: CanvasText;
+    --material-navigation-focus: Highlight;
     --material-navigation-muted: CanvasText;
     --material-navigation-control-shadow: none;
     --material-navigation-control-hover-shadow: none;

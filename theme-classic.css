@@ -39,9 +39,9 @@ body:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-glass"])) {
   --ui-warning-badge-text: #8a5a00;
   --ui-danger: #b43f46;
   --ui-danger-soft: #fae5e6;
-  --ui-focus: var(--ui-text);
+  --ui-focus: var(--ui-field-focus);
   --ui-highlight: #e7b548;
-  --ui-field-focus: var(--ui-accent-hover);
+  --ui-field-focus: var(--ui-accent);
   --ui-field-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ui-field-focus) 22%, transparent);
 
   /* Material roles are the skin boundary consumed by component styles. */
@@ -103,6 +103,7 @@ body:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-glass"])) {
   --material-navigation-drawer-background: var(--material-navigation-background);
   --material-navigation-drawer-filter: none;
   --material-navigation-text: #f8fbfa;
+  --material-navigation-focus: #65c7b8;
   --material-navigation-muted: #a9c0c3;
   --material-navigation-control-background: rgba(255, 255, 255, 0.08);
   --material-navigation-control-hover-background: rgba(255, 255, 255, 0.16);
@@ -156,7 +157,7 @@ body.dark-theme:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-gl
   --ui-warning-badge-text: #ffd36f;
   --ui-danger: #ee7c84;
   --ui-danger-soft: #3e2226;
-  --ui-focus: var(--ui-text);
+  --ui-focus: var(--ui-field-focus);
   --ui-highlight: #d2aa4b;
   --ui-field-focus: var(--ui-accent-hover);
   --ui-field-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ui-field-focus) 26%, transparent);

@@ -1562,10 +1562,10 @@ label span {
 }
 
 /* Navigation surfaces differ from the page (dark in Classic and Layered Glass),
-   so their ring takes the navigation ink, and destination rows draw it inside
-   the scrolling column that would clip an outer ring. */
+   so each skin picks the ring's accent for that surface, and destination rows draw
+   it inside the scrolling column that would clip an outer ring. */
 .dictionary-panel :focus-visible {
-  outline-color: var(--material-navigation-text);
+  outline-color: var(--material-navigation-focus);
 }
 
 .dictionary-panel .tool-button:focus-visible {

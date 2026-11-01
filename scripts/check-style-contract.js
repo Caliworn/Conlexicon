@@ -80,15 +80,24 @@ assert(
   "The standalone lab must not access product data, APIs, or persistent browser storage",
 );
 // Focus: one zero-specificity fallback gives every focusable element the skin's
-// ink ring, so component focus rules (and a field's outline: none) always win.
+// ring, so component focus rules (and a field's outline: none) always win.
 // A prefix outside :where() would count and override them.
 assert(/\n:where\(:focus-visible\) \{\n  outline: 2px solid var\(--ui-focus\);/.test(styles),
   "The focus fallback must be an unprefixed :where(:focus-visible) rule drawing --ui-focus");
+// Rings and text fields share one color, in both themes of every skin, so moving
+// between a field and a button changes the shape of the focus but not its hue.
+for (const [name, source] of [["Classic", classic], ["Layered Glass", layeredGlass], ["Liquid Glass", liquidGlass]]) {
+  const declarations = [...source.matchAll(/--ui-focus:\s*([^;]+);/g)].map(([, value]) => value);
+  assert(declarations.length === 2 && declarations.every((value) => value === "var(--ui-field-focus)"),
+    `${name} must point --ui-focus at --ui-field-focus in both themes`);
+}
 // --ui-focus means focus only; the warm palette accent it used to lend to search
 // hits, quality badges and analysis charts is --ui-highlight.
 for (const [, property] of `${styles}\n${classic}\n${layeredGlass}\n${liquidGlass}`.matchAll(/([a-z-]+)\s*:[^;{}]*var\(--ui-focus\)/g)) {
-  assert(["outline", "outline-color"].includes(property), `--ui-focus may only color focus outlines, not ${property}`);
+  assert(["outline", "outline-color", "--material-navigation-focus"].includes(property), `--ui-focus may only color focus outlines, not ${property}`);
 }
+assert(/\.dictionary-panel :focus-visible \{\n  outline-color: var\(--material-navigation-focus\);/.test(styles),
+  "Navigation focus must draw --material-navigation-focus, the accent chosen for the navigation surface");
 for (const [name, source] of [["Layered Glass", layeredGlass], ["Liquid Glass", liquidGlass]]) {
   assert(!/\.tool-button:focus-visible\s*\{[^}]*outline:/.test(source),
     `${name} must not redraw navigation focus; the shared navigation focus rule owns it`);
@@ -668,6 +677,9 @@ for (const tokenName of [
     `Classic dark theme must override scoped material token: ${tokenName}`,
   );
 }
+// The accent's hover shade is lighter in dark mode but reads as black in a 2px line
+// in light mode, so focus deliberately points at a different token in each theme.
+const classicDarkAliasOverrides = new Map([["--ui-field-focus", "var(--ui-accent-hover)"]]);
 for (const [tokenName, lightValue] of classicLightTokenValues) {
   const aliasMatch = lightValue.match(/^var\((--(?:ui|material|radius)-[a-z0-9-]+)\)$/);
   if (!aliasMatch || !classicDarkTokenValues.has(aliasMatch[1])) {
@@ -675,7 +687,7 @@ for (const [tokenName, lightValue] of classicLightTokenValues) {
   }
   assert.equal(
     classicDarkTokenValues.get(tokenName),
-    lightValue,
+    classicDarkAliasOverrides.get(tokenName) ?? lightValue,
     `Classic dark theme must rebind ${tokenName} to its dark-scoped dependency ${aliasMatch[1]}`,
   );
 }
