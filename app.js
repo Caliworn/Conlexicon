@@ -93,6 +93,7 @@ const {
   normalizeGlossFontFamily,
   normalizeGlossFontSize,
   normalizeGlossStyles,
+  normalizeNewEntryButtonAction,
   normalizeToolNavOrder,
   normalizeUiLanguage,
   normalizeUiSkin,
@@ -128,6 +129,7 @@ let corpusSaveRequested = false;
 let corpusUnitPreviewFrame = null;
 let docsDraftState = null;
 let confirmDialogResolver = null;
+let infoDialogReturnFocus = null;
 let confirmDialogResults = { cancel: false, alternate: false, accept: true };
 const viewScrollMemory = {
   docsPage: 0,
@@ -952,6 +954,43 @@ const i18n = {
     lexicalNetworkLoading: "正在加载词汇网络",
     contentUpdating: "正在更新",
     lexicalNetworkLoadFailed: "无法加载词汇网络",
+    newEntryButtonAction: "新建按钮默认打开",
+    fullNewEntryTooltip: "在完整编辑器中新建",
+    newEntryShiftClickHint: "Shift+点击：{action}",
+    shortcutHelpTitle: "快捷键",
+    shortcutHelpIntro: "macOS 上用 Cmd 代替 Ctrl。",
+    shortcutGroupGeneral: "全局",
+    shortcutGroupEditing: "词条编辑",
+    shortcutGroupQuickEntry: "快速录入",
+    shortcutGroupReorder: "排序",
+    shortcutGroupSources: "来源输入框",
+    shortcutSearch: "搜索词条",
+    shortcutQuickEntry: "打开快速录入",
+    shortcutNewFullEntry: "在完整编辑器中新建词条",
+    shortcutShiftClickNew: "点击“+”时改用另一种新建方式",
+    shortcutSave: "保存当前页面或编辑",
+    shortcutHelp: "显示此列表",
+    shortcutClose: "关闭弹窗、菜单或抽屉",
+    shortcutEditEntry: "编辑当前词条",
+    shortcutEditSave: "保存编辑",
+    shortcutEditCancel: "取消编辑，有未保存改动时先确认",
+    shortcutSingleLineSave: "在单行输入框中保存",
+    shortcutQuickNext: "下一项；在释义上新起一条",
+    shortcutQuickFill: "在空字段上填入建议",
+    shortcutQuickMove: "在字段间移动",
+    shortcutQuickRemove: "删除空的多余释义",
+    shortcutQuickSubmit: "提交",
+    shortcutQuickTransfer: "转入完整编辑器",
+    shortcutQuickTags: "显示或隐藏释义标签行",
+    shortcutQuickClose: "关闭，草稿非空时先确认",
+    shortcutReorderVertical: "移动聚焦的卡片或拖动把手",
+    shortcutReorderHorizontal: "移动压缩视图的标签块和来源卡片",
+    shortcutSourceMove: "移动当前候选",
+    shortcutSourceLink: "绑定当前候选",
+    shortcutSourceClose: "关闭候选",
+    shortcutTagMove: "在标签间移动",
+    shortcutTagConfirm: "确认输入",
+    shortcutTagCancel: "取消输入",
   },
   en: {
     appTitle: "Constructed Language Dictionary",
@@ -1595,6 +1634,43 @@ const i18n = {
     lexicalNetworkLoading: "Loading lexical network",
     contentUpdating: "Updating",
     lexicalNetworkLoadFailed: "Could not load lexical network",
+    newEntryButtonAction: "New entry button opens",
+    fullNewEntryTooltip: "New Entry in Full Editor",
+    newEntryShiftClickHint: "Shift+click: {action}",
+    shortcutHelpTitle: "Keyboard Shortcuts",
+    shortcutHelpIntro: "On macOS, use Cmd instead of Ctrl.",
+    shortcutGroupGeneral: "General",
+    shortcutGroupEditing: "Entry editing",
+    shortcutGroupQuickEntry: "Quick entry",
+    shortcutGroupReorder: "Reordering",
+    shortcutGroupSources: "Source field",
+    shortcutSearch: "Search entries",
+    shortcutQuickEntry: "Open quick entry",
+    shortcutNewFullEntry: "New entry in the full editor",
+    shortcutShiftClickNew: "Click + to use the other way of adding an entry",
+    shortcutSave: "Save the current page or edit",
+    shortcutHelp: "Show this list",
+    shortcutClose: "Close a dialog, menu or drawer",
+    shortcutEditEntry: "Edit the current entry",
+    shortcutEditSave: "Save the edit",
+    shortcutEditCancel: "Cancel the edit, asking first if there are unsaved changes",
+    shortcutSingleLineSave: "Save from a single-line field",
+    shortcutQuickNext: "Next field; on a definition, add another",
+    shortcutQuickFill: "Fill the suggestion in an empty field",
+    shortcutQuickMove: "Move between fields",
+    shortcutQuickRemove: "Remove an empty extra definition",
+    shortcutQuickSubmit: "Submit",
+    shortcutQuickTransfer: "Move to the full editor",
+    shortcutQuickTags: "Show or hide definition tag lines",
+    shortcutQuickClose: "Close, asking first if the draft is not empty",
+    shortcutReorderVertical: "Move the focused card or drag handle",
+    shortcutReorderHorizontal: "Move compact tag tiles and source cards",
+    shortcutSourceMove: "Move through suggestions",
+    shortcutSourceLink: "Link the current suggestion",
+    shortcutSourceClose: "Close suggestions",
+    shortcutTagMove: "Move between tags",
+    shortcutTagConfirm: "Confirm the input",
+    shortcutTagCancel: "Cancel the input",
   },
 };
 
@@ -1602,6 +1678,67 @@ i18n.zh.addExample = "添加例句";
 i18n.zh.addDefinitionNote = "添加释义备注";
 i18n.zh.addDefinitionTags = "添加释义标签";
 i18n.zh.createSourceEntry = "新建来源词条：{source}";
+
+const SHORTCUT_HELP_GROUPS = Object.freeze([
+  {
+    title: "shortcutGroupGeneral",
+    rows: [
+      ["Ctrl K", "shortcutSearch"],
+      ["Ctrl Enter", "shortcutQuickEntry"],
+      ["Ctrl Shift Enter", "shortcutNewFullEntry"],
+      ["Shift Click", "shortcutShiftClickNew"],
+      ["Ctrl S", "shortcutSave"],
+      ["?", "shortcutHelp"],
+      ["Esc", "shortcutClose"],
+    ],
+  },
+  {
+    title: "shortcutGroupEditing",
+    rows: [
+      ["Ctrl E", "shortcutEditEntry"],
+      ["Ctrl Enter", "shortcutEditSave"],
+      ["Esc", "shortcutEditCancel"],
+      ["Enter", "shortcutSingleLineSave"],
+    ],
+  },
+  {
+    title: "shortcutGroupQuickEntry",
+    rows: [
+      ["Enter", "shortcutQuickNext"],
+      ["Tab", "shortcutQuickFill"],
+      ["↑ / ↓", "shortcutQuickMove"],
+      ["Backspace", "shortcutQuickRemove"],
+      ["Ctrl Enter", "shortcutQuickSubmit"],
+      ["Ctrl S", "shortcutQuickSubmit"],
+      ["Ctrl Shift Enter", "shortcutQuickTransfer"],
+      ["Ctrl /", "shortcutQuickTags"],
+      ["Esc", "shortcutQuickClose"],
+    ],
+  },
+  {
+    title: "shortcutGroupReorder",
+    rows: [
+      ["Alt ↑ / ↓", "shortcutReorderVertical"],
+      ["Alt ← / →", "shortcutReorderHorizontal"],
+    ],
+  },
+  {
+    title: "shortcutGroupSources",
+    rows: [
+      ["↑ / ↓", "shortcutSourceMove"],
+      ["Enter", "shortcutSourceLink"],
+      ["Esc", "shortcutSourceClose"],
+    ],
+  },
+  {
+    title: "tagManager",
+    rows: [
+      ["↑ / ↓", "shortcutTagMove"],
+      ["Enter", "shortcutTagConfirm"],
+      ["Esc", "shortcutTagCancel"],
+    ],
+  },
+]);
 
 const elements = {
   appShell: document.querySelector("#appShell"),
@@ -1760,6 +1897,7 @@ const elements = {
   searchHighlightInput: document.querySelector("#searchHighlightInput"),
   savePartialOnSwitchInput: document.querySelector("#savePartialOnSwitchInput"),
   saveFullOnSwitchInput: document.querySelector("#saveFullOnSwitchInput"),
+  newEntryButtonActionInput: document.querySelector("#newEntryButtonActionInput"),
   corpusAutoSaveInput: document.querySelector("#corpusAutoSaveInput"),
   docsAutoSaveInput: document.querySelector("#docsAutoSaveInput"),
   allowEmptyPronunciationInput: document.querySelector("#allowEmptyPronunciationInput"),
@@ -2011,6 +2149,8 @@ function closeInfoDialog() {
   elements.infoDialog.hidden = true;
   elements.infoDialogTitle.textContent = "";
   elements.infoDialogBody.innerHTML = "";
+  infoDialogReturnFocus?.focus();
+  infoDialogReturnFocus = null;
 }
 
 function infoDialogTextHtml(text) {
@@ -2039,7 +2179,20 @@ function morphologySyntaxInfoHtml() {
   `;
 }
 
+function shortcutHelpHtml() {
+  const groups = SHORTCUT_HELP_GROUPS.map(({ title, rows }) => `
+    <section class="shortcut-help-group">
+      <h3>${escapeHtml(t(title))}</h3>
+      <dl>
+        ${rows.map(([keys, label]) => `<div><dt><kbd>${escapeHtml(keys)}</kbd></dt><dd>${escapeHtml(t(label))}</dd></div>`).join("")}
+      </dl>
+    </section>
+  `).join("");
+  return `<div class="shortcut-help"><p>${escapeHtml(t("shortcutHelpIntro"))}</p>${groups}</div>`;
+}
+
 function appInfoDialog(title, options = {}) {
+  infoDialogReturnFocus = document.activeElement;
   elements.infoDialogTitle.textContent = title;
   elements.infoDialogBody.innerHTML = options.html || infoDialogTextHtml(options.text);
   elements.infoDialog.hidden = false;
@@ -4069,9 +4222,26 @@ function renderToolNav() {
   });
 }
 
+// The setting swaps what a click and Shift+click on "+" do, so the name always
+// describes the plain click and the hint describes the Shift+click.
+function renderNewEntryButtons() {
+  const [labelKey, shiftLabelKey] = dictionarySettings().newEntryButtonAction === "full"
+    ? ["fullNewEntryTooltip", "quickNewEntryTooltip"]
+    : ["quickNewEntryTooltip", "fullNewEntryTooltip"];
+  const hint = formatText("newEntryShiftClickHint", { action: t(shiftLabelKey) });
+  [elements.entryListNewEntryButton, elements.collapsedNewEntryButton, elements.mobileNewEntryButton].forEach((button) => {
+    button.dataset.i18nAriaLabel = labelKey;
+    button.setAttribute("aria-label", t(labelKey));
+    button.setAttribute("aria-description", hint);
+    button.dataset.appTooltipLabel = `${t(labelKey)} · ${hint}`;
+    button.dataset.appTooltipWrap = "true";
+  });
+}
+
 function renderHeader() {
   const dictionary = activeDictionary();
   elements.entryListNewEntryButton.disabled = !dictionary;
+  renderNewEntryButtons();
   document.querySelectorAll("[data-active-dictionary-name]").forEach((eyebrow) => {
     eyebrow.textContent = dictionary?.name || "";
     eyebrow.hidden = !dictionary;
@@ -11673,6 +11843,10 @@ function fullEntryFormCandidate(existing = selectedEntry()) {
   };
 }
 
+function fullEntryEditIsOpen() {
+  return state.activeView === "editor" && editorMode === "edit" && !elements.entryForm.hidden;
+}
+
 function fullEntryFormIsDirty() {
   if (elements.entryForm.hidden) {
     return false;
@@ -12498,6 +12672,7 @@ function fillSettingsForm(dictionary) {
   elements.searchHighlightInput.checked = settings.searchHighlight;
   elements.savePartialOnSwitchInput.value = settings.partialEditPageSwitchAction;
   elements.saveFullOnSwitchInput.value = settings.fullEditPageSwitchAction;
+  elements.newEntryButtonActionInput.value = settings.newEntryButtonAction;
   elements.corpusAutoSaveInput.checked = settings.corpusAutoSave;
   elements.docsAutoSaveInput.checked = settings.docsAutoSave;
   elements.allowEmptyPronunciationInput.checked = settings.allowEmptyPronunciation;
@@ -12711,6 +12886,7 @@ function settingsFormSnapshot() {
     searchHighlight: elements.searchHighlightInput.checked,
     partialEditPageSwitchAction: normalizeEditPageSwitchAction(elements.savePartialOnSwitchInput.value),
     fullEditPageSwitchAction: normalizeEditPageSwitchAction(elements.saveFullOnSwitchInput.value),
+    newEntryButtonAction: normalizeNewEntryButtonAction(elements.newEntryButtonActionInput.value),
     allowEmptyPronunciation: elements.allowEmptyPronunciationInput.checked,
     allowEmptyTags: elements.allowEmptyTagsInput.checked,
     allowEmptyDefinitions: elements.allowEmptyDefinitionsInput.checked,
@@ -12736,6 +12912,7 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
     searchHighlight: settings.searchHighlight,
     partialEditPageSwitchAction: settings.partialEditPageSwitchAction,
     fullEditPageSwitchAction: settings.fullEditPageSwitchAction,
+    newEntryButtonAction: settings.newEntryButtonAction,
     allowEmptyPronunciation: settings.allowEmptyPronunciation,
     allowEmptyTags: settings.allowEmptyTags,
     allowEmptyDefinitions: settings.allowEmptyDefinitions,
@@ -12883,6 +13060,7 @@ function collectDictionarySettingsFromForm(existing = {}) {
     searchHighlight: elements.searchHighlightInput.checked,
     partialEditPageSwitchAction: normalizeEditPageSwitchAction(elements.savePartialOnSwitchInput.value),
     fullEditPageSwitchAction: normalizeEditPageSwitchAction(elements.saveFullOnSwitchInput.value),
+    newEntryButtonAction: normalizeNewEntryButtonAction(elements.newEntryButtonActionInput.value),
     allowEmptyPronunciation: elements.allowEmptyPronunciationInput.checked,
     allowEmptyTags: elements.allowEmptyTagsInput.checked,
     allowEmptyDefinitions: elements.allowEmptyDefinitionsInput.checked,
@@ -16379,6 +16557,22 @@ function cancelEntryEdit() {
   render();
 }
 
+// Escape is an explicit cancel, so unsaved changes always ask instead of
+// following the dictionary's page-switch action.
+async function requestFullEditCancel() {
+  const returnFocus = document.activeElement;
+  const action = fullEntryFormIsDirty()
+    ? await appEditSwitchPrompt(t("fullEditSwitchPrompt"))
+    : "discard";
+  if (action === "discard") {
+    cancelEntryEdit();
+  } else if (action === "save") {
+    await saveEntry({ preventDefault() {} });
+  }
+  // The dialog held focus, and a closed form cannot take it back.
+  (editorMode === "edit" ? returnFocus : elements.editEntryButton)?.focus();
+}
+
 async function saveEntry(event) {
   event.preventDefault();
 
@@ -17481,7 +17675,7 @@ elements.mobileEntryListButton.addEventListener("click", () => {
   }
   openMobileEntryBrowserDrawer();
 });
-elements.mobileNewEntryButton.addEventListener("click", () => openQuickEntry());
+elements.mobileNewEntryButton.addEventListener("click", handleNewEntryButtonClick);
 elements.mobileDrawerBackdrop.addEventListener("click", closeMobileDrawers);
 elements.entryBrowserToggleButton.addEventListener("click", toggleEntryBrowser);
 elements.addDictionaryButton.addEventListener("click", prepareNewDictionary);
@@ -17613,8 +17807,8 @@ elements.tagManagerZones.addEventListener("drop", (event) => {
   moveTagRow(tagModel.tagMoveToIndex(tagManagerRows(), tag, target.partOfSpeech, target.index));
 });
 elements.tagManagerZones.addEventListener("dragend", finishTagDrag);
-elements.collapsedNewEntryButton.addEventListener("click", () => openQuickEntry());
-elements.entryListNewEntryButton.addEventListener("click", () => openQuickEntry());
+elements.collapsedNewEntryButton.addEventListener("click", handleNewEntryButtonClick);
+elements.entryListNewEntryButton.addEventListener("click", handleNewEntryButtonClick);
 elements.quickEntryPanel.addEventListener("keydown", handleQuickEntryKeydown);
 elements.quickEntryFields.addEventListener("input", (event) => {
   const input = event.target.closest("[data-quick-entry-index]");
@@ -18336,7 +18530,7 @@ function isNewEntryShortcutEvent(event) {
     && event.key === "Enter";
 }
 
-async function triggerNewEntryShortcut(fullEditor) {
+async function startNewEntry(fullEditor) {
   if (!backendAvailable) {
     return;
   }
@@ -18353,22 +18547,96 @@ async function triggerNewEntryShortcut(fullEditor) {
   await beginNewEntry();
 }
 
+function handleNewEntryButtonClick(event) {
+  const fullEditor = (dictionarySettings().newEntryButtonAction === "full") !== event.shiftKey;
+  startNewEntry(fullEditor).catch((error) => console.error(error));
+}
+
+function entryEditFormAt(target) {
+  const inlineForm = partialEditForm();
+  if (inlineForm?.contains(target)) {
+    return inlineForm;
+  }
+  return fullEntryEditIsOpen() && elements.entryForm.contains(target) ? elements.entryForm : null;
+}
+
 function handleNewEntryShortcut(event) {
   if (!isNewEntryShortcutEvent(event) || quickEntryIsOpen()) {
     return false;
   }
   event.preventDefault();
   event.stopPropagation();
-  if (confirmDialogResolver || !elements.infoDialog.hidden || isEditableShortcutTarget(event.target)) {
+  if (confirmDialogResolver || !elements.infoDialog.hidden) {
+    return true;
+  }
+  // Inside an open edit the same key saves, as it submits in quick entry.
+  const editForm = event.shiftKey ? null : entryEditFormAt(event.target);
+  if (editForm) {
+    if (!event.repeat && !event.isComposing) {
+      editForm.requestSubmit();
+    }
+    return true;
+  }
+  if (isEditableShortcutTarget(event.target)) {
     return true;
   }
   if (!event.repeat) {
-    triggerNewEntryShortcut(event.shiftKey).catch((error) => console.error(error));
+    startNewEntry(event.shiftKey).catch((error) => console.error(error));
   }
   return true;
 }
 
 window.addEventListener("keydown", handleNewEntryShortcut, { capture: true });
+
+async function focusEntrySearch() {
+  if (state.activeView !== "editor") {
+    await showView("editor");
+    if (state.activeView !== "editor") {
+      return;
+    }
+  }
+  if (mobileShellMode()) {
+    openMobileEntryBrowserDrawer();
+  } else if (effectiveEntryBrowserCollapsed()) {
+    toggleEntryBrowser();
+  }
+  elements.searchInput.focus();
+  elements.searchInput.select();
+}
+
+function showShortcutHelp() {
+  appInfoDialog(t("shortcutHelpTitle"), { html: shortcutHelpHtml() });
+}
+
+// Ctrl/Cmd+K works while typing, because it only moves focus. Ctrl/Cmd+E and ?
+// wait until focus has left editable fields, like the new-entry shortcuts.
+function handleAppShortcut(event) {
+  const overlayOpen = confirmDialogResolver || !elements.infoDialog.hidden || quickEntryIsOpen() || networkOpen;
+  if (overlayOpen || event.isComposing || event.keyCode === 229) {
+    return false;
+  }
+  const run = (action) => {
+    event.preventDefault();
+    if (!event.repeat) {
+      closeEntryContextMenu();
+      Promise.resolve(action()).catch((error) => console.error(error));
+    }
+    return true;
+  };
+  const editable = isEditableShortcutTarget(event.target);
+  const modifier = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey;
+  const letter = modifier ? event.key.toLocaleLowerCase() : "";
+  if (letter === "k" && backendAvailable && activeDictionary()) {
+    return run(focusEntrySearch);
+  }
+  if (letter === "e" && !editable && state.activeView === "editor" && editorMode !== "edit") {
+    return run(beginEditEntry);
+  }
+  if (event.key === "?" && !event.ctrlKey && !event.metaKey && !event.altKey && !editable) {
+    return run(showShortcutHelp);
+  }
+  return false;
+}
 
 document.addEventListener("keydown", (event) => {
   if (event.defaultPrevented) {
@@ -18406,7 +18674,16 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (handleNewEntryShortcut(event)) {
+  // Focus falls back to the body after a click on empty form space. Elsewhere,
+  // such as the search box, Escape keeps its own meaning.
+  if (event.key === "Escape" && !event.isComposing && fullEntryEditIsOpen()
+    && (elements.entryForm.contains(event.target) || event.target === document.body)) {
+    event.preventDefault();
+    requestFullEditCancel().catch((error) => console.error(error));
+    return;
+  }
+
+  if (handleNewEntryShortcut(event) || handleAppShortcut(event)) {
     return;
   }
 
@@ -18425,7 +18702,7 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (state.activeView === "editor" && editorMode === "edit" && !elements.entryForm.hidden) {
+  if (fullEntryEditIsOpen()) {
     event.preventDefault();
     elements.entryForm.requestSubmit();
     return;

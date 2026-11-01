@@ -182,7 +182,7 @@
                 <div class="entry-search-control" id="entrySearchControl">
                   <div class="entry-mail-search-surface" aria-hidden="true"></div>
                   <svg class="nav-icon entry-mail-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg>
-                  <input id="searchInput" type="search" data-i18n-placeholder="searchPlaceholder" placeholder="搜索词形、释义、标签">
+                  <input id="searchInput" type="search" aria-keyshortcuts="Control+K Meta+K" data-i18n-placeholder="searchPlaceholder" placeholder="搜索词形、释义、标签">
                   <button class="secondary-button entry-mail-clear" id="entrySearchClearButton" data-control-tone="neutral" type="button" hidden><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button>
                   <button class="secondary-button entry-search-config-button" id="entrySearchConfigButton" data-control-tone="neutral" type="button" aria-controls="entrySearchConfigMenu" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="currentSearchSettings" aria-label="当前搜索设置">
                     <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -303,7 +303,7 @@
                       </svg>
                     </button>
                     <button class="secondary-button" id="openLexicalNetworkButton" data-control-tone="neutral" type="button" data-i18n="lexicalNetwork">词汇网络</button>
-                    <button class="secondary-button" id="editEntryButton" data-control-tone="neutral" type="button" data-i18n="editEntry">编辑词条</button>
+                    <button class="secondary-button" id="editEntryButton" data-control-tone="neutral" type="button" aria-keyshortcuts="Control+E Meta+E" data-i18n="editEntry">编辑词条</button>
                   </div>
                 </div>
 
@@ -783,6 +783,13 @@
                 <div class="subsection-title">
                   <h3 data-i18n="editEntrySettings">编辑词条</h3>
                 </div>
+                <label>
+                  <span data-i18n="newEntryButtonAction">新建按钮默认打开</span>
+                  <select id="newEntryButtonActionInput">
+                    <option value="quick" data-i18n="quickNewEntryTooltip">快速录入</option>
+                    <option value="full" data-i18n="quickEntryFullEdit">完整编辑</option>
+                  </select>
+                </label>
                 <label class="toggle-row">
                   <span data-i18n="allowEmptyPronunciation">允许发音留空时保存</span>
                   <input id="allowEmptyPronunciationInput" type="checkbox">

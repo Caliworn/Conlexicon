@@ -12,6 +12,7 @@ const vm = require("node:vm");
 const app = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
 const docsFunctions = app.slice(app.indexOf("function ensureDocsDraft("), app.indexOf("function cloneCorpus("));
 const switchFunction = app.slice(app.indexOf("async function closePendingEditsForPageSwitch("), app.indexOf("function activeFilterVariantUsesEntryQuery("));
+const fullEditCancelFunction = app.slice(app.indexOf("async function requestFullEditCancel("), app.indexOf("async function saveEntry("));
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
 function docsHarness() {
@@ -132,9 +133,68 @@ async function checkEditSwitchErrors() {
   assert.equal(errors.length, 0, "Normal cancellation is not an error");
 }
 
+async function checkFullEditCancel() {
+  const run = async ({ dirty, action, saved = true }) => {
+    const calls = [];
+    let focused = "";
+    const context = vm.createContext({
+      editorMode: "edit",
+      document: { activeElement: { focus: () => { focused = "field"; } } },
+      elements: { editEntryButton: { focus: () => { focused = "edit button"; } } },
+      fullEntryFormIsDirty: () => dirty,
+      appEditSwitchPrompt: async () => {
+        calls.push("prompt");
+        return action;
+      },
+      cancelEntryEdit: () => {
+        calls.push("discard");
+        context.editorMode = "display";
+      },
+      saveEntry: async () => {
+        calls.push("save");
+        if (saved) {
+          context.editorMode = "display";
+        }
+        return saved;
+      },
+      t: (key) => key,
+    });
+    vm.runInContext(fullEditCancelFunction, context);
+    await context.requestFullEditCancel();
+    return { calls, focused, editorMode: context.editorMode };
+  };
+
+  assert.deepEqual(
+    await run({ dirty: false }),
+    { calls: ["discard"], focused: "edit button", editorMode: "display" },
+    "A clean edit closes without asking",
+  );
+  assert.deepEqual(
+    await run({ dirty: true, action: "cancel" }),
+    { calls: ["prompt"], focused: "field", editorMode: "edit" },
+    "Cancelling the prompt keeps the edit and the focus",
+  );
+  assert.deepEqual(
+    await run({ dirty: true, action: "discard" }),
+    { calls: ["prompt", "discard"], focused: "edit button", editorMode: "display" },
+    "Discarding closes the edit",
+  );
+  assert.deepEqual(
+    await run({ dirty: true, action: "save" }),
+    { calls: ["prompt", "save"], focused: "edit button", editorMode: "display" },
+    "Saving closes the edit",
+  );
+  assert.deepEqual(
+    await run({ dirty: true, action: "save", saved: false }),
+    { calls: ["prompt", "save"], focused: "field", editorMode: "edit" },
+    "A failed save keeps the edit open and never discards it",
+  );
+}
+
 async function main() {
   await checkDocsSaves();
   await checkEditSwitchErrors();
+  await checkFullEditCancel();
   console.log("Editor save and navigation checks passed.");
 }
 

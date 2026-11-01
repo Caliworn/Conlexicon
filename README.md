@@ -48,25 +48,31 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - **Gloss 渲染**：支持 `\gla`、`\glb`、`\glc`、`\ft`；语料单元卡片、单元标题和词条例句分别设置，并可逐行配置字体、字号、粗体、斜体以及 `\glb` small caps。
 - **数据分析**：按需加载的总览（词汇规模、资料覆盖、词性分布、编辑活动），以及标签与标签集合排行、多词性词条与词性组合、词根家族、正写法、IPA 检查与分布、形态统计；多数统计项可直接打开对应词条。质量检查有独立页面，按优先度和检查模块分组。
 - **标签**：独立的标签管理页，用一张有序的登记表管理词性、显示名、红色强调和所有标签的顺序，每次改动立即保存。标签很多时可切换到压缩视图，一行显示多个标签，专门用来拖动排序；每个标签的操作在右键菜单或 ⋯ 按钮里。词性区永远在普通标签之前；新标签保存词条时自动登记，未使用的标签显示为灰色，在用标签不能删除。词条列表、筛选菜单和悬浮卡片的标签显示选项也在这一页。
-- **设置**：默认搜索方式、Gloss 渲染、导航时未保存编辑的处理方式、自动保存和导航排序。
+- **设置**：默认搜索方式、Gloss 渲染、导航时未保存编辑的处理方式、新建按钮默认打开的编辑器、自动保存和导航排序。
 - **外观**：经典、层叠玻璃和液态玻璃三套皮肤，浅色与深色主题，中英文界面；全局皮肤、主题和语言记忆在 `data/index.json` 中。液态玻璃仍在调校中，光学效果不可用或开启辅助模式时会退回普通材质。
-- **布局**：响应式外壳，导航和词条列表均可收起，移动端使用抽屉。词条列表工具栏的“+”（列表收起时在列表开关旁，移动端在顶栏）打开快速录入：浮层中逐行填写词形、发音、标签和释义（底栏的“释义标签”开关可在每条释义前加一行释义标签），提交后留在浮层并开始下一条草稿，不离开当前词条；“完整编辑”把草稿带入完整编辑器，用于补充来源、例句、备注或形态学。其他页面通过导航返回词条编辑。
+- **布局**：响应式外壳，导航和词条列表均可收起，移动端使用抽屉。词条列表工具栏的“+”（列表收起时在列表开关旁，移动端在顶栏）默认打开快速录入，`Shift` + 点击改为在完整编辑器中新建；其他设置里可以交换这两种行为，这是词典级设置。快速录入：浮层中逐行填写词形、发音、标签和释义（底栏的“释义标签”开关可在每条释义前加一行释义标签），提交后留在浮层并开始下一条草稿，不离开当前词条；“完整编辑”把草稿带入完整编辑器，用于补充来源、例句、备注或形态学。其他页面通过导航返回词条编辑。
 
 ## Keyboard Shortcuts / 快捷键
 
-- `Ctrl`/`Cmd` + `S`: save the active edit form or module when saving is available.
-- `Ctrl`/`Cmd` + `Enter`: open quick entry when focus is not in an editable field. `Ctrl`/`Cmd` + `Shift` + `Enter` opens the full editor for a new entry instead; unsaved edits go through the usual save / discard / cancel prompt first.
-- In quick entry: `Enter` moves to the next field (on a definition it starts another definition; an empty definition does nothing); `Tab` in an empty field fills the suggestion (auto IPA for pronunciation, the tags of the previous quick entry for tags, the nearest filled definition tag line above for definition tags) and otherwise moves focus, which stays inside the overlay; `↑`/`↓` move between fields; `Backspace` on an empty extra definition removes it, with its empty tag line; `Ctrl`/`Cmd` + `Enter` or `Ctrl`/`Cmd` + `S` submits; `Ctrl`/`Cmd` + `Shift` + `Enter` moves the draft into the full editor; `Ctrl`/`Cmd` + `/` shows or hides the definition tag lines (they cannot be hidden while any has content); `Esc` closes, asking first if the draft is not empty.
-- `Esc` in a local (section) edit: cancel it; with unsaved changes, the save / discard / cancel prompt appears first.
-- `Alt` + `↑`/`↓` on a focused sort card or drag handle: move it one place. This covers tool navigation, entry sections, IPA rules, morphology tables and table groups, and tag rows; tag tiles use `Alt` + `←`/`→` and source cards take all four arrows.
-- In a source field: `↑`/`↓` move the current suggestion; `Enter` links it, and with no current suggestion keeps the text and never submits the form; `Tab` only moves focus; `Esc` closes the suggestions and keeps the text.
+Press `?` outside a text field to see every shortcut in the app. `Ctrl` and `Cmd` are interchangeable. The main ones:
 
-- `Ctrl`/`Cmd` + `S`：在当前表单或模块支持保存时执行保存。
-- `Ctrl`/`Cmd` + `Enter`：焦点不在可编辑区域时打开快速录入。`Ctrl`/`Cmd` + `Shift` + `Enter` 改为在完整编辑器中新建词条；有未保存编辑时先走“保存 / 放弃 / 取消”确认。
-- 快速录入中：`Enter` 进入下一项（在释义上新起一条释义，空释义不动作）；`Tab` 在空字段上填入建议（发音填自动 IPA，标签沿用上一条快速录入的标签，释义标签沿用上方最近一行有内容的释义标签），否则移动焦点，焦点始终留在浮层内；`↑`/`↓` 在字段间移动；空的多余释义上按 `Backspace` 删除该行及其空的释义标签行；`Ctrl`/`Cmd` + `Enter` 或 `Ctrl`/`Cmd` + `S` 提交；`Ctrl`/`Cmd` + `Shift` + `Enter` 把草稿转入完整编辑器；`Ctrl`/`Cmd` + `/` 显示或隐藏释义标签行（有任何一行有内容时不能隐藏）；`Esc` 关闭，草稿非空时先确认。
-- 局部编辑中按 `Esc`：取消局部编辑；有未保存改动时先弹出“保存 / 放弃 / 取消”确认。
-- 聚焦排序卡片或拖动把手后按 `Alt` + `↑`/`↓`：移动一位。适用于工具导航、词条栏目、IPA 规则、形态表格和表格组，以及标签行；压缩视图的标签块用 `Alt` + `←`/`→`，来源卡片四个方向都可用。
-- 来源输入框内：`↑`/`↓` 移动当前候选；`Enter` 绑定当前候选，没有当前候选时保留文本且不提交表单；`Tab` 只移动焦点；`Esc` 关闭候选并保留文本。
+- `Ctrl` + `K`: jump to the entry search from anywhere. Other pages go through the usual unsaved-changes check first.
+- `Ctrl` + `Enter`: open quick entry when focus is not in a text field. `Ctrl` + `Shift` + `Enter` opens the full editor for a new entry instead.
+- `Shift` + click on "+": use the other way of adding an entry. A dictionary setting chooses which one a plain click opens; the two `Enter` shortcuts above never change.
+- `Ctrl` + `E`: edit the current entry when focus is not in a text field.
+- With focus in an open full or local edit: `Ctrl` + `Enter` saves, and `Esc` cancels, asking first if there are unsaved changes.
+- `Ctrl` + `S`: save the active edit form or module when saving is available.
+- `Alt` + arrow keys on a focused sort card or drag handle: move it one place.
+
+在文本框以外按 `?` 可以查看应用内的完整快捷键列表。`Ctrl` 和 `Cmd` 通用。常用的有：
+
+- `Ctrl` + `K`：从任何页面跳到词条搜索框；在其他页面时先走未保存检查。
+- `Ctrl` + `Enter`：焦点不在文本框时打开快速录入。`Ctrl` + `Shift` + `Enter` 改为在完整编辑器中新建词条。
+- `Shift` + 点击“+”：改用另一种新建方式。普通点击打开哪一种由词典设置决定，上面两个 `Enter` 快捷键不受影响。
+- `Ctrl` + `E`：焦点不在文本框时编辑当前词条。
+- 焦点在打开的完整编辑或局部编辑内时：`Ctrl` + `Enter` 保存，`Esc` 取消，有未保存改动时先确认。
+- `Ctrl` + `S`：在当前表单或模块支持保存时执行保存。
+- 聚焦排序卡片或拖动把手后按 `Alt` + 方向键：移动一位。
 
 ## Run Locally / 本地运行
 
