@@ -2149,7 +2149,7 @@ function closeInfoDialog() {
   elements.infoDialog.hidden = true;
   elements.infoDialogTitle.textContent = "";
   elements.infoDialogBody.innerHTML = "";
-  infoDialogReturnFocus?.focus();
+  infoDialogReturnFocus?.focus({ preventScroll: true });
   infoDialogReturnFocus = null;
 }
 
@@ -16399,7 +16399,7 @@ function hideQuickEntry({ restoreFocus = true } = {}) {
   elements.quickEntryLog.replaceChildren();
   quickEntryState = null;
   if (restoreFocus && returnFocus?.isConnected && returnFocus.getClientRects().length) {
-    returnFocus.focus();
+    returnFocus.focus({ preventScroll: true });
   }
 }
 
