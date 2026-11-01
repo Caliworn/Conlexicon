@@ -6042,7 +6042,7 @@ input[type="checkbox"].switch:checked:is(:disabled, [aria-disabled="true"]) {
 }
 
 /* Chrome leaves a stale box edge on the fixed navigation's backdrop filter
-   while a full-screen scrim covers it (any filter, including plain blur), and
+   while a full-screen scrim covers it (any blur, native or SVG), and
    only a window-level repaint clears it. The scrim hides the blur anyway.
    Important outranks every skin's optics state rules. */
 body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {

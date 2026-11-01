@@ -321,6 +321,15 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
     border-radius: var(--liquid-glass-navigation-rail-radius);
   }
 
+  /* Chrome leaves a stale box edge on the fixed navigation's backdrop filter
+     after partial repaints (any blur, native or SVG). Only the page
+     gradient sits behind it on desktop, so the filter shows nothing anyway.
+     Important outranks the optics state rules; the baked rim highlight stays. */
+  body[data-ui-skin="liquid-glass"] .dictionary-panel {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
   body[data-ui-skin="liquid-glass"] .workspace {
     grid-column: 1;
     padding-left: calc(var(--liquid-glass-navigation-width) + var(--liquid-glass-navigation-inset) + 28px);
