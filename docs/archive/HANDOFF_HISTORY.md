@@ -2,7 +2,7 @@
 
 本文是 `NEXT_IMPLEMENTATION_HANDOFF.md` 在 2026-09-30 精简前的历史记录，原样保留当时的状态说明、阶段 B 实施流水、测试与代码组织建议和接手清单，供追溯决策背景使用。
 
-**本文不是现行规范。** 其中不少条目已被后续实现或专题文档取代（文中也有“此行为取代早期描述”之类的互相覆盖记录）。现行行为以 [API 契约](../API_CONTRACT.md)、各专题文档、`AGENTS.md` 和当前代码为准；当前进度与下一步见 `NEXT_IMPLEMENTATION_HANDOFF.md`。阶段 A、A+、C、D 的设计已分别迁至 [应用外壳规范](../APP_SHELL_SPEC.md)、[触摸、焦点与无障碍计划](../TOUCH_FOCUS_A11Y_PLAN.md)、[例句链接计划](../EXAMPLE_CORPUS_LINK_PLAN.md) 和 [语料库工作区计划](../CORPUS_WORKSPACE_PLAN.md)，不在本文重复。
+**本文不是现行规范。** 其中不少条目已被后续实现或专题文档取代（文中也有“此行为取代早期描述”之类的互相覆盖记录）。现行行为以 [API 契约](../API_CONTRACT.md)、各专题文档、`AGENTS.md` 和当前代码为准；当前进度与下一步见 `NEXT_IMPLEMENTATION_HANDOFF.md`。阶段 A、A+ 的设计已分别迁至 [应用外壳规范](../APP_SHELL_SPEC.md) 和 [触摸、焦点与无障碍计划](../TOUCH_FOCUS_A11Y_PLAN.md)，原阶段 C、D 已由 [轻量语料库计划](../CORPUS_LIGHTWEIGHT_PLAN.md) 取代，不在本文重复。
 
 ---
 

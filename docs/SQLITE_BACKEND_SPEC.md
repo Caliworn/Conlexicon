@@ -493,8 +493,7 @@ CREATE TABLE entry_morphology_search_values (
 以下在真实需求或基准出现前不做；它们可以受益于 SQLite，但不应和无关改动混在一起：
 
 - **候选索引**（FTS、ngram 等）：fuzzy 仍线性扫描所选 projection records，只有真实词典基准确认它成为主要瓶颈后再选型。
-- **语料 SQL 化**：语料库进入独立升级阶段（[阶段 D](CORPUS_WORKSPACE_PLAN.md)）后，再把 `module_blobs.corpus` 拆成正式 SQL 表及块/单元级 API；保存粒度的待定事项见审计 R06。
-- **例句语料链接**：见[阶段 C 计划](EXAMPLE_CORPUS_LINK_PLAN.md)；释义外键与级联策略见审计 R11。
+- **语料 SQL 化与例句连接**：见[轻量语料库计划](CORPUS_LIGHTWEIGHT_PLAN.md)，实施后 `module_blobs.corpus` 和 `definitions.example` 由 `corpus_items`、`definition_examples` 取代。
 - 自定义滚动条、首字母/全局导航地图和 marker/overview 交互；现有原生滚动条、数据窗口与虚拟列表继续保留。
 - 高级形态分析或自动 gloss 系统。
 - 面向多窗口实时协同的 revision 机制；单词条条件保存见审计 A05 与 [Entry Incremental Save Plan](ENTRY_INCREMENTAL_SAVE_PLAN.md)。

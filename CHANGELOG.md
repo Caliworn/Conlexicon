@@ -13,6 +13,7 @@
 
 ### 文档
 
+- 新增 `docs/CORPUS_LIGHTWEIGHT_PLAN.md`：田野调查需求已不存在，语料库改为缩成一句一条的轻量结构，释义可以直接连接语料 ID。计划取代并删除 `docs/EXAMPLE_CORPUS_LINK_PLAN.md`、`docs/CORPUS_WORKSPACE_PLAN.md`，交接和各专题文档的引用同步更新。功能尚未实施。
 - 液态玻璃 tint 方向定案（规范 13.19）：继续用静态中性叠色，放弃明暗压缩；大面板定位为磨砂面板；tint 在视觉定稿时按表面调整数值，视觉定稿和去框化 U4 不再等它。不提供照片背景选项，从搁置清单删除，交接文档里依赖照片背景的未验收项一并清理。Apple 材质的观察记录移入 `docs/archive/LIQUID_GLASS_RESEARCH.md`。
 
 ## 2026-11-01

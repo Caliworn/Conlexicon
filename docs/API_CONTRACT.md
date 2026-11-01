@@ -428,7 +428,7 @@ SQLite projection 查询中，带 `q` 的分页结果会为每个命中词条附
 
 `/root-groups` 带搜索时复用相同的静态/形态 projection 匹配 SQL，但只消费去重命中 ID，不执行普通词条列表所需的排序；命中集合随后映射到独立缓存的稳定词根拓扑。该路径不接受或物化一份来自拓扑的全词典候选 ID 数组。
 
-未来例句迁移为语料链接后，`examples` record 仍以对应释义作为列表展示定位；语料单元 ID 的返回字段随阶段 C 的关系 API 一并确定，当前 record 形状不预留。
+未来例句迁移为语料连接后，`examples` record 仍以对应释义作为列表展示定位；来源定位的调整见[轻量语料库计划](CORPUS_LIGHTWEIGHT_PLAN.md)，当前 record 形状不预留。
 
 形态搜索不是简单读取持久化字段。词条使用 `morphologyMode: "auto" | "manual"`：`auto` 先按自动分配规则得出有序模板组，再按真实 `templateGroupId` 合并该词条的 overlay；`manual` 按词条形态组 position 使用显式模板组，空列表表示明确不使用形态。随后遍历组内全部子表，逐格读取以真实子表 ID 分层的 override；没有 override 时用词形、形态规则和形态函数动态生成默认形式。`templateGroupId` 不再接受 `"auto"` 或 `"none"` 伪值；旧 JSON 的转换只发生在导入迁移。
 
