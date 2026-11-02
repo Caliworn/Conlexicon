@@ -6,7 +6,7 @@
 
 - 生命周期恢复由引擎统一处理：Q3 激活时观察 hidden/class/style 属性变化，仅将影响已注册表面的祖先或表面加入逐帧合并检查；可见性恢复不依赖 ResizeObserver。几何 transitionend/transitioncancel 后检查最终参数；仍有相关过渡运行时等待其结束，最终状态取消额外 resize 防抖。无动画的状态变化同样有效；transform/opacity 动画不触发重建。关闭引擎时移除观察器、事件和待处理帧。
 - Q3 资源解析统一覆盖注册、重新显示、参数更新和 resize：相同当前资源不写状态；精确缓存命中同步领取并替换，先保留目标引用再释放旧引用，不经过 pending。仅连续 resize 的缓存/在途任务均未命中时等待 80ms；等待或失败使用 Q1，不拉伸旧几何。现有精确参数键、32MiB 会话 LRU、提交时几何/注册/会话校验及换肤清理继续保留，不预生成尺寸档位。
-- 当前状态：LQ-1–LQ-6 已完成并完成第一优先级光学校正、可读性修正与圆角法线连续性修正；正式 continuous 表面（导航、移动顶栏、列表搜索栏与工具栏背景）和紧凑 relationship 控件在 Q3 使用角色化光学模糊、受安全 bezel 约束的几何滤镜和预烘焙的静态环境 specular 层，所有角色默认只做单次位移、不做 RGB 色散，micro 保持无逐控件 backdrop 采样的 CSS 体积材质；focus、modal 与 floating（后两者 2026-10-02 起）固定使用 Q1。LQ-7 已完成候选 1、2（高光拆层、去色散；2026-10-02 色散改为全部角色默认关闭），其余待实测。
+- 当前状态：LQ-1–LQ-6 已完成并完成第一优先级光学校正、可读性修正与圆角法线连续性修正；正式 continuous 表面（导航、列表搜索栏与工具栏背景）和紧凑 relationship 控件在 Q3 使用角色化光学模糊、受安全 bezel 约束的几何滤镜和预烘焙的静态环境 specular 层，所有角色默认只做单次位移、不做 RGB 色散，micro 保持无逐控件 backdrop 采样的 CSS 体积材质；focus、modal 与 floating（后两者 2026-10-02 起）固定使用 Q1。LQ-7 已完成候选 1、2（高光拆层、去色散；2026-10-02 色散改为全部角色默认关闭），其余待实测。
 - 用户可见名称：`液态玻璃 / Liquid Glass`。
 - 内部 ID：`liquid-glass`。
 - 经典皮肤继续作为默认与未知值回退；`layered-glass` 继续保持已经冻结的层叠玻璃边界。
@@ -52,7 +52,7 @@
 
 ### 4.3 连续导航与列表控制栏
 
-桌面导航、移动应用栏和移动抽屉使用半透明连续玻璃。Q3 对单实例连续表面使用受限分辨率的几何折射，在动态 URL filter 内先执行 `3px` 光学模糊，再叠加角色级中性 tint；Q1 使用相同的 continuous tint、`3px` blur、`1.06×` 饱和度、边框和阴影，只省略贴图与方向性光学。工具导航内部是同一玻璃上的平面列表行：idle 透明，hover 使用低透明中性状态底，active 使用无独立折射、无固定渐变和无外阴影的选择胶囊。展开栏、rail 和移动抽屉共享这一状态语言，不把每个工具项注册成玻璃表面。
+桌面导航和移动抽屉使用半透明连续玻璃。移动应用栏（2026-11-02 起）不是玻璃表面：没有外壳，只有一条底部细分隔线，栏内按钮按紧凑控件注册。Q3 对单实例连续表面使用受限分辨率的几何折射，在动态 URL filter 内先执行 `3px` 光学模糊，再叠加角色级中性 tint；Q1 使用相同的 continuous tint、`3px` blur、`1.06×` 饱和度、边框和阴影，只省略贴图与方向性光学。工具导航内部是同一玻璃上的平面列表行：idle 透明，hover 使用低透明中性状态底，active 使用无独立折射、无固定渐变和无外阴影的选择胶囊。展开栏、rail 和移动抽屉共享这一状态语言，不把每个工具项注册成玻璃表面。
 
 液态玻璃独立启用 Mail 布局：桌面摘要列表最大宽度 `340px`，详情获得剩余空间；移动端保留原抽屉。搜索框与下方工具胶囊均撑满列表宽度，两侧边界对齐；工具按钮保持 `40px`，以至少 `8px` 的水平间距逐行均匀分配余量。两条装饰分隔线不占 flex 空间，由布局控制器在同步和容器尺寸变化时置于相邻分组按钮间隙中央；分组边界跨行时隐藏该线。空间不足时按三个分组（菜单、词根模式、新建）整体换行，分组不拆开，新建靠右，行距 `4px`；词根操作常驻，切换模式不改变按钮位置。两者各有一个无交互、`aria-hidden` 的 `continuous` 滤镜叶节点（`.entry-mail-search-surface`、`.entry-mail-tools-surface`）。请求 bezel `44px`、最大位移 `12px`、光学模糊 `3px`、饱和度 `1.06×`、最大贴图边长 `420px` 均复用现有角色；tint/外阴影复用移动应用栏材质，浅/暗 tint 均为 `0.34`，常态轮廓消费 `--radius-pill`。词根扩展态半径上限为单行胶囊的 `24px`，避免窄屏两行工具栏变成端部过圆的椭圆。
 
@@ -82,7 +82,7 @@ LQ-1 使用现有 token 契约，不增加组件 DOM，也不加入专用运行�
 
 - `theme-liquid-glass.css` 只在 `body[data-ui-skin="liquid-glass"]` 下覆盖明暗材质。
 - 画布提供连续环境色场。
-- navigation、navigation-drawer、mobile-bar、floating、overlay-panel 和 entry-detail 按 continuous/focus/floating/modal 角色消费与 Q3 一致的 tint、blur、饱和度、边框与阴影；Q1 不包含任何贴图或方向性光学。
+- navigation、navigation-drawer、floating、overlay-panel 和 entry-detail 按 continuous/focus/floating/modal 角色消费与 Q3 一致的 tint、blur、饱和度、边框与阴影；Q1 不包含任何贴图或方向性光学。
 - control 使用静态多层反射，但不使用 blur。
 - panel、list-item、browser 和 inset 不执行 backdrop blur。
 - 不支持 blur、减少透明度和强制高对比时提供同层级实色降级。
@@ -240,7 +240,7 @@ liquidGlassEngine.deactivate();
 
 圆角矩形的最近边法线在内部 medial axis 上会发生方向切换，分别截断水平/垂直影响也会留下可见的激活线。Q3 因此把“外轮廓距离”和“光学方向”分离：先按实际元素尺寸归一化四角半径，以精确 signed distance 决定 inside、edge distance 与 rim；最外层继续服从真实边界法线，随后用 quintic smootherstep 过渡到由四条边共同贡献、全支撑且解析连续的有理势场法线。位移图和 normal/rim 图必须消费同一个方向场，光学带外法线归零；不得再以硬截断 influence、最近边分区或贴图后模糊遮盖接缝。`effectiveBezel = min(requestedBezel, minDimension / 2 - guard)`，不让最小视觉圆角钳制整条直边；`guard` 至少为 `2px` 或一个贴图采样间距。continuous/focus/floating/modal 请求 bezel 为 `44/46/36/52px`。内容、菜单、tooltip、modal 和网络面板继续消费对应角色圆角；导航卡片使用液态皮肤私有的结构圆角，因为它表达的是跨展开、rail 和移动抽屉状态的导航容器，而不是共享 panel。Lab 的圆角滑杆仍是独立诊断输入，不受此约束。
 
-桌面导航、rail、移动应用栏和移动抽屉现在都从视口边缘内缩，四条边均暴露于连续背景，因此与 focus、floating、modal 一样使用完整四边模型。若安全宽度不足 `4px`，表面稳定使用 Q1 普通 blur，不生成畸形贴图；尺寸变化期间立即解除旧几何滤镜并显示 Q1 材质，`ResizeObserver` 合并变化后再以稳定尺寸进入 Q3，禁止拉伸旧贴图伪装过渡。
+桌面导航、rail 和移动抽屉现在都从视口边缘内缩，四条边均暴露于连续背景，因此与 focus、floating、modal 一样使用完整四边模型。若安全宽度不足 `4px`，表面稳定使用 Q1 普通 blur，不生成畸形贴图；尺寸变化期间立即解除旧几何滤镜并显示 Q1 材质，`ResizeObserver` 合并变化后再以稳定尺寸进入 Q3，禁止拉伸旧贴图伪装过渡。
 
 位移图的 R/G 通道分别编码归一化 X/Y 偏移；第二张图的 R/G/B 分别编码 X 法线、Y 法线与 rim。光源方向不进入几何缓存键；当前产品路径使用默认环境光向量，内部 `setLightVector()` 能力保留给后续正确坐标模型，但应用不再从局部指针位置驱动全部表面。滤镜管线依次完成：
 
@@ -274,7 +274,7 @@ Q1 与 Q3 通过同一个表面局部接口衔接：各正式消费者映射质�
 
 | 角色 | 消费者 | 折射策略 | 动态策略 |
 | --- | --- | --- | --- |
-| `continuous` | 桌面浮动导航卡片、移动浮动应用栏与导航抽屉、词条列表控制栏背景、标签管理页搜索框 | `3px` 光学模糊；所有内缩容器使用完整四边折射。桌面导航例外（2026-11-02 起）：宽度 800px 及以上不使用 `backdrop-filter`，只保留 tint 与 specular，以规避 Chrome 局部重绘时在其背景模糊上留下的方框边缘（原生与 SVG 模糊都会触发，只做位移不会） | 静态环境 specular；不跟随局部指针 |
+| `continuous` | 桌面浮动导航卡片、移动导航抽屉、词条列表控制栏背景、标签管理页搜索框 | `3px` 光学模糊；所有内缩容器使用完整四边折射。桌面导航例外（2026-11-02 起）：宽度 800px 及以上不使用 `backdrop-filter`，只保留 tint 与 specular，以规避 Chrome 局部重绘时在其背景模糊上留下的方框边缘（原生与 SVG 模糊都会触发，只做位移不会） | 静态环境 specular；不跟随局部指针 |
 | `focus` | 内容外壳（`data-surface="content-shell"`）：词条详情、完整编辑，以及工具页面的卡片 | 固定 Q1：`4px` CSS blur、`1.09×` 饱和度及原 tint/边框/阴影 | CSS-only，无贴图、位移、色散或光学 specular |
 | `floating` | 搜索/筛选/排序/皮肤菜单、来源建议、右键菜单、全部结构化 tooltip/popover、toast | 固定 Q1（2026-10-02 起）：`5.5px` CSS blur、`1.12×` 饱和度及原 tint/边框/阴影 | CSS-only，无贴图、位移或光学 specular |
 | `modal` | 信息/确认 modal、词汇网络主面板 | 固定 Q1（2026-10-02 起）：`7px` CSS blur、`1.08×` 饱和度及原 tint/边框/阴影 | CSS-only，无贴图、位移或光学 specular；遮罩不成为 Backdrop Root |

@@ -819,7 +819,7 @@ for (const definition of liquidGlassSurfaceDefinitions) {
 const liquidGlassContinuousDefinitions = liquidGlassSurfaceDefinitions.filter(({ role }) => role === "continuous");
 assert.deepEqual(
   new Set(liquidGlassContinuousDefinitions.map(({ selector }) => selector)),
-  new Set([".dictionary-panel", ".mobile-app-bar", ".entry-mail-search-surface", ".entry-mail-tools-surface", ".tag-manager-search-surface"]),
+  new Set([".dictionary-panel", ".entry-mail-search-surface", ".entry-mail-tools-surface", ".tag-manager-search-surface"]),
   "Continuous navigation and Mail search/tools backgrounds must remain independent optical surfaces",
 );
 assert(
@@ -833,9 +833,9 @@ assert(
   "Liquid Glass desktop navigation must float as one inset card above a full-width canvas",
 );
 assert(
-  /@media \(max-width: 799\.98px\) \{[\s\S]*?body\[data-ui-skin="liquid-glass"\] \.mobile-app-bar\s*\{[\s\S]*?margin:[\s\S]*?border:\s*1px solid var\(--material-floating-border\);[\s\S]*?border-radius:/s.test(liquidGlass)
+  /@media \(max-width: 799\.98px\) \{[\s\S]*?body\[data-ui-skin="liquid-glass"\] \.mobile-app-bar\s*\{[^}]*border-bottom-color:\s*var\(--ui-border\);[^}]*background:\s*transparent;[^}]*backdrop-filter:\s*none;/s.test(liquidGlass)
     && /body\[data-ui-skin="liquid-glass"\] \.app-nav\[data-nav-state="drawer"\][\s\S]*?inset:[\s\S]*?border-radius:\s*var\(--liquid-glass-mobile-navigation-radius\);/s.test(liquidGlass),
-  "Liquid Glass compact navigation must keep both the app bar and drawer inset from viewport edges",
+  "Liquid Glass compact navigation must keep a flat app bar and an inset drawer",
 );
 assert(
   /\.dictionary-panel \.utility-actions\s*\{[^}]*border-top:\s*1px solid var\(--material-navigation-control-border\);[^}]*background:\s*transparent;/s.test(liquidGlass),

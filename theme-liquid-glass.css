@@ -528,11 +528,6 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel[data-nav-state="drawer"] {
   --liquid-glass-surface-tint: var(--liquid-glass-navigation-drawer-surface-tint);
 }
 
-body[data-ui-skin="liquid-glass"] .mobile-app-bar {
-  --liquid-glass-surface-tint: var(--liquid-glass-mobile-bar-surface-tint);
-  --liquid-glass-surface-q1-filter: var(--liquid-glass-q1-continuous-filter);
-}
-
 /* Content shells: page-level panels that hold a tool's or an entry's content,
    declared with data-surface. Everything that treats them alike reads that. */
 body[data-ui-skin="liquid-glass"] [data-surface="content-shell"] {
@@ -650,7 +645,7 @@ body[data-ui-skin="liquid-glass"] :is([data-control-tone="neutral"]:not([data-co
   --control-pressed-shadow: var(--liquid-glass-compact-control-shadow);
 }
 
-body[data-ui-skin="liquid-glass"] :is(.dictionary-panel, .mobile-app-bar, .entry-search-control, .entry-mail-tools, .tag-manager-search, #docsModeControl, #corpusModeControl, #tagManagerViewControl) {
+body[data-ui-skin="liquid-glass"] :is(.dictionary-panel, .entry-search-control, .entry-mail-tools, .tag-manager-search, #docsModeControl, #corpusModeControl, #tagManagerViewControl) {
   --liquid-glass-compact-control-shadow: none;
 }
 
@@ -833,16 +828,14 @@ body[data-ui-skin="liquid-glass"] :is(
 }
 
 @media (max-width: 799.98px) {
+  /* No shell: nothing scrolls behind the bar, so its buttons carry the glass and
+     one hairline separates them from the content below. */
   body[data-ui-skin="liquid-glass"] .mobile-app-bar {
-    top: var(--liquid-glass-mobile-navigation-inset);
-    margin:
-      var(--liquid-glass-mobile-navigation-inset)
-      var(--liquid-glass-mobile-navigation-inset)
-      0;
-    min-height: 54px;
-    padding: 6px 10px;
-    border: 1px solid var(--material-floating-border);
-    border-radius: 20px;
+    border-bottom-color: var(--ui-border);
+    background: transparent;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   body[data-ui-skin="liquid-glass"] .dictionary-panel,
@@ -864,7 +857,6 @@ body[data-ui-skin="liquid-glass"] :is(
 
 body[data-ui-skin="liquid-glass"]:not(.dark-theme) :is(
   .dictionary-panel,
-  .mobile-app-bar,
   .entry-mail-search-surface,
   .entry-mail-tools-surface,
   .tag-manager-search-surface,
@@ -1018,12 +1010,6 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
     -webkit-backdrop-filter: none;
   }
 
-  body[data-ui-skin="liquid-glass"] .mobile-app-bar {
-    box-shadow: var(--material-mobile-bar-shadow);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
-
   body[data-ui-skin="liquid-glass"] :is(
     .entry-search-config-menu,
     .entry-filter-menu,
@@ -1170,7 +1156,6 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
 
   body[data-ui-skin="liquid-glass"] :is(
     [data-surface="content-shell"],
-    .mobile-app-bar,
     .entry-search-config-menu,
     .entry-filter-menu,
     .source-suggestions,
