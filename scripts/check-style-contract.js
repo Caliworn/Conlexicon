@@ -844,7 +844,7 @@ assert(
 const liquidGlassOpticalRoleRule = liquidGlassStyleBlocks.find(({ selector, declarations }) => (
   selector.includes('[data-liquid-glass-optics-quality="q3"]')
     && selector.includes('[data-liquid-glass-optics="ready"]')
-    && declarations.includes("backdrop-filter: var(--liquid-glass-optical-filter);")
+    && declarations.includes("backdrop-filter: var(--liquid-glass-optical-filter, var(--liquid-glass-surface-q1-filter));")
 ));
 assert(liquidGlassOpticalRoleRule, "Q3 must apply generated optics only to ready runtime roles");
 assert(

@@ -120,7 +120,8 @@ body[data-ui-skin="liquid-glass"] {
   --material-list-item-secondary-color: inherit;
   --material-list-item-secondary-opacity: 0.77;
   --material-browser-background: rgba(232, 241, 243, 0.66);
-  --material-browser-filter: none;
+  /* The narrow entry drawer covers page content, like the navigation drawer. */
+  --material-browser-filter: var(--liquid-glass-q1-continuous-filter);
   --material-tooltip-background: #10181c;
   --material-tooltip-text: #f8fbfa;
   --material-tooltip-border: rgba(255, 255, 255, 0.18);
@@ -458,7 +459,8 @@ body[data-ui-skin="liquid-glass"] .docs-editor-pane:focus-within {
 /* Two independent decorative leaves; popup ancestors stay unfiltered. */
 body[data-ui-skin="liquid-glass"] :is(.entry-mail-search-surface, .entry-mail-tools-surface, .tag-manager-search-surface) {
   --liquid-glass-surface-tint: var(--material-mobile-bar-background);
-  --liquid-glass-surface-q1-filter: var(--material-mobile-bar-filter);
+  /* Nothing scrolls behind these leaves. */
+  --liquid-glass-surface-q1-filter: none;
   display: block;
   position: absolute;
   inset: 0;
@@ -554,7 +556,8 @@ body[data-ui-skin="liquid-glass"] :is(
 /* Experimental compact surfaces share one registry-owned material boundary. */
 body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"] {
   --liquid-glass-surface-tint: var(--material-floating-background);
-  --liquid-glass-surface-q1-filter: blur(1px) saturate(1.04);
+  /* Compact controls sit on static panels or the page gradient. */
+  --liquid-glass-surface-q1-filter: none;
   --material-control-background: var(--liquid-glass-surface-tint);
   background: var(--liquid-glass-surface-tint);
   border-color: var(--material-floating-border);
@@ -821,8 +824,9 @@ body[data-ui-skin="liquid-glass"] :is(
     background-size: 100% 100%;
     background-repeat: no-repeat;
     background-origin: border-box;
-    backdrop-filter: var(--liquid-glass-optical-filter);
-    -webkit-backdrop-filter: var(--liquid-glass-optical-filter);
+    /* Without refraction the engine sets no optical filter. */
+    backdrop-filter: var(--liquid-glass-optical-filter, var(--liquid-glass-surface-q1-filter));
+    -webkit-backdrop-filter: var(--liquid-glass-optical-filter, var(--liquid-glass-surface-q1-filter));
   }
 }
 
@@ -926,6 +930,7 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
     --material-navigation-filter: none;
     --material-navigation-drawer-background: #e8f2f2;
     --material-navigation-drawer-filter: none;
+    --material-browser-filter: none;
     --material-list-item-background: #f8fbfb;
     --material-browser-background: #eaf1f3;
     --material-rich-tooltip-background: #eff7f7;
@@ -969,6 +974,7 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
     --material-navigation-filter: none;
     --material-navigation-drawer-background: #e8f2f2;
     --material-navigation-drawer-filter: none;
+    --material-browser-filter: none;
     --material-list-item-background: #f8fbfb;
     --material-browser-background: #eaf1f3;
     --material-rich-tooltip-background: #eff7f7;
@@ -1082,6 +1088,7 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
     --material-navigation-filter: none;
     --material-navigation-drawer-background: Canvas;
     --material-navigation-drawer-filter: none;
+    --material-browser-filter: none;
     --material-navigation-text: CanvasText;
     --material-navigation-muted: CanvasText;
     --material-navigation-control-shadow: none;

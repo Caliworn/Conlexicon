@@ -6815,6 +6815,7 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
     background: var(--material-browser-background);
     box-shadow: var(--material-floating-shadow);
     backdrop-filter: var(--material-browser-filter);
+    -webkit-backdrop-filter: var(--material-browser-filter);
   }
 
   .entry-filter-menu {

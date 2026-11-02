@@ -113,6 +113,8 @@ const entryDetailCache = new QueryPageCache({
 const liquidGlassOpticalEngine = window.ConlexiconLiquidGlassEngine?.createEngine({
   workerUrl: "lib/liquid-glass-map-worker.js",
   maxBytes: 32 * 1024 * 1024,
+  // The product keeps baked highlights only; refraction stays in the Lab.
+  refraction: false,
 }) || null;
 if (liquidGlassOpticalEngine) {
   window.ConlexiconLiquidGlassRuntime = liquidGlassOpticalEngine;

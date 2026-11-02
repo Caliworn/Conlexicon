@@ -918,7 +918,36 @@ async function checkConcurrentWorkerFailure() {
   renderer.dispose();
 }
 
-checkConcurrentWorkerFailure().then(checkAsyncSurfaceLifecycle).then(() => {
+// The product turns refraction off: a resource keeps only its baked highlight
+// and the surface falls back to its CSS Q1 backdrop filter.
+async function checkHighlightOnlyResource() {
+  const engine = new LiquidGlassEngine({ refraction: false });
+  engine.active = true;
+  engine.renderer = { render: async () => ({ width: 2, height: 2, byteLength: 0, specularBuffer: new ArrayBuffer(16) }) };
+  engine.materializePayload = async () => ["map", "rim", "highlight"];
+  engine.createFilter = () => {
+    throw new Error("Without refraction no SVG displacement filter may be built");
+  };
+  const resource = await engine.createResource("highlight-only", { specularStrength: 0.48 }, engine.sessionGeneration);
+  assert.equal(resource.filterId, "");
+  assert.equal(resource.filterElement, null);
+  assert.equal(resource.highlightUrl, "highlight");
+  const properties = new Map();
+  const record = {
+    cacheKey: "",
+    element: {
+      dataset: {},
+      style: { setProperty: (name, value) => properties.set(name, value) },
+    },
+  };
+  engine.attachSurfaceResource(record, "highlight-only", resource);
+  assert.equal(properties.has("--liquid-glass-optical-filter"), false,
+    "Highlight-only surfaces must leave the optical filter unset so CSS uses the Q1 filter");
+  assert.equal(properties.get("--liquid-glass-specular-layer"), 'url("highlight")');
+  assert.equal(record.element.dataset.liquidGlassOptics, "ready");
+}
+
+checkConcurrentWorkerFailure().then(checkAsyncSurfaceLifecycle).then(checkHighlightOnlyResource).then(() => {
   console.log("Liquid Glass geometry, deterministic map, and byte-budget cache checks passed.");
 }).catch((error) => {
   console.error(error);
