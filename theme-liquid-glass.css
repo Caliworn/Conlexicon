@@ -54,8 +54,9 @@ body[data-ui-skin="liquid-glass"] {
   --material-entry-detail-mobile-background: var(--liquid-glass-focus-surface-tint);
   --material-content-shell-border: rgba(255, 255, 255, 0.78);
   --material-content-shell-shadow: 0 26px 68px rgba(14, 39, 48, 0.18), 0 4px 14px rgba(14, 39, 48, 0.1);
-  --material-content-shell-filter: var(--liquid-glass-q1-focus-filter);
-  --material-entry-detail-mobile-filter: var(--liquid-glass-q1-focus-filter);
+  /* Only the page gradient sits behind content shells, and blurring it bands. */
+  --material-content-shell-filter: none;
+  --material-entry-detail-mobile-filter: none;
   --material-entry-detail-section-background: rgba(249, 252, 252, 0.9);
   --material-entry-detail-section-border: rgba(65, 99, 108, 0.18);
   --material-entry-detail-header-divider: transparent;
@@ -141,7 +142,6 @@ body[data-ui-skin="liquid-glass"] {
   --material-network-node-focus-shadow: drop-shadow(0 16px 24px rgba(24, 121, 108, 0.17));
   --material-network-status-filter: blur(10px);
   --liquid-glass-q1-continuous-filter: blur(3px) saturate(1.06);
-  --liquid-glass-q1-focus-filter: blur(4px) saturate(1.09);
   --liquid-glass-q1-floating-filter: blur(5.5px) saturate(1.12);
   --liquid-glass-q1-modal-filter: blur(7px) saturate(1.08);
   --liquid-glass-navigation-surface-tint: rgba(242, 249, 248, 0.38);
@@ -532,7 +532,6 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel[data-nav-state="drawer"] {
    declared with data-surface. Everything that treats them alike reads that. */
 body[data-ui-skin="liquid-glass"] [data-surface="content-shell"] {
   --liquid-glass-surface-tint: var(--liquid-glass-focus-surface-tint);
-  --liquid-glass-surface-q1-filter: var(--liquid-glass-q1-focus-filter);
   border-color: var(--material-content-shell-border);
   background: var(--material-content-shell-background);
   box-shadow: var(--material-content-shell-shadow);
@@ -916,8 +915,6 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
     --material-panel-background: #f8fbfb;
     --material-content-shell-background: #f8fbfb;
     --material-entry-detail-mobile-background: #f8fbfb;
-    --material-content-shell-filter: none;
-    --material-entry-detail-mobile-filter: none;
     --material-entry-detail-section-background: #ffffff;
     --material-control-background: #f7fbfb;
     --material-inset-background: #e2ecee;
@@ -961,8 +958,6 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
     --material-panel-background: #f8fbfb;
     --material-content-shell-background: #f8fbfb;
     --material-entry-detail-mobile-background: #f8fbfb;
-    --material-content-shell-filter: none;
-    --material-entry-detail-mobile-filter: none;
     --material-entry-detail-section-background: #ffffff;
     --material-control-background: #f7fbfb;
     --material-inset-background: #e2ecee;
@@ -1063,8 +1058,6 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
     --material-entry-detail-mobile-background: Canvas;
     --material-content-shell-border: CanvasText;
     --material-content-shell-shadow: none;
-    --material-content-shell-filter: none;
-    --material-entry-detail-mobile-filter: none;
     --material-entry-detail-section-background: Canvas;
     --material-entry-detail-section-border: CanvasText;
     --material-control-background: ButtonFace;

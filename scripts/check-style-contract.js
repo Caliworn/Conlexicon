@@ -867,7 +867,7 @@ assert(
   liquidGlassQ1RuntimeRule,
   "Q1 pending and fallback surfaces must consume one semantic tint/filter interface",
 );
-for (const role of ["continuous", "focus", "floating", "modal"]) {
+for (const role of ["continuous", "floating", "modal"]) {
   const defaults = liquidGlassEngineApi.ROLE_DEFAULTS[role];
   const expectedFilter = `--liquid-glass-q1-${role}-filter: blur(${defaults.opticalBlur}px) saturate(${defaults.saturation});`;
   assert(
