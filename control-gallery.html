@@ -200,7 +200,7 @@
 
     /* Product surfaces are fixed, sticky or off-canvas; here they sit in flow at a
        fixed size. Paint, borders, shadows and filters stay with the product rules. */
-    .cg-roles [data-cg-role] {
+    .cg-roles [data-cg-role]:not([data-cg-natural-size]) {
       position: relative !important;
       inset: auto !important;
       transform: none !important;
@@ -216,6 +216,22 @@
       /* Entrance animations (the tooltip fade-in) are motion, not material; without
          them a fixture always shows its settled appearance. */
       animation: none !important;
+    }
+
+    /* Size fixtures keep the product geometry: the Lab locks compact controls and
+       the toolbar capsule to these bounds. Every button carries the same text, so
+       the seven recipes differ only in paint. */
+    .cg-size-fixtures {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      max-width: 340px;
+    }
+
+    .cg-toolbar-fixture {
+      width: 300px;
+      max-width: 100%;
     }
 
     /* Mobile surfaces take their geometry and material from the < 800px media
@@ -437,7 +453,7 @@
 
     <section class="cg-roles-section">
       <h2>材质角色表面</h2>
-      <p class="cg-note">产品各材质角色的空外壳，使用产品类名，对照页只把它们改为原位排列的固定尺寸。Liquid Glass Lab 的产品外观探针读取这里的夹具（以及上方“页面底 · 默认”的七种控件）。抽屉和移动顶栏的外观只在视口窄于 800px 时生效（与横竖比例无关）：宽窗口下它们显示在一个 480px 宽的内嵌视口中，跟随本页的皮肤、明暗与背景；窗口本身窄于 800px 时直接原位显示。</p>
+      <p class="cg-note">产品各材质角色的空外壳，使用产品类名，对照页只把它们改为原位排列的固定尺寸。Liquid Glass Lab 的产品外观探针读取这里的夹具。工具栏胶囊和七种紧凑控件是尺寸夹具：保持产品尺寸，按钮统一写“示例文字”（与 Lab 舞台的示例文字相同），Lab 选中它们时按夹具的宽高和圆角锁定几何。抽屉和移动顶栏的外观只在视口窄于 800px 时生效（与横竖比例无关）：宽窗口下它们显示在一个 480px 宽的内嵌视口中，跟随本页的皮肤、明暗与背景；窗口本身窄于 800px 时直接原位显示。</p>
       <div class="cg-roles">
         <figure><figcaption>导航</figcaption><aside class="dictionary-panel app-nav" data-nav-state="expanded" data-cg-role="navigation"></aside></figure>
         <figure data-cg-mobile><figcaption>导航抽屉</figcaption><aside class="dictionary-panel app-nav" data-nav-state="drawer" data-cg-role="navigation-drawer"></aside></figure>
@@ -450,6 +466,16 @@
         <figure><figcaption>Toast</figcaption><div class="toast show" data-cg-role="toast"></div></figure>
         <figure><figcaption>弹窗</figcaption><section class="modal-panel" data-cg-role="modal"></section></figure>
         <figure><figcaption>词汇网络面板</figcaption><section class="network-panel" data-cg-role="network"></section></figure>
+        <figure inert><figcaption>工具栏胶囊（尺寸夹具）</figcaption>
+          <div class="filter-row entry-list-toolbar cg-toolbar-fixture">
+            <div class="entry-search-control">
+              <div class="entry-mail-search-surface" aria-hidden="true" data-cg-role="toolbar" data-cg-natural-size></div>
+              <svg class="nav-icon entry-mail-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg>
+              <input type="search" placeholder="搜索词形、释义、标签" aria-label="工具栏胶囊夹具">
+            </div>
+          </div>
+        </figure>
+        <figure inert><figcaption>紧凑控件（尺寸夹具，统一测试文字）</figcaption><div class="cg-size-fixtures" id="cgCompactFixtures"></div></figure>
       </div>
     </section>
 
@@ -773,6 +799,17 @@
           metric.className = "cg-metric";
           cell.append(label, toolbar, metric);
           container.append(cell);
+        });
+      }
+
+      // Size fixtures for the Lab: every recipe with the same text, so their bounds
+      // differ only where the recipe itself changes the geometry.
+      function buildCompactFixtures(container) {
+        RECIPES.forEach((recipe) => {
+          const button = controlButton({ ...recipe, text: "示例文字" });
+          button.dataset.cgRole = `compact-${recipe.id}`;
+          button.dataset.cgNaturalSize = "";
+          container.append(button);
         });
       }
 
@@ -1294,6 +1331,7 @@
         buildMatrix(container, container.dataset.cgContext, container.dataset.cgRows === "fields" ? FIELD_ROWS : ROWS);
       });
       buildSearchFields(document.getElementById("cgSearchFields"));
+      buildCompactFixtures(document.getElementById("cgCompactFixtures"));
       buildNav(document.getElementById("cgNavList"));
       buildSpecials(elements.specials);
       buildSwitchLabels(document.getElementById("cgSwitchLabels"));

@@ -71,11 +71,6 @@
       border-color: var(--lab-accent);
     }
 
-    .lab-compare-grid button[aria-pressed="true"] {
-      border-color: var(--lab-accent);
-      background: var(--lab-accent-soft);
-    }
-
     button:focus-visible,
     select:focus-visible,
     input:focus-visible {
@@ -151,9 +146,19 @@
 
     .lab-toolbar-group {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 8px;
       min-width: 0;
+    }
+
+    .lab-loupe-hint {
+      color: var(--lab-muted);
+      font-size: 12px;
+    }
+
+    .lab-loupe-hint[hidden] {
+      display: none;
     }
 
     .lab-toolbar label {
@@ -175,6 +180,51 @@
       overflow: hidden;
       isolation: isolate;
       background: var(--lab-stage);
+    }
+
+    .lab-stage[data-loupe="on"] {
+      cursor: crosshair;
+    }
+
+    /* The loupe holds an enlarged copy of the backdrop and the glass surface. The
+       copy is re-rendered at the larger scale, so edges stay sharp; the baked
+       highlight image is interpolated and shows its real resolution. */
+    .lab-loupe {
+      --lab-loupe-size: 240px;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 5;
+      width: var(--lab-loupe-size);
+      height: var(--lab-loupe-size);
+      overflow: hidden;
+      border-radius: 50%;
+      background: var(--lab-stage);
+      pointer-events: none;
+      /* A filter makes the loupe a backdrop root, so the copied glass samples only
+         the enlarged copy behind it, not the stage under the loupe. */
+      filter: drop-shadow(0 10px 28px rgba(0, 0, 0, 0.35));
+    }
+
+    .lab-loupe[hidden] {
+      display: none;
+    }
+
+    .lab-loupe::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      box-shadow: inset 0 0 0 2px var(--lab-accent);
+    }
+
+    .lab-loupe-content {
+      position: absolute;
+      top: 0;
+      left: 0;
+      display: grid;
+      place-items: center;
+      transform-origin: 0 0;
     }
 
     .lab-backdrop {
@@ -292,8 +342,10 @@
       width: 620px;
       height: 280px;
       max-width: calc(100% - 40px);
-      padding: clamp(22px, 5vw, 44px);
+      padding: var(--lab-panel-padding);
       overflow: hidden;
+      /* The sample text sizes itself to the surface, not to the window. */
+      container-type: size;
       border: 1px solid rgba(224, 249, 252, 0.28);
       border-radius: 8px;
       background: rgba(230, 246, 248, 0.28);
@@ -355,30 +407,60 @@
 
     }
 
-    /* Button-size surfaces have no room for the sample text or its padding. */
-    .lab-surface[data-compact="true"] {
-      padding: 0;
-    }
-
-    .lab-surface[data-compact="true"] .lab-surface-content {
+    /* Sample text tiers follow the surface size: a panel heading, a single line
+       for bars, toasts and tooltips, a button label, or nothing. */
+    .lab-surface [data-text] {
       display: none;
     }
 
-    .lab-surface-kicker {
-      margin: 0 0 8px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      opacity: 0.7;
+    .lab-surface[data-text-tier="panel"] [data-text="panel"],
+    .lab-surface[data-text-tier="bar"] [data-text="bar"],
+    .lab-surface[data-text-tier="button"] [data-text="button"] {
+      display: block;
+    }
+
+    .lab-surface:not([data-text-tier="panel"]) {
+      justify-content: center;
+    }
+
+    .lab-surface[data-text-tier="bar"] {
+      padding: 0 var(--lab-line-padding, 18px);
+    }
+
+    .lab-surface[data-text-tier="button"] {
+      padding: 0 var(--lab-line-padding, 14px);
+      text-align: center;
+    }
+
+    .lab-surface[data-text-tier="none"] {
+      padding: 0;
+    }
+
+    .lab-surface-line {
+      position: relative;
+      z-index: 2;
+      margin: 0;
+      overflow: hidden;
+      font-family: var(--lab-line-font-family, inherit);
+      font-size: var(--lab-line-font-size, 15px);
+      font-weight: var(--lab-line-font-weight, 500);
+      letter-spacing: var(--lab-line-letter-spacing, normal);
+      line-height: 1.3;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .lab-surface-line[data-text="button"] {
+      font-size: var(--lab-line-font-size, 14px);
+      font-weight: var(--lab-line-font-weight, 600);
     }
 
     .lab-surface h2 {
       margin: 0;
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: clamp(40px, 8vw, 76px);
-      line-height: 0.95;
-      letter-spacing: -0.055em;
+      font-size: clamp(28px, min(18cqi, 60cqb), 76px);
+      font-weight: 700;
+      line-height: 1.1;
+      white-space: nowrap;
     }
 
     .lab-readout {
@@ -504,12 +586,6 @@
       text-transform: uppercase;
     }
 
-    .lab-select-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
     .lab-field {
       display: grid;
       gap: 6px;
@@ -555,24 +631,132 @@
       line-height: 1.45;
     }
 
-    .lab-compare-grid {
+    /* The product's segmented control (one bordered strip, divided segments, a
+       solid selected segment) drawn with Lab tokens. */
+    .lab-segmented {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 7px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      overflow: hidden;
+      border: 1px solid var(--lab-border);
+      border-radius: 10px;
+      background: var(--lab-panel-strong);
     }
 
-    .lab-compare-grid button {
+    .lab-segmented button {
+      position: relative;
       min-width: 0;
-      padding: 7px 9px;
-      font-size: 11px;
-      line-height: 1.25;
+      min-height: 34px;
+      padding: 0 8px;
+      overflow: hidden;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--lab-muted);
+      font-size: 12px;
+      font-weight: 600;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .lab-segmented button:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      inset-block: 0;
+      right: 0;
+      width: 1px;
+      background: var(--lab-border);
+    }
+
+    .lab-segmented button:hover {
+      background: var(--lab-accent-soft);
+      color: var(--lab-text);
+    }
+
+    .lab-segmented button[aria-checked="true"] {
+      background: var(--lab-accent);
+      color: var(--lab-page);
+    }
+
+    .lab-segmented button:focus-visible {
+      outline-offset: -3px;
     }
 
     .lab-layer-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 7px 12px;
-      margin-top: 10px;
+      gap: 8px;
+    }
+
+    /* Layer switches as whole-tile toggles. The native checkbox stays for the
+       keyboard and screen readers; the tile and its mark show the state. */
+    .lab-chip {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      min-height: 38px;
+      padding: 0 10px;
+      border: 1px solid var(--lab-border);
+      border-radius: 10px;
+      background: var(--lab-panel-strong);
+      color: var(--lab-muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .lab-chip input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .lab-chip:hover {
+      border-color: var(--lab-accent);
+      color: var(--lab-text);
+    }
+
+    .lab-chip:has(input:checked) {
+      border-color: var(--lab-accent);
+      background: var(--lab-accent-soft);
+      color: var(--lab-text);
+    }
+
+    .lab-chip:has(input:focus-visible) {
+      outline: 2px solid var(--lab-accent);
+      outline-offset: 2px;
+    }
+
+    .lab-chip-mark {
+      position: relative;
+      flex: none;
+      width: 16px;
+      height: 16px;
+      border: 1.5px solid var(--lab-border);
+      border-radius: 5px;
+    }
+
+    .lab-chip:has(input:checked) .lab-chip-mark {
+      border-color: var(--lab-accent);
+      background: var(--lab-accent);
+    }
+
+    .lab-chip:has(input:checked) .lab-chip-mark::after {
+      content: "";
+      position: absolute;
+      left: 4.5px;
+      top: 1px;
+      width: 4px;
+      height: 8px;
+      border: solid var(--lab-page);
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
     }
 
     .lab-layer-toggle {
@@ -609,6 +793,29 @@
 
     }
 
+    @media (min-width: 1360px) {
+      .lab-layout {
+        grid-template-columns: minmax(0, 1fr) minmax(560px, 660px);
+      }
+    }
+
+    /* A wide settings panel (beside the stage on wide windows, below it on mid
+       widths) flows its sections down the first column, then the second. */
+    @media (min-width: 1360px), (min-width: 681px) and (max-width: 980px) {
+      .lab-controls {
+        columns: 2;
+        column-gap: 22px;
+      }
+
+      .lab-controls-header {
+        column-span: all;
+      }
+
+      .lab-control-section {
+        break-inside: avoid;
+      }
+    }
+
     @media (max-width: 680px) {
       .lab-shell {
         padding: 10px;
@@ -628,6 +835,15 @@
         min-height: 430px;
       }
 
+      .lab-loupe {
+        --lab-loupe-size: 180px;
+      }
+
+      .lab-segmented button {
+        padding: 0 4px;
+        font-size: 11px;
+      }
+
       .lab-readout {
         grid-template-columns: repeat(2, 1fr);
       }
@@ -640,8 +856,7 @@
         border-bottom: 1px solid var(--lab-border);
       }
 
-      .lab-maps,
-      .lab-select-grid {
+      .lab-maps {
         grid-template-columns: 1fr;
       }
     }
@@ -706,6 +921,14 @@
             </select>
           </div>
           <div class="lab-toolbar-group">
+            <label class="lab-layer-toggle" for="textToggle"><input id="textToggle" type="checkbox" checked>示例文字</label>
+            <label class="lab-layer-toggle" for="loupeToggle"><input id="loupeToggle" type="checkbox">放大镜</label>
+            <select id="loupeZoomSelect" aria-label="放大倍数" disabled>
+              <option value="2">2×</option>
+              <option value="4" selected>4×</option>
+              <option value="8">8×</option>
+            </select>
+            <span id="loupeHint" class="lab-loupe-hint" hidden>点击或拖动舞台空白处移动</span>
             <span id="liveStatus" role="status" aria-live="polite">初始化</span>
           </div>
         </div>
@@ -718,11 +941,13 @@
             <div class="lab-words" aria-hidden="true"><span>a</span><span>ɬ</span><span>ŋ</span><span>ə</span></div>
           </div>
           <article id="labSurface" class="lab-surface" aria-label="可拖动液态玻璃示例卡片">
-            <div class="lab-surface-content">
-              <p class="lab-surface-kicker">Preview text</p>
-              <h2>Sample</h2>
+            <div class="lab-surface-content" data-text="panel">
+              <h2>示例文字</h2>
             </div>
+            <p class="lab-surface-line" data-text="bar">示例文字</p>
+            <p class="lab-surface-line" data-text="button">示例文字</p>
           </article>
+          <div id="labLoupe" class="lab-loupe" aria-hidden="true" hidden><div id="labLoupeContent" class="lab-loupe-content"></div></div>
         </div>
 
         <div class="lab-readout" aria-label="运行状态">
@@ -772,19 +997,17 @@
             <span class="lab-field-heading"><span>超椭圆指数</span><output id="cornerExponentOutput" class="lab-field-value">2.00</output></span>
             <input id="cornerExponentInput" data-shape-control type="range" min="2" max="8" step="0.25" value="2">
           </label>
+          <p id="geometryLockNote" class="lab-status-note" hidden>当前外观是产品尺寸夹具（工具栏胶囊或紧凑控件），宽高、圆角和指数已锁定为对照页夹具的产品几何；切回 Neutral Lab 或其他表面后解锁。光学参数仍可调整。</p>
           <p id="shapeNote" class="lab-status-note">指数 2 为传统圆角，与产品一致；4 对应 CSS 的 corner-shape: squircle（即 superellipse(2)），是常用的平滑圆角；2 以上都保留直边。Lab 按 superellipse(log₂ 指数) 换算。</p>
         </details>
 
         <section class="lab-control-section">
-          <h3>光学质量</h3>
-          <label class="lab-field" for="productQualitySelect">
-            <span class="lab-field-heading"><span>等级</span></span>
-            <select id="productQualitySelect">
-              <option value="q3" selected>Q3 · 折射</option>
-              <option value="q2">Q2 · 烘焙高光</option>
-              <option value="q1">Q1 · 无高光</option>
-            </select>
-          </label>
+          <h3 id="productQualityLabel">光学质量</h3>
+          <div id="productQualityControl" class="lab-segmented" role="radiogroup" aria-labelledby="productQualityLabel">
+            <button type="button" role="radio" aria-checked="true" tabindex="0" data-value="q3">Q3 · 折射</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-value="q2">Q2 · 烘焙高光</button>
+            <button type="button" role="radio" aria-checked="false" tabindex="-1" data-value="q1">Q1 · 无高光</button>
+          </div>
         </section>
 
         <section class="lab-control-section">
@@ -796,6 +1019,7 @@
               <optgroup label="产品表面">
                 <option value="navigation">Navigation</option>
                 <option value="navigation-drawer">Navigation drawer</option>
+                <option value="toolbar">Toolbar capsule</option>
                 <option value="focus-display">Focus display</option>
                 <option value="focus-editor">Focus editor</option>
                 <option value="floating">Floating menu</option>
@@ -817,40 +1041,31 @@
             </select>
           </label>
           <label class="lab-field" for="tintInput">
-            <span class="lab-field-heading"><span>中性 tint（仅 Neutral Lab）</span><output id="tintOutput" class="lab-field-value">0.48</output></span>
-            <input id="tintInput" type="range" min="0" max="0.8" step="0.01" value="0.48">
+            <span class="lab-field-heading"><span>tint 不透明度</span><output id="tintOutput" class="lab-field-value">0.48</output></span>
+            <input id="tintInput" type="range" min="0" max="1" step="0.01" value="0.48">
           </label>
-          <div class="lab-compare-grid">
-            <button type="button" data-product-comparison="full">完整合成</button>
-            <button type="button" data-product-comparison="optics">仅光学</button>
-            <button type="button" data-product-comparison="optics-tint">光学＋tint</button>
-            <button type="button" data-product-comparison="appearance">仅外观层</button>
-          </div>
-          <div class="lab-layer-grid" aria-label="外观层开关">
-            <label class="lab-layer-toggle"><input type="checkbox" data-product-layer="optics" checked>动态光学</label>
-            <label class="lab-layer-toggle"><input type="checkbox" data-product-layer="tint" checked>tint</label>
-            <label class="lab-layer-toggle"><input type="checkbox" data-product-layer="border" checked>1px 边框</label>
-            <label class="lab-layer-toggle"><input type="checkbox" data-product-layer="shadow" checked>外部阴影</label>
+          <div class="lab-layer-grid" role="group" aria-label="外观层开关">
+            <label class="lab-chip"><input type="checkbox" data-product-layer="optics" checked><span class="lab-chip-mark" aria-hidden="true"></span>动态光学</label>
+            <label class="lab-chip"><input type="checkbox" data-product-layer="tint" checked><span class="lab-chip-mark" aria-hidden="true"></span>tint</label>
+            <label class="lab-chip"><input type="checkbox" data-product-layer="border" checked><span class="lab-chip-mark" aria-hidden="true"></span>1px 边框</label>
+            <label class="lab-chip"><input type="checkbox" data-product-layer="shadow" checked><span class="lab-chip-mark" aria-hidden="true"></span>外部阴影</label>
           </div>
           <p id="appearanceStatus" class="lab-status-note">Neutral Lab · 使用 Lab 自己的中性 tint、边框、阴影与文字色。</p>
-          <p class="lab-status-note">这些开关只旁路最终外观层，不重建贴图或清空缓存。产品外观从隔离探针（以探针模式加载的控件对照页 <code>control-gallery.html</code>）读取当前 Q1／Q2／Q3 的正式计算样式。选择产品外观会联动：导航和抽屉切到 Continuous 预设；紧凑控件切到 Relationship 预设，并把共享几何调成该按钮的宽高和圆角；内容外壳、浮层、弹窗等纯 CSS 表面关闭“动态光学”，和产品一样没有烘焙高光。之后仍可手动调整。背景场景和 modal／network 遮罩保持不变。</p>
+          <p class="lab-status-note">tint 滑条在 Neutral Lab 下调 Lab 自己的中性 tint；选产品外观时显示该表面的产品不透明度，拖动只改不透明度、保留产品颜色，换外观时回到产品值。图层开关只旁路最终外观层，不重建贴图或清空缓存。产品外观从隔离探针（以探针模式加载的控件对照页 <code>control-gallery.html</code>）读取当前 Q1／Q2／Q3 的正式计算样式。选择产品外观会联动：导航和抽屉、工具栏胶囊、紧凑控件切到各自的光学预设（当前为 Custom 时保留手动参数）；内容外壳、浮层、弹窗等纯 CSS 表面关闭“动态光学”，和产品一样没有烘焙高光。共享几何换成该表面的典型尺寸（按产品宽度估计，超出舞台时缩小）和产品圆角，之后仍可调整；工具栏胶囊和紧凑控件取对照页尺寸夹具的宽高和圆角并锁定几何。背景场景和 modal／network 遮罩保持不变。</p>
         </section>
 
         <section class="lab-control-section">
           <h3>光学参数预设</h3>
-          <div class="lab-select-grid">
-            <label class="lab-field" for="presetSelect">
-              <span class="lab-field-heading"><span>预设</span></span>
-              <select id="presetSelect">
-                <option value="continuous" selected>Continuous（导航）</option>
-                <option value="toolbar">Toolbar（搜索与工具胶囊）</option>
-                <option value="relationship">Relationship（紧凑控件）</option>
-                <option value="custom">Custom</option>
-              </select>
-            </label>
-            <button id="resetButton" type="button">恢复预设参数</button>
-          </div>
-          <p class="lab-status-note">预设只填写下面三组参数，不改变外观；手动调整任一参数后变为 Custom。</p>
+          <label class="lab-field" for="presetSelect">
+            <span class="lab-field-heading"><span>预设</span></span>
+            <select id="presetSelect">
+              <option value="continuous" selected>Continuous（导航）</option>
+              <option value="toolbar">Toolbar（搜索与工具胶囊）</option>
+              <option value="relationship">Relationship（紧凑控件）</option>
+              <option value="custom">Custom</option>
+            </select>
+          </label>
+          <p class="lab-status-note">预设填写烘焙高光组（光源强度除外）和折射组的参数，以及外观里 Neutral Lab 的中性 tint；不改光源角度和光源强度。手动调整任一参数后变为 Custom，重新选择预设即可恢复。</p>
         </section>
 
         <section class="lab-control-section">
@@ -941,9 +1156,15 @@
         themeButton: document.querySelector("#themeButton"),
         sceneSelect: document.querySelector("#sceneSelect"),
         presetSelect: document.querySelector("#presetSelect"),
-        productQualitySelect: document.querySelector("#productQualitySelect"),
+        productQualityControl: document.querySelector("#productQualityControl"),
         mapLimitSelect: document.querySelector("#mapLimitSelect"),
-        resetButton: document.querySelector("#resetButton"),
+        textToggle: document.querySelector("#textToggle"),
+        loupe: document.querySelector("#labLoupe"),
+        loupeContent: document.querySelector("#labLoupeContent"),
+        loupeToggle: document.querySelector("#loupeToggle"),
+        loupeZoomSelect: document.querySelector("#loupeZoomSelect"),
+        loupeHint: document.querySelector("#loupeHint"),
+        geometryLockNote: document.querySelector("#geometryLockNote"),
         liveStatus: document.querySelector("#liveStatus"),
         displacementCanvas: document.querySelector("#displacementCanvas"),
         normalCanvas: document.querySelector("#normalCanvas"),
@@ -1001,33 +1222,28 @@
 
       const PRODUCT_LAB_ROLE = "diagnostic";
       const productLayerInputs = [...document.querySelectorAll("[data-product-layer]")];
-      const productComparisonButtons = [...document.querySelectorAll("[data-product-comparison]")];
-      const productComparisonStates = Object.freeze({
-        full: Object.freeze({ optics: true, tint: true, border: true, shadow: true }),
-        optics: Object.freeze({ optics: true, tint: false, border: false, shadow: false }),
-        "optics-tint": Object.freeze({ optics: true, tint: true, border: false, shadow: false }),
-        appearance: Object.freeze({ optics: false, tint: true, border: true, shadow: true }),
-      });
       // Fixtures live in control-gallery.html, the single copy of product structure.
       // opticalRole is the role the production engine would give the fixture;
-      // CSS-only surfaces have none.
-      const surfaceRole = (viewport, name, opticalRole, label) => Object.freeze({
-        viewport, selector: `[data-cg-role="${name}"]`, opticalRole, label,
+      // CSS-only surfaces have none. size is the surface's default Lab geometry:
+      // panels have no fixed height in the product, so these are typical sizes from
+      // the product widths (styles.css), shrunk to the stage; "fixture" takes and
+      // locks the bounds of a gallery size fixture (toolbar capsule, compact controls).
+      const surfaceRole = (viewport, name, opticalRole, label, size) => Object.freeze({
+        viewport, selector: `[data-cg-role="${name}"]`, opticalRole, label, size,
       });
-      const compactRole = (recipe, label) => Object.freeze({
-        viewport: "desktop", selector: `[data-cg-specimen="page/${recipe}/default"]`, opticalRole: "relationship", label,
-      });
+      const compactRole = (recipe, label) => surfaceRole("desktop", `compact-${recipe}`, "relationship", label, "fixture");
       const productAppearanceRoles = Object.freeze({
-        navigation: surfaceRole("desktop", "navigation", "continuous", "Navigation"),
-        "navigation-drawer": surfaceRole("mobile", "navigation-drawer", "continuous", "Navigation drawer"),
-        "focus-display": surfaceRole("desktop", "focus-display", null, "Focus display"),
-        "focus-editor": surfaceRole("desktop", "focus-editor", null, "Focus editor"),
-        floating: surfaceRole("desktop", "floating", null, "Floating menu"),
-        "rich-tooltip": surfaceRole("desktop", "rich-tooltip", null, "Rich tooltip"),
-        "quality-tooltip": surfaceRole("desktop", "quality-tooltip", null, "Quality tooltip"),
-        toast: surfaceRole("desktop", "toast", null, "Toast"),
-        modal: surfaceRole("desktop", "modal", null, "Modal"),
-        network: surfaceRole("desktop", "network", null, "Network panel"),
+        navigation: surfaceRole("desktop", "navigation", "continuous", "Navigation", { width: 280, height: 640 }),
+        "navigation-drawer": surfaceRole("mobile", "navigation-drawer", "continuous", "Navigation drawer", { width: 320, height: 640 }),
+        toolbar: surfaceRole("desktop", "toolbar", "toolbar", "Toolbar capsule", "fixture"),
+        "focus-display": surfaceRole("desktop", "focus-display", null, "Focus display", { width: 640, height: 440 }),
+        "focus-editor": surfaceRole("desktop", "focus-editor", null, "Focus editor", { width: 640, height: 440 }),
+        floating: surfaceRole("desktop", "floating", null, "Floating menu", { width: 320, height: 360 }),
+        "rich-tooltip": surfaceRole("desktop", "rich-tooltip", null, "Rich tooltip", { width: 260, height: 120 }),
+        "quality-tooltip": surfaceRole("desktop", "quality-tooltip", null, "Quality tooltip", { width: 280, height: 96 }),
+        toast: surfaceRole("desktop", "toast", null, "Toast", { width: 360, height: 56 }),
+        modal: surfaceRole("desktop", "modal", null, "Modal", { width: 760, height: 480 }),
+        network: surfaceRole("desktop", "network", null, "Network panel", { width: 1180, height: 720 }),
         "compact-neutral": compactRole("neutral", "Compact neutral"),
         "compact-accent-outline": compactRole("accent-outline", "Compact accent / outline"),
         "compact-accent-tinted": compactRole("accent-tinted", "Compact accent / tinted"),
@@ -1044,7 +1260,6 @@
         toolbar: { tintLight: 0.34, tintDark: 0.34 },
         relationship: { tintLight: 0.28, tintDark: 0.32 },
       };
-      let lastProductPreset = "continuous";
 
       const opticalEngine = engineApi.createEngine({
         workerUrl: "lib/liquid-glass-map-worker.js",
@@ -1063,6 +1278,21 @@
       let pendingDragPosition = null;
       let appearanceProbePromise = null;
       let currentProductAppearance = null;
+      // The appearance whose geometry still waits for its fixture to be read.
+      let pendingGeometryRole = null;
+      // The tint slider edits the product tint's opacity while a product appearance
+      // is shown; the Neutral Lab value waits here until Neutral Lab returns.
+      let tintOverride = null;
+      let neutralTint = null;
+      const tintProbe = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+      let geometryLocked = false;
+      // Loupe state: the stage point under its center, the copied surface, and
+      // whether the backdrop copy must be rebuilt (a photo scene changed).
+      let loupePoint = null;
+      let loupeSurface = null;
+      let loupeBackdropDirty = true;
+      let loupeFrame = 0;
+      let loupeDragPointer = null;
       const appearanceProbeFrames = new Map();
 
       function setGeometryValue(name, value) {
@@ -1085,7 +1315,7 @@
         if (!supportsSuperellipse) {
           elements.cornerExponentInput.value = "2";
         }
-        elements.cornerExponentInput.disabled = !supportsSuperellipse;
+        elements.cornerExponentInput.disabled = !supportsSuperellipse || geometryLocked;
         elements.cornerExponentOutput.value = cornerExponent().toFixed(2);
         elements.shapeNote.textContent = supportsSuperellipse
           ? "指数 2 为传统圆角，与产品一致；4 对应 CSS 的 corner-shape: squircle（即 superellipse(2)），是常用的平滑圆角；2 以上都保留直边。Lab 按 superellipse(log₂ 指数) 换算。"
@@ -1115,6 +1345,29 @@
         updateGeometryOutputs();
       }
 
+      function colorAlpha(color) {
+        tintProbe.clearRect(0, 0, 1, 1);
+        tintProbe.fillStyle = color;
+        tintProbe.fillRect(0, 0, 1, 1);
+        return tintProbe.getImageData(0, 0, 1, 1).data[3] / 255;
+      }
+
+      // Presets and the theme set the Neutral Lab tint; while a product appearance
+      // owns the slider they only update the stored Neutral value.
+      function setNeutralTint(value) {
+        if (productAppearanceSelected()) {
+          neutralTint = value;
+          return;
+        }
+        setRangeValue("tint", value);
+        formatRange("tint");
+      }
+
+      // The theme-dependent preset tint.
+      function presetTint(preset, theme) {
+        return theme === "dark" ? preset.tintDark : preset.tintLight;
+      }
+
       function setRangeValue(name, value) {
         rangeSpecs[name].input.value = String(value);
       }
@@ -1140,7 +1393,6 @@
           return;
         }
         const defaults = engineApi.ROLE_DEFAULTS[name];
-        lastProductPreset = name;
         elements.mapLimitSelect.value = String(defaults.maximumMapDimension);
         setRangeValue("bezel", defaults.bezel);
         setRangeValue("thickness", defaults.thickness);
@@ -1148,7 +1400,7 @@
         setRangeValue("maxDisplacement", defaults.maxDisplacement);
         setRangeValue("opticalBlur", defaults.opticalBlur);
         setRangeValue("saturation", defaults.saturation);
-        setRangeValue("tint", elements.root.dataset.theme === "dark" ? preset.tintDark : preset.tintLight);
+        setNeutralTint(presetTint(preset, elements.root.dataset.theme));
         setRangeValue("specularStrength", defaults.specularStrength);
         elements.dispersionInput.checked = defaults.chromaticDispersion;
         updateAllOutputs();
@@ -1274,7 +1526,7 @@
         if (assistedOpticsSuppressed()) {
           return "q0";
         }
-        const selected = elements.productQualitySelect.value;
+        const selected = elements.productQualityControl.value;
         return selected === "q3" ? opticalEngine.detectQuality() : selected;
       }
 
@@ -1346,8 +1598,14 @@
           label: role.label,
           width: bounds.width,
           height: bounds.height,
-          radius: Number.parseFloat(computed.borderTopLeftRadius) || 0,
+          radius: Number.parseFloat(computed.borderTopLeftRadius),
+          paddingInline: computed.paddingLeft,
+          fontFamily: computed.fontFamily,
+          fontSize: computed.fontSize,
+          fontWeight: computed.fontWeight,
+          letterSpacing: computed.letterSpacing,
           backgroundColor: computed.backgroundColor,
+          tintAlpha: colorAlpha(computed.backgroundColor),
           borderColor: computed.borderTopColor,
           borderWidth: computed.borderTopWidth,
           borderStyle: computed.borderTopStyle,
@@ -1375,7 +1633,10 @@
           return;
         }
         const appearance = currentProductAppearance;
-        elements.appearanceStatus.textContent = `Product ${requestedProductQuality().toUpperCase()} · ${appearance.label} · tint ${appearance.backgroundColor} · border ${appearance.borderWidth} ${appearance.borderColor} · shadow ${appearance.shadowLayers} 层`;
+        const tint = tintOverride === null
+          ? appearance.backgroundColor
+          : `${appearance.backgroundColor} → 不透明度 ${tintOverride.toFixed(2)}`;
+        elements.appearanceStatus.textContent = `Product ${requestedProductQuality().toUpperCase()} · ${appearance.label} · tint ${tint} · border ${appearance.borderWidth} ${appearance.borderColor} · shadow ${appearance.shadowLayers} 层`;
       }
 
       async function refreshProductAppearance() {
@@ -1397,9 +1658,9 @@
           syncAppearanceProbeQuality();
           syncAppearanceProbeLight();
           currentProductAppearance = readProductAppearance(elements.appearanceRoleSelect.value);
-          if (linkGeometryToFixture) {
-            linkGeometryToFixture = false;
-            applyFixtureGeometry(currentProductAppearance);
+          if (pendingGeometryRole === elements.appearanceRoleSelect.value) {
+            pendingGeometryRole = null;
+            applyRoleGeometry(productAppearanceRoles[currentProductAppearance.role], currentProductAppearance);
           }
           updateSurfaceAppearance();
           updateAppearanceStatus();
@@ -1412,40 +1673,68 @@
         }
       }
 
-      // A product appearance moves the optics to match the product: engine roles
-      // load their preset, compact controls also take the button's size, and
-      // CSS-only surfaces drop the baked highlight they do not have.
-      let linkGeometryToFixture = false;
-
+      // A product appearance moves the Lab to match the product: engine roles load
+      // their preset unless the parameters are Custom, CSS-only surfaces drop the
+      // baked highlight they do not have, and the geometry takes the surface's size
+      // once its fixture has been read.
       function applyAppearanceLinks(roleName) {
-        const { opticalRole } = productAppearanceRoles[roleName];
+        const role = productAppearanceRoles[roleName];
         const optics = productLayerInputs.find((input) => input.dataset.productLayer === "optics");
-        optics.checked = Boolean(opticalRole);
+        optics.checked = Boolean(role.opticalRole);
         updateProductLayerState();
-        if (opticalRole) {
-          elements.presetSelect.value = opticalRole;
-          applyPreset(opticalRole);
+        if (role.opticalRole && elements.presetSelect.value !== "custom") {
+          elements.presetSelect.value = role.opticalRole;
+          applyPreset(role.opticalRole);
         }
-        linkGeometryToFixture = opticalRole === "relationship";
+        setGeometryLocked(role.size === "fixture");
+        pendingGeometryRole = roleName;
       }
 
-      function applyFixtureGeometry(appearance) {
+      // Size fixtures lock the geometry to the product's; other surfaces only start
+      // from a typical size.
+      function setGeometryLocked(locked) {
+        geometryLocked = locked;
+        Object.values(geometrySpecs).forEach((spec) => {
+          spec.input.disabled = locked;
+        });
+        elements.geometryLockNote.hidden = !locked;
+        updateShapeControls();
+      }
+
+      function applyRoleGeometry(role, appearance) {
+        const fixture = role.size === "fixture";
+        const size = fixture ? appearance : role.size;
+        const stageHeight = Number.parseFloat(getComputedStyle(elements.stage).minHeight);
         const even = (value) => Math.max(24, Math.round(value / 2) * 2);
-        setGeometryValue("width", even(appearance.width));
-        setGeometryValue("height", even(appearance.height));
+        setGeometryValue("width", even(Math.min(size.width, Number(geometrySpecs.width.input.max), elements.stage.clientWidth - 40)));
+        setGeometryValue("height", even(Math.min(size.height, Number(geometrySpecs.height.input.max), stageHeight - 40)));
         syncGeometryBounds();
         setGeometryValue("radius", Math.min(Math.round(appearance.radius), Number(geometrySpecs.radius.input.max)));
         syncGeometryBounds();
+        if (fixture) {
+          elements.cornerExponentInput.value = "2";
+        }
+        updateShapeControls();
         scheduleRefresh();
       }
 
       function updateAppearanceControls() {
         const product = productAppearanceSelected();
-        rangeSpecs.tint.input.disabled = product;
+        tintOverride = null;
+        if (product && neutralTint === null) {
+          neutralTint = readNumber("tint");
+        }
+        if (!product && neutralTint !== null) {
+          setRangeValue("tint", neutralTint);
+          formatRange("tint");
+          neutralTint = null;
+        }
         if (product) {
           applyAppearanceLinks(elements.appearanceRoleSelect.value);
           refreshProductAppearance();
         } else {
+          pendingGeometryRole = null;
+          setGeometryLocked(false);
           currentProductAppearance = null;
           updateSurfaceAppearance();
           updateAppearanceStatus();
@@ -1464,7 +1753,17 @@
         elements.surface.style.width = `${width}px`;
         elements.surface.style.height = `${height}px`;
         elements.surface.style.borderRadius = `${radius}px`;
-        elements.surface.dataset.compact = String(width < 160 || height < 80);
+        elements.surface.dataset.textTier = !elements.textToggle.checked || width < 56
+          ? "none"
+          : width >= 240 && height >= 140
+          ? "panel"
+          : width >= 200
+          ? "bar"
+          : "button";
+        elements.surface.style.setProperty(
+          "--lab-panel-padding",
+          `${Math.round(Math.min(44, Math.max(18, Math.min(width, height) * 0.16)))}px`,
+        );
         elements.surface.style.setProperty(
           "corner-shape",
           actualOuterShape === "superellipse"
@@ -1478,17 +1777,33 @@
         elements.surface.style.removeProperty("box-shadow");
         elements.surface.style.removeProperty("color");
         elements.surface.style.removeProperty("--lab-surface-border");
+        ["--lab-line-padding", "--lab-line-font-family", "--lab-line-font-size", "--lab-line-font-weight", "--lab-line-letter-spacing"]
+          .forEach((name) => elements.surface.style.removeProperty(name));
         const productMaterial = productAppearanceSelected()
           ? currentProductAppearance
           : null;
         if (productMaterial) {
-          elements.surface.style.backgroundColor = productMaterial.backgroundColor;
+          setRangeValue("tint", (tintOverride ?? productMaterial.tintAlpha).toFixed(2));
+          formatRange("tint");
+          elements.surface.style.backgroundColor = tintOverride === null
+            ? productMaterial.backgroundColor
+            : `rgb(from ${productMaterial.backgroundColor} r g b / ${tintOverride})`;
           elements.surface.style.borderWidth = productMaterial.borderWidth;
           elements.surface.style.borderStyle = productMaterial.borderStyle;
           elements.surface.style.borderColor = productMaterial.borderColor;
           elements.surface.style.boxShadow = productMaterial.boxShadow;
           elements.surface.style.color = productMaterial.color;
           elements.surface.style.setProperty("--lab-surface-border", productMaterial.borderColor);
+          // Single-line tiers take the fixture's type, so a compact control reads
+          // as the product button; a padless fixture (the toolbar leaf) keeps the
+          // Lab inset.
+          if (Number.parseFloat(productMaterial.paddingInline) > 0) {
+            elements.surface.style.setProperty("--lab-line-padding", productMaterial.paddingInline);
+          }
+          elements.surface.style.setProperty("--lab-line-font-family", productMaterial.fontFamily);
+          elements.surface.style.setProperty("--lab-line-font-size", productMaterial.fontSize);
+          elements.surface.style.setProperty("--lab-line-font-weight", productMaterial.fontWeight);
+          elements.surface.style.setProperty("--lab-line-letter-spacing", productMaterial.letterSpacing);
         } else {
           elements.surface.style.backgroundColor = light
             ? `rgba(235, 247, 249, ${tint})`
@@ -1499,25 +1814,118 @@
         window.requestAnimationFrame(clampSurfacePosition);
       }
 
-      function updateProductLayerState(activeComparison = "") {
+      function updateProductLayerState() {
         productLayerInputs.forEach((input) => {
           elements.surface.dataset[`product${input.dataset.productLayer[0].toUpperCase()}${input.dataset.productLayer.slice(1)}`]
             = input.checked ? "on" : "off";
         });
-        productComparisonButtons.forEach((button) => {
-          button.setAttribute("aria-pressed", String(button.dataset.productComparison === activeComparison));
-        });
       }
 
-      function applyProductComparison(name) {
-        const state = productComparisonStates[name];
-        if (!state) {
+      // The copied surface mirrors the live one attribute by attribute: size, paint,
+      // drag transform and the engine's optics state and resources all live there.
+      function syncLoupeSurface() {
+        for (const { name, value } of elements.surface.attributes) {
+          if (name !== "id" && loupeSurface.getAttribute(name) !== value) {
+            loupeSurface.setAttribute(name, value);
+          }
+        }
+        for (const { name } of [...loupeSurface.attributes]) {
+          if (!elements.surface.hasAttribute(name)) {
+            loupeSurface.removeAttribute(name);
+          }
+        }
+      }
+
+      function renderLoupe() {
+        loupeFrame = 0;
+        if (!elements.loupeToggle.checked) {
           return;
         }
-        productLayerInputs.forEach((input) => {
-          input.checked = state[input.dataset.productLayer];
-        });
-        updateProductLayerState(name);
+        if (loupeBackdropDirty || !loupeSurface) {
+          loupeBackdropDirty = false;
+          const backdrop = elements.stage.querySelector(".lab-backdrop").cloneNode(true);
+          backdrop.querySelectorAll("[id]").forEach((node) => node.removeAttribute("id"));
+          loupeSurface = elements.surface.cloneNode(true);
+          loupeSurface.removeAttribute("id");
+          elements.loupeContent.replaceChildren(backdrop, loupeSurface);
+        }
+        syncLoupeSurface();
+        const radius = elements.loupe.offsetWidth / 2;
+        const zoom = Number(elements.loupeZoomSelect.value);
+        elements.loupeContent.style.width = `${elements.stage.clientWidth}px`;
+        elements.loupeContent.style.height = `${elements.stage.clientHeight}px`;
+        elements.loupe.style.transform = `translate(${loupePoint.x - radius}px, ${loupePoint.y - radius}px)`;
+        elements.loupeContent.style.transform = `translate(${radius - loupePoint.x * zoom}px, ${radius - loupePoint.y * zoom}px) scale(${zoom})`;
+      }
+
+      function scheduleLoupe(rebuildBackdrop = false) {
+        if (rebuildBackdrop) {
+          loupeBackdropDirty = true;
+        }
+        if (!loupeFrame && elements.loupeToggle.checked) {
+          loupeFrame = window.requestAnimationFrame(renderLoupe);
+        }
+      }
+
+      // The loupe starts over the surface's upper-left corner, where the default
+      // light falls, so it shows the rim and the highlight.
+      function defaultLoupePoint() {
+        const stage = elements.stage.getBoundingClientRect();
+        const surface = elements.surface.getBoundingClientRect();
+        return {
+          x: surface.left - stage.left + Math.min(24, surface.width / 4),
+          y: surface.top - stage.top + Math.min(24, surface.height / 4),
+        };
+      }
+
+      function updateLoupeToggle() {
+        const on = elements.loupeToggle.checked;
+        elements.loupe.hidden = !on;
+        elements.loupeZoomSelect.disabled = !on;
+        elements.loupeHint.hidden = !on;
+        elements.stage.dataset.loupe = on ? "on" : "off";
+        if (on) {
+          loupePoint = loupePoint || defaultLoupePoint();
+          scheduleLoupe(true);
+        } else {
+          elements.loupeContent.replaceChildren();
+          loupeSurface = null;
+        }
+      }
+
+      function moveLoupeTo(event) {
+        const stage = elements.stage.getBoundingClientRect();
+        loupePoint = {
+          x: Math.max(0, Math.min(stage.width, event.clientX - stage.left)),
+          y: Math.max(0, Math.min(stage.height, event.clientY - stage.top)),
+        };
+        scheduleLoupe();
+      }
+
+      function handleStagePointerDown(event) {
+        if (!elements.loupeToggle.checked || event.button !== 0 || elements.surface.contains(event.target)) {
+          return;
+        }
+        loupeDragPointer = event.pointerId;
+        moveLoupeTo(event);
+        event.preventDefault();
+        elements.stage.setPointerCapture(event.pointerId);
+      }
+
+      function handleStagePointerMove(event) {
+        if (event.pointerId === loupeDragPointer) {
+          moveLoupeTo(event);
+        }
+      }
+
+      function finishLoupeDrag(event) {
+        if (event.pointerId !== loupeDragPointer) {
+          return;
+        }
+        if (elements.stage.hasPointerCapture(event.pointerId)) {
+          elements.stage.releasePointerCapture(event.pointerId);
+        }
+        loupeDragPointer = null;
       }
 
       function surfaceDragLimits() {
@@ -1724,13 +2132,6 @@
           applyPreset(elements.presetSelect.value);
         }
       });
-      elements.resetButton.addEventListener("click", () => {
-        const preset = elements.presetSelect.value === "custom"
-          ? lastProductPreset
-          : elements.presetSelect.value;
-        elements.presetSelect.value = preset;
-        applyPreset(preset);
-      });
       document.querySelectorAll("[data-geometry-control]").forEach((control) => {
         control.addEventListener("input", () => {
           syncGeometryBounds();
@@ -1756,21 +2157,59 @@
         });
         control.addEventListener("change", scheduleRefresh);
       });
-      productComparisonButtons.forEach((button) => {
-        button.addEventListener("click", () => applyProductComparison(button.dataset.productComparison));
-      });
+      elements.textToggle.addEventListener("change", updateSurfaceAppearance);
+      elements.loupeToggle.addEventListener("change", updateLoupeToggle);
+      elements.loupeZoomSelect.addEventListener("change", () => scheduleLoupe());
+      elements.stage.addEventListener("pointerdown", handleStagePointerDown);
+      elements.stage.addEventListener("pointermove", handleStagePointerMove);
+      elements.stage.addEventListener("pointerup", finishLoupeDrag);
+      elements.stage.addEventListener("pointercancel", finishLoupeDrag);
       productLayerInputs.forEach((input) => {
         input.addEventListener("change", () => updateProductLayerState());
       });
       elements.appearanceRoleSelect.addEventListener("change", updateAppearanceControls);
-      elements.productQualitySelect.addEventListener("change", updateProductQuality);
+      (function setUpSegmented(group) {
+        const options = [...group.querySelectorAll("[data-value]")];
+        const checked = () => options.find((option) => option.getAttribute("aria-checked") === "true");
+        const choose = (option) => {
+          options.forEach((item) => {
+            item.setAttribute("aria-checked", String(item === option));
+            item.tabIndex = item === option ? 0 : -1;
+          });
+        };
+        Object.defineProperty(group, "value", {
+          get: () => checked().dataset.value,
+          set: (value) => choose(options.find((option) => option.dataset.value === value)),
+        });
+        const pick = (option) => {
+          if (option === checked()) return;
+          choose(option);
+          group.dispatchEvent(new Event("change"));
+        };
+        group.addEventListener("click", (event) => {
+          const option = event.target.closest("[data-value]");
+          if (option) pick(option);
+        });
+        group.addEventListener("keydown", (event) => {
+          const step = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[event.key];
+          if (step === undefined && event.key !== "Home" && event.key !== "End") return;
+          event.preventDefault();
+          const index = options.indexOf(checked());
+          const next = event.key === "Home" ? 0
+            : event.key === "End" ? options.length - 1
+              : (index + step + options.length) % options.length;
+          pick(options[next]);
+          options[next].focus();
+        });
+      })(elements.productQualityControl);
+      elements.productQualityControl.addEventListener("change", updateProductQuality);
       rangeSpecs.tint.input.addEventListener("input", () => {
         formatRange("tint");
         if (productAppearanceSelected()) {
-          refreshProductAppearance();
-        } else {
-          updateSurfaceAppearance();
+          tintOverride = readNumber("tint");
+          updateAppearanceStatus();
         }
+        updateSurfaceAppearance();
       });
       rangeSpecs.lightAngle.input.addEventListener("input", () => {
         formatRange("lightAngle");
@@ -1796,8 +2235,7 @@
         elements.themeButton.textContent = nextTheme === "dark" ? "切换浅色场景" : "切换暗色场景";
         const activePreset = presets[elements.presetSelect.value];
         if (activePreset) {
-          setRangeValue("tint", nextTheme === "dark" ? activePreset.tintDark : activePreset.tintLight);
-          formatRange("tint");
+          setNeutralTint(presetTint(activePreset, nextTheme));
         }
         if (productAppearanceSelected()) {
           refreshProductAppearance();
@@ -1822,7 +2260,12 @@
         attributes: true,
         attributeFilter: ["data-liquid-glass-optics"],
       });
-      new ResizeObserver(scheduleRefresh).observe(elements.stage);
+      new ResizeObserver(() => {
+        scheduleRefresh();
+        scheduleLoupe();
+      }).observe(elements.stage);
+      new MutationObserver(() => scheduleLoupe()).observe(elements.surface, { attributes: true });
+      new MutationObserver(() => scheduleLoupe(true)).observe(elements.photo, { attributes: true });
 
       // file:// pages cannot reach the gallery probe's document (Chrome gives each
       // file its own origin), so the Product source is disabled with a visible reason.
@@ -1834,7 +2277,7 @@
       syncGeometryBounds();
       updateShapeControls();
       applyPreset("continuous");
-      applyProductComparison("full");
+      updateProductLayerState();
       updateAppearanceControls();
       applyScene();
       activateRequestedProductQuality();

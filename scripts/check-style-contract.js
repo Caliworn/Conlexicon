@@ -168,10 +168,10 @@ assert(
   "Product quality-level appearance comparisons must read the control gallery's fixtures, the single copy of product structure, in isolated desktop and mobile probes",
 );
 assert(
-  liquidGlassLab.includes('id="productQualitySelect"')
-    && liquidGlassLab.includes('<option value="q3" selected>')
-    && liquidGlassLab.includes('<option value="q2">')
-    && liquidGlassLab.includes('<option value="q1">')
+  liquidGlassLab.includes('id="productQualityControl" class="lab-segmented" role="radiogroup"')
+    && liquidGlassLab.includes('aria-checked="true" tabindex="0" data-value="q3"')
+    && liquidGlassLab.includes('data-value="q2"')
+    && liquidGlassLab.includes('data-value="q1"')
     && liquidGlassLab.includes("activateRequestedProductQuality()")
     && liquidGlassLab.includes('opticalEngine.stats().quality !== "q3"'),
   "The Product lab must switch between real Q3 optics, Q2 highlights and Q1, rendering diagnostic maps only for Q3",
