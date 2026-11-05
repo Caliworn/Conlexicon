@@ -3,7 +3,7 @@
  *
  * Usage: open the app with the Liquid Glass skin, paste this file into the browser
  * console, and use the panel in the bottom-right corner. It scales the alpha of the
- * role surface tints (navigation, drawer, mobile bar, focus, floating, tooltip, modal),
+ * role surface tints (navigation, drawer, toolbar, focus, floating, tooltip, modal),
  * optionally swaps the page background for a Lab photo, and toggles the theme.
  * Control recipes, borders and shadows are untouched. Everything is injected at
  * runtime and disappears on reload; call window.__liquidGlassTintProbe.remove()
@@ -13,7 +13,7 @@
 (() => {
   window.__liquidGlassTintProbe?.remove();
 
-  const ROLES = ["navigation", "navigation-drawer", "mobile-bar", "focus", "floating", "tooltip", "modal"];
+  const ROLES = ["navigation", "navigation-drawer", "toolbar", "focus", "floating", "tooltip", "modal"];
   const PHOTOS = ["interior", "diamond-valley-lake-poppies", "whangarei-falls-footbridge", "turquoise-shallow-water-rocks", "people-in-dry-grass-field"];
   const state = { scale: 1, photo: -1 };
   // The dark theme defines its tokens and background on body.dark-theme[...],

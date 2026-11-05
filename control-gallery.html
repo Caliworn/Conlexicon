@@ -133,14 +133,14 @@
       color: var(--ui-warning, var(--ui-danger));
     }
 
-    .cg-context-q1 {
+    .cg-context-shell {
       display: block;
     }
 
-    /* One large production Mail toolbar as the Q3 owner, like the Q1 shell above.
+    /* One large production Mail toolbar as the glass owner, like the content shell above.
        Only its toolbar geometry (flex row, pill radius, 4px padding) is replaced;
        paint and optics stay with the production rules and the engine. */
-    body[data-entry-layout="mail"] .entry-mail-tools.cg-context-q3 {
+    body[data-entry-layout="mail"] .entry-mail-tools.cg-context-glass {
       display: block;
       padding: 16px;
       border-radius: var(--radius-panel);
@@ -391,19 +391,19 @@
     </section>
 
     <section>
-      <h2>Q1 外壳</h2>
-      <p class="cg-note">使用产品的词条详情外壳 <code>.entry-display</code>（液态玻璃中为固定 Q1 磨砂面板）。弹窗与浮层的内部按钮属于同一类情形。</p>
-      <article class="entry-display cg-context-q1" data-surface="content-shell">
-        <div class="cg-scroll"><div class="cg-matrix" data-cg-context="q1"></div></div>
+      <h2>内容外壳</h2>
+      <p class="cg-note">使用产品的词条详情外壳 <code>.entry-display</code>（液态玻璃中只有底色、边框和阴影，没有背景模糊）。弹窗与浮层的内部按钮属于同一类情形。</p>
+      <article class="entry-display cg-context-shell" data-surface="content-shell">
+        <div class="cg-scroll"><div class="cg-matrix" data-cg-context="shell"></div></div>
       </article>
     </section>
 
-    <section id="cgQ3Section">
-      <h2>Q3 外壳</h2>
-      <p class="cg-note">使用产品的 Mail 工具栏 <code>.entry-mail-tools</code>，只有液态玻璃有这一层：外壳提供折射与层次，内部控件不再单独注册、不带阴影。其他皮肤下本节隐藏。</p>
-      <div class="entry-mail-tools cg-context-q3">
+    <section id="cgGlassSection">
+      <h2>玻璃工具栏</h2>
+      <p class="cg-note">使用产品的 Mail 工具栏 <code>.entry-mail-tools</code>，只有液态玻璃有这一层：外壳带烘焙高光，内部控件不再单独注册、不带阴影。其他皮肤下本节隐藏。</p>
+      <div class="entry-mail-tools cg-context-glass">
         <div class="entry-mail-tools-surface" aria-hidden="true"></div>
-        <div class="cg-scroll"><div class="cg-matrix" data-cg-context="q3"></div></div>
+        <div class="cg-scroll"><div class="cg-matrix" data-cg-context="glass"></div></div>
       </div>
     </section>
 
@@ -411,8 +411,8 @@
       <h2>文本框</h2>
       <p class="cg-note">文本框激活即显示聚焦样式（<code>:focus</code>，鼠标点进去也会出现），按钮只在键盘导航时显示焦点环（<code>:focus-visible</code>）。“聚焦”列下方的数字是聚焦边框与背后底色的对比度。文本框聚焦用强调色边框（<code>--ui-field-focus</code>）加 <code>--ui-field-focus-ring</code>：经典与层叠玻璃为淡外光晕，液态玻璃为边缘提亮（玻璃变亮、内侧强调色辉光、外沿亮色细线），不加外轮廓。</p>
       <div class="cg-scroll"><div class="cg-matrix" data-cg-context="page" data-cg-rows="fields"></div></div>
-      <article class="entry-display cg-context-q1" data-surface="content-shell">
-        <div class="cg-scroll"><div class="cg-matrix" data-cg-context="q1" data-cg-rows="fields"></div></div>
+      <article class="entry-display cg-context-shell" data-surface="content-shell">
+        <div class="cg-scroll"><div class="cg-matrix" data-cg-context="shell" data-cg-rows="fields"></div></div>
       </article>
       <h3 class="cg-subhead">词条列表搜索框</h3>
       <p class="cg-note">产品的列表工具栏搜索控件（液态玻璃中为 Mail 胶囊搜索框，其他皮肤为普通输入框）。</p>
@@ -427,7 +427,7 @@
 
     <section>
       <h2>导航</h2>
-      <p class="cg-note">产品导航外壳里的目的地按钮（经典为深色实底，两套玻璃为玻璃导航；液态玻璃中是 Q3 光学外壳）。导航内的焦点环取 <code>--material-navigation-focus</code>，也就是当前导航底色上的强调色，目的地按钮用内偏移，避免被可滚动的导航列裁掉。</p>
+      <p class="cg-note">产品导航外壳里的目的地按钮（经典为深色实底，两套玻璃为玻璃导航；液态玻璃中是带烘焙高光的导航外壳）。导航内的焦点环取 <code>--material-navigation-focus</code>，也就是当前导航底色上的强调色，目的地按钮用内偏移，避免被可滚动的导航列裁掉。</p>
       <div class="cg-nav-row">
         <aside class="dictionary-panel app-nav cg-nav-shell" data-nav-state="expanded">
           <nav class="tool-list" aria-label="导航样本" id="cgNavList"></nav>
@@ -475,7 +475,7 @@
       const SKINS = ["classic", "layered-glass", "liquid-glass"];
       const SKIN_LABELS = { classic: "经典", "layered-glass": "层叠玻璃", "liquid-glass": "液态玻璃" };
       const THEME_LABELS = { light: "浅色", dark: "暗色" };
-      const CONTEXT_LABELS = { page: "页面底", q1: "Q1 外壳", q3: "Q3 外壳", search: "列表搜索框", nav: "导航" };
+      const CONTEXT_LABELS = { page: "页面底", shell: "内容外壳", glass: "玻璃工具栏", search: "列表搜索框", nav: "导航" };
       const FORCED_STATES = [
         [/:hover\b/g, "[data-cg-hover]"],
         [/:active\b/g, "[data-cg-active]"],
@@ -614,7 +614,7 @@
         run: document.getElementById("cgRunCheck"),
         status: document.getElementById("cgStatus"),
         report: document.getElementById("cgReport"),
-        q3Section: document.getElementById("cgQ3Section"),
+        glassSection: document.getElementById("cgGlassSection"),
         specials: document.getElementById("cgSpecials"),
         error: document.getElementById("cgError"),
       };
@@ -633,7 +633,7 @@
       }
       const engine = probe ? null : window.ConlexiconLiquidGlassEngine?.createEngine({
         workerUrl: "lib/liquid-glass-map-worker.js",
-        // Matches the application budget; the Q3 owner here is a large surface.
+        // Matches the application budget; the glass toolbar here is a large surface.
         maxBytes: 32 * 1024 * 1024,
         refraction: false,
       }) || null;
@@ -1095,7 +1095,7 @@
         } else {
           delete document.body.dataset.entryLayout;
         }
-        elements.q3Section.hidden = skin !== "liquid-glass";
+        elements.glassSection.hidden = skin !== "liquid-glass";
         engine?.setEnabled(skin === "liquid-glass");
       }
 

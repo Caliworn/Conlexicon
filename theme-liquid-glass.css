@@ -53,7 +53,7 @@ body[data-ui-skin="liquid-glass"] {
   --material-content-shell-background: var(--liquid-glass-focus-surface-tint);
   --material-entry-detail-mobile-background: var(--liquid-glass-focus-surface-tint);
   --material-content-shell-border: rgba(255, 255, 255, 0.78);
-  --material-content-shell-shadow: 0 26px 68px rgba(14, 39, 48, 0.18), 0 4px 14px rgba(14, 39, 48, 0.1);
+  --material-content-shell-shadow: var(--liquid-glass-edge-panel), 0 26px 68px rgba(14, 39, 48, 0.18), 0 4px 14px rgba(14, 39, 48, 0.1);
   /* Only the page gradient sits behind content shells, and blurring it bands. */
   --material-content-shell-filter: none;
   --material-entry-detail-mobile-filter: none;
@@ -88,16 +88,18 @@ body[data-ui-skin="liquid-glass"] {
   --material-inset-border: rgba(72, 103, 112, 0.2);
   --material-floating-background: var(--liquid-glass-floating-surface-tint);
   --material-floating-border: rgba(255, 255, 255, 0.72);
-  --material-floating-shadow: 0 32px 78px rgba(7, 28, 36, 0.3), 0 8px 24px rgba(7, 28, 36, 0.16);
-  --material-floating-filter: var(--liquid-glass-q1-floating-filter);
-  --material-mobile-bar-background: var(--liquid-glass-mobile-bar-surface-tint);
-  --material-mobile-bar-shadow: 0 15px 36px rgba(12, 35, 43, 0.2);
-  --material-mobile-bar-filter: var(--liquid-glass-q1-continuous-filter);
+  --material-floating-shadow: var(--liquid-glass-edge-panel), 0 32px 78px rgba(7, 28, 36, 0.3), 0 8px 24px rgba(7, 28, 36, 0.16);
+  --material-floating-filter: var(--liquid-glass-floating-filter);
+  /* The narrow app bar has no shell: nothing scrolls behind it. */
+  --material-mobile-bar-background: transparent;
+  --material-mobile-bar-shadow: none;
+  --material-mobile-bar-filter: none;
+  --liquid-glass-toolbar-shadow: 0 15px 36px rgba(12, 35, 43, 0.2);
   --material-navigation-background: var(--liquid-glass-navigation-surface-tint);
   --material-navigation-shadow: 0 20px 58px rgba(16, 43, 51, 0.22), 0 2px 10px rgba(16, 43, 51, 0.1);
-  --material-navigation-filter: var(--liquid-glass-q1-continuous-filter);
+  --material-navigation-filter: var(--liquid-glass-continuous-filter);
   --material-navigation-drawer-background: var(--liquid-glass-navigation-drawer-surface-tint);
-  --material-navigation-drawer-filter: var(--liquid-glass-q1-continuous-filter);
+  --material-navigation-drawer-filter: var(--liquid-glass-continuous-filter);
   --material-navigation-text: #173038;
   --material-navigation-focus: var(--ui-focus);
   --material-navigation-muted: #526970;
@@ -116,12 +118,20 @@ body[data-ui-skin="liquid-glass"] {
   --material-list-item-background: rgba(248, 251, 252, 0.62);
   --liquid-glass-list-card-border: rgba(9, 48, 57, 0.14);
   --liquid-glass-list-card-shadow: 0 3px 10px rgba(20, 43, 51, 0.06);
+  /* One light direction feeds both the CSS edge (Q1) and the engine's baked
+     highlight (Q2/Q3); the engine reads these two numbers when it starts. */
+  --liquid-glass-light-x: -0.55;
+  --liquid-glass-light-y: -0.84;
+  --liquid-glass-edge-panel: inset calc(var(--liquid-glass-light-x) * -1.2px) calc(var(--liquid-glass-light-y) * -1.2px) 0 rgba(255, 255, 255, 0.5), inset calc(var(--liquid-glass-light-x) * -8px) calc(var(--liquid-glass-light-y) * -8px) 18px -9px rgba(255, 255, 255, 0.12), inset calc(var(--liquid-glass-light-x) * 0.8px) calc(var(--liquid-glass-light-y) * 0.8px) 0 rgba(255, 255, 255, 0.05);
+  --liquid-glass-edge-card: inset calc(var(--liquid-glass-light-x) * -1px) calc(var(--liquid-glass-light-y) * -1px) 0 rgba(255, 255, 255, 0.5), inset calc(var(--liquid-glass-light-x) * -4px) calc(var(--liquid-glass-light-y) * -4px) 10px -5px rgba(255, 255, 255, 0.1);
+  /* Content cards stop at Q1; compact controls keep the plain card shadow. */
+  --liquid-glass-entry-card-shadow: var(--liquid-glass-edge-card), var(--liquid-glass-list-card-shadow);
   --liquid-glass-compact-control-shadow: var(--liquid-glass-list-card-shadow);
   --material-list-item-secondary-color: inherit;
   --material-list-item-secondary-opacity: 0.77;
   --material-browser-background: rgba(232, 241, 243, 0.66);
   /* The narrow entry drawer covers page content, like the navigation drawer. */
-  --material-browser-filter: var(--liquid-glass-q1-continuous-filter);
+  --material-browser-filter: var(--liquid-glass-continuous-filter);
   --material-tooltip-background: #10181c;
   --material-tooltip-text: #f8fbfa;
   --material-tooltip-border: rgba(255, 255, 255, 0.18);
@@ -131,23 +141,23 @@ body[data-ui-skin="liquid-glass"] {
   --material-rich-tooltip-text: var(--ui-text);
   --material-rich-tooltip-muted: var(--ui-text-muted);
   --material-rich-tooltip-shadow: var(--material-floating-shadow);
-  --material-rich-tooltip-filter: var(--liquid-glass-q1-floating-filter);
+  --material-rich-tooltip-filter: var(--liquid-glass-floating-filter);
   --material-toast-background: #17202a;
   --material-overlay-modal-background: rgba(5, 18, 25, 0.27);
   --material-overlay-strong-background: rgba(4, 16, 23, 0.32);
   --material-overlay-drawer-background: rgba(6, 20, 27, 0.3);
   --material-overlay-panel-background: var(--liquid-glass-modal-surface-tint);
-  --material-overlay-panel-shadow: 0 38px 110px rgba(1, 13, 19, 0.42), 0 10px 30px rgba(1, 13, 19, 0.2);
+  --material-overlay-panel-shadow: var(--liquid-glass-edge-panel), 0 38px 110px rgba(1, 13, 19, 0.42), 0 10px 30px rgba(1, 13, 19, 0.2);
   --material-network-node-shadow: drop-shadow(0 8px 12px rgba(24, 36, 48, 0.08));
   --material-network-node-hover-shadow: drop-shadow(0 12px 18px rgba(24, 36, 48, 0.16));
   --material-network-node-focus-shadow: drop-shadow(0 16px 24px rgba(24, 121, 108, 0.17));
   --material-network-status-filter: blur(10px);
-  --liquid-glass-q1-continuous-filter: blur(3px) saturate(1.06);
-  --liquid-glass-q1-floating-filter: blur(5.5px) saturate(1.12);
-  --liquid-glass-q1-modal-filter: blur(7px) saturate(1.08);
+  --liquid-glass-continuous-filter: blur(3px) saturate(1.06);
+  --liquid-glass-floating-filter: blur(5.5px) saturate(1.12);
+  --liquid-glass-modal-filter: blur(7px) saturate(1.08);
   --liquid-glass-navigation-surface-tint: rgba(242, 249, 248, 0.38);
   --liquid-glass-navigation-drawer-surface-tint: rgba(236, 246, 246, 0.52);
-  --liquid-glass-mobile-bar-surface-tint: rgba(239, 248, 248, 0.34);
+  --liquid-glass-toolbar-surface-tint: rgba(239, 248, 248, 0.34);
   --liquid-glass-focus-surface-tint: rgba(241, 249, 250, 0.3);
   --liquid-glass-floating-surface-tint: rgba(239, 248, 249, 0.28);
   --liquid-glass-tooltip-surface-tint: rgba(239, 248, 249, 0.36);
@@ -192,7 +202,7 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-content-shell-background: var(--liquid-glass-focus-surface-tint);
   --material-entry-detail-mobile-background: var(--liquid-glass-focus-surface-tint);
   --material-content-shell-border: rgba(230, 255, 251, 0.22);
-  --material-content-shell-shadow: 0 30px 78px rgba(0, 0, 0, 0.48), 0 5px 18px rgba(0, 0, 0, 0.28);
+  --material-content-shell-shadow: var(--liquid-glass-edge-panel), 0 30px 78px rgba(0, 0, 0, 0.48), 0 5px 18px rgba(0, 0, 0, 0.28);
   --material-entry-detail-section-background: rgba(24, 36, 42, 0.9);
   --material-entry-detail-section-border: rgba(221, 248, 244, 0.15);
   --material-entry-detail-header-divider: transparent;
@@ -223,9 +233,8 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-inset-border: rgba(221, 248, 244, 0.15);
   --material-floating-background: var(--liquid-glass-floating-surface-tint);
   --material-floating-border: rgba(229, 255, 251, 0.22);
-  --material-floating-shadow: 0 34px 86px rgba(0, 0, 0, 0.62), 0 9px 26px rgba(0, 0, 0, 0.36);
-  --material-mobile-bar-background: var(--liquid-glass-mobile-bar-surface-tint);
-  --material-mobile-bar-shadow: 0 17px 42px rgba(0, 0, 0, 0.44);
+  --material-floating-shadow: var(--liquid-glass-edge-panel), 0 34px 86px rgba(0, 0, 0, 0.62), 0 9px 26px rgba(0, 0, 0, 0.36);
+  --liquid-glass-toolbar-shadow: 0 17px 42px rgba(0, 0, 0, 0.44);
   --material-navigation-background: var(--liquid-glass-navigation-surface-tint);
   --material-navigation-shadow: 0 22px 64px rgba(0, 0, 0, 0.54), 0 3px 12px rgba(0, 0, 0, 0.28);
   --material-navigation-drawer-background: var(--liquid-glass-navigation-drawer-surface-tint);
@@ -246,6 +255,8 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-list-item-background: rgba(26, 39, 45, 0.64);
   --liquid-glass-list-card-border: rgba(229, 255, 251, 0.16);
   --liquid-glass-list-card-shadow: 0 3px 10px rgba(0, 0, 0, 0.16);
+  --liquid-glass-edge-panel: inset calc(var(--liquid-glass-light-x) * -1.2px) calc(var(--liquid-glass-light-y) * -1.2px) 0 rgba(240, 251, 255, 0.5), inset calc(var(--liquid-glass-light-x) * -8px) calc(var(--liquid-glass-light-y) * -8px) 18px -9px rgba(240, 251, 255, 0.12), inset calc(var(--liquid-glass-light-x) * 0.8px) calc(var(--liquid-glass-light-y) * 0.8px) 0 rgba(240, 251, 255, 0.05);
+  --liquid-glass-edge-card: inset calc(var(--liquid-glass-light-x) * -1px) calc(var(--liquid-glass-light-y) * -1px) 0 rgba(240, 251, 255, 0.5), inset calc(var(--liquid-glass-light-x) * -4px) calc(var(--liquid-glass-light-y) * -4px) 10px -5px rgba(240, 251, 255, 0.1);
   --material-list-item-secondary-color: var(--ui-text-muted);
   --material-list-item-secondary-opacity: 1;
   --material-browser-background: rgba(12, 23, 29, 0.68);
@@ -258,10 +269,10 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --material-overlay-strong-background: rgba(0, 5, 9, 0.43);
   --material-overlay-drawer-background: rgba(0, 7, 11, 0.41);
   --material-overlay-panel-background: var(--liquid-glass-modal-surface-tint);
-  --material-overlay-panel-shadow: 0 42px 120px rgba(0, 0, 0, 0.68), 0 12px 34px rgba(0, 0, 0, 0.4);
+  --material-overlay-panel-shadow: var(--liquid-glass-edge-panel), 0 42px 120px rgba(0, 0, 0, 0.68), 0 12px 34px rgba(0, 0, 0, 0.4);
   --liquid-glass-navigation-surface-tint: rgba(7, 18, 24, 0.48);
   --liquid-glass-navigation-drawer-surface-tint: rgba(7, 18, 24, 0.6);
-  --liquid-glass-mobile-bar-surface-tint: rgba(13, 26, 32, 0.34);
+  --liquid-glass-toolbar-surface-tint: rgba(13, 26, 32, 0.34);
   --liquid-glass-focus-surface-tint: rgba(18, 30, 36, 0.34);
   --liquid-glass-floating-surface-tint: rgba(16, 29, 35, 0.32);
   --liquid-glass-tooltip-surface-tint: rgba(14, 27, 33, 0.4);
@@ -458,9 +469,9 @@ body[data-ui-skin="liquid-glass"] .docs-editor-pane:focus-within {
 
 /* Two independent decorative leaves; popup ancestors stay unfiltered. */
 body[data-ui-skin="liquid-glass"] :is(.entry-mail-search-surface, .entry-mail-tools-surface, .tag-manager-search-surface) {
-  --liquid-glass-surface-tint: var(--material-mobile-bar-background);
+  --liquid-glass-surface-tint: var(--liquid-glass-toolbar-surface-tint);
   /* Nothing scrolls behind these leaves. */
-  --liquid-glass-surface-q1-filter: none;
+  --liquid-glass-surface-filter: none;
   display: block;
   position: absolute;
   inset: 0;
@@ -469,9 +480,9 @@ body[data-ui-skin="liquid-glass"] :is(.entry-mail-search-surface, .entry-mail-to
   border: 1px solid var(--ui-border);
   border-radius: inherit;
   background: var(--liquid-glass-surface-tint);
-  box-shadow: var(--material-mobile-bar-shadow);
-  backdrop-filter: var(--liquid-glass-surface-q1-filter);
-  -webkit-backdrop-filter: var(--liquid-glass-surface-q1-filter);
+  box-shadow: var(--liquid-glass-toolbar-shadow);
+  backdrop-filter: var(--liquid-glass-surface-filter);
+  -webkit-backdrop-filter: var(--liquid-glass-surface-filter);
 }
 
 /* The leaf paints the glass; the input stays clear on top of it. */
@@ -523,7 +534,7 @@ body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
 
 body[data-ui-skin="liquid-glass"] .dictionary-panel {
   --liquid-glass-surface-tint: var(--liquid-glass-navigation-surface-tint);
-  --liquid-glass-surface-q1-filter: var(--liquid-glass-q1-continuous-filter);
+  --liquid-glass-surface-filter: var(--liquid-glass-continuous-filter);
 }
 
 body[data-ui-skin="liquid-glass"] .dictionary-panel[data-nav-state="drawer"] {
@@ -550,20 +561,20 @@ body[data-ui-skin="liquid-glass"] :is(
   .toast
 ) {
   --liquid-glass-surface-tint: var(--liquid-glass-floating-surface-tint);
-  --liquid-glass-surface-q1-filter: var(--liquid-glass-q1-floating-filter);
+  --liquid-glass-surface-filter: var(--liquid-glass-floating-filter);
 }
 
 /* Experimental compact surfaces share one registry-owned material boundary. */
 body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"] {
   --liquid-glass-surface-tint: var(--material-floating-background);
   /* Compact controls sit on static panels or the page gradient. */
-  --liquid-glass-surface-q1-filter: none;
+  --liquid-glass-surface-filter: none;
   --material-control-background: var(--liquid-glass-surface-tint);
   background: var(--liquid-glass-surface-tint);
   border-color: var(--material-floating-border);
   box-shadow: var(--liquid-glass-list-card-shadow);
-  backdrop-filter: var(--liquid-glass-surface-q1-filter);
-  -webkit-backdrop-filter: var(--liquid-glass-surface-q1-filter);
+  backdrop-filter: var(--liquid-glass-surface-filter);
+  -webkit-backdrop-filter: var(--liquid-glass-surface-filter);
 }
 
 body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"]:where(button, label):not([data-control-tone]):hover:not(:disabled):not(:has(> input:disabled)) {
@@ -747,7 +758,7 @@ body[data-ui-skin="liquid-glass"] .segmented-control > button[data-control-selec
 
 @media (prefers-reduced-transparency: reduce), (forced-colors: active) {
   body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"] {
-    --liquid-glass-surface-q1-filter: none;
+    --liquid-glass-surface-filter: none;
   }
 }
 
@@ -759,7 +770,7 @@ body[data-ui-skin="liquid-glass"] .segmented-control > button[data-control-selec
     --control-glass-solid-pressed: color-mix(in srgb, var(--control-glass-solid-ink) 80%, black);
   }
   body[data-ui-skin="liquid-glass"] [data-liquid-glass-role="relationship"] {
-    --liquid-glass-surface-q1-filter: none;
+    --liquid-glass-surface-filter: none;
   }
 }
 
@@ -777,27 +788,27 @@ body[data-ui-skin="liquid-glass"] :is(
   .app-tooltip.rich-tooltip
 ) {
   --liquid-glass-surface-tint: var(--liquid-glass-tooltip-surface-tint);
-  --liquid-glass-surface-q1-filter: var(--liquid-glass-q1-floating-filter);
+  --liquid-glass-surface-filter: var(--liquid-glass-floating-filter);
 }
 
 body[data-ui-skin="liquid-glass"] .entry-quality-issue-tooltip {
   --liquid-glass-surface-tint: var(--liquid-glass-floating-surface-tint);
-  --liquid-glass-surface-q1-filter: var(--liquid-glass-q1-floating-filter);
+  --liquid-glass-surface-filter: var(--liquid-glass-floating-filter);
 }
 
 body[data-ui-skin="liquid-glass"] .modal-panel {
   --liquid-glass-surface-tint: var(--liquid-glass-modal-surface-tint);
-  --liquid-glass-surface-q1-filter: var(--liquid-glass-q1-modal-filter);
+  --liquid-glass-surface-filter: var(--liquid-glass-modal-filter);
 }
 
 body[data-ui-skin="liquid-glass"] .network-panel {
   --liquid-glass-surface-tint: var(--liquid-glass-modal-surface-tint);
-  --liquid-glass-surface-q1-filter: var(--liquid-glass-q1-modal-filter);
+  --liquid-glass-surface-filter: var(--liquid-glass-modal-filter);
 }
 
 body[data-ui-skin="liquid-glass"] :is(.modal-panel, .network-panel) {
-  backdrop-filter: var(--liquid-glass-q1-modal-filter);
-  -webkit-backdrop-filter: var(--liquid-glass-q1-modal-filter);
+  backdrop-filter: var(--liquid-glass-modal-filter);
+  -webkit-backdrop-filter: var(--liquid-glass-modal-filter);
 }
 
 body[data-ui-skin="liquid-glass"] :is(
@@ -805,40 +816,43 @@ body[data-ui-skin="liquid-glass"] :is(
   [data-liquid-glass-optics="fallback"]
 ) {
   background: var(--liquid-glass-surface-tint);
-  backdrop-filter: var(--liquid-glass-surface-q1-filter);
-  -webkit-backdrop-filter: var(--liquid-glass-surface-q1-filter);
+  backdrop-filter: var(--liquid-glass-surface-filter);
+  -webkit-backdrop-filter: var(--liquid-glass-surface-filter);
 }
 
+/* Q2 and Q3: the engine bakes the rim highlight into its own image; it sits
+   above the tint and never reruns when the backdrop changes. */
+body[data-ui-skin="liquid-glass"]:is([data-liquid-glass-optics-quality="q2"], [data-liquid-glass-optics-quality="q3"]) :is(
+  [data-liquid-glass-role="continuous"][data-liquid-glass-optics="ready"],
+  [data-liquid-glass-role="relationship"][data-liquid-glass-optics="ready"],
+  [data-liquid-glass-role="toolbar"][data-liquid-glass-optics="ready"]
+) {
+  background: var(--liquid-glass-surface-tint);
+  background-image: var(--liquid-glass-specular-layer, none);
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  background-origin: border-box;
+  backdrop-filter: var(--liquid-glass-surface-filter);
+  -webkit-backdrop-filter: var(--liquid-glass-surface-filter);
+}
+
+/* Q3 alone refracts through the engine's SVG filter. */
 @supports ((backdrop-filter: url("#liquid-glass-optical-probe")) or (-webkit-backdrop-filter: url("#liquid-glass-optical-probe"))) {
   body[data-ui-skin="liquid-glass"][data-liquid-glass-optics-quality="q3"] :is(
     [data-liquid-glass-role="continuous"][data-liquid-glass-optics="ready"],
     [data-liquid-glass-role="relationship"][data-liquid-glass-optics="ready"],
-    [data-liquid-glass-role="focus"][data-liquid-glass-optics="ready"],
-    [data-liquid-glass-role="floating"][data-liquid-glass-optics="ready"],
-    [data-liquid-glass-role="modal"][data-liquid-glass-optics="ready"]
+    [data-liquid-glass-role="toolbar"][data-liquid-glass-optics="ready"]
   ) {
-    /* The engine bakes the rim highlight into its own image; it sits above the
-       tint and never reruns when the backdrop changes. */
-    background: var(--liquid-glass-surface-tint);
-    background-image: var(--liquid-glass-specular-layer, none);
-    background-size: 100% 100%;
-    background-repeat: no-repeat;
-    background-origin: border-box;
-    /* Without refraction the engine sets no optical filter. */
-    backdrop-filter: var(--liquid-glass-optical-filter, var(--liquid-glass-surface-q1-filter));
-    -webkit-backdrop-filter: var(--liquid-glass-optical-filter, var(--liquid-glass-surface-q1-filter));
+    backdrop-filter: var(--liquid-glass-optical-filter, var(--liquid-glass-surface-filter));
+    -webkit-backdrop-filter: var(--liquid-glass-optical-filter, var(--liquid-glass-surface-filter));
   }
 }
 
 @media (max-width: 799.98px) {
-  /* No shell: nothing scrolls behind the bar, so its buttons carry the glass and
-     one hairline separates them from the content below. */
+  /* No shell (see the bar tokens): its buttons carry the glass and one hairline
+     separates them from the content below. */
   body[data-ui-skin="liquid-glass"] .mobile-app-bar {
     border-bottom-color: var(--ui-border);
-    background: transparent;
-    box-shadow: none;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
   }
 
   body[data-ui-skin="liquid-glass"] .dictionary-panel,
@@ -885,7 +899,7 @@ body[data-ui-skin="liquid-glass"] .entry-card,
 body[data-ui-skin="liquid-glass"] .tool-order-card {
   background: var(--material-list-item-background);
   border-color: var(--liquid-glass-list-card-border);
-  box-shadow: var(--liquid-glass-list-card-shadow);
+  box-shadow: var(--liquid-glass-entry-card-shadow);
 }
 
 body[data-ui-skin="liquid-glass"] .entry-card:hover {
@@ -924,11 +938,11 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
     --material-inset-background: #e2ecee;
     --material-floating-background: #eff7f7;
     --material-floating-filter: none;
-    --material-mobile-bar-background: #eaf3f4;
-    --material-mobile-bar-filter: none;
+    --liquid-glass-toolbar-surface-tint: #eaf3f4;
     --material-navigation-background: #eef6f5;
     --material-navigation-filter: none;
     --material-navigation-drawer-background: #e8f2f2;
+    --liquid-glass-navigation-drawer-surface-tint: #e8f2f2;
     --material-navigation-drawer-filter: none;
     --material-browser-filter: none;
     --material-list-item-background: #f8fbfb;
@@ -946,9 +960,10 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
     --material-control-background: #1d2b31;
     --material-inset-background: #1f3036;
     --material-floating-background: #102027;
-    --material-mobile-bar-background: #0d1a20;
+    --liquid-glass-toolbar-surface-tint: #0d1a20;
     --material-navigation-background: #071820;
     --material-navigation-drawer-background: #071820;
+    --liquid-glass-navigation-drawer-surface-tint: #071820;
     --material-list-item-background: #1a292f;
     --material-browser-background: #0c171d;
     --material-rich-tooltip-background: #102027;
@@ -968,8 +983,7 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
     --material-inset-background: #e2ecee;
     --material-floating-background: #eff7f7;
     --material-floating-filter: none;
-    --material-mobile-bar-background: #eaf3f4;
-    --material-mobile-bar-filter: none;
+    --liquid-glass-toolbar-surface-tint: #eaf3f4;
     --material-navigation-background: #eef6f5;
     --material-navigation-filter: none;
     --material-navigation-drawer-background: #e8f2f2;
@@ -990,7 +1004,7 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
     --material-control-background: #1d2b31;
     --material-inset-background: #1f3036;
     --material-floating-background: #102027;
-    --material-mobile-bar-background: #0d1a20;
+    --liquid-glass-toolbar-surface-tint: #0d1a20;
     --material-navigation-background: #071820;
     --material-navigation-drawer-background: #071820;
     --material-list-item-background: #1a292f;
@@ -1080,9 +1094,8 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
     --material-floating-border: CanvasText;
     --material-floating-shadow: none;
     --material-floating-filter: none;
-    --material-mobile-bar-background: Canvas;
-    --material-mobile-bar-shadow: none;
-    --material-mobile-bar-filter: none;
+    --liquid-glass-toolbar-surface-tint: Canvas;
+    --liquid-glass-toolbar-shadow: none;
     --material-navigation-background: Canvas;
     --material-navigation-shadow: none;
     --material-navigation-filter: none;
@@ -1097,6 +1110,7 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
     --material-list-item-background: Canvas;
     --liquid-glass-list-card-border: CanvasText;
     --liquid-glass-list-card-shadow: none;
+    --liquid-glass-entry-card-shadow: none;
     --material-browser-background: Canvas;
     --material-rich-tooltip-background: Canvas;
     --material-rich-tooltip-border: CanvasText;

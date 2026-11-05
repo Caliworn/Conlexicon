@@ -310,31 +310,6 @@
       z-index: 2;
     }
 
-    .lab-surface[data-outer-shape="global-superellipse"] {
-      border-color: transparent;
-    }
-
-    .lab-global-shape-outline {
-      position: absolute;
-      z-index: 1;
-      inset: 0;
-      display: none;
-      width: 100%;
-      height: 100%;
-      overflow: visible;
-      pointer-events: none;
-    }
-
-    .lab-surface[data-outer-shape="global-superellipse"] .lab-global-shape-outline {
-      display: block;
-    }
-
-    .lab-global-shape-outline path {
-      fill: none;
-      stroke: var(--lab-surface-border, var(--lab-border));
-      vector-effect: non-scaling-stroke;
-    }
-
     .lab-surface.is-dragging {
       cursor: grabbing;
     }
@@ -374,17 +349,19 @@
         border-color: transparent !important;
       }
 
-      .lab-surface[data-product-border="off"] .lab-global-shape-outline {
-        opacity: 0;
-      }
-
       .lab-surface[data-product-shadow="off"] {
         box-shadow: none !important;
       }
 
-      .lab-surface[data-product-foreground="off"] {
-        color: var(--lab-neutral-surface-text) !important;
-      }
+    }
+
+    /* Button-size surfaces have no room for the sample text or its padding. */
+    .lab-surface[data-compact="true"] {
+      padding: 0;
+    }
+
+    .lab-surface[data-compact="true"] .lab-surface-content {
+      display: none;
     }
 
     .lab-surface-kicker {
@@ -705,7 +682,7 @@
       </div>
       <button id="themeButton" type="button" aria-pressed="true">切换浅色场景</button>
     </header>
-    <p id="fileProtocolNotice" class="lab-file-notice" role="alert" hidden>当前以 file:// 直接打开。浏览器不允许读取内嵌的控件对照页，“Product role”外观对照已停用；贴图 worker 也可能无法创建、退回主线程生成。请启动本地服务后通过 http://localhost:4173/liquid-glass-lab.html 打开（已在运行的服务需重启才能提供对照页）。</p>
+    <p id="fileProtocolNotice" class="lab-file-notice" role="alert" hidden>当前以 file:// 直接打开。浏览器不允许读取内嵌的控件对照页，产品外观对照已停用；贴图 worker 也可能无法创建、退回主线程生成。请启动本地服务后通过 http://localhost:4173/liquid-glass-lab.html 打开（已在运行的服务需重启才能提供对照页）。</p>
 
     <div class="lab-layout">
       <section class="lab-workspace" aria-label="液态玻璃预览">
@@ -741,11 +718,8 @@
             <div class="lab-words" aria-hidden="true"><span>a</span><span>ɬ</span><span>ŋ</span><span>ə</span></div>
           </div>
           <article id="labSurface" class="lab-surface" aria-label="可拖动液态玻璃示例卡片">
-            <svg id="globalShapeOutline" class="lab-global-shape-outline" aria-hidden="true" focusable="false">
-              <path id="globalShapeOutlinePath"></path>
-            </svg>
             <div class="lab-surface-content">
-              <p class="lab-surface-kicker">Neutral preview text</p>
+              <p class="lab-surface-kicker">Preview text</p>
               <h2>Sample</h2>
             </div>
           </article>
@@ -778,179 +752,169 @@
       <aside class="lab-controls" aria-label="液态玻璃参数">
         <div class="lab-controls-header">
           <h2>参数</h2>
-          <button id="resetButton" type="button">恢复角色默认值</button>
         </div>
 
-        <details class="lab-control-section">
+        <details class="lab-control-section" open>
           <summary><h3>共享表面几何</h3></summary>
-          <label class="lab-field" for="outerShapeSelect">
-            <span class="lab-field-heading"><span>外轮廓模型</span></span>
-            <select id="outerShapeSelect" data-shape-control>
-              <option value="corner">直边＋超椭圆角</option>
-              <option value="global-superellipse">全局超椭圆</option>
-            </select>
-          </label>
           <label class="lab-field" for="widthInput">
             <span class="lab-field-heading"><span>宽度</span><output id="widthOutput" class="lab-field-value">420px</output></span>
-            <input id="widthInput" data-geometry-control type="range" min="180" max="900" step="2" value="420">
+            <input id="widthInput" data-geometry-control type="range" min="24" max="900" step="2" value="420">
           </label>
           <label class="lab-field" for="heightInput">
             <span class="lab-field-heading"><span>高度</span><output id="heightOutput" class="lab-field-value">200px</output></span>
-            <input id="heightInput" data-geometry-control type="range" min="80" max="800" step="2" value="200">
+            <input id="heightInput" data-geometry-control type="range" min="24" max="800" step="2" value="200">
           </label>
           <label class="lab-field" for="radiusInput">
             <span class="lab-field-heading"><span>圆角</span><output id="radiusOutput" class="lab-field-value">60px</output></span>
             <input id="radiusInput" data-geometry-control type="range" min="2" max="400" step="1" value="60">
           </label>
           <label class="lab-field" for="cornerExponentInput">
-            <span class="lab-field-heading"><span>超椭圆指数</span><output id="cornerExponentOutput" class="lab-field-value">4.00</output></span>
-            <input id="cornerExponentInput" data-shape-control type="range" min="2" max="8" step="0.25" value="4">
+            <span class="lab-field-heading"><span>超椭圆指数</span><output id="cornerExponentOutput" class="lab-field-value">2.00</output></span>
+            <input id="cornerExponentInput" data-shape-control type="range" min="2" max="8" step="0.25" value="2">
           </label>
-          <p id="outerShapeNote" class="lab-status-note">角部模型保留直边；指数 2 为传统圆角，2 以上为超椭圆角。</p>
+          <p id="shapeNote" class="lab-status-note">指数 2 为传统圆角，与产品一致；4 对应 CSS 的 corner-shape: squircle（即 superellipse(2)），是常用的平滑圆角；2 以上都保留直边。Lab 按 superellipse(log₂ 指数) 换算。</p>
         </details>
 
         <section class="lab-control-section">
-          <h3>预设与贴图</h3>
-          <div class="lab-select-grid">
-            <label class="lab-field" for="presetSelect">
-              <span class="lab-field-heading"><span>预设</span></span>
-              <select id="presetSelect">
-                <option value="focus">Focus</option>
-                <option value="continuous">Continuous</option>
-                <option value="relationship">Relationship（紧凑控件）</option>
-                <option value="floating">Floating</option>
-                <option value="modal">Modal</option>
-                <option value="custom">Custom</option>
-              </select>
-            </label>
-            <label class="lab-field" for="productQualitySelect">
-              <span class="lab-field-heading"><span>光学质量</span></span>
-              <select id="productQualitySelect">
-                <option value="q3" selected>Q3 · 完整光学</option>
-                <option value="q1">Q1 · 普通玻璃</option>
-              </select>
-            </label>
-            <label class="lab-field" for="mapLimitSelect">
-              <span class="lab-field-heading"><span>贴图上限</span></span>
-              <select id="mapLimitSelect" data-optic-control>
-                <option value="192">192px</option>
-                <option value="256">256px</option>
-                <option value="420">420px</option>
-                <option value="448">448px</option>
-                <option value="480">480px</option>
-                <option value="512">512px</option>
-                <option value="768">768px</option>
-              </select>
-            </label>
-          </div>
+          <h3>光学质量</h3>
+          <label class="lab-field" for="productQualitySelect">
+            <span class="lab-field-heading"><span>等级</span></span>
+            <select id="productQualitySelect">
+              <option value="q3" selected>Q3 · 折射</option>
+              <option value="q2">Q2 · 烘焙高光</option>
+              <option value="q1">Q1 · 无高光</option>
+            </select>
+          </label>
         </section>
 
         <section class="lab-control-section">
-          <h3>Product 外观对照</h3>
-          <div class="lab-select-grid">
-            <label class="lab-field" for="appearanceSourceSelect">
-              <span class="lab-field-heading"><span>外观来源</span></span>
-              <select id="appearanceSourceSelect">
-                <option value="neutral" selected>Neutral Lab</option>
-                <option value="product">Product role</option>
-              </select>
-            </label>
-            <label class="lab-field" for="appearanceRoleSelect">
-              <span class="lab-field-heading"><span>正式外观角色</span></span>
-              <select id="appearanceRoleSelect" disabled>
-                <optgroup label="表面">
-                  <option value="navigation">Navigation</option>
-                  <option value="navigation-drawer">Navigation drawer</option>
-                  <option value="focus-display" selected>Focus display</option>
-                  <option value="focus-editor">Focus editor</option>
-                  <option value="floating">Floating menu</option>
-                  <option value="rich-tooltip">Rich tooltip</option>
-                  <option value="quality-tooltip">Quality tooltip</option>
-                  <option value="toast">Toast</option>
-                  <option value="modal">Modal</option>
-                  <option value="network">Network panel</option>
-                </optgroup>
-                <optgroup label="紧凑控件（relationship）">
-                  <option value="compact-neutral">neutral</option>
-                  <option value="compact-accent-outline">accent / outline</option>
-                  <option value="compact-accent-tinted">accent / tinted</option>
-                  <option value="compact-accent-solid">accent / solid</option>
-                  <option value="compact-danger-outline">danger / outline</option>
-                  <option value="compact-danger-tinted">danger / tinted</option>
-                  <option value="compact-danger-solid">danger / solid</option>
-                </optgroup>
-              </select>
-            </label>
-          </div>
+          <h3>外观</h3>
+          <label class="lab-field" for="appearanceRoleSelect">
+            <span class="lab-field-heading"><span>外观</span></span>
+            <select id="appearanceRoleSelect">
+              <option value="neutral" selected>Neutral Lab</option>
+              <optgroup label="产品表面">
+                <option value="navigation">Navigation</option>
+                <option value="navigation-drawer">Navigation drawer</option>
+                <option value="focus-display">Focus display</option>
+                <option value="focus-editor">Focus editor</option>
+                <option value="floating">Floating menu</option>
+                <option value="rich-tooltip">Rich tooltip</option>
+                <option value="quality-tooltip">Quality tooltip</option>
+                <option value="toast">Toast</option>
+                <option value="modal">Modal</option>
+                <option value="network">Network panel</option>
+              </optgroup>
+              <optgroup label="产品紧凑控件（relationship）">
+                <option value="compact-neutral">neutral</option>
+                <option value="compact-accent-outline">accent / outline</option>
+                <option value="compact-accent-tinted">accent / tinted</option>
+                <option value="compact-accent-solid">accent / solid</option>
+                <option value="compact-danger-outline">danger / outline</option>
+                <option value="compact-danger-tinted">danger / tinted</option>
+                <option value="compact-danger-solid">danger / solid</option>
+              </optgroup>
+            </select>
+          </label>
+          <label class="lab-field" for="tintInput">
+            <span class="lab-field-heading"><span>中性 tint（仅 Neutral Lab）</span><output id="tintOutput" class="lab-field-value">0.48</output></span>
+            <input id="tintInput" type="range" min="0" max="0.8" step="0.01" value="0.48">
+          </label>
           <div class="lab-compare-grid">
             <button type="button" data-product-comparison="full">完整合成</button>
             <button type="button" data-product-comparison="optics">仅光学</button>
             <button type="button" data-product-comparison="optics-tint">光学＋tint</button>
             <button type="button" data-product-comparison="appearance">仅外观层</button>
           </div>
-          <div class="lab-layer-grid" aria-label="Product 外观层开关">
+          <div class="lab-layer-grid" aria-label="外观层开关">
             <label class="lab-layer-toggle"><input type="checkbox" data-product-layer="optics" checked>动态光学</label>
             <label class="lab-layer-toggle"><input type="checkbox" data-product-layer="tint" checked>tint</label>
             <label class="lab-layer-toggle"><input type="checkbox" data-product-layer="border" checked>1px 边框</label>
             <label class="lab-layer-toggle"><input type="checkbox" data-product-layer="shadow" checked>外部阴影</label>
-            <label class="lab-layer-toggle"><input type="checkbox" data-product-layer="foreground" checked disabled>正式前景色</label>
           </div>
-          <p id="appearanceStatus" class="lab-status-note">Neutral Lab · 使用当前 Lab 中性 tint、边框、阴影与前景色。</p>
-          <p class="lab-status-note">这些开关只旁路最终外观层，不重建贴图或清空缓存。Product role 从隔离探针（以探针模式加载的控件对照页 <code>control-gallery.html</code>）读取当前 Q1/Q3 的正式计算样式；共享宽高、圆角、padding、背景场景和 modal/network 遮罩保持不变。紧凑控件只取外观，舞台几何不随之改变，需要时用“共享表面几何”调成按钮尺寸，并配合 Relationship 预设。</p>
+          <p id="appearanceStatus" class="lab-status-note">Neutral Lab · 使用 Lab 自己的中性 tint、边框、阴影与文字色。</p>
+          <p class="lab-status-note">这些开关只旁路最终外观层，不重建贴图或清空缓存。产品外观从隔离探针（以探针模式加载的控件对照页 <code>control-gallery.html</code>）读取当前 Q1／Q2／Q3 的正式计算样式。选择产品外观会联动：导航和抽屉切到 Continuous 预设；紧凑控件切到 Relationship 预设，并把共享几何调成该按钮的宽高和圆角；内容外壳、浮层、弹窗等纯 CSS 表面关闭“动态光学”，和产品一样没有烘焙高光。之后仍可手动调整。背景场景和 modal／network 遮罩保持不变。</p>
         </section>
 
         <section class="lab-control-section">
-          <h3>光学几何</h3>
-          <label class="lab-field" for="bezelInput">
-            <span class="lab-field-heading"><span>请求 bezel</span><output id="bezelOutput" class="lab-field-value">46px</output></span>
-            <input id="bezelInput" data-optic-control type="range" min="2" max="72" step="1" value="46">
-          </label>
-          <label class="lab-field" for="thicknessInput">
-            <span class="lab-field-heading"><span>光学厚度</span><output id="thicknessOutput" class="lab-field-value">21px</output></span>
-            <input id="thicknessInput" data-optic-control type="range" min="1" max="64" step="1" value="21">
-          </label>
+          <h3>光学参数预设</h3>
+          <div class="lab-select-grid">
+            <label class="lab-field" for="presetSelect">
+              <span class="lab-field-heading"><span>预设</span></span>
+              <select id="presetSelect">
+                <option value="continuous" selected>Continuous（导航）</option>
+                <option value="toolbar">Toolbar（搜索与工具胶囊）</option>
+                <option value="relationship">Relationship（紧凑控件）</option>
+                <option value="custom">Custom</option>
+              </select>
+            </label>
+            <button id="resetButton" type="button">恢复预设参数</button>
+          </div>
+          <p class="lab-status-note">预设只填写下面三组参数，不改变外观；手动调整任一参数后变为 Custom。</p>
         </section>
 
         <section class="lab-control-section">
-          <h3>折射与材质</h3>
-          <label class="lab-field" for="iorInput">
-            <span class="lab-field-heading"><span>折射率 IOR</span><output id="iorOutput" class="lab-field-value">1.46</output></span>
-            <input id="iorInput" data-optic-control type="range" min="1.01" max="2.2" step="0.01" value="1.46">
-          </label>
-          <label class="lab-field" for="displacementInput">
-            <span class="lab-field-heading"><span>最大位移</span><output id="displacementOutput" class="lab-field-value">17px</output></span>
-            <input id="displacementInput" data-optic-control type="range" min="0.5" max="48" step="0.5" value="17">
-          </label>
-          <label class="lab-field" for="blurInput">
-            <span class="lab-field-heading"><span>光学内模糊</span><output id="blurOutput" class="lab-field-value">4px</output></span>
-            <input id="blurInput" data-optic-control type="range" min="0" max="12" step="0.1" value="4">
-          </label>
-          <label class="lab-field" for="saturationInput">
-            <span class="lab-field-heading"><span>饱和度</span><output id="saturationOutput" class="lab-field-value">1.09×</output></span>
-            <input id="saturationInput" data-optic-control type="range" min="0.7" max="1.5" step="0.01" value="1.09">
-          </label>
-          <label class="lab-field" for="tintInput">
-            <span class="lab-field-heading"><span>中性 tint</span><output id="tintOutput" class="lab-field-value">0.30</output></span>
-            <input id="tintInput" type="range" min="0" max="0.8" step="0.01" value="0.30">
-          </label>
-        </section>
-
-        <section class="lab-control-section">
-          <h3>环境镜面</h3>
-          <label class="lab-field" for="specularInput">
-            <span class="lab-field-heading"><span>Specular 强度</span><output id="specularOutput" class="lab-field-value">0.64</output></span>
-            <input id="specularInput" data-optic-control type="range" min="0" max="1" step="0.01" value="0.64">
-          </label>
+          <h3>光源</h3>
           <label class="lab-field" for="lightAngleInput">
-            <span class="lab-field-heading"><span>光源角度</span><output id="lightAngleOutput" class="lab-field-value">−123°</output></span>
+            <span class="lab-field-heading"><span>光源角度（Q1 边缘与烘焙高光）</span><output id="lightAngleOutput" class="lab-field-value">−123°</output></span>
             <input id="lightAngleInput" type="range" min="-180" max="180" step="1" value="-123">
+          </label>
+          <p class="lab-status-note">光源角度同时转动产品 CSS 边缘（Q1）和烘焙高光（Q2／Q3）。</p>
+        </section>
+
+        <section class="lab-control-section">
+          <h3>烘焙高光（Q2 及以上）</h3>
+          <label class="lab-field" for="bezelInput">
+            <span class="lab-field-heading"><span>请求 bezel</span><output id="bezelOutput" class="lab-field-value">44px</output></span>
+            <input id="bezelInput" data-optic-control type="range" min="2" max="72" step="1" value="44">
+          </label>
+          <label class="lab-field" for="specularInput">
+            <span class="lab-field-heading"><span>Specular 强度</span><output id="specularOutput" class="lab-field-value">0.48</output></span>
+            <input id="specularInput" data-optic-control type="range" min="0" max="1" step="0.01" value="0.48">
           </label>
           <label class="lab-field" for="lightStrengthInput">
             <span class="lab-field-heading"><span>光源强度</span><output id="lightStrengthOutput" class="lab-field-value">1.00</output></span>
             <input id="lightStrengthInput" type="range" min="0" max="1.35" step="0.01" value="1">
           </label>
+          <label class="lab-field" for="mapLimitSelect">
+            <span class="lab-field-heading"><span>贴图上限</span></span>
+            <select id="mapLimitSelect" data-optic-control>
+              <option value="192">192px</option>
+              <option value="256">256px</option>
+              <option value="420">420px</option>
+              <option value="448">448px</option>
+              <option value="480">480px</option>
+              <option value="512">512px</option>
+              <option value="768">768px</option>
+            </select>
+          </label>
+          <p class="lab-status-note">产品停在 Q2：这一组和光源决定烘焙高光的样子。CSS 边缘的强度由皮肤单独设定，不随这里变化。</p>
+        </section>
+
+        <section class="lab-control-section">
+          <h3>折射（仅 Q3）</h3>
+          <label class="lab-field" for="thicknessInput">
+            <span class="lab-field-heading"><span>光学厚度</span><output id="thicknessOutput" class="lab-field-value">17px</output></span>
+            <input id="thicknessInput" data-optic-control type="range" min="1" max="64" step="1" value="17">
+          </label>
+          <label class="lab-field" for="iorInput">
+            <span class="lab-field-heading"><span>折射率 IOR</span><output id="iorOutput" class="lab-field-value">1.43</output></span>
+            <input id="iorInput" data-optic-control type="range" min="1.01" max="2.2" step="0.01" value="1.43">
+          </label>
+          <label class="lab-field" for="displacementInput">
+            <span class="lab-field-heading"><span>最大位移</span><output id="displacementOutput" class="lab-field-value">12px</output></span>
+            <input id="displacementInput" data-optic-control type="range" min="0.5" max="48" step="0.5" value="12">
+          </label>
+          <label class="lab-field" for="blurInput">
+            <span class="lab-field-heading"><span>光学内模糊</span><output id="blurOutput" class="lab-field-value">3px</output></span>
+            <input id="blurInput" data-optic-control type="range" min="0" max="12" step="0.1" value="3">
+          </label>
+          <label class="lab-field" for="saturationInput">
+            <span class="lab-field-heading"><span>饱和度</span><output id="saturationOutput" class="lab-field-value">1.06×</output></span>
+            <input id="saturationInput" data-optic-control type="range" min="0.7" max="1.5" step="0.01" value="1.06">
+          </label>
           <label class="lab-layer-toggle"><input id="dispersionInput" type="checkbox" data-optic-control>RGB 色散</label>
-          <p class="lab-status-note">色散只是开关，三路比例沿用生产引擎的固定值；所有生产角色默认关闭，用于在细节丰富的背景上对比。</p>
+          <p class="lab-status-note">这一组只影响 Q3 的折射滤镜。色散只是开关，三路比例沿用生产引擎的固定值；所有生产角色默认关闭，用于在细节丰富的背景上对比。</p>
         </section>
       </aside>
     </div>
@@ -974,8 +938,6 @@
         stage: document.querySelector("#labStage"),
         photo: document.querySelector("#labPhoto"),
         surface: document.querySelector("#labSurface"),
-        globalShapeOutline: document.querySelector("#globalShapeOutline"),
-        globalShapeOutlinePath: document.querySelector("#globalShapeOutlinePath"),
         themeButton: document.querySelector("#themeButton"),
         sceneSelect: document.querySelector("#sceneSelect"),
         presetSelect: document.querySelector("#presetSelect"),
@@ -992,11 +954,9 @@
         mapValue: document.querySelector("#mapValue"),
         cacheValue: document.querySelector("#cacheValue"),
         secondaryMapLegend: document.querySelector("#secondaryMapLegend"),
-        outerShapeSelect: document.querySelector("#outerShapeSelect"),
         cornerExponentInput: document.querySelector("#cornerExponentInput"),
         cornerExponentOutput: document.querySelector("#cornerExponentOutput"),
-        outerShapeNote: document.querySelector("#outerShapeNote"),
-        appearanceSourceSelect: document.querySelector("#appearanceSourceSelect"),
+        shapeNote: document.querySelector("#shapeNote"),
         appearanceRoleSelect: document.querySelector("#appearanceRoleSelect"),
         appearanceStatus: document.querySelector("#appearanceStatus"),
         dispersionInput: document.querySelector("#dispersionInput"),
@@ -1043,13 +1003,14 @@
       const productLayerInputs = [...document.querySelectorAll("[data-product-layer]")];
       const productComparisonButtons = [...document.querySelectorAll("[data-product-comparison]")];
       const productComparisonStates = Object.freeze({
-        full: Object.freeze({ optics: true, tint: true, border: true, shadow: true, foreground: true }),
-        optics: Object.freeze({ optics: true, tint: false, border: false, shadow: false, foreground: false }),
-        "optics-tint": Object.freeze({ optics: true, tint: true, border: false, shadow: false, foreground: false }),
-        appearance: Object.freeze({ optics: false, tint: true, border: true, shadow: true, foreground: true }),
+        full: Object.freeze({ optics: true, tint: true, border: true, shadow: true }),
+        optics: Object.freeze({ optics: true, tint: false, border: false, shadow: false }),
+        "optics-tint": Object.freeze({ optics: true, tint: true, border: false, shadow: false }),
+        appearance: Object.freeze({ optics: false, tint: true, border: true, shadow: true }),
       });
       // Fixtures live in control-gallery.html, the single copy of product structure.
-      // opticalRole is the role the production engine would give the fixture.
+      // opticalRole is the role the production engine would give the fixture;
+      // CSS-only surfaces have none.
       const surfaceRole = (viewport, name, opticalRole, label) => Object.freeze({
         viewport, selector: `[data-cg-role="${name}"]`, opticalRole, label,
       });
@@ -1059,14 +1020,14 @@
       const productAppearanceRoles = Object.freeze({
         navigation: surfaceRole("desktop", "navigation", "continuous", "Navigation"),
         "navigation-drawer": surfaceRole("mobile", "navigation-drawer", "continuous", "Navigation drawer"),
-        "focus-display": surfaceRole("desktop", "focus-display", "focus", "Focus display"),
-        "focus-editor": surfaceRole("desktop", "focus-editor", "focus", "Focus editor"),
-        floating: surfaceRole("desktop", "floating", "floating", "Floating menu"),
-        "rich-tooltip": surfaceRole("desktop", "rich-tooltip", "floating", "Rich tooltip"),
-        "quality-tooltip": surfaceRole("desktop", "quality-tooltip", "floating", "Quality tooltip"),
-        toast: surfaceRole("desktop", "toast", "floating", "Toast"),
-        modal: surfaceRole("desktop", "modal", "modal", "Modal"),
-        network: surfaceRole("desktop", "network", "modal", "Network panel"),
+        "focus-display": surfaceRole("desktop", "focus-display", null, "Focus display"),
+        "focus-editor": surfaceRole("desktop", "focus-editor", null, "Focus editor"),
+        floating: surfaceRole("desktop", "floating", null, "Floating menu"),
+        "rich-tooltip": surfaceRole("desktop", "rich-tooltip", null, "Rich tooltip"),
+        "quality-tooltip": surfaceRole("desktop", "quality-tooltip", null, "Quality tooltip"),
+        toast: surfaceRole("desktop", "toast", null, "Toast"),
+        modal: surfaceRole("desktop", "modal", null, "Modal"),
+        network: surfaceRole("desktop", "network", null, "Network panel"),
         "compact-neutral": compactRole("neutral", "Compact neutral"),
         "compact-accent-outline": compactRole("accent-outline", "Compact accent / outline"),
         "compact-accent-tinted": compactRole("accent-tinted", "Compact accent / tinted"),
@@ -1075,15 +1036,15 @@
         "compact-danger-tinted": compactRole("danger-tinted", "Compact danger / tinted"),
         "compact-danger-solid": compactRole("danger-solid", "Compact danger / solid"),
       });
+      // Neutral Lab tints approximate the product: continuous takes the desktop
+      // navigation tint (the drawer is denser), and compact neutral/outline
+      // recipes paint with the floating material.
       const presets = {
-        continuous: { tintLight: 0.52, tintDark: 0.56 },
-        focus: { tintLight: 0.30, tintDark: 0.34 },
-        // Compact neutral/outline recipes paint with the floating material.
+        continuous: { tintLight: 0.38, tintDark: 0.48 },
+        toolbar: { tintLight: 0.34, tintDark: 0.34 },
         relationship: { tintLight: 0.28, tintDark: 0.32 },
-        floating: { tintLight: 0.28, tintDark: 0.32 },
-        modal: { tintLight: 0.32, tintDark: 0.36 },
       };
-      let lastProductPreset = "focus";
+      let lastProductPreset = "continuous";
 
       const opticalEngine = engineApi.createEngine({
         workerUrl: "lib/liquid-glass-map-worker.js",
@@ -1112,16 +1073,7 @@
         return Number(geometrySpecs[name].input.value);
       }
 
-      function selectedShapeModel() {
-        return elements.outerShapeSelect.value === "global-superellipse"
-          ? "global-superellipse"
-          : "corner";
-      }
-
       function selectedOuterShape() {
-        if (selectedShapeModel() === "global-superellipse") {
-          return "global-superellipse";
-        }
         return supportsSuperellipse && cornerExponent() > 2 ? "superellipse" : "round";
       }
 
@@ -1130,23 +1082,14 @@
       }
 
       function updateShapeControls() {
-        const global = selectedShapeModel() === "global-superellipse";
-        if (!supportsSuperellipse && !global) {
+        if (!supportsSuperellipse) {
           elements.cornerExponentInput.value = "2";
         }
-        elements.cornerExponentInput.disabled = !supportsSuperellipse && !global;
-        geometrySpecs.radius.input.disabled = global;
+        elements.cornerExponentInput.disabled = !supportsSuperellipse;
         elements.cornerExponentOutput.value = cornerExponent().toFixed(2);
-        if (global) {
-          elements.outerShapeNote.textContent = "全局超椭圆使用整张表面的 Lamé 曲线；传统圆角半径不参与该模型。";
-        } else if (supportsSuperellipse) {
-          elements.outerShapeNote.textContent = "角部模型保留直边；指数 2 为传统圆角，2 以上为超椭圆角。";
-        } else {
-          elements.outerShapeNote.textContent = "当前浏览器不支持 CSS corner-shape；角部模型指数已锁定为 2。全局超椭圆仍可通过匹配的 clip-path 与贴图比较。";
-        }
-        elements.secondaryMapLegend.textContent = global
-          ? "R = normal X · G = normal Y · A = shape"
-          : "R = normal X · G = normal Y";
+        elements.shapeNote.textContent = supportsSuperellipse
+          ? "指数 2 为传统圆角，与产品一致；4 对应 CSS 的 corner-shape: squircle（即 superellipse(2)），是常用的平滑圆角；2 以上都保留直边。Lab 按 superellipse(log₂ 指数) 换算。"
+          : "当前浏览器不支持 CSS corner-shape，指数锁定为 2（传统圆角，与产品一致）。";
       }
 
       function formatGeometryRange(name) {
@@ -1311,6 +1254,17 @@
         appearanceProbePromise = null;
       }
 
+      // Product fixtures draw their CSS edge from the skin's light variables. The
+      // Lab light overrides them, so the edge turns with the baked highlight.
+      function syncAppearanceProbeLight() {
+        const light = opticalEngine.stats().lightVector;
+        appearanceProbeFrames.forEach((frame) => {
+          const style = frame.contentDocument.body.style;
+          style.setProperty("--liquid-glass-light-x", String(light.x));
+          style.setProperty("--liquid-glass-light-y", String(light.y));
+        });
+      }
+
       function syncAppearanceProbeTheme() {
         const theme = elements.root.dataset.theme === "dark" ? "dark" : "light";
         appearanceProbeFrames.forEach((frame) => setProbeSelect(frame, "cgTheme", theme));
@@ -1320,9 +1274,8 @@
         if (assistedOpticsSuppressed()) {
           return "q0";
         }
-        return elements.productQualitySelect.value === "q1"
-          ? "q1"
-          : opticalEngine.detectQuality();
+        const selected = elements.productQualitySelect.value;
+        return selected === "q3" ? opticalEngine.detectQuality() : selected;
       }
 
       function activateRequestedProductQuality() {
@@ -1350,8 +1303,11 @@
               if (!fixture) {
                 throw new Error(`The control gallery has no fixture for ${role.label}: ${role.selector}`);
               }
+              if (!role.opticalRole) {
+                return;
+              }
               fixture.dataset.liquidGlassRole = role.opticalRole;
-              fixture.dataset.liquidGlassOptics = quality === "q3" ? "ready" : "fallback";
+              fixture.dataset.liquidGlassOptics = quality === "q2" || quality === "q3" ? "ready" : "fallback";
               fixture.style.setProperty("--liquid-glass-optical-filter", "none");
             });
         });
@@ -1384,9 +1340,13 @@
           throw new Error(`Unknown Product appearance role: ${roleName}`);
         }
         const computed = frame.contentWindow.getComputedStyle(fixture);
+        const bounds = fixture.getBoundingClientRect();
         const appearance = {
           role: roleName,
           label: role.label,
+          width: bounds.width,
+          height: bounds.height,
+          radius: Number.parseFloat(computed.borderTopLeftRadius) || 0,
           backgroundColor: computed.backgroundColor,
           borderColor: computed.borderTopColor,
           borderWidth: computed.borderTopWidth,
@@ -1402,12 +1362,12 @@
       }
 
       function productAppearanceSelected() {
-        return elements.appearanceSourceSelect.value === "product";
+        return elements.appearanceRoleSelect.value !== "neutral";
       }
 
       function updateAppearanceStatus() {
         if (!productAppearanceSelected()) {
-          elements.appearanceStatus.textContent = "Neutral Lab · 使用当前 Lab 中性 tint、边框、阴影与前景色。";
+          elements.appearanceStatus.textContent = "Neutral Lab · 使用 Lab 自己的中性 tint、边框、阴影与文字色。";
           return;
         }
         if (!currentProductAppearance) {
@@ -1435,58 +1395,61 @@
           }
           syncAppearanceProbeTheme();
           syncAppearanceProbeQuality();
+          syncAppearanceProbeLight();
           currentProductAppearance = readProductAppearance(elements.appearanceRoleSelect.value);
+          if (linkGeometryToFixture) {
+            linkGeometryToFixture = false;
+            applyFixtureGeometry(currentProductAppearance);
+          }
           updateSurfaceAppearance();
           updateAppearanceStatus();
         } catch (error) {
           console.warn("Product appearance probe is unavailable; using Neutral Lab.", error);
-          elements.appearanceSourceSelect.value = "neutral";
+          elements.appearanceRoleSelect.value = "neutral";
           currentProductAppearance = null;
           updateAppearanceControls();
           elements.appearanceStatus.textContent = `Product appearance unavailable（${error.message}）· 已恢复 Neutral Lab。`;
         }
       }
 
+      // A product appearance moves the optics to match the product: engine roles
+      // load their preset, compact controls also take the button's size, and
+      // CSS-only surfaces drop the baked highlight they do not have.
+      let linkGeometryToFixture = false;
+
+      function applyAppearanceLinks(roleName) {
+        const { opticalRole } = productAppearanceRoles[roleName];
+        const optics = productLayerInputs.find((input) => input.dataset.productLayer === "optics");
+        optics.checked = Boolean(opticalRole);
+        updateProductLayerState();
+        if (opticalRole) {
+          elements.presetSelect.value = opticalRole;
+          applyPreset(opticalRole);
+        }
+        linkGeometryToFixture = opticalRole === "relationship";
+      }
+
+      function applyFixtureGeometry(appearance) {
+        const even = (value) => Math.max(24, Math.round(value / 2) * 2);
+        setGeometryValue("width", even(appearance.width));
+        setGeometryValue("height", even(appearance.height));
+        syncGeometryBounds();
+        setGeometryValue("radius", Math.min(Math.round(appearance.radius), Number(geometrySpecs.radius.input.max)));
+        syncGeometryBounds();
+        scheduleRefresh();
+      }
+
       function updateAppearanceControls() {
         const product = productAppearanceSelected();
-        elements.appearanceRoleSelect.disabled = !product;
         rangeSpecs.tint.input.disabled = product;
-        const foreground = productLayerInputs.find((input) => input.dataset.productLayer === "foreground");
-        if (foreground) {
-          foreground.disabled = !product;
-        }
         if (product) {
+          applyAppearanceLinks(elements.appearanceRoleSelect.value);
           refreshProductAppearance();
         } else {
           currentProductAppearance = null;
           updateSurfaceAppearance();
           updateAppearanceStatus();
         }
-      }
-
-      function globalSuperellipseOutline(width, height, exponent, sampleCount = 128) {
-        const clipPoints = [];
-        const pathPoints = [];
-        for (let index = 0; index < sampleCount; index += 1) {
-          const angle = index / sampleCount * Math.PI * 2;
-          const cosine = Math.cos(angle);
-          const sine = Math.sin(angle);
-          const normalizedX = Math.sign(cosine) * Math.pow(Math.abs(cosine), 2 / exponent);
-          const normalizedY = Math.sign(sine) * Math.pow(Math.abs(sine), 2 / exponent);
-          const percentX = 50 + normalizedX * 50;
-          const percentY = 50 + normalizedY * 50;
-          clipPoints.push(`${percentX.toFixed(4)}% ${percentY.toFixed(4)}%`);
-          pathPoints.push([
-            width / 2 + normalizedX * width / 2,
-            height / 2 + normalizedY * height / 2,
-          ]);
-        }
-        return {
-          clipPath: `polygon(${clipPoints.join(", ")})`,
-          path: `${pathPoints.map(([x, y], index) => (
-            `${index === 0 ? "M" : "L"}${x.toFixed(3)} ${y.toFixed(3)}`
-          )).join(" ")} Z`,
-        };
       }
 
       function updateSurfaceAppearance() {
@@ -1496,29 +1459,18 @@
         const height = readGeometryNumber("height");
         const radius = readGeometryNumber("radius");
         const actualOuterShape = selectedOuterShape();
-        const global = actualOuterShape === "global-superellipse";
         const tint = readNumber("tint");
         const light = elements.root.dataset.theme === "light";
         elements.surface.style.width = `${width}px`;
         elements.surface.style.height = `${height}px`;
-        elements.surface.style.borderRadius = global ? "0" : `${radius}px`;
+        elements.surface.style.borderRadius = `${radius}px`;
+        elements.surface.dataset.compact = String(width < 160 || height < 80);
         elements.surface.style.setProperty(
           "corner-shape",
           actualOuterShape === "superellipse"
             ? `superellipse(${Math.log2(cornerExponent()).toFixed(6)})`
             : "round",
         );
-        if (global) {
-          const outline = globalSuperellipseOutline(width, height, cornerExponent());
-          elements.surface.style.clipPath = outline.clipPath;
-          elements.surface.style.webkitClipPath = outline.clipPath;
-          elements.globalShapeOutline.setAttribute("viewBox", `0 0 ${width} ${height}`);
-          elements.globalShapeOutlinePath.setAttribute("d", outline.path);
-        } else {
-          elements.surface.style.clipPath = "none";
-          elements.surface.style.webkitClipPath = "none";
-          elements.globalShapeOutlinePath.removeAttribute("d");
-        }
         elements.surface.dataset.outerShape = actualOuterShape;
         elements.surface.style.removeProperty("border-width");
         elements.surface.style.removeProperty("border-style");
@@ -1710,15 +1662,15 @@
         elements.surfaceStateValue.textContent = suppressed ? "solid fallback" : surfaceState;
         elements.sizeValue.textContent = `${config.width.toFixed(0)} × ${config.height.toFixed(0)}`;
         elements.bezelValue.textContent = `${config.effectiveBezel.toFixed(1)}px / guard ${config.bezelGuard.toFixed(1)}`;
-        elements.mapValue.textContent = suppressed || stats.quality !== "q3"
+        elements.mapValue.textContent = suppressed || (stats.quality !== "q2" && stats.quality !== "q3")
           ? "disabled"
           : `${config.mapWidth} × ${config.mapHeight}`;
         elements.cacheValue.textContent = `${stats.cache.entries} · ${(stats.cache.bytes / 1048576).toFixed(2)} MiB`;
         elements.liveStatus.textContent = suppressed
           ? "Q0 · transparency disabled"
           : stats.quality === "q1"
-          ? "Q1 · role-matched blur / tint / saturation"
-          : config.q3Eligible
+          ? "Q1 · tint without highlight"
+          : config.rimEligible
           ? `${surfaceState} · ${PRODUCT_LAB_ROLE}`
           : "Q1 fallback · safe bezel 不足";
       }
@@ -1748,6 +1700,14 @@
           Math.sin(radians),
           readNumber("lightStrength"),
         );
+        // Re-read the product fixture in place; a full refresh would flash the
+        // neutral look on every slider step.
+        if (currentProductAppearance) {
+          syncAppearanceProbeLight();
+          currentProductAppearance = readProductAppearance(elements.appearanceRoleSelect.value);
+          updateSurfaceAppearance();
+          updateAppearanceStatus();
+        }
         updateReadout();
       }
 
@@ -1802,8 +1762,7 @@
       productLayerInputs.forEach((input) => {
         input.addEventListener("change", () => updateProductLayerState());
       });
-      elements.appearanceSourceSelect.addEventListener("change", updateAppearanceControls);
-      elements.appearanceRoleSelect.addEventListener("change", refreshProductAppearance);
+      elements.appearanceRoleSelect.addEventListener("change", updateAppearanceControls);
       elements.productQualitySelect.addEventListener("change", updateProductQuality);
       rangeSpecs.tint.input.addEventListener("input", () => {
         formatRange("tint");
@@ -1869,12 +1828,12 @@
       // file its own origin), so the Product source is disabled with a visible reason.
       if (window.location.protocol === "file:") {
         document.getElementById("fileProtocolNotice").hidden = false;
-        elements.appearanceSourceSelect.querySelector('option[value="product"]').disabled = true;
+        elements.appearanceRoleSelect.querySelectorAll("optgroup").forEach((group) => { group.disabled = true; });
       }
 
       syncGeometryBounds();
       updateShapeControls();
-      applyPreset("focus");
+      applyPreset("continuous");
       applyProductComparison("full");
       updateAppearanceControls();
       applyScene();

@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const geometry = require("../lib/liquid-glass-geometry");
 const {
   ByteBudgetLru,
+  DEFAULT_LIGHT_VECTOR,
   LiquidGlassEngine,
   ResilientMapRenderer,
   buildResourceKey,
@@ -76,7 +77,7 @@ function almostEqual(actual, expected, epsilon, message) {
   const engine = new LiquidGlassEngine({
     document: { createElementNS: (_, name) => makeNode(name), querySelector: () => host },
   });
-  const filterElement = engine.createFilter("alpha-test", ["map", "rim"], {
+  const filterElement = engine.createFilter("alpha-test", "map", {
     width: 120, height: 38, maxDisplacement: 4, opticalBlur: 1,
     saturation: 1, specularStrength: 0.48, chromaticDispersion: true,
   });
@@ -238,7 +239,7 @@ const tinySurface = geometry.normalizeSurfaceOptions({
   mapWidth: 80,
   mapHeight: 10,
 });
-assert.equal(tinySurface.q3Eligible, false, "Surfaces without a usable optical rim must select Q1");
+assert.equal(tinySurface.rimEligible, false, "Surfaces without a usable optical rim must select Q1");
 assert.deepEqual(
   geometry.sampleSurface(1, 1, tinySurface),
   { displacementX: 0, displacementY: 0, normalX: 0, normalY: 0, rim: 0 },
@@ -257,7 +258,7 @@ const invalid = geometry.normalizeSurfaceOptions({
 assert(invalid.width >= 8 && invalid.height >= 8, "Invalid surface dimensions must be clamped");
 assert(invalid.ior > 1, "Invalid IOR must be clamped above air");
 assert(invalid.requestedBezel >= 2, "Invalid requested bezel width must be clamped");
-assert.equal(invalid.q3Eligible, false, "A normalized zero-radius surface must fall back instead of crossing its medial seam");
+assert.equal(invalid.rimEligible, false, "A normalized zero-radius surface must fall back instead of crossing its medial seam");
 assert(invalid.radii.every((radius) => radius <= Math.min(invalid.width, invalid.height) / 2), "Corner radii must fit the surface");
 
 const keyA = geometry.buildCacheKey(options);
@@ -362,64 +363,6 @@ assert(squircleCornerProbe.rim > 0, "The exponent-four squircle must include its
 const squircleTop = geometry.sampleSurface(options.width / 2, 1, superellipseOptions);
 assert.equal(squircleTop.normalX, 0, "The Product squircle top edge must remain horizontally tangent");
 assert.equal(squircleTop.normalY, -1, "The Product squircle top edge must retain its outward normal");
-
-const globalEllipseOptions = geometry.normalizeSurfaceOptions({
-  ...options,
-  outerShape: "global-superellipse",
-  cornerExponent: 2,
-});
-const globalSquircleOptions = geometry.normalizeSurfaceOptions({
-  ...options,
-  outerShape: "global-superellipse",
-  cornerExponent: 4,
-});
-assert.equal(
-  globalEllipseOptions.outerShape,
-  "global-superellipse",
-  "Exponent two must remain a global ellipse instead of normalizing to a rounded rectangle",
-);
-const ellipseBoundary = geometry.sampleSurface(
-  options.width / 2 + options.width / 2 / Math.SQRT2,
-  options.height / 2 - options.height / 2 / Math.SQRT2,
-  globalEllipseOptions,
-);
-almostEqual(ellipseBoundary.rim, 1, 1e-6, "The Product global ellipse must follow the Lamé boundary");
-assert.equal(
-  geometry.sampleSurface(1, 1, globalEllipseOptions).rim,
-  0,
-  "A global ellipse must exclude the rectangular map corner",
-);
-assert.equal(
-  geometry.buildCacheKey(globalSquircleOptions),
-  geometry.buildCacheKey({ ...globalSquircleOptions, radius: 2 }),
-  "Global superellipse cache identity must ignore the inactive rounded-corner radius",
-);
-assert.notEqual(
-  geometry.buildCacheKey(globalEllipseOptions),
-  geometry.buildCacheKey(globalSquircleOptions),
-  "Different global superellipse exponents must not share Product cache entries",
-);
-const globalSquircleMaps = geometry.generateSurfaceMaps(globalSquircleOptions);
-const globalCornerOffset = 3;
-const globalCenterOffset = (
-  Math.floor(globalSquircleMaps.height / 2) * globalSquircleMaps.width
-  + Math.floor(globalSquircleMaps.width / 2)
-) * 4 + 3;
-assert.equal(
-  globalSquircleMaps.displacement[globalCornerOffset],
-  255,
-  "The displacement map must keep opaque neutral RGB outside the global outline",
-);
-assert.equal(
-  globalSquircleMaps.specular[globalCornerOffset],
-  0,
-  "The lighting map alpha must exclude the rectangular corner outside a global superellipse",
-);
-assert.equal(
-  globalSquircleMaps.specular[globalCenterOffset],
-  255,
-  "The lighting map alpha must retain the global superellipse interior",
-);
 
 const mapsA = geometry.generateSurfaceMaps(options);
 const mapsB = geometry.generateSurfaceMaps(options);
@@ -553,8 +496,8 @@ assert.equal(movedLight.strength, 1.08, "Unified light strength must remain inde
   });
   const base = { width: 120, height: 38, maxDisplacement: 4, opticalBlur: 1, saturation: 1.04 };
   const names = (filter) => filter.children.map((node) => node.name);
-  const rgb = names(engine.createFilter("rgb-test", ["map", "rim"], { ...base, chromaticDispersion: true }));
-  const mono = names(engine.createFilter("mono-test", ["map", "rim"], base));
+  const rgb = names(engine.createFilter("rgb-test", "map", { ...base, chromaticDispersion: true }));
+  const mono = names(engine.createFilter("mono-test", "map", base));
   for (const chain of [rgb, mono]) {
     assert(!chain.includes("feFlood") && !chain.includes("feComponentTransfer"),
       "Backdrop filters must not recompute the background-independent rim highlight");
@@ -569,7 +512,7 @@ assert.equal(movedLight.strength, 1.08, "Unified light strength must remain inde
   );
 }
 
-function qualityEngine({ url = true, assisted = false } = {}) {
+function qualityEngine({ url = true, assisted = false, refraction = true } = {}) {
   const runtimeWindow = {
     CSS: {
       supports: (_property, value) => (value.startsWith("url") ? url : true),
@@ -579,12 +522,22 @@ function qualityEngine({ url = true, assisted = false } = {}) {
   const document = {
     createElement: () => ({ getContext: () => ({}) }),
   };
-  return new LiquidGlassEngine({ window: runtimeWindow, document });
+  return new LiquidGlassEngine({ window: runtimeWindow, document, refraction });
 }
 
-assert.equal(qualityEngine().detectQuality(), "q3", "Full URL-filter support must select Q3");
-assert.equal(qualityEngine({ url: false }).detectQuality(), "q1", "Missing URL-filter support must select ordinary blur Q1");
+assert.equal(qualityEngine().detectQuality(), "q3", "Refraction with URL-filter support must select Q3");
+assert.equal(qualityEngine({ url: false }).detectQuality(), "q2", "Without URL filters, refraction falls back to baked highlights");
+assert.equal(qualityEngine({ refraction: false }).detectQuality(), "q2", "With refraction off, highlights alone are Q2");
 assert.equal(qualityEngine({ assisted: true }).detectQuality(), "q0", "Assisted display modes must select solid Q0");
+
+{
+  const surface = { width: 120, height: 38, radius: 12, bezel: 8, mapWidth: 60, mapHeight: 19, maxDisplacement: 4 };
+  const full = geometry.generateSurfaceMaps(surface);
+  const highlightOnly = geometry.generateSurfaceMaps(surface, { displacement: false });
+  assert.equal(highlightOnly.displacement, null, "Highlight-only maps skip the displacement map");
+  assert.deepEqual(Array.from(highlightOnly.specular), Array.from(full.specular),
+    "Skipping displacement must not change the normal/rim map the highlight is baked from");
+}
 
 class SurfaceElement {
   constructor(width, height) {
@@ -635,7 +588,7 @@ const resizeEngine = new LiquidGlassEngine({ window: resizeWindow, document: {} 
 const resizeElement = new SurfaceElement(320, 180);
 const resizeRecord = {
   element: resizeElement,
-  role: "floating",
+  role: "continuous",
   overrides: {},
   generation: 0,
   cacheKey: "floating-cache-key",
@@ -709,7 +662,7 @@ async function checkAsyncSurfaceLifecycle() {
       disconnect() {},
     };
     element.visibility = "hidden";
-    engine.register(element);
+    engine.register(element, "continuous");
     assert.deepEqual(observations.map(({ node }) => node), [element, ancestor]);
     observations.forEach(({ options }) => {
       assert.equal(options.attributes, true);
@@ -764,7 +717,7 @@ async function checkAsyncSurfaceLifecycle() {
       setProperty: (_name, value) => writes.push(value),
       removeProperty: () => writes.push("removed"),
     };
-    engine.register(element);
+    engine.register(element, "continuous");
     jobs[0].resolve(); await flush();
     const keyA = engine.surfaces.get(element).cacheKey;
     element.size.width += 20;
@@ -792,7 +745,7 @@ async function checkAsyncSurfaceLifecycle() {
     assert.equal(engine.resizeTimers.size, 0, "Returning to cached geometry must cancel a pending resize");
     assert.equal(element.dataset.liquidGlassOptics, "ready");
     const sibling = new SurfaceElement(element.size.width, element.size.height);
-    engine.register(sibling);
+    engine.register(sibling, "continuous");
     assert.equal(sibling.dataset.liquidGlassOptics, "ready", "New registrations must also attach cache hits synchronously");
     assert.equal(engine.cache.entries.get(keyA).refCount, 2);
     engine.unregister(element);
@@ -802,7 +755,7 @@ async function checkAsyncSurfaceLifecycle() {
 
   {
     const { engine, element, jobs } = fixture();
-    engine.register(element);
+    engine.register(element, "continuous");
     assert.equal(jobs[0].parameters.width, 320.125);
     assert.equal(jobs[0].parameters.height, 180.25);
     engine.handleResize([{ target: element, borderBoxSize: [{ inlineSize: 320.125, blockSize: 180.25 }] }]);
@@ -828,7 +781,7 @@ async function checkAsyncSurfaceLifecycle() {
 
   for (const explicitRefresh of [true, false]) {
     const { engine, element, jobs } = fixture();
-    engine.register(element);
+    engine.register(element, "continuous");
     element.visibility = "hidden";
     if (explicitRefresh) await engine.refresh(element);
     jobs[0].resolve(); await flush();
@@ -843,7 +796,7 @@ async function checkAsyncSurfaceLifecycle() {
 
   {
     const { engine, element, jobs } = fixture();
-    engine.register(element);
+    engine.register(element, "continuous");
     element.size = { width: 0, height: 0 };
     await engine.refresh(element);
     jobs[0].resolve(); await flush();
@@ -854,9 +807,9 @@ async function checkAsyncSurfaceLifecycle() {
 
   {
     const { engine, element, jobs } = fixture();
-    engine.register(element);
+    engine.register(element, "continuous");
     engine.unregister(element);
-    engine.register(element);
+    engine.register(element, "continuous");
     jobs[0].resolve(); await flush();
     assert.equal(jobs.length, 1, "Re-registration may join the same in-flight generation");
     assert.equal(element.dataset.liquidGlassOptics, "ready");
@@ -866,7 +819,7 @@ async function checkAsyncSurfaceLifecycle() {
 
   {
     const { engine, element, jobs } = fixture();
-    engine.register(element);
+    engine.register(element, "continuous");
     // A geometry change may precede the next ResizeObserver delivery.
     element.size.width += 0.125;
     jobs[0].resolve(); await flush();
@@ -883,11 +836,11 @@ async function checkAsyncSurfaceLifecycle() {
       boxSizing: "content-box", paddingLeft: "2.25px", paddingRight: "3.5px",
       borderLeftWidth: "1px", borderRightWidth: "1px", writingMode: "vertical-rl",
     };
-    const parameters = engine.surfaceOptions({ element, role: "floating", overrides: {} });
+    const parameters = engine.surfaceOptions({ element, role: "continuous", overrides: {} });
     assert.equal(parameters.width, 327.875, "Content-box inputs must include padding and border on physical axes");
     assert.equal(parameters.height, 180.25);
     element.isConnected = false;
-    assert.equal(engine.surfaceOptions({ element, role: "floating", overrides: {} }), null);
+    assert.equal(engine.surfaceOptions({ element, role: "continuous", overrides: {} }), null);
   }
 }
 
@@ -918,19 +871,43 @@ async function checkConcurrentWorkerFailure() {
   renderer.dispose();
 }
 
+// The skin's light variables are the single source for the CSS edge and the
+// baked highlight; pages without them keep the engine default.
+{
+  const values = { "--liquid-glass-light-x": " 0.6", "--liquid-glass-light-y": "-0.8" };
+  const runtimeWindow = { getComputedStyle: () => ({ getPropertyValue: (name) => values[name] || "" }) };
+  const engine = new LiquidGlassEngine({ window: runtimeWindow, document: { body: {} } });
+  const fromSkin = engine.readSkinLightVector();
+  almostEqual(fromSkin.x, 0.6, 1e-9, "The light x component must come from the skin");
+  almostEqual(fromSkin.y, -0.8, 1e-9, "The light y component must come from the skin");
+  delete values["--liquid-glass-light-x"];
+  assert.deepEqual(engine.readSkinLightVector(), { ...DEFAULT_LIGHT_VECTOR },
+    "Without skin variables the engine keeps its default light");
+}
+
 // The product turns refraction off: a resource keeps only its baked highlight
 // and the surface falls back to its CSS Q1 backdrop filter.
 async function checkHighlightOnlyResource() {
   const engine = new LiquidGlassEngine({ refraction: false });
   engine.active = true;
-  engine.renderer = { render: async () => ({ width: 2, height: 2, byteLength: 0, specularBuffer: new ArrayBuffer(16) }) };
-  engine.materializePayload = async () => ["map", "rim", "highlight"];
+  engine.quality = "q2";
+  let requestedOutputs = null;
+  engine.renderer = {
+    render: async (_options, _lighting, outputs) => {
+      requestedOutputs = outputs;
+      return { width: 2, height: 2, byteLength: 0 };
+    },
+  };
+  engine.materializePayload = async () => ({ highlightUrl: "highlight", displacementUrl: "", normalUrl: "" });
   engine.createFilter = () => {
     throw new Error("Without refraction no SVG displacement filter may be built");
   };
   const resource = await engine.createResource("highlight-only", { specularStrength: 0.48 }, engine.sessionGeneration);
+  assert.deepEqual(requestedOutputs, { displacement: false, normalMap: false },
+    "Q2 must ask the renderer for the highlight only");
   assert.equal(resource.filterId, "");
   assert.equal(resource.filterElement, null);
+  assert.equal(resource.normalRim, null, "Q2 keeps no normal/rim bytes while the light stays fixed");
   assert.equal(resource.highlightUrl, "highlight");
   const properties = new Map();
   const record = {

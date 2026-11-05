@@ -165,15 +165,16 @@ assert(
     && liquidGlassLab.includes("getComputedStyle(fixture)")
     && liquidGlassLab.includes('createAppearanceProbe("desktop"')
     && liquidGlassLab.includes('createAppearanceProbe("mobile"'),
-  "Product Q1/Q3 appearance comparisons must read the control gallery's fixtures, the single copy of product structure, in isolated desktop and mobile probes",
+  "Product quality-level appearance comparisons must read the control gallery's fixtures, the single copy of product structure, in isolated desktop and mobile probes",
 );
 assert(
   liquidGlassLab.includes('id="productQualitySelect"')
     && liquidGlassLab.includes('<option value="q3" selected>')
+    && liquidGlassLab.includes('<option value="q2">')
     && liquidGlassLab.includes('<option value="q1">')
     && liquidGlassLab.includes("activateRequestedProductQuality()")
-    && liquidGlassLab.includes('stats.quality !== "q3"'),
-  "The Product lab must switch between real Q3 optics and Q1 without generating diagnostic maps for Q1",
+    && liquidGlassLab.includes('opticalEngine.stats().quality !== "q3"'),
+  "The Product lab must switch between real Q3 optics, Q2 highlights and Q1, rendering diagnostic maps only for Q3",
 );
 
 function numericLayer(name) {
@@ -558,7 +559,7 @@ assert(!/--(?:material-)?control-(?:hover-|pressed-)?shadow/.test(
   assert(removeButton && !removeButton.includes("controlTone"),
     "The source card's remove button must stay part of the card, without its own recipe");
   const engineOwners = liquidGlassEngineApi.SURFACE_ROLE_DEFINITIONS
-    .filter(({ sampleBackdrop, selector }) => sampleBackdrop && !leafSurfaces.has(selector))
+    .filter(({ selector }) => !leafSurfaces.has(selector))
     .flatMap(({ selector, controlsWithin }) => (controlsWithin || selector).split(",").map((value) => value.trim()));
   assert.deepEqual([...cssOwners].sort(), [...new Set(engineOwners)].sort(),
     "Flat nested controls must follow exactly the engine's backdrop owners that contain controls");
@@ -781,9 +782,9 @@ assert(
   "Ordinary controls excluded from nested Q3 must retain a neutral CSS fallback",
 );
 assert(
-  liquidGlassSurfaceDefinitions.some(({ selector, registration, sampleBackdrop }) => (
+  liquidGlassSurfaceDefinitions.some(({ selector }) => (
     selector === liquidGlassEngineApi.COMPACT_CONTROL_SELECTOR
-      && selector.includes(".content-disclosure-button") && registration === "automatic" && sampleBackdrop
+      && selector.includes(".content-disclosure-button")
   )),
   "Content disclosure controls must share one Q3 registration boundary",
 );
@@ -793,16 +794,14 @@ assert(
   "Disclosure direction must follow the accessible expanded state",
 );
 assert(
-  liquidGlassSurfaceDefinitions.some(({ role, selector, registration, sampleBackdrop }) => (
+  liquidGlassSurfaceDefinitions.some(({ role, selector }) => (
     role === "relationship" && selector === ".analysis-page-tabs button, .analysis-subpage-tabs button"
-      && registration === "automatic" && sampleBackdrop
   )),
   "Compact Q3 tab experiment must cover analysis and the shared quality-category navigation",
 );
 assert(
-  liquidGlassSurfaceDefinitions.some(({ role, selector, registration, sampleBackdrop }) => (
+  liquidGlassSurfaceDefinitions.some(({ role, selector }) => (
     role === "relationship" && selector === "#displayDerived .derived-link, #fullEditDerived .derived-link"
-      && registration === "automatic" && sampleBackdrop
   )),
   "Derived-card Q3 must cover both relation views without registering generic editor controls",
 );
@@ -811,16 +810,19 @@ for (const definition of liquidGlassSurfaceDefinitions) {
   assert(
     typeof definition.selector === "string"
       && definition.selector.trim()
-      && Object.hasOwn(liquidGlassEngineApi.ROLE_DEFAULTS, definition.role)
-      && ["automatic", "explicit", "css"].includes(definition.registration),
+      && Object.hasOwn(liquidGlassEngineApi.ROLE_DEFAULTS, definition.role),
     `Liquid Glass surface registration must reference a configured role: ${definition.selector}`,
   );
 }
-const liquidGlassContinuousDefinitions = liquidGlassSurfaceDefinitions.filter(({ role }) => role === "continuous");
+const liquidGlassSelectorsForRole = (name) => new Set(
+  liquidGlassSurfaceDefinitions.filter(({ role }) => role === name).map(({ selector }) => selector),
+);
+assert.deepEqual(liquidGlassSelectorsForRole("continuous"), new Set([".dictionary-panel"]),
+  "The continuous role must cover the navigation card and drawer");
 assert.deepEqual(
-  new Set(liquidGlassContinuousDefinitions.map(({ selector }) => selector)),
-  new Set([".dictionary-panel", ".entry-mail-search-surface", ".entry-mail-tools-surface", ".tag-manager-search-surface"]),
-  "Continuous navigation and Mail search/tools backgrounds must remain independent optical surfaces",
+  liquidGlassSelectorsForRole("toolbar"),
+  new Set([".entry-mail-search-surface", ".entry-mail-tools-surface", ".tag-manager-search-surface"]),
+  "The toolbar role must cover the search and tool capsules as independent optical surfaces",
 );
 assert(
   ["entry-mail-search-surface", "entry-mail-tools-surface", "tag-manager-search-surface"].every((name) => index.includes(`<div class="${name}" aria-hidden="true"></div>`)),
@@ -833,7 +835,8 @@ assert(
   "Liquid Glass desktop navigation must float as one inset card above a full-width canvas",
 );
 assert(
-  /@media \(max-width: 799\.98px\) \{[\s\S]*?body\[data-ui-skin="liquid-glass"\] \.mobile-app-bar\s*\{[^}]*border-bottom-color:\s*var\(--ui-border\);[^}]*background:\s*transparent;[^}]*backdrop-filter:\s*none;/s.test(liquidGlass)
+  /--material-mobile-bar-background:\s*transparent;\s*--material-mobile-bar-shadow:\s*none;\s*--material-mobile-bar-filter:\s*none;/.test(liquidGlass)
+    && /@media \(max-width: 799\.98px\) \{[\s\S]*?body\[data-ui-skin="liquid-glass"\] \.mobile-app-bar\s*\{[^}]*border-bottom-color:\s*var\(--ui-border\);/s.test(liquidGlass)
     && /body\[data-ui-skin="liquid-glass"\] \.app-nav\[data-nav-state="drawer"\][\s\S]*?inset:[\s\S]*?border-radius:\s*var\(--liquid-glass-mobile-navigation-radius\);/s.test(liquidGlass),
   "Liquid Glass compact navigation must keep a flat app bar and an inset drawer",
 );
@@ -841,44 +844,62 @@ assert(
   /\.dictionary-panel \.utility-actions\s*\{[^}]*border-top:\s*1px solid var\(--material-navigation-control-border\);[^}]*background:\s*transparent;/s.test(liquidGlass),
   "Liquid Glass utility commands must use flat grouping inside the single navigation surface",
 );
+const liquidGlassHighlightRoleRule = liquidGlassStyleBlocks.find(({ selector }) => (
+  selector.includes('[data-liquid-glass-optics-quality="q2"]')
+    && selector.includes('[data-liquid-glass-optics-quality="q3"]')
+    && selector.includes('[data-liquid-glass-optics="ready"]')
+));
+assert(liquidGlassHighlightRoleRule, "Q2 and Q3 must paint baked highlights on ready runtime roles");
+assert(
+  liquidGlassHighlightRoleRule.declarations.includes("background: var(--liquid-glass-surface-tint);")
+    && liquidGlassHighlightRoleRule.declarations.includes("background-image: var(--liquid-glass-specular-layer, none);")
+    && liquidGlassHighlightRoleRule.declarations.includes("background-origin: border-box;")
+    && liquidGlassHighlightRoleRule.declarations.includes("backdrop-filter: var(--liquid-glass-surface-filter);"),
+  "Ready surfaces must paint the role tint and the baked rim highlight over the whole border box, with the surface's own backdrop filter",
+);
+// Q2 must not depend on URL backdrop-filter support; only the Q3 optics rule may.
+assert(
+  !/@supports[^{]*url\([^{]*\{\s*body\[data-ui-skin="liquid-glass"\]:is\(\[data-liquid-glass-optics-quality="q2"\]/.test(liquidGlass),
+  "The Q2 highlight rule must not sit inside the URL backdrop-filter @supports block",
+);
 const liquidGlassOpticalRoleRule = liquidGlassStyleBlocks.find(({ selector, declarations }) => (
   selector.includes('[data-liquid-glass-optics-quality="q3"]')
+    && !selector.includes('[data-liquid-glass-optics-quality="q2"]')
     && selector.includes('[data-liquid-glass-optics="ready"]')
-    && declarations.includes("backdrop-filter: var(--liquid-glass-optical-filter, var(--liquid-glass-surface-q1-filter));")
+    && declarations.includes("backdrop-filter: var(--liquid-glass-optical-filter, var(--liquid-glass-surface-filter));")
 ));
-assert(liquidGlassOpticalRoleRule, "Q3 must apply generated optics only to ready runtime roles");
+assert(liquidGlassOpticalRoleRule, "Only Q3 may apply generated optics to ready runtime roles");
+assert(!/blur\(/.test(liquidGlassOpticalRoleRule.declarations), "Q3 optics must not add a material blur");
 assert(
-  liquidGlassOpticalRoleRule.declarations.includes("background: var(--liquid-glass-surface-tint);")
-    && !/blur\(/.test(liquidGlassOpticalRoleRule.declarations),
-  "Q3 must use a low-alpha role tint and generated optics without the Q1 material blur",
-);
-assert(
-  liquidGlassOpticalRoleRule.declarations.includes("background-image: var(--liquid-glass-specular-layer, none);")
-    && liquidGlassOpticalRoleRule.declarations.includes("background-origin: border-box;"),
-  "Q3 ready surfaces must paint the baked rim highlight over the whole border box, outside the backdrop filter",
+  /--liquid-glass-light-x:\s*-?[\d.]+;/.test(liquidGlass)
+    && /--liquid-glass-light-y:\s*-?[\d.]+;/.test(liquidGlass)
+    && (liquidGlass.match(/--liquid-glass-edge-(?:panel|card):[^;]*var\(--liquid-glass-light-x\)[^;]*var\(--liquid-glass-light-y\)/g) || []).length === 4
+    && liquidGlassEngine.includes('"--liquid-glass-light-x"')
+    && liquidGlassEngine.includes('"--liquid-glass-light-y"'),
+  "The Q1 CSS edge and the engine's baked highlight must take their light direction from the same skin variables",
 );
 const liquidGlassQ1RuntimeRule = liquidGlassStyleBlocks.find(({ selector, declarations }) => (
   selector.includes('[data-liquid-glass-optics="pending"]')
     && selector.includes('[data-liquid-glass-optics="fallback"]')
     && declarations.includes("background: var(--liquid-glass-surface-tint);")
-    && declarations.includes("backdrop-filter: var(--liquid-glass-surface-q1-filter);")
+    && declarations.includes("backdrop-filter: var(--liquid-glass-surface-filter);")
 ));
 assert(
   liquidGlassQ1RuntimeRule,
   "Q1 pending and fallback surfaces must consume one semantic tint/filter interface",
 );
-for (const role of ["continuous", "floating", "modal"]) {
-  const defaults = liquidGlassEngineApi.ROLE_DEFAULTS[role];
-  const expectedFilter = `--liquid-glass-q1-${role}-filter: blur(${defaults.opticalBlur}px) saturate(${defaults.saturation});`;
+// The narrow drawer's CSS blur stays equal to the continuous role's optical blur,
+// so it reads the same whether or not refraction is on.
+{
+  const defaults = liquidGlassEngineApi.ROLE_DEFAULTS.continuous;
   assert(
-    liquidGlass.includes(expectedFilter),
-    `Q1 ${role} blur and saturation must match the Q3 role parameters`,
+    liquidGlass.includes(`--liquid-glass-continuous-filter: blur(${defaults.opticalBlur}px) saturate(${defaults.saturation});`),
+    "The continuous CSS blur must match the continuous role parameters",
   );
 }
 for (const [materialToken, surfaceTintToken] of [
   ["--material-content-shell-background", "--liquid-glass-focus-surface-tint"],
   ["--material-floating-background", "--liquid-glass-floating-surface-tint"],
-  ["--material-mobile-bar-background", "--liquid-glass-mobile-bar-surface-tint"],
   ["--material-navigation-background", "--liquid-glass-navigation-surface-tint"],
   ["--material-navigation-drawer-background", "--liquid-glass-navigation-drawer-surface-tint"],
   ["--material-rich-tooltip-background", "--liquid-glass-tooltip-surface-tint"],
@@ -890,11 +911,11 @@ for (const [materialToken, surfaceTintToken] of [
   );
 }
 assert(
-  /:is\(\.modal-panel, \.network-panel\)\s*\{[^}]*backdrop-filter:\s*var\(--liquid-glass-q1-modal-filter\);/s.test(liquidGlass),
+  /:is\(\.modal-panel, \.network-panel\)\s*\{[^}]*backdrop-filter:\s*var\(--liquid-glass-modal-filter\);/s.test(liquidGlass),
   "Q1 modal and network surfaces must consume the modal role blur instead of the floating filter",
 );
 for (const role of new Set(
-  liquidGlassSurfaceDefinitions.filter(({ sampleBackdrop }) => sampleBackdrop).map(({ role }) => role),
+  liquidGlassSurfaceDefinitions.map(({ role }) => role),
 )) {
   assert(
     liquidGlassOpticalRoleRule.selector.includes(`[data-liquid-glass-role="${role}"]`),
@@ -905,7 +926,7 @@ for (const materialToken of [
   "--material-content-shell-background",
   "--material-entry-detail-mobile-background",
   "--material-floating-background",
-  "--material-mobile-bar-background",
+  "--liquid-glass-toolbar-surface-tint",
   "--material-navigation-background",
   "--material-navigation-drawer-background",
   "--material-rich-tooltip-background",
@@ -939,24 +960,15 @@ for (const definition of liquidGlassSurfaceDefinitions) {
       `Liquid Glass CSS must configure the ${definition.role} registry selector: ${selector}`,
     );
   }
-  if (definition.sampleBackdrop) {
-    assert(
-      liquidGlass.includes(`[data-liquid-glass-role="${definition.role}"]`),
-      `Liquid Glass optical CSS must consume the ${definition.role} runtime role`,
-    );
-  }
+  assert(
+    liquidGlass.includes(`[data-liquid-glass-role="${definition.role}"]`),
+    `Liquid Glass optical CSS must consume the ${definition.role} runtime role`,
+  );
 }
-const liquidGlassMicroDefinition = liquidGlassSurfaceDefinitions.find(({ role }) => role === "micro");
-assert(
-  liquidGlassMicroDefinition
-    && liquidGlassMicroDefinition.sampleBackdrop === false
-    && liquidGlassMicroDefinition.registration === "css"
-    && !liquidGlass.includes('[data-liquid-glass-role="micro"]'),
-  "LQ-5 micro surfaces must remain CSS volume materials without per-control backdrop maps",
-);
-// Small text popups sit over the dense entry list, where refraction reads as
-// seams, and content-sized tooltips would regenerate maps on nearly every open.
-for (const popupSelector of [
+// Text popups, content shells and large panels stay CSS-only: popups sit over
+// the dense entry list where refraction reads as seams, shells over the page
+// gradient, and panels over a static scrim. None may become an engine surface.
+for (const selector of [
   ".entry-search-config-menu",
   ".entry-filter-menu",
   ".source-suggestions",
@@ -967,41 +979,24 @@ for (const popupSelector of [
   ".app-tooltip.rich-tooltip",
   ".entry-quality-issue-tooltip",
   ".toast",
+  '[data-surface="content-shell"]',
+  ".modal-panel",
+  ".network-panel",
 ]) {
-  const definition = liquidGlassSurfaceDefinitions.find(({ selector }) => selector.split(", ").includes(popupSelector));
-  assert(
-    definition?.role === "floating" && definition.registration === "css" && definition.sampleBackdrop === false,
-    `Floating popups must stay on the Q1 floating material: ${popupSelector}`,
-  );
-}
-const liquidGlassFocusDefinition = liquidGlassSurfaceDefinitions.find(({ role }) => role === "focus");
-assert(
-  liquidGlassFocusDefinition?.registration === "css"
-    && liquidGlassFocusDefinition.sampleBackdrop === false
-    && liquidGlassFocusDefinition.selector === '[data-surface="content-shell"]'
-    && index.includes('<article class="entry-display" data-surface="content-shell"')
-    && index.includes('<form class="editor-panel" data-surface="content-shell"')
-    && /\[data-surface="content-shell"\] \{[\s\S]*?background:\s*var\(--material-content-shell-background\);[\s\S]*?backdrop-filter:\s*var\(--material-content-shell-filter\);/.test(liquidGlass),
-  "Entry display, primary form and tool cards must share focus Q1 material without runtime optical registration",
-);
-for (const selector of ['[data-surface="content-shell"]']) {
   const element = { matches: (selectors) => selectors.split(",").map((item) => item.trim()).includes(selector) };
-  assert.equal(liquidGlassEngineApi.surfaceRoleDefinition(element, { includeCssOnly: true }), liquidGlassFocusDefinition);
+  assert.equal(liquidGlassEngineApi.surfaceRoleDefinition(element), null, `${selector} must stay CSS-only`);
   assert.equal(
     liquidGlassEngineApi.LiquidGlassEngine.prototype.registerMappedSurface.call({ active: true }, element),
     false,
     `${selector} must stay CSS-only even when explicitly requested through the mapped surface API`,
   );
 }
-for (const selector of [".modal-panel", ".network-panel"]) {
-  const element = { matches: (selectors) => selectors.split(",").map((item) => item.trim()).includes(selector) };
-  assert.equal(liquidGlassEngineApi.surfaceRoleDefinition(element, { includeCssOnly: true })?.role, "modal");
-  assert.equal(
-    liquidGlassEngineApi.LiquidGlassEngine.prototype.registerMappedSurface.call({ active: true }, element),
-    false,
-    `${selector} is a large text panel over a static scrim and must stay on the Q1 modal material`,
-  );
-}
+assert(
+  index.includes('<article class="entry-display" data-surface="content-shell"')
+    && index.includes('<form class="editor-panel" data-surface="content-shell"')
+    && /\[data-surface="content-shell"\] \{[\s\S]*?background:\s*var\(--material-content-shell-background\);[\s\S]*?backdrop-filter:\s*var\(--material-content-shell-filter\);/.test(liquidGlass),
+  "Entry display, primary form and tool cards must share the content shell material",
+);
 assert.deepEqual(
   liquidGlassStyleBlocks
     .filter(({ selector, declarations }) => (
