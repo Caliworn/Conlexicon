@@ -354,8 +354,6 @@ const i18n = {
     morphologyFunctions: "形态函数",
     morphologyDisplay: "形态学",
     morphologyGroup: "形态组",
-    morphologyNeedDictionary: "自动形态学配置会保存到当前词典文件中。",
-    qualityNeedDictionary: "质量检查会根据当前词典中的词条、标签、词源、IPA 和 Glossed 例句实时生成。",
     morphologyTables: "形态表格",
     morphologyFunctionObjects: "函数识别对象",
     morphologyFunctionObjectsHelp: "为 leftV/rightV 配置它们会识别的对象。函数被规则使用时必须先配置；函数会先找到最近的已配置对象，再判断它是否属于括号中的候选项。多个对象用逗号分隔。",
@@ -441,9 +439,7 @@ const i18n = {
     backendFileMessage: "当前是 file:// 页面，无法调用后端 API。",
     backendApiMessage: "无法连接后端 API。",
     backendHint: "启动后端后，请访问 http://localhost:4173/。",
-    noDictionary: "尚未创建词典",
-    createDictionaryFirst: "先创建一个词典",
-    emptyDictionaryBody: "词条编辑器会在存在当前词典后显示。进入词典管理即可新建、导入或切换词典。",
+    noDictionary: "还没有词典",
     openDictionaryManager: "打开词典管理",
     searchPlaceholder: "搜索词形、释义、标签",
     noPart: "无词性",
@@ -563,7 +559,6 @@ const i18n = {
     sourceBindingConflict: "原来源已变化或已删除，未创建词条。请返回原词条后重新发起。",
     addSource: "输入或搜索来源",
     etymologyDescription: "说明",
-    settingsNeedDictionary: "其他设置会保存到当前词典文件中。",
     corpusRendering: "渲染",
     corpusRenderPattern: "渲染对象",
     corpusRenderPatternHelp: "留空时将对应内容作为纯文本原样显示并保持换行，不识别 Gloss 格式。填写时仅接受 \\gla、\\glb、\\glc、\\ft；配置中的每一行对应一条输出行，多条非 \\ft 输出行可按词位对齐。用括号包裹对象（如 (\\gla)）可在内容缺失时跳过该对象。",
@@ -677,7 +672,6 @@ const i18n = {
     tagManagerAddSeparator: "标签不能包含逗号或顿号。",
     tagManagerDisplay: "显示",
     tagManagerDisplayOptions: "显示选项",
-    tagManagerNeedDictionary: "标签登记表会保存到当前词典文件中。",
     tagManagerSummary: "共 {count} 个标签 · {unused} 个未使用",
     tagManagerPartZone: "词性",
     tagManagerPartZoneHelp: "放在这里的标签会被识别为词性。",
@@ -834,7 +828,6 @@ const i18n = {
     updatedAt: "修订日期",
     source: "来源",
     derivedEntries: "衍生",
-    ipaNeedDictionary: "IPA 设置会保存到当前词典文件中。",
     mappingRules: "映射规则",
     addMapping: "添加映射",
     ipaMappingHelpTitle: "映射规则说明",
@@ -876,14 +869,12 @@ const i18n = {
     ipaSandboxMapped: "映射",
     ipaSandboxSyllables: "音节划分",
     ipaSandboxFinal: "最终输出",
-    docsNeedDictionary: "语言文档会保存到当前词典文件中。",
-    analysisNeedDictionary: "数据分析会根据当前词典中的词条、标签、词源、IPA 和形态学配置实时生成。",
+    docsPreviewEmpty: "还没有文档内容",
     splitMode: "分栏",
     editMode: "编辑",
     previewMode: "查看",
     saveDocs: "保存文档",
     docsSaved: "文档已保存",
-    corpusNeedDictionary: "语料库会保存到当前词典文件中。",
     saveCorpus: "保存语料库",
     corpusSaved: "语料库已保存",
     corpusBlocks: "块",
@@ -1033,8 +1024,6 @@ const i18n = {
     morphologyFunctions: "Morphology Functions",
     morphologyDisplay: "Morphology",
     morphologyGroup: "Morphology Group",
-    morphologyNeedDictionary: "Auto morphology config is saved in the current dictionary file.",
-    qualityNeedDictionary: "Quality checks are generated live from the current dictionary's entries, tags, etymology, IPA, and Glossed examples.",
     morphologyTables: "Morphology Tables",
     morphologyFunctionObjects: "Function Recognition Objects",
     morphologyFunctionObjectsHelp: "Configure the objects recognized by leftV/rightV. A function must be configured before rules can use it; the function finds the nearest configured object first, then checks whether it is in the candidates inside parentheses. Separate objects with commas.",
@@ -1120,9 +1109,7 @@ const i18n = {
     backendFileMessage: "This file:// page cannot call the backend API.",
     backendApiMessage: "Cannot connect to the backend API.",
     backendHint: "Start the backend, then visit http://localhost:4173/.",
-    noDictionary: "No Dictionary",
-    createDictionaryFirst: "Create a Dictionary First",
-    emptyDictionaryBody: "The entry editor appears after a current dictionary exists. Open dictionary management to create, import, or switch dictionaries.",
+    noDictionary: "No dictionaries yet",
     openDictionaryManager: "Open Dictionary Manager",
     searchPlaceholder: "Search lemma, definition, tags",
     noPart: "No Part",
@@ -1242,7 +1229,6 @@ const i18n = {
     sourceBindingConflict: "The original source changed or was deleted. No entry was created. Return to the original entry and try again.",
     addSource: "Type or search for a source",
     etymologyDescription: "Description",
-    settingsNeedDictionary: "Settings are saved in the current dictionary file.",
     corpusRendering: "Rendering",
     corpusRenderPattern: "Render Objects",
     corpusRenderPatternHelp: "Leave blank to display the corresponding content verbatim as plain text, preserving line breaks without parsing Gloss syntax. Otherwise use only \\gla, \\glb, \\glc, and \\ft; each configured line becomes one output row, and multiple non-\\ft rows can align by token. Wrap an object in parentheses, such as (\\gla), to skip it when its content is missing.",
@@ -1356,7 +1342,6 @@ const i18n = {
     tagManagerAddSeparator: "Tags cannot contain commas or ideographic commas.",
     tagManagerDisplay: "Display",
     tagManagerDisplayOptions: "Display Options",
-    tagManagerNeedDictionary: "The tag registry is saved in the current dictionary file.",
     tagManagerSummary: "{count} tags · {unused} unused",
     tagManagerPartZone: "Parts of Speech",
     tagManagerPartZoneHelp: "Tags placed here are recognized as parts of speech.",
@@ -1517,7 +1502,6 @@ const i18n = {
     source: "Source",
     createSourceEntry: "Create Source Entry: {source}",
     derivedEntries: "Derived",
-    ipaNeedDictionary: "IPA settings are saved in the current dictionary file.",
     mappingRules: "Mapping Rules",
     addMapping: "Add Mapping",
     ipaMappingHelpTitle: "Mapping Rules",
@@ -1559,14 +1543,12 @@ const i18n = {
     ipaSandboxMapped: "Mapping",
     ipaSandboxSyllables: "Syllabification",
     ipaSandboxFinal: "Final Output",
-    docsNeedDictionary: "Language docs are saved in the current dictionary file.",
-    analysisNeedDictionary: "Analytics are generated live from the current dictionary's entries, tags, etymology, IPA, and morphology config.",
+    docsPreviewEmpty: "No document content yet",
     splitMode: "Split",
     editMode: "Edit",
     previewMode: "Preview",
     saveDocs: "Save Docs",
     docsSaved: "Docs saved",
-    corpusNeedDictionary: "The corpus is saved in the current dictionary file.",
     saveCorpus: "Save Corpus",
     corpusSaved: "Corpus saved",
     corpusBlocks: "Blocks",
@@ -4255,15 +4237,8 @@ function renderHeader() {
     eyebrow.hidden = !dictionary;
   });
 
-  if (!backendAvailable) {
-    elements.dictionaryTitle.textContent = t("backendOffline");
-    elements.dictionaryMeta.textContent = t("backendApiMessage");
-    return;
-  }
-
-  if (!dictionary) {
-    elements.dictionaryTitle.textContent = t("noDictionary");
-    elements.dictionaryMeta.textContent = t("emptyDictionaryBody");
+  // The editor top bar is hidden without a backend or a dictionary (renderAvailability).
+  if (!backendAvailable || !dictionary) {
     return;
   }
 
@@ -5364,7 +5339,7 @@ function renderEntries(options = {}) {
   if (!dictionary) {
     finishStaleContentUpdate("list");
     entryListHasSettledContent = false;
-    renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noDictionary"), t("emptyDictionaryBody")));
+    renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noDictionary")));
     return;
   }
 
@@ -11412,7 +11387,7 @@ function renderDictionaryManager() {
   elements.dictionaryManagerList.innerHTML = "";
 
   if (!state.dictionaries.length) {
-    elements.dictionaryManagerList.append(emptyState(t("noDictionary"), t("emptyDictionaryBody")));
+    elements.dictionaryManagerList.append(emptyState(t("noDictionary")));
     return;
   }
 
@@ -15327,7 +15302,7 @@ function renderMarkdown(markdown) {
   }
   flushParagraph();
   flushList();
-  return html.join("") || `<p class="muted-text">${escapeHtml(t("docsNeedDictionary"))}</p>`;
+  return html.join("") || `<p class="muted-text">${escapeHtml(t("docsPreviewEmpty"))}</p>`;
 }
 
 function renderInlineMarkdown(value) {
@@ -15542,7 +15517,7 @@ async function runEntryBatch(dictionary, body) {
 function emptyState(title, body) {
   const empty = document.createElement("div");
   empty.className = "empty-state";
-  empty.innerHTML = `<strong>${escapeHtml(title)}</strong><span>${escapeHtml(body)}</span>`;
+  empty.innerHTML = `<strong>${escapeHtml(title)}</strong>${body ? `<span>${escapeHtml(body)}</span>` : ""}`;
   return empty;
 }
 
