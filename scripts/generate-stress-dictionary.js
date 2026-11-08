@@ -126,12 +126,27 @@ const partDisplayLabels = {
   clf: "classifier",
 };
 
-function makeDefinitions(index, lemma, partOfSpeech) {
+// Examples are corpus items linked from the definition.
+function makeExamples(content, group, index, corpusItems) {
+  if (!content) {
+    return [];
+  }
+  const id = deterministicId("corpus-item", group, index);
+  corpusItems.push({ id, name: "", group: "", content });
+  return [{ itemId: id }];
+}
+
+function makeDefinitions(index, lemma, partOfSpeech, corpusItems) {
   const domain = pick(semanticDomains);
   const definitions = [{
     id: deterministicId("def", 1, index),
     meaning: `${domain} ${partOfSpeech} sense for ${lemma}`,
-    example: chance(0.36) ? `${lemma} ${pick(["mi", "ta", "lu", "ne"])} ${pick(["kari", "soma", "lentu"])}.` : "",
+    examples: makeExamples(
+      chance(0.36) ? `${lemma} ${pick(["mi", "ta", "lu", "ne"])} ${pick(["kari", "soma", "lentu"])}.` : "",
+      1,
+      index,
+      corpusItems,
+    ),
     note: chance(0.18) ? `Generated note ${index % 97}` : "",
   }];
 
@@ -139,7 +154,12 @@ function makeDefinitions(index, lemma, partOfSpeech) {
     definitions.push({
       id: deterministicId("def", 2, index),
       meaning: `secondary ${pick(semanticDomains)} sense`,
-      example: chance(0.28) ? `${pick(["ha", "no", "se"])} ${lemma} ${pick(["var", "tuk", "min"])}.` : "",
+      examples: makeExamples(
+        chance(0.28) ? `${pick(["ha", "no", "se"])} ${lemma} ${pick(["var", "tuk", "min"])}.` : "",
+        2,
+        index,
+        corpusItems,
+      ),
       note: chance(0.15) ? "Needs semantic review" : "",
     });
   }
@@ -231,6 +251,7 @@ function buildDictionary(entryCount = DEFAULT_ENTRY_COUNT) {
   random = mulberry32(0xC0DEC0DE);
   const usedLemmas = new Set();
   const entries = [];
+  const corpusItems = [];
 
   for (let index = 1; index <= entryCount; index += 1) {
     const lemma = makeLemma(index, usedLemmas);
@@ -240,7 +261,7 @@ function buildDictionary(entryCount = DEFAULT_ENTRY_COUNT) {
       lemma,
       pronunciation: chance(0.06) ? "" : pronounce(lemma),
       tags: chance(0.035) ? [] : makeTags(partOfSpeech),
-      definitions: chance(0.045) ? [{ id: deterministicId("def", 1, index), meaning: "", example: "", note: "" }] : makeDefinitions(index, lemma, partOfSpeech),
+      definitions: chance(0.045) ? [{ id: deterministicId("def", 1, index), meaning: "", note: "" }] : makeDefinitions(index, lemma, partOfSpeech, corpusItems),
       etymology: {
         sources: makeSources(index, entries),
         description: chance(0.12) ? `Synthetic derivation note ${index}` : "",
@@ -299,8 +320,7 @@ function buildDictionary(entryCount = DEFAULT_ENTRY_COUNT) {
       markdown: "",
     },
     corpus: {
-      blocks: [],
-      units: [],
+      items: corpusItems,
     },
     morphology: {
       functions: {},

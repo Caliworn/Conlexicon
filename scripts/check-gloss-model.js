@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const {
   glossInlinePlainText,
+  glossSearchText,
   normalizeGlossLineBreaks,
   parseGloss,
   parseGlossInline,
@@ -84,9 +85,16 @@ assert.deepEqual(pex.issues.map((issue) => issue.code), ["unknown_command", "dup
 assert.equal(pex.issues[0].command, String.raw`\pex`);
 assert.equal(pex.issues[1].level, "gla");
 
-// Old data stored line breaks as backslash-n; commands such as \nogloss stay.
+// Old data stored line breaks as backslash-n; import converts them, and
+// commands such as \nogloss stay. At runtime a backslash-n is text.
 assert.equal(normalizeGlossLineBreaks(String.raw`\gla a\n\glb b\nogloss`), lines(String.raw`\gla a`, String.raw`\glb b\nogloss`));
-assertGloss(String.raw`\gla a b\n\glb A B\n\ft test`, { gla: ["a", "b"], glb: ["A", "B"], ft: "test" });
+assertGloss(String.raw`\gla a b\n`, { gla: ["a", String.raw`b\n`] });
+
+// Search text keeps every level, plain line and comment without markup.
+assert.equal(
+  glossSearchText(lines(String.raw`\gla the-\textsc{acc} {out to}`, String.raw`\ft saw`, "% note")),
+  lines("the-acc out to", "saw", "note"),
+);
 
 // Inline formatting.
 assert.deepEqual(parseGlossInline(String.raw`the-\textsc{acc}`), [

@@ -66,7 +66,7 @@
 
 - 子对象级 HTTP 端点、按分区的 PATCH 保存；
 - `PATCH /entries` 的版本条件（见 §5.3）；
-- C13 的删列、R09–R10 的 schema 调整、R11 的例句链接外键；
+- C13 的删列、R09–R10 的 schema 调整；
 - 新建词条时 `createdAt` 的语义。仍按现状接受客户端传入的值。
 
 ## 3. A20 设计：单一差异写入器
@@ -101,7 +101,7 @@ writeEntryChanges(db, previous, next, position, dictionary, options)
   - 新的 ID：普通 `INSERT`。这样撞上其他词条的释义 ID 时，仍由主键约束拒绝并整体回滚，`API_CONTRACT` 中的现有语义不变。
 - `previous` 中有、`next` 中没有的 ID：`DELETE`。
 - **不能**用 `INSERT … ON CONFLICT(id) DO UPDATE`。否则 `next` 里如果带着别的词条的释义 ID，会把那条释义改挂到当前词条上。
-- 这样做同时满足 R11 的前提：保存时保留未变的释义行，将来给例句链接加外键时不会被级联删除。
+- 例句连接 `definition_examples` 对释义是级联外键，目前随词条保存整体重写；改为按 ID 比较后，保留的释义行不会触发级联，连接仍须按 DTO 写回。
 - `definitions.updated_at` 在 C13 删除之前，只在插入和更新的行里写入词条的 `updatedAt`。
 
 **tags、sources、形态组与 override：整组比较**
@@ -211,7 +211,7 @@ writeEntryChanges(db, previous, next, position, dictionary, options)
 
 **5.1 为什么 definitions 按 ID 比较，其他子表整组比较**
 
-单看 A20，整组比较就够了。但释义是每条词条中最大的子列表，而且 R11 需要保存时保留释义行。分类所需的 ID 集合已经在 `previous` 里，额外的复杂度只是一条 UPDATE 分支，所以保留按 ID 比较。其他子表没有这类需求，保持简单。
+单看 A20，整组比较就够了。但释义是每条词条中最大的子列表，而且保留释义行可以避免级联删除例句连接。分类所需的 ID 集合已经在 `previous` 里，额外的复杂度只是一条 UPDATE 分支，所以保留按 ID 比较。其他子表没有这类需求，保持简单。
 
 **5.2 为什么静态投影用"重新计算后比较"，形态投影用生成键**
 

@@ -1,6 +1,6 @@
 # 轻量语料库计划（阶段 C）
 
-状态：设计已确认并做过独立复评。第 1 阶段（Gloss 模型）已于 2026-11-08 完成，其余阶段未实施。本计划取代原阶段 C“例句迁移为语料单元链接”和阶段 D“语料库工作区重做”，原计划保留在 Git 历史中。
+状态：设计已确认并做过独立复评。第 1 阶段（Gloss 模型）和第 2 阶段（数据切换）已于 2026-11-08 完成，第 3、4 阶段未实施。已实现的契约见 `docs/API_CONTRACT.md`、`docs/SQLITE_BACKEND_SPEC.md` 和 `docs/IMPORT_EXPORT_SPEC.md`。本计划取代原阶段 C“例句迁移为语料单元链接”和阶段 D“语料库工作区重做”，原计划保留在 Git 历史中。
 
 ## 1. 目标与边界
 
@@ -71,7 +71,7 @@ definition: { id, meaning, note, tags, examples: [{ itemId, content }] }
 definition: { id, meaning, note, tags, examples: [{ itemId } /* 或 */ { content }] }
 
 // 导出 JSON
-definition: { id, meaning, note, tags, examples: ["corpus-item-id"] }
+definition: { id, meaning, note, tags, examples: [{ itemId }] }
 corpus: { items: [{ id, name, group, content, createdAt, updatedAt }] }
 ```
 
@@ -98,7 +98,7 @@ corpus: { items: [{ id, name, group, content, createdAt, updatedAt }] }
 - 切词只看花括号外的空白。`{out to throw}` 是一列并去掉外层括号，`{}` 是空列。
 - `\glb` 的重复层在 ExPex 中合法，本计划按“提示”处理，避免现有解析器后者覆盖前者时内容无声消失。
 
-字面 `\n` 的转换：原先运行期把所有字面 `\n` 转成换行，会破坏 `\nogloss` 这类命令。第 1 阶段已收窄为只转换后面不跟字母的情况（`normalizeGlossLineBreaks()`），以便现有数据继续工作；第 2 阶段把它移到 JSON 导入，运行期不再转换。
+字面 `\n` 的转换：原先运行期把所有字面 `\n` 转成换行，会破坏 `\nogloss` 这类命令。第 1 阶段先收窄为只转换后面不跟字母的情况（`normalizeGlossLineBreaks()`）；第 2 阶段已把它移到 JSON 导入，运行期不再转换。
 
 `parseGloss()`（`lib/gloss-model.js`）和 `parseStrictCorpusGloss()`（`app.js`）合并成一个共用解析器，前后端共用，返回层、纯文本、注释和提示。
 
@@ -166,13 +166,13 @@ corpus: { items: [{ id, name, group, content, createdAt, updatedAt }] }
 | `POST` | `/api/dictionaries/:id/corpus/groups/rename` | 分组重命名；新名称已存在时并入该组末尾 |
 | `GET` | `/api/dictionaries/:id/corpus/expex` | 按 `group` 生成整组 ExPex |
 
-- 语料列表和例句检索都走服务端窗口，沿用 `/entries` 无搜索时的做法：SQL 直接 count 和分页，前端用页缓存和虚拟列表，不一次读取全部语料。
+- 语料列表和例句检索都走服务端窗口，SQL 直接 count 和 offset 分页，不用 cursor（实施时的调整：语料写入频率低，过期窗口重读即可）；前端按分组和搜索分别缓存窗口并用虚拟列表，不一次读取全部语料。
 - 搜索对 `normalized_text` 做子串匹配，查询词经同一规范化处理，保证和词条搜索的等价规则一致。
 - 词典工作区响应不再包含 `corpus`。
 - 语料质量沿用 `POST /api/dictionaries/:id/quality/query`，新增 source `{ type: "corpusQuality", version: 1, options: {} }` 和 `itemKind: "corpusItem"`，窗口项为 `{ item, issues }`。
 - 删除 `PUT /api/dictionaries/:id/corpus`。`POST /autosave` 的 `corpus` 改为当前编辑的单条语料。
 - 新增错误码需要本地化提示。
-- 保存语料且内容变化时，重写连接到它的词条的搜索投影，沿用 `deleteEntry` 中重写引用方投影的做法；只改名称或分组时不重写。未连接语料的保存不必失效词条查询会话。
+- 保存语料且内容变化时，重写连接到它的词条的搜索投影，沿用 `deleteEntry` 中重写引用方投影的做法；只改名称或分组时不重写。所有语料写入都使查询会话 generation 前进（实施时的调整：语料库质量会话依赖它）。
 
 ## 7. 界面
 
@@ -182,9 +182,9 @@ corpus: { items: [{ id, name, group, content, createdAt, updatedAt }] }
 
 - 列表：搜索框，可折叠分组，未分组排在最后。分组数量来自分组概览，每个展开的分组各自按窗口加载；搜索时不显示分组，平铺结果。行内显示名称，无名称时显示 `\gla` 或第一行；有解析提示时显示图标；有连接时显示数量。继续使用虚拟列表。
 - 详情：渲染结果在上；名称和分组是单行输入框，分组提供已有名称建议；内容框上方有粗体、斜体、小型大写按钮；下方只读列出连接的释义，可以打开词条。
-- 操作：复制 ExPex、删除。自动保存关闭时显示保存按钮。
-- 分组操作：重命名、整组复制 ExPex。
-- 同组内调整顺序沿用 `Alt` + `↑`／`↓` 和拖动把手。在分组中新建时插到当前句之后。
+- 操作：删除；复制 ExPex 在第 3 阶段加入。自动保存关闭时显示保存按钮。
+- “新建语料”在搜索框旁（实施时的调整：窄屏会隐藏顶栏操作），新建的语料加入当前语料的分组，暂时追加到组末。
+- 第 3 阶段：分组重命名、整组复制 ExPex；同组内调整顺序沿用 `Alt` + `↑`／`↓` 和拖动把手；在分组中新建时插到当前句之后。
 - 语料页使用现有工作页外壳。
 
 保存：同一时间只有一条语料在编辑，草稿模型缩成单条。
@@ -199,7 +199,7 @@ corpus: { items: [{ id, name, group, content, createdAt, updatedAt }] }
 完整编辑和局部编辑共用。快速录入没有例句字段，提交时写死的 `example: ""` 一并删除。
 
 - 已连接的例句按渲染结果显示，可解除连接或打开语料。解除连接不删除语料。
-- 多条例句可以调整顺序，方式与释义卡片相同：`Alt` + `↑`／`↓` 和拖动把手。
+- 多条例句可以调整顺序，方式与释义卡片相同：`Alt` + `↑`／`↓` 和拖动把手（第 3 阶段；第 2 阶段按连接顺序显示）。
 - 检索框调用语料窗口接口。框为空时按 `Tab` 填入当前词形并开始查找；有内容时 `Tab` 照常移动焦点；`Shift` + `Tab` 不受影响；输入法组字时不触发。这与快速录入的 `Tab` 约定一致。
 - “写新例句”展开文本框，保存词条时创建无名称、无分组的语料并连接。改已有句子要跳到语料页。
 - 词条详情的例句沿用 `entryExampleRenderPattern` 和对齐设置。
@@ -208,7 +208,7 @@ corpus: { items: [{ id, name, group, content, createdAt, updatedAt }] }
 
 ### 质量页
 
-质量检查分成“词条”和“语料库”两个平行部分，用页面顶部的切换控件进入，各有自己的摘要和列表。
+质量检查分成“词条”和“语料库”两个平行部分，各有自己的摘要和列表。实施时改为在现有子页分组里加一组“语料库”，与“按优先度”“按检查模块”并列，而不是另做顶部切换。
 
 - 词条部分保持现有的按优先度和按模块分页，去掉“Glossed 例句”模块。
 - 语料库部分按问题类型分页：全部、Gloss 不完整、对齐数量不一致、无法解析。列表行显示语料和问题，点击打开语料页的这一条。
@@ -262,8 +262,8 @@ corpus: { items: [{ id, name, group, content, createdAt, updatedAt }] }
 各阶段独立提交：
 
 1. **Gloss 模型**（2026-11-08 完成）：共用解析器、切词、行内格式、长 Gloss 按列折行、删除 small caps，配 `scripts/check-gloss-model.js` 并接入 `check-all`。数据模型不变，现有例句和语料继续工作。
-2. **数据切换**：schema、仓库、API、导入导出、搜索、质量检查、统计，以及新语料页和释义例句区。这一步必须一起完成，因为 `definition.example` 和旧语料模块同时删除，不保留过渡层。
-3. **编辑增强**：快捷键、复制 ExPex、分组重命名、调整顺序和在当前句后新建。
+2. **数据切换**（2026-11-08 完成）：schema、仓库、API、导入导出、搜索、质量检查、统计，以及新语料页和释义例句区。这一步必须一起完成，因为 `definition.example` 和旧语料模块同时删除，不保留过渡层。
+3. **编辑增强**：快捷键、复制 ExPex、分组重命名、同组和释义内的顺序调整、在当前句后新建。
 4. **收尾**：删除旧语料代码、样式和文案，更新文档。
 
 ## 11. 验收

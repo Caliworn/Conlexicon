@@ -7,7 +7,7 @@ function completeRecord(id, options = {}) {
     lemma: options.lemma ?? id,
     pronunciation: options.pronunciation ?? "/a/",
     tags: options.tags ?? ["n"],
-    definitions: options.definitions ?? [{ id: `def-${id}`, meaning: "meaning", example: "", tags: [] }],
+    definitions: options.definitions ?? [{ id: `def-${id}`, meaning: "meaning", tags: [] }],
     sources: options.sources ?? [],
   };
 }
@@ -31,18 +31,9 @@ function qualityFixture() {
       definitions: [{
         id: "def-mixed",
         meaning: "meaning",
-        example: "\\gla a b\n\\glb A B",
         tags: [],
       }],
       sources: [{ entryId: "", text: "missing-root" }],
-    }),
-    completeRecord("entry-gloss-mismatch", {
-      definitions: [{
-        id: "def-gloss-mismatch",
-        meaning: "meaning",
-        example: "\\gla a b\n\\glb A\n\\ft test",
-        tags: [],
-      }],
     }),
     completeRecord("entry-near-tag-a", { tags: ["proper noun"] }),
     completeRecord("entry-near-tag-b", { tags: ["proper-noun"] }),
@@ -52,7 +43,6 @@ function qualityFixture() {
       definitions: [{
         id: "def-tagged",
         meaning: "meaning",
-        example: "",
         tags: ["y".repeat(25), "proper_noun"],
       }],
     }),
@@ -62,20 +52,20 @@ function qualityFixture() {
     // Definition tags against the entry's own tags.
     completeRecord("entry-layer-duplicate", {
       tags: ["n", "rare"],
-      definitions: [{ id: "def-layer-duplicate", meaning: "meaning", example: "", tags: ["rare", "n"] }],
+      definitions: [{ id: "def-layer-duplicate", meaning: "meaning", tags: ["rare", "n"] }],
     }),
     completeRecord("entry-layer-mixed", {
       tags: ["n"],
       definitions: [
-        { id: "def-layer-mixed", meaning: "meaning", example: "", tags: ["v"] },
-        { id: "def-layer-entry-part", meaning: "meaning", example: "", tags: [] },
+        { id: "def-layer-mixed", meaning: "meaning", tags: ["v"] },
+        { id: "def-layer-entry-part", meaning: "meaning", tags: [] },
       ],
     }),
     completeRecord("entry-layer-missing", {
       tags: ["rare"],
       definitions: [
-        { id: "def-layer-own-part", meaning: "meaning", example: "", tags: ["adj"] },
-        { id: "def-layer-no-part", meaning: "meaning", example: "", tags: [] },
+        { id: "def-layer-own-part", meaning: "meaning", tags: ["adj"] },
+        { id: "def-layer-no-part", meaning: "meaning", tags: [] },
       ],
     }),
   ];
@@ -90,8 +80,6 @@ const qualitySettings = {
 };
 
 const expectedDefinitions = {
-  gloss_incomplete: { severity: "medium", module: "gloss", scope: "entry" },
-  gloss_alignment_mismatch: { severity: "medium", module: "gloss", scope: "entry" },
   duplicate_lemma: { severity: "high", module: "lemma", scope: "entry" },
   near_duplicate_tags: { severity: "low", module: "tags", scope: "global" },
   display_label_conflict: { severity: "low", module: "tags", scope: "global" },
@@ -110,7 +98,7 @@ const expectedDefinitions = {
 
 assert.deepEqual(qualityModel.QUALITY_ISSUE_DEFINITIONS, expectedDefinitions);
 assert.deepEqual(qualityModel.QUALITY_SEVERITY_KEYS, ["high", "medium", "low"]);
-assert.deepEqual(qualityModel.QUALITY_MODULE_KEYS, ["lemma", "tags", "ipa", "network", "gloss", "other"]);
+assert.deepEqual(qualityModel.QUALITY_MODULE_KEYS, ["lemma", "tags", "ipa", "network", "other"]);
 assert.throws(
   () => qualityModel.createQualityIssue("unknown_quality_issue", ""),
   /Unknown quality issue code/,
@@ -128,16 +116,32 @@ const issueFor = (code, entryId = null) => issues.find((issue) => (
   issue.code === code && (entryId === null || issue.entryId === entryId)
 ));
 
-assert.deepEqual(issueFor("gloss_incomplete").params, {
-  definitionId: "def-mixed",
-  definitionPosition: 0,
-  missingFields: ["ft"],
-});
-assert.deepEqual(issueFor("gloss_alignment_mismatch").params, {
-  definitionId: "def-gloss-mismatch",
-  definitionPosition: 0,
-  glaCount: 2,
-  glbCount: 1,
+// Gloss checks run per corpus item, once however many definitions link to it.
+const corpusIssues = (content) => qualityModel.corpusItemQualityIssues({ id: "item", content });
+assert.deepEqual(corpusIssues("\\gla a b\n\\glb A B"), [
+  { code: "gloss_incomplete", itemId: "item", params: { missingFields: ["ft"] } },
+]);
+assert.deepEqual(corpusIssues("\\gla a b\n\\glb A\n\\ft test"), [
+  { code: "gloss_alignment_mismatch", itemId: "item", params: { glaCount: 2, glbCount: 1 } },
+]);
+assert.deepEqual(corpusIssues("\\a out {to throw}\n\\b leave \\textsc{3 acc}\n\\ft x"), [], "braces and inline commands keep one item each");
+assert.deepEqual(corpusIssues("plain sentence\n% a note"), [], "plain text has no levels to check");
+assert.deepEqual(corpusIssues("\\pex\n\\a one\n\\xe").map((issue) => issue.code), ["gloss_unparsed", "gloss_incomplete"]);
+assert.deepEqual(corpusIssues("\\pex\n\\a one\n\\xe")[0].params.problems.map((problem) => problem.code), ["unknown_command", "stray_line"]);
+assert.deepEqual(qualityModel.CORPUS_QUALITY_CODES, ["gloss_unparsed", "gloss_incomplete", "gloss_alignment_mismatch"]);
+assert.deepEqual(qualityModel.buildCorpusQualitySummary([
+  { code: "gloss_incomplete", itemId: "a" },
+  { code: "gloss_unparsed", itemId: "a" },
+  { code: "gloss_incomplete", itemId: "b" },
+], 5), {
+  inputItemCount: 5,
+  issueCount: 3,
+  itemCount: 2,
+  codes: [
+    { key: "gloss_unparsed", issueCount: 1, itemCount: 1 },
+    { key: "gloss_incomplete", issueCount: 2, itemCount: 2 },
+    { key: "gloss_alignment_mismatch", issueCount: 0, itemCount: 0 },
+  ],
 });
 assert.deepEqual(issueFor("duplicate_lemma", "entry-duplicate-a").params, {
   lemmas: ["Same", "same"],
@@ -218,9 +222,9 @@ assert.deepEqual(issueFor("source_cycle", "cycle-upstream").params, {
 });
 
 const summary = qualityModel.buildQualitySummary(issues, records.length);
-assert.equal(summary.inputEntryCount, 14);
+assert.equal(summary.inputEntryCount, 13);
 assert.equal(summary.issueCount, issues.length);
-assert.equal(summary.affectedEntryCount, 14);
+assert.equal(summary.affectedEntryCount, 13);
 assert.equal(summary.globalIssueCount, 4);
 assert.equal(
   summary.severities.reduce((total, row) => total + row.issueCount, 0),

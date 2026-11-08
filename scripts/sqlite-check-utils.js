@@ -54,7 +54,7 @@ function sampleSqliteDictionary() {
       { tag: "v", partOfSpeech: true },
     ],
     docs: { markdown: "# Notes" },
-    corpus: { units: [{ id: "corpus-unit-roundtrip", content: "unit" }] },
+    corpus: { items: [{ id: "corpus-item-roundtrip", content: "root example" }] },
     morphology: {
       templateGroups: [{
         id: "morph-roundtrip",
@@ -75,7 +75,7 @@ function sampleSqliteDictionary() {
         lemma: "root",
         pronunciation: "/root/",
         tags: ["n", "root-tag"],
-        definitions: [{ id: "def-root", meaning: "root meaning", example: "root example", note: "root note" }],
+        definitions: [{ id: "def-root", meaning: "root meaning", examples: [{ itemId: "corpus-item-roundtrip" }], note: "root note" }],
         notes: "entry note",
         morphologyMode: "manual",
         morphologyGroups: [{

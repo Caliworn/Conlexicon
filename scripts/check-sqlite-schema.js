@@ -359,12 +359,9 @@ async function runSqliteSchemaCheck() {
     assert.equal(Object.hasOwn(savedDocs, "entries"), false);
     assert.equal(savedDocs.docs.markdown, "# SQLite docs");
 
-    const savedCorpus = await repository.saveCorpusChanges(sourceDictionary.id, {
-      units: [{ content: "SQLite corpus" }],
-    });
-    assert.deepEqual(Object.keys(savedCorpus).sort(), ["corpus", "id", "updatedAt"]);
-    assert.equal(Object.hasOwn(savedCorpus, "entries"), false);
-    assert.equal(savedCorpus.corpus.units[0].content, "SQLite corpus");
+    const savedCorpusItem = await repository.createCorpusItem(sourceDictionary.id, { content: "SQLite corpus" });
+    assert.deepEqual(Object.keys(savedCorpusItem).sort(), ["id", "item", "updatedAt"]);
+    assert.equal(savedCorpusItem.item.content, "SQLite corpus");
 
     const morphologyWithGeneratedCell = structuredClone(sourceDictionary.morphology);
     morphologyWithGeneratedCell.templateGroups[0].tables[0].cells["0,1"] = { sourceText: "{}-suffix" };

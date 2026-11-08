@@ -13,7 +13,6 @@ function definition(index, meaning, extras = {}) {
   return {
     id: fixtureId("def", index),
     meaning,
-    example: extras.example || "",
     note: extras.note || "",
   };
 }
@@ -40,7 +39,7 @@ function buildMorphologyTestDictionary() {
       allowEmptyDefinitions: true,
     },
     docs: { markdown: "# Morphology Acceptance Fixture" },
-    corpus: { blocks: [], units: [] },
+    corpus: { items: [] },
     morphology: {
       functions: {
         leftV: ["a", "o", "u", "e", "i"],

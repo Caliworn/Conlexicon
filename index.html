@@ -534,25 +534,14 @@
                 </div>
                 <div class="gloss-render-contexts">
                   <section class="gloss-render-context">
-                    <h4 data-i18n="corpusCardRendering">语料单元卡片</h4>
+                    <h4 data-i18n="corpusContentRendering">语料内容</h4>
                     <label>
                       <span data-i18n="corpusRenderPattern">渲染对象</span>
-                      <textarea id="corpusUnitCardRenderPatternInput" rows="4" spellcheck="false" placeholder="\gla&#10;(\glb)&#10;(\ft)"></textarea>
+                      <textarea id="corpusRenderPatternInput" rows="4" spellcheck="false" placeholder="\gla&#10;(\glb)&#10;(\ft)"></textarea>
                     </label>
                     <label class="toggle-row">
-                      <span data-i18n="corpusCardGlossAlign">卡片中对齐多行 Gloss</span>
-                      <input id="corpusUnitCardGlossAlignInput" type="checkbox">
-                    </label>
-                  </section>
-                  <section class="gloss-render-context">
-                    <h4 data-i18n="corpusUnitNameRendering">语料单元名称（内容）</h4>
-                    <label>
-                      <span data-i18n="corpusRenderPattern">渲染对象</span>
-                      <textarea id="corpusUnitRenderPatternInput" rows="4" spellcheck="false" placeholder="\gla&#10;(\glb)&#10;(\ft)"></textarea>
-                    </label>
-                    <label class="toggle-row">
-                      <span data-i18n="corpusUnitGlossAlign">单元名称中对齐多行 Gloss</span>
-                      <input id="corpusUnitGlossAlignInput" type="checkbox">
+                      <span data-i18n="corpusGlossAlign">对齐多行 Gloss</span>
+                      <input id="corpusGlossAlignInput" type="checkbox">
                     </label>
                   </section>
                   <section class="gloss-render-context">
@@ -854,25 +843,13 @@
             <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="corpusOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
           </section>
 
-          <section class="corpus-integrity-panel" id="corpusIntegrityPanel" hidden>
-            <div>
-              <strong data-i18n="corpusIntegrityTitle">检测到语料链接问题</strong>
-              <p data-i18n="corpusIntegrityHelp">手动编辑 JSON 可能让一个单元出现在多个父级中。请检查以下项目。</p>
-            </div>
-            <ul id="corpusIntegrityList"></ul>
-          </section>
-
           <section class="corpus-panel" id="corpusPanel">
-            <div class="corpus-toolbar">
-              <div class="segmented-control" id="corpusModeControl" role="radiogroup" data-i18n-aria-label="corpusModeLabel" aria-label="语料类型">
-                <button class="active" data-control-tone="neutral" data-control-selection role="radio" aria-checked="true" tabindex="0" type="button" data-corpus-mode="blocks" data-i18n="corpusBlocks">块</button>
-                <button data-control-tone="neutral" data-control-selection role="radio" aria-checked="false" tabindex="-1" type="button" data-corpus-mode="units" data-i18n="corpusUnits">单元</button>
-              </div>
-              <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="newCorpusItemButton" type="button" data-i18n="newCorpusBlock">新建块</button>
-            </div>
             <div class="corpus-layout">
               <aside class="corpus-browser">
-                <input id="corpusSearchInput" type="search" data-i18n-placeholder="corpusSearchPlaceholder" placeholder="搜索块或单元">
+                <div class="corpus-browser-tools">
+                  <input id="corpusSearchInput" type="search" data-i18n-placeholder="corpusSearchPlaceholder" placeholder="搜索语料">
+                  <button class="secondary-button" data-control-tone="accent" data-control-emphasis="outline" id="newCorpusItemButton" type="button" data-i18n="newCorpusItem">新建语料</button>
+                </div>
                 <div class="corpus-item-list" id="corpusItemList"></div>
               </aside>
               <section class="corpus-editor-panel" id="corpusEditor"></section>
@@ -1266,12 +1243,12 @@
     <script src="lib/tag-model.js"></script>
     <script src="lib/orthography-model.js"></script>
     <script src="lib/morphology-model.js"></script>
+    <script src="lib/gloss-model.js"></script>
     <script src="lib/entry-search-model.js"></script>
     <script src="lib/entry-query-model.js"></script>
     <script src="lib/source-reference-model.js"></script>
     <script src="lib/etymology-graph-model.js"></script>
     <script src="lib/ipa-model.js"></script>
-    <script src="lib/gloss-model.js"></script>
     <script src="lib/dictionary-data-model.js"></script>
     <script src="lib/query-page-cache.js"></script>
     <script src="lib/liquid-glass-geometry.js"></script>

@@ -90,7 +90,7 @@ async function checkWorkspaceAndEntryBatchContract(repository) {
     ["root", "x", "n"],
     "the workspace carries the registry in rank order",
   );
-  assert.ok(workspace.corpus && workspace.morphology);
+  assert.ok(workspace.morphology);
   assert.deepEqual(workspace.summary, { entryCount: 3, rootCount: 3 });
 
   const batch = (body) => callApi(repository, "POST", `${dictionaryPath}/entries/batch`, body);
@@ -128,7 +128,7 @@ async function checkEntityIdSaveScopeInvariants(repository) {
       },
     ],
     corpus: {
-      units: [{ id: "corpus-unit-contract", content: "corpus unit" }],
+      items: [{ id: "corpus-unit-contract", content: "corpus unit" }],
     },
     morphology: {
       templateGroups: [{
@@ -195,16 +195,22 @@ async function checkEntityIdSaveScopeInvariants(repository) {
       "the definition owner is unchanged",
     );
 
-    await assertRejectStatus(
-      repository.saveCorpusChanges(dictionary.id, {
-        units: [
-          { id: "corpus-duplicate-contract", content: "one" },
-          { id: "corpus-duplicate-contract", content: "two" },
-        ],
-      }),
-      409,
-      "corpus save rejects duplicate ids inside corpus blob",
+    const createdItem = (await repository.createCorpusItem(dictionary.id, {
+      name: "",
+      group: "",
+      content: "created",
+    })).item;
+    assert.match(createdItem.id, /^corpus-item-/, "the server generates corpus item IDs");
+    const missingExample = await assertRejectStatus(
+      repository.saveEntry(dictionary.id, {
+        id: "entry-corpus-contract",
+        lemma: "corpus contract",
+        definitions: [{ id: "def-corpus-contract", meaning: "contract", examples: [{ itemId: "corpus-item-missing" }] }],
+      }, { requireExisting: true }),
+      400,
+      "examples must point at existing corpus items",
     );
+    assert.equal(missingExample.code, "corpus_item_not_found");
     const morphologyBefore = (await repository.getDictionarySnapshot(dictionary.id)).morphology;
     const duplicateTables = await assertRejectStatus(
       repository.saveMorphology(dictionary.id, {
@@ -242,13 +248,14 @@ async function checkAnalysisQueryContract(repository) {
       { tag: "n", partOfSpeech: true, displayLabel: "Noun" },
       { tag: "v", partOfSpeech: true, displayLabel: "Verb" },
     ],
+    corpus: { items: [{ id: "corpus-analysis-alpha", content: "alpha example" }] },
     entries: [
       {
         id: "entry-analysis-alpha",
         lemma: "alpha",
         pronunciation: "a",
         tags: ["n", "root"],
-        definitions: [{ id: "def-analysis-alpha", meaning: "first", example: "alpha example" }],
+        definitions: [{ id: "def-analysis-alpha", meaning: "first", examples: [{ itemId: "corpus-analysis-alpha" }] }],
         notes: "note",
         etymology: { sources: [{ entryId: "entry-analysis-beta", text: "beta" }, { entryId: "entry-analysis-gamma", text: "gamma" }] },
         createdAt: "2026-07-01T08:00:00.000Z",
@@ -825,8 +832,21 @@ function testCompareEntries(sort = "lemmaAsc") {
   };
 }
 
+// Saved examples reference corpus items; the shared matcher reads their text
+// the way entry DTOs carry it.
+function entriesWithExampleContents(dictionary) {
+  const contents = new Map((dictionary.corpus?.items || []).map((item) => [item.id, item.content]));
+  return (dictionary.entries || []).map((entry) => ({
+    ...entry,
+    definitions: (entry.definitions || []).map((definition) => ({
+      ...definition,
+      examples: (definition.examples || []).map((example) => ({ ...example, content: contents.get(example.itemId) || "" })),
+    })),
+  }));
+}
+
 function expectedEntryIds(dictionary, query = {}) {
-  return [...(dictionary.entries || [])]
+  return entriesWithExampleContents(dictionary)
     .filter((entry) => testEntryMatches(entry, dictionary, query))
     .sort(testCompareEntries(query.sort || "lemmaAsc"))
     .map((entry) => entry.id);
@@ -956,9 +976,6 @@ function checkModelNormalization() {
     settings: {
       tagListSeparatorStyle: "ideographicComma",
     },
-    corpus: {
-      blocks: [{ title: "block", tags: [" corpus ", "corpus"] }],
-    },
     morphology: {
       templateGroups: [{ name: "group", matchTags: [" n ", "n"], tables: [] }],
     },
@@ -970,7 +987,6 @@ function checkModelNormalization() {
     { tag: "null", partOfSpeech: false, displayLabel: "", color: "" },
   ], "the first row of a tag wins, parts of speech come first, entry tags are registered");
   assert.equal(normalizedTagLists.settings.tagListSeparatorStyle, "ideographicComma");
-  assert.deepEqual(normalizedTagLists.corpus.blocks[0].tags, ["corpus"]);
   assert.deepEqual(normalizedTagLists.morphology.templateGroups[0].matchTags, ["n"]);
   const registry = [
     { tag: "n", partOfSpeech: true, displayLabel: "noun", color: "" },
@@ -1525,7 +1541,9 @@ function checkModelNormalization() {
       },
       toolNavOrder: ["editor", "morphology", "settings"],
       glossFontFamily: "sans",
-      corpusGlossAlign: false,
+      corpusUnitRenderPattern: "\\gla",
+      corpusUnitCardRenderPattern: "\\ft",
+      corpusUnitGlossAlign: false,
       savePartialEditOnSwitch: true,
       fuzzySearch: false,
       tagFuzzySearch: false,
@@ -1553,10 +1571,11 @@ function checkModelNormalization() {
   assert.deepEqual(importedVowels(" aei "), ["a", "e", "i"], "surrounding space is not a separator");
   assert.deepEqual(importedVowels(["a", "ai"]), ["a", "ai"]);
   assert.equal(legacyConvertedImport.dictionary.settings.glossStyles.gla.fontFamily, "sans");
-  assert.equal(legacyConvertedImport.dictionary.settings.corpusUnitCardGlossAlign, false);
+  assert.equal(legacyConvertedImport.dictionary.settings.corpusRenderPattern, "\\gla", "the unit heading pattern wins");
+  assert.equal(legacyConvertedImport.dictionary.settings.corpusGlossAlign, false);
   assert.equal(legacyConvertedImport.dictionary.settings.partialEditPageSwitchAction, "save");
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "glossFontFamily"), false);
-  assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "corpusGlossAlign"), false);
+  assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "corpusUnitRenderPattern"), false);
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "savePartialEditOnSwitch"), false);
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "fuzzySearch"), false);
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "tagFuzzySearch"), false);
@@ -1641,7 +1660,7 @@ function checkModelNormalization() {
     () => {
       const duplicate = normalizeDictionary({
         entries: [{ id: "shared-id", lemma: "a" }],
-        corpus: { units: [{ id: "shared-id", content: "x" }] },
+        corpus: { items: [{ id: "shared-id", content: "x" }] },
       });
       assertUniqueDictionaryEntityIds(duplicate);
     },
@@ -1649,7 +1668,7 @@ function checkModelNormalization() {
       && Array.isArray(error.details?.duplicates)
       && error.details.duplicates[0]?.id === "shared-id"
       && error.details.duplicates[0]?.types.includes("entry")
-      && error.details.duplicates[0]?.types.includes("corpusUnit"),
+      && error.details.duplicates[0]?.types.includes("corpusItem"),
   );
 
   assert.throws(
@@ -1671,7 +1690,7 @@ function checkModelNormalization() {
         entries: [{ id: "shared-cross-type-id", lemma: "a" }],
         settings: { ipa: { mappings: [{ from: "a", to: "b" }] } },
         morphology: { templateGroups: [{ id: "shared-cross-type-id", name: "A", tables: [] }] },
-        corpus: { units: [{ id: "shared-cross-type-id", content: "x" }] },
+        corpus: { items: [{ id: "shared-cross-type-id", content: "x" }] },
       });
       assertUniqueDictionaryEntityIds(duplicate);
     },
@@ -1857,13 +1876,14 @@ async function checkReadApiConsistency(repository) {
         },
       ],
     },
+    corpus: { items: [{ id: "corpus-read-alpha", content: "alpha example" }] },
     entries: [
       {
         id: "entry-alpha",
         lemma: "alpha",
         pronunciation: "/alpha/",
         tags: ["n", "motion"],
-        definitions: [{ id: "def-alpha", meaning: "mirror meaning", example: "alpha example", note: "alpha note" }],
+        definitions: [{ id: "def-alpha", meaning: "mirror meaning", examples: [{ itemId: "corpus-read-alpha" }], note: "alpha note" }],
         etymology: { sources: [{ entryId: "", text: "root" }], description: "source note" },
         notes: "entry note",
         createdAt: "2026-01-01T00:00:00.000Z",
@@ -2448,20 +2468,37 @@ async function runRepositoryContractTests(options = {}) {
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.docs.markdown, "# Notes");
 
-    apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/corpus`, {
-      units: [{ content: "corpus unit" }],
+    apiResult = await callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(first.id)}/corpus/items`, {
+      item: { content: "corpus unit", group: " story " },
     });
-    assert.equal(apiResult.statusCode, 200);
-    assert.equal(apiResult.body.corpus.units[0].content, "corpus unit");
-    assert.match(apiResult.body.corpus.units[0].id, /^corpus-unit-/);
+    assert.equal(apiResult.statusCode, 201);
+    assert.equal(apiResult.body.item.content, "corpus unit");
+    assert.equal(apiResult.body.item.group, "story", "group names are trimmed");
+    assert.match(apiResult.body.item.id, /^corpus-item-/);
+    const corpusItemId = apiResult.body.item.id;
 
     apiResult = await callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(first.id)}/autosave`, {
       docs: { markdown: "# Autosaved notes" },
-      corpus: { units: [{ content: "autosaved corpus unit" }] },
+      corpusItem: { id: corpusItemId, name: "", group: "story", content: "autosaved corpus unit" },
     });
     assert.equal(apiResult.statusCode, 200);
     assert.equal(apiResult.body.docs.markdown, "# Autosaved notes");
-    assert.equal(apiResult.body.corpus.units[0].content, "autosaved corpus unit");
+    assert.equal(apiResult.body.corpusItem.content, "autosaved corpus unit");
+
+    apiResult = await callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/corpus/items?group=story&limit=1`);
+    assert.equal(apiResult.statusCode, 200);
+    assert.deepEqual(apiResult.body.items.map((item) => item.content), ["autosaved corpus unit"]);
+    assert.equal(apiResult.body.pageInfo.total, 1);
+    await assertRejectStatus(
+      callApi(repository, "GET", `/api/dictionaries/${encodeURIComponent(first.id)}/corpus/items?limit=0`),
+      400,
+      "corpus window limit must be positive",
+    );
+    await assertRejectStatus(
+      callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/corpus/items/${corpusItemId}`, { item: { content: 3 } }),
+      400,
+      "corpus item fields must be strings",
+    );
 
     await assertRejectStatus(
       callApi(repository, "POST", `/api/dictionaries/${encodeURIComponent(first.id)}/autosave`, {}),
@@ -2625,7 +2662,7 @@ async function runRepositoryContractTests(options = {}) {
         entries: [{ id: "shared-import-id", lemma: "a" }],
         settings: { ipa: { mappings: [{ from: "a", to: "b" }] } },
         morphology: { templateGroups: [{ id: "shared-import-id", name: "A", tables: [] }] },
-        corpus: { units: [{ id: "shared-import-id", content: "x" }] },
+        corpus: { items: [{ id: "shared-import-id", content: "x" }] },
       })),
       409,
       "cross type duplicate id import",

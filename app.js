@@ -81,10 +81,6 @@ const {
   DEFAULT_ENTRY_SECTION_ORDER,
   DEFAULT_TOOL_NAV_ORDER,
   ensureEntityId,
-  normalizeCorpus,
-  normalizeCorpusBlock,
-  normalizeCorpusLayer,
-  normalizeCorpusUnit,
   normalizeDefinition,
   normalizeDictionarySettings,
   normalizeDocs,
@@ -128,7 +124,9 @@ let docsSaveRequested = false;
 let corpusSaveTimer = null;
 let corpusSavePromise = null;
 let corpusSaveRequested = false;
-let corpusUnitPreviewFrame = null;
+let corpusSearchTimer = null;
+let corpusPreviewFrame = null;
+let corpusListState = null;
 let docsDraftState = null;
 let confirmDialogResolver = null;
 let infoDialogReturnFocus = null;
@@ -249,7 +247,15 @@ const entryRelationsCache = new Map();
 const ENTRY_RELATIONS_CACHE_MAX = 24;
 const QUALITY_SOURCE = Object.freeze({ type: "dictionaryQuality", version: 1, options: {} });
 const QUALITY_SEVERITY_SUBPAGES = Object.freeze(["high", "medium", "low"]);
-const QUALITY_MODULE_SUBPAGES = Object.freeze(["lemma", "tags", "ipa", "network", "gloss", "other"]);
+const QUALITY_MODULE_SUBPAGES = Object.freeze(["lemma", "tags", "ipa", "network", "other"]);
+const CORPUS_QUALITY_SOURCE = Object.freeze({ type: "corpusQuality", version: 1, options: {} });
+// Corpus subpages and the issue code each one shows; "" shows every code.
+const CORPUS_QUALITY_SUBPAGES = Object.freeze({
+  corpus: "",
+  "corpus-unparsed": "gloss_unparsed",
+  "corpus-incomplete": "gloss_incomplete",
+  "corpus-alignment": "gloss_alignment_mismatch",
+});
 const QUALITY_ISSUE_PAGE_SIZE = 200;
 let qualitySummaryState = {
   key: "",
@@ -267,6 +273,8 @@ let qualityIssueWindowState = {
   error: null,
   requestId: 0,
 };
+let corpusQualitySummaryState = { key: "", status: "idle", response: null, requestId: 0 };
+let corpusQualityWindowState = { key: "", status: "idle", items: [], total: 0, requestId: 0 };
 let analysisTagSetRenderState = {
   key: "",
   visibleCount: 100,
@@ -284,7 +292,8 @@ let entryBrowserLayoutRefreshFrame = 0;
 let entryBrowserLayoutRefreshUntil = 0;
 let activeEntryContextMenu = null;
 const entryVirtualList = createVirtualListState(145);
-const corpusVirtualList = createVirtualListState(74);
+const corpusVirtualList = createVirtualListState(44);
+const CORPUS_PAGE_SIZE = 100;
 const masonryLayouts = new WeakMap();
 const VIRTUAL_LIST_RESIZE_EPSILON = 0.5;
 const VIRTUAL_LIST_ACTIVE_SCROLL_MS = 180;
@@ -344,7 +353,6 @@ const i18n = {
     entryEditor: "词条编辑",
     dictionaryConfig: "词典配置",
     docsModeLabel: "文档模式",
-    corpusModeLabel: "语料类型",
     current: "当前",
     ipaConfig: "IPA",
     analysis: "数据分析",
@@ -487,7 +495,6 @@ const i18n = {
     activeFilterTagIssues: "标签问题",
     activeFilterIpaIssues: "IPA 问题",
     activeFilterEtymologyIssues: "词源网络问题",
-    activeFilterGlossedExampleIssues: "Glossed 例句问题",
     activeFilterOtherIssues: "其他问题",
     activeFilterPartOfSpeech: "词性",
     activeFilterTagCombination: "标签集合",
@@ -562,11 +569,7 @@ const i18n = {
     corpusRendering: "渲染",
     corpusRenderPattern: "渲染对象",
     corpusRenderPatternHelp: "留空时将对应内容作为纯文本原样显示并保持换行，不识别 Gloss 格式。填写时仅接受 \\gla、\\glb、\\glc、\\ft；配置中的每一行对应一条输出行，多条非 \\ft 输出行可按词位对齐。用括号包裹对象（如 (\\gla)）可在内容缺失时跳过该对象。",
-    corpusCardRendering: "语料单元卡片",
-    corpusUnitNameRendering: "语料单元名称（内容）",
     entryExampleRendering: "词条例句",
-    corpusCardGlossAlign: "卡片中对齐多行 Gloss",
-    corpusUnitGlossAlign: "单元名称中对齐多行 Gloss",
     entryExampleGlossAlign: "例句中对齐多行 Gloss",
     glossFontFamily: "渲染字体",
     glossFontSize: "渲染字号",
@@ -579,7 +582,7 @@ const i18n = {
     fontSizeMedium: "中",
     fontSizeLarge: "大",
     invalidCorpusRenderPattern: "渲染对象只能包含 \\gla、\\glb、\\glc、\\ft、用于可选对象的括号和换行。",
-    corpusRenderError: "单元名称渲染错误",
+    corpusRenderError: "语料渲染错误",
     glossShownAsSource: "按原文显示：{reason}",
     glossIssueUnknownCommand: "无法识别的命令 {command}",
     glossIssueDuplicateLevel: "重复的层 {level}",
@@ -806,6 +809,21 @@ const i18n = {
     apiErrorInvalidSettingsPayload: "设置保存请求格式无效",
     apiErrorInvalidDocsPayload: "语言文档保存请求格式无效",
     apiErrorInvalidCorpusPayload: "语料库保存请求格式无效",
+    openEntry: "打开词条",
+    loading: "正在加载",
+    openCorpusItem: "打开语料",
+    unlinkExample: "解除连接",
+    writeNewExample: "写新例句",
+    newExamplePlaceholder: "写下例句，保存词条时会存入语料库",
+    removeNewExample: "移除这条新例句",
+    exampleSearchPlaceholder: "检索语料，空白时按 Tab 填入词形",
+    exampleSearchLabel: "检索要连接的语料",
+    exampleAlreadyLinked: "已连接",
+    noExampleMatches: "没有包含这段文字的语料",
+    apiErrorCorpusItemNotFound: "这条语料已不存在",
+    apiErrorCorpusItemLinked: "这条语料仍被释义连接",
+    apiErrorInvalidCorpusQuery: "语料查询参数无效",
+    apiErrorInvalidExampleReference: "导入文件中的例句指向不存在的语料",
     apiErrorInvalidMorphologyPayload: "形态学保存请求格式无效",
     apiErrorMorphologyReferencesInUse: "模板仍被词条形态配置或覆写引用，请先移除对应引用",
     apiErrorInvalidIpaSettingsPayload: "IPA 设置保存请求格式无效",
@@ -877,72 +895,37 @@ const i18n = {
     docsSaved: "文档已保存",
     saveCorpus: "保存语料库",
     corpusSaved: "语料库已保存",
-    corpusBlocks: "块",
-    corpusUnits: "单元",
-    newCorpusBlock: "新建块",
-    newCorpusUnit: "新建单元",
-    corpusSearchPlaceholder: "搜索块或单元",
-    noCorpusBlocks: "还没有语料块",
-    noCorpusUnits: "还没有语料单元",
-    noCorpusSelection: "从左侧选择一项，或新建内容。",
-    corpusBlock: "语料块",
-    corpusLayer: "语料层",
-    corpusUnit: "语料单元",
-    corpusBlockTitle: "块标题",
-    corpusUnitContent: "单元内容",
-    corpusTags: "标签",
-    corpusTagsHelp: "为当前语料项目添加标签。多个标签可用半角逗号、全角逗号或顿号分隔。",
-    corpusNotes: "备注",
-    corpusAttributes: "属性",
-    addAttribute: "添加属性",
-    attributeName: "属性名",
-    attributeValue: "属性值",
-    removeAttribute: "删除属性",
-    directUnits: "块直属单元",
-    corpusLayers: "层",
-    addLayer: "添加层",
-    layerName: "层名称",
-    speaker: "发言人",
-    modality: "模态",
-    linkedUnits: "关联单元",
-    chooseUnit: "选择单元",
-    linkUnit: "关联单元",
-    unlink: "解除关联",
+    newCorpusItem: "新建语料",
+    noCorpusItems: "还没有语料",
+    noCorpusMatches: "没有匹配的语料",
+    corpusItem: "语料",
+    corpusItemName: "名称（可选）",
+    corpusItemGroup: "分组（可选）",
+    corpusItemContent: "内容",
+    corpusItemLinks: "连接的释义",
+    noCorpusItemLinks: "还没有释义连接这条语料。",
+    corpusUngrouped: "未分组",
+    corpusItemFallback: "空语料",
+    corpusItemHasIssue: "有解析提示",
+    corpusItemLinkCount: "{count} 个释义连接",
+    deleteCorpusItem: "删除语料",
+    deleteCorpusItemConfirm: "删除这条语料？",
+    deleteLinkedCorpusItemConfirm: "这条语料被以下释义连接：{links}。删除后这些连接会一并解除。",
+    corpusLinksMore: "{links} 等 {count} 个释义",
+    corpusItemDeleted: "语料已删除",
+    corpusLoadFailed: "无法读取语料",
+    corpusContentRendering: "语料内容",
+    corpusGlossAlign: "对齐多行 Gloss",
+    corpusSearchPlaceholder: "搜索语料",
+    noCorpusSelection: "从左侧选择一条语料，或新建一条。",
     moveUp: "上移",
     moveDown: "下移",
-    deleteCorpusBlock: "删除块",
-    deleteCorpusLayer: "删除层",
-    deleteCorpusUnit: "删除单元",
-    deleteCorpusBlockConfirm: "删除这个块？其中的层会一并删除，关联单元将变为孤立单元。",
-    deleteCorpusLayerConfirm: "删除这个层？关联单元将变为孤立单元。",
-    deleteCorpusUnitConfirm: "删除这个单元？它也会从当前父级解除链接。",
-    corpusParent: "父级链接",
-    corpusOrphan: "孤立单元",
-    corpusBlockParent: "块",
-    corpusLayerParent: "层",
-    effectiveAttributes: "生效属性",
-    effectiveAttributesHelp: "层内单元依次继承块和层属性，单元自己的同名属性优先。单独写入的属性始终保留在单元中。",
-    noEffectiveAttributes: "暂无生效属性",
-    attributeSourceBlock: "块",
-    attributeSourceLayer: "层",
-    attributeSourceUnit: "单元",
-    corpusLinkMovesUnit: "关联操作会先解除该单元原有的父级链接。",
-    corpusIntegrityTitle: "检测到语料完整性问题",
-    corpusIntegrityHelp: "手动编辑 JSON 可能造成重复 ID、无效链接或多父级链接。请检查以下项目。",
-    corpusMultipleParents: "单元“{unit}”被链接到多个父级：{parents}",
-    corpusMissingUnit: "父级“{parent}”引用了不存在的单元：{unit}",
-    corpusDuplicateLink: "父级“{parent}”重复引用了单元“{unit}”",
     duplicateEntityIdsTitle: "检测到重复 ID",
     duplicateEntityIdsMessage: "以下 ID 被多个词典对象使用，保存或导入已停止：\n{details}",
     entryEntity: "词条",
     definitionEntity: "释义",
     morphologyTemplateGroupEntity: "形态模板组",
     morphologyTemplateTableEntity: "形态模板表",
-    corpusBlockFallback: "未命名块",
-    corpusLayerFallback: "未命名层",
-    corpusUnitFallback: "空单元",
-    corpusBlockStats: "{layers} 层 · {units} 单元",
-    corpusUnitParentLabel: "父级：{parent}",
     lexicalNetwork: "词汇网络",
     closeNetwork: "关闭网络",
     networkRelationSummary: "网络关系统计",
@@ -1014,7 +997,6 @@ const i18n = {
     entryEditor: "Entries",
     dictionaryConfig: "Dictionary configuration",
     docsModeLabel: "Document view mode",
-    corpusModeLabel: "Corpus item type",
     current: "Current",
     ipaConfig: "IPA",
     analysis: "Analytics",
@@ -1157,7 +1139,6 @@ const i18n = {
     activeFilterTagIssues: "Tag issues",
     activeFilterIpaIssues: "IPA issues",
     activeFilterEtymologyIssues: "Etymology network issues",
-    activeFilterGlossedExampleIssues: "Glossed example issues",
     activeFilterOtherIssues: "Other issues",
     activeFilterPartOfSpeech: "Part of Speech",
     activeFilterTagCombination: "Tag Set",
@@ -1232,11 +1213,7 @@ const i18n = {
     corpusRendering: "Rendering",
     corpusRenderPattern: "Render Objects",
     corpusRenderPatternHelp: "Leave blank to display the corresponding content verbatim as plain text, preserving line breaks without parsing Gloss syntax. Otherwise use only \\gla, \\glb, \\glc, and \\ft; each configured line becomes one output row, and multiple non-\\ft rows can align by token. Wrap an object in parentheses, such as (\\gla), to skip it when its content is missing.",
-    corpusCardRendering: "Corpus Unit Cards",
-    corpusUnitNameRendering: "Unit Name (Content)",
     entryExampleRendering: "Entry Examples",
-    corpusCardGlossAlign: "Align multi-line Gloss in cards",
-    corpusUnitGlossAlign: "Align multi-line Gloss in unit names",
     entryExampleGlossAlign: "Align multi-line Gloss in examples",
     glossFontFamily: "Rendering Font",
     glossFontSize: "Rendering Size",
@@ -1249,7 +1226,7 @@ const i18n = {
     fontSizeMedium: "Medium",
     fontSizeLarge: "Large",
     invalidCorpusRenderPattern: "Render Objects may contain only \\gla, \\glb, \\glc, \\ft, parentheses around optional objects, and line breaks.",
-    corpusRenderError: "Unit name rendering error",
+    corpusRenderError: "Corpus rendering error",
     glossShownAsSource: "Shown as written: {reason}",
     glossIssueUnknownCommand: "unrecognized command {command}",
     glossIssueDuplicateLevel: "repeated level {level}",
@@ -1479,6 +1456,21 @@ const i18n = {
     apiErrorInvalidSettingsPayload: "Invalid settings save request",
     apiErrorInvalidDocsPayload: "Invalid language docs save request",
     apiErrorInvalidCorpusPayload: "Invalid corpus save request",
+    openEntry: "Open Entry",
+    loading: "Loading",
+    openCorpusItem: "Open in Corpus",
+    unlinkExample: "Remove link",
+    writeNewExample: "Write New Example",
+    newExamplePlaceholder: "Write an example; saving the entry adds it to the corpus",
+    removeNewExample: "Remove this new example",
+    exampleSearchPlaceholder: "Search the corpus; Tab in an empty box fills in the lemma",
+    exampleSearchLabel: "Search corpus items to link",
+    exampleAlreadyLinked: "Linked",
+    noExampleMatches: "No corpus item contains this text",
+    apiErrorCorpusItemNotFound: "This corpus item no longer exists",
+    apiErrorCorpusItemLinked: "Definitions still link to this corpus item",
+    apiErrorInvalidCorpusQuery: "Invalid corpus query",
+    apiErrorInvalidExampleReference: "Examples in the imported file point at missing corpus items",
     apiErrorInvalidMorphologyPayload: "Invalid morphology save request",
     apiErrorMorphologyReferencesInUse: "The template is still referenced by entry morphology settings or overrides",
     apiErrorInvalidIpaSettingsPayload: "Invalid IPA settings save request",
@@ -1551,72 +1543,37 @@ const i18n = {
     docsSaved: "Docs saved",
     saveCorpus: "Save Corpus",
     corpusSaved: "Corpus saved",
-    corpusBlocks: "Blocks",
-    corpusUnits: "Units",
-    newCorpusBlock: "New Block",
-    newCorpusUnit: "New Unit",
-    corpusSearchPlaceholder: "Search blocks or units",
-    noCorpusBlocks: "No corpus blocks yet",
-    noCorpusUnits: "No corpus units yet",
+    newCorpusItem: "New Item",
+    noCorpusItems: "No corpus items yet",
+    noCorpusMatches: "No matching corpus items",
+    corpusItem: "Corpus Item",
+    corpusItemName: "Name (optional)",
+    corpusItemGroup: "Group (optional)",
+    corpusItemContent: "Content",
+    corpusItemLinks: "Linked Definitions",
+    noCorpusItemLinks: "No definition links to this item yet.",
+    corpusUngrouped: "Ungrouped",
+    corpusItemFallback: "Empty item",
+    corpusItemHasIssue: "Has a parsing note",
+    corpusItemLinkCount: "{count} linked definitions",
+    deleteCorpusItem: "Delete Item",
+    deleteCorpusItemConfirm: "Delete this corpus item?",
+    deleteLinkedCorpusItemConfirm: "These definitions link to this item: {links}. Deleting it removes those links too.",
+    corpusLinksMore: "{links}, and {count} definitions in all",
+    corpusItemDeleted: "Corpus item deleted",
+    corpusLoadFailed: "Could not read the corpus",
+    corpusContentRendering: "Corpus Content",
+    corpusGlossAlign: "Align multi-line Gloss",
+    corpusSearchPlaceholder: "Search corpus",
     noCorpusSelection: "Select an item on the left, or create one.",
-    corpusBlock: "Corpus Block",
-    corpusLayer: "Corpus Layer",
-    corpusUnit: "Corpus Unit",
-    corpusBlockTitle: "Block Title",
-    corpusUnitContent: "Unit Content",
-    corpusTags: "Tags",
-    corpusTagsHelp: "Add tags to this corpus item. Separate multiple tags with halfwidth commas, fullwidth commas, or ideographic commas.",
-    corpusNotes: "Notes",
-    corpusAttributes: "Attributes",
-    addAttribute: "Add Attribute",
-    attributeName: "Attribute Name",
-    attributeValue: "Attribute Value",
-    removeAttribute: "Remove Attribute",
-    directUnits: "Direct Block Units",
-    corpusLayers: "Layers",
-    addLayer: "Add Layer",
-    layerName: "Layer Name",
-    speaker: "Speaker",
-    modality: "Modality",
-    linkedUnits: "Linked Units",
-    chooseUnit: "Choose a unit",
-    linkUnit: "Link Unit",
-    unlink: "Unlink",
     moveUp: "Move Up",
     moveDown: "Move Down",
-    deleteCorpusBlock: "Delete Block",
-    deleteCorpusLayer: "Delete Layer",
-    deleteCorpusUnit: "Delete Unit",
-    deleteCorpusBlockConfirm: "Delete this block? Its layers will also be removed, and linked units will become orphan units.",
-    deleteCorpusLayerConfirm: "Delete this layer? Linked units will become orphan units.",
-    deleteCorpusUnitConfirm: "Delete this unit? It will also be unlinked from its current parent.",
-    corpusParent: "Parent Link",
-    corpusOrphan: "Orphan Unit",
-    corpusBlockParent: "Block",
-    corpusLayerParent: "Layer",
-    effectiveAttributes: "Effective Attributes",
-    effectiveAttributesHelp: "A unit in a layer inherits block then layer attributes; its own values take precedence. Explicit unit attributes always remain stored on that unit.",
-    noEffectiveAttributes: "No effective attributes",
-    attributeSourceBlock: "Block",
-    attributeSourceLayer: "Layer",
-    attributeSourceUnit: "Unit",
-    corpusLinkMovesUnit: "Linking first removes the unit from its previous parent.",
-    corpusIntegrityTitle: "Corpus integrity problems detected",
-    corpusIntegrityHelp: "Manual JSON edits can create duplicate IDs, invalid links, or multiple parents. Review these items.",
-    corpusMultipleParents: "Unit “{unit}” is linked to multiple parents: {parents}",
-    corpusMissingUnit: "Parent “{parent}” references a missing unit: {unit}",
-    corpusDuplicateLink: "Parent “{parent}” references unit “{unit}” more than once",
     duplicateEntityIdsTitle: "Duplicate IDs detected",
     duplicateEntityIdsMessage: "These IDs are used by multiple dictionary objects. Saving or importing has been stopped:\n{details}",
     entryEntity: "Entry",
     definitionEntity: "Definition",
     morphologyTemplateGroupEntity: "Morphology template group",
     morphologyTemplateTableEntity: "Morphology template table",
-    corpusBlockFallback: "Untitled Block",
-    corpusLayerFallback: "Untitled Layer",
-    corpusUnitFallback: "Empty Unit",
-    corpusBlockStats: "{layers} layers · {units} units",
-    corpusUnitParentLabel: "Parent: {parent}",
     lexicalNetwork: "Lexical Network",
     closeNetwork: "Close Network",
     networkRelationSummary: "Network relation summary",
@@ -1870,10 +1827,8 @@ const elements = {
   qualityPanel: document.querySelector("#qualityPanel"),
   settingsForm: document.querySelector("#settingsForm"),
   glossStyleRows: [...document.querySelectorAll("[data-gloss-style]")],
-  corpusUnitCardRenderPatternInput: document.querySelector("#corpusUnitCardRenderPatternInput"),
-  corpusUnitCardGlossAlignInput: document.querySelector("#corpusUnitCardGlossAlignInput"),
-  corpusUnitRenderPatternInput: document.querySelector("#corpusUnitRenderPatternInput"),
-  corpusUnitGlossAlignInput: document.querySelector("#corpusUnitGlossAlignInput"),
+  corpusRenderPatternInput: document.querySelector("#corpusRenderPatternInput"),
+  corpusGlossAlignInput: document.querySelector("#corpusGlossAlignInput"),
   entryExampleRenderPatternInput: document.querySelector("#entryExampleRenderPatternInput"),
   entryExampleGlossAlignInput: document.querySelector("#entryExampleGlossAlignInput"),
   showEmptyEntrySectionsInput: document.querySelector("#showEmptyEntrySectionsInput"),
@@ -1904,10 +1859,7 @@ const elements = {
   saveCorpusButton: document.querySelector("#saveCorpusButton"),
   corpusNoDictionaryNotice: document.querySelector("#corpusNoDictionaryNotice"),
   corpusOpenDictionaryManagerButton: document.querySelector("#corpusOpenDictionaryManagerButton"),
-  corpusIntegrityPanel: document.querySelector("#corpusIntegrityPanel"),
-  corpusIntegrityList: document.querySelector("#corpusIntegrityList"),
   corpusPanel: document.querySelector("#corpusPanel"),
-  corpusModeControl: document.querySelector("#corpusModeControl"),
   newCorpusItemButton: document.querySelector("#newCorpusItemButton"),
   corpusSearchInput: document.querySelector("#corpusSearchInput"),
   corpusItemList: document.querySelector("#corpusItemList"),
@@ -2255,6 +2207,10 @@ const API_ERROR_TOAST_KEYS = {
   invalid_settings_payload: "apiErrorInvalidSettingsPayload",
   invalid_docs_payload: "apiErrorInvalidDocsPayload",
   invalid_corpus_payload: "apiErrorInvalidCorpusPayload",
+  invalid_corpus_query: "apiErrorInvalidCorpusQuery",
+  corpus_item_not_found: "apiErrorCorpusItemNotFound",
+  corpus_item_linked: "apiErrorCorpusItemLinked",
+  invalid_example_reference: "apiErrorInvalidExampleReference",
   invalid_morphology_payload: "apiErrorInvalidMorphologyPayload",
   morphology_references_in_use: "apiErrorMorphologyReferencesInUse",
   invalid_ipa_settings_payload: "apiErrorInvalidIpaSettingsPayload",
@@ -2297,9 +2253,7 @@ function duplicateEntityTypeLabel(type) {
     definition: "definitionEntity",
     morphologyTemplateGroup: "morphologyTemplateGroupEntity",
     morphologyTemplateTable: "morphologyTemplateTableEntity",
-    corpusBlock: "corpusBlock",
-    corpusLayer: "corpusLayer",
-    corpusUnit: "corpusUnit",
+    corpusItem: "corpusItem",
   };
   return keys[type] ? t(keys[type]) : String(type || "");
 }
@@ -2480,7 +2434,6 @@ function normalizeDictionary(dictionary) {
     settings: normalizeDictionarySettings(dictionary.settings),
     tagRegistry: dictionary.tagRegistry,
     docs: normalizeDocs(dictionary.docs),
-    corpus: normalizeCorpus(dictionary.corpus),
     morphology: normalizeMorphology(dictionary.morphology),
     createdAt: dictionary.createdAt || new Date().toISOString(),
     updatedAt: dictionary.updatedAt || new Date().toISOString(),
@@ -5633,7 +5586,7 @@ function entryCardContentSizeSignature(entry) {
     entryDefinitionItems(entry).map((definition) => [
       definition.id,
       definition.meaning,
-      definition.example,
+      (definition.examples || []).map((example) => example.content).join("~"),
       definition.note,
       definitionOwnParts(definition).join(","),
     ].map(virtualListSignaturePart).join("~")).join("^"),
@@ -8602,7 +8555,7 @@ function renderEntryDisplay(entry) {
 
   elements.displayDefinitions.innerHTML = "";
   const visibleDefinitions = (entry.definitions || []).filter((definition) => (
-    definition.meaning || definition.example || definition.note || (definition.tags || []).length
+    definition.meaning || (definition.examples || []).length || definition.note || (definition.tags || []).length
   ));
   elements.displayDefinitionsSection.hidden = !visibleDefinitions.length && !showEmptySections;
   if (!visibleDefinitions.length) {
@@ -8617,7 +8570,7 @@ function renderEntryDisplay(entry) {
         <p class="definition-meaning">${(definition.tags || []).length
           ? `<span class="definition-tags">${definitionTagsHtml(definitionStates.get(definition))}</span>`
           : ""}${escapeHtml(definition.meaning)}</p>
-        ${definition.example ? `<div class="example-box"><span>${escapeHtml(t("example"))}</span>${renderExampleHtml(definition.example)}</div>` : ""}
+        ${(definition.examples || []).length ? `<div class="example-box"><span>${escapeHtml(t("example"))}</span>${definition.examples.map((example) => `<div class="example-item">${renderExampleHtml(example.content)}</div>`).join("")}</div>` : ""}
         ${definition.note ? `<div class="definition-note"><span>${escapeHtml(t("definitionNote"))}</span><p>${escapeHtml(definition.note)}</p></div>` : ""}
       </div>
     `;
@@ -9415,7 +9368,7 @@ function renderGlossInlineHtml(value) {
 }
 
 function glossSourceLines(content) {
-  return glossModel.normalizeGlossLineBreaks(content).split(/\r?\n/);
+  return String(content || "").split(/\r?\n/);
 }
 
 function glossIssueText(issue) {
@@ -9437,7 +9390,7 @@ function glossParseHintHtml(issues) {
 function renderExampleHtml(example, settings = dictionarySettings()) {
   const pattern = parseCorpusRenderPattern(settings.entryExampleRenderPattern);
   if (pattern.error) {
-    return `<p class="corpus-unit-render-error" title="${escapeHtml(pattern.error)}">${escapeHtml(t("corpusRenderError"))}</p>`;
+    return `<p class="corpus-render-error" title="${escapeHtml(pattern.error)}">${escapeHtml(t("corpusRenderError"))}</p>`;
   }
   if (!pattern.groups.length) {
     return `<p>${escapeHtml(example).replaceAll("\n", "<br>")}</p>`;
@@ -9450,7 +9403,7 @@ function renderExampleHtml(example, settings = dictionarySettings()) {
     return `<p>${parsed.plainLines.map(renderGlossInlineHtml).join("<br>")}</p>`;
   }
   if (!corpusGlossHasTargets(parsed.gloss, pattern.groups)) {
-    return `<p class="corpus-unit-render-error">${escapeHtml(t("corpusRenderError"))}</p>`;
+    return `<p class="corpus-render-error">${escapeHtml(t("corpusRenderError"))}</p>`;
   }
   return `<div class="gloss-block">${renderCorpusGlossRows(pattern.groups, parsed.gloss, settings, settings.entryExampleGlossAlign)}</div>`;
 }
@@ -9864,7 +9817,12 @@ function renderQuality(dictionary = activeDictionary()) {
   analysisFilterCounter = 0;
   const subpage = activeQualitySubpage();
   void loadQualitySummary(dictionary);
-  void loadQualityIssueWindow(dictionary, subpage);
+  void loadCorpusQualitySummary(dictionary);
+  if (isCorpusQualitySubpage(subpage)) {
+    void loadCorpusQualityWindow(dictionary, subpage);
+  } else {
+    void loadQualityIssueWindow(dictionary, subpage);
+  }
   elements.qualityPanel.innerHTML = renderQualityPage(subpage);
   synchronizePageTabs(elements.qualityPanel, focusedTab);
   setupQualityMasonryLayouts();
@@ -9993,6 +9951,14 @@ async function loadQualityIssueWindow(dictionary, subpage, { more = false, force
 function retryQuality(dictionary) {
   if (qualitySummaryState.status === "error") {
     void loadQualitySummary(dictionary, { force: true });
+  }
+  if (corpusQualitySummaryState.status === "error") {
+    void loadCorpusQualitySummary(dictionary, { force: true });
+  }
+  if (corpusQualityWindowState.status === "error") {
+    void loadCorpusQualityWindow(dictionary, activeQualitySubpage(), corpusQualityWindowState.items.length
+      ? { more: true }
+      : { force: true });
   }
   if (qualityIssueWindowState.status === "error") {
     const subpage = activeQualitySubpage();
@@ -10137,7 +10103,9 @@ function qualitySubpageNav(activeSubpage, summary) {
 }
 
 function renderQualitySubpageButton(subpage, label, activeSubpage, summary) {
-  const count = summary ? qualitySubpageEntryCount(summary, subpage) : null;
+  const count = isCorpusQualitySubpage(subpage)
+    ? corpusQualitySubpageCount(subpage)
+    : summary ? qualitySubpageEntryCount(summary, subpage) : null;
   const isActive = subpage === activeSubpage;
   const disabled = count === 0 && !isActive;
   const countBadge = count === null ? "" : `<span class="analysis-tab-count">${escapeHtml(count)}</span>`;
@@ -10170,8 +10138,16 @@ function qualitySubpageGroups() {
         ["tags", aText("标签问题", "Tags")],
         ["ipa", "IPA"],
         ["network", aText("词源网络", "Etymology")],
-        ["gloss", aText("Glossed 例句", "Glossed Examples")],
         ["other", aText("其他问题", "Other")],
+      ],
+    },
+    {
+      label: aText("语料库", "Corpus"),
+      subpages: [
+        ["corpus", aText("全部语料问题", "All Corpus Issues")],
+        ["corpus-unparsed", aText("无法完整解析", "Not Fully Readable")],
+        ["corpus-incomplete", aText("Gloss 不完整", "Incomplete Gloss")],
+        ["corpus-alignment", aText("对齐数量不一致", "Alignment Mismatch")],
       ],
     },
   ];
@@ -10862,7 +10838,126 @@ function renderAnalysisActivityQuery(response, subpage) {
   return `<section class="analysis-detail-grid">${analysisCard(aText("编辑词条（按日期）", "Entries by Update Date"), analysisBarList(rowsForField(activity.updated, "updated"), { empty: aText("暂无编辑记录", "No edit records") }))}</section>`;
 }
 
+function isCorpusQualitySubpage(subpage) {
+  return Object.hasOwn(CORPUS_QUALITY_SUBPAGES, subpage);
+}
+
+function corpusQualitySelector(subpage) {
+  const code = CORPUS_QUALITY_SUBPAGES[subpage];
+  return code ? { group: "code", value: code } : { group: "all" };
+}
+
+function corpusQualitySubpageCount(subpage) {
+  const summary = corpusQualitySummaryState.response?.summary;
+  if (corpusQualitySummaryState.status !== "ready" || !summary) {
+    return null;
+  }
+  const code = CORPUS_QUALITY_SUBPAGES[subpage];
+  return code ? summary.codes.find((row) => row.key === code).itemCount : summary.itemCount;
+}
+
+async function loadCorpusQualitySummary(dictionary, { force = false } = {}) {
+  const key = qualityResultKey(dictionary);
+  if (!force && corpusQualitySummaryState.key === key) {
+    return;
+  }
+  const requestId = corpusQualitySummaryState.requestId + 1;
+  corpusQualitySummaryState = { key, status: "loading", response: null, requestId };
+  try {
+    const response = await api(qualityQueryPath(dictionary), {
+      method: "POST",
+      body: JSON.stringify({ source: CORPUS_QUALITY_SOURCE, responseMode: "summary" }),
+    });
+    if (corpusQualitySummaryState.requestId !== requestId) {
+      return;
+    }
+    corpusQualitySummaryState = { key, status: "ready", response, requestId };
+  } catch (error) {
+    if (corpusQualitySummaryState.requestId !== requestId) {
+      return;
+    }
+    corpusQualitySummaryState = { key, status: "error", response: null, requestId };
+    console.error(error);
+  }
+  rerenderQualityIfVisible(dictionary);
+}
+
+async function loadCorpusQualityWindow(dictionary, subpage, { more = false, force = false } = {}) {
+  const key = stableJson({ result: qualityResultKey(dictionary), subpage });
+  const current = corpusQualityWindowState;
+  if (more) {
+    if (current.key !== key || current.status === "loading-more" || current.items.length >= current.total) {
+      return;
+    }
+  } else if (!force && current.key === key) {
+    return;
+  }
+  const requestId = current.requestId + 1;
+  const keptItems = more ? current.items : [];
+  corpusQualityWindowState = { key, status: more ? "loading-more" : "loading", items: keptItems, total: more ? current.total : 0, requestId };
+  try {
+    const response = await api(qualityQueryPath(dictionary), {
+      method: "POST",
+      body: JSON.stringify({
+        source: CORPUS_QUALITY_SOURCE,
+        view: { itemKind: "corpusItem", selector: corpusQualitySelector(subpage) },
+        page: { limit: QUALITY_ISSUE_PAGE_SIZE, offset: keptItems.length },
+      }),
+    });
+    if (corpusQualityWindowState.requestId !== requestId) {
+      return;
+    }
+    corpusQualityWindowState = { key, status: "ready", items: [...keptItems, ...response.items], total: response.pageInfo.total, requestId };
+  } catch (error) {
+    if (corpusQualityWindowState.requestId !== requestId) {
+      return;
+    }
+    corpusQualityWindowState = { key, status: "error", items: keptItems, total: more ? current.total : 0, requestId };
+    console.error(error);
+  }
+  rerenderQualityIfVisible(dictionary);
+}
+
+function renderCorpusQualityWindow() {
+  const windowState = corpusQualityWindowState;
+  if (windowState.status === "loading" || windowState.status === "idle") {
+    return `<p class="muted-text">${escapeHtml(aText("正在检查语料", "Checking the corpus"))}</p>`;
+  }
+  if (windowState.status === "error" && !windowState.items.length) {
+    return qualityErrorState(aText("无法加载语料问题", "Could not load corpus issues"));
+  }
+  if (!windowState.items.length) {
+    return `<p class="muted-text">${escapeHtml(aText("未发现问题", "No issues found"))}</p>`;
+  }
+  const remaining = windowState.total - windowState.items.length;
+  const footer = windowState.status === "error"
+    ? qualityErrorState(aText("无法加载更多问题", "Could not load more issues"))
+    : remaining > 0
+      ? `<button type="button" class="secondary-button analysis-tag-set-more" data-control-tone="neutral" data-corpus-quality-more ${windowState.status === "loading-more" ? "disabled" : ""}>${escapeHtml(
+        aText("再显示 {count} 项", "Show {count} more").replace("{count}", Math.min(QUALITY_ISSUE_PAGE_SIZE, remaining)),
+      )}</button>`
+      : "";
+  return `<ul class="analysis-issue-list">${windowState.items.map(({ item, issues }) => `
+    <li class="analysis-issue medium">
+      <span>medium</span>
+      <div>
+        <button type="button" data-corpus-quality-item="${escapeHtml(item.id)}">${escapeHtml(corpusItemLabel(item))}</button>
+        ${issues.map((issue) => {
+          const { title, detail } = qualityIssueText(issue);
+          return `<strong>${escapeHtml(title)}</strong>${detail ? `<small>${escapeHtml(detail)}</small>` : ""}`;
+        }).join("")}
+      </div>
+    </li>
+  `).join("")}</ul>${footer}`;
+}
+
 function qualityPageBody(subpage, summary) {
+  if (isCorpusQualitySubpage(subpage)) {
+    if (corpusQualitySummaryState.status === "error") {
+      return qualityErrorState(aText("无法加载语料质量检查", "Could not load corpus quality checks"));
+    }
+    return `<section class="analysis-detail-grid">${analysisCard(qualitySubpageLabel(subpage), renderCorpusQualityWindow())}</section>`;
+  }
   if (qualitySummaryState.status === "error") {
     return qualityErrorState(aText("无法加载质量检查", "Could not load quality checks"));
   }
@@ -10922,6 +11017,7 @@ function qualityIssueList(items) {
 
 function qualityIssueText(issue) {
   const titles = {
+    gloss_unparsed: ["Gloss 无法完整解析", "Gloss not fully readable"],
     gloss_incomplete: ["Gloss 不完整", "Incomplete gloss"],
     gloss_alignment_mismatch: ["Gloss 对齐数量不一致", "Gloss alignment mismatch"],
     duplicate_lemma: ["重复词形", "Duplicate lemma"],
@@ -10942,6 +11038,7 @@ function qualityIssueText(issue) {
   const params = issue.params;
   const definitionLabel = () => `${aText("释义", "Definition")} ${params.definitionPosition + 1}`;
   const details = {
+    gloss_unparsed: () => params.problems.map(glossIssueText).join("; "),
     gloss_incomplete: () => `${aText("缺少", "Missing")}: ${params.missingFields.map((key) => `\\${key}`).join(", ")}`,
     gloss_alignment_mismatch: () => `\\gla ${params.glaCount} / \\glb ${params.glbCount}`,
     duplicate_lemma: () => params.lemmas.join(", "),
@@ -11035,7 +11132,6 @@ function qualityFilterTitleDescriptor(subpage) {
     tags: "activeFilterTagIssues",
     ipa: "activeFilterIpaIssues",
     network: "activeFilterEtymologyIssues",
-    gloss: "activeFilterGlossedExampleIssues",
     other: "activeFilterOtherIssues",
   };
   return activeFilterTitleDescriptor(keys[subpage]);
@@ -11047,7 +11143,6 @@ function qualityIssueModuleLabel(module) {
     tags: aText("标签问题", "Tag issues"),
     ipa: aText("IPA 问题", "IPA issues"),
     network: aText("词源网络问题", "Etymology network issues"),
-    gloss: aText("Glossed 例句问题", "Glossed example issues"),
     other: aText("其他问题", "Other issues"),
   };
   return labels[module];
@@ -11629,10 +11724,10 @@ function definitionFormStateFromCard(card) {
   return {
     id: card.dataset.definitionId || uid("def"),
     meaning: card.querySelector('[data-field="meaning"]')?.value.trim() || "",
-    example: card.querySelector('[data-field="example"]')?.value.trim() || "",
     note: card.querySelector('[data-field="note"]')?.value.trim() || "",
     tags: tagsInput ? parseTagListText(tagsInput.value) : [],
-    showExample: Boolean(card.querySelector('[data-field="example"]')),
+    examples: definitionExamplesFromCard(card),
+    showExample: Boolean(card.querySelector("[data-definition-examples]")),
     showNote: Boolean(card.querySelector('[data-field="note"]')),
     showTags: Boolean(tagsInput),
   };
@@ -11679,12 +11774,11 @@ function definitionTagsFieldHtml(definition = {}) {
 }
 
 function definitionOptionalFieldsHtml(definition = {}) {
-  const example = definitionFormValue(definition, "example");
   const note = definitionFormValue(definition, "note");
-  const showExample = Boolean(example || definition.showExample);
+  const showExample = Boolean((definition.examples || []).length || definition.showExample);
   const showNote = Boolean(note || definition.showNote);
   const fields = [
-    showExample ? definitionOptionalFieldHtml("example", "example", example) : "",
+    showExample ? definitionExamplesHtml(definition) : "",
     showNote ? definitionOptionalFieldHtml("note", "definitionNote", note) : "",
   ].filter(Boolean);
   const actions = [
@@ -11767,14 +11861,171 @@ function renderDefinitionFormCardInPlace(card, fieldToShow) {
   } else {
     updateRemoveDefinitionButtons();
   }
-  card.querySelector(`[data-field="${fieldToShow}"]`)?.focus();
+  card.querySelector(fieldToShow === "example" ? "[data-example-search]" : `[data-field="${fieldToShow}"]`)?.focus();
 }
 
-// A definition with only tags is not empty.
+function definitionHasContent(definition) {
+  return Boolean(definition.meaning || definition.note || definition.tags.length || definition.examples.length);
+}
+
+function definitionExamplesFromCard(card) {
+  return [...card.querySelectorAll("[data-definition-example]")].map((row) => (
+    row.dataset.itemId
+      ? { itemId: row.dataset.itemId, content: row.dataset.exampleContent || "" }
+      : { content: row.querySelector('[data-field="example-new"]')?.value.trim() || "" }
+  )).filter((example) => example.itemId || example.content);
+}
+
+function linkedExampleRowHtml(example) {
+  return `
+    <li class="definition-example" data-definition-example data-item-id="${escapeHtml(example.itemId)}" data-example-content="${escapeHtml(example.content || "")}">
+      <div class="definition-example-render">${renderExampleHtml(example.content || "")}</div>
+      <div class="definition-example-actions">
+        <button class="secondary-button" data-control-tone="neutral" type="button" data-action="open-example-item" data-i18n="openCorpusItem">${escapeHtml(t("openCorpusItem"))}</button>
+        <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="unlink-example" data-app-tooltip="always" data-i18n-aria-label="unlinkExample" aria-label="${escapeHtml(t("unlinkExample"))}">
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+        </button>
+      </div>
+    </li>
+  `;
+}
+
+function newExampleRowHtml(content = "") {
+  return `
+    <li class="definition-example definition-example-new" data-definition-example>
+      <textarea data-field="example-new" rows="2" spellcheck="false" data-i18n-placeholder="newExamplePlaceholder" placeholder="${escapeHtml(t("newExamplePlaceholder"))}" aria-label="${escapeHtml(t("writeNewExample"))}">${escapeHtml(content)}</textarea>
+      <div class="definition-example-actions">
+        <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="remove-new-example" data-app-tooltip="always" data-i18n-aria-label="removeNewExample" aria-label="${escapeHtml(t("removeNewExample"))}">
+          <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+        </button>
+      </div>
+    </li>
+  `;
+}
+
+// Saved examples are links to corpus items; the search finds items to link,
+// and a new example becomes an ungrouped item when the entry is saved.
+function definitionExamplesHtml(definition) {
+  return `
+    <div class="definition-examples" data-definition-examples>
+      <span class="definition-examples-label" data-i18n="example">${escapeHtml(t("example"))}</span>
+      <ol class="definition-example-list">
+        ${(definition.examples || []).map((example) => (example.itemId ? linkedExampleRowHtml(example) : newExampleRowHtml(example.content))).join("")}
+      </ol>
+      <div class="definition-example-search">
+        <input type="search" data-example-search data-i18n-placeholder="exampleSearchPlaceholder" placeholder="${escapeHtml(t("exampleSearchPlaceholder"))}" data-i18n-aria-label="exampleSearchLabel" aria-label="${escapeHtml(t("exampleSearchLabel"))}">
+        <div class="definition-example-results" data-example-results></div>
+      </div>
+      <button class="secondary-button additive-button" data-control-tone="accent" data-control-emphasis="outline" type="button" data-action="write-new-example" data-i18n="writeNewExample">${escapeHtml(t("writeNewExample"))}</button>
+    </div>
+  `;
+}
+
+function notifyDefinitionChanged(card) {
+  card.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function exampleSearchLemma(card) {
+  const form = card.closest("form");
+  const lemmaField = form?.querySelector("#lemmaInput, [data-field=\"lemma\"]");
+  return String(lemmaField ? lemmaField.value : selectedEntry()?.lemma || "").trim();
+}
+
+const exampleSearchTimers = new WeakMap();
+
+function scheduleExampleSearch(input) {
+  clearTimeout(exampleSearchTimers.get(input));
+  exampleSearchTimers.set(input, setTimeout(() => {
+    runExampleSearch(input).catch((error) => console.error(error));
+  }, 250));
+}
+
+async function runExampleSearch(input) {
+  const container = input.closest("[data-definition-examples]");
+  const results = container?.querySelector("[data-example-results]");
+  const dictionary = activeDictionary();
+  if (!results || !dictionary) {
+    return;
+  }
+  const query = input.value.trim();
+  if (!query) {
+    results.innerHTML = "";
+    return;
+  }
+  const params = new URLSearchParams({ q: query, limit: "8" });
+  let response;
+  try {
+    response = await api(`${corpusApiPath(dictionary, "/items")}?${params}`);
+  } catch (error) {
+    results.innerHTML = `<p class="muted-text">${escapeHtml(t("corpusLoadFailed"))}</p>`;
+    console.error(error);
+    return;
+  }
+  if (input.value.trim() !== query || !input.isConnected) {
+    return;
+  }
+  const linkedIds = new Set([...container.querySelectorAll("[data-definition-example][data-item-id]")].map((row) => row.dataset.itemId));
+  results.innerHTML = response.items.length
+    ? response.items.map((item) => {
+      const linked = linkedIds.has(item.id);
+      return `
+        <button type="button" class="definition-example-result" data-control-tone="neutral" data-action="link-example" data-item-id="${escapeHtml(item.id)}" data-example-content="${escapeHtml(item.content)}" ${linked ? 'aria-disabled="true"' : ""}>
+          <span class="definition-example-result-label">${escapeHtml(corpusItemLabel(item))}</span>
+          <small>${escapeHtml(linked ? t("exampleAlreadyLinked") : corpusGroupLabel(item.group))}</small>
+        </button>
+      `;
+    }).join("")
+    : `<p class="muted-text">${escapeHtml(t("noExampleMatches"))}</p>`;
+}
+
+function handleDefinitionExampleClick(event) {
+  const container = event.target.closest("[data-definition-examples]");
+  if (!container) {
+    return false;
+  }
+  const card = container.closest(".definition-form-card");
+  const list = container.querySelector(".definition-example-list");
+  const action = event.target.closest("[data-action]")?.dataset.action;
+  if (action === "write-new-example") {
+    list.insertAdjacentHTML("beforeend", newExampleRowHtml());
+    list.lastElementChild.querySelector("textarea").focus();
+    notifyDefinitionChanged(card);
+    return true;
+  }
+  if (action === "remove-new-example" || action === "unlink-example") {
+    event.target.closest("[data-definition-example]").remove();
+    notifyDefinitionChanged(card);
+    return true;
+  }
+  if (action === "open-example-item") {
+    const itemId = event.target.closest("[data-definition-example]").dataset.itemId;
+    openCorpusItem(itemId).catch((error) => console.error(error));
+    return true;
+  }
+  if (action === "link-example") {
+    const result = event.target.closest("[data-action]");
+    if (result.getAttribute("aria-disabled") === "true") {
+      return true;
+    }
+    list.insertAdjacentHTML("beforeend", linkedExampleRowHtml({
+      itemId: result.dataset.itemId,
+      content: result.dataset.exampleContent,
+    }));
+    const search = container.querySelector("[data-example-search]");
+    search.value = "";
+    container.querySelector("[data-example-results]").innerHTML = "";
+    search.focus();
+    notifyDefinitionChanged(card);
+    return true;
+  }
+  return false;
+}
+
+// A definition with only tags or examples is not empty.
 function definitionsFromFormStates(formStates) {
   return formStates
-    .map(({ id, meaning, example, note, tags }) => ({ id, meaning, example, note, tags }))
-    .filter((definition) => definition.meaning || definition.example || definition.note || definition.tags.length);
+    .map(({ id, meaning, note, tags, examples }) => ({ id, meaning, note, tags, examples }))
+    .filter(definitionHasContent);
 }
 
 function collectDefinitions() {
@@ -11796,11 +12047,13 @@ function entrySemanticSnapshot(entry = {}) {
       .map((definition) => ({
         id: String(definition?.id || ""),
         meaning: String(definition?.meaning || "").trim(),
-        example: String(definition?.example || "").trim(),
         note: String(definition?.note || "").trim(),
         tags: tagSetSnapshot(definition?.tags),
+        examples: (definition?.examples || []).map((example) => (
+          example.itemId ? { itemId: example.itemId } : { content: String(example.content || "").trim() }
+        )),
       }))
-      .filter((definition) => definition.meaning || definition.example || definition.note || definition.tags.length),
+      .filter(definitionHasContent),
     etymology: {
       sources: sourceReferenceModel.orderSourceReferences(entry.etymology?.sources || []).map((source) => source.entryId
         ? { entryId: source.entryId } : { entryId: "", text: source.text.trim() }),
@@ -12657,10 +12910,8 @@ function syncEntrySearchSettingsControls() {
 function fillSettingsForm(dictionary) {
   const settings = dictionarySettings(dictionary);
   fillGlossStyleForm(settings.glossStyles);
-  elements.corpusUnitCardRenderPatternInput.value = settings.corpusUnitCardRenderPattern;
-  elements.corpusUnitCardGlossAlignInput.checked = settings.corpusUnitCardGlossAlign;
-  elements.corpusUnitRenderPatternInput.value = settings.corpusUnitRenderPattern;
-  elements.corpusUnitGlossAlignInput.checked = settings.corpusUnitGlossAlign;
+  elements.corpusRenderPatternInput.value = settings.corpusRenderPattern;
+  elements.corpusGlossAlignInput.checked = settings.corpusGlossAlign;
   elements.entryExampleRenderPatternInput.value = settings.entryExampleRenderPattern;
   elements.entryExampleGlossAlignInput.checked = settings.entryExampleGlossAlign;
   elements.showEmptyEntrySectionsInput.checked = settings.showEmptyEntrySections;
@@ -12868,10 +13119,8 @@ function savedDictionarySnapshot(dictionary = selectedDictionaryConfig()) {
 function settingsFormSnapshot() {
   return {
     glossStyles: collectGlossStyleForm(),
-    corpusUnitCardRenderPattern: elements.corpusUnitCardRenderPatternInput.value.trim(),
-    corpusUnitCardGlossAlign: elements.corpusUnitCardGlossAlignInput.checked,
-    corpusUnitRenderPattern: elements.corpusUnitRenderPatternInput.value.trim(),
-    corpusUnitGlossAlign: elements.corpusUnitGlossAlignInput.checked,
+    corpusRenderPattern: elements.corpusRenderPatternInput.value.trim(),
+    corpusGlossAlign: elements.corpusGlossAlignInput.checked,
     entryExampleRenderPattern: elements.entryExampleRenderPatternInput.value.trim(),
     entryExampleGlossAlign: elements.entryExampleGlossAlignInput.checked,
     corpusAutoSave: elements.corpusAutoSaveInput.checked,
@@ -12894,10 +13143,8 @@ function savedSettingsSnapshot(dictionary = activeDictionary()) {
   const settings = dictionarySettings(dictionary);
   return {
     glossStyles: settings.glossStyles,
-    corpusUnitCardRenderPattern: settings.corpusUnitCardRenderPattern,
-    corpusUnitCardGlossAlign: settings.corpusUnitCardGlossAlign,
-    corpusUnitRenderPattern: settings.corpusUnitRenderPattern,
-    corpusUnitGlossAlign: settings.corpusUnitGlossAlign,
+    corpusRenderPattern: settings.corpusRenderPattern,
+    corpusGlossAlign: settings.corpusGlossAlign,
     entryExampleRenderPattern: settings.entryExampleRenderPattern,
     entryExampleGlossAlign: settings.entryExampleGlossAlign,
     corpusAutoSave: settings.corpusAutoSave,
@@ -13022,17 +13269,9 @@ function discardDocsDraft() {
   docsDraftState = null;
 }
 
-function discardCorpusDraft() {
-  clearTimeout(corpusSaveTimer);
-  corpusSaveTimer = null;
-  corpusSaveRequested = false;
-  corpusDraftState = null;
-}
-
 function invalidSettingsRenderPatternInput() {
   const renderPatternInputs = [
-    elements.corpusUnitCardRenderPatternInput,
-    elements.corpusUnitRenderPatternInput,
+    elements.corpusRenderPatternInput,
     elements.entryExampleRenderPatternInput,
   ];
   return renderPatternInputs.find((input) => parseCorpusRenderPattern(input.value).error) || null;
@@ -13042,10 +13281,8 @@ function collectDictionarySettingsFromForm(existing = {}) {
   return {
     ...(existing || {}),
     glossStyles: collectGlossStyleForm(),
-    corpusUnitCardRenderPattern: elements.corpusUnitCardRenderPatternInput.value.trim(),
-    corpusUnitCardGlossAlign: elements.corpusUnitCardGlossAlignInput.checked,
-    corpusUnitRenderPattern: elements.corpusUnitRenderPatternInput.value.trim(),
-    corpusUnitGlossAlign: elements.corpusUnitGlossAlignInput.checked,
+    corpusRenderPattern: elements.corpusRenderPatternInput.value.trim(),
+    corpusGlossAlign: elements.corpusGlossAlignInput.checked,
     entryExampleRenderPattern: elements.entryExampleRenderPatternInput.value.trim(),
     entryExampleGlossAlign: elements.entryExampleGlossAlignInput.checked,
     corpusAutoSave: elements.corpusAutoSaveInput.checked,
@@ -13939,16 +14176,11 @@ function scheduleDocsSave() {
   }, 700);
 }
 
-function cloneCorpus(corpus = {}) {
-  return JSON.parse(JSON.stringify(normalizeCorpus(corpus)));
-}
-
 function createCorpusViewState() {
   return {
-    mode: "blocks",
     query: "",
-    selectedBlockId: "",
-    selectedUnitId: "",
+    selectedItemId: "",
+    collapsedGroups: new Set(),
   };
 }
 
@@ -13960,155 +14192,760 @@ function activeCorpusViewState() {
   return corpusViewStates.get(dictionaryId);
 }
 
-function ensureCorpusDraft(dictionary = activeDictionary()) {
-  if (!dictionary) {
-    return null;
-  }
-  if (!corpusDraftState || corpusDraftState.dictionaryId !== dictionary.id) {
-    corpusDraftState = {
-      dictionaryId: dictionary.id,
-      corpus: cloneCorpus(dictionary.corpus),
-    };
-  }
-  return corpusDraftState.corpus;
+// What the corpus page has read: the group overview and windows of items per
+// group or per search. `syncedUpdatedAt` is the dictionary version the data
+// matches; edits elsewhere (entry saves creating items or links) make the page
+// read it again the next time it renders.
+function createCorpusListState(dictionary) {
+  return {
+    dictionaryId: dictionary.id,
+    syncedUpdatedAt: dictionary.updatedAt || "",
+    groups: null,
+    status: "loading",
+    sources: new Map(),
+  };
 }
 
-function corpusParentRefs(corpus = ensureCorpusDraft()) {
-  if (!corpus) {
-    return [];
+function corpusApiPath(dictionary, suffix = "") {
+  return `/api/dictionaries/${encodeURIComponent(dictionary.id)}/corpus${suffix}`;
+}
+
+function corpusItemApiPath(dictionary, itemId, suffix = "") {
+  return corpusApiPath(dictionary, `/items/${encodeURIComponent(itemId)}${suffix}`);
+}
+
+function resetCorpusListData(dictionary) {
+  corpusListState = createCorpusListState(dictionary);
+  return loadCorpusGroups(dictionary);
+}
+
+async function loadCorpusGroups(dictionary) {
+  const listState = corpusListState;
+  try {
+    const { groups } = await api(corpusApiPath(dictionary, "/groups"));
+    if (corpusListState !== listState) {
+      return;
+    }
+    listState.groups = groups;
+    listState.status = "success";
+    if (!corpusDraftState) {
+      renderCorpusEditor();
+    }
+  } catch (error) {
+    if (corpusListState !== listState) {
+      return;
+    }
+    listState.status = "error";
+    showApiErrorToast(error, "corpusLoadFailed");
   }
-  const refs = [];
-  corpus.blocks.forEach((block) => {
-    refs.push({
-      key: `block:${block.id}`,
-      type: "block",
-      block,
-      layer: null,
-      unitIds: block.unitIds,
-    });
-    block.layers.forEach((layer) => {
-      refs.push({
-        key: `layer:${block.id}:${layer.id}`,
-        type: "layer",
-        block,
-        layer,
-        unitIds: layer.unitIds,
-      });
-    });
+  renderCorpusList();
+}
+
+function corpusListSource(key) {
+  if (!corpusListState.sources.has(key)) {
+    corpusListState.sources.set(key, { total: null, pages: new Map() });
+  }
+  return corpusListState.sources.get(key);
+}
+
+function loadCorpusPage(dictionary, key, pageIndex) {
+  const listState = corpusListState;
+  const source = corpusListSource(key);
+  if (source.pages.has(pageIndex)) {
+    return source.pages.get(pageIndex).promise;
+  }
+  const params = new URLSearchParams({
+    offset: String(pageIndex * CORPUS_PAGE_SIZE),
+    limit: String(CORPUS_PAGE_SIZE),
   });
-  return refs;
-}
-
-function corpusParentLabel(ref) {
-  if (!ref) {
-    return t("corpusOrphan");
+  if (key.startsWith("search:")) {
+    params.set("q", key.slice("search:".length));
+  } else {
+    params.set("group", key.slice("group:".length));
   }
-  const blockTitle = ref.block.title || t("corpusBlockFallback");
-  if (ref.type === "block") {
-    return `${t("corpusBlockParent")}: ${blockTitle}`;
+  const page = { status: "loading", items: [] };
+  page.promise = api(`${corpusApiPath(dictionary, "/items")}?${params}`)
+    .then((result) => {
+      if (corpusListState !== listState) {
+        return;
+      }
+      page.status = "success";
+      page.items = result.items;
+      source.total = result.pageInfo.total;
+      renderCorpusList();
+    })
+    .catch((error) => {
+      if (corpusListState !== listState) {
+        return;
+      }
+      page.status = "error";
+      showApiErrorToast(error, "corpusLoadFailed");
+      renderCorpusList();
+    });
+  source.pages.set(pageIndex, page);
+  return page.promise;
+}
+
+function corpusSearchKey(viewState) {
+  const query = viewState.query.trim();
+  return query ? `search:${query}` : "";
+}
+
+// Rows of the list: a header per group (none when every item is ungrouped)
+// and a row per item, or the flat results of a search.
+function corpusListRows(viewState) {
+  const searchKey = corpusSearchKey(viewState);
+  if (searchKey) {
+    const total = corpusListSource(searchKey).total || 0;
+    return Array.from({ length: total }, (_, index) => ({ kind: "item", sourceKey: searchKey, index }));
   }
-  const layerName = ref.layer.name || t("corpusLayerFallback");
-  return `${t("corpusLayerParent")}: ${blockTitle} / ${layerName}`;
+  const groups = corpusListState.groups || [];
+  const showHeaders = groups.some((group) => group.name);
+  return groups.flatMap((group) => {
+    const collapsed = showHeaders && viewState.collapsedGroups.has(group.name);
+    const header = showHeaders ? [{ kind: "group", name: group.name, count: group.count, collapsed }] : [];
+    if (collapsed) {
+      return header;
+    }
+    const sourceKey = `group:${group.name}`;
+    return [
+      ...header,
+      ...Array.from({ length: group.count }, (_, index) => ({ kind: "item", sourceKey, index })),
+    ];
+  });
 }
 
-function corpusParentsForUnit(unitId, corpus = ensureCorpusDraft()) {
-  return corpusParentRefs(corpus).filter((ref) => ref.unitIds.includes(unitId));
+function corpusRowItem(row) {
+  const page = corpusListState.sources.get(row.sourceKey)?.pages.get(Math.floor(row.index / CORPUS_PAGE_SIZE));
+  return page?.status === "success" ? page.items[row.index % CORPUS_PAGE_SIZE] || null : null;
 }
 
-function corpusOwnerByKey(ownerKey, corpus = ensureCorpusDraft()) {
-  return corpusParentRefs(corpus).find((ref) => ref.key === ownerKey) || null;
+function corpusItemLabel(item) {
+  if (item.name) {
+    return item.name;
+  }
+  const parsed = glossModel.parseGloss(item.content);
+  const glossText = parsed.gloss.gla.map(glossModel.glossInlinePlainText).join(" ")
+    || glossModel.glossInlinePlainText(parsed.gloss.ft);
+  const text = glossText
+    || (parsed.plainLines[0] ? glossModel.glossInlinePlainText(parsed.plainLines[0]) : "")
+    || glossSourceLines(item.content).map((line) => line.trim()).find(Boolean)
+    || "";
+  return text || t("corpusItemFallback");
 }
 
-function moveCorpusUnitToParent(corpus, unitId, ownerKey = "") {
-  const currentParents = corpusParentsForUnit(unitId, corpus);
-  const currentOccurrences = currentParents.reduce(
-    (count, ref) => count + ref.unitIds.filter((id) => id === unitId).length,
-    0,
-  );
-  if (
-    (currentParents.length === 0 && !ownerKey)
-    || (currentParents.length === 1 && currentOccurrences === 1 && currentParents[0].key === ownerKey)
-  ) {
+function corpusGroupLabel(name) {
+  return name || t("corpusUngrouped");
+}
+
+function createCorpusRow(row, viewState) {
+  if (row.kind === "group") {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "corpus-group-header";
+    button.dataset.corpusGroup = row.name;
+    button.setAttribute("aria-expanded", String(!row.collapsed));
+    button.innerHTML = `
+      <svg class="nav-icon corpus-group-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+      <span class="corpus-group-name">${escapeHtml(corpusGroupLabel(row.name))}</span>
+      <span class="corpus-group-count">${escapeHtml(String(row.count))}</span>
+    `;
+    return button;
+  }
+  const item = corpusRowItem(row);
+  if (!item) {
+    const placeholder = document.createElement("div");
+    placeholder.className = "corpus-item-card is-placeholder";
+    placeholder.setAttribute("aria-hidden", "true");
+    return placeholder;
+  }
+  const hasIssue = glossModel.parseGloss(item.content).issues.length > 0;
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `corpus-item-card${item.id === viewState.selectedItemId ? " selected" : ""}`;
+  button.dataset.corpusItemId = item.id;
+  button.setAttribute("aria-current", item.id === viewState.selectedItemId ? "true" : "false");
+  button.innerHTML = `
+    <span class="corpus-item-label">${escapeHtml(corpusItemLabel(item))}</span>
+    ${hasIssue ? `<svg class="nav-icon corpus-item-issue" viewBox="0 0 24 24" role="img" aria-label="${escapeHtml(t("corpusItemHasIssue"))}"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"></path></svg>` : ""}
+    ${item.linkCount ? `<span class="corpus-item-link-count" aria-label="${escapeHtml(formatText("corpusItemLinkCount", { count: item.linkCount }))}">${escapeHtml(String(item.linkCount))}</span>` : ""}
+  `;
+  return button;
+}
+
+function corpusRowKey(row) {
+  if (row.kind === "group") {
+    return `group:${row.name}`;
+  }
+  const item = corpusRowItem(row);
+  return item ? `item:${item.id}` : `slot:${row.sourceKey}:${row.index}`;
+}
+
+function renderCorpusList() {
+  const dictionary = activeDictionary();
+  if (!dictionary || !corpusListState || corpusListState.dictionaryId !== dictionary.id) {
     return;
   }
-  corpusParentRefs(corpus).forEach((ref) => {
-    ref.unitIds.splice(0, ref.unitIds.length, ...ref.unitIds.filter((id) => id !== unitId));
+  const viewState = activeCorpusViewState();
+  const searchKey = corpusSearchKey(viewState);
+  if (searchKey && !corpusListSource(searchKey).pages.has(0)) {
+    void loadCorpusPage(dictionary, searchKey, 0);
+  }
+  const rows = corpusListRows(viewState);
+  const loading = searchKey
+    ? corpusListSource(searchKey).total === null
+    : corpusListState.status === "loading";
+  elements.corpusPanel.classList.toggle("is-empty", !loading && !rows.length && !searchKey);
+  if (!rows.length) {
+    const empty = document.createElement("p");
+    empty.className = "corpus-empty-list";
+    empty.textContent = loading ? t("loading") : t(searchKey ? "noCorpusMatches" : "noCorpusItems");
+    renderVirtualListEmpty(elements.corpusItemList, corpusVirtualList, empty);
+    return;
+  }
+  renderVirtualList(elements.corpusItemList, corpusVirtualList, rows, {
+    resetToken: `${dictionary.id}|${searchKey}`,
+    getKey: corpusRowKey,
+    getSizeCacheKey: (row, key) => {
+      const item = row.kind === "item" ? corpusRowItem(row) : null;
+      return item ? `${key}|${item.updatedAt}|${item.name}|${item.linkCount}` : key;
+    },
+    renderItem: (row) => createCorpusRow(row, viewState),
+    // Selection only changes classes, so the focused row is kept; changed text
+    // or counts replace the row.
+    updateItem: (card, row) => {
+      const next = createCorpusRow(row, viewState);
+      if (card.tagName !== next.tagName || card.innerHTML !== next.innerHTML) {
+        card.replaceWith(next);
+        return true;
+      }
+      card.className = next.className;
+      ["aria-current", "aria-expanded"].forEach((name) => {
+        if (next.hasAttribute(name)) {
+          card.setAttribute(name, next.getAttribute(name));
+        }
+      });
+      return true;
+    },
+    onRangeChange: (range) => {
+      const missing = new Map();
+      range.items.forEach((row) => {
+        if (row.kind === "item" && !corpusRowItem(row)) {
+          missing.set(`${row.sourceKey}|${Math.floor(row.index / CORPUS_PAGE_SIZE)}`, row);
+        }
+      });
+      missing.forEach((row) => {
+        void loadCorpusPage(dictionary, row.sourceKey, Math.floor(row.index / CORPUS_PAGE_SIZE));
+      });
+    },
   });
-  const target = ownerKey ? corpusOwnerByKey(ownerKey, corpus) : null;
-  if (target) {
-    target.unitIds.push(unitId);
+}
+
+function corpusTextOf(item) {
+  return {
+    name: String(item.name || "").trim(),
+    group: String(item.group || "").trim(),
+    content: String(item.content || ""),
+  };
+}
+
+function corpusTextsEqual(left, right) {
+  const a = corpusTextOf(left);
+  const b = corpusTextOf(right);
+  return a.name === b.name && a.group === b.group && a.content === b.content;
+}
+
+// One item is edited at a time. `saved` is what the server last returned, so a
+// save that comes back while the user keeps typing leaves the newer draft.
+function setCorpusDraft(dictionary, item) {
+  corpusDraftState = {
+    dictionaryId: dictionary.id,
+    itemId: item.id,
+    item,
+    saved: corpusTextOf(item),
+    draft: { name: item.name, group: item.group, content: item.content },
+    links: null,
+    linksStatus: "loading",
+  };
+  renderCorpusEditor();
+  void loadCorpusItemLinks(dictionary, corpusDraftState);
+}
+
+function cachedCorpusItem(itemId) {
+  for (const source of corpusListState?.sources.values() || []) {
+    for (const page of source.pages.values()) {
+      const item = page.items.find((candidate) => candidate.id === itemId);
+      if (item) {
+        return item;
+      }
+    }
+  }
+  return null;
+}
+
+async function openCorpusDraft(dictionary, itemId) {
+  const cached = cachedCorpusItem(itemId);
+  if (cached) {
+    setCorpusDraft(dictionary, cached);
+    return true;
+  }
+  try {
+    const { item } = await api(corpusItemApiPath(dictionary, itemId));
+    if (activeDictionary()?.id !== dictionary.id || activeCorpusViewState().selectedItemId !== itemId) {
+      return false;
+    }
+    setCorpusDraft(dictionary, item);
+    return true;
+  } catch (error) {
+    if (error.code === "corpus_item_not_found") {
+      activeCorpusViewState().selectedItemId = "";
+      renderCorpusEditor();
+      return false;
+    }
+    showApiErrorToast(error, "corpusLoadFailed");
+    return false;
   }
 }
 
-function corpusIntegrityIssues(corpus = ensureCorpusDraft()) {
-  if (!corpus) {
-    return [];
+async function loadCorpusItemLinks(dictionary, draftState) {
+  try {
+    const { links } = await api(corpusItemApiPath(dictionary, draftState.itemId, "/links"));
+    if (corpusDraftState !== draftState) {
+      return;
+    }
+    draftState.links = links;
+    draftState.linksStatus = "success";
+  } catch (error) {
+    if (corpusDraftState !== draftState) {
+      return;
+    }
+    draftState.linksStatus = "error";
+    console.error(error);
   }
-  const unitsById = new Map(corpus.units.map((unit) => [unit.id, unit]));
-  const parentsByUnit = new Map();
-  const issues = [];
-  corpusParentRefs(corpus).forEach((ref) => {
-    const parent = corpusParentLabel(ref);
-    const seen = new Set();
-    ref.unitIds.forEach((unitId) => {
-      if (seen.has(unitId)) {
-        const unit = unitsById.get(unitId);
-        issues.push(formatText("corpusDuplicateLink", {
-          parent,
-          unit: corpusUnitLabel(unit, unitId),
-        }));
-        return;
-      }
-      seen.add(unitId);
-      if (!unitsById.has(unitId)) {
-        issues.push(formatText("corpusMissingUnit", { parent, unit: unitId }));
-        return;
-      }
-      if (!parentsByUnit.has(unitId)) {
-        parentsByUnit.set(unitId, []);
-      }
-      parentsByUnit.get(unitId).push(ref);
-    });
+  renderCorpusLinks();
+}
+
+// Leaving the edited item saves it under auto-save; otherwise the user
+// chooses to save, discard or stay. Resolves false when the user stays.
+async function resolveCorpusDraft() {
+  if (!corpusFormIsDirty()) {
+    return true;
+  }
+  if (dictionarySettings().corpusAutoSave) {
+    try {
+      return await saveCorpus(false);
+    } catch (error) {
+      showApiErrorToast(error, "saveFailed");
+      return false;
+    }
+  }
+  return confirmUnsavedChanges(t("unsavedCorpusConfirm"), {
+    save: () => saveCorpus(false),
+    discard: discardCorpusDraft,
   });
-  parentsByUnit.forEach((parents, unitId) => {
-    if (parents.length > 1) {
-      issues.push(formatText("corpusMultipleParents", {
-        unit: corpusUnitLabel(unitsById.get(unitId), unitId),
-        parents: parents.map(corpusParentLabel).join("; "),
-      }));
+}
+
+async function selectCorpusItem(itemId) {
+  const dictionary = activeDictionary();
+  if (!dictionary || corpusDraftState?.itemId === itemId) {
+    return;
+  }
+  if (!(await resolveCorpusDraft())) {
+    return;
+  }
+  activeCorpusViewState().selectedItemId = itemId;
+  corpusDraftState = null;
+  renderCorpusList();
+  await openCorpusDraft(dictionary, itemId);
+}
+
+// Opens the group holding an item, loads its window and scrolls to it.
+async function revealCorpusItem(dictionary, itemId) {
+  const { location } = await api(corpusItemApiPath(dictionary, itemId));
+  const viewState = activeCorpusViewState();
+  viewState.query = "";
+  elements.corpusSearchInput.value = "";
+  viewState.collapsedGroups.delete(location.group);
+  if (!corpusListState.groups) {
+    await loadCorpusGroups(dictionary);
+  }
+  await loadCorpusPage(dictionary, `group:${location.group}`, Math.floor(location.index / CORPUS_PAGE_SIZE));
+  renderCorpusList();
+  requestAnimationFrame(() => {
+    scrollVirtualListItemIntoView(corpusVirtualList, `item:${itemId}`, "auto");
+  });
+}
+
+async function openCorpusItem(itemId) {
+  await showView("corpus");
+  const dictionary = activeDictionary();
+  if (state.activeView !== "corpus" || !dictionary) {
+    return;
+  }
+  await selectCorpusItem(itemId);
+  if (corpusDraftState?.itemId === itemId) {
+    await revealCorpusItem(dictionary, itemId);
+  }
+}
+
+function renderCorpusContentHtml(content) {
+  const settings = dictionarySettings();
+  const pattern = parseCorpusRenderPattern(settings.corpusRenderPattern);
+  if (pattern.error) {
+    return `<span class="corpus-render-error" title="${escapeHtml(pattern.error)}">${escapeHtml(t("corpusRenderError"))}</span>`;
+  }
+  const renderLines = (lines, renderLine) => {
+    const rendered = lines.map((line) => `<span>${line ? renderLine(line) : "&nbsp;"}</span>`).join("");
+    return `<span class="corpus-content corpus-content-raw">${rendered || escapeHtml(t("corpusItemFallback"))}</span>`;
+  };
+  if (!pattern.groups.length) {
+    return renderLines(glossSourceLines(content), escapeHtml);
+  }
+  const parsed = glossModel.parseGloss(content);
+  if (parsed.issues.length) {
+    return `${renderLines(glossSourceLines(content), escapeHtml)}${glossParseHintHtml(parsed.issues)}`;
+  }
+  if (parsed.kind !== "gloss") {
+    return renderLines(parsed.plainLines, renderGlossInlineHtml);
+  }
+  if (!corpusGlossHasTargets(parsed.gloss, pattern.groups)) {
+    return `<span class="corpus-render-error">${escapeHtml(t("corpusRenderError"))}</span>`;
+  }
+  return `<span class="corpus-content corpus-content-gloss">${renderCorpusGlossRows(pattern.groups, parsed.gloss, settings, settings.corpusGlossAlign)}</span>`;
+}
+
+// The open form is kept while it shows the same item, so renders never replace
+// the fields being typed in or their undo history; `force` rebuilds it for a
+// language change.
+function renderCorpusEditor({ force = false } = {}) {
+  const draftState = corpusDraftState;
+  if (!draftState) {
+    const hasItems = Boolean(corpusListState?.groups?.length);
+    const selecting = Boolean(activeCorpusViewState().selectedItemId);
+    elements.corpusEditor.innerHTML = `<p class="corpus-empty-editor">${escapeHtml(t(selecting ? "loading" : hasItems ? "noCorpusSelection" : "noCorpusItems"))}</p>`;
+    return;
+  }
+  const groupNames = (corpusListState?.groups || []).map((group) => group.name).filter(Boolean);
+  const currentForm = elements.corpusEditor.querySelector(".corpus-form");
+  if (!force && currentForm?.dataset.corpusItemId === draftState.itemId) {
+    currentForm.querySelector("[data-corpus-meta]").textContent = corpusGroupLabel(draftState.saved.group);
+    currentForm.querySelector("#corpusGroupOptions").innerHTML = groupNames.map((name) => `<option value="${escapeHtml(name)}"></option>`).join("");
+    currentForm.querySelector("[data-corpus-preview]").innerHTML = renderCorpusContentHtml(draftState.draft.content);
+    renderCorpusLinks();
+    return;
+  }
+  elements.corpusEditor.innerHTML = `
+    <form class="corpus-form" data-corpus-item-id="${escapeHtml(draftState.itemId)}" autocomplete="off">
+      <div class="form-heading compact-heading">
+        <div>
+          <p class="eyebrow" data-i18n="corpusItem">${escapeHtml(t("corpusItem"))}</p>
+          <p class="corpus-item-meta" data-corpus-meta>${escapeHtml(corpusGroupLabel(draftState.saved.group))}</p>
+        </div>
+        <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="delete-corpus-item" data-i18n="deleteCorpusItem">${escapeHtml(t("deleteCorpusItem"))}</button>
+      </div>
+      <div class="corpus-rendered" data-corpus-preview>${renderCorpusContentHtml(draftState.draft.content)}</div>
+      <div class="form-grid">
+        <label><span data-i18n="corpusItemName">${escapeHtml(t("corpusItemName"))}</span><input data-field="name" maxlength="160"></label>
+        <label><span data-i18n="corpusItemGroup">${escapeHtml(t("corpusItemGroup"))}</span><input data-field="group" maxlength="160" list="corpusGroupOptions"></label>
+      </div>
+      <datalist id="corpusGroupOptions">${groupNames.map((name) => `<option value="${escapeHtml(name)}"></option>`).join("")}</datalist>
+      <label><span data-i18n="corpusItemContent">${escapeHtml(t("corpusItemContent"))}</span><textarea data-field="content" rows="7" spellcheck="false"></textarea></label>
+      <section class="corpus-subsection">
+        <div class="subsection-title"><h3 data-i18n="corpusItemLinks">${escapeHtml(t("corpusItemLinks"))}</h3></div>
+        <div class="corpus-link-list" data-corpus-links></div>
+      </section>
+    </form>
+  `;
+  const form = elements.corpusEditor.querySelector(".corpus-form");
+  form.querySelector('[data-field="name"]').value = draftState.draft.name;
+  form.querySelector('[data-field="group"]').value = draftState.draft.group;
+  form.querySelector('[data-field="content"]').value = draftState.draft.content;
+  renderCorpusLinks();
+}
+
+function renderCorpusLinks() {
+  const host = elements.corpusEditor.querySelector("[data-corpus-links]");
+  const draftState = corpusDraftState;
+  if (!host || !draftState) {
+    return;
+  }
+  if (draftState.linksStatus !== "success") {
+    host.innerHTML = `<p class="muted-text">${escapeHtml(t(draftState.linksStatus === "error" ? "corpusLoadFailed" : "loading"))}</p>`;
+    return;
+  }
+  if (!draftState.links.length) {
+    host.innerHTML = `<p class="muted-text" data-i18n="noCorpusItemLinks">${escapeHtml(t("noCorpusItemLinks"))}</p>`;
+    return;
+  }
+  host.innerHTML = `<ul>${draftState.links.map((link) => `
+    <li>
+      <span class="corpus-link-text"><strong>${escapeHtml(link.lemma)}</strong> ${escapeHtml(`${link.definitionPosition + 1}.`)} ${escapeHtml(link.meaning)}</span>
+      <button class="secondary-button" data-control-tone="neutral" type="button" data-corpus-open-entry="${escapeHtml(link.entryId)}" data-i18n="openEntry">${escapeHtml(t("openEntry"))}</button>
+    </li>
+  `).join("")}</ul>`;
+}
+
+function syncCorpusEditorToDraft() {
+  const form = elements.corpusEditor.querySelector(".corpus-form");
+  const draftState = corpusDraftState;
+  if (!form || !draftState || form.dataset.corpusItemId !== draftState.itemId) {
+    return;
+  }
+  draftState.draft = {
+    name: form.querySelector('[data-field="name"]').value,
+    group: form.querySelector('[data-field="group"]').value,
+    content: form.querySelector('[data-field="content"]').value,
+  };
+}
+
+function scheduleCorpusPreview() {
+  if (corpusPreviewFrame !== null) {
+    cancelAnimationFrame(corpusPreviewFrame);
+  }
+  corpusPreviewFrame = requestAnimationFrame(() => {
+    corpusPreviewFrame = null;
+    const preview = elements.corpusEditor.querySelector("[data-corpus-preview]");
+    if (preview && corpusDraftState) {
+      preview.innerHTML = renderCorpusContentHtml(corpusDraftState.draft.content);
     }
   });
-  return issues;
 }
 
-function corpusUnitLabel(unit, fallback = "") {
-  const settings = dictionarySettings();
-  const pattern = parseCorpusRenderPattern(settings.corpusUnitCardRenderPattern);
-  const parsed = glossModel.parseGloss(unit?.content);
-  let content = "";
-  if (pattern.error) {
-    content = "";
-  } else if (!pattern.groups.length || parsed.issues.length) {
-    content = glossSourceLines(unit?.content)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .join(" / ");
-  } else if (parsed.kind === "plain") {
-    content = parsed.plainLines.map(glossModel.glossInlinePlainText).join(" / ");
-  } else if (corpusGlossHasTargets(parsed.gloss, pattern.groups)) {
-    content = pattern.groups
-      .map((group) => group
-        .filter((target) => corpusGlossTargetHasContent(parsed.gloss, target))
-        .map((target) => corpusGlossText(parsed.gloss, target.key))
-        .filter(Boolean)
-        .join(" "))
-      .filter(Boolean)
-      .join(" / ");
+function corpusFormIsDirty(dictionary = activeDictionary()) {
+  const draftState = corpusDraftState;
+  return Boolean(dictionary && draftState && draftState.dictionaryId === dictionary.id
+    && !corpusTextsEqual(draftState.draft, draftState.saved));
+}
+
+function discardCorpusDraft() {
+  clearTimeout(corpusSaveTimer);
+  corpusSaveTimer = null;
+  corpusSaveRequested = false;
+  if (corpusDraftState) {
+    corpusDraftState.draft = { ...corpusDraftState.saved };
   }
-  if (!content) {
-    return fallback || t("corpusUnitFallback");
+}
+
+// Saved text goes back into every cached window; a new group changes the item
+// position, so the list is read again.
+function applyCorpusItemSaved(dictionary, draftState, result) {
+  const groupChanged = draftState.saved.group !== result.item.group;
+  draftState.item = result.item;
+  draftState.saved = corpusTextOf(result.item);
+  updateLoadedDictionary(dictionary.id, { updatedAt: result.updatedAt });
+  if (corpusListState?.dictionaryId === dictionary.id) {
+    corpusListState.syncedUpdatedAt = result.updatedAt;
+    if (groupChanged) {
+      const listState = corpusListState;
+      void resetCorpusListData(dictionary).then(() => {
+        if (corpusListState === listState) {
+          corpusListState.syncedUpdatedAt = result.updatedAt;
+        }
+      });
+    } else {
+      corpusListState.sources.forEach((source) => source.pages.forEach((page) => {
+        page.items = page.items.map((item) => (item.id === result.item.id ? result.item : item));
+      }));
+      renderCorpusList();
+    }
   }
-  return content.length > 72 ? `${content.slice(0, 72)}...` : content;
+  const meta = elements.corpusEditor.querySelector("[data-corpus-meta]");
+  if (meta && corpusDraftState === draftState) {
+    meta.textContent = corpusGroupLabel(draftState.saved.group);
+  }
+  if (result.item.linkCount) {
+    resetEntryReadStateAfterSave();
+  }
+}
+
+async function runCorpusSaveQueue() {
+  let savedAny = false;
+  while (corpusSaveRequested) {
+    corpusSaveRequested = false;
+    const dictionary = activeDictionary();
+    const draftState = corpusDraftState;
+    if (!dictionary || !draftState || draftState.dictionaryId !== dictionary.id) {
+      return savedAny;
+    }
+    const snapshot = { ...draftState.draft };
+    const result = await api(corpusItemApiPath(dictionary, draftState.itemId), {
+      method: "PUT",
+      body: JSON.stringify({ item: snapshot }),
+    });
+    savedAny = true;
+    clearTimeout(corpusSaveTimer);
+    corpusSaveTimer = null;
+    applyCorpusItemSaved(dictionary, draftState, result);
+    if (corpusDraftState === draftState && !corpusTextsEqual(draftState.draft, draftState.saved)) {
+      corpusSaveRequested = true;
+    }
+  }
+  return savedAny;
+}
+
+function saveCorpus(showSavedToast = true) {
+  const dictionary = activeDictionary();
+  if (!dictionary) {
+    showToast(t("createDictionaryFirstToast"));
+    return Promise.resolve(false);
+  }
+  syncCorpusEditorToDraft();
+  clearTimeout(corpusSaveTimer);
+  corpusSaveTimer = null;
+  if (!corpusFormIsDirty(dictionary)) {
+    if (showSavedToast) {
+      showToast(t("noChangesToSave"));
+    }
+    return Promise.resolve(true);
+  }
+  corpusSaveRequested = true;
+  if (!corpusSavePromise) {
+    corpusSavePromise = runCorpusSaveQueue().finally(() => {
+      corpusSavePromise = null;
+    });
+  }
+  const pendingSave = corpusSavePromise;
+  if (!showSavedToast) {
+    return pendingSave;
+  }
+  return pendingSave.then((saved) => {
+    if (saved) {
+      showToast(t("corpusSaved"));
+    }
+    return saved;
+  }).catch((error) => {
+    showApiErrorToast(error, "saveFailed");
+    return false;
+  });
+}
+
+function scheduleCorpusSave() {
+  clearTimeout(corpusSaveTimer);
+  const dictionary = activeDictionary();
+  if (!dictionary || !dictionarySettings(dictionary).corpusAutoSave || !corpusFormIsDirty(dictionary)) {
+    return;
+  }
+  corpusSaveTimer = setTimeout(() => {
+    saveCorpus(false).catch((error) => showApiErrorToast(error, "saveFailed"));
+  }, 700);
+}
+
+// New items join the group of the item being edited, so a longer text can be
+// written sentence by sentence.
+async function createCorpusItem() {
+  const dictionary = activeDictionary();
+  if (!dictionary || !(await resolveCorpusDraft())) {
+    return;
+  }
+  const group = corpusDraftState?.saved.group || "";
+  try {
+    const result = await api(corpusApiPath(dictionary, "/items"), {
+      method: "POST",
+      body: JSON.stringify({ item: { name: "", group, content: "" } }),
+    });
+    updateLoadedDictionary(dictionary.id, { updatedAt: result.updatedAt });
+    const viewState = activeCorpusViewState();
+    viewState.selectedItemId = result.item.id;
+    setCorpusDraft(dictionary, result.item);
+    await resetCorpusListData(dictionary);
+    corpusListState.syncedUpdatedAt = result.updatedAt;
+    await revealCorpusItem(dictionary, result.item.id);
+    elements.corpusEditor.querySelector('[data-field="content"]')?.focus();
+  } catch (error) {
+    showApiErrorToast(error, "saveFailed");
+  }
+}
+
+function corpusLinkSummary(links) {
+  const shown = links.slice(0, 5).map((link) => `${link.lemma} ${link.definitionPosition + 1}. ${link.meaning}`.trim());
+  return links.length > shown.length
+    ? formatText("corpusLinksMore", { links: shown.join("、"), count: links.length })
+    : shown.join("、");
+}
+
+async function deleteCorpusItem() {
+  const dictionary = activeDictionary();
+  const draftState = corpusDraftState;
+  if (!dictionary || !draftState) {
+    return;
+  }
+  if (!(await appConfirm(t("deleteCorpusItemConfirm"), { danger: true }))) {
+    return;
+  }
+  const path = corpusItemApiPath(dictionary, draftState.itemId);
+  try {
+    let result;
+    try {
+      result = await api(path, { method: "DELETE" });
+    } catch (error) {
+      if (error.code !== "corpus_item_linked") {
+        throw error;
+      }
+      const confirmed = await appConfirm(
+        formatText("deleteLinkedCorpusItemConfirm", { links: corpusLinkSummary(error.details?.links || []) }),
+        { danger: true },
+      );
+      if (!confirmed) {
+        return;
+      }
+      result = await api(`${path}?unlink=true`, { method: "DELETE" });
+    }
+    discardCorpusDraft();
+    corpusDraftState = null;
+    activeCorpusViewState().selectedItemId = "";
+    updateLoadedDictionary(dictionary.id, { updatedAt: result.updatedAt });
+    if (result.entryIds.length) {
+      resetEntryReadStateAfterSave();
+    }
+    await resetCorpusListData(dictionary);
+    corpusListState.syncedUpdatedAt = result.updatedAt;
+    renderCorpusEditor();
+    showToast(t("corpusItemDeleted"));
+  } catch (error) {
+    showApiErrorToast(error, "saveFailed");
+  }
+}
+
+function renderCorpus(dictionary = activeDictionary()) {
+  if (!dictionary) {
+    elements.corpusItemList.innerHTML = "";
+    elements.corpusEditor.innerHTML = "";
+    return;
+  }
+  if (corpusDraftState && corpusDraftState.dictionaryId !== dictionary.id) {
+    corpusDraftState = null;
+  }
+  const stale = !corpusListState
+    || corpusListState.dictionaryId !== dictionary.id
+    || corpusListState.syncedUpdatedAt !== (dictionary.updatedAt || "");
+  const viewState = activeCorpusViewState();
+  elements.corpusSearchInput.value = viewState.query;
+  if (stale) {
+    void resetCorpusListData(dictionary);
+  }
+  renderCorpusList();
+  const itemId = corpusDraftState?.itemId || viewState.selectedItemId;
+  if (itemId && (!corpusDraftState || (stale && !corpusFormIsDirty(dictionary)))) {
+    renderCorpusEditor();
+    void openCorpusDraft(dictionary, itemId);
+  } else {
+    renderCorpusEditor();
+  }
+}
+
+function renderCorpusLocale(dictionary = activeDictionary()) {
+  if (!dictionary) {
+    return;
+  }
+  renderCorpusList();
+  refreshCorpusEditorLocale();
+}
+
+// The editor keeps its form between renders, so a language change rebuilds it
+// even while the corpus page is hidden.
+function refreshCorpusEditorLocale() {
+  syncCorpusEditorToDraft();
+  renderCorpusEditor({ force: true });
 }
 
 function parseCorpusRenderPattern(value) {
@@ -14148,80 +14985,6 @@ function corpusGlossText(gloss, key) {
     : gloss[key].map(glossModel.glossInlinePlainText).join(" ");
 }
 
-function corpusUnitRenderConfig(settings, context) {
-  return context === "card"
-    ? { pattern: settings.corpusUnitCardRenderPattern, align: settings.corpusUnitCardGlossAlign }
-    : { pattern: settings.corpusUnitRenderPattern, align: settings.corpusUnitGlossAlign };
-}
-
-function renderCorpusUnitNameHtml(unit, context = "content") {
-  const settings = dictionarySettings();
-  const renderConfig = corpusUnitRenderConfig(settings, context);
-  const pattern = parseCorpusRenderPattern(renderConfig.pattern);
-  if (pattern.error) {
-    return `<span class="corpus-unit-render-error" title="${escapeHtml(pattern.error)}">${escapeHtml(t("corpusRenderError"))}</span>`;
-  }
-  const renderLines = (lines, renderLine) => {
-    const rendered = lines.map((line) => `<span>${line ? renderLine(line) : "&nbsp;"}</span>`).join("");
-    return `<span class="corpus-unit-name corpus-unit-name-raw">${rendered || escapeHtml(t("corpusUnitFallback"))}</span>`;
-  };
-  if (!pattern.groups.length) {
-    return renderLines(glossSourceLines(unit?.content), escapeHtml);
-  }
-  const parsed = glossModel.parseGloss(unit?.content);
-  if (parsed.issues.length) {
-    return `${renderLines(glossSourceLines(unit?.content), escapeHtml)}${glossParseHintHtml(parsed.issues)}`;
-  }
-  if (parsed.kind !== "gloss") {
-    return renderLines(parsed.plainLines, renderGlossInlineHtml);
-  }
-  if (!corpusGlossHasTargets(parsed.gloss, pattern.groups)) {
-    return `<span class="corpus-unit-render-error" title="${escapeHtml(t("corpusRenderError"))}">${escapeHtml(t("corpusRenderError"))}</span>`;
-  }
-  return `
-    <span class="corpus-unit-name corpus-unit-name-gloss">
-      ${renderCorpusGlossRows(pattern.groups, parsed.gloss, settings, renderConfig.align)}
-    </span>
-  `;
-}
-
-function updateCorpusUnitNamePreview(unitId) {
-  const corpus = ensureCorpusDraft();
-  const unit = corpus?.units.find((item) => item.id === unitId);
-  if (!unit) {
-    return;
-  }
-  const contentRendered = renderCorpusUnitNameHtml(unit, "content");
-  const cardRendered = renderCorpusUnitNameHtml(unit, "card");
-  const form = elements.corpusEditor.querySelector('.corpus-form[data-corpus-kind="unit"]');
-  if (form?.dataset.corpusId === unitId) {
-    const heading = form.querySelector(".corpus-rendered-heading");
-    if (heading) {
-      heading.innerHTML = contentRendered;
-    }
-  }
-  elements.corpusPanel.querySelectorAll("[data-corpus-unit-id], [data-linked-unit-id]").forEach((container) => {
-    const linkedUnitId = container.dataset.corpusUnitId || container.dataset.linkedUnitId;
-    if (linkedUnitId !== unitId) {
-      return;
-    }
-    const host = container.querySelector(".corpus-unit-name-host");
-    if (host) {
-      host.innerHTML = cardRendered;
-    }
-  });
-}
-
-function scheduleCorpusUnitNamePreview(unitId) {
-  if (corpusUnitPreviewFrame !== null) {
-    cancelAnimationFrame(corpusUnitPreviewFrame);
-  }
-  corpusUnitPreviewFrame = requestAnimationFrame(() => {
-    corpusUnitPreviewFrame = null;
-    updateCorpusUnitNamePreview(unitId);
-  });
-}
-
 function corpusGlossRowTokens(targets, gloss) {
   return targets.flatMap(({ key }) => {
     const values = key === "ft" ? glossModel.tokenizeGlossLevel(gloss.ft) : gloss[key];
@@ -14239,7 +15002,7 @@ function renderCorpusGlossRows(groups, gloss, settings, alignEnabled) {
     .filter((targets) => targets.length)
     .map((targets) => ({ targets, tokens: corpusGlossRowTokens(targets, gloss) }));
   if (!rows.length) {
-    return escapeHtml(t("corpusUnitFallback"));
+    return escapeHtml(t("corpusItemFallback"));
   }
 
   const output = [];
@@ -14298,619 +15061,6 @@ function renderCorpusGlossRowGroup(rows, alignEnabled, settings) {
 
 function renderCorpusGlossToken(key, value, settings) {
   return `<span class="${glossStyleClassNames(key, settings)}">${renderGlossInlineHtml(value)}</span>`;
-}
-
-function ensureCorpusSelection(corpus, viewState = activeCorpusViewState()) {
-  if (!corpus.blocks.some((block) => block.id === viewState.selectedBlockId)) {
-    viewState.selectedBlockId = corpus.blocks[0]?.id || "";
-  }
-  if (!corpus.units.some((unit) => unit.id === viewState.selectedUnitId)) {
-    viewState.selectedUnitId = corpus.units[0]?.id || "";
-  }
-}
-
-function renderCorpus(dictionary = activeDictionary()) {
-  syncCorpusEditorToDraft();
-  if (!dictionary) {
-    elements.corpusItemList.innerHTML = "";
-    elements.corpusEditor.innerHTML = "";
-    elements.corpusIntegrityPanel.hidden = true;
-    return;
-  }
-
-  const corpus = ensureCorpusDraft(dictionary);
-  const viewState = activeCorpusViewState();
-  ensureCorpusSelection(corpus, viewState);
-  elements.corpusPanel.classList.toggle("is-empty", viewState.mode === "blocks" ? !corpus.blocks.length : !corpus.units.length);
-  elements.corpusEditor.dataset.dictionaryId = dictionary.id;
-  elements.corpusSearchInput.value = viewState.query;
-  elements.corpusModeControl.querySelectorAll("[data-corpus-mode]").forEach((button) => {
-    button.classList.toggle("active", button.dataset.corpusMode === viewState.mode);
-    button.setAttribute("aria-checked", String(button.dataset.corpusMode === viewState.mode));
-    button.tabIndex = button.dataset.corpusMode === viewState.mode ? 0 : -1;
-  });
-  elements.newCorpusItemButton.textContent = t(viewState.mode === "blocks" ? "newCorpusBlock" : "newCorpusUnit");
-  renderCorpusIntegrity(corpus);
-  renderCorpusItemList(corpus, viewState);
-  renderCorpusEditor(corpus, viewState);
-  if (dictionarySettings(dictionary).corpusAutoSave && corpusFormIsDirty(dictionary)) {
-    scheduleCorpusSave();
-  }
-}
-
-function renderCorpusLocale(dictionary = activeDictionary()) {
-  if (!dictionary) {
-    return;
-  }
-  const corpus = ensureCorpusDraft(dictionary);
-  const viewState = activeCorpusViewState();
-  elements.newCorpusItemButton.textContent = t(viewState.mode === "blocks" ? "newCorpusBlock" : "newCorpusUnit");
-  renderCorpusIntegrity(corpus);
-  renderCorpusItemList(corpus, viewState);
-  refreshCorpusEditorLocale();
-}
-
-function refreshCorpusEditorLocale() {
-  const form = elements.corpusEditor.querySelector(".corpus-form");
-  const corpus = ensureCorpusDraft();
-  if (!form || !corpus) {
-    return;
-  }
-
-  const parentLabels = new Map(corpusParentRefs(corpus).map((ref) => [ref.key, corpusParentLabel(ref)]));
-  form.querySelectorAll('select[data-field="parent"]').forEach((select) => {
-    [...select.options].forEach((option) => {
-      option.textContent = option.value ? parentLabels.get(option.value) || option.textContent : t("corpusOrphan");
-    });
-  });
-
-  const unitsById = new Map(corpus.units.map((unit) => [unit.id, unit]));
-  form.querySelectorAll("select[data-corpus-unit-link]").forEach((select) => {
-    [...select.options].forEach((option) => {
-      option.textContent = option.value
-        ? corpusUnitLabel(unitsById.get(option.value), option.value)
-        : t("chooseUnit");
-    });
-  });
-
-  if (form.dataset.corpusKind === "unit") {
-    const unit = unitsById.get(form.dataset.corpusId);
-    const content = form.querySelector('[data-field="content"]')?.value;
-    const heading = form.querySelector(".corpus-rendered-heading");
-    if (unit && heading && content !== undefined) {
-      heading.innerHTML = renderCorpusUnitNameHtml({ ...unit, content }, "content");
-    }
-    return;
-  }
-
-  const blockTitle = form.querySelector('[data-field="title"]')?.value.trim();
-  const blockHeading = form.querySelector("[data-corpus-block-title-preview]");
-  if (blockHeading) {
-    blockHeading.textContent = blockTitle || t("corpusBlockFallback");
-  }
-  form.querySelectorAll(".corpus-layer-card").forEach((card) => {
-    const name = card.querySelector('[data-field="name"]')?.value.trim();
-    const heading = card.querySelector("[data-corpus-layer-name-preview]");
-    if (heading) {
-      heading.textContent = name || t("corpusLayerFallback");
-    }
-  });
-}
-
-function renderCorpusIntegrity(corpus) {
-  const issues = corpusIntegrityIssues(corpus);
-  elements.corpusIntegrityPanel.hidden = !issues.length;
-  elements.corpusIntegrityList.innerHTML = issues.map((issue) => `<li>${escapeHtml(issue)}</li>`).join("");
-}
-
-function renderCorpusItemList(corpus, viewState) {
-  const query = normalize(viewState.query);
-  if (viewState.mode === "blocks") {
-    const blocks = corpus.blocks.filter((block) => {
-      const text = [
-        block.title,
-        block.notes,
-        ...block.tags,
-        ...Object.entries(block.attributes).flat(),
-        ...block.layers.flatMap((layer) => [layer.name, layer.speaker, layer.modality, layer.notes, ...layer.tags]),
-      ].join(" ");
-      return !query || normalize(text).includes(query);
-    });
-    if (!blocks.length) {
-      const empty = document.createElement("p");
-      empty.className = "corpus-empty-list";
-      empty.textContent = t("noCorpusBlocks");
-      renderVirtualListEmpty(elements.corpusItemList, corpusVirtualList, empty);
-      return;
-    }
-    renderVirtualList(elements.corpusItemList, corpusVirtualList, blocks, {
-      resetToken: corpusVirtualResetToken(viewState),
-      getKey: (block) => `block:${block.id}`,
-      getSizeCacheKey: (block) => corpusItemSizeCacheKey("block", block, viewState),
-      updateItem: (card, block) => {
-        if (card?.dataset.corpusBlockId !== block.id) return false;
-        reconcileVirtualCard(card, createCorpusBlockCard(block, viewState));
-        return true;
-      },
-      renderItem: (block) => createCorpusBlockCard(block, viewState),
-    });
-    return;
-  }
-
-  const units = corpus.units.filter((unit) => {
-    const text = [unit.content, unit.notes, ...unit.tags, ...Object.entries(unit.attributes).flat()].join(" ");
-    return !query || normalize(text).includes(query);
-  });
-  if (!units.length) {
-    const empty = document.createElement("p");
-    empty.className = "corpus-empty-list";
-    empty.textContent = t("noCorpusUnits");
-    renderVirtualListEmpty(elements.corpusItemList, corpusVirtualList, empty);
-    return;
-  }
-  renderVirtualList(elements.corpusItemList, corpusVirtualList, units, {
-    resetToken: corpusVirtualResetToken(viewState),
-    getKey: (unit) => `unit:${unit.id}`,
-    getEstimatedHeight: () => 92,
-    getSizeCacheKey: (unit) => corpusItemSizeCacheKey("unit", unit, viewState),
-    updateItem: (card, unit) => {
-      if (card?.dataset.corpusUnitId !== unit.id) return false;
-      reconcileVirtualCard(card, createCorpusUnitCard(unit, corpus, viewState));
-      return true;
-    },
-    renderItem: (unit) => createCorpusUnitCard(unit, corpus, viewState),
-  });
-}
-
-function corpusVirtualResetToken(viewState) {
-  return [state.activeDictionaryId, viewState.mode, normalize(viewState.query)].join("|");
-}
-
-function corpusItemSizeCacheKey(kind, item, viewState) {
-  return [
-    `corpus-${kind}`,
-    state.activeDictionaryId,
-    currentLanguage,
-    normalize(viewState.query),
-    viewState.mode,
-    item.id,
-    item.updatedAt,
-    item.title,
-    item.content,
-    item.notes,
-    (item.tags || []).join(","),
-    stableJson(item.attributes || {}),
-    kind === "block" ? stableJson((item.layers || []).map((layer) => ({
-      id: layer.id,
-      name: layer.name,
-      speaker: layer.speaker,
-      modality: layer.modality,
-      notes: layer.notes,
-      tags: layer.tags || [],
-    }))) : "",
-  ].map(virtualListSignaturePart).join("|");
-}
-
-function createCorpusBlockCard(block, viewState) {
-  const button = document.createElement("button");
-  const unitCount = block.unitIds.length + block.layers.reduce((sum, layer) => sum + layer.unitIds.length, 0);
-  button.className = `corpus-item-card${block.id === viewState.selectedBlockId ? " selected" : ""}`;
-  button.type = "button";
-  button.dataset.corpusBlockId = block.id;
-  button.innerHTML = `
-    <strong>${escapeHtml(block.title || t("corpusBlockFallback"))}</strong>
-    <span>${escapeHtml(formatText("corpusBlockStats", { layers: block.layers.length, units: unitCount }))}</span>
-  `;
-  return signVirtualCard(button);
-}
-
-function createCorpusUnitCard(unit, corpus, viewState) {
-  const button = document.createElement("button");
-  const parent = corpusParentsForUnit(unit.id, corpus)[0];
-  button.className = `corpus-item-card${unit.id === viewState.selectedUnitId ? " selected" : ""}`;
-  button.type = "button";
-  button.dataset.corpusUnitId = unit.id;
-  button.innerHTML = `
-    <div class="corpus-unit-name-host">${renderCorpusUnitNameHtml(unit, "card")}</div>
-    <span>${escapeHtml(formatText("corpusUnitParentLabel", { parent: corpusParentLabel(parent) }))}</span>
-  `;
-  return signVirtualCard(button);
-}
-
-function scheduleCorpusItemScroll(mode, itemId, behavior = "smooth") {
-  if (!itemId) {
-    return;
-  }
-  requestAnimationFrame(() => {
-    scrollVirtualListItemIntoView(corpusVirtualList, `${mode === "blocks" ? "block" : "unit"}:${itemId}`, behavior);
-  });
-}
-
-function renderCorpusEditor(corpus, viewState) {
-  if (viewState.mode === "blocks") {
-    const block = corpus.blocks.find((item) => item.id === viewState.selectedBlockId);
-    elements.corpusEditor.innerHTML = block
-      ? renderCorpusBlockEditor(block, corpus)
-      : `<p class="corpus-empty-editor" data-i18n="noCorpusSelection">${escapeHtml(t("noCorpusSelection"))}</p>`;
-    return;
-  }
-  const unit = corpus.units.find((item) => item.id === viewState.selectedUnitId);
-  elements.corpusEditor.innerHTML = unit
-    ? renderCorpusUnitEditor(unit, corpus)
-    : `<p class="corpus-empty-editor" data-i18n="noCorpusSelection">${escapeHtml(t("noCorpusSelection"))}</p>`;
-}
-
-function renderCorpusAttributeEditor(attributes = {}) {
-  const rows = Object.entries(attributes).map(([key, value]) => renderCorpusAttributeRow(key, value)).join("");
-  return `
-    <div class="corpus-attribute-editor" data-corpus-attributes>
-      <div class="corpus-attribute-rows">${rows}</div>
-      <button class="secondary-button" data-control-tone="accent" data-control-emphasis="outline" type="button" data-action="add-corpus-attribute" data-i18n="addAttribute">${escapeHtml(t("addAttribute"))}</button>
-    </div>
-  `;
-}
-
-function renderCorpusAttributeRow(key = "", value = "") {
-  return `
-    <div class="corpus-attribute-row">
-      <input data-field="attribute-key" data-i18n-aria-label="attributeName" data-i18n-placeholder="attributeName" aria-label="${escapeHtml(t("attributeName"))}" placeholder="${escapeHtml(t("attributeName"))}" value="${escapeHtml(key)}">
-      <input data-field="attribute-value" data-i18n-aria-label="attributeValue" data-i18n-placeholder="attributeValue" aria-label="${escapeHtml(t("attributeValue"))}" placeholder="${escapeHtml(t("attributeValue"))}" value="${escapeHtml(value)}">
-      <button class="corpus-icon-button danger" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="remove-corpus-attribute" data-app-tooltip="always" data-i18n-aria-label="removeAttribute" aria-label="${escapeHtml(t("removeAttribute"))}">×</button>
-    </div>
-  `;
-}
-
-function collectCorpusAttributes(container) {
-  if (!container) {
-    return {};
-  }
-  const attributes = {};
-  container.querySelectorAll(".corpus-attribute-row").forEach((row) => {
-    const key = row.querySelector('[data-field="attribute-key"]')?.value.trim() || "";
-    if (key) {
-      attributes[key] = row.querySelector('[data-field="attribute-value"]')?.value || "";
-    }
-  });
-  return attributes;
-}
-
-function renderCorpusBlockEditor(block, corpus) {
-  return `
-    <form class="corpus-form" data-corpus-kind="block" data-corpus-id="${escapeHtml(block.id)}" autocomplete="off">
-      <div class="form-heading compact-heading">
-        <div><p class="eyebrow" data-i18n="corpusBlock">${escapeHtml(t("corpusBlock"))}</p><h3 data-corpus-block-title-preview>${escapeHtml(block.title || t("corpusBlockFallback"))}</h3></div>
-        <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="delete-corpus-block" data-i18n="deleteCorpusBlock">${escapeHtml(t("deleteCorpusBlock"))}</button>
-      </div>
-      <label><span data-i18n="corpusBlockTitle">${escapeHtml(t("corpusBlockTitle"))}</span><input data-field="title" maxlength="160" value="${escapeHtml(block.title)}"></label>
-      <label><span data-i18n="corpusTags">${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(serializeTagList(block.tags))}"><small class="field-help" data-i18n="corpusTagsHelp">${escapeHtml(t("corpusTagsHelp"))}</small></label>
-      <label><span data-i18n="corpusNotes">${escapeHtml(t("corpusNotes"))}</span><textarea data-field="notes" rows="4">${escapeHtml(block.notes)}</textarea></label>
-      <section class="corpus-subsection">
-        <div class="subsection-title"><h3 data-i18n="corpusAttributes">${escapeHtml(t("corpusAttributes"))}</h3></div>
-        ${renderCorpusAttributeEditor(block.attributes)}
-      </section>
-      <section class="corpus-subsection">
-        <div class="subsection-title"><h3 data-i18n="directUnits">${escapeHtml(t("directUnits"))}</h3></div>
-        ${renderCorpusLinkedUnits(block.unitIds, `block:${block.id}`, corpus)}
-      </section>
-      <section class="corpus-subsection">
-        <div class="form-heading compact-heading">
-          <div><h3 data-i18n="corpusLayers">${escapeHtml(t("corpusLayers"))}</h3></div>
-          <button class="secondary-button" data-control-tone="accent" data-control-emphasis="outline" type="button" data-action="add-corpus-layer" data-i18n="addLayer">${escapeHtml(t("addLayer"))}</button>
-        </div>
-        <div class="corpus-layer-list">
-          ${block.layers.map((layer, index) => renderCorpusLayerEditor(block, layer, index, corpus)).join("")}
-        </div>
-      </section>
-    </form>
-  `;
-}
-
-function renderCorpusLayerEditor(block, layer, index, corpus) {
-  return `
-    <article class="corpus-layer-card" data-layer-id="${escapeHtml(layer.id)}">
-      <div class="corpus-layer-header">
-        <div><p class="eyebrow"><span data-i18n="corpusLayer">${escapeHtml(t("corpusLayer"))}</span> ${index + 1}</p><strong data-corpus-layer-name-preview>${escapeHtml(layer.name || t("corpusLayerFallback"))}</strong></div>
-        <div class="corpus-order-actions">
-          <button class="corpus-icon-button" data-control-tone="neutral" type="button" data-action="move-corpus-layer-up" data-app-tooltip="always" data-i18n-aria-label="moveUp" aria-label="${escapeHtml(t("moveUp"))}" ${index === 0 ? "disabled" : ""}>↑</button>
-          <button class="corpus-icon-button" data-control-tone="neutral" type="button" data-action="move-corpus-layer-down" data-app-tooltip="always" data-i18n-aria-label="moveDown" aria-label="${escapeHtml(t("moveDown"))}" ${index === block.layers.length - 1 ? "disabled" : ""}>↓</button>
-          <button class="corpus-icon-button danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="delete-corpus-layer" data-app-tooltip="always" data-i18n-aria-label="deleteCorpusLayer" aria-label="${escapeHtml(t("deleteCorpusLayer"))}">
-            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"></path></svg>
-          </button>
-        </div>
-      </div>
-      <div class="form-grid">
-        <label><span data-i18n="layerName">${escapeHtml(t("layerName"))}</span><input data-field="name" value="${escapeHtml(layer.name)}"></label>
-        <label><span data-i18n="speaker">${escapeHtml(t("speaker"))}</span><input data-field="speaker" value="${escapeHtml(layer.speaker)}"></label>
-        <label><span data-i18n="modality">${escapeHtml(t("modality"))}</span><input data-field="modality" value="${escapeHtml(layer.modality)}"></label>
-        <label><span data-i18n="corpusTags">${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(serializeTagList(layer.tags))}"><small class="field-help" data-i18n="corpusTagsHelp">${escapeHtml(t("corpusTagsHelp"))}</small></label>
-      </div>
-      <label><span data-i18n="corpusNotes">${escapeHtml(t("corpusNotes"))}</span><textarea data-field="notes" rows="3">${escapeHtml(layer.notes)}</textarea></label>
-      <div class="subsection-title"><h3 data-i18n="corpusAttributes">${escapeHtml(t("corpusAttributes"))}</h3></div>
-      ${renderCorpusAttributeEditor(layer.attributes)}
-      <div class="subsection-title"><h3 data-i18n="linkedUnits">${escapeHtml(t("linkedUnits"))}</h3></div>
-      ${renderCorpusLinkedUnits(layer.unitIds, `layer:${block.id}:${layer.id}`, corpus)}
-    </article>
-  `;
-}
-
-function renderCorpusLinkedUnits(unitIds, ownerKey, corpus) {
-  const unitsById = new Map(corpus.units.map((unit) => [unit.id, unit]));
-  const linked = unitIds.map((unitId, index) => {
-    const unit = unitsById.get(unitId);
-    return `
-      <li data-linked-unit-id="${escapeHtml(unitId)}">
-        <div class="corpus-unit-name-host${unit ? "" : " missing"}">${unit ? renderCorpusUnitNameHtml(unit, "card") : escapeHtml(unitId)}</div>
-        <div class="corpus-order-actions">
-          <button class="corpus-icon-button" data-control-tone="neutral" type="button" data-action="move-corpus-unit-up" data-app-tooltip="always" data-i18n-aria-label="moveUp" aria-label="${escapeHtml(t("moveUp"))}" ${index === 0 ? "disabled" : ""}>↑</button>
-          <button class="corpus-icon-button" data-control-tone="neutral" type="button" data-action="move-corpus-unit-down" data-app-tooltip="always" data-i18n-aria-label="moveDown" aria-label="${escapeHtml(t("moveDown"))}" ${index === unitIds.length - 1 ? "disabled" : ""}>↓</button>
-          <button class="corpus-icon-button danger" data-control-tone="danger" data-control-emphasis="outline" type="button" data-action="unlink-corpus-unit" data-app-tooltip="always" data-i18n-aria-label="unlink" aria-label="${escapeHtml(t("unlink"))}">
-            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m10 13-1 1a4 4 0 0 1-6-6l3-3a4 4 0 0 1 6 0M14 11l1-1a4 4 0 0 1 6 6l-3 3a4 4 0 0 1-6 0M3 21l3-3M18 6l3-3"></path></svg>
-          </button>
-        </div>
-      </li>
-    `;
-  }).join("");
-  const availableUnits = corpus.units.filter((unit) => !unitIds.includes(unit.id));
-  return `
-    <div class="corpus-linked-units" data-corpus-owner="${escapeHtml(ownerKey)}">
-      <ol>${linked}</ol>
-      <div class="corpus-link-row">
-        <select data-corpus-unit-link data-i18n-aria-label="chooseUnit" aria-label="${escapeHtml(t("chooseUnit"))}" ${availableUnits.length ? "" : "disabled"}>
-          <option value="" data-i18n="chooseUnit">${escapeHtml(t("chooseUnit"))}</option>
-          ${availableUnits.map((unit) => `<option value="${escapeHtml(unit.id)}">${escapeHtml(corpusUnitLabel(unit))}</option>`).join("")}
-        </select>
-        <button class="secondary-button" data-control-tone="accent" data-control-emphasis="outline" type="button" data-action="link-corpus-unit" data-i18n="linkUnit" ${availableUnits.length ? "" : "disabled"}>${escapeHtml(t("linkUnit"))}</button>
-      </div>
-      <p class="field-help" data-i18n="corpusLinkMovesUnit">${escapeHtml(t("corpusLinkMovesUnit"))}</p>
-    </div>
-  `;
-}
-
-function renderCorpusUnitEditor(unit, corpus) {
-  const parents = corpusParentsForUnit(unit.id, corpus);
-  const parent = parents[0] || null;
-  return `
-    <form class="corpus-form" data-corpus-kind="unit" data-corpus-id="${escapeHtml(unit.id)}" autocomplete="off">
-      <div class="form-heading compact-heading">
-        <div><p class="eyebrow" data-i18n="corpusUnit">${escapeHtml(t("corpusUnit"))}</p><div class="corpus-rendered-heading">${renderCorpusUnitNameHtml(unit, "content")}</div></div>
-        <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="delete-corpus-unit" data-i18n="deleteCorpusUnit">${escapeHtml(t("deleteCorpusUnit"))}</button>
-      </div>
-      <label><span data-i18n="corpusUnitContent">${escapeHtml(t("corpusUnitContent"))}</span><textarea data-field="content" rows="6">${escapeHtml(unit.content)}</textarea></label>
-      <label><span data-i18n="corpusParent">${escapeHtml(t("corpusParent"))}</span>
-        <select data-field="parent">
-          <option value="" data-i18n="corpusOrphan">${escapeHtml(t("corpusOrphan"))}</option>
-          ${corpusParentRefs(corpus).map((ref) => `<option value="${escapeHtml(ref.key)}"${parent?.key === ref.key ? " selected" : ""}>${escapeHtml(corpusParentLabel(ref))}</option>`).join("")}
-        </select>
-      </label>
-      <label><span data-i18n="corpusTags">${escapeHtml(t("corpusTags"))}</span><input data-field="tags" value="${escapeHtml(serializeTagList(unit.tags))}"><small class="field-help" data-i18n="corpusTagsHelp">${escapeHtml(t("corpusTagsHelp"))}</small></label>
-      <label><span data-i18n="corpusNotes">${escapeHtml(t("corpusNotes"))}</span><textarea data-field="notes" rows="4">${escapeHtml(unit.notes)}</textarea></label>
-      <section class="corpus-subsection">
-        <div class="subsection-title"><h3 data-i18n="corpusAttributes">${escapeHtml(t("corpusAttributes"))}</h3></div>
-        ${renderCorpusAttributeEditor(unit.attributes)}
-      </section>
-      <section class="corpus-subsection">
-        <div class="subsection-title"><h3 data-i18n="effectiveAttributes">${escapeHtml(t("effectiveAttributes"))}</h3></div>
-        <p class="field-help" data-i18n="effectiveAttributesHelp">${escapeHtml(t("effectiveAttributesHelp"))}</p>
-        ${renderCorpusEffectiveAttributes(unit, parent)}
-      </section>
-    </form>
-  `;
-}
-
-function renderCorpusEffectiveAttributes(unit, parent) {
-  const effective = new Map();
-  const apply = (attributes, sourceKey) => {
-    Object.entries(attributes || {}).forEach(([key, value]) => effective.set(key, { value, sourceKey }));
-  };
-  if (parent) {
-    apply(parent.block.attributes, "attributeSourceBlock");
-    if (parent.layer) {
-      apply(parent.layer.attributes, "attributeSourceLayer");
-    }
-  }
-  apply(unit.attributes, "attributeSourceUnit");
-  if (!effective.size) {
-    return `<p class="muted-text" data-i18n="noEffectiveAttributes">${escapeHtml(t("noEffectiveAttributes"))}</p>`;
-  }
-  return `
-    <div class="corpus-effective-table">
-      ${[...effective.entries()].map(([key, detail]) => `
-        <div><strong>${escapeHtml(key)}</strong><span>${escapeHtml(detail.value)}</span><small data-i18n="${detail.sourceKey}">${escapeHtml(t(detail.sourceKey))}</small></div>
-      `).join("")}
-    </div>
-  `;
-}
-
-function updateCorpusRecord(record, changes) {
-  const changed = Object.entries(changes).some(([key, value]) => stableJson(record[key]) !== stableJson(value));
-  if (!changed) {
-    return;
-  }
-  Object.assign(record, changes);
-  if (Object.hasOwn(record, "updatedAt")) {
-    record.updatedAt = new Date().toISOString();
-  }
-}
-
-function syncCorpusEditorToDraft() {
-  const form = elements.corpusEditor.querySelector(".corpus-form");
-  if (!form || !corpusDraftState || elements.corpusEditor.dataset.dictionaryId !== corpusDraftState.dictionaryId) {
-    return;
-  }
-  const corpus = corpusDraftState.corpus;
-  if (form.dataset.corpusKind === "block") {
-    const block = corpus.blocks.find((item) => item.id === form.dataset.corpusId);
-    if (!block) {
-      return;
-    }
-    updateCorpusRecord(block, {
-      title: form.querySelector('[data-field="title"]').value.trim(),
-      tags: parseTagListText(form.querySelector(':scope > label [data-field="tags"]').value),
-      notes: form.querySelector(':scope > label [data-field="notes"]').value,
-      attributes: collectCorpusAttributes(form.querySelector(':scope > .corpus-subsection [data-corpus-attributes]')),
-    });
-    form.querySelectorAll(".corpus-layer-card").forEach((card) => {
-      const layer = block.layers.find((item) => item.id === card.dataset.layerId);
-      if (!layer) {
-        return;
-      }
-      updateCorpusRecord(layer, {
-        name: card.querySelector('[data-field="name"]').value.trim(),
-        speaker: card.querySelector('[data-field="speaker"]').value.trim(),
-        modality: card.querySelector('[data-field="modality"]').value.trim(),
-        tags: parseTagListText(card.querySelector('[data-field="tags"]').value),
-        notes: card.querySelector('[data-field="notes"]').value,
-        attributes: collectCorpusAttributes(card.querySelector('[data-corpus-attributes]')),
-      });
-    });
-    return;
-  }
-  const unit = corpus.units.find((item) => item.id === form.dataset.corpusId);
-  if (!unit) {
-    return;
-  }
-  updateCorpusRecord(unit, {
-    content: form.querySelector('[data-field="content"]').value,
-    tags: parseTagListText(form.querySelector('[data-field="tags"]').value),
-    notes: form.querySelector('[data-field="notes"]').value,
-    attributes: collectCorpusAttributes(form.querySelector('[data-corpus-attributes]')),
-  });
-  moveCorpusUnitToParent(corpus, unit.id, form.querySelector('[data-field="parent"]').value);
-}
-
-function corpusFormIsDirty(dictionary = activeDictionary()) {
-  if (!dictionary || corpusDraftState?.dictionaryId !== dictionary.id) {
-    return false;
-  }
-  syncCorpusEditorToDraft();
-  return stableJson(corpusDraftState.corpus) !== stableJson(normalizeCorpus(dictionary.corpus));
-}
-
-async function runCorpusSaveQueue() {
-  let savedAny = false;
-  while (corpusSaveRequested) {
-    corpusSaveRequested = false;
-    const dictionary = activeDictionary();
-    if (!dictionary) {
-      return savedAny;
-    }
-    syncCorpusEditorToDraft();
-    const snapshot = cloneCorpus(ensureCorpusDraft(dictionary));
-    const saved = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/corpus`, {
-      method: "PUT",
-      body: JSON.stringify(snapshot),
-    });
-    const normalized = applyDictionaryModulePayload(saved);
-    savedAny = true;
-    clearTimeout(corpusSaveTimer);
-    corpusSaveTimer = null;
-
-    // Input may have changed the live draft while this snapshot was being saved.
-    if (
-      corpusDraftState?.dictionaryId === normalized.id
-      && stableJson(corpusDraftState.corpus) !== stableJson(normalized.corpus)
-    ) {
-      corpusSaveRequested = true;
-    }
-  }
-  return savedAny;
-}
-
-function saveCorpus(showSavedToast = true) {
-  const dictionary = activeDictionary();
-  if (!dictionary) {
-    showToast(t("createDictionaryFirstToast"));
-    return Promise.resolve(false);
-  }
-  syncCorpusEditorToDraft();
-  ensureCorpusDraft(dictionary);
-  clearTimeout(corpusSaveTimer);
-  corpusSaveTimer = null;
-  if (!corpusFormIsDirty(dictionary)) {
-    if (showSavedToast) {
-      showToast(t("noChangesToSave"));
-    }
-    return Promise.resolve(true);
-  }
-  corpusSaveRequested = true;
-  if (!corpusSavePromise) {
-    corpusSavePromise = runCorpusSaveQueue().finally(() => {
-      corpusSavePromise = null;
-    });
-  }
-  const pendingSave = corpusSavePromise;
-  if (!showSavedToast) {
-    return pendingSave;
-  }
-  return pendingSave.then((saved) => {
-    if (saved) {
-      showToast(t("corpusSaved"));
-    }
-    return saved;
-  }).catch((error) => {
-    showApiErrorToast(error, "saveFailed");
-    return false;
-  });
-}
-
-function scheduleCorpusSave() {
-  clearTimeout(corpusSaveTimer);
-  const dictionary = activeDictionary();
-  if (!dictionary || !dictionarySettings(dictionary).corpusAutoSave || !corpusFormIsDirty(dictionary)) {
-    return;
-  }
-  corpusSaveTimer = setTimeout(() => {
-    saveCorpus(false).catch((error) => console.error(error));
-  }, 700);
-}
-
-function addCorpusBlock() {
-  const dictionary = activeDictionary();
-  const corpus = ensureCorpusDraft(dictionary);
-  if (!corpus) {
-    return;
-  }
-  syncCorpusEditorToDraft();
-  const block = normalizeCorpusBlock({
-    id: uid("corpus-block"),
-    title: "",
-  });
-  corpus.blocks.push(block);
-  const viewState = activeCorpusViewState();
-  viewState.mode = "blocks";
-  viewState.selectedBlockId = block.id;
-  renderCorpus(dictionary);
-  scheduleCorpusItemScroll("blocks", block.id);
-  elements.corpusEditor.querySelector('[data-field="title"]')?.focus();
-}
-
-function addCorpusUnit() {
-  const dictionary = activeDictionary();
-  const corpus = ensureCorpusDraft(dictionary);
-  if (!corpus) {
-    return;
-  }
-  syncCorpusEditorToDraft();
-  const unit = normalizeCorpusUnit({
-    id: uid("corpus-unit"),
-    content: "",
-  });
-  corpus.units.push(unit);
-  const viewState = activeCorpusViewState();
-  viewState.mode = "units";
-  viewState.selectedUnitId = unit.id;
-  renderCorpus(dictionary);
-  scheduleCorpusItemScroll("units", unit.id);
-  elements.corpusEditor.querySelector('[data-field="content"]')?.focus();
-}
-
-function moveArrayItem(items, index, offset) {
-  const nextIndex = index + offset;
-  if (index < 0 || nextIndex < 0 || nextIndex >= items.length) {
-    return;
-  }
-  const [item] = items.splice(index, 1);
-  items.splice(nextIndex, 0, item);
 }
 
 function fillMorphologyFunctionsForm(dictionary) {
@@ -16169,7 +16319,6 @@ function quickEntryEntryDraft() {
     definitions: draft.definitions
       .map((definition) => ({
         meaning: definition.meaning.trim(),
-        example: "",
         note: "",
         tags: parseTagListText(definition.tags),
       }))
@@ -16851,7 +17000,6 @@ function applyDictionaryModulePayload(payload) {
     updatedAt: payload.updatedAt,
     ...(Object.hasOwn(payload, "settings") ? { settings: normalizeDictionarySettings(payload.settings) } : {}),
     ...(Object.hasOwn(payload, "docs") ? { docs: normalizeDocs(payload.docs) } : {}),
-    ...(Object.hasOwn(payload, "corpus") ? { corpus: normalizeCorpus(payload.corpus) } : {}),
     ...(Object.hasOwn(payload, "morphology") ? { morphology: normalizeMorphology(payload.morphology) } : {}),
   });
 }
@@ -16924,6 +17072,9 @@ async function deleteSelectedDictionary() {
     runtimeEntrySearchProfiles.delete(dictionary.id);
     if (corpusDraftState?.dictionaryId === dictionary.id) {
       corpusDraftState = null;
+    }
+    if (corpusListState?.dictionaryId === dictionary.id) {
+      corpusListState = null;
     }
     if (docsDraftState?.dictionaryId === dictionary.id) {
       docsDraftState = null;
@@ -17033,6 +17184,9 @@ function importData(event) {
         runtimeEntrySearchProfiles.delete(dictionary.id);
         if (corpusDraftState?.dictionaryId === dictionary.id) {
           corpusDraftState = null;
+        }
+        if (corpusListState?.dictionaryId === dictionary.id) {
+          corpusListState = null;
         }
         if (docsDraftState?.dictionaryId === dictionary.id) {
           docsDraftState = null;
@@ -17188,9 +17342,9 @@ function flushAutomaticModuleSaves() {
     };
   }
   if (settings.corpusAutoSave && corpusFormIsDirty(dictionary)) {
-    body.corpus = cloneCorpus(corpusDraftState.corpus);
+    body.corpusItem = { id: corpusDraftState.itemId, ...corpusDraftState.draft };
   }
-  if (!body.docs && !body.corpus) {
+  if (!body.docs && !body.corpusItem) {
     return;
   }
   const payload = JSON.stringify(body);
@@ -17942,6 +18096,16 @@ elements.qualityPanel.addEventListener("click", (event) => {
     renderQuality(activeDictionary());
     return;
   }
+  if (event.target.closest("[data-corpus-quality-more]")) {
+    void loadCorpusQualityWindow(activeDictionary(), activeQualitySubpage(), { more: true });
+    renderQuality(activeDictionary());
+    return;
+  }
+  const corpusItemButton = event.target.closest("[data-corpus-quality-item]");
+  if (corpusItemButton) {
+    openCorpusItem(corpusItemButton.dataset.corpusQualityItem).catch((error) => console.error(error));
+    return;
+  }
   const subpageButton = event.target.closest("[data-quality-subpage]");
   if (subpageButton) {
     rememberProcessScroll();
@@ -18052,52 +18216,34 @@ setupListDragSort(elements.toolNavOrderList, { item: ".tool-order-card", onMove:
 setupListDragSort(elements.entrySectionOrderList, { item: ".tool-order-card", onMove: syncEntrySectionOrderReset });
 elements.toolNavOrderResetButton.addEventListener("click", () => renderToolNavOrderEditor());
 elements.entrySectionOrderResetButton.addEventListener("click", () => renderEntrySectionOrderEditor());
-elements.corpusModeControl.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-corpus-mode]");
-  if (!button) {
-    return;
-  }
-  syncCorpusEditorToDraft();
-  const viewState = activeCorpusViewState();
-  viewState.mode = button.dataset.corpusMode;
-  renderCorpus(activeDictionary());
-  scheduleCorpusItemScroll(
-    viewState.mode,
-    viewState.mode === "blocks" ? viewState.selectedBlockId : viewState.selectedUnitId,
-    "auto",
-  );
-});
 elements.newCorpusItemButton.addEventListener("click", () => {
-  if (activeCorpusViewState().mode === "blocks") {
-    addCorpusBlock();
-  } else {
-    addCorpusUnit();
-  }
+  createCorpusItem().catch((error) => console.error(error));
 });
 elements.corpusSearchInput.addEventListener("input", () => {
-  const corpus = ensureCorpusDraft();
-  if (!corpus) {
-    return;
-  }
-  syncCorpusEditorToDraft();
-  const viewState = activeCorpusViewState();
-  viewState.query = elements.corpusSearchInput.value;
-  renderCorpusItemList(corpus, viewState);
+  clearTimeout(corpusSearchTimer);
+  corpusSearchTimer = setTimeout(() => {
+    const viewState = activeCorpusViewState();
+    viewState.query = elements.corpusSearchInput.value;
+    renderCorpusList();
+  }, 250);
 });
 elements.corpusItemList.addEventListener("click", (event) => {
-  const blockButton = event.target.closest("[data-corpus-block-id]");
-  const unitButton = event.target.closest("[data-corpus-unit-id]");
-  if (!blockButton && !unitButton) {
+  const groupButton = event.target.closest("[data-corpus-group]");
+  if (groupButton) {
+    const { collapsedGroups } = activeCorpusViewState();
+    const group = groupButton.dataset.corpusGroup;
+    if (collapsedGroups.has(group)) {
+      collapsedGroups.delete(group);
+    } else {
+      collapsedGroups.add(group);
+    }
+    renderCorpusList();
     return;
   }
-  syncCorpusEditorToDraft();
-  const viewState = activeCorpusViewState();
-  if (blockButton) {
-    viewState.selectedBlockId = blockButton.dataset.corpusBlockId;
-  } else {
-    viewState.selectedUnitId = unitButton.dataset.corpusUnitId;
+  const itemButton = event.target.closest("[data-corpus-item-id]");
+  if (itemButton) {
+    selectCorpusItem(itemButton.dataset.corpusItemId).catch((error) => console.error(error));
   }
-  renderCorpus(activeDictionary());
 });
 elements.saveCorpusButton.addEventListener("click", () => {
   saveCorpus().catch((error) => console.error(error));
@@ -18106,127 +18252,19 @@ elements.corpusEditor.addEventListener("submit", (event) => {
   event.preventDefault();
   saveCorpus().catch((error) => console.error(error));
 });
-elements.corpusEditor.addEventListener("input", (event) => {
+elements.corpusEditor.addEventListener("input", () => {
   syncCorpusEditorToDraft();
-  const form = event.target.closest('.corpus-form[data-corpus-kind="unit"]');
-  if (form && event.target.matches('[data-field="content"]')) {
-    scheduleCorpusUnitNamePreview(form.dataset.corpusId);
-  }
+  scheduleCorpusPreview();
   scheduleCorpusSave();
 });
-elements.corpusEditor.addEventListener("change", (event) => {
-  if (!event.target.matches('[data-field="parent"]')) {
+elements.corpusEditor.addEventListener("click", (event) => {
+  if (event.target.closest('[data-action="delete-corpus-item"]')) {
+    deleteCorpusItem().catch((error) => console.error(error));
     return;
   }
-  syncCorpusEditorToDraft();
-  renderCorpus(activeDictionary());
-});
-elements.corpusEditor.addEventListener("click", async (event) => {
-  const actionButton = event.target.closest("[data-action]");
-  if (!actionButton) {
-    return;
-  }
-  const action = actionButton.dataset.action;
-  if (action === "add-corpus-attribute") {
-    const editor = actionButton.closest("[data-corpus-attributes]");
-    editor.querySelector(".corpus-attribute-rows").insertAdjacentHTML("beforeend", renderCorpusAttributeRow());
-    editor.querySelector('.corpus-attribute-row:last-child [data-field="attribute-key"]')?.focus();
-    return;
-  }
-  if (action === "remove-corpus-attribute") {
-    actionButton.closest(".corpus-attribute-row")?.remove();
-    syncCorpusEditorToDraft();
-    scheduleCorpusSave();
-    return;
-  }
-
-  syncCorpusEditorToDraft();
-  const dictionary = activeDictionary();
-  const corpus = ensureCorpusDraft(dictionary);
-  if (!corpus) {
-    return;
-  }
-  const viewState = activeCorpusViewState();
-  const form = actionButton.closest(".corpus-form");
-  const block = form?.dataset.corpusKind === "block"
-    ? corpus.blocks.find((item) => item.id === form.dataset.corpusId)
-    : null;
-
-  if (action === "add-corpus-layer" && block) {
-    block.layers.push(normalizeCorpusLayer({
-      id: uid("corpus-layer"),
-    }));
-    block.updatedAt = new Date().toISOString();
-    renderCorpus(dictionary);
-    return;
-  }
-  if (action === "delete-corpus-block" && block) {
-    const confirmed = await appConfirm(t("deleteCorpusBlockConfirm"), { danger: true });
-    if (!confirmed) {
-      return;
-    }
-    corpus.blocks = corpus.blocks.filter((item) => item.id !== block.id);
-    viewState.selectedBlockId = corpus.blocks[0]?.id || "";
-    renderCorpus(dictionary);
-    return;
-  }
-  if (action === "delete-corpus-unit") {
-    const unitId = form?.dataset.corpusId || "";
-    const confirmed = await appConfirm(t("deleteCorpusUnitConfirm"), { danger: true });
-    if (!confirmed) {
-      return;
-    }
-    moveCorpusUnitToParent(corpus, unitId, "");
-    corpus.units = corpus.units.filter((unit) => unit.id !== unitId);
-    viewState.selectedUnitId = corpus.units[0]?.id || "";
-    renderCorpus(dictionary);
-    return;
-  }
-
-  const layerCard = actionButton.closest(".corpus-layer-card");
-  const layer = block && layerCard
-    ? block.layers.find((item) => item.id === layerCard.dataset.layerId)
-    : null;
-  if (action === "delete-corpus-layer" && block && layer) {
-    const confirmed = await appConfirm(t("deleteCorpusLayerConfirm"), { danger: true });
-    if (!confirmed) {
-      return;
-    }
-    block.layers = block.layers.filter((item) => item.id !== layer.id);
-    block.updatedAt = new Date().toISOString();
-    renderCorpus(dictionary);
-    return;
-  }
-  if ((action === "move-corpus-layer-up" || action === "move-corpus-layer-down") && block && layer) {
-    moveArrayItem(block.layers, block.layers.indexOf(layer), action.endsWith("up") ? -1 : 1);
-    block.updatedAt = new Date().toISOString();
-    renderCorpus(dictionary);
-    return;
-  }
-
-  const linkedUnits = actionButton.closest(".corpus-linked-units");
-  const owner = linkedUnits ? corpusOwnerByKey(linkedUnits.dataset.corpusOwner, corpus) : null;
-  if (action === "link-corpus-unit" && owner) {
-    const unitId = linkedUnits.querySelector("[data-corpus-unit-link]").value;
-    if (unitId) {
-      moveCorpusUnitToParent(corpus, unitId, owner.key);
-      renderCorpus(dictionary);
-    }
-    return;
-  }
-  const linkedItem = actionButton.closest("[data-linked-unit-id]");
-  if (!owner || !linkedItem) {
-    return;
-  }
-  const unitId = linkedItem.dataset.linkedUnitId;
-  if (action === "unlink-corpus-unit") {
-    owner.unitIds.splice(0, owner.unitIds.length, ...owner.unitIds.filter((id) => id !== unitId));
-    renderCorpus(dictionary);
-    return;
-  }
-  if (action === "move-corpus-unit-up" || action === "move-corpus-unit-down") {
-    moveArrayItem(owner.unitIds, owner.unitIds.indexOf(unitId), action.endsWith("up") ? -1 : 1);
-    renderCorpus(dictionary);
+  const entryButton = event.target.closest("[data-corpus-open-entry]");
+  if (entryButton) {
+    navigateToEntryFromReport(entryButton.dataset.corpusOpenEntry).catch((error) => console.error(error));
   }
 });
 elements.docsMarkdownInput.addEventListener("input", () => {
@@ -18488,6 +18526,33 @@ elements.languageToggleButton.addEventListener("click", async () => {
   } finally {
     elements.languageToggleButton.disabled = false;
   }
+});
+
+document.addEventListener("click", (event) => {
+  handleDefinitionExampleClick(event);
+});
+
+document.addEventListener("input", (event) => {
+  if (event.target.matches?.("[data-example-search]")) {
+    scheduleExampleSearch(event.target);
+  }
+});
+
+// Tab in the empty search fills in the lemma and searches, like Tab fills a
+// suggestion in quick entry; otherwise Tab moves focus as usual.
+document.addEventListener("keydown", (event) => {
+  const input = event.target;
+  if (event.key !== "Tab" || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey
+    || event.isComposing || !input.matches?.("[data-example-search]") || input.value) {
+    return;
+  }
+  const lemma = exampleSearchLemma(input.closest(".definition-form-card"));
+  if (!lemma) {
+    return;
+  }
+  event.preventDefault();
+  input.value = lemma;
+  runExampleSearch(input).catch((error) => console.error(error));
 });
 
 document.addEventListener("beforeinput", (event) => {

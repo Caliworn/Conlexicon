@@ -44,7 +44,6 @@ function benchmarkDictionary(size) {
         definitions: [{
           id: `def-quality-benchmark-${index}`,
           meaning: index % 17 === 0 ? "" : `meaning ${index}`,
-          example: index % 11 === 0 ? "\\gla a b\n\\glb A" : "",
         }],
         etymology: { sources: index < 3 ? sources.slice(-1) : sources },
       };

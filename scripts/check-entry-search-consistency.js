@@ -57,13 +57,26 @@ function compareEntries(left, right, sort = "lemmaAsc") {
   return lemmaCompare || idCompare;
 }
 
+// Saved examples reference corpus items; the shared matcher reads their text
+// the way entry DTOs carry it.
+function entriesWithExampleContents(dictionary) {
+  const contents = new Map((dictionary.corpus?.items || []).map((item) => [item.id, item.content]));
+  return (dictionary.entries || []).map((entry) => ({
+    ...entry,
+    definitions: (entry.definitions || []).map((definition) => ({
+      ...definition,
+      examples: (definition.examples || []).map((example) => ({ ...example, content: contents.get(example.itemId) || "" })),
+    })),
+  }));
+}
+
 function expectedEntryIds(dictionary, query = {}) {
   const searchRuntime = entrySearchModel.searchSettingsQueryOptions(dictionary.settings?.search);
   const searchFields = entrySearchModel.normalizeSearchFields(query.fields || query.searchFields);
   const fuzzyFields = entrySearchModel.normalizeFuzzyFields(query.fuzzyFields);
   const normalizedQuery = searchRuntime.normalizeText(query.q || query.query);
   const tags = splitList(query.tags).map(searchNormalizationModel.normalizeStructuralKey);
-  return [...(dictionary.entries || [])]
+  return entriesWithExampleContents(dictionary)
     .filter((entry) => {
       if (normalizedQuery && !entrySearchModel.entryMatchesSearchText(entry, dictionary, query.q || query.query, {
         fields: searchFields,
@@ -126,6 +139,15 @@ function searchConsistencyDictionary() {
   return normalizeDictionary({
     id: "dict-entry-search-consistency",
     name: "Entry Search Consistency",
+    // Examples are linked corpus items; search reads their text.
+    corpus: {
+      items: [
+        { id: "corpus-example-token", content: "ExampleToken" },
+        { id: "corpus-example-left", content: "f" },
+        { id: "corpus-example-right", content: "ar" },
+        { id: "corpus-example-phrase", content: "Example Phrase Inside Value" },
+      ],
+    },
     tagRegistry: [
       { tag: "n", partOfSpeech: true },
       { tag: "v", partOfSpeech: true },
@@ -157,7 +179,7 @@ function searchConsistencyDictionary() {
         definitions: [{
           id: "def-alpha-root",
           meaning: "CommonToken DefinitionToken",
-          example: "ExampleToken",
+          examples: [{ itemId: "corpus-example-token" }],
           note: "DefinitionNoteToken",
         }],
         notes: "EntryNoteToken",
@@ -194,9 +216,9 @@ function searchConsistencyDictionary() {
         lemma: "SeparateSearchValues",
         tags: ["TagLeftMarker", "TagRightMarker"],
         definitions: [
-          { id: "def-separate-left", meaning: "DefinitionLeftMarker", example: "f", note: "NoteLeftMarker" },
-          { id: "def-separate-right", meaning: "DefinitionRightMarker", example: "ar", note: "NoteRightMarker" },
-          { id: "def-single-phrase", meaning: "Phrase Inside Value", example: "Example Phrase Inside Value" },
+          { id: "def-separate-left", meaning: "DefinitionLeftMarker", examples: [{ itemId: "corpus-example-left" }], note: "NoteLeftMarker" },
+          { id: "def-separate-right", meaning: "DefinitionRightMarker", examples: [{ itemId: "corpus-example-right" }], note: "NoteRightMarker" },
+          { id: "def-single-phrase", meaning: "Phrase Inside Value", examples: [{ itemId: "corpus-example-phrase" }] },
         ],
         notes: "EntryNoteMarker",
         etymology: {

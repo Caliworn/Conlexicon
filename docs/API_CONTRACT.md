@@ -16,7 +16,7 @@
     "code": "duplicate_entity_ids",
     "message": "Duplicate dictionary entity IDs: ...",
     "details": {
-      "duplicates": [{ "id": "shared-id", "types": ["entry", "corpusUnit"] }]
+      "duplicates": [{ "id": "shared-id", "types": ["entry", "corpusItem"] }]
     }
   }
 }
@@ -56,7 +56,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 ### 请求体大小限制
 
 - 普通单对象与设置端点最多接受 5 MiB 请求体，包括全局偏好、新建词典、词典 metadata、普通设置、IPA 设置以及单词条新建/保存。
-- 模块级或批量保存端点最多接受 32 MiB，包括 `autosave`、语言文档、语料库、形态学和批量词条 patch。
+- 模块级或批量保存端点最多接受 32 MiB，包括 `autosave`、语言文档、形态学和批量词条 patch。
 - JSON 导入端点最多接受 64 MiB。该上限只控制 HTTP 请求边界；导入仍会经历 JSON 解析、legacy migration 和规范化，不能据此推断峰值内存等于文件大小。
 - 后端会用合法的 `Content-Length` 提前拒绝明显超限请求，同时继续按实际收到的字节流累计检查；缺失、伪造或偏小的声明长度不能绕过上限。超限统一返回 `request_body_too_large`，并在 `details.limitBytes` 中给出当前端点的字节上限。
 
@@ -78,7 +78,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `GET` | `/api/export?dictionaryId=&format=&profile=` | 导出数据 | 当前支持 JSON 完整词典 payload | 默认 `format=json&profile=legacy-json`；`profile=portable-json` 当前只是同结构兼容别名，不代表已有独立 portable 格式。原生 SQLite 与 XLSX 导出尚未实装。 |
 | `POST` | `/api/import?overwrite=&regenerateId=&profile=` | 导入 JSON | 应用状态 | 默认 `profile=legacy-json`；完整快照导入会通过转换服务执行 legacy 兼容解析、搜索自定义规则检查、规范化和实体 ID 检查。`regenerateId=true` 生成新的词典 UUID，按非覆盖方式新建，忽略 `overwrite`。 |
 | `POST` | `/api/dictionaries` | 新建词典 | 完整词典 JSON | 后端生成词典 UUID，并使用非覆盖式创建；ID 已存在时返回 `dictionary_id_exists`。创建成功后设为当前词典。 |
-| `GET` | `/api/dictionaries/:id` | 读取当前词典工作区 | `{ id, name, language, description, settings, docs, corpus, morphology, createdAt, updatedAt, summary }`，不含 `entries` | 前端启动或切换当前词典时加载；模块为存储中的原样，前端在进入状态时规范化。词条只经 `/entries`、单词条、关系和各查询端点读取，前端不保存整本词条。完整词典（含词条）只经 `/api/export` 导出。 |
+| `GET` | `/api/dictionaries/:id` | 读取当前词典工作区 | `{ id, name, language, description, settings, docs, morphology, createdAt, updatedAt, summary }`，不含 `entries` 和语料 | 前端启动或切换当前词典时加载；模块为存储中的原样，前端在进入状态时规范化。词条只经 `/entries`、单词条、关系和各查询端点读取，前端不保存整本词条。完整词典（含词条）只经 `/api/export` 导出。 |
 | `POST` | `/api/dictionaries/:id/activate` | 切换当前词典 | 应用状态 | 只改 `index.json` 中的当前词典。 |
 | `DELETE` | `/api/dictionaries/:id` | 删除词典 | 应用状态 | 删除词典文件并更新索引。 |
 
@@ -89,10 +89,27 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `PUT` | `/api/dictionaries/:id/meta` | 保存词典名称、语言、描述 | 词典 metadata payload | 不做实体 ID 检查；响应包含 `id/name/language/description/createdAt/updatedAt`。 |
 | `PUT` | `/api/dictionaries/:id/settings` | 保存其他设置 | `{ id, updatedAt, settings }` | 不做实体 ID 检查；会保留既有 IPA 设置。`settings.search` 含字段级 `enabled/fuzzy`、`etymologyAutocomplete.fuzzy`，以及 `normalization: { unicodeNormalization: "none" | "nfc", caseFolding: boolean, customRules: { canonical, variants[] }[] }`。规范化默认严格关闭；自定义规则按最长变体优先且单次应用。前端据此生成读取 API 参数，并同步用于词根模式、搜索摘要/高亮、字段命中计数和词源自动补全。`settings.tagListSeparatorStyle` 支持 `commaSpace`、`fullwidthComma`、`ideographicComma`，只控制标签列表输入框重新显示时的分隔符。`settings.search.normalization.customRules` 必须是数组，每条规则须有非空的 `canonical` 和非空的 `variants`，同一变体不能对应不同的标准形式；任何一条不合规都整次拒绝，返回 400 `invalid_search_normalization_rule`（规则无效时运行期会忽略全部自定义规则，所以不接受部分保存）。`settings.toolNavOrder` 与 `settings.entrySectionOrder` 由服务端保留合法项顺序、去掉重复与未知项并补齐缺项；未知 settings 字段原样保留。 |
 | `PUT` | `/api/dictionaries/:id/docs` | 保存语言文档 | `{ id, updatedAt, docs }` | 不做实体 ID 检查。 |
-| `PUT` | `/api/dictionaries/:id/corpus` | 保存语料库模块 | `{ id, updatedAt, corpus }` | 检查语料内部实体 ID 重复，不查词条与形态。 |
 | `PUT` | `/api/dictionaries/:id/morphology` | 保存自动形态学模块 | `{ id, updatedAt, morphology }` | 请求仍表示完整替换形态模块；后端检查提交内组与表 ID 不重复（不查词条与语料）、规则语法和函数配置，并按稳定组/表 ID 增量写入模板。纯名称、说明、表格标题或行列标签变化不重建生成投影；规则、函数、表结构或自动分配变化只重建实际受影响词条的形态搜索 projection。完全相同的规范化 payload 作为 no-op 返回既有 `updatedAt`。删除组、删除/移动表格或缩小表格会使既有词条形态组或覆写悬空时返回 `morphology_references_in_use`。 |
 | `PUT` | `/api/dictionaries/:id/settings/ipa` | 保存自动 IPA 设置 | `{ id, updatedAt, settings }` | 请求体是 `settings.ipa` 的字段，可另带 `ipaKeyboard`，两者在同一事务里写入 `settings`；不带时保留已有键盘。IPA 映射是按顺序保存的纯文本规则 `{ from, to, before, after }`，没有实体 ID，也不参与实体 ID 防撞。`syllable.vowels`、`onsetClusters`、`codaClusters`、`complexPhonemes` 都是字符串数组；写入字符串或含分隔符的数组项时，按空白、逗号、顿号拆开。 |
-| `POST` | `/api/dictionaries/:id/autosave` | 页面卸载时保存文档/语料草稿 | `{ id, updatedAt, docs?, corpus? }` | 当前只分发 `docs` 和 `corpus`；请求至少须携带其中一个有效对象，否则返回 `invalid_autosave_payload`。 |
+| `POST` | `/api/dictionaries/:id/autosave` | 页面卸载时保存文档／正在编辑的语料 | `{ id, updatedAt, docs?, corpusItem? }` | `corpusItem` 为 `{ id, name, group, content }`，按 `PUT /corpus/items/:itemId` 保存；请求至少须携带 `docs` 或带 `id` 的 `corpusItem`，否则返回 `invalid_autosave_payload`。 |
+
+### 语料与例句连接
+
+语料存于 `corpus_items`，一句一条；例句连接存于 `definition_examples`（schema 见 [SQLite 后端规范](SQLITE_BACKEND_SPEC.md#52-词条核心)）。
+
+| 方法 | 路径 | 用途 | 响应 | 说明 |
+| --- | --- | --- | --- | --- |
+| `GET` | `/api/dictionaries/:id/corpus/groups` | 分组概览 | `{ groups: [{ name, count }] }` | 有名分组按名称排序，未分组（`name: ""`）排在最后。 |
+| `GET` | `/api/dictionaries/:id/corpus/items` | 按窗口读取语料 | `{ items, pageInfo: { total, limit, windowOffset, hasMore } }` | 参数 `q`、`group`、`offset`（默认 0）、`limit`（1–200，默认 100），越界返回 `invalid_corpus_query`。无 cursor：每次直接 SQL count 和分页。顺序为分组名、组内位置、ID。`q` 对派生列 `normalized_text` 做子串匹配，查询词和该列都经词典的搜索规范化。`group` 为空串时只读未分组。 |
+| `POST` | `/api/dictionaries/:id/corpus/items` | 新建语料 | 201，`{ id, updatedAt, item }` | 请求体 `{ item: { name?, group?, content? } }`，字段须为字符串，否则 `invalid_corpus_payload`；ID 由服务端生成，追加到分组末尾。 |
+| `GET` | `/api/dictionaries/:id/corpus/items/:itemId` | 读取一条语料及位置 | `{ item, location: { group, index } }` | `index` 是组内位置，用于打开该条所在的窗口；不存在返回 404 `corpus_item_not_found`。 |
+| `PUT` | `/api/dictionaries/:id/corpus/items/:itemId` | 保存一条语料 | `{ id, updatedAt, item }` | 名称与分组去掉首尾空白；改分组时追加到新分组末尾；内容变化时重写连接它的词条的搜索投影。 |
+| `DELETE` | `/api/dictionaries/:id/corpus/items/:itemId` | 删除语料 | `{ id, updatedAt, entryIds }` | 有连接时返回 409 `corpus_item_linked`，`details.links` 列出受影响的释义；带 `unlink=true` 时先解除连接并更新这些词条的 `updatedAt` 与搜索投影，`entryIds` 为受影响词条。 |
+| `GET` | `/api/dictionaries/:id/corpus/items/:itemId/links` | 读取连接的释义 | `{ links: [{ entryId, lemma, definitionId, definitionPosition, meaning }] }` | 按词形排序。 |
+
+语料 DTO 为 `{ id, name, group, content, linkCount, createdAt, updatedAt }`。语料写入都使查询会话 generation 前进，语料库质量会话随之失效。
+
+词条详情 DTO 的 `definitions[].examples` 为 `[{ itemId, content }]`，按连接顺序排列，`content` 是语料原文。保存词条时每项为 `{ itemId }`（可附带 `content`，服务端忽略）或 `{ content }`：后者是在释义里新写的例句，服务端在同一事务中建成一条无名称、未分组的语料并连接。同一释义内重复的 `itemId` 只保留首个；指向不存在语料的 `itemId` 返回 400 `corpus_item_not_found`。词条摘要 DTO 不带例句。
 
 ### 词条读取与保存
 
@@ -197,7 +214,6 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 - 普通保存只检查数据库键无法拒绝的提交范围，重复返回 `duplicate_entity_ids_scoped`：
   - 词条保存不做 ID 检查：释义 ID 重复由主键约束失败并整体回滚；新建撞上已有词条 ID 时返回 409，不覆盖。
   - 形态保存在生成写入计划前拒绝提交内重复的组／表 ID：写入计划按 ID 建索引，重复会被静默合并。
-  - 语料保存检查语料块、层和单元之间的重复：语料存为整块 JSON，没有主键约束。
   - IPA 映射没有实体 ID；元数据、普通设置和语言文档保存不做 ID 检查。
 - 全量重复 ID 诊断和自动修复属于未来诊断/修复模块，不应混入普通保存路径。
 
@@ -235,7 +251,11 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `invalid_search_normalization_rule` | 设置保存、带 settings 的批量 patch 或导入中的搜索自定义规则无效，整次拒绝。`details.errors` 为 `{ index, variantIndex?, variant?, code }[]`，`code` 为 `invalid_rules`（规则列表不是数组）、`invalid_rule`、`invalid_canonical`、`empty_canonical`、`invalid_variants`、`empty_variants`、`invalid_variant`、`empty_variant` 或 `conflicting_variant`，与设置表单的本地检查相同，前端复用同一组提示。 |
 | `invalid_docs_payload` | 语言文档请求体格式无效。 |
 | `invalid_corpus_payload` | 语料请求体格式无效。 |
-| `invalid_autosave_payload` | autosave 请求未携带有效 docs 或 corpus 对象。 |
+| `invalid_corpus_query` | 语料窗口的 `offset` 或 `limit` 无效。 |
+| `corpus_item_not_found` | 语料不存在，或词条保存的例句指向不存在的语料（`details.itemIds`）。 |
+| `corpus_item_linked` | 删除的语料仍被释义连接；`details.links` 列出受影响的释义。 |
+| `invalid_example_reference` | 导入文件中的例句指向文件里不存在的语料。 |
+| `invalid_autosave_payload` | autosave 请求未携带有效的 docs 或 corpusItem。 |
 | `invalid_query_window_offset` | 查询窗口 offset 不是非负安全整数。 |
 | `invalid_entry_query_limit` | 词条、feature-result 或质量查询 limit 不在 1–200 范围内。 |
 | `invalid_root_group_query_limit` | 父级词根组查询 limit 不在 1–100 范围内。 |
@@ -272,7 +292,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 - 普通保存优先增加细粒度端点，不再回退到完整词典 PUT。
 - `GET /api/state` 是轻量启动状态入口；普通启动只应读取词典 metadata/summary，再通过 `GET /api/dictionaries/:id` 或专用读取端点按需加载当前词典内容。
 - 新的分析与功能结果走 repository 查询、`/analysis/query`、feature result 或质量服务，不让前端扫描大型完整快照；Gloss 分析在例句—语料链接边界确定后再接入。
-- 当前不引入词典级 revision。对象级乐观锁与语料细粒度 changeset 的设想见 [API Drafts](API_DRAFTS.md)。
+- 当前不引入词典级 revision。对象级乐观锁的设想见 [API Drafts](API_DRAFTS.md)。
 
 ## 读取 API
 
@@ -303,7 +323,7 @@ GET /api/dictionaries/:id/entries?filter=&q=&fields=&fuzzyFields=&part=&tags=&ta
   - `pronunciation`：发音 / IPA；
   - `tags`：词条标签和释义标签的原始值与显示替换值（词性也是标签）；
   - `definitions`：释义文本；
-  - `examples`：当前词条内嵌例句；后续例句升级为语料链接后，该字段应继续表示“与词条关联的例句文本”，来源可包含嵌入字段和链接语料；
+  - `examples`：释义连接的语料文本，经 `glossSearchText()` 去掉行内格式，包含各层、纯文本行与注释；
   - `notes`：词条备注、释义备注和词条形态组备注；
   - `etymology`：词源描述和来源文本；
   - `morphology`：按当前形态表设置动态生成的形态形式，以及词条级形态 override。
@@ -428,7 +448,7 @@ SQLite projection 查询中，带 `q` 的分页结果会为每个命中词条附
 
 `/root-groups` 带搜索时复用相同的静态/形态 projection 匹配 SQL，但只消费去重命中 ID，不执行普通词条列表所需的排序；命中集合随后映射到独立缓存的稳定词根拓扑。该路径不接受或物化一份来自拓扑的全词典候选 ID 数组。
 
-未来例句迁移为语料连接后，`examples` record 仍以对应释义作为列表展示定位；来源定位的调整见[轻量语料库计划](CORPUS_LIGHTWEIGHT_PLAN.md)，当前 record 形状不预留。
+`examples` record 的 `sourceType` 为 `definitionExample`，`sourceId` 为释义 ID，`sourcePosition` 为例句在该释义内的位置，因此同一释义的多条例句各占一条 record。
 
 形态搜索不是简单读取持久化字段。词条使用 `morphologyMode: "auto" | "manual"`：`auto` 先按自动分配规则得出有序模板组，再按真实 `templateGroupId` 合并该词条的 overlay；`manual` 按词条形态组 position 使用显式模板组，空列表表示明确不使用形态。随后遍历组内全部子表，逐格读取以真实子表 ID 分层的 override；没有 override 时用词形、形态规则和形态函数动态生成默认形式。`templateGroupId` 不再接受 `"auto"` 或 `"none"` 伪值；旧 JSON 的转换只发生在导入迁移。
 
@@ -443,7 +463,7 @@ SQLite projection 查询中，带 `q` 的分页结果会为每个命中词条附
 - 词条标签和释义标签的每个值都已登记，由外键保证。运行期写入在写标签行之前把新值登记到普通区末尾，同一次写入里的多个新标签按输入顺序：词条标签在前，然后按释义顺序。新标签一律进普通区。
 - 除了 `delete` 操作，任何操作都不删除登记行；不再被使用的标签留在表中，`entryCount` 为 0。
 - 标签身份是去首尾空白后的原始字符串，逐字符比较，不做大小写折叠或 Unicode 规范化。
-- 语料块、语料层、语料单元的标签不进入登记表。形态模板组的 `matchTags` 不写入登记表，也不计入使用数。
+- 形态模板组的 `matchTags` 不写入登记表，也不计入使用数。
 
 #### 读取
 
@@ -984,7 +1004,7 @@ assignment 的两个计数互斥且和为 `inputEntryCount`；每个 mode 行的
 
 feature result 与质量结果都在请求内同步构建。只有满足任一条件时，才独立复评进程内 deferred execution（只增加 `deferred / running / failed` 状态、取消/去重和轮询或推送，进程重启后由 descriptor 重提）：代表性 10k 数据冷构建 p95 持续超过 500 ms；event-loop delay 持续超过 100 ms 并影响同进程保存或查询；外部音系引擎只能以长时 Promise、子进程或远程调用工作；用户导航或取消后仍须等待无用计算结束。`scripts/benchmark-feature-result-session.js` 测量 10k/30k 冷热耗时。
 
-不做：自动生成 IPA 的持久化列、派生表或历史版本；通用后台任务框架、持久化 job queue 与跨重启恢复；通用分析 DSL 或任意布尔 feature expression；会话的单词条增量维护（写入后按 generation 整体失效，重建成本成为真实瓶颈后再设计）。Gloss 不作为 feature source：当前只由质量规则读取，例句迁移为语料链接后按阶段 C 计划升级输入。
+不做：自动生成 IPA 的持久化列、派生表或历史版本；通用后台任务框架、持久化 job queue 与跨重启恢复；通用分析 DSL 或任意布尔 feature expression；会话的单词条增量维护（写入后按 generation 整体失效，重建成本成为真实瓶颈后再设计）。Gloss 不作为 feature source：只由语料库质量读取。
 
 source、version、options、response mode、category、分布 value、page 与搜索字段验证失败分别使用 `invalid_feature_result_source`、`unsupported_feature_result_source`、`invalid_feature_result_source_version`、`invalid_feature_result_source_options`、`invalid_feature_result_response_mode`、`invalid_feature_result_category`、`invalid_feature_result_value` 或既有 EntryQuery 校验码。summary 模式携带 `view` 或 `page` 时返回 `invalid_feature_result_summary_request`；location 缺少目标 ID 时返回 `invalid_feature_result_location_entry_id`。
 
@@ -1021,18 +1041,16 @@ source 固定为 `{ type: "dictionaryQuality", version: 1, options: {} }`，`res
 
 基础会话以 `{ dictionaryId, generation, source }` 为身份，同一 generation 下的 summary、全部 selector、搜索、排序、窗口和 location 共用一次规则构建；UI 语言不属于请求或身份。会话放在独立的有界 `FeatureResultSessionCache` 实例中（TTL/LRU、in-flight 合并），写入使 generation 前进后旧会话不再命中，旧 cursor 返回 `query_cursor_stale`。每个视图的有序成员在会话内按 LRU 缓存最多 12 个。会话、issue `id` 和 cursor 都只在当前进程内有效（cursor 带进程纪元），规则改动随代码重启生效，因此身份里不带规则版本；以后若要把质量结果或 issue `id` 保存到进程之外，再另行设计版本或指纹。
 
-规则输入由 repository 的 `qualityInputRecords()` 一次同步读取：词条 `id / lemma / pronunciation`、有序标签、释义 `id / meaning / example / tags`、有序来源 `entryId / text`（顺序与公开词条 DTO 相同）；紧接着由 `qualityInputSettings()` 读取规则用到的唯一设置 `partOfSpeechTags`。不读取备注、词源描述、形态、语料、语言文档或完整 snapshot；repository 不生成质量 code、严重度或详情。HTTP 响应不携带全局问题的关联词条 ID 数组或任何完整匹配 ID 数组。
+规则输入由 repository 的 `qualityInputRecords()` 一次同步读取：词条 `id / lemma / pronunciation`、有序标签、释义 `id / meaning / tags`、有序来源 `entryId / text`（顺序与公开词条 DTO 相同）；紧接着由 `qualityInputSettings()` 读取规则用到的唯一设置 `partOfSpeechTags`。不读取备注、词源描述、形态、语料、语言文档或完整 snapshot；repository 不生成质量 code、严重度或详情。HTTP 响应不携带全局问题的关联词条 ID 数组或任何完整匹配 ID 数组。
 
 source、version、options、response mode、item kind、selector 与 issue 视图字段验证失败分别返回 `invalid_quality_source`、`unsupported_quality_source`、`invalid_quality_source_version`、`invalid_quality_source_options`、`invalid_quality_response_mode`、`invalid_quality_view`、`invalid_quality_item_kind`、`invalid_quality_selector`、`invalid_quality_issue_view`；请求体不是对象时返回 `invalid_quality_query_payload` 或 `invalid_quality_location_payload`，location 缺少目标 ID 时返回 `invalid_quality_location_entry_id`，page 与搜索字段沿用既有 EntryQuery 校验码。未知词典返回 `dictionary_not_found`。
 
 ##### 规则
 
-严重度顺序固定为 `high / medium / low`，模块顺序固定为 `lemma / tags / ipa / network / gloss / other`。
+严重度顺序固定为 `high / medium / low`，模块顺序固定为 `lemma / tags / ipa / network / other`。Gloss 检查属于语料库质量，见下文。
 
 | Code | 严重度 | 模块 | 范围 | 稳定参数 |
 | --- | --- | --- | --- | --- |
-| `gloss_incomplete` | medium | gloss | entry/definition | `definitionId`、`definitionPosition`、`missingFields` |
-| `gloss_alignment_mismatch` | medium | gloss | entry/definition | `definitionId`、`definitionPosition`、`glaCount`、`glbCount` |
 | `duplicate_lemma` | high | lemma | entry/cross-entry | `lemmas`、`duplicateEntryCount` |
 | `near_duplicate_tags` | low | tags | global | `forms`；会话内部另保存受影响词条集合 |
 | `display_label_conflict` | low | tags | global | `displayLabel`、`forms`；会话内部另保存受影响词条集合 |
@@ -1057,9 +1075,23 @@ source、version、options、response mode、item kind、selector 与 issue 视�
 - 服务端只返回稳定字段；前端（`app.js` 的 `qualityIssueText()`）按 code 与 params 生成标题和详情。UI 语言不属于质量计算身份：中英文只改变标题、详情和标签，不改变 code、参数、数量或成员；切换语言只重新渲染已取回的结果，不重新请求、不失效会话。
 - 词形、标签和来源匹配使用固定的服务端关系规范化基线，不读取自由文本搜索的 NFC、case folding 或自定义等价设置。
 
+##### 语料库质量
+
+`POST /quality/query` 的 source 为 `{ type: "corpusQuality", version: 1, options: {} }` 时读取语料库质量，由 `lib/corpus-quality-service.js` 处理，与词条质量互不读取对方的输入。会话以 `{ dictionaryId, generation, source }` 为身份，放在独立的 `FeatureResultSessionCache` 中，只在被请求时构建；规则输入是 `corpusQualityInput()` 读取的全部语料。
+
+- **summary**：`{ inputItemCount, issueCount, itemCount, codes: [{ key, issueCount, itemCount }] }`。
+- **items**：`view` 为 `{ itemKind: "corpusItem", selector: { group: "all" } | { group: "code", value } }`，`page` 为 `{ offset, limit }`（limit 1–200，默认 100）；窗口项为 `{ item: { id, name, group, content }, issues }`，顺序与语料列表相同，`pageInfo` 为 `{ total, limit, windowOffset, hasMore }`。不支持 location；`/quality/location` 收到该 source 返回 `invalid_quality_item_kind`。
+
+| Code | 严重度 | 稳定参数 |
+| --- | --- | --- |
+| `gloss_unparsed` | medium | `problems`：解析器的提示列表（`unknown_command` 带 `command`，`duplicate_level` 带 `level`，`stray_line`） |
+| `gloss_incomplete` | medium | `missingFields`：缺少的 `gla`、`glb`、`ft` |
+| `gloss_alignment_mismatch` | medium | `glaCount`、`glbCount` |
+
+规则读取 `\gla / \glb / \glc / \ft` 及别名 `\a / \b / \c / \glft`（解析在 `lib/gloss-model.js`，前后端共用；切词只看花括号外的空白，行内格式命令不改变项数）。只有至少一层存在时才检查完整性和对齐；纯文本语料与没有连接的语料不产生问题。一条语料无论被多少释义连接，每个问题只报告一次。
+
 ##### 规则边界行为
 
-- **Gloss**：规则读取当前 `definitions.example` 中的 `\gla / \glb / \glc / \ft` 及其别名 `\a / \b / \c / \glft`（解析在 `lib/gloss-model.js`，前后端共用；切词只看花括号外的空白，行内格式命令不改变项数）。只有至少一层存在时才检查；无法完整解析的内容仍按已识别的层检查，解析提示目前只在界面显示。这只冻结质量检查语义，不为例句—语料链接建立存储契约；存储模型变化时必须同步修改输入 adapter。
 - **来源循环**：来源链最终进入循环的词条也产生 `source_cycle`，issue 不只属于循环参与者；`cycleEntryIds / cycleLemmas` 只记录实际循环见证，并重复首节点闭合路径。实现消费 `etymology-graph-model` 的强连通分量，按分量拓扑序记忆化传播，O(V+E)：
   - 每个循环分量（成员数大于 1；保存校验拒绝自引用）只有一条规范见证：从分量内 ID 最小的成员出发，按来源位置顺序在分量内深度优先，第一条回到起点的边闭合见证；
   - 循环分量的成员都引用本分量的见证，其他词条按自身来源位置顺序，取第一个能到达循环的来源所继承的见证；

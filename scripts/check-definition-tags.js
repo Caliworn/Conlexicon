@@ -325,7 +325,7 @@ async function checkJsonImport(repository) {
       lemma: "json",
       tags: [],
       definitions: [
-        { id: "def-json-tag-only", meaning: "", example: "", note: "", tags: ["n"] },
+        { id: "def-json-tag-only", meaning: "", note: "", tags: ["n"] },
         { id: "def-json-legacy", meaning: "old" },
       ],
     }],

@@ -74,18 +74,18 @@ Legacy JSON 导入应分为几个明确阶段：
    - 判断是不是可识别词典。
    - 拒绝非对象、空对象或明显不是词典的结构。
 2. legacy 兼容迁移。
-   - 由 `lib/legacy-dictionary-migration.js` 处理旧字段，例如旧释义/例句字段、旧来源文本字段、旧 corpus 字段、旧 IPA `stressMappings`、旧 IPA 字符串 `syllable.vowels`（有空格、逗号或顿号时按分隔符拆成数组，和运行时读取一致；没有时逐字符拆开，基字保留组合附加符）、旧设置字段，以及旧形态 `morphology.tables` / `entry.morphology` 结构。
+   - 由 `lib/legacy-dictionary-migration.js` 处理旧字段，例如旧释义/例句字段（`definition.example` 转成未分组语料并连接，相同文本不合并）、旧来源文本字段、旧语料块与单元（块转成分组，单元保留 ID 和顺序，层名、发言人、模态、备注、标签与属性转成 `%` 注释行，被多处链接的单元保留首处并记 warning）、旧语料渲染设置（单元标题的渲染对象优先）、旧 IPA `stressMappings`、旧 IPA 字符串 `syllable.vowels`（有空格、逗号或顿号时按分隔符拆成数组，和运行时读取一致；没有时逐字符拆开，基字保留组合附加符）、旧设置字段，以及旧形态 `morphology.tables` / `entry.morphology` 结构。
    - 记录发生过的 legacy 字段转换。
    - 迁移会移除旧的空释义；判断"空"时也看释义标签 `definitions[].tags`，因此当前格式中只有标签的释义会保留。旧 JSON 没有释义标签。
    - 文件没有 `tagRegistry` 时，由 `partOfSpeechTags`、`tagSortOrder`、`tagDisplayMap`、`redHighlightTags` 和词典中实际在用的标签生成登记表，并从 settings 移除这四项（见 5.1）。
 3. 规范化。
    - 补齐缺失 ID。
-   - 规范化当前形状的 settings、docs、corpus、morphology、IPA、entries、definitions（含可选的释义标签 `tags`，缺省为 `[]`）、sources、tags。
+   - 规范化当前形状的 settings、docs、corpus（`{ items: [{ id, name, group, content, createdAt, updatedAt }] }`）、morphology、IPA、entries、definitions（含可选的释义标签 `tags`，缺省为 `[]`；例句 `examples: [{ itemId }]`）、sources、tags。
    - 规范化标签登记表：同一标签保留首行，词性区排在普通区之前，与自身相同的显示名按空保存；文件中在用但未登记的标签按首次出现追加到普通区末尾。
    - 对错误词典 ID 提供“作为新词典导入并重新生成 ID”的路径。
 4. 校验。
    - 完整实体 ID 唯一性。
-   - 语料父子关系、顺序字段、模块结构。
+   - 例句连接指向文件中存在的语料，否则返回 `invalid_example_reference`。
    - 形态语法、IPA 映射规则等已有模块校验。
    - `tagRegistry` 是数组，每行标签非空且不重复，`partOfSpeech` 是布尔值，`displayLabel` 是字符串，`color` 是合法颜色名；不合规返回 `invalid_tag_registry`，整次拒绝。不校验分隔符：数组形式的写入和导入本来就不拆分，已有数据可能含这类标签，校验会让导出的文件无法再导入。
 5. 写入 SQLite。
@@ -215,12 +215,12 @@ JSON 导出顶层带 `tagRegistry`（含未使用的行，不含 `displayAmbiguo
 | 词典 ID 已存在 | 需要覆盖确认。 |
 | 实体 ID 重复 | 拒绝迁移该词典，报告重复类型和位置；后续诊断修复模块可提供修复。 |
 | legacy 字段被转换 | 迁移成功但写入 warning。 |
-| 语料结构错误 | 拒绝或降级为 warning 需谨慎，默认拒绝更安全。 |
+| 例句指向不存在的语料 | 拒绝，返回 `invalid_example_reference`。 |
 | 未识别字段 | 当前 normalized dictionary 只保留受支持的当前字段，尚无通用未知字段保留机制。扩展外部格式前，应在对应 import adapter 中显式映射或报告未识别字段，不能把“无损保留未知字段”写成现有保证。 |
 
 诊断修复模块可以复用迁移 report 的结构，但不要把未解析来源等普通质量检查问题塞进迁移诊断。迁移诊断只处理“会影响数据能否安全进入 canonical storage”的问题。
 
-在语料库尚未正式 SQL 化之前，`corpus` 仍作为 module blob 保存，但其 block、layer、unit ID 仍属于全局实体 ID 命名空间。完整导入与迁移把 corpus blob 内部 ID 纳入全量跨类型唯一性检查；语料模块保存只检查语料内部重复，词条、普通设置和文档保存不检查 corpus ID（规则见 [API Contract](API_CONTRACT.md#实体-id-校验约定)）。repository contract 覆盖导入时 corpus ID 与词条／释义 ID 互撞和语料保存时的内部重复，避免后续 SQLite 下推或语料库重构时绕过该规则。
+语料条目 ID 属于全局实体 ID 命名空间，完整导入与迁移把它纳入全量跨类型唯一性检查；运行期新建语料由服务端生成 ID（规则见 [API Contract](API_CONTRACT.md#实体-id-校验约定)）。导出写出全部语料，顺序为分组名、组内位置、ID；例句只写 `{ itemId }`。
 
 ## 10. 当前策略与回滚
 
@@ -231,7 +231,6 @@ JSON 导出顶层带 `tagRegistry`（含未使用的行，不含 `displayAmbiguo
 3. 启动时不扫描、不自动迁移旧 JSON data，也不静默原地改写真实 `data/`。
 4. 旧 JSON 词典通过词典管理界面的 JSON 导入功能手动迁入 SQLite；批量迁移使用 `scripts/migrate-json-data-to-sqlite.js`，它直接只读旧数据目录，也是将来迁移向导的基础设施。
 5. JSON 导入/导出返回完整 dictionary-shaped JSON；这是交换和备份路径，不代表存储层使用 JSON。
-6. 语料库仍作为 `module_blobs.corpus` 保存（见 [SQLite 后端规范](SQLITE_BACKEND_SPEC.md#11-暂缓)）。
 
 ### 10.2 回滚步骤
 

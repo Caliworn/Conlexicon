@@ -509,7 +509,7 @@ assert(!scopedBlock(styles, ".file-trigger input")?.[1].includes("display: none"
 for (const marker of [
   'id="mobileNewEntryButton"', 'id="entryListNewEntryButton"', 'id="addIpaMappingButton"',
   'id="activeFilterRefreshButton"', 'id="activeFilterCycleButton"',
-  'data-action="add-corpus-attribute"', 'data-action="add-corpus-layer"', 'data-action="link-corpus-unit"',
+  'data-action="write-new-example"',
 ]) {
   const opening = [...`${index}\n${app}`.matchAll(/<button\b[^>]*>/g)]
     .find(([tag]) => tag.includes(marker))?.[0];
@@ -518,7 +518,8 @@ for (const marker of [
   `Add/link and outlined quick actions must share the accent outline recipe: ${marker}`);
 }
 for (const [marker, emphasis] of [
-  ['data-action="remove-corpus-attribute"', "tinted"],
+  ['data-action="unlink-example"', "tinted"],
+  ['data-action="delete-corpus-item"', "tinted"],
   ['id="activeFilterExitButton"', "outline"],
   ['id="confirmAlternateButton"', "tinted"],
 ]) {
@@ -595,9 +596,6 @@ assert(scopedBlock(styles, semanticPaintSelector)[1].includes("box-shadow: var(-
   "Ordinary semantic controls must paint the resolved shadow");
 assert(scopedBlock(liquidGlass, opticalOutlineSelector)[1].includes("box-shadow: var(--control-current-shadow)"),
   "Optical surfaces must honor disabled and interaction shadow resolution");
-for (const match of app.matchAll(/<button\b[^>]*class="corpus-icon-button[^"]*"[^>]*>/g)) {
-  assert(match[0].includes("data-control-tone="), "Corpus icon actions must use semantic interaction paint");
-}
 const tokenDefinitions = new Set(classicDefinitions);
 const tokenReferences = new Set(
   [...`${classic}\n${layeredGlass}\n${liquidGlass}\n${styles}`.matchAll(/var\(\s*(--(?:ui|material|radius)-[a-z0-9-]+)/g)]

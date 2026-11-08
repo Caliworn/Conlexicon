@@ -85,36 +85,34 @@ async function checkSqliteJsonReads() {
     }
 
     writeModule("settings", originalSettings);
-    writeModule("corpus", '{"units":');
+    writeModule("docs", '{"markdown":');
     reopenRepository();
     assert.deepEqual(
       await repository.getEntryRelations(dictionary.id, "entry-derived"),
       expectedRelations,
-      "relations must remain available with damaged corpus data",
+      "relations must remain available with damaged docs data",
     );
     assert.deepEqual(
       await repository.getTagRegistry(dictionary.id),
       expectedRegistry,
-      "the tag registry must remain available with damaged corpus data",
+      "the tag registry must remain available with damaged docs data",
     );
     assert.deepEqual(
       (await repository.queryAnalysis(dictionary.id, analysisQuery)).widgets,
       expectedAnalysis.widgets,
-      "settings-based analysis must remain available with damaged corpus data",
+      "settings-based analysis must remain available with damaged docs data",
     );
     await assert.rejects(
       () => repository.exportDictionary(dictionary.id),
       isJsonParseError,
-      "export must surface system_json_parse when required corpus data is damaged",
+      "export must surface system_json_parse when required docs data is damaged",
     );
 
-    writeModule("docs", '{"markdown":');
-    reopenRepository();
     const derived = await repository.getEntry(dictionary.id, "entry-derived");
     const savedEntry = await repository.saveEntry(dictionary.id, { ...derived, notes: "saved beside damaged modules" });
-    assert.equal(savedEntry.entry.notes, "saved beside damaged modules", "entry saves must not depend on docs or corpus");
+    assert.equal(savedEntry.entry.notes, "saved beside damaged modules", "entry saves must not depend on docs");
     const patched = await repository.patchEntries(dictionary.id, [{ id: "entry-derived", patch: { pronunciation: "patched" } }]);
-    assert.equal(patched.entries[0].pronunciation, "patched", "entry patches must not depend on docs or corpus");
+    assert.equal(patched.entries[0].pronunciation, "patched", "entry patches must not depend on docs");
   } finally {
     repository.close();
     await fs.rm(dataDir, { recursive: true, force: true });

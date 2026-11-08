@@ -113,7 +113,7 @@ module_blobs(
 )
 ```
 
-`module_blobs` 是 SQLite 主库里的 JSON 扩展位，不是把设置 SQL 化。它保存低频或结构复杂的模块，例如 `settings`（含 IPA 规则）、`docs`、暂未拆表的语料，以及形态学当前 v1 DSL 的 `leftV/rightV` 函数对象设置。只有当某个模块需要独立查询、筛选、排序、索引或局部保存时，才再拆出关系表。
+`module_blobs` 是 SQLite 主库里的 JSON 扩展位，不是把设置 SQL 化。它保存低频或结构复杂的模块，例如 `settings`（含 IPA 规则）、`docs`，以及形态学当前 v1 DSL 的 `leftV/rightV` 函数对象设置。只有当某个模块需要独立查询、筛选、排序、索引或局部保存时，才再拆出关系表。
 
 词典 metadata 与各模块分别通过模块级端点保存，响应只返回变更对象和更新时间，不返回完整词典（端点见 [API Contract](API_CONTRACT.md#词典元数据与模块级保存)）。
 
@@ -138,9 +138,28 @@ definitions(
   entry_id TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
   position INTEGER NOT NULL,
   meaning TEXT,
-  example TEXT,
   notes TEXT,
   updated_at TEXT
+)
+
+corpus_items(
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL DEFAULT '',
+  content TEXT NOT NULL DEFAULT '',
+  group_name TEXT NOT NULL DEFAULT '',      -- '' 为未分组；分组不是实体
+  position INTEGER NOT NULL,                -- 组内顺序
+  normalized_text TEXT NOT NULL DEFAULT '', -- 派生：名称、分组与去掉格式的内容，经搜索规范化
+  created_at TEXT,
+  updated_at TEXT
+)
+
+definition_examples(
+  definition_id TEXT NOT NULL,
+  entry_id TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  item_id TEXT NOT NULL REFERENCES corpus_items(id) ON DELETE RESTRICT,
+  PRIMARY KEY(definition_id, item_id),
+  FOREIGN KEY(definition_id, entry_id) REFERENCES definitions(id, entry_id) ON DELETE CASCADE
 )
 
 tag_registry(
@@ -196,7 +215,6 @@ SQL 列名沿用表语义：`entries.notes` 映射词条对象的 `entry.notes`�
 - 形态学旧 `leftV/rightV` 函数对象设置：暂时继续放 `module_blobs("morphology")`；后续 DSL v2 函数库落地时再移除。
 - 形态学模板组、子表、单元格、词条形态组和 override：已经拆为 SQL 结构化表。
 - 语言文档：`module_blobs("docs")`。
-- 语料库：`module_blobs("corpus")`；不预先建一套未使用的 corpus schema。
 
 约束：
 
@@ -204,7 +222,7 @@ SQL 列名沿用表语义：`entries.notes` 映射词条对象的 `entry.notes`�
 - 搜索继续通过共享 IPA/形态模块解释规则；缓存的生成结果（如形态搜索 projection）必须在词条、标签、规则或 override 变化时失效。
 - 批量 IPA 生成和标签排序走明确的 `entries/batch` 端点，由服务端按已保存设置执行并返回目标数。
 
-语料库最终仍应 SQL 化，因为大语料必须分页、局部保存和排序；这作为语料升级阶段的单独设计（见第 11 节）。
+语料库已 SQL 化为 `corpus_items`，例句连接为 `definition_examples`。连接随词条保存与 `definition_tags` 一样整体重写，删除释义时级联删除；语料一侧用 RESTRICT 外键，删除被连接的语料须先解除连接。所有从数据库重建词条的路径（质量输入除外）都读取连接，否则保存会清空连接。`normalized_text` 是可重建的派生列：保存语料时更新，搜索规范化设置变化时与搜索投影一同全量重建。
 
 ### 5.4 形态学结构化 schema
 
@@ -405,7 +423,8 @@ cursor 由 `lib/result-window-cursor.js` 编码，绑定 process epoch、`cacheG
 | `updateSettings()` / `updateIpaSettings()` | 直接更新 `module_blobs.settings`，IPA 只替换 settings 内的 `ipa`；IPA 映射为无 ID 的顺序文本规则，返回 `{ id, updatedAt, settings }` | 否 | 如增加 IPA 搜索/质量索引，再同步刷新 |
 | `saveDocs()` | 直接更新 `module_blobs.docs` 并返回 `{ id, updatedAt, docs }` | 否 | — |
 | `saveMorphology()` | 保留形态语法校验；旧 `leftV/rightV` 函数对象设置写入 `module_blobs.morphology`，模板组/子表/单元格写入 SQL 表；同一事务内按受影响范围重建形态搜索 projection（第 10 节），并做提交内实体 ID 检查 | 否；只返回 `{ id, updatedAt, morphology }` | DSL v2 时移除旧函数对象设置 |
-| `saveCorpusChanges()` | 直接更新 `module_blobs.corpus` 并返回 `{ id, updatedAt, corpus }`；检查语料内部 ID 重复 | 否；语料内容整块保存 | 不提供伪细粒度读取；语料升级阶段按正式 SQL 模型设计 HTTP API（审计 R06） |
+| `queryCorpusItems()` / `getCorpusGroups()` / `getCorpusItem()` / `getCorpusItemLinks()` | 直接 SQL 读取语料窗口、分组概览、单条及组内位置、连接的释义 | 否 | — |
+| `createCorpusItem()` / `saveCorpusItem()` / `deleteCorpusItem()` | 单条写入 `corpus_items`；内容变化或解除连接时重写受影响词条的搜索投影；有连接时删除须 `unlink` | 否；只返回 `{ id, updatedAt, item }` 或 `{ id, updatedAt, entryIds }` | — |
 | `saveEntry()` / `deleteEntry()` / `patchEntries()` | 按词条写入目标 entry、definitions、释义标签、tags、sources、词条形态组/override 和两张搜索 projection，删除经外键级联；`patchEntries()` 只接受词条级字段，可附带 settings；整词典批处理经内部的 `writeEntryEdits()` 写入，可改写释义标签；返回 `{ id, updatedAt, entry }`、`{ id, updatedAt }` 或 `{ id, updatedAt, entries, settings? }` | 否 | 词条内部仍整条重建子记录与搜索投影（审计 A20） |
 | `getEntry()` | 按 `entries.id` 读取 SQL 表并组装完整 entry | 否 | — |
 | `queryEntries()` | 始终返回摘要 DTO 分页对象。无搜索时完全下推到 SQL，标签条件都按有效标签：词性与标签 `any/all` 由两张标签表 `(tag, entry_id)` 索引驱动的候选集合实现，无词性反向查询复用标签候选集；词性只由词典显式配置的词性标签决定，不读取标签位置；活动日期使用 UTC 半开范围，来源数量上下界共享一次计数 | 否；完整词条只通过 `getEntry()` 按需读取 | 按真实基准继续优化查询形状；默认排序索引见审计 R09 |
@@ -493,7 +512,6 @@ CREATE TABLE entry_morphology_search_values (
 以下在真实需求或基准出现前不做；它们可以受益于 SQLite，但不应和无关改动混在一起：
 
 - **候选索引**（FTS、ngram 等）：fuzzy 仍线性扫描所选 projection records，只有真实词典基准确认它成为主要瓶颈后再选型。
-- **语料 SQL 化与例句连接**：见[轻量语料库计划](CORPUS_LIGHTWEIGHT_PLAN.md)，实施后 `module_blobs.corpus` 和 `definitions.example` 由 `corpus_items`、`definition_examples` 取代。
 - 自定义滚动条、首字母/全局导航地图和 marker/overview 交互；现有原生滚动条、数据窗口与虚拟列表继续保留。
 - 高级形态分析或自动 gloss 系统。
 - 面向多窗口实时协同的 revision 机制；单词条条件保存见审计 A05 与 [Entry Incremental Save Plan](ENTRY_INCREMENTAL_SAVE_PLAN.md)。

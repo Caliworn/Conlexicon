@@ -22,7 +22,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - **Auto IPA**: mapping, syllabification, onset/coda clusters, multi-character phonemes, stress settings, the IPA keyboard, a sandbox, and batch generation.
 - **Auto morphology**: template groups with multiple tables, automatic or manual group selection per entry, rule syntax, function objects, overrides, and searchable generated forms.
 - **Language documentation**: Markdown with split, edit-only, and preview-only modes.
-- **Corpus**: ordered blocks, speaker/modality layers, standalone units, inherited attributes, ID and parent-link validation, and gloss-based unit names.
+- **Corpus**: one sentence per item, with an optional name and group. Items keep their order within a group; the list loads in windows and searches with the dictionary's search rules, and each item lists the definitions linked to it. Definition examples are links to corpus items: search the corpus from the definition (Tab in the empty search box fills in the lemma), link an item, or write a new example, which becomes an ungrouped item when the entry is saved. Deleting a linked item asks first and removes its links. The quality page has a corpus section for gloss problems.
 - **Gloss rendering**: `\gla`, `\glb`, `\glc`, and `\ft`, also written `\a`, `\b`, `\c`, and `\glft`. Each level takes one line, or several levels share a line separated by `//`; ExPex wrappers such as `\ex` and `\begingl` may be written and are skipped. Braces group one aligned item, `{}` is an empty item, lines starting with `%` are comments, and `\textbf`, `\textit`, `\textsc`, and `\textnormal` format text inline. Content that cannot be read as gloss is shown as written with the reason. Corpus unit cards, unit headings, and entry examples have separate settings, plus per-line font, size, bold, and italic.
 - **Data analysis**: an on-demand overview of lexicon size, coverage, parts of speech, and editing activity, plus tag and tag-set rankings, multi-POS entries and part-of-speech combinations, root families, orthography, IPA checks and distributions, and morphology statistics. Most figures open the matching entries. Quality checks have their own page, grouped by priority and module.
 - **Tags**: a dedicated page keeps one ordered registry of parts of speech, display names, red emphasis, and tag order, saving every change at once. With many tags, a compact view shows several per line for reordering by drag. Each tag's actions are in its right-click menu or the ⋯ button.
@@ -44,7 +44,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - **自动 IPA**：映射、音节划分、音节首／尾辅音簇、多字符音位、重音设置、IPA 虚拟键盘、沙盒测试和批量生成。
 - **自动形态学**：模板组及组内多个表格、词条级自动或手动选择形态组、规则语法、函数识别对象、覆盖项，以及可搜索的生成形式。
 - **语言文档**：Markdown，支持分栏、纯编辑和纯预览模式。
-- **语料库**：有序语料块、发言人／模态语料层、独立语料单元、属性继承、ID 与父级链接校验，以及基于 Gloss 的单元名。
+- **语料库**：一句一条，名称和分组可选。同组语料保持顺序；列表按窗口加载，搜索使用词典的搜索规则；每条语料列出连接它的释义。释义的例句是对语料的连接：在释义里检索语料（检索框为空时按 Tab 填入词形）并连接，或写新例句，保存词条时会存成一条未分组的语料。删除被连接的语料会先确认并解除连接。质量检查有单独的语料库部分，检查 Gloss 问题。
 - **Gloss 渲染**：支持 `\gla`、`\glb`、`\glc`、`\ft`，也可写作 `\a`、`\b`、`\c`、`\glft`。每层占一行，也可以用 `//` 把多层写在同一行；`\ex`、`\begingl` 等 ExPex 外壳可以写，会被忽略。花括号把多个词组成一个对齐项，`{}` 是空项，`%` 开头的行是注释，`\textbf`、`\textit`、`\textsc`、`\textnormal` 用于行内格式。无法按 Gloss 读取的内容按原文显示并说明原因。语料单元卡片、单元标题和词条例句分别设置，并可逐行配置字体、字号、粗体和斜体。
 - **数据分析**：按需加载的总览（词汇规模、资料覆盖、词性分布、编辑活动），以及标签与标签集合排行、多词性词条与词性组合、词根家族、正写法、IPA 检查与分布、形态统计；多数统计项可直接打开对应词条。质量检查有独立页面，按优先度和检查模块分组。
 - **标签**：独立的标签管理页，用一张有序的登记表管理词性、显示名、红色强调和所有标签的顺序，每次改动立即保存。标签很多时可切换到压缩视图，一行显示多个标签，专门用来拖动排序；每个标签的操作在右键菜单或 ⋯ 按钮里。词性区永远在普通标签之前；新标签保存词条时自动登记，未使用的标签显示为灰色，在用标签不能删除。词条列表、筛选菜单和悬浮卡片的标签显示选项也在这一页。
@@ -137,7 +137,7 @@ The `data/` directory is ignored by Git so personal dictionaries are never commi
 
 Since 2026-10-30, Auto IPA vowel phonemes must be separated by spaces or commas. Legacy JSON is converted on import; for an existing dictionary, retype the vowels on the IPA page (for example `a e i o u`), otherwise the joined vowels count as one item and nothing is syllabified.
 
-The SQLite schema is not versioned or upgraded at startup during development. When an update changes it (as the definition-tag update of 2026-10-25 did), export each dictionary as JSON with the previous version first, then re-import the JSON after updating.
+The SQLite schema is not versioned or upgraded at startup during development. When an update changes it (as the lightweight corpus update of 2026-11-08 did), export each dictionary as JSON with the previous version first, then re-import the JSON after updating. An old database still opens without an error, but data the new schema no longer reads, such as old examples and corpus blocks, is not shown.
 
 Run only one server process per data directory at a time. Index reads and updates are serialized within that process, and writes use atomic file replacement; this does not coordinate multiple server processes.
 
@@ -145,7 +145,7 @@ Run only one server process per data directory at a time. Index reads and update
 
 2026-10-30 起，自动 IPA 的元音音位必须用空格、逗号或顿号分隔。旧 JSON 导入时会自动转换；已有词典要在 IPA 页重新输入一次元音（例如 `a e i o u`），否则连在一起的元音会算成一项，音节不再切分。
 
-开发期间 SQLite schema 没有版本号，启动时也不升级旧库。更新改动了 schema 时（例如 2026-10-30 的标签登记表更新），请先用旧版本把每本词典导出为 JSON，更新后再导入。
+开发期间 SQLite schema 没有版本号，启动时也不升级旧库。更新改动了 schema 时（例如 2026-11-08 的轻量语料库更新），请先用旧版本把每本词典导出为 JSON，更新后再导入。旧数据库仍能打开且不报错，但新 schema 不再读取的数据（例如旧例句和语料块）不会显示。
 
 同一数据目录同一时间只允许一个服务进程写入。索引读取和更新在该进程内串行执行，写入通过原子替换文件发布，不协调多个服务进程。
 

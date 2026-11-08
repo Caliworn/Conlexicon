@@ -23,7 +23,7 @@ function completeEntry(id, options = {}) {
     lemma: options.lemma ?? id,
     pronunciation: options.pronunciation ?? "/a/",
     tags: options.tags ?? ["n"],
-    definitions: options.definitions ?? [{ id: `def-${id}`, meaning: "meaning", example: "" }],
+    definitions: options.definitions ?? [{ id: `def-${id}`, meaning: "meaning" }],
     etymology: { sources: options.sources ?? [] },
   };
 }
@@ -46,15 +46,8 @@ function qualityDictionary() {
         lemma: "mixed",
         pronunciation: "/ˈaˈb/",
         tags: ["x".repeat(25)],
-        definitions: [{ id: "def-mixed", meaning: "meaning", example: "\\gla a b\n\\glb A B" }],
+        definitions: [{ id: "def-mixed", meaning: "meaning" }],
         sources: [{ entryId: "", text: "missing-root" }],
-      }),
-      completeEntry("entry-gloss-mismatch", {
-        definitions: [{
-          id: "def-gloss-mismatch",
-          meaning: "meaning",
-          example: "\\gla a b\n\\glb A\n\\ft test",
-        }],
       }),
       completeEntry("entry-near-tag-a", { tags: ["proper noun"] }),
       completeEntry("entry-near-tag-b", { tags: ["proper-noun"] }),
