@@ -119,16 +119,24 @@ const issueFor = (code, entryId = null) => issues.find((issue) => (
 // Gloss checks run per corpus item, once however many definitions link to it.
 const corpusIssues = (content) => qualityModel.corpusItemQualityIssues({ id: "item", content });
 assert.deepEqual(corpusIssues("\\gla a b\n\\glb A B"), [
-  { code: "gloss_incomplete", itemId: "item", params: { missingFields: ["ft"] } },
+  { code: "gloss_incomplete", severity: "medium", itemId: "item", params: { missingFields: ["ft"] } },
 ]);
 assert.deepEqual(corpusIssues("\\gla a b\n\\glb A\n\\ft test"), [
-  { code: "gloss_alignment_mismatch", itemId: "item", params: { glaCount: 2, glbCount: 1 } },
+  { code: "gloss_alignment_mismatch", severity: "medium", itemId: "item", params: { glaCount: 2, glbCount: 1 } },
 ]);
+assert.deepEqual(corpusIssues("\\gla \\nogloss{[} a + b\n\\glb A B\n\\ft x"), [], "\\nogloss and + take no item below");
 assert.deepEqual(corpusIssues("\\a out {to throw}\n\\b leave \\textsc{3 acc}\n\\ft x"), [], "braces and inline commands keep one item each");
 assert.deepEqual(corpusIssues("plain sentence\n% a note"), [], "plain text has no levels to check");
-assert.deepEqual(corpusIssues("\\pex\n\\a one\n\\xe").map((issue) => issue.code), ["gloss_unparsed", "gloss_incomplete"]);
-assert.deepEqual(corpusIssues("\\pex\n\\a one\n\\xe")[0].params.problems.map((problem) => problem.code), ["unknown_command", "stray_line"]);
-assert.deepEqual(qualityModel.CORPUS_QUALITY_CODES, ["gloss_unparsed", "gloss_incomplete", "gloss_alignment_mismatch"]);
+// Skipped block commands are only a low notice; text after a closed level is
+// an issue.
+assert.deepEqual(corpusIssues("\\pex\n\\a one\n\\xe"), [
+  { code: "gloss_incomplete", severity: "medium", itemId: "item", params: { missingFields: ["glb", "ft"] } },
+  { code: "gloss_unknown_command", severity: "low", itemId: "item", params: { commands: ["\\pex"] } },
+]);
+assert.deepEqual(corpusIssues("\\gla a //\nstray\n\\glb A //\n\\ft x"), [
+  { code: "gloss_unparsed", severity: "medium", itemId: "item", params: { problems: [{ code: "stray_line", line: 2 }] } },
+]);
+assert.deepEqual(qualityModel.CORPUS_QUALITY_CODES, ["gloss_unparsed", "gloss_incomplete", "gloss_alignment_mismatch", "gloss_unknown_command"]);
 assert.deepEqual(qualityModel.buildCorpusQualitySummary([
   { code: "gloss_incomplete", itemId: "a" },
   { code: "gloss_unparsed", itemId: "a" },
@@ -141,6 +149,7 @@ assert.deepEqual(qualityModel.buildCorpusQualitySummary([
     { key: "gloss_unparsed", issueCount: 1, itemCount: 1 },
     { key: "gloss_incomplete", issueCount: 2, itemCount: 2 },
     { key: "gloss_alignment_mismatch", issueCount: 0, itemCount: 0 },
+    { key: "gloss_unknown_command", issueCount: 0, itemCount: 0 },
   ],
 });
 assert.deepEqual(issueFor("duplicate_lemma", "entry-duplicate-a").params, {

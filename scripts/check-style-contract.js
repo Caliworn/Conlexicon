@@ -819,11 +819,11 @@ assert.deepEqual(liquidGlassSelectorsForRole("continuous"), new Set([".dictionar
   "The continuous role must cover the navigation card and drawer");
 assert.deepEqual(
   liquidGlassSelectorsForRole("toolbar"),
-  new Set([".entry-mail-search-surface", ".entry-mail-tools-surface", ".tag-manager-search-surface"]),
+  new Set([".entry-mail-search-surface", ".entry-mail-tools-surface", ".tag-manager-search-surface", ".corpus-search-surface"]),
   "The toolbar role must cover the search and tool capsules as independent optical surfaces",
 );
 assert(
-  ["entry-mail-search-surface", "entry-mail-tools-surface", "tag-manager-search-surface"].every((name) => index.includes(`<div class="${name}" aria-hidden="true"></div>`)),
+  ["entry-mail-search-surface", "entry-mail-tools-surface", "tag-manager-search-surface", "corpus-search-surface"].every((name) => index.includes(`<div class="${name}" aria-hidden="true"></div>`)),
   "Mail optical surfaces must be decorative leaves, not backdrop-filter ancestors of popup menus",
 );
 assert(

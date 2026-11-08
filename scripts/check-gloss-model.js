@@ -14,7 +14,15 @@ function assertGloss(source, expected) {
   const parsed = parseGloss(source);
   assert.equal(parsed.kind, "gloss", source);
   assert.deepEqual(parsed.issues, [], source);
-  assert.deepEqual(parsed.gloss, { gla: [], glb: [], glc: [], ft: "", ...expected }, source);
+  assert.deepEqual(parsed.gloss, {
+    preamble: "",
+    gla: [],
+    glaLayout: { breaks: [], joins: [], nogloss: [] },
+    glb: [],
+    glc: [],
+    ft: "",
+    ...expected,
+  }, source);
   return parsed;
 }
 
@@ -56,6 +64,54 @@ assertGloss(String.raw`\ft the form //kat// is old`, { ft: "the form //kat// is 
 assertGloss(String.raw`\ft the form //kat//`, { ft: "the form //kat" });
 assertGloss(String.raw`\ft the form {//kat//}`, { ft: "the form {//kat//}" });
 
+// Levels run across lines up to the next marker or //, as in ExPex, and full
+// markers also split a line without //.
+assertGloss(String.raw`\gla vento-n sur \glb wind north \ft The wind.`, {
+  gla: ["vento-n", "sur"],
+  glb: ["wind", "north"],
+  ft: "The wind.",
+});
+assertGloss(lines(
+  String.raw`\gla Mary ist sicher, dass`,
+  "es den Hans //",
+  String.raw`\glb Mary is sure that`,
+  "it the Hans //",
+  String.raw`\glft Mary is sure`,
+  "that it would not annoy John. //",
+), {
+  gla: ["Mary", "ist", "sicher,", "dass", "es", "den", "Hans"],
+  glb: ["Mary", "is", "sure", "that", "it", "the", "Hans"],
+  ft: "Mary is sure that it would not annoy John.",
+});
+assertGloss(lines(String.raw`\gla a b`, "c d", String.raw`\ft x`), { gla: ["a", "b", "c", "d"], ft: "x" });
+// One-letter aliases only start a level at a line start or after //, since
+// \b o and \c c are LaTeX accents.
+assertGloss(String.raw`\gla fa\c c \b o`, { gla: [String.raw`fa\c`, "c", String.raw`\b`, "o"] });
+
+// Text before the first level is the preamble, like \glpreamble.
+assertGloss(lines("Mary ist sicher.", String.raw`\gla Mary ist sicher.`), {
+  preamble: "Mary ist sicher.",
+  gla: ["Mary", "ist", "sicher."],
+});
+assertGloss(lines(String.raw`\ex \begingl \glpreamble Mary ist`, "sicher.//", String.raw`\gla Mary //`, String.raw`\endgl \xe`), {
+  preamble: "Mary ist sicher.",
+  gla: ["Mary"],
+});
+
+// Exceptional \gla items: + breaks the line, @ joins two items and \nogloss
+// has nothing below it. None of them takes an item on the lower levels.
+assertGloss(lines(
+  String.raw`\gla Mary ist sicher, + dass es @ den \nogloss{[[} Hans`,
+  String.raw`\glb Mary is sure that it the Hans`,
+), {
+  gla: ["Mary", "ist", "sicher,", "dass", "es", "den", "[[", "Hans"],
+  glaLayout: { breaks: [3], joins: [5], nogloss: [6] },
+  glb: ["Mary", "is", "sure", "that", "it", "the", "Hans"],
+});
+assertGloss(String.raw`\gla + a @ + b @`, { gla: ["a", "b"], glaLayout: { breaks: [1], joins: [], nogloss: [] } });
+assertGloss(String.raw`\glb A + B`, { glb: ["A", "+", "B"] });
+assertGloss(String.raw`\gla \nogloss{{\textit{t}}]} x`, { gla: [String.raw`{\textit{t}}]`, "x"], glaLayout: { breaks: [], joins: [], nogloss: [0] } });
+
 // Items split on spaces outside braces; empty braces keep an empty column.
 assert.deepEqual(tokenizeGlossLevel("a {out to throw} {} the-\\textsc{3 acc}"), ["a", "{out to throw}", "{}", "the-\\textsc{3 acc}"]);
 assert.deepEqual(tokenizeGlossLevel(String.raw`a\ b c`), [String.raw`a\ b`, "c"]);
@@ -75,15 +131,28 @@ assert.deepEqual(issueCodes(String.raw`\c{c}a and more`), [], "an inline command
 const commented = assertGloss(lines(String.raw`\gla a`, "% check this", String.raw`\ft x`), { gla: ["a"], ft: "x" });
 assert.deepEqual(commented.comments, ["check this"]);
 
-// Content that cannot be read is reported, never dropped silently.
-assert.deepEqual(issueCodes(lines(String.raw`\gla a`, "stray words")), ["stray_line"]);
+// Text after a closed level and repeated levels are reported, never dropped
+// silently.
+assert.deepEqual(parseGloss(lines(String.raw`\gla a //`, "stray words", String.raw`\glb A`)).issues, [{ code: "stray_line", line: 2 }]);
+const strayThenLevel = parseGloss(lines(String.raw`\gla a //`, String.raw`stray \glb A`));
+assert.deepEqual(strayThenLevel.issues, [{ code: "stray_line", line: 2 }]);
+assert.deepEqual(strayThenLevel.gloss.glb, ["A"], "a level after stray text on the same line is still read");
+assert.deepEqual(issueCodes(lines(String.raw`\gla a`, String.raw`\endgl stray`)), ["stray_line"]);
 assert.deepEqual(issueCodes(lines(String.raw`\glb a`, String.raw`\glb b`)), ["duplicate_level"]);
 assert.deepEqual(parseGloss(lines(String.raw`\glb a`, String.raw`\glb b`)).gloss.glb, ["a"], "the first repeated level is kept");
-assert.deepEqual(issueCodes(String.raw`\glpreamble Mary ist sicher.//`), ["unknown_command"]);
+assert.deepEqual(parseGloss(lines("Mary.", String.raw`\glpreamble Mary //`, String.raw`\gla a`)).issues, [
+  { code: "duplicate_level", line: 1, level: "preamble" },
+]);
+
+// Block commands outside a level are skipped and noted; inside a level they
+// are text.
 const pex = parseGloss(lines(String.raw`\pex`, String.raw`\a one`, String.raw`\a two`, String.raw`\xe`));
-assert.deepEqual(pex.issues.map((issue) => issue.code), ["unknown_command", "duplicate_level", "stray_line"]);
-assert.equal(pex.issues[0].command, String.raw`\pex`);
-assert.equal(pex.issues[1].level, "gla");
+assert.deepEqual(pex.issues, [{ code: "duplicate_level", line: 3, level: "gla" }]);
+assert.deepEqual(pex.notices, [{ code: "unknown_command", line: 1, command: String.raw`\pex` }]);
+const skipped = assertGloss(lines(String.raw`\gla a //`, String.raw`\lingset{glspace=1em}`, String.raw`\glb A //`), { gla: ["a"], glb: ["A"] });
+assert.deepEqual(skipped.notices, [{ code: "unknown_command", line: 2, command: String.raw`\lingset` }]);
+assertGloss(lines(String.raw`\gla a`, String.raw`\gbl A`), { gla: ["a", String.raw`\gbl`, "A"] });
+assert.deepEqual(parseGloss(String.raw`\pex plain`).plainLines, [String.raw`\pex plain`], "without levels every line is plain text");
 
 // Old data stored line breaks as backslash-n; import converts them, and
 // commands such as \nogloss stay. At runtime a backslash-n is text.
@@ -92,8 +161,8 @@ assertGloss(String.raw`\gla a b\n`, { gla: ["a", String.raw`b\n`] });
 
 // Search text keeps every level, plain line and comment without markup.
 assert.equal(
-  glossSearchText(lines(String.raw`\gla the-\textsc{acc} {out to}`, String.raw`\ft saw`, "% note")),
-  lines("the-acc out to", "saw", "note"),
+  glossSearchText(lines("Pre", String.raw`\gla the-\textsc{acc} {out to}`, String.raw`\ft saw`, "% note")),
+  lines("Pre", "the-acc out to", "saw", "note"),
 );
 
 // Inline formatting.

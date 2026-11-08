@@ -588,6 +588,7 @@ fieldset {
 .entry-mail-search-surface,
 .entry-mail-tools-surface,
 .tag-manager-search-surface,
+.corpus-search-surface,
 .entry-mail-search-icon,
 .entry-mail-root-icon,
 .entry-mail-clear {
@@ -1146,7 +1147,8 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
   font-size: 0.78rem;
 }
 
-.secondary-button.entry-list-new-button {
+.secondary-button.entry-list-new-button,
+.secondary-button.corpus-new-button {
   display: grid;
   width: 40px;
   height: 40px;
@@ -1163,7 +1165,8 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
   aspect-ratio: 1;
 }
 
-.secondary-button.entry-list-new-button .nav-icon {
+.secondary-button.entry-list-new-button .nav-icon,
+.secondary-button.corpus-new-button .nav-icon {
   grid-area: 1 / 1;
   display: block;
   width: 20px;
@@ -2401,6 +2404,22 @@ span.pending-source {
   min-width: 0;
 }
 
+/* A + in \gla starts the next .gloss-columns; the gap matches the one
+   between wrapped lines. */
+.gloss-columns + .gloss-columns {
+  margin-top: 12px;
+}
+
+.corpus-gloss-group.aligned {
+  gap: 0;
+}
+
+/* Columns joined by @ sit together without the column gap and wrap as one. */
+.gloss-column-cluster {
+  display: flex;
+  align-items: flex-start;
+}
+
 .gloss-column {
   display: grid;
   gap: 6px;
@@ -2647,7 +2666,8 @@ span.pending-source {
   margin-top: 10px;
 }
 
-.morphology-page-title {
+.morphology-page-title,
+.page-title-with-info {
   align-items: center;
 }
 
@@ -4140,9 +4160,15 @@ span.pending-source {
   min-width: 0;
 }
 
-.corpus-browser-tools input {
+.corpus-search {
+  position: relative;
   flex: 1;
   min-width: 0;
+  border-radius: var(--radius-control);
+}
+
+.corpus-search > input {
+  width: 100%;
 }
 
 .corpus-browser-tools button {
@@ -4198,12 +4224,33 @@ span.pending-source {
   white-space: nowrap;
 }
 
-.corpus-group-count,
-.corpus-item-link-count {
+.corpus-group-count {
   flex: 0 0 auto;
   color: var(--ui-text-muted);
   font-size: 0.76rem;
   font-weight: 800;
+}
+
+/* A linked-definition count sits a few pixels below the group's item count,
+   so it carries a link icon and an accent pill to stay distinct from it. */
+.corpus-item-link-count {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+  border-radius: 999px;
+  padding: 1px 7px 1px 5px;
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.corpus-item-link-count .nav-icon {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.2;
 }
 
 .corpus-item-card {
@@ -4273,7 +4320,8 @@ span.pending-source {
 }
 
 .corpus-content-raw > span,
-.corpus-gloss-row {
+.corpus-gloss-row,
+.corpus-gloss-preamble {
   display: block;
   overflow-wrap: anywhere;
 }
@@ -6367,6 +6415,44 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
   display: grid;
   gap: 10px;
   padding-left: 1.2em;
+}
+
+.corpus-syntax-help section {
+  display: grid;
+  gap: 8px;
+}
+
+.corpus-syntax-help h3 {
+  margin: 4px 0 0;
+  font-size: 0.95rem;
+}
+
+.corpus-syntax-help ul {
+  gap: 6px;
+}
+
+.corpus-syntax-help code {
+  border-radius: 4px;
+  padding: 1px 4px;
+  background: var(--material-inset-background);
+  font-family: Consolas, "Cascadia Mono", monospace;
+  font-size: 0.86em;
+  overflow-wrap: anywhere;
+}
+
+.corpus-syntax-help pre {
+  margin: 0;
+  overflow-x: auto;
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+  background: var(--material-inset-background);
+  line-height: 1.5;
+}
+
+.corpus-syntax-help pre code {
+  padding: 0;
+  background: none;
+  overflow-wrap: normal;
 }
 
 .shortcut-help,

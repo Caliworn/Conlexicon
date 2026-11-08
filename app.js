@@ -255,6 +255,7 @@ const CORPUS_QUALITY_SUBPAGES = Object.freeze({
   "corpus-unparsed": "gloss_unparsed",
   "corpus-incomplete": "gloss_incomplete",
   "corpus-alignment": "gloss_alignment_mismatch",
+  "corpus-unknown-command": "gloss_unknown_command",
 });
 const QUALITY_ISSUE_PAGE_SIZE = 200;
 let qualitySummaryState = {
@@ -403,6 +404,8 @@ const i18n = {
     morphologyOverrideHelp: "留空则使用表格规则；填写内容会覆盖对应栏目。",
     morphologySyntaxTitle: "形态语法",
     morphologySyntaxInfo: "查看形态语法",
+    corpusSyntaxTitle: "语料格式说明",
+    corpusSyntaxInfo: "查看语料格式说明",
     morphologySyntaxIntro: "每个单元格最终输出一个字符串。普通字符会原样输出，{} 会引用当前词条的词形。系统会先展开所有 {} / {X = Y}，然后再执行 /.../ 条件判断。",
     morphologySyntaxLemma: "{}：直接引用词形。例如 {}-ka 会输出 lemma-ka。",
     morphologySyntaxReplace: "{X = Y}：引用词形并把第一个 X 替换为 Y，等同于 {X[1] = Y}。{X[n] = Y} 替换从左到右第 n 个 X；{X[-n] = Y} 替换从右到左第 n 个 X；{X[*] = Y} 替换所有 X。多条规则都只在原始词形上定位，不会使用其他规则生成后的结果。",
@@ -449,7 +452,7 @@ const i18n = {
     backendHint: "启动后端后，请访问 http://localhost:4173/。",
     noDictionary: "还没有词典",
     openDictionaryManager: "打开词典管理",
-    searchPlaceholder: "搜索词形、释义、标签",
+    searchPlaceholder: "搜索词条",
     noPart: "无词性",
     rootMode: "词根模式",
     expandAll: "全部展开",
@@ -584,9 +587,8 @@ const i18n = {
     invalidCorpusRenderPattern: "渲染对象只能包含 \\gla、\\glb、\\glc、\\ft、用于可选对象的括号和换行。",
     corpusRenderError: "语料渲染错误",
     glossShownAsSource: "按原文显示：{reason}",
-    glossIssueUnknownCommand: "无法识别的命令 {command}",
-    glossIssueDuplicateLevel: "重复的层 {level}",
-    glossIssueStrayLine: "Gloss 中有没有层标记的行",
+    glossIssueDuplicateLevel: "第 {line} 行重复了 {level}",
+    glossIssueStrayLine: "第 {line} 行的文字在 // 之后，不属于任何层",
     searchSettings: "搜索",
     searchDisplay: "显示",
     save: "保存",
@@ -910,7 +912,7 @@ const i18n = {
     corpusItemLinkCount: "{count} 个释义连接",
     deleteCorpusItem: "删除语料",
     deleteCorpusItemConfirm: "删除这条语料？",
-    deleteLinkedCorpusItemConfirm: "这条语料被以下释义连接：{links}。删除后这些连接会一并解除。",
+    deleteLinkedCorpusItemConfirm: "删除这条语料？它被以下释义连接：{links}。删除后这些连接会一并解除。",
     corpusLinksMore: "{links} 等 {count} 个释义",
     corpusItemDeleted: "语料已删除",
     corpusLoadFailed: "无法读取语料",
@@ -1047,6 +1049,8 @@ const i18n = {
     morphologyOverrideHelp: "Leave blank to use table rules; filled cells override that slot.",
     morphologySyntaxTitle: "Morphology Syntax",
     morphologySyntaxInfo: "Show morphology syntax",
+    corpusSyntaxTitle: "Corpus Syntax",
+    corpusSyntaxInfo: "Show corpus syntax",
     morphologySyntaxIntro: "Each cell outputs one string. Plain text is emitted as written, and {} references the current entry lemma. All {} / {X = Y} references are expanded first, then /.../ conditions are evaluated.",
     morphologySyntaxLemma: "{}: reference the lemma directly. For example, {}-ka outputs lemma-ka.",
     morphologySyntaxReplace: "{X = Y}: reference the lemma and replace the first X with Y, equivalent to {X[1] = Y}. {X[n] = Y} replaces the nth X from the left; {X[-n] = Y} replaces the nth X from the right; {X[*] = Y} replaces every X. Multiple rules locate targets only in the original lemma, never in another rule's output.",
@@ -1093,7 +1097,7 @@ const i18n = {
     backendHint: "Start the backend, then visit http://localhost:4173/.",
     noDictionary: "No dictionaries yet",
     openDictionaryManager: "Open Dictionary Manager",
-    searchPlaceholder: "Search lemma, definition, tags",
+    searchPlaceholder: "Search entries",
     noPart: "No Part",
     rootMode: "Root Mode",
     expandAll: "Expand All",
@@ -1228,9 +1232,8 @@ const i18n = {
     invalidCorpusRenderPattern: "Render Objects may contain only \\gla, \\glb, \\glc, \\ft, parentheses around optional objects, and line breaks.",
     corpusRenderError: "Corpus rendering error",
     glossShownAsSource: "Shown as written: {reason}",
-    glossIssueUnknownCommand: "unrecognized command {command}",
-    glossIssueDuplicateLevel: "repeated level {level}",
-    glossIssueStrayLine: "a line in the gloss has no level marker",
+    glossIssueDuplicateLevel: "line {line} repeats {level}",
+    glossIssueStrayLine: "line {line} has text after // that belongs to no level",
     searchSettings: "Search",
     searchDisplay: "Display",
     save: "Save",
@@ -1543,7 +1546,7 @@ const i18n = {
     docsSaved: "Docs saved",
     saveCorpus: "Save Corpus",
     corpusSaved: "Corpus saved",
-    newCorpusItem: "New Item",
+    newCorpusItem: "New corpus item",
     noCorpusItems: "No corpus items yet",
     noCorpusMatches: "No matching corpus items",
     corpusItem: "Corpus Item",
@@ -1558,7 +1561,7 @@ const i18n = {
     corpusItemLinkCount: "{count} linked definitions",
     deleteCorpusItem: "Delete Item",
     deleteCorpusItemConfirm: "Delete this corpus item?",
-    deleteLinkedCorpusItemConfirm: "These definitions link to this item: {links}. Deleting it removes those links too.",
+    deleteLinkedCorpusItemConfirm: "Delete this corpus item? These definitions link to it: {links}. Deleting it removes those links too.",
     corpusLinksMore: "{links}, and {count} definitions in all",
     corpusItemDeleted: "Corpus item deleted",
     corpusLoadFailed: "Could not read the corpus",
@@ -1877,6 +1880,7 @@ const elements = {
   morphologyTableList: document.querySelector("#morphologyTableList"),
   addMorphologyTableGroupButton: document.querySelector("#addMorphologyTableGroupButton"),
   morphologySyntaxButton: document.querySelector("#morphologySyntaxButton"),
+  corpusSyntaxButton: document.querySelector("#corpusSyntaxButton"),
   infoDialog: document.querySelector("#infoDialog"),
   infoDialogTitle: document.querySelector("#infoDialogTitle"),
   infoDialogBody: document.querySelector("#infoDialogBody"),
@@ -2117,6 +2121,144 @@ function morphologySyntaxInfoHtml() {
         <li>${escapeHtml(t("morphologySyntaxSpacing"))}</li>
       </ul>
       <p>${escapeHtml(t("morphologySyntaxExamples"))}</p>
+    </div>
+  `;
+}
+
+// The corpus help is structured text with code, so each language keeps its
+// sections here rather than as many separate i18n strings. Inline code is
+// written between backticks.
+const CORPUS_SYNTAX_HELP = Object.freeze({
+  zh: {
+    intro: "每条语料写一句话。没有层标记的内容按纯文本逐行显示；写了层标记就按 Gloss 读取，写法与 ExPex 兼容。",
+    sections: [
+      {
+        title: "层",
+        items: [
+          "`\\gla`（或 `\\a`）：原文，按空格切成对齐项。",
+          "`\\glb`（或 `\\b`）、`\\glc`（或 `\\c`）：逐项注释，与 `\\gla` 的项依次对齐。",
+          "`\\glft`（或 `\\ft`）：自由翻译。",
+          "`\\glpreamble`：前言，显示在 Gloss 上方。第一个层标记之前的文字也算前言。",
+        ],
+        code: ["Mary ist sicher.", "\\gla Mary ist sicher. //", "\\glb Mary is sure //", "\\glft Mary is sure. //"],
+      },
+      {
+        title: "分层与换行",
+        items: [
+          "一层从层标记开始，到 `//`、下一个层标记或内容结尾为止。层内换行等同空格，太长的一层可以折成多行。",
+          "`//` 可以省略。同一行写多层时，用 `//` 分隔或直接写下一个层标记都可以。",
+          "`\\a`、`\\b`、`\\c` 只在行首或 `//` 之后识别，以免与 LaTeX 的重音命令 `\\b o`、`\\c c` 混淆；在行中间请写全名。",
+        ],
+        code: ["\\gla Mary ist sicher, dass es den Hans", "nicht stören würde //", "\\glb Mary is sure that it the Hans", "not annoy would //"],
+      },
+      {
+        title: "对齐项",
+        items: [
+          "花括号把多个词合成一项，如 `{out to throw}`；`{}` 是空项。",
+          "`\\gla` 里的特殊项不占下层的位置：`+` 从这里换行，`@` 去掉前后两项之间的间距，`\\nogloss{…}` 是下方不加注释的项。",
+          "`\\glb` 的项数与 `\\gla` 不同时照常显示，并在质量检查中报告对齐数量不一致。",
+        ],
+        code: ["\\gla wiye kepi e- @ ca + \\nogloss{[} ni //", "\\glb two whitemen 1p:3d- found OBL //"],
+      },
+      {
+        title: "行内格式",
+        items: [
+          "`\\textsc{…}` 小型大写，`\\textbf{…}` 粗体，`\\textit{…}` 斜体，`\\textnormal{…}` 清除所在层的粗体和斜体；也可以写 `{\\sc …}`。",
+          "`\\%`、`\\&`、`\\#`、`\\_`、`\\$`、`\\{`、`\\}` 显示为对应的符号。层内的其他命令按原文显示。",
+        ],
+      },
+      {
+        title: "会被忽略的内容",
+        items: [
+          "`%` 开头的行是注释：不显示，但能被搜索到。",
+          "ExPex 外壳 `\\ex`、`\\begingl`、`\\endgl`、`\\xe` 会被跳过。",
+          "层外以命令开头的行（如 `\\lingset{…}`、`\\pex`）会被跳过，并在质量检查的“未识别的命令”中列出。",
+        ],
+      },
+      {
+        title: "会被报告的问题",
+        items: [
+          "`//` 结束一层之后、下一个层标记之前出现的文字。",
+          "重复的层，例如第二个 `\\glb`。",
+          "出现这两种问题时，语料按原文显示并说明原因，内容不会丢失。",
+        ],
+      },
+    ],
+  },
+  en: {
+    intro: "Write one sentence per corpus item. Content without level markers is shown as plain text, line by line; with level markers it is read as a gloss, in a syntax compatible with ExPex.",
+    sections: [
+      {
+        title: "Levels",
+        items: [
+          "`\\gla` (or `\\a`): the original text, split into aligned items at spaces.",
+          "`\\glb` (or `\\b`) and `\\glc` (or `\\c`): item-by-item glosses, aligned with the `\\gla` items in order.",
+          "`\\glft` (or `\\ft`): the free translation.",
+          "`\\glpreamble`: the preamble, shown above the gloss. Text before the first level marker is also the preamble.",
+        ],
+        code: ["Mary ist sicher.", "\\gla Mary ist sicher. //", "\\glb Mary is sure //", "\\glft Mary is sure. //"],
+      },
+      {
+        title: "Levels and line breaks",
+        items: [
+          "A level runs from its marker to `//`, the next level marker or the end of the content. A line break inside a level counts as a space, so a long level can wrap over several lines.",
+          "`//` is optional. To put several levels on one line, separate them with `//` or just write the next level marker.",
+          "`\\a`, `\\b` and `\\c` are only read at the start of a line or after `//`, so they are not confused with the LaTeX accents `\\b o` and `\\c c`; mid-line, write the full name.",
+        ],
+        code: ["\\gla Mary ist sicher, dass es den Hans", "nicht stören würde //", "\\glb Mary is sure that it the Hans", "not annoy would //"],
+      },
+      {
+        title: "Aligned items",
+        items: [
+          "Braces make several words one item, as in `{out to throw}`; `{}` is an empty item.",
+          "Special items on `\\gla` take no item on the lower levels: `+` starts a new line, `@` removes the space between the items around it, and `\\nogloss{…}` is an item with no gloss below it.",
+          "When `\\glb` has more or fewer items than `\\gla`, both are still shown, and the quality checks report the alignment mismatch.",
+        ],
+        code: ["\\gla wiye kepi e- @ ca + \\nogloss{[} ni //", "\\glb two whitemen 1p:3d- found OBL //"],
+      },
+      {
+        title: "Inline formatting",
+        items: [
+          "`\\textsc{…}` for small caps, `\\textbf{…}` for bold, `\\textit{…}` for italic, and `\\textnormal{…}` to clear the level's bold and italic; `{\\sc …}` also works.",
+          "`\\%`, `\\&`, `\\#`, `\\_`, `\\$`, `\\{` and `\\}` show as those characters. Other commands inside a level are shown as written.",
+        ],
+      },
+      {
+        title: "Skipped content",
+        items: [
+          "Lines starting with `%` are comments: not shown, but searchable.",
+          "The ExPex wrappers `\\ex`, `\\begingl`, `\\endgl` and `\\xe` are skipped.",
+          "Lines outside a level that start with a command, such as `\\lingset{…}` or `\\pex`, are skipped and listed under “Unrecognized Commands” in the quality checks.",
+        ],
+      },
+      {
+        title: "Reported problems",
+        items: [
+          "Text after a `//` that closed a level and before the next level marker.",
+          "A repeated level, such as a second `\\glb`.",
+          "With either problem the item is shown as written, with the reason, so nothing is lost.",
+        ],
+      },
+    ],
+  },
+});
+
+function helpTextWithCodeHtml(text) {
+  return escapeHtml(text).replace(/`([^`]+)`/g, "<code>$1</code>");
+}
+
+function corpusSyntaxInfoHtml() {
+  const help = CORPUS_SYNTAX_HELP[currentLanguage === "zh" ? "zh" : "en"];
+  return `
+    <div class="syntax-help corpus-syntax-help">
+      <p>${escapeHtml(help.intro)}</p>
+      ${help.sections.map(({ title, items, code }) => `
+        <section>
+          <h3>${escapeHtml(title)}</h3>
+          <ul>${items.map((item) => `<li>${helpTextWithCodeHtml(item)}</li>`).join("")}</ul>
+          ${code ? `<pre><code>${code.map(escapeHtml).join("\n")}</code></pre>` : ""}
+        </section>
+      `).join("")}
     </div>
   `;
 }
@@ -9372,13 +9514,11 @@ function glossSourceLines(content) {
 }
 
 function glossIssueText(issue) {
-  if (issue.code === "unknown_command") {
-    return formatText("glossIssueUnknownCommand", { command: issue.command });
-  }
   if (issue.code === "duplicate_level") {
-    return formatText("glossIssueDuplicateLevel", { level: `\\${issue.level}` });
+    const level = issue.level === "preamble" ? "glpreamble" : issue.level;
+    return formatText("glossIssueDuplicateLevel", { line: issue.line, level: `\\${level}` });
   }
-  return t("glossIssueStrayLine");
+  return formatText("glossIssueStrayLine", { line: issue.line });
 }
 
 // Content the parser cannot fully read is shown as written, with the first
@@ -10148,6 +10288,7 @@ function qualitySubpageGroups() {
         ["corpus-unparsed", aText("无法完整解析", "Not Fully Readable")],
         ["corpus-incomplete", aText("Gloss 不完整", "Incomplete Gloss")],
         ["corpus-alignment", aText("对齐数量不一致", "Alignment Mismatch")],
+        ["corpus-unknown-command", aText("未识别的命令", "Unrecognized Commands")],
       ],
     },
   ];
@@ -10937,9 +11078,11 @@ function renderCorpusQualityWindow() {
         aText("再显示 {count} 项", "Show {count} more").replace("{count}", Math.min(QUALITY_ISSUE_PAGE_SIZE, remaining)),
       )}</button>`
       : "";
-  return `<ul class="analysis-issue-list">${windowState.items.map(({ item, issues }) => `
-    <li class="analysis-issue medium">
-      <span>medium</span>
+  return `<ul class="analysis-issue-list">${windowState.items.map(({ item, issues }) => {
+    const severity = issues.some((issue) => issue.severity === "medium") ? "medium" : "low";
+    return `
+    <li class="analysis-issue ${severity}">
+      <span>${severity}</span>
       <div>
         <button type="button" data-corpus-quality-item="${escapeHtml(item.id)}">${escapeHtml(corpusItemLabel(item))}</button>
         ${issues.map((issue) => {
@@ -10948,7 +11091,8 @@ function renderCorpusQualityWindow() {
         }).join("")}
       </div>
     </li>
-  `).join("")}</ul>${footer}`;
+  `;
+  }).join("")}</ul>${footer}`;
 }
 
 function qualityPageBody(subpage, summary) {
@@ -11020,6 +11164,7 @@ function qualityIssueText(issue) {
     gloss_unparsed: ["Gloss 无法完整解析", "Gloss not fully readable"],
     gloss_incomplete: ["Gloss 不完整", "Incomplete gloss"],
     gloss_alignment_mismatch: ["Gloss 对齐数量不一致", "Gloss alignment mismatch"],
+    gloss_unknown_command: ["Gloss 中有未识别的命令，已跳过", "Unrecognized commands skipped in gloss"],
     duplicate_lemma: ["重复词形", "Duplicate lemma"],
     near_duplicate_tags: ["近似标签可能不一致", "Near-duplicate tags"],
     display_label_conflict: ["标签显示相同", "Tags shown alike"],
@@ -11041,6 +11186,7 @@ function qualityIssueText(issue) {
     gloss_unparsed: () => params.problems.map(glossIssueText).join("; "),
     gloss_incomplete: () => `${aText("缺少", "Missing")}: ${params.missingFields.map((key) => `\\${key}`).join(", ")}`,
     gloss_alignment_mismatch: () => `\\gla ${params.glaCount} / \\glb ${params.glbCount}`,
+    gloss_unknown_command: () => params.commands.join(", "),
     duplicate_lemma: () => params.lemmas.join(", "),
     near_duplicate_tags: () => params.forms.join(", "),
     display_label_conflict: () => `${params.displayLabel}: ${params.forms.join(", ")}`,
@@ -14325,7 +14471,12 @@ function corpusItemLabel(item) {
     return item.name;
   }
   const parsed = glossModel.parseGloss(item.content);
-  const glossText = parsed.gloss.gla.map(glossModel.glossInlinePlainText).join(" ")
+  // Items joined by @ read as one word, as they are typeset.
+  const glaText = parsed.gloss.gla
+    .map((value, index) => `${index > 0 && !parsed.gloss.glaLayout.joins.includes(index) ? " " : ""}${glossModel.glossInlinePlainText(value)}`)
+    .join("");
+  const glossText = glossModel.glossInlinePlainText(parsed.gloss.preamble)
+    || glaText
     || glossModel.glossInlinePlainText(parsed.gloss.ft);
   const text = glossText
     || (parsed.plainLines[0] ? glossModel.glossInlinePlainText(parsed.plainLines[0]) : "")
@@ -14368,7 +14519,7 @@ function createCorpusRow(row, viewState) {
   button.innerHTML = `
     <span class="corpus-item-label">${escapeHtml(corpusItemLabel(item))}</span>
     ${hasIssue ? `<svg class="nav-icon corpus-item-issue" viewBox="0 0 24 24" role="img" aria-label="${escapeHtml(t("corpusItemHasIssue"))}"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"></path></svg>` : ""}
-    ${item.linkCount ? `<span class="corpus-item-link-count" aria-label="${escapeHtml(formatText("corpusItemLinkCount", { count: item.linkCount }))}">${escapeHtml(String(item.linkCount))}</span>` : ""}
+    ${item.linkCount ? `<span class="corpus-item-link-count" role="img" aria-label="${escapeHtml(formatText("corpusItemLinkCount", { count: item.linkCount }))}"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>${escapeHtml(String(item.linkCount))}</span>` : ""}
   `;
   return button;
 }
@@ -14869,27 +15020,19 @@ async function deleteCorpusItem() {
   if (!dictionary || !draftState) {
     return;
   }
-  if (!(await appConfirm(t("deleteCorpusItemConfirm"), { danger: true }))) {
-    return;
-  }
   const path = corpusItemApiPath(dictionary, draftState.itemId);
   try {
-    let result;
-    try {
-      result = await api(path, { method: "DELETE" });
-    } catch (error) {
-      if (error.code !== "corpus_item_linked") {
-        throw error;
-      }
-      const confirmed = await appConfirm(
-        formatText("deleteLinkedCorpusItemConfirm", { links: corpusLinkSummary(error.details?.links || []) }),
-        { danger: true },
-      );
-      if (!confirmed) {
-        return;
-      }
-      result = await api(`${path}?unlink=true`, { method: "DELETE" });
+    // Reading the links first means the confirmation can list them and the
+    // delete never meets the server's 409 for a linked item; that rejection
+    // only guards a link added in between.
+    const { links } = await api(corpusItemApiPath(dictionary, draftState.itemId, "/links"));
+    const message = links.length
+      ? formatText("deleteLinkedCorpusItemConfirm", { links: corpusLinkSummary(links) })
+      : t("deleteCorpusItemConfirm");
+    if (!(await appConfirm(message, { danger: true }))) {
+      return;
     }
+    const result = await api(links.length ? `${path}?unlink=true` : path, { method: "DELETE" });
     discardCorpusDraft();
     corpusDraftState = null;
     activeCorpusViewState().selectedItemId = "";
@@ -15001,22 +15144,23 @@ function renderCorpusGlossRows(groups, gloss, settings, alignEnabled) {
     .map((targets) => targets.filter((target) => corpusGlossTargetHasContent(gloss, target)))
     .filter((targets) => targets.length)
     .map((targets) => ({ targets, tokens: corpusGlossRowTokens(targets, gloss) }));
-  if (!rows.length) {
+  if (!rows.length && !gloss.preamble) {
     return escapeHtml(t("corpusItemFallback"));
   }
 
-  const output = [];
+  // The preamble always sits above the gloss, as in ExPex.
+  const output = gloss.preamble ? [renderCorpusGlossPreamble(gloss.preamble, settings)] : [];
   let alignableRows = [];
   const flushAlignableRows = () => {
     if (alignableRows.length) {
-      output.push(renderCorpusGlossRowGroup(alignableRows, alignEnabled, settings));
+      output.push(renderCorpusGlossRowGroup(alignableRows, alignEnabled, settings, gloss.glaLayout));
       alignableRows = [];
     }
   };
   rows.forEach((row) => {
     if (row.targets.some(({ key }) => key === "ft")) {
       flushAlignableRows();
-      output.push(renderCorpusGlossRowGroup([row], false, settings));
+      output.push(renderCorpusGlossRowGroup([row], false, settings, gloss.glaLayout));
     } else {
       alignableRows.push(row);
     }
@@ -15025,36 +15169,104 @@ function renderCorpusGlossRows(groups, gloss, settings, alignEnabled) {
   return output.join("");
 }
 
-function renderCorpusGlossRowGroup(rows, alignEnabled, settings) {
+// The preamble is object-language text, so it takes the \gla font and size
+// but neither its bold nor its italic.
+function renderCorpusGlossPreamble(preamble, settings) {
+  const style = settings.glossStyles.gla;
+  return `<span class="corpus-gloss-group corpus-gloss-preamble gloss-font-${style.fontFamily} gloss-size-${style.fontSize}">${renderGlossInlineHtml(preamble)}</span>`;
+}
+
+// The \gla layout (+ breaks, @ joins, \nogloss items) applies to a row that
+// shows \gla alone, where its items are the row's tokens.
+function isGlaOnlyRow(row) {
+  return row.targets.length === 1 && row.targets[0].key === "gla";
+}
+
+function renderUnalignedGlossRow(row, settings, layout) {
+  const glaLayout = isGlaOnlyRow(row) ? layout : null;
+  return row.tokens.map(({ key, value }, index) => {
+    const separator = index === 0
+      ? ""
+      : glaLayout?.breaks.includes(index) ? "<br>" : glaLayout?.joins.includes(index) ? "" : " ";
+    return separator + renderCorpusGlossToken(key, value, settings);
+  }).join("");
+}
+
+// Lower levels align with the \gla items that are not \nogloss, and items
+// beyond the \gla items get columns of their own.
+function corpusGlossColumns(rows, layout) {
+  const glaRow = rows.findIndex(isGlaOnlyRow);
+  if (glaRow === -1) {
+    const count = Math.max(...rows.map(({ tokens }) => tokens.length));
+    return Array.from({ length: count }, (_, column) => ({
+      cells: rows.map(({ tokens }) => tokens[column] || null),
+      breakBefore: false,
+      joinBefore: false,
+    }));
+  }
+  const glaCount = rows[glaRow].tokens.length;
+  const glossedColumns = Array.from({ length: glaCount }, (_, column) => column)
+    .filter((column) => !layout.nogloss.includes(column));
+  const extra = Math.max(0, ...rows.map(({ tokens }, index) => (index === glaRow ? 0 : tokens.length - glossedColumns.length)));
+  const columns = Array.from({ length: glaCount + extra }, (_, column) => ({
+    cells: rows.map(() => null),
+    breakBefore: layout.breaks.includes(column),
+    joinBefore: layout.joins.includes(column),
+  }));
+  rows.forEach(({ tokens }, rowIndex) => {
+    tokens.forEach((token, index) => {
+      const column = rowIndex === glaRow
+        ? index
+        : index < glossedColumns.length ? glossedColumns[index] : glaCount + index - glossedColumns.length;
+      columns[column].cells[rowIndex] = token;
+    });
+  });
+  return columns;
+}
+
+function renderCorpusGlossRowGroup(rows, alignEnabled, settings, layout) {
   const align = alignEnabled && rows.length > 1;
   if (!align) {
     return `
       <span class="corpus-gloss-group unaligned">
-        ${rows.map(({ targets, tokens }) => `<span class="corpus-gloss-row ${corpusGlossRowClasses(targets)}">${tokens.map(({ key, value }) => renderCorpusGlossToken(key, value, settings)).join(" ")}</span>`).join("")}
+        ${rows.map((row) => `<span class="corpus-gloss-row ${corpusGlossRowClasses(row.targets)}">${renderUnalignedGlossRow(row, settings, layout)}</span>`).join("")}
       </span>
     `;
   }
   // Each aligned item is a column holding its levels, and the columns wrap
-  // like words. Read column by column the levels would interleave, so
+  // like words: + starts a new line, and columns joined by @ stay together
+  // without a gap. Read column by column the levels would interleave, so
   // assistive technology gets the levels line by line instead.
-  const columnCount = Math.max(...rows.map(({ tokens }) => tokens.length));
   const rowText = rows.map(({ tokens }) => tokens
     .map(({ value }) => glossModel.glossInlinePlainText(value))
     .filter(Boolean)
     .join(" "));
+  const renderColumn = ({ cells }) => `<span class="gloss-column">${cells.map((token, rowIndex) => (
+    token
+      ? renderCorpusGlossToken(token.key, token.value, settings)
+      : `<span class="${glossStyleClassNames(rows[rowIndex].targets[0].key, settings)}"></span>`
+  )).join("")}</span>`;
+  // Lines split at each +, and each line holds clusters of columns joined by @.
+  const lines = [[]];
+  corpusGlossColumns(rows, layout).forEach((column) => {
+    if (column.breakBefore) {
+      lines.push([]);
+    }
+    const line = lines[lines.length - 1];
+    if (column.joinBefore && line.length) {
+      line[line.length - 1].push(column);
+    } else {
+      line.push([column]);
+    }
+  });
   return `
     <span class="corpus-gloss-group aligned">
       <span class="visually-hidden">${rowText.map(escapeHtml).join("<br>")}</span>
-      <span class="gloss-columns" aria-hidden="true">
-        ${Array.from({ length: columnCount }, (_, column) => `
-          <span class="gloss-column">${rows.map(({ targets, tokens }) => {
-            const token = tokens[column];
-            return token
-              ? renderCorpusGlossToken(token.key, token.value, settings)
-              : `<span class="${glossStyleClassNames(targets[0].key, settings)}"></span>`;
-          }).join("")}</span>
-        `).join("")}
-      </span>
+      ${lines.map((clusters) => `<span class="gloss-columns" aria-hidden="true">${clusters.map((columns) => (
+        columns.length > 1
+          ? `<span class="gloss-column-cluster">${columns.map(renderColumn).join("")}</span>`
+          : renderColumn(columns[0])
+      )).join("")}</span>`).join("")}
     </span>
   `;
 }
@@ -18301,6 +18513,11 @@ elements.morphologyTablesForm.addEventListener("keydown", (event) => {
 elements.morphologySyntaxButton.addEventListener("click", () => {
   appInfoDialog(t("morphologySyntaxTitle"), {
     html: morphologySyntaxInfoHtml(),
+  });
+});
+elements.corpusSyntaxButton.addEventListener("click", () => {
+  appInfoDialog(t("corpusSyntaxTitle"), {
+    html: corpusSyntaxInfoHtml(),
   });
 });
 elements.closeInfoDialogButton.addEventListener("click", closeInfoDialog);

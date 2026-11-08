@@ -278,8 +278,8 @@ page background            被采样的环境内容
 | 角色或材质 | 消费者 | 折射策略 | 动态策略 |
 | --- | --- | --- | --- |
 | `continuous` | 桌面浮动导航卡片、移动导航抽屉 | Lab：`3px` 光学模糊与完整四边折射。产品（2026-11-02 起）：移动导航抽屉为 `blur(3px)`，桌面导航无背景滤镜，只保留 tint 与 specular；桌面导航另有 `!important` 规则，以规避 Chrome 局部重绘时在其背景模糊上留下的方框边缘（原生与 SVG 模糊都会触发，只做位移不会） | 静态环境 specular；不跟随局部指针 |
-| `toolbar` | 词条列表搜索框与工具栏背景、标签管理页搜索框（2026-11-02 从 continuous 拆出） | 除光学内模糊外参数暂与 continuous 相同，可单独调整；光学内模糊为 0（2026-11-08 起），与它没有背景滤镜一致，Q2 与 Q3 只差折射；产品无背景滤镜，只保留 tint（`--liquid-glass-toolbar-surface-tint`）、阴影与 specular | 同 continuous |
-| 内容外壳（CSS） | 内容外壳（`data-surface="content-shell"`）：词条详情、完整编辑，以及工具页面的卡片 | 无背景滤镜（2026-11-02 起），只有 tint/边框/阴影 | CSS-only，无贴图、位移、色散或光学 specular |
+| `toolbar` | 词条列表搜索框与工具栏背景、标签管理页搜索框（2026-11-02 从 continuous 拆出）、语料库搜索框（2026-11-08 起） | 除光学内模糊外参数暂与 continuous 相同，可单独调整；光学内模糊为 0（2026-11-08 起），与它没有背景滤镜一致，Q2 与 Q3 只差折射；产品无背景滤镜，只保留 tint（`--liquid-glass-toolbar-surface-tint`）、阴影与 specular | 同 continuous |
+| 内容外壳（CSS） | 内容外壳（`data-surface="content-shell"`）：词条详情、完整编辑、语料详情面板，以及工具页面的卡片 | 无背景滤镜（2026-11-02 起），只有 tint/边框/阴影 | CSS-only，无贴图、位移、色散或光学 specular |
 | 浮层（CSS） | 搜索/筛选/排序/皮肤菜单、来源建议、右键菜单、全部结构化 tooltip/popover、toast | 固定 Q1（2026-10-02 起）：`5.5px` CSS blur、`1.12×` 饱和度及原 tint/边框/阴影 | CSS-only，无贴图、位移或光学 specular |
 | 弹窗（CSS） | 信息/确认 modal、词汇网络主面板 | 固定 Q1（2026-10-02 起）：`7px` CSS blur、`1.08×` 饱和度及原 tint/边框/阴影 | CSS-only，无贴图、位移或光学 specular；遮罩不成为 Backdrop Root |
 | 普通控件（CSS） | 按钮、输入框、select、chip | CSS/高光图表达微型体积，不逐个采样 backdrop | hover/pressed 改变光照和压力感 |

@@ -155,13 +155,15 @@ async function main() {
     // Corpus quality checks every item once.
     const quality = new CorpusQualityService({ repository });
     await repository.createCorpusItem(DICTIONARY_ID, { content: [String.raw`\gla a b`, String.raw`\glb A`, String.raw`\ft x`].join("\n") });
-    await repository.createCorpusItem(DICTIONARY_ID, { content: String.raw`\pex` });
+    await repository.createCorpusItem(DICTIONARY_ID, { content: [String.raw`\gla a //`, "stray", String.raw`\glb A //`, String.raw`\ft x`].join("\n") });
+    await repository.createCorpusItem(DICTIONARY_ID, { content: [String.raw`\pex`, String.raw`\gla a`, String.raw`\glb A`, String.raw`\ft x`].join("\n") });
     const source = { type: "corpusQuality", version: 1 };
     const summary = await quality.query(DICTIONARY_ID, { source, responseMode: "summary" });
     assert.deepEqual(summary.summary.codes.map((row) => [row.key, row.itemCount]), [
       ["gloss_unparsed", 1],
       ["gloss_incomplete", 1],
       ["gloss_alignment_mismatch", 1],
+      ["gloss_unknown_command", 1],
     ]);
     const mismatch = await quality.query(DICTIONARY_ID, {
       source,

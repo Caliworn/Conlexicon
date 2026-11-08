@@ -1084,11 +1084,12 @@ source、version、options、response mode、item kind、selector 与 issue 视�
 
 | Code | 严重度 | 稳定参数 |
 | --- | --- | --- |
-| `gloss_unparsed` | medium | `problems`：解析器的提示列表（`unknown_command` 带 `command`，`duplicate_level` 带 `level`，`stray_line`） |
+| `gloss_unparsed` | medium | `problems`：解析器的 issues，均带 `line`（`duplicate_level` 另带 `level`，可为 `preamble`；`stray_line` 为 `//` 结束一层后的多余文字） |
 | `gloss_incomplete` | medium | `missingFields`：缺少的 `gla`、`glb`、`ft` |
-| `gloss_alignment_mismatch` | medium | `glaCount`、`glbCount` |
+| `gloss_alignment_mismatch` | medium | `glaCount`（不含 `\nogloss` 项）、`glbCount` |
+| `gloss_unknown_command` | low | `commands`：层外被跳过的命令，去重后按出现顺序 |
 
-规则读取 `\gla / \glb / \glc / \ft` 及别名 `\a / \b / \c / \glft`（解析在 `lib/gloss-model.js`，前后端共用；切词只看花括号外的空白，行内格式命令不改变项数）。只有至少一层存在时才检查完整性和对齐；纯文本语料与没有连接的语料不产生问题。一条语料无论被多少释义连接，每个问题只报告一次。
+语料 issue 为 `{ code, severity, itemId, params }`，`severity` 取自上表。规则读取 `\gla / \glb / \glc / \glft` 及别名 `\a / \b / \c / \ft`、前言 `\glpreamble`（解析在 `lib/gloss-model.js`，前后端共用，规则见 [轻量语料库计划](CORPUS_LIGHTWEIGHT_PLAN.md#3-gloss-格式)；切词只看花括号外的空白，行内格式命令不改变项数，`\gla` 的 `+`、`@` 不算项）。只有至少一层存在时才检查完整性和对齐；纯文本语料与没有连接的语料不产生问题。一条语料无论被多少释义连接，每个问题只报告一次。
 
 ##### 规则边界行为
 

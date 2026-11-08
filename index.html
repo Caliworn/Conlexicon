@@ -180,7 +180,7 @@
                 <div class="entry-search-control" id="entrySearchControl">
                   <div class="entry-mail-search-surface" aria-hidden="true"></div>
                   <svg class="nav-icon entry-mail-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg>
-                  <input id="searchInput" type="search" aria-keyshortcuts="Control+K Meta+K" data-i18n-placeholder="searchPlaceholder" placeholder="搜索词形、释义、标签">
+                  <input id="searchInput" type="search" aria-keyshortcuts="Control+K Meta+K" data-i18n-placeholder="searchPlaceholder" placeholder="搜索词条">
                   <button class="secondary-button entry-mail-clear" id="entrySearchClearButton" data-control-tone="neutral" type="button" hidden><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button>
                   <button class="secondary-button entry-search-config-button" id="entrySearchConfigButton" data-control-tone="neutral" type="button" aria-controls="entrySearchConfigMenu" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="currentSearchSettings" aria-label="当前搜索设置">
                     <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -831,7 +831,10 @@
           <section class="top-bar">
             <div>
               <p class="eyebrow dictionary-name-eyebrow" data-active-dictionary-name></p>
-              <h2 data-i18n="corpus">语料库</h2>
+              <div class="heading-line page-title-with-info">
+                <h2 data-i18n="corpus">语料库</h2>
+                <button class="info-button" id="corpusSyntaxButton" data-control-tone="neutral" type="button" data-app-tooltip="always" data-i18n-aria-label="corpusSyntaxInfo" aria-label="查看语料格式说明">i</button>
+              </div>
             </div>
             <div class="top-actions">
               <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="saveCorpusButton" type="button" data-i18n="saveCorpus">保存语料库</button>
@@ -847,12 +850,19 @@
             <div class="corpus-layout">
               <aside class="corpus-browser">
                 <div class="corpus-browser-tools">
-                  <input id="corpusSearchInput" type="search" data-i18n-placeholder="corpusSearchPlaceholder" placeholder="搜索语料">
-                  <button class="secondary-button" data-control-tone="accent" data-control-emphasis="outline" id="newCorpusItemButton" type="button" data-i18n="newCorpusItem">新建语料</button>
+                  <div class="corpus-search">
+                    <div class="corpus-search-surface" aria-hidden="true"></div>
+                    <input id="corpusSearchInput" type="search" data-i18n-placeholder="corpusSearchPlaceholder" data-i18n-aria-label="corpusSearchPlaceholder" placeholder="搜索语料" aria-label="搜索语料">
+                  </div>
+                  <button class="secondary-button corpus-new-button" data-control-tone="accent" data-control-emphasis="outline" id="newCorpusItemButton" type="button" data-app-tooltip="always" data-i18n-aria-label="newCorpusItem" aria-label="新建语料">
+                    <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 5v14M5 12h14"></path>
+                    </svg>
+                  </button>
                 </div>
                 <div class="corpus-item-list" id="corpusItemList"></div>
               </aside>
-              <section class="corpus-editor-panel" id="corpusEditor"></section>
+              <section class="corpus-editor-panel" data-surface="content-shell" id="corpusEditor"></section>
             </div>
           </section>
         </section>
