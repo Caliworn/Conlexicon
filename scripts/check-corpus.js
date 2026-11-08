@@ -9,11 +9,6 @@ function legacyDictionary() {
   return {
     id: DICTIONARY_ID,
     name: "Corpus check",
-    settings: {
-      corpusUnitRenderPattern: String.raw`\gla`,
-      corpusUnitCardRenderPattern: String.raw`\ft`,
-      corpusUnitGlossAlign: false,
-    },
     entries: [
       {
         id: "entry-wapm",
@@ -65,8 +60,6 @@ async function main() {
 
     // Legacy JSON: blocks become groups, units keep IDs and order, extra
     // structure becomes % comments, and examples become linked items.
-    assert.equal(dictionary.settings.corpusRenderPattern, String.raw`\gla`, "the unit heading pattern wins");
-    assert.equal(dictionary.settings.corpusGlossAlign, false);
     assert.ok(report.warnings.some((line) => line.includes("unit-1")), "a unit placed twice is reported");
     assert.deepEqual(dictionary.corpus.items.slice(0, 5).map(({ id, group, content }) => [id, group, content]), [
       ["unit-1", "Story", ["% 块备注：told by K.", "% 标签：t1", String.raw`\gla a b`, String.raw`\glb A B`].join("\n")],

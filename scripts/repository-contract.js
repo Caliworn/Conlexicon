@@ -1546,6 +1546,8 @@ function checkModelNormalization() {
       corpusUnitRenderPattern: "\\gla",
       corpusUnitCardRenderPattern: "\\ft",
       corpusUnitGlossAlign: false,
+      entryExampleRenderPattern: "(\\gla)",
+      entryExampleGlossAlign: false,
       savePartialEditOnSwitch: true,
       fuzzySearch: false,
       tagFuzzySearch: false,
@@ -1573,11 +1575,12 @@ function checkModelNormalization() {
   assert.deepEqual(importedVowels(" aei "), ["a", "e", "i"], "surrounding space is not a separator");
   assert.deepEqual(importedVowels(["a", "ai"]), ["a", "ai"]);
   assert.equal(legacyConvertedImport.dictionary.settings.glossStyles.gla.fontFamily, "sans");
-  assert.equal(legacyConvertedImport.dictionary.settings.corpusRenderPattern, "\\gla", "the unit heading pattern wins");
-  assert.equal(legacyConvertedImport.dictionary.settings.corpusGlossAlign, false);
   assert.equal(legacyConvertedImport.dictionary.settings.partialEditPageSwitchAction, "save");
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "glossFontFamily"), false);
-  assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "corpusUnitRenderPattern"), false);
+  // Gloss rendering has no settings, so render patterns and alignment
+  // switches of every version stay out of the imported settings.
+  ["corpusUnitRenderPattern", "corpusUnitCardRenderPattern", "corpusUnitGlossAlign", "entryExampleRenderPattern", "entryExampleGlossAlign"]
+    .forEach((key) => assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, key), false, key));
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "savePartialEditOnSwitch"), false);
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "fuzzySearch"), false);
   assert.equal(Object.hasOwn(legacyConvertedImport.dictionary.settings, "tagFuzzySearch"), false);

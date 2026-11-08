@@ -3985,34 +3985,6 @@ span.pending-source {
   opacity: 0.72;
 }
 
-.gloss-render-contexts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.gloss-render-context {
-  display: grid;
-  align-content: start;
-  gap: 8px;
-  min-width: 0;
-}
-
-.gloss-render-context + .gloss-render-context {
-  border-left: 1px solid var(--ui-border);
-  padding-left: 14px;
-}
-
-.gloss-render-context h4 {
-  margin: 0;
-  color: var(--ui-text);
-  font-size: 0.9rem;
-}
-
-.gloss-render-context textarea {
-  min-height: 66px;
-}
-
 .gloss-style-list {
   display: grid;
   gap: 8px;
@@ -4324,11 +4296,6 @@ span.pending-source {
 .corpus-gloss-preamble {
   display: block;
   overflow-wrap: anywhere;
-}
-
-.corpus-render-error {
-  color: var(--ui-danger);
-  font-weight: 800;
 }
 
 .corpus-empty-list,
@@ -7148,17 +7115,6 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
   .ipa-rule-grid .icon-danger-button {
     grid-column: 3;
     grid-row: 1;
-  }
-
-  .gloss-render-contexts {
-    grid-template-columns: 1fr;
-  }
-
-  .gloss-render-context + .gloss-render-context {
-    border-top: 1px solid var(--ui-border);
-    border-left: 0;
-    padding-top: 12px;
-    padding-left: 0;
   }
 
   .gloss-style-row {

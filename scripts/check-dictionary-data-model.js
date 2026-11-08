@@ -38,8 +38,6 @@ function checkSettingsPreservation() {
     entryListTagFiltering: false,
     allowEmptyTags: false,
     newEntryButtonAction: "full",
-    entryExampleRenderPattern: "",
-    corpusUnitCardRenderPattern: "",
   });
   assert.deepEqual(settings.futureOption, { nested: true }, "unknown settings fields pass through");
   assert.equal(settings.corpusAutoSave, false);
@@ -48,13 +46,10 @@ function checkSettingsPreservation() {
   assert.equal(settings.allowEmptyTags, false);
   assert.equal(settings.newEntryButtonAction, "full");
   assert.equal(normalizeDictionarySettings({ newEntryButtonAction: "bogus" }).newEntryButtonAction, "quick");
-  assert.equal(settings.entryExampleRenderPattern, "", "an explicit empty pattern is not replaced by the default");
-  assert.equal(settings.corpusUnitCardRenderPattern, "");
 
   const defaults = normalizeDictionarySettings();
   assert.equal(defaults.corpusAutoSave, true);
   assert.equal(defaults.newEntryButtonAction, "quick");
-  assert.equal(defaults.entryExampleRenderPattern, "(\\gla)\n(\\glb)\n(\\glc)\n(\\ft)");
   assert.equal(defaults.glossStyles.ft.italic, true);
 }
 

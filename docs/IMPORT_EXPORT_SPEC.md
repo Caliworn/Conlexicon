@@ -74,7 +74,7 @@ Legacy JSON 导入应分为几个明确阶段：
    - 判断是不是可识别词典。
    - 拒绝非对象、空对象或明显不是词典的结构。
 2. legacy 兼容迁移。
-   - 由 `lib/legacy-dictionary-migration.js` 处理旧字段，例如旧释义/例句字段（`definition.example` 转成未分组语料并连接，相同文本不合并）、旧来源文本字段、旧语料块与单元（块转成分组，单元保留 ID 和顺序，层名、发言人、模态、备注、标签与属性转成 `%` 注释行，被多处链接的单元保留首处并记 warning）、旧语料渲染设置（单元标题的渲染对象优先）、旧 IPA `stressMappings`、旧 IPA 字符串 `syllable.vowels`（有空格、逗号或顿号时按分隔符拆成数组，和运行时读取一致；没有时逐字符拆开，基字保留组合附加符）、旧设置字段，以及旧形态 `morphology.tables` / `entry.morphology` 结构。
+   - 由 `lib/legacy-dictionary-migration.js` 处理旧字段，例如旧释义/例句字段（`definition.example` 转成未分组语料并连接，相同文本不合并）、旧来源文本字段、旧语料块与单元（块转成分组，单元保留 ID 和顺序，层名、发言人、模态、备注、标签与属性转成 `%` 注释行，被多处链接的单元保留首处并记 warning）、各版本的语料与例句渲染对象及对齐开关（Gloss 有什么就渲染什么，导入时一律丢弃）、旧 IPA `stressMappings`、旧 IPA 字符串 `syllable.vowels`（有空格、逗号或顿号时按分隔符拆成数组，和运行时读取一致；没有时逐字符拆开，基字保留组合附加符）、旧设置字段，以及旧形态 `morphology.tables` / `entry.morphology` 结构。
    - 记录发生过的 legacy 字段转换。
    - 迁移会移除旧的空释义；判断"空"时也看释义标签 `definitions[].tags`，因此当前格式中只有标签的释义会保留。旧 JSON 没有释义标签。
    - 文件没有 `tagRegistry` 时，由 `partOfSpeechTags`、`tagSortOrder`、`tagDisplayMap`、`redHighlightTags` 和词典中实际在用的标签生成登记表，并从 settings 移除这四项（见 5.1）。

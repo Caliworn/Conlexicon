@@ -529,34 +529,9 @@
                 <div class="form-heading compact-heading">
                   <div>
                     <p class="eyebrow" data-i18n="corpus">语料库</p>
-                    <h3 data-i18n="corpusRendering">渲染</h3>
+                    <h3 data-i18n="corpusRendering">Gloss 样式</h3>
                   </div>
                 </div>
-                <div class="gloss-render-contexts">
-                  <section class="gloss-render-context">
-                    <h4 data-i18n="corpusContentRendering">语料内容</h4>
-                    <label>
-                      <span data-i18n="corpusRenderPattern">渲染对象</span>
-                      <textarea id="corpusRenderPatternInput" rows="4" spellcheck="false" placeholder="\gla&#10;(\glb)&#10;(\ft)"></textarea>
-                    </label>
-                    <label class="toggle-row">
-                      <span data-i18n="corpusGlossAlign">对齐多行 Gloss</span>
-                      <input id="corpusGlossAlignInput" type="checkbox">
-                    </label>
-                  </section>
-                  <section class="gloss-render-context">
-                    <h4 data-i18n="entryExampleRendering">词条例句</h4>
-                    <label>
-                      <span data-i18n="corpusRenderPattern">渲染对象</span>
-                      <textarea id="entryExampleRenderPatternInput" rows="4" spellcheck="false" placeholder="\gla&#10;(\glb)&#10;(\ft)"></textarea>
-                    </label>
-                    <label class="toggle-row">
-                      <span data-i18n="entryExampleGlossAlign">例句中对齐多行 Gloss</span>
-                      <input id="entryExampleGlossAlignInput" type="checkbox">
-                    </label>
-                  </section>
-                </div>
-                <p class="field-help" data-i18n="corpusRenderPatternHelp">留空时将对应内容作为纯文本原样显示并保持换行，不识别 Gloss 格式。填写时仅接受 \gla、\glb、\glc、\ft；配置中的每一行对应一条输出行，多条非 \ft 输出行可按词位对齐。用括号包裹对象（如 (\gla)）可在内容缺失时跳过该对象。</p>
                 <div class="gloss-style-list">
                   <div class="gloss-style-row" data-gloss-style="gla">
                     <code>\gla</code>

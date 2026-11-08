@@ -212,7 +212,7 @@ corpus: { items: [{ id, name, group, content, createdAt, updatedAt }] }
 - 多条例句可以调整顺序，方式与释义卡片相同：`Alt` + `↑`／`↓` 和拖动把手（第 3 阶段；第 2 阶段按连接顺序显示）。
 - 检索框调用语料窗口接口。框为空时按 `Tab` 填入当前词形并开始查找；有内容时 `Tab` 照常移动焦点；`Shift` + `Tab` 不受影响；输入法组字时不触发。这与快速录入的 `Tab` 约定一致。
 - “写新例句”展开文本框，保存词条时创建无名称、无分组的语料并连接。改已有句子要跳到语料页。
-- 词条详情的例句沿用 `entryExampleRenderPattern` 和对齐设置。
+- 词条详情的例句与语料页使用同一套渲染：内容里有的部分都显示，多层始终按项对齐。
 
 已知限制：检索只匹配文本，查词形找不到变形后的句子，需要手动改搜索词。
 
@@ -267,7 +267,7 @@ corpus: { items: [{ id, name, group, content, createdAt, updatedAt }] }
 
 ## 10. 设置与实施阶段
 
-设置：`corpusUnitCardRenderPattern`、`corpusUnitRenderPattern` 及对应的对齐开关合并为 `corpusRenderPattern`、`corpusGlossAlign`。`entryExampleRenderPattern`、`entryExampleGlossAlign` 和 `corpusAutoSave` 保留。
+设置：第 2 阶段把语料卡片和单元标题的渲染对象与对齐开关合并为 `corpusRenderPattern`、`corpusGlossAlign`；之后（2026-11-08）语料和词条例句的渲染对象与对齐开关全部删除，Gloss 有什么就渲染什么：前言、按项对齐的 `\gla`／`\glb`／`\glc`、自由翻译，导入时丢弃这些旧字段。设置页只保留各层的字体、字号、粗体和斜体。`corpusAutoSave` 保留。
 
 各阶段独立提交：
 
