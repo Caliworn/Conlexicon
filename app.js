@@ -577,7 +577,6 @@ const i18n = {
     glossFontSize: "渲染字号",
     glossStyleBold: "粗体",
     glossStyleItalic: "斜体",
-    glossStyleSmallCaps: "Small caps",
     fontSerif: "衬线",
     fontSans: "无衬线",
     fontMono: "等宽",
@@ -586,6 +585,10 @@ const i18n = {
     fontSizeLarge: "大",
     invalidCorpusRenderPattern: "渲染对象只能包含 \\gla、\\glb、\\glc、\\ft、用于可选对象的括号和换行。",
     corpusRenderError: "单元名称渲染错误",
+    glossShownAsSource: "按原文显示：{reason}",
+    glossIssueUnknownCommand: "无法识别的命令 {command}",
+    glossIssueDuplicateLevel: "重复的层 {level}",
+    glossIssueStrayLine: "Gloss 中有没有层标记的行",
     searchSettings: "搜索",
     searchDisplay: "显示",
     save: "保存",
@@ -1253,7 +1256,6 @@ const i18n = {
     glossFontSize: "Rendering Size",
     glossStyleBold: "Bold",
     glossStyleItalic: "Italic",
-    glossStyleSmallCaps: "Small Caps",
     fontSerif: "Serif",
     fontSans: "Sans",
     fontMono: "Mono",
@@ -1262,6 +1264,10 @@ const i18n = {
     fontSizeLarge: "Large",
     invalidCorpusRenderPattern: "Render Objects may contain only \\gla, \\glb, \\glc, \\ft, parentheses around optional objects, and line breaks.",
     corpusRenderError: "Unit name rendering error",
+    glossShownAsSource: "Shown as written: {reason}",
+    glossIssueUnknownCommand: "unrecognized command {command}",
+    glossIssueDuplicateLevel: "repeated level {level}",
+    glossIssueStrayLine: "a line in the gloss has no level marker",
     searchSettings: "Search",
     searchDisplay: "Display",
     save: "Save",
@@ -9417,10 +9423,40 @@ function glossStyleClassNames(key, settings) {
   ].join(" ");
 }
 
-function renderGlossTokenText(key, value, settings) {
-  return key === "glb" && settings.glossStyles.glb.smallCaps
-    ? renderSmallCaps(value)
-    : escapeHtml(value);
+const GLOSS_INLINE_STYLE_CLASSES = Object.freeze({
+  bold: "gloss-inline-bold",
+  italic: "gloss-inline-italic",
+  smallCaps: "smallcaps",
+  normal: "gloss-inline-normal",
+});
+
+function renderGlossInlineHtml(value) {
+  const render = (nodes) => nodes.map((node) => (
+    node.type === "text"
+      ? escapeHtml(node.value)
+      : `<span class="${GLOSS_INLINE_STYLE_CLASSES[node.style]}">${render(node.children)}</span>`
+  )).join("");
+  return render(glossModel.parseGlossInline(value));
+}
+
+function glossSourceLines(content) {
+  return glossModel.normalizeGlossLineBreaks(content).split(/\r?\n/);
+}
+
+function glossIssueText(issue) {
+  if (issue.code === "unknown_command") {
+    return formatText("glossIssueUnknownCommand", { command: issue.command });
+  }
+  if (issue.code === "duplicate_level") {
+    return formatText("glossIssueDuplicateLevel", { level: `\\${issue.level}` });
+  }
+  return t("glossIssueStrayLine");
+}
+
+// Content the parser cannot fully read is shown as written, with the first
+// reason, so no part of it disappears from the rendering.
+function glossParseHintHtml(issues) {
+  return `<small class="gloss-parse-hint">${escapeHtml(formatText("glossShownAsSource", { reason: glossIssueText(issues[0]) }))}</small>`;
 }
 
 function renderExampleHtml(example, settings = dictionarySettings()) {
@@ -9431,27 +9467,17 @@ function renderExampleHtml(example, settings = dictionarySettings()) {
   if (!pattern.groups.length) {
     return `<p>${escapeHtml(example).replaceAll("\n", "<br>")}</p>`;
   }
-  const gloss = parseGloss(example);
-  if (!gloss) {
-    return `<p>${escapeHtml(example).replaceAll("\n", "<br>")}</p>`;
+  const parsed = glossModel.parseGloss(example);
+  if (parsed.issues.length) {
+    return `<p>${glossSourceLines(example).map(escapeHtml).join("<br>")}</p>${glossParseHintHtml(parsed.issues)}`;
   }
-  if (!corpusGlossHasTargets(gloss, pattern.groups)) {
+  if (parsed.kind !== "gloss") {
+    return `<p>${parsed.plainLines.map(renderGlossInlineHtml).join("<br>")}</p>`;
+  }
+  if (!corpusGlossHasTargets(parsed.gloss, pattern.groups)) {
     return `<p class="corpus-unit-render-error">${escapeHtml(t("corpusRenderError"))}</p>`;
   }
-  return `<div class="gloss-block">${renderCorpusGlossRows(pattern.groups, gloss, settings, settings.entryExampleGlossAlign)}</div>`;
-}
-
-function parseGloss(example) {
-  return glossModel.parseGloss(example);
-}
-
-function renderSmallCaps(value) {
-  return String(value || "").replace(/[a-z0-9]+|[&<>"']/g, (match) => {
-    if (/^[a-z0-9]+$/.test(match)) {
-      return `<span class="smallcaps">${match}</span>`;
-    }
-    return escapeHtml(match);
-  });
+  return `<div class="gloss-block">${renderCorpusGlossRows(pattern.groups, parsed.gloss, settings, settings.entryExampleGlossAlign)}</div>`;
 }
 
 function entryListTagItems(entry, { includePartTags = true, dictionary = activeDictionary() } = {}) {
@@ -12527,10 +12553,6 @@ function fillGlossStyleForm(styles) {
     row.querySelector("[data-gloss-style-size]").value = style.fontSize;
     row.querySelector("[data-gloss-style-bold]").checked = style.bold;
     row.querySelector("[data-gloss-style-italic]").checked = style.italic;
-    const smallCapsInput = row.querySelector("[data-gloss-style-smallcaps]");
-    if (smallCapsInput) {
-      smallCapsInput.checked = Boolean(style.smallCaps);
-    }
   });
 }
 
@@ -12543,9 +12565,6 @@ function collectGlossStyleForm() {
       fontSize: normalizeGlossFontSize(row.querySelector("[data-gloss-style-size]").value),
       bold: row.querySelector("[data-gloss-style-bold]").checked,
       italic: row.querySelector("[data-gloss-style-italic]").checked,
-      ...(key === "glb" ? {
-        smallCaps: row.querySelector("[data-gloss-style-smallcaps]").checked,
-      } : {}),
     };
   });
   return normalizeGlossStyles(styles);
@@ -14090,24 +14109,24 @@ function corpusIntegrityIssues(corpus = ensureCorpusDraft()) {
 function corpusUnitLabel(unit, fallback = "") {
   const settings = dictionarySettings();
   const pattern = parseCorpusRenderPattern(settings.corpusUnitCardRenderPattern);
+  const parsed = glossModel.parseGloss(unit?.content);
   let content = "";
-  if (!pattern.error && pattern.groups.length) {
-    const parsed = parseStrictCorpusGloss(unit?.content);
-    if (!parsed.error && corpusGlossHasTargets(parsed.gloss, pattern.groups)) {
-      content = pattern.groups
-        .map((group) => group
-          .filter((target) => corpusGlossTargetHasContent(parsed.gloss, target))
-          .map((target) => corpusGlossText(parsed.gloss, target.key))
-          .filter(Boolean)
-          .join(" "))
-        .filter(Boolean)
-        .join(" / ");
-    }
-  } else if (!pattern.error) {
-    content = String(unit?.content || "")
-      .replaceAll("\\n", "\n")
-      .split(/\r?\n/)
+  if (pattern.error) {
+    content = "";
+  } else if (!pattern.groups.length || parsed.issues.length) {
+    content = glossSourceLines(unit?.content)
       .map((line) => line.trim())
+      .filter(Boolean)
+      .join(" / ");
+  } else if (parsed.kind === "plain") {
+    content = parsed.plainLines.map(glossModel.glossInlinePlainText).join(" / ");
+  } else if (corpusGlossHasTargets(parsed.gloss, pattern.groups)) {
+    content = pattern.groups
+      .map((group) => group
+        .filter((target) => corpusGlossTargetHasContent(parsed.gloss, target))
+        .map((target) => corpusGlossText(parsed.gloss, target.key))
+        .filter(Boolean)
+        .join(" "))
       .filter(Boolean)
       .join(" / ");
   }
@@ -14140,26 +14159,6 @@ function parseCorpusRenderPattern(value) {
   return { groups, error: "" };
 }
 
-function parseStrictCorpusGloss(value) {
-  const gloss = { gla: [], glb: [], glc: [], ft: "" };
-  const lines = String(value || "").replaceAll("\\n", "\n").split(/\r?\n/).filter((line) => line.trim());
-  if (!lines.length) {
-    return { gloss, error: "" };
-  }
-  for (const line of lines) {
-    const match = line.match(/^\\(gla|glb|glc|ft)\s*(.*)$/);
-    if (!match) {
-      return { gloss, error: t("corpusRenderError") };
-    }
-    if (match[1] === "ft") {
-      gloss.ft = match[2].trim();
-    } else {
-      gloss[match[1]] = match[2].trim().split(/\s+/).filter(Boolean);
-    }
-  }
-  return { gloss, error: "" };
-}
-
 function corpusGlossHasTargets(gloss, groups) {
   return groups.flat().every((target) => target.optional || corpusGlossTargetHasContent(gloss, target));
 }
@@ -14169,7 +14168,9 @@ function corpusGlossTargetHasContent(gloss, target) {
 }
 
 function corpusGlossText(gloss, key) {
-  return key === "ft" ? gloss.ft : (gloss[key] || []).join(" ");
+  return key === "ft"
+    ? glossModel.glossInlinePlainText(gloss.ft)
+    : gloss[key].map(glossModel.glossInlinePlainText).join(" ");
 }
 
 function corpusUnitRenderConfig(settings, context) {
@@ -14185,13 +14186,21 @@ function renderCorpusUnitNameHtml(unit, context = "content") {
   if (pattern.error) {
     return `<span class="corpus-unit-render-error" title="${escapeHtml(pattern.error)}">${escapeHtml(t("corpusRenderError"))}</span>`;
   }
-  if (!pattern.groups.length) {
-    const lines = String(unit?.content || "").replaceAll("\\n", "\n").split(/\r?\n/);
-    const rendered = lines.map((line) => `<span>${line ? escapeHtml(line) : "&nbsp;"}</span>`).join("");
+  const renderLines = (lines, renderLine) => {
+    const rendered = lines.map((line) => `<span>${line ? renderLine(line) : "&nbsp;"}</span>`).join("");
     return `<span class="corpus-unit-name corpus-unit-name-raw">${rendered || escapeHtml(t("corpusUnitFallback"))}</span>`;
+  };
+  if (!pattern.groups.length) {
+    return renderLines(glossSourceLines(unit?.content), escapeHtml);
   }
-  const parsed = parseStrictCorpusGloss(unit?.content);
-  if (parsed.error || !corpusGlossHasTargets(parsed.gloss, pattern.groups)) {
+  const parsed = glossModel.parseGloss(unit?.content);
+  if (parsed.issues.length) {
+    return `${renderLines(glossSourceLines(unit?.content), escapeHtml)}${glossParseHintHtml(parsed.issues)}`;
+  }
+  if (parsed.kind !== "gloss") {
+    return renderLines(parsed.plainLines, renderGlossInlineHtml);
+  }
+  if (!corpusGlossHasTargets(parsed.gloss, pattern.groups)) {
     return `<span class="corpus-unit-render-error" title="${escapeHtml(t("corpusRenderError"))}">${escapeHtml(t("corpusRenderError"))}</span>`;
   }
   return `
@@ -14240,7 +14249,7 @@ function scheduleCorpusUnitNamePreview(unitId) {
 
 function corpusGlossRowTokens(targets, gloss) {
   return targets.flatMap(({ key }) => {
-    const values = key === "ft" ? gloss.ft.split(/\s+/).filter(Boolean) : gloss[key];
+    const values = key === "ft" ? glossModel.tokenizeGlossLevel(gloss.ft) : gloss[key];
     return values.map((value) => ({ key, value }));
   });
 }
@@ -14287,25 +14296,33 @@ function renderCorpusGlossRowGroup(rows, alignEnabled, settings) {
       </span>
     `;
   }
+  // Each aligned item is a column holding its levels, and the columns wrap
+  // like words. Read column by column the levels would interleave, so
+  // assistive technology gets the levels line by line instead.
   const columnCount = Math.max(...rows.map(({ tokens }) => tokens.length));
+  const rowText = rows.map(({ tokens }) => tokens
+    .map(({ value }) => glossModel.glossInlinePlainText(value))
+    .filter(Boolean)
+    .join(" "));
   return `
     <span class="corpus-gloss-group aligned">
-      <table class="gloss-table"><tbody>
-        ${rows.map(({ targets, tokens }) => `
-          <tr class="gloss-row ${corpusGlossRowClasses(targets)}">
-            ${Array.from({ length: columnCount }, (_, column) => {
-              const token = tokens[column];
-              return `<td class="gloss-cell">${token ? renderCorpusGlossToken(token.key, token.value, settings) : ""}</td>`;
-            }).join("")}
-          </tr>
+      <span class="visually-hidden">${rowText.map(escapeHtml).join("<br>")}</span>
+      <span class="gloss-columns" aria-hidden="true">
+        ${Array.from({ length: columnCount }, (_, column) => `
+          <span class="gloss-column">${rows.map(({ targets, tokens }) => {
+            const token = tokens[column];
+            return token
+              ? renderCorpusGlossToken(token.key, token.value, settings)
+              : `<span class="${glossStyleClassNames(targets[0].key, settings)}"></span>`;
+          }).join("")}</span>
         `).join("")}
-      </tbody></table>
+      </span>
     </span>
   `;
 }
 
 function renderCorpusGlossToken(key, value, settings) {
-  return `<span class="${glossStyleClassNames(key, settings)}">${renderGlossTokenText(key, value, settings)}</span>`;
+  return `<span class="${glossStyleClassNames(key, settings)}">${renderGlossInlineHtml(value)}</span>`;
 }
 
 function ensureCorpusSelection(corpus, viewState = activeCorpusViewState()) {

@@ -56,7 +56,6 @@ function checkSettingsPreservation() {
   assert.equal(defaults.newEntryButtonAction, "quick");
   assert.equal(defaults.entryExampleRenderPattern, "(\\gla)\n(\\glb)\n(\\glc)\n(\\ft)");
   assert.equal(defaults.glossStyles.ft.italic, true);
-  assert.equal(defaults.glossStyles.glb.smallCaps, false);
 }
 
 function checkStability() {

@@ -15,6 +15,7 @@ const CHECK_GROUPS = [
       "check-models.js",
       "check-dictionary-data-model.js",
       "check-editor-saves.js",
+      "check-gloss-model.js",
       "check-quality-model.js",
       "check-search-normalization.js",
       "check-source-candidate-ranking.js",

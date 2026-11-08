@@ -1,6 +1,5 @@
 const assert = require("node:assert/strict");
 const qualityModel = require("../lib/quality-model");
-const { parseGloss } = require("../lib/gloss-model");
 
 function completeRecord(id, options = {}) {
   return {
@@ -116,8 +115,6 @@ assert.throws(
   () => qualityModel.createQualityIssue("unknown_quality_issue", ""),
   /Unknown quality issue code/,
 );
-assert.deepEqual(parseGloss("\\gla a b\n\\glb A B\n\\ft test"), { gla: ["a", "b"], glb: ["A", "B"], glc: [], ft: "test" });
-assert.equal(parseGloss("plain example"), null);
 
 const records = qualityFixture();
 const issues = qualityModel.buildQualityIssues(records, qualitySettings);

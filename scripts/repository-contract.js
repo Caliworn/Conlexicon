@@ -1086,7 +1086,7 @@ function checkModelNormalization() {
     ),
     false,
   );
-  assert.deepEqual(parseGloss("\\gla a b\n\\glb A B\n\\ft test"), {
+  assert.deepEqual(parseGloss("\\gla a b\n\\glb A B\n\\ft test").gloss, {
     gla: ["a", "b"],
     glb: ["A", "B"],
     glc: [],

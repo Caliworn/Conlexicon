@@ -1059,7 +1059,7 @@ source、version、options、response mode、item kind、selector 与 issue 视�
 
 ##### 规则边界行为
 
-- **Gloss**：规则读取当前 `definitions.example` 中的 `\gla / \glb / \glc / \ft`（解析在 `lib/gloss-model.js`，前后端共用）。这只冻结质量检查语义，不为例句—语料链接建立存储契约；存储模型变化时必须同步修改输入 adapter。
+- **Gloss**：规则读取当前 `definitions.example` 中的 `\gla / \glb / \glc / \ft` 及其别名 `\a / \b / \c / \glft`（解析在 `lib/gloss-model.js`，前后端共用；切词只看花括号外的空白，行内格式命令不改变项数）。只有至少一层存在时才检查；无法完整解析的内容仍按已识别的层检查，解析提示目前只在界面显示。这只冻结质量检查语义，不为例句—语料链接建立存储契约；存储模型变化时必须同步修改输入 adapter。
 - **来源循环**：来源链最终进入循环的词条也产生 `source_cycle`，issue 不只属于循环参与者；`cycleEntryIds / cycleLemmas` 只记录实际循环见证，并重复首节点闭合路径。实现消费 `etymology-graph-model` 的强连通分量，按分量拓扑序记忆化传播，O(V+E)：
   - 每个循环分量（成员数大于 1；保存校验拒绝自引用）只有一条规范见证：从分量内 ID 最小的成员出发，按来源位置顺序在分量内深度优先，第一条回到起点的边闭合见证；
   - 循环分量的成员都引用本分量的见证，其他词条按自身来源位置顺序，取第一个能到达循环的来源所继承的见证；

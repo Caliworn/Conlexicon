@@ -2390,16 +2390,30 @@ span.pending-source {
   overscroll-behavior-inline: contain;
 }
 
-.gloss-table {
-  width: max-content;
-  border-collapse: separate;
-  border-spacing: 18px 6px;
-  margin-left: -18px;
+/* Wrapped lines sit further apart than the levels inside a column, so each
+   wrapped line reads as one group. Fixed line heights keep a level level
+   across columns; inline small caps are kept inside that height. */
+.gloss-columns {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px 18px;
+  min-width: 0;
 }
 
-.gloss-cell {
+.gloss-column {
+  display: grid;
+  gap: 6px;
   white-space: nowrap;
-  vertical-align: baseline;
+}
+
+.gloss-column > span {
+  min-height: 1lh;
+  line-height: 1.45;
+}
+
+.gloss-column .smallcaps {
+  line-height: 0;
 }
 
 .gloss-font-serif {
@@ -2455,17 +2469,45 @@ span.pending-source {
   font-style: normal;
 }
 
+.gloss-inline-bold {
+  font-weight: 700;
+}
+
+.gloss-inline-italic {
+  font-style: italic;
+}
+
+/* Small caps are drawn larger to match the surrounding lowercase; text that
+   \textnormal returns to normal undoes that scale. */
 .smallcaps {
+  --smallcaps-scale: 1.32;
   font-family: inherit;
-  font-variant: small-caps;
-  font-size: 1.32em;
+  font-variant-caps: small-caps;
+  font-size: calc(var(--smallcaps-scale) * 1em);
   letter-spacing: 0;
+}
+
+.gloss-inline-normal {
+  font-weight: 400;
+  font-style: normal;
+  font-variant-caps: normal;
+}
+
+.smallcaps .gloss-inline-normal {
+  font-size: calc(1em / var(--smallcaps-scale));
 }
 
 .example-box .smallcaps {
   color: inherit;
-  font-size: 1.32em;
-  font-weight: inherit;
+}
+
+.gloss-parse-hint {
+  display: block;
+  margin-top: 4px;
+  color: var(--ui-warning-badge-text);
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 700;
 }
 
 .gloss-ft {
@@ -3958,7 +4000,7 @@ span.pending-source {
 
 .gloss-style-row {
   display: grid;
-  grid-template-columns: 40px minmax(72px, 1fr) minmax(64px, 0.65fr) 36px 36px 44px;
+  grid-template-columns: 40px minmax(72px, 1fr) minmax(64px, 0.65fr) 36px 36px;
   align-items: center;
   gap: 6px;
   min-width: 0;
@@ -3976,8 +4018,7 @@ span.pending-source {
   padding: 7px 26px 7px 8px;
 }
 
-.gloss-style-toggle,
-.gloss-style-toggle-placeholder {
+.gloss-style-toggle {
   width: 100%;
   height: 36px;
 }
@@ -4003,10 +4044,6 @@ span.pending-source {
 .gloss-style-toggle span {
   font-size: 0.78rem;
   line-height: 1;
-}
-
-.smallcaps-toggle span {
-  font-variant: small-caps;
 }
 
 .tool-order-list {
@@ -4175,15 +4212,16 @@ span.pending-source {
   overflow-wrap: anywhere;
 }
 
-.corpus-unit-name-gloss .gloss-table {
-  max-width: 100%;
-  margin-left: -10px;
-  border-spacing: 10px 3px;
-  font-size: inherit;
+.corpus-unit-name-gloss .gloss-columns {
+  gap: 8px 10px;
+}
+
+.corpus-unit-name-gloss .gloss-column {
+  gap: 3px;
 }
 
 .corpus-unit-name-gloss .smallcaps {
-  font-size: 1.2em;
+  --smallcaps-scale: 1.2;
 }
 
 .corpus-rendered-heading {
@@ -6997,7 +7035,7 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
   }
 
   .gloss-style-row {
-    grid-template-columns: 34px minmax(58px, 1fr) minmax(52px, 0.75fr) 30px 30px 40px;
+    grid-template-columns: 34px minmax(58px, 1fr) minmax(52px, 0.75fr) 30px 30px;
     gap: 3px;
   }
 

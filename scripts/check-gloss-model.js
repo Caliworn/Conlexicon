@@ -1,0 +1,122 @@
+const assert = require("node:assert/strict");
+const {
+  glossInlinePlainText,
+  normalizeGlossLineBreaks,
+  parseGloss,
+  parseGlossInline,
+  tokenizeGlossLevel,
+} = require("../lib/gloss-model");
+
+const lines = (...values) => values.join("\n");
+
+function assertGloss(source, expected) {
+  const parsed = parseGloss(source);
+  assert.equal(parsed.kind, "gloss", source);
+  assert.deepEqual(parsed.issues, [], source);
+  assert.deepEqual(parsed.gloss, { gla: [], glb: [], glc: [], ft: "", ...expected }, source);
+  return parsed;
+}
+
+function issueCodes(source) {
+  return parseGloss(source).issues.map((issue) => issue.code);
+}
+
+// Levels, aliases and the ExPex wrappers.
+assertGloss(lines(String.raw`\gla a b`, String.raw`\glb A B`, String.raw`\glc x y`, String.raw`\ft test`), {
+  gla: ["a", "b"],
+  glb: ["A", "B"],
+  glc: ["x", "y"],
+  ft: "test",
+});
+assertGloss(lines(String.raw`\a a b`, String.raw`\b A B`, String.raw`\c x y`, String.raw`\glft test`), {
+  gla: ["a", "b"],
+  glb: ["A", "B"],
+  glc: ["x", "y"],
+  ft: "test",
+});
+assertGloss(lines(
+  String.raw`\ex[everygla=]<tag>`,
+  String.raw`\begingl[glstyle=wrap]`,
+  String.raw`\gla x y //`,
+  String.raw`\glb X Y //`,
+  String.raw`\glft t//`,
+  String.raw`\endgl`,
+  String.raw`\xe`,
+), { gla: ["x", "y"], glb: ["X", "Y"], ft: "t" });
+assertGloss(lines(String.raw`\ex \begingl \gla x //`, String.raw`\glft t// \endgl \xe`), { gla: ["x"], ft: "t" });
+
+// A // ends a level only at the end of the line or before the next marker.
+assertGloss(String.raw`\a wapm -a // \b see \textsc{acc} // \ft saw them`, {
+  gla: ["wapm", "-a"],
+  glb: ["see", String.raw`\textsc{acc}`],
+  ft: "saw them",
+});
+assertGloss(String.raw`\ft the form //kat// is old`, { ft: "the form //kat// is old" });
+assertGloss(String.raw`\ft the form //kat//`, { ft: "the form //kat" });
+assertGloss(String.raw`\ft the form {//kat//}`, { ft: "the form {//kat//}" });
+
+// Items split on spaces outside braces; empty braces keep an empty column.
+assert.deepEqual(tokenizeGlossLevel("a {out to throw} {} the-\\textsc{3 acc}"), ["a", "{out to throw}", "{}", "the-\\textsc{3 acc}"]);
+assert.deepEqual(tokenizeGlossLevel(String.raw`a\ b c`), [String.raw`a\ b`, "c"]);
+assert.deepEqual(tokenizeGlossLevel("a } b"), ["a", "}", "b"]);
+assert.deepEqual(tokenizeGlossLevel(""), []);
+
+// Plain text, comments and empty content.
+const plain = parseGloss(lines("% source: field notes", String.raw`ama \textit{sola}!`, "", "second line"));
+assert.equal(plain.kind, "plain");
+assert.deepEqual(plain.plainLines, [String.raw`ama \textit{sola}!`, "second line"]);
+assert.deepEqual(plain.comments, ["source: field notes"]);
+assert.deepEqual(plain.issues, []);
+assert.deepEqual(parseGloss(String.raw`\ex plain sentence \xe`).plainLines, ["plain sentence"]);
+assert.equal(parseGloss(" \n % only a comment").kind, "empty");
+assert.equal(parseGloss("").kind, "empty");
+assert.deepEqual(issueCodes(String.raw`\c{c}a and more`), [], "an inline command with braces starts plain text");
+const commented = assertGloss(lines(String.raw`\gla a`, "% check this", String.raw`\ft x`), { gla: ["a"], ft: "x" });
+assert.deepEqual(commented.comments, ["check this"]);
+
+// Content that cannot be read is reported, never dropped silently.
+assert.deepEqual(issueCodes(lines(String.raw`\gla a`, "stray words")), ["stray_line"]);
+assert.deepEqual(issueCodes(lines(String.raw`\glb a`, String.raw`\glb b`)), ["duplicate_level"]);
+assert.deepEqual(parseGloss(lines(String.raw`\glb a`, String.raw`\glb b`)).gloss.glb, ["a"], "the first repeated level is kept");
+assert.deepEqual(issueCodes(String.raw`\glpreamble Mary ist sicher.//`), ["unknown_command"]);
+const pex = parseGloss(lines(String.raw`\pex`, String.raw`\a one`, String.raw`\a two`, String.raw`\xe`));
+assert.deepEqual(pex.issues.map((issue) => issue.code), ["unknown_command", "duplicate_level", "stray_line"]);
+assert.equal(pex.issues[0].command, String.raw`\pex`);
+assert.equal(pex.issues[1].level, "gla");
+
+// Old data stored line breaks as backslash-n; commands such as \nogloss stay.
+assert.equal(normalizeGlossLineBreaks(String.raw`\gla a\n\glb b\nogloss`), lines(String.raw`\gla a`, String.raw`\glb b\nogloss`));
+assertGloss(String.raw`\gla a b\n\glb A B\n\ft test`, { gla: ["a", "b"], glb: ["A", "B"], ft: "test" });
+
+// Inline formatting.
+assert.deepEqual(parseGlossInline(String.raw`the-\textsc{acc}`), [
+  { type: "text", value: "the-" },
+  { type: "style", style: "smallCaps", children: [{ type: "text", value: "acc" }] },
+]);
+assert.deepEqual(parseGlossInline(String.raw`\textbf{a \textit{b}} \textnormal{c}`), [
+  {
+    type: "style",
+    style: "bold",
+    children: [
+      { type: "text", value: "a " },
+      { type: "style", style: "italic", children: [{ type: "text", value: "b" }] },
+    ],
+  },
+  { type: "text", value: " " },
+  { type: "style", style: "normal", children: [{ type: "text", value: "c" }] },
+]);
+assert.deepEqual(parseGlossInline(String.raw`{\sc pl} {\scshape du}`), [
+  { type: "style", style: "smallCaps", children: [{ type: "text", value: "pl" }] },
+  { type: "text", value: " " },
+  { type: "style", style: "smallCaps", children: [{ type: "text", value: "du" }] },
+]);
+assert.deepEqual(parseGlossInline("{out to throw}"), [{ type: "text", value: "out to throw" }]);
+assert.deepEqual(parseGlossInline("{}"), []);
+assert.deepEqual(parseGlossInline(String.raw`\nogloss{x} $_i$ \textbf no-brace`), [
+  { type: "text", value: String.raw`\nogloss{x} $_i$ \textbf no-brace` },
+]);
+assert.deepEqual(parseGlossInline(String.raw`50\% \& \"u`), [{ type: "text", value: String.raw`50% & \"u` }]);
+assert.deepEqual(parseGlossInline(String.raw`\textsc{open`), [{ type: "text", value: String.raw`\textsc{open` }]);
+assert.equal(glossInlinePlainText(String.raw`the-\textsc{acc} \textsc{a\textnormal{b}c} {x y}`), "the-acc abc x y");
+
+console.log("Gloss model checks passed.");

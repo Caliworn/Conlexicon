@@ -17,7 +17,7 @@
 | [Morphology Assignment Plan](MORPHOLOGY_ASSIGNMENT_PLAN.md) | 设计草案，已复评，未实施 | 形态分配重做：去掉形态组，表格以析取范式规则直接匹配；每张表属于一个槽位，槽位内按 elsewhere 由更具体者胜出、槽位间叠加，槽位顺序即显示顺序；覆写按表记录，旧数据转换结果不变；槽位面板、试算面板与影响范围的编辑界面。 |
 | [App Shell Specification](APP_SHELL_SPEC.md) | 阶段 A 已完成 | 响应式应用外壳：布局、外壳状态模型、DOM/CSS 边界、断点与验收。 |
 | [Touch, Focus and Accessibility Plan](TOUCH_FOCUS_A11Y_PLAN.md) | 阶段 A+ 未开始 | 触摸替代交互、输入能力判定、命中区域、焦点管理与无障碍验收。 |
-| [Lightweight Corpus Plan](CORPUS_LIGHTWEIGHT_PLAN.md) | 阶段 C 设计已复评，未实施 | 语料库缩成一句一条的轻量结构：SQL 模型、释义连接、Gloss 格式、ExPex 复制、界面、JSON 导入与验收。 |
+| [Lightweight Corpus Plan](CORPUS_LIGHTWEIGHT_PLAN.md) | 阶段 C 第 1 阶段已完成（2026-11-08），其余未实施 | 语料库缩成一句一条的轻量结构：SQL 模型、释义连接、Gloss 格式、ExPex 复制、界面、JSON 导入与验收。 |
 | [Style Skin Plan](STYLE_SKIN_PLAN.md) | S0、控件材质职责收尾、控件对照页与开关控件已完成 / 视觉定稿待实施 | 样式 token、材质角色、视觉基线与通用皮肤边界；控件颜色语义、焦点与开关控件契约；普通控件材质职责收尾、控件对照页与视觉定稿的分批计划。 |
 | [Entry Editor Unboxing Plan](ENTRY_EDITOR_UNBOXING_PLAN.md) | U1–U3 已完成（2026-10-09～10）/ U4 待 tint 定稿，U5 搁置 | 完整编辑与局部编辑去框化：沿用详情分区分隔接口、框预算、字段与操作栏皮肤 token、分阶段实施与验收。 |
 | [Layered Glass Skin Specification](LAYERED_GLASS_SKIN_SPEC.md) | LG-1–LG-4C 已完成 | 层叠玻璃皮肤的层级、透明度、静态与指针响应光学层、运行期选择、降级与性能验收。 |
