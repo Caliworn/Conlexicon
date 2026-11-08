@@ -377,22 +377,18 @@
       background-size: 100% 100%;
       background-repeat: no-repeat;
       background-origin: border-box;
-      -webkit-backdrop-filter: var(--liquid-glass-optical-filter);
-      backdrop-filter: var(--liquid-glass-optical-filter);
+      /* Q3 refracts through the engine filter, which carries its own blur; Q2 has
+         no optical filter and keeps the surface's own, as in the product. */
+      -webkit-backdrop-filter: var(--liquid-glass-optical-filter, var(--lab-surface-filter));
+      backdrop-filter: var(--liquid-glass-optical-filter, var(--lab-surface-filter));
     }
 
     .lab-surface:is([data-liquid-glass-optics="pending"], [data-liquid-glass-optics="fallback"]) {
-      -webkit-backdrop-filter: blur(var(--lab-fallback-blur, 5px)) saturate(var(--lab-fallback-saturation, 1.08));
-      backdrop-filter: blur(var(--lab-fallback-blur, 5px)) saturate(var(--lab-fallback-saturation, 1.08));
+      -webkit-backdrop-filter: var(--lab-surface-filter);
+      backdrop-filter: var(--lab-surface-filter);
     }
 
     @media (prefers-reduced-transparency: no-preference) and (forced-colors: none) {
-      .lab-surface[data-product-optics="off"] {
-        background-image: none !important;
-        -webkit-backdrop-filter: none !important;
-        backdrop-filter: none !important;
-      }
-
       .lab-surface[data-product-tint="off"] {
         background-color: transparent !important;
       }
@@ -683,7 +679,7 @@
 
     .lab-layer-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 8px;
     }
 
@@ -1044,14 +1040,21 @@
             <span class="lab-field-heading"><span>tint 不透明度</span><output id="tintOutput" class="lab-field-value">0.48</output></span>
             <input id="tintInput" type="range" min="0" max="1" step="0.01" value="0.48">
           </label>
+          <label class="lab-field" for="surfaceBlurInput">
+            <span class="lab-field-heading"><span>背景模糊（Q1／Q2）</span><output id="surfaceBlurOutput" class="lab-field-value">3.0px</output></span>
+            <input id="surfaceBlurInput" type="range" min="0" max="12" step="0.5" value="3">
+          </label>
+          <label class="lab-field" for="surfaceSaturationInput">
+            <span class="lab-field-heading"><span>背景饱和度（Q1／Q2）</span><output id="surfaceSaturationOutput" class="lab-field-value">1.06×</output></span>
+            <input id="surfaceSaturationInput" type="range" min="0.7" max="1.5" step="0.01" value="1.06">
+          </label>
           <div class="lab-layer-grid" role="group" aria-label="外观层开关">
-            <label class="lab-chip"><input type="checkbox" data-product-layer="optics" checked><span class="lab-chip-mark" aria-hidden="true"></span>动态光学</label>
             <label class="lab-chip"><input type="checkbox" data-product-layer="tint" checked><span class="lab-chip-mark" aria-hidden="true"></span>tint</label>
-            <label class="lab-chip"><input type="checkbox" data-product-layer="border" checked><span class="lab-chip-mark" aria-hidden="true"></span>1px 边框</label>
-            <label class="lab-chip"><input type="checkbox" data-product-layer="shadow" checked><span class="lab-chip-mark" aria-hidden="true"></span>外部阴影</label>
+            <label class="lab-chip"><input type="checkbox" data-product-layer="border" checked><span class="lab-chip-mark" aria-hidden="true"></span>边框</label>
+            <label class="lab-chip"><input type="checkbox" data-product-layer="shadow" checked><span class="lab-chip-mark" aria-hidden="true"></span>阴影</label>
           </div>
           <p id="appearanceStatus" class="lab-status-note">Neutral Lab · 使用 Lab 自己的中性 tint、边框、阴影与文字色。</p>
-          <p class="lab-status-note">tint 滑条在 Neutral Lab 下调 Lab 自己的中性 tint；选产品外观时显示该表面的产品不透明度，拖动只改不透明度、保留产品颜色，换外观时回到产品值。图层开关只旁路最终外观层，不重建贴图或清空缓存。产品外观从隔离探针（以探针模式加载的控件对照页 <code>control-gallery.html</code>）读取当前 Q1／Q2／Q3 的正式计算样式。选择产品外观会联动：导航和抽屉、工具栏胶囊、紧凑控件切到各自的光学预设（当前为 Custom 时保留手动参数）；内容外壳、浮层、弹窗等纯 CSS 表面关闭“动态光学”，和产品一样没有烘焙高光。共享几何换成该表面的典型尺寸（按产品宽度估计，超出舞台时缩小）和产品圆角，之后仍可调整；工具栏胶囊和紧凑控件取对照页尺寸夹具的宽高和圆角并锁定几何。背景场景和 modal／network 遮罩保持不变。</p>
+          <p class="lab-status-note">tint 滑条在 Neutral Lab 下调 Lab 自己的中性 tint；选产品外观时显示该表面的产品不透明度，拖动只改不透明度、保留产品颜色，换外观时回到产品值。背景模糊和饱和度是表面自己的背景滤镜，Q1 和 Q2 都用它，Q3 改用下方折射组的光学内模糊和饱和度，与产品相同；选产品外观时换成该表面的产品值（例如导航 3px，内容外壳和紧凑控件为无），之后仍可调整。图层开关只旁路最终外观层，不重建贴图或清空缓存。产品外观从隔离探针（以探针模式加载的控件对照页 <code>control-gallery.html</code>）读取当前等级的正式计算样式。选择产品外观会联动：等级切到产品实际使用的一档，导航和抽屉、工具栏胶囊、紧凑控件为 Q2，内容外壳、浮层、弹窗等纯 CSS 表面为 Q1（产品中没有烘焙高光），之后可以手动切到 Q3 看折射；引擎表面切到各自的光学预设（当前为 Custom 时保留手动参数）。共享几何换成该表面的典型尺寸（按产品宽度估计，超出舞台时缩小）和产品圆角，之后仍可调整；工具栏胶囊和紧凑控件取对照页尺寸夹具的宽高和圆角并锁定几何。背景场景和 modal／network 遮罩保持不变。</p>
         </section>
 
         <section class="lab-control-section">
@@ -1129,7 +1132,7 @@
             <input id="saturationInput" data-optic-control type="range" min="0.7" max="1.5" step="0.01" value="1.06">
           </label>
           <label class="lab-layer-toggle"><input id="dispersionInput" type="checkbox" data-optic-control>RGB 色散</label>
-          <p class="lab-status-note">这一组只影响 Q3 的折射滤镜。色散只是开关，三路比例沿用生产引擎的固定值；所有生产角色默认关闭，用于在细节丰富的背景上对比。</p>
+          <p class="lab-status-note">这一组只影响 Q3 的折射滤镜；Q3 下表面自己的背景滤镜由这里的光学内模糊和饱和度代替。色散只是开关，三路比例沿用生产引擎的固定值；所有生产角色默认关闭，用于在细节丰富的背景上对比。</p>
         </section>
       </aside>
     </div>
@@ -1213,6 +1216,8 @@
         specularStrength: { input: "specularInput", output: "specularOutput", suffix: "", digits: 2 },
         lightAngle: { input: "lightAngleInput", output: "lightAngleOutput", suffix: "°", digits: 0 },
         lightStrength: { input: "lightStrengthInput", output: "lightStrengthOutput", suffix: "", digits: 2 },
+        surfaceBlur: { input: "surfaceBlurInput", output: "surfaceBlurOutput", suffix: "px", digits: 1 },
+        surfaceSaturation: { input: "surfaceSaturationInput", output: "surfaceSaturationOutput", suffix: "×", digits: 2 },
       };
 
       Object.values(rangeSpecs).forEach((spec) => {
@@ -1278,12 +1283,14 @@
       let pendingDragPosition = null;
       let appearanceProbePromise = null;
       let currentProductAppearance = null;
-      // The appearance whose geometry still waits for its fixture to be read.
-      let pendingGeometryRole = null;
+      // The appearance whose geometry and surface filter still wait for its fixture
+      // to be read.
+      let pendingAppearanceLink = null;
       // The tint slider edits the product tint's opacity while a product appearance
       // is shown; the Neutral Lab value waits here until Neutral Lab returns.
       let tintOverride = null;
       let neutralTint = null;
+      let neutralSurfaceFilter = null;
       const tintProbe = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
       let geometryLocked = false;
       // Loupe state: the stage point under its center, the copied surface, and
@@ -1343,6 +1350,27 @@
           setGeometryValue("radius", maximumRadius);
         }
         updateGeometryOutputs();
+      }
+
+      // Product surface filters are a blur and a saturation (or none); anything else
+      // would not survive the Lab's two settings, so it fails loudly.
+      function parseSurfaceFilter(value) {
+        if (value === "none" || value === "") {
+          return { blur: 0, saturation: 1 };
+        }
+        const blur = value.match(/blur\(([\d.]+)px\)/);
+        const saturation = value.match(/saturate\(([\d.]+)\)/);
+        if (value.replace(/blur\([^)]*\)|saturate\([^)]*\)/g, "").trim()) {
+          throw new Error(`Unsupported product surface filter: ${value}`);
+        }
+        return { blur: blur ? Number(blur[1]) : 0, saturation: saturation ? Number(saturation[1]) : 1 };
+      }
+
+      function setSurfaceFilter({ blur, saturation }) {
+        setRangeValue("surfaceBlur", blur);
+        setRangeValue("surfaceSaturation", saturation);
+        formatRange("surfaceBlur");
+        formatRange("surfaceSaturation");
       }
 
       function colorAlpha(color) {
@@ -1546,8 +1574,9 @@
         appearanceProbeFrames.forEach((frame, viewport) => {
           const probeDocument = frame.contentDocument;
           probeDocument.body.dataset.liquidGlassOpticsQuality = quality;
-          // Write what the engine would: the role, the optics state and an empty
-          // optical filter, since the probe generates no maps.
+          // Write what the engine would: the role and the optics state. The probe
+          // generates no maps, so it leaves the optical filter unset and a Q3
+          // fixture falls back to (and computes) its own surface filter.
           Object.values(productAppearanceRoles)
             .filter((role) => role.viewport === viewport)
             .forEach((role) => {
@@ -1560,7 +1589,6 @@
               }
               fixture.dataset.liquidGlassRole = role.opticalRole;
               fixture.dataset.liquidGlassOptics = quality === "q2" || quality === "q3" ? "ready" : "fallback";
-              fixture.style.setProperty("--liquid-glass-optical-filter", "none");
             });
         });
         return quality;
@@ -1606,6 +1634,9 @@
           letterSpacing: computed.letterSpacing,
           backgroundColor: computed.backgroundColor,
           tintAlpha: colorAlpha(computed.backgroundColor),
+          // The computed filter, so overrides such as the desktop navigation's
+          // important none are included.
+          surfaceFilter: parseSurfaceFilter(computed.backdropFilter),
           borderColor: computed.borderTopColor,
           borderWidth: computed.borderTopWidth,
           borderStyle: computed.borderTopStyle,
@@ -1636,7 +1667,11 @@
         const tint = tintOverride === null
           ? appearance.backgroundColor
           : `${appearance.backgroundColor} → 不透明度 ${tintOverride.toFixed(2)}`;
-        elements.appearanceStatus.textContent = `Product ${requestedProductQuality().toUpperCase()} · ${appearance.label} · tint ${tint} · border ${appearance.borderWidth} ${appearance.borderColor} · shadow ${appearance.shadowLayers} 层`;
+        const describeFilter = (blur, saturation) => (blur === 0 && saturation === 1 ? "none" : `blur(${blur}px) saturate(${saturation})`);
+        const productFilter = describeFilter(appearance.surfaceFilter.blur, appearance.surfaceFilter.saturation);
+        const labFilter = describeFilter(readNumber("surfaceBlur"), readNumber("surfaceSaturation"));
+        const filter = productFilter === labFilter ? productFilter : `${productFilter} → ${labFilter}`;
+        elements.appearanceStatus.textContent = `Product ${requestedProductQuality().toUpperCase()} · ${appearance.label} · tint ${tint} · filter ${filter} · border ${appearance.borderWidth} ${appearance.borderColor} · shadow ${appearance.shadowLayers} 层`;
       }
 
       async function refreshProductAppearance() {
@@ -1658,9 +1693,10 @@
           syncAppearanceProbeQuality();
           syncAppearanceProbeLight();
           currentProductAppearance = readProductAppearance(elements.appearanceRoleSelect.value);
-          if (pendingGeometryRole === elements.appearanceRoleSelect.value) {
-            pendingGeometryRole = null;
+          if (pendingAppearanceLink === elements.appearanceRoleSelect.value) {
+            pendingAppearanceLink = null;
             applyRoleGeometry(productAppearanceRoles[currentProductAppearance.role], currentProductAppearance);
+            setSurfaceFilter(currentProductAppearance.surfaceFilter);
           }
           updateSurfaceAppearance();
           updateAppearanceStatus();
@@ -1673,21 +1709,22 @@
         }
       }
 
-      // A product appearance moves the Lab to match the product: engine roles load
-      // their preset unless the parameters are Custom, CSS-only surfaces drop the
-      // baked highlight they do not have, and the geometry takes the surface's size
-      // once its fixture has been read.
+      // A product appearance moves the Lab to match the product: the quality level
+      // becomes the one the product ships for it (Q2 for engine surfaces, Q1 for
+      // CSS-only ones, which have no baked highlight), engine roles load their
+      // preset unless the parameters are Custom, and the geometry and surface
+      // filter take the product's once the fixture has been read.
       function applyAppearanceLinks(roleName) {
         const role = productAppearanceRoles[roleName];
-        const optics = productLayerInputs.find((input) => input.dataset.productLayer === "optics");
-        optics.checked = Boolean(role.opticalRole);
-        updateProductLayerState();
+        elements.productQualityControl.value = role.opticalRole ? "q2" : "q1";
+        activateRequestedProductQuality();
+        scheduleRefresh();
         if (role.opticalRole && elements.presetSelect.value !== "custom") {
           elements.presetSelect.value = role.opticalRole;
           applyPreset(role.opticalRole);
         }
         setGeometryLocked(role.size === "fixture");
-        pendingGeometryRole = roleName;
+        pendingAppearanceLink = roleName;
       }
 
       // Size fixtures lock the geometry to the product's; other surfaces only start
@@ -1729,11 +1766,18 @@
           formatRange("tint");
           neutralTint = null;
         }
+        if (product && neutralSurfaceFilter === null) {
+          neutralSurfaceFilter = { blur: readNumber("surfaceBlur"), saturation: readNumber("surfaceSaturation") };
+        }
+        if (!product && neutralSurfaceFilter !== null) {
+          setSurfaceFilter(neutralSurfaceFilter);
+          neutralSurfaceFilter = null;
+        }
         if (product) {
           applyAppearanceLinks(elements.appearanceRoleSelect.value);
           refreshProductAppearance();
         } else {
-          pendingGeometryRole = null;
+          pendingAppearanceLink = null;
           setGeometryLocked(false);
           currentProductAppearance = null;
           updateSurfaceAppearance();
@@ -1809,8 +1853,12 @@
             ? `rgba(235, 247, 249, ${tint})`
             : `rgba(12, 26, 32, ${tint})`;
         }
-        elements.surface.style.setProperty("--lab-fallback-blur", `${readNumber("opticalBlur")}px`);
-        elements.surface.style.setProperty("--lab-fallback-saturation", String(readNumber("saturation")));
+        const surfaceBlur = readNumber("surfaceBlur");
+        const surfaceSaturation = readNumber("surfaceSaturation");
+        elements.surface.style.setProperty(
+          "--lab-surface-filter",
+          surfaceBlur === 0 && surfaceSaturation === 1 ? "none" : `blur(${surfaceBlur}px) saturate(${surfaceSaturation})`,
+        );
         window.requestAnimationFrame(clampSurfacePosition);
       }
 
@@ -2210,6 +2258,13 @@
           updateAppearanceStatus();
         }
         updateSurfaceAppearance();
+      });
+      ["surfaceBlur", "surfaceSaturation"].forEach((name) => {
+        rangeSpecs[name].input.addEventListener("input", () => {
+          formatRange(name);
+          updateSurfaceAppearance();
+          updateAppearanceStatus();
+        });
       });
       rangeSpecs.lightAngle.input.addEventListener("input", () => {
         formatRange("lightAngle");
