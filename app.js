@@ -11942,6 +11942,7 @@ function renderDefinitionFormList(definitions = []) {
     block.innerHTML = definitionFormCardHtml(definition, index, "remove-definition");
     elements.definitionFormList.append(block);
   });
+  observeAutoHeightTextareas(elements.definitionFormList);
   updateRemoveDefinitionButtons();
 }
 
@@ -11972,6 +11973,7 @@ function renderDefinitionFormCardInPlace(card, fieldToShow) {
     Math.max(0, index),
     isPartial ? "remove-partial-definition" : "remove-definition",
   );
+  observeAutoHeightTextareas(card);
   if (isPartial) {
     updatePartialRemoveDefinitionButtons(list);
   } else {
@@ -12006,10 +12008,56 @@ function linkedExampleRowHtml(example) {
   `;
 }
 
+// Text boxes marked data-auto-height grow with their content between the CSS
+// min-height and max-height, then scroll inside. Wrapping depends on the width,
+// so a box is fitted again whenever its width changes.
+const autoHeightWidths = new WeakMap();
+const autoHeightObserver = new ResizeObserver((records) => {
+  records.forEach(({ target, contentRect }) => {
+    if (!target.isConnected) {
+      autoHeightObserver.unobserve(target);
+      return;
+    }
+    if (autoHeightWidths.get(target) === contentRect.width) {
+      return;
+    }
+    autoHeightWidths.set(target, contentRect.width);
+    fitAutoHeight(target);
+  });
+});
+
+// Fitted at once, so a box opened with long content has its height before the
+// first paint; a box still hidden is fitted by the observer when it shows.
+function observeAutoHeightTextareas(root) {
+  root.querySelectorAll("textarea[data-auto-height]").forEach((textarea) => {
+    fitAutoHeight(textarea);
+    autoHeightObserver.observe(textarea);
+  });
+}
+
+// Measuring needs the box at its natural height for a moment; the scroll
+// positions around it are put back so the page does not jump.
+function fitAutoHeight(textarea) {
+  if (!textarea.clientWidth) {
+    return;
+  }
+  const scrolled = [];
+  for (let node = textarea.parentElement; node; node = node.parentElement) {
+    if (node.scrollTop) {
+      scrolled.push([node, node.scrollTop]);
+    }
+  }
+  textarea.style.height = "auto";
+  textarea.style.height = `${textarea.scrollHeight + textarea.offsetHeight - textarea.clientHeight}px`;
+  scrolled.forEach(([node, top]) => {
+    node.scrollTop = top;
+  });
+}
+
 function newExampleRowHtml(content = "") {
   return `
     <li class="definition-example definition-example-new" data-definition-example>
-      <textarea data-field="example-new" rows="2" spellcheck="false" data-i18n-placeholder="newExamplePlaceholder" placeholder="${escapeHtml(t("newExamplePlaceholder"))}" aria-label="${escapeHtml(t("writeNewExample"))}">${escapeHtml(content)}</textarea>
+      <textarea data-field="example-new" data-auto-height rows="2" spellcheck="false" data-i18n-placeholder="newExamplePlaceholder" placeholder="${escapeHtml(t("newExamplePlaceholder"))}" aria-label="${escapeHtml(t("writeNewExample"))}">${escapeHtml(content)}</textarea>
       <div class="definition-example-actions">
         <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="remove-new-example" data-app-tooltip="always" data-i18n-aria-label="removeNewExample" aria-label="${escapeHtml(t("removeNewExample"))}">
           <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg>
@@ -12104,6 +12152,7 @@ function handleDefinitionExampleClick(event) {
   const action = event.target.closest("[data-action]")?.dataset.action;
   if (action === "write-new-example") {
     list.insertAdjacentHTML("beforeend", newExampleRowHtml());
+    observeAutoHeightTextareas(list.lastElementChild);
     list.lastElementChild.querySelector("textarea").focus();
     notifyDefinitionChanged(card);
     return true;
@@ -14757,7 +14806,7 @@ function renderCorpusEditor({ force = false } = {}) {
         <label><span data-i18n="corpusItemGroup">${escapeHtml(t("corpusItemGroup"))}</span><input data-field="group" maxlength="160" list="corpusGroupOptions"></label>
       </div>
       <datalist id="corpusGroupOptions">${groupNames.map((name) => `<option value="${escapeHtml(name)}"></option>`).join("")}</datalist>
-      <label><span data-i18n="corpusItemContent">${escapeHtml(t("corpusItemContent"))}</span><textarea data-field="content" rows="7" spellcheck="false"></textarea></label>
+      <label><span data-i18n="corpusItemContent">${escapeHtml(t("corpusItemContent"))}</span><textarea data-field="content" data-auto-height rows="7" spellcheck="false"></textarea></label>
       <section class="corpus-subsection">
         <div class="subsection-title"><h3 data-i18n="corpusItemLinks">${escapeHtml(t("corpusItemLinks"))}</h3></div>
         <div class="corpus-link-list" data-corpus-links></div>
@@ -14768,6 +14817,7 @@ function renderCorpusEditor({ force = false } = {}) {
   form.querySelector('[data-field="name"]').value = draftState.draft.name;
   form.querySelector('[data-field="group"]').value = draftState.draft.group;
   form.querySelector('[data-field="content"]').value = draftState.draft.content;
+  observeAutoHeightTextareas(form);
   renderCorpusLinks();
 }
 
@@ -15908,6 +15958,7 @@ function renderPartialDefinitionList(definitions = []) {
     card.innerHTML = definitionFormCardHtml(definition, index, "remove-partial-definition");
     list.append(card);
   });
+  observeAutoHeightTextareas(list);
 
   updatePartialRemoveDefinitionButtons(list);
 }
@@ -18665,6 +18716,12 @@ document.addEventListener("keydown", (event) => {
   event.preventDefault();
   input.value = lemma;
   runExampleSearch(input).catch((error) => console.error(error));
+});
+
+document.addEventListener("input", (event) => {
+  if (event.target.matches?.("textarea[data-auto-height]")) {
+    fitAutoHeight(event.target);
+  }
 });
 
 document.addEventListener("beforeinput", (event) => {

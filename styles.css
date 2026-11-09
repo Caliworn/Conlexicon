@@ -1326,6 +1326,13 @@ textarea {
   line-height: 1.55;
 }
 
+/* Grows with its content (see fitAutoHeight in app.js) between the min-height
+   and max-height set for each box, so dragging the size would be undone. */
+textarea[data-auto-height] {
+  resize: none;
+  overflow-y: auto;
+}
+
 input:not([type="checkbox"]):not([type="radio"]):focus,
 select:focus,
 textarea:focus {
@@ -4334,7 +4341,11 @@ span.pending-source {
   font-weight: 700;
 }
 
+/* 7 to 18 lines (padding and borders are 22px), never taller than 60% of the
+   window unless that is below 7 lines. */
 .corpus-form textarea[data-field="content"] {
+  min-height: calc(7 * 1.6em + 22px);
+  max-height: max(calc(7 * 1.6em + 22px), min(calc(18 * 1.6em + 22px), 60vh));
   font-family: Consolas, "Cascadia Mono", "Noto Sans Mono", monospace;
   font-size: 0.86rem;
   line-height: 1.6;
@@ -4433,7 +4444,9 @@ span.pending-source {
   height: 16px;
 }
 
+/* Up to 10 lines; the shared 92px minimum stays. */
 .definition-example-new textarea {
+  max-height: max(92px, min(calc(10 * 1.55em + 22px), 60vh));
   font-family: Consolas, "Cascadia Mono", "Noto Sans Mono", monospace;
   font-size: 0.86rem;
 }
