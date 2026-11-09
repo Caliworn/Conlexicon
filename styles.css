@@ -549,9 +549,127 @@ fieldset {
   will-change: transform;
 }
 
+/* Segment ticks float over the cards beside the track while the pointer is on
+   the navigator or a drag is on; each tick owns a full-width band of the rail.
+   The rail width comes from the widest label (lib/list-navigator.js). */
+.list-navigator-rail {
+  position: absolute;
+  top: 0;
+  right: 100%;
+  bottom: 0;
+  width: var(--list-navigator-rail-width, 0px);
+  border: 1px solid var(--material-floating-border);
+  border-radius: 8px;
+  background: var(--material-floating-background);
+  box-shadow: var(--material-floating-shadow);
+  backdrop-filter: var(--material-floating-filter);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease;
+}
+
+.list-navigator:is(:hover, .dragging) .list-navigator-rail {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.list-navigator-rail[hidden] {
+  display: none;
+}
+
+.list-navigator-label {
+  position: absolute;
+  right: 4px;
+  padding: 0 2px;
+  color: var(--ui-text-muted);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.list-navigator-label.merged {
+  font-size: 11.7px;
+}
+
+.list-navigator-label.hovered {
+  color: var(--ui-text);
+}
+
+.list-navigator-label.current {
+  color: var(--ui-accent);
+}
+
+.list-navigator-band {
+  position: absolute;
+  right: 2px;
+  left: 2px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ui-text) 9%, transparent);
+  pointer-events: none;
+}
+
+.list-navigator-band[hidden] {
+  display: none;
+}
+
+/* The bubble names the segment under the thumb (drag) or under the pointer
+   (hover preview), left of the rail. */
+.list-navigator-bubble,
+.list-navigator-tip {
+  position: absolute;
+  right: calc(var(--list-navigator-width) + var(--list-navigator-rail-width, 0px) + 8px);
+  border: 1px solid var(--material-floating-border);
+  background: var(--material-floating-background);
+  box-shadow: var(--material-floating-shadow);
+  backdrop-filter: var(--material-floating-filter);
+  color: var(--ui-text);
+  pointer-events: none;
+}
+
+.list-navigator-bubble {
+  z-index: 5;
+  min-width: 48px;
+  padding: 8px 12px;
+  border-radius: var(--radius-floating);
+  text-align: center;
+}
+
+.list-navigator-bubble strong {
+  display: block;
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.list-navigator-bubble small {
+  display: block;
+  margin-top: 2px;
+  color: var(--ui-text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.list-navigator-tip {
+  z-index: 6;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  transform: translateY(-50%);
+}
+
+:is(.list-navigator-bubble, .list-navigator-tip)[hidden] {
+  display: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .list-navigator,
-  .list-navigator-thumb {
+  .list-navigator-thumb,
+  .list-navigator-rail {
     transition: none;
   }
 }
@@ -561,8 +679,13 @@ fieldset {
     background: CanvasText;
   }
 
-  .list-navigator.dragging .list-navigator-thumb {
+  .list-navigator.dragging .list-navigator-thumb,
+  .list-navigator-label.current {
     background: Highlight;
+  }
+
+  .list-navigator-label.current {
+    color: HighlightText;
   }
 }
 

@@ -428,6 +428,7 @@ cursor 由 `lib/result-window-cursor.js` 编码，绑定 process epoch、`cacheG
 | `saveEntry()` / `deleteEntry()` / `patchEntries()` | 按词条写入目标 entry、definitions、释义标签、tags、sources、词条形态组/override 和两张搜索 projection，删除经外键级联；`patchEntries()` 只接受词条级字段，可附带 settings；整词典批处理经内部的 `writeEntryEdits()` 写入，可改写释义标签；返回 `{ id, updatedAt, entry }`、`{ id, updatedAt }` 或 `{ id, updatedAt, entries, settings? }` | 否 | 词条内部仍整条重建子记录与搜索投影（审计 A20） |
 | `getEntry()` | 按 `entries.id` 读取 SQL 表并组装完整 entry | 否 | — |
 | `queryEntries()` | 始终返回摘要 DTO 分页对象。无搜索时完全下推到 SQL，标签条件都按有效标签：词性与标签 `any/all` 由两张标签表 `(tag, entry_id)` 索引驱动的候选集合实现，无词性反向查询复用标签候选集；词性只由词典显式配置的词性标签决定，不读取标签位置；活动日期使用 UTC 半开范围，来源数量上下界共享一次计数 | 否；完整词条只通过 `getEntry()` 按需读取 | 按真实基准继续优化查询形状；默认排序索引见审计 R09 |
+| `getEntryQueryOverview()` | 列表概览：与 `queryEntries()` 同一查询的全部结果按排序切段（API 契约“列表概览”）。无搜索时在 SQL 中只读排序键列，有搜索时复用查询会话的有序命中 ID | 否 | 不缓存；10 万条时无搜索路径同样受 R09 的排序成本影响 |
 | 严格 / fuzzy / 形态搜索 | 按字段读取两张 projection（第 9、10 节），首次查询建立有序命中 ID 会话，总数、窗口和定位复用同一结果；统一返回 `searchHits`；fuzzy 通过连接级确定性函数复用共享评分 | 否；fuzzy 线性扫描所选 projection records | 候选索引见第 11 节 |
 | `getTagRegistry()` / `changeTagRegistry()` | 读取登记行，使用数由 SQL 聚合并按 generation 缓存，按有效标签每个词条计一次；修改在单事务内整表写回 | 否 | — |
 | `getEntryRelations()` | 用 `entry_sources`/`entries` 查询来源和直接衍生，并复用稳定词根拓扑的反向索引组装同根组 | 否 | 衍生词逐个读取完整详情再取摘要（审计 A19） |

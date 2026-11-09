@@ -117,6 +117,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | `{ items, pageInfo, searchSummary }`，其中 `items` 固定为词条摘要 DTO | 支持结构化 JSON `filter`，以及现有 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`sort`、`cursor`、`windowOffset`、`limit`。结构化 `filter` 不得与平铺筛选参数混用。无参数请求也使用默认排序和窗口大小，不返回完整词条数组。 |
 | `POST` | `/api/dictionaries/:id/entries/filter-facts` | 批量读取结构筛选是否存在候选 | `{ dictionaryId, generation, facts }` | 最多接受 16 个 filter descriptor；只返回按请求 ID 对应的 `available` 布尔值，不接受搜索、排序或分页语义。 |
+| `GET` | `/api/dictionaries/:id/entries/overview` | 当前查询结果的分段概览，供列表导航条的刻度与气泡使用 | `{ total, sort, grain, buckets: [{ key, start, count }] }` | 接受与 `/entries` 相同的查询 descriptor（cursor 与分页无关），另加 `tz`（IANA 时区名，省略为 UTC；无效返回 400 `invalid_overview_time_zone`）。语义见下文“列表概览”。路由排在 `/entries/:entryId` 之前匹配。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId/location` | 定位词条在当前查询中的窗口 | `{ items, pageInfo, searchSummary, location }` | 接受与 `/entries` 相同的查询 descriptor 和 `limit`，但不接受客户端 cursor；目标存在但被查询排除时返回 `location.found: false`。 |
 | `POST` | `/api/dictionaries/:id/entries` | 新建词条 | `{ entry, summary }` | 客户端不得携带词条 ID；后端为每次请求生成一次 UUID，并在 `entry.id` 返回。新建为非覆盖式写入，ID 已存在时返回 409 `duplicate_entity_ids_scoped`；不做其他实体 ID 检查，释义 ID 冲突由主键约束拒绝并整体回滚。`summary` 是写入后的轻量词典计数。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
@@ -245,6 +246,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `entry_not_found` | 词条不存在或已被删除。 |
 | `invalid_entry_morphology` | 词条携带的当前形态组或覆盖项结构无效。 |
 | `invalid_entry_location_target` | 词根窗口定位请求未提供目标词条 ID。 |
+| `invalid_overview_time_zone` | 列表概览的 `tz` 不是可识别的 IANA 时区名。 |
 | `invalid_root_context` | `preferredRootId` 不是目标词条的可用词根上下文。 |
 | `root_group_not_found` | 请求的词根组不存在于当前查询结果。 |
 | `invalid_settings_payload` | 设置请求体格式无效。 |
@@ -408,6 +410,16 @@ GET /api/dictionaries/:id/entries/:entryId/location?filter=&q=&fields=&fuzzyFiel
 带 `q` 的普通词条、词根组及 feature items/location 响应在顶层返回同一 `searchSummary`；无 `q` 时为 `null`。`fields` 只包含本次查询实际启用的字段，`matching` 固定为 `strict` 或 `fuzzy`，`entryCount` 按“该字段至少有一个独立值命中”的唯一词条数计算。同一词条在同一字段命中多个值仍只计一次，但可以同时计入多个字段，因此字段计数之和可以大于 `matchedEntryCount`。统计复用生成当前结果集合的同一轮 projection 匹配，不按字段追加查询，也不因打开前端字段面板重新请求。
 
 普通列表和 feature result 的 `matchedEntryCount` 等于搜索及候选条件相交后的唯一词条总数。词根模式仍统计直接命中搜索的唯一词条，不统计可见词根组数，也不把“词根命中后随组展示但自身未命中”的衍生词计入；因此它可以与 `pageInfo.total` 不同。location 响应复用相同查询会话中的摘要，即使目标不在结果内也不重新计算。
+
+#### 列表概览
+
+`GET /api/dictionaries/:id/entries/overview` 把当前查询的完整结果按排序切成段，返回每段的键、起始结果下标和条数，供列表导航条（`lib/list-navigator.js`）显示刻度和气泡。分段逻辑在 `lib/entry-overview-model.js`：
+
+- 按当前排序取出全部结果的分段键，按“相邻且键相同”切段，所以各段首尾相接、合计等于 `total`。同一个键可能出现在两处（如无法解析的日期夹在有效日期之间），这时分成两段，起点仍然正确。
+- 词形排序（`grain` 为空串）：键是 `sort_key` 的第一个码位，与码位排序一致；以后改为自定义字母表排序时，只替换 `firstSortUnit()`。
+- 时间排序：按 `created_at` 或 `updated_at` 在 `tz` 时区的本地日期切段。粒度按有效时间跨度自动选择：60 天内为 `day`（键 `YYYY-MM-DD`），4 年内为 `month`（`YYYY-MM`），更长为 `year`（`YYYY`）。不是 ISO 时间戳的值归入键 `none`。
+- 无搜索时在 SQL 中按 `sqlOrderClause()` 读取分段键；有搜索时按查询会话的有序命中 ID 读取，与列表窗口同序。结果不缓存。
+- 标签由前端按界面语言生成，接口只返回键。前端在指针第一次移进导航条时才请求，并按查询 key 缓存；查询条件或词典版本变化后丢弃，下次悬停再请求。功能结果与质量结果筛选不请求概览，只显示滑块。
 
 #### 逐值检索与命中定位契约
 

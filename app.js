@@ -300,6 +300,10 @@ let entryListEdgeFrame = 0;
 let entryListScrollbarWidth = -1;
 let entryListNavigatorHoldsLoads = false;
 let entryListNavigatorLayout = { items: null, rows: [], total: 0 };
+// Segments for the navigator's ticks and bubble, per entry query (key).
+let entryListOverview = { key: "", status: "idle", data: null, labeled: null, language: "" };
+// Result index a tick press is waiting to land on until its window loads.
+let entryListPendingJump = null;
 // Corpus rows have fixed heights in styles.css (item card 44px, group header
 // 32px, each plus the row's 2px gap), so these estimates are exact.
 const CORPUS_ITEM_ROW_HEIGHT = 46;
@@ -5202,11 +5206,123 @@ function setEntryListNavigatorActive(active) {
     renderWindow: () => renderVirtualListWindow(entryVirtualList),
     setLoadsHeld: (held) => {
       entryListNavigatorHoldsLoads = held;
+      if (held) {
+        entryListPendingJump = null;
+      }
     },
+    requestOverview: requestEntryListOverview,
+    jumpToIndex: jumpEntryListToIndex,
+    formatCount: (count) => aText(`${count.toLocaleString()} 条`, `${count.toLocaleString()} ${count === 1 ? "entry" : "entries"}`),
+    formatPosition: (position, total) => `${position.toLocaleString()} / ${total.toLocaleString()}`,
   });
   entryListNavigator.setActive(active);
   // Root mode keeps the native scrollbar, and with it the deferred height updates.
   entryVirtualList.immediateSizeUpdates = active;
+  if (active) {
+    syncEntryListOverview();
+  }
+}
+
+// Only plain entry queries have segments; feature and quality results show the
+// thumb alone (plan D21).
+function entryListOverviewApplies() {
+  return entryQueryState.status === "success" && !activeFilterUsesFeatureQuery();
+}
+
+function requestEntryListOverview() {
+  const dictionary = activeDictionary();
+  if (!dictionary || !entryListOverviewApplies()) {
+    return;
+  }
+  const key = entryQueryState.key;
+  if (entryListOverview.key === key && entryListOverview.status !== "error") {
+    return;
+  }
+  entryListOverview = { key, status: "loading", data: null, labeled: null, language: "" };
+  const params = entryQueryParams(dictionary);
+  params.set("tz", Intl.DateTimeFormat().resolvedOptions().timeZone);
+  api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/overview?${params}`)
+    .then((data) => {
+      if (entryListOverview.key !== key) {
+        return;
+      }
+      entryListOverview = { ...entryListOverview, status: "success", data };
+      syncEntryListOverview();
+    })
+    .catch((error) => {
+      if (entryListOverview.key !== key) {
+        return;
+      }
+      // The thumb works without segments; the next hover asks again.
+      entryListOverview = { ...entryListOverview, status: "error" };
+      console.error("Entry list overview request failed", error);
+    });
+}
+
+const OVERVIEW_MONTHS_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// `full` is the bubble's label, `short` the tick's.
+function entryListOverviewLabels(key, grain) {
+  if (!grain) {
+    return { full: key || "—", short: key || "—" };
+  }
+  if (key === "none") {
+    return { full: aText("无日期", "No date"), short: "—" };
+  }
+  const [year, month, day] = key.split("-").map(Number);
+  const monthName = OVERVIEW_MONTHS_EN[month - 1];
+  if (grain === "year") {
+    return { full: aText(`${year} 年`, `${year}`), short: `${year}` };
+  }
+  if (grain === "month") {
+    return {
+      full: aText(`${year} 年 ${month} 月`, `${monthName} ${year}`),
+      short: month === 1 ? `${year}` : aText(`${month}月`, monthName),
+    };
+  }
+  return {
+    full: aText(`${year} 年 ${month} 月 ${day} 日`, `${monthName} ${day}, ${year}`),
+    short: day === 1 ? aText(`${month}月`, monthName) : `${day}`,
+  };
+}
+
+function syncEntryListOverview() {
+  const { data } = entryListOverview;
+  const current = entryListOverview.status === "success"
+    && entryListOverview.key === entryQueryState.key
+    && entryListOverviewApplies();
+  if (current && entryListOverview.language !== currentLanguage) {
+    entryListOverview.labeled = {
+      total: data.total,
+      buckets: data.buckets.map(({ key, start, count }) => ({ start, count, ...entryListOverviewLabels(key, data.grain) })),
+    };
+    entryListOverview.language = currentLanguage;
+  }
+  entryListNavigator.setOverview(current ? entryListOverview.labeled : null);
+}
+
+// A tick press scrolls to the estimate at once, then lands on the segment's
+// first entry once that entry's window has loaded.
+function jumpEntryListToIndex(index) {
+  elements.entryList.scrollTop = window.ConlexiconListNavigator.scrollTopForIndex(entryListNavigatorRows(), index);
+  entryListPendingJump = index;
+  renderVirtualListWindow(entryVirtualList);
+  alignEntryListJump();
+}
+
+function alignEntryListJump() {
+  if (entryListPendingJump === null) {
+    return;
+  }
+  const index = entryVirtualList.items.findIndex(({ value }) => value.kind === "entry" && value.resultIndex === entryListPendingJump);
+  if (index < 0) {
+    return;
+  }
+  entryListPendingJump = null;
+  // At the very top the row anchors measurement fixes; the stable scroll then
+  // clears it of the top edge fade.
+  elements.entryList.scrollTop = entryVirtualList.offsets[index];
+  scrollVirtualListItemIntoViewStable(entryVirtualList, entryVirtualList.items[index].key);
 }
 
 function renderVirtualList(container, virtualList, items, options) {
@@ -5637,6 +5753,7 @@ function renderEntryRows(entries = [], options = {}) {
     onRangeChange: options.onRangeChange,
   });
   setEntryListNavigatorActive(true);
+  alignEntryListJump();
 }
 
 function renderQueryWindowPlaceholder(row) {
@@ -17990,6 +18107,12 @@ elements.entryList.addEventListener("pointerover", (event) => {
 });
 elements.entryList.addEventListener("scroll", updateHoveredEntryQualityIssueTooltipPlacement, { passive: true });
 elements.entryList.addEventListener("scroll", scheduleEntryListEdges, { passive: true });
+// Scrolling by hand cancels a tick press still waiting for its window.
+["wheel", "touchstart", "keydown"].forEach((type) => {
+  elements.entryList.addEventListener(type, () => {
+    entryListPendingJump = null;
+  }, { passive: true });
+});
 new ResizeObserver(scheduleEntryListEdges).observe(elements.entryList);
 
 document.addEventListener("pointerover", (event) => {

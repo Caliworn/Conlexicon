@@ -40,6 +40,7 @@ const CHECK_GROUPS = [
       "check-sqlite-contract.js",
       "check-definition-tags.js",
       "check-corpus.js",
+      "check-entry-overview.js",
       "check-tag-registry.js",
       "check-query-session-cache.js",
       "check-feature-result-session.js",

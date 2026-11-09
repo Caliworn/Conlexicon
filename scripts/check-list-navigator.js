@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { indexAtScroll, scrollTopForIndex, thumbGeometry } = require("../lib/list-navigator");
+const { indexAtScroll, layoutTicks, scrollTopForIndex, thumbGeometry } = require("../lib/list-navigator");
 
 // A windowed list: loaded window 0 (rows of uneven height), placeholder for
 // window 1, loaded window 2, placeholder for the last partial window.
@@ -72,7 +72,26 @@ function checkThumbGeometry() {
   assert.equal(thumbGeometry({ trackHeight: 20, total: 1000, visible: 5, minThumb: 32 }).thumbHeight, 20, "the thumb never outgrows its track");
 }
 
+function checkTickLayout() {
+  const bucket = (start, count, label) => ({ start, count, full: label, short: label });
+  const buckets = [bucket(0, 10, "a"), bucket(10, 1, "b"), bucket(11, 1, "c"), bucket(12, 78, "d"), bucket(90, 10, "e")];
+  const ticks = layoutTicks({ buckets, trackHeight: 200, thumbHeight: 32, travel: 168, maxIndex: 95, gap: 20 });
+  // b and c land within 20px of a and merge into its tick; d and e stand alone.
+  assert.deepEqual(ticks.map((tick) => [tick.first.short, tick.last.short, tick.start, tick.end, tick.count]), [
+    ["a", "c", 0, 12, 12],
+    ["d", "d", 12, 90, 78],
+    ["e", "e", 90, 100, 10],
+  ]);
+  assert.equal(ticks[0].y, 16, "a segment starting at the top sits at the thumb's middle");
+  assert.equal(ticks[0].top, 0, "the first band starts at the top of the rail");
+  assert.equal(ticks[ticks.length - 1].bottom, 200, "the last band reaches the bottom of the rail");
+  ticks.slice(1).forEach((tick, index) => {
+    assert.equal(tick.top, ticks[index].bottom, "bands meet without gaps, so every point on the rail picks a tick");
+  });
+}
+
 checkInverse();
+checkTickLayout();
 checkPlaceholderInterpolation();
 checkBounds();
 checkRowsWithoutResults();
