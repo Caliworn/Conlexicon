@@ -1203,13 +1203,20 @@
           groups.push({ y: position, members: [bucket] });
         }
       });
+      // A last band shorter than the gap joins the tick before it.
+      if (groups.length > 1 && g.trackHeight - groups[groups.length - 1].y < gap) {
+        groups[groups.length - 2].members.push(...groups.pop().members);
+      }
       const merge = opt("tickMode") === "merge";
       groups.forEach((group, index) => {
         const first = group.members[0];
         const last = group.members[group.members.length - 1];
+        // A band is the segment's own stretch of the track; the label sits in its middle.
+        const top = index === 0 ? 0 : group.y;
+        const bottom = index === groups.length - 1 ? g.trackHeight : groups[index + 1].y;
         const label = document.createElement("span");
         label.className = "sp-label";
-        label.style.top = `${group.y}px`;
+        label.style.top = `${(top + bottom) / 2}px`;
         const mergedShort = merge && group.members.length > 1;
         label.textContent = mergedShort ? `${first.short}–${last.short}` : first.short;
         if (mergedShort) label.classList.add("sp-merged");
@@ -1219,12 +1226,7 @@
         label.dataset.start = first.start;
         label.dataset.end = merge ? last.start + last.count : first.start + first.count;
         rail.append(label);
-        // Each label owns the whole rail width between the midpoints to its neighbours.
-        tickBands.push({
-          top: index === 0 ? 0 : (groups[index - 1].y + group.y) / 2,
-          bottom: index === groups.length - 1 ? g.trackHeight : (group.y + groups[index + 1].y) / 2,
-          label,
-        });
+        tickBands.push({ top, bottom, label });
       });
       if (opt("railWidth") === "auto") {
         // Fit the widest label; a rail that is too narrow clips labels on the left.

@@ -88,6 +88,32 @@ function checkTickLayout() {
   ticks.slice(1).forEach((tick, index) => {
     assert.equal(tick.top, ticks[index].bottom, "bands meet without gaps, so every point on the rail picks a tick");
   });
+  // A band is its segment's stretch of the track under the mapping the hover
+  // preview uses (thumb centred on the pointer), so a press and the preview agree.
+  const indexAtY = (y) => ((y - 16) / 168) * 95;
+  ticks.slice(1).forEach((tick) => {
+    assert.ok(Math.abs(indexAtY(tick.top) - tick.start) < 1e-9, `band ${tick.first.short} starts where its segment starts`);
+  });
+  ticks.slice(0, -1).forEach((tick) => {
+    assert.ok(Math.abs(indexAtY(tick.bottom) - tick.end) < 1e-9, `band ${tick.first.short} ends where its segment ends`);
+  });
+  ticks.forEach((tick) => {
+    assert.equal(tick.labelY, (tick.top + tick.bottom) / 2, "the label sits in the middle of its band");
+  });
+  // A short last segment starting 16px above the rail's end would get a band
+  // shorter than the gap, so it joins the tick before it.
+  const tail = layoutTicks({
+    buckets: [bucket(0, 50, "a"), bucket(50, 45, "d"), bucket(95, 5, "e")],
+    trackHeight: 200,
+    thumbHeight: 32,
+    travel: 168,
+    maxIndex: 95,
+    gap: 20,
+  });
+  assert.deepEqual(tail.map((tick) => [tick.first.short, tick.last.short, tick.end]), [["a", "a", 50], ["d", "e", 100]]);
+  tail.forEach((tick) => {
+    assert.ok(tick.bottom - tick.top >= 20, `band ${tick.first.short} is at least the gap tall`);
+  });
 }
 
 checkInverse();
