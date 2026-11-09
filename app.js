@@ -33,7 +33,6 @@ const shellState = {
   navCollapsed: false,
   wideNavCollapsed: false,
   navDrawerOpen: false,
-  browserCollapsedByView: {},
   browserDrawerOpen: false,
 };
 let activeAppTooltipTarget = null;
@@ -360,8 +359,6 @@ const i18n = {
     applyFilter: "应用",
     clearFilter: "清除筛选",
     entrySortLabel: "词条排序",
-    collapseEntryBrowser: "收起词条列表",
-    expandEntryBrowser: "展开词条列表",
     openEntryList: "打开词条列表",
     closeEntryList: "关闭词条列表",
     focusCurrentEntryInList: "在词条列表中定位当前词条",
@@ -1001,8 +998,6 @@ const i18n = {
     applyFilter: "Apply",
     clearFilter: "Clear filter",
     entrySortLabel: "Entry sorting",
-    collapseEntryBrowser: "Collapse entry list",
-    expandEntryBrowser: "Expand entry list",
     openEntryList: "Open entry list",
     closeEntryList: "Close entry list",
     focusCurrentEntryInList: "Locate current entry in the list",
@@ -1711,7 +1706,6 @@ const elements = {
   appTooltip: document.querySelector("#appTooltip"),
   editorView: document.querySelector("#editorView"),
   editorTopBar: document.querySelector("#editorTopBar"),
-  entryBrowserToggleButton: document.querySelector("#entryBrowserToggleButton"),
   entryBrowserSlot: document.querySelector("#entryBrowserSlot"),
   entryBrowser: document.querySelector("#entryBrowser"),
   dictionaryManagerView: document.querySelector("#dictionaryManagerView"),
@@ -1769,7 +1763,6 @@ const elements = {
   partFilter: document.querySelector("#partFilter"),
   partFilterChips: document.querySelector("#partFilterChips"),
   sortSelect: document.querySelector("#sortSelect"),
-  collapsedNewEntryButton: document.querySelector("#collapsedNewEntryButton"),
   entryListNewEntryButton: document.querySelector("#entryListNewEntryButton"),
   importInput: document.querySelector("#importInput"),
   entryDetailPanel: document.querySelector("#entryDetailPanel"),
@@ -3844,7 +3837,6 @@ function revealEntryBrowserForResults() {
     shellState.browserDrawerOpen = true;
     return;
   }
-  shellState.browserCollapsedByView.editor = false;
   shellState.browserDrawerOpen = false;
 }
 
@@ -4051,12 +4043,6 @@ function syncAppTooltipVisibility() {
   hideAppTooltip();
 }
 
-function effectiveEntryBrowserCollapsed(view = state.activeView) {
-  return desktopNavMediaQuery.matches
-    && view === "editor"
-    && Boolean(shellState.browserCollapsedByView[view]);
-}
-
 function renderShellEntryBrowser() {
   hideAppTooltip();
   if (mobileShellMode()) {
@@ -4068,8 +4054,6 @@ function renderShellEntryBrowser() {
     elements.contentGrid.dataset.browserState = "expanded";
     elements.entryBrowser.hidden = !canOpenDrawer || !shellState.browserDrawerOpen;
     entryToolbarMenus?.syncVisibility();
-    elements.entryBrowserToggleButton.hidden = true;
-    elements.collapsedNewEntryButton.hidden = true;
     elements.mobileEntryListButton.setAttribute("aria-expanded", String(shellState.browserDrawerOpen));
     elements.mobileEntryListButton.setAttribute("aria-label", t(shellState.browserDrawerOpen ? "closeEntryList" : "openEntryList"));
     syncMobileDrawerBodyState();
@@ -4082,22 +4066,10 @@ function renderShellEntryBrowser() {
     return;
   }
   shellState.browserDrawerOpen = false;
-  const canToggle = desktopNavMediaQuery.matches
-    && backendAvailable
-    && Boolean(activeDictionary())
-    && state.activeView === "editor";
-  const collapsed = canToggle && effectiveEntryBrowserCollapsed("editor");
-  const browserState = collapsed ? "collapsed" : "expanded";
-  elements.appShell.dataset.browserState = browserState;
-  elements.contentGrid.dataset.browserState = browserState;
-  elements.entryBrowser.hidden = collapsed;
+  elements.appShell.dataset.browserState = "expanded";
+  elements.contentGrid.dataset.browserState = "expanded";
+  elements.entryBrowser.hidden = false;
   entryToolbarMenus?.syncVisibility();
-  elements.entryBrowserToggleButton.hidden = !canToggle;
-  elements.collapsedNewEntryButton.hidden = !collapsed;
-  elements.entryBrowserToggleButton.setAttribute("aria-expanded", String(!collapsed));
-  const controlLabel = t(collapsed ? "expandEntryBrowser" : "collapseEntryBrowser");
-  elements.entryBrowserToggleButton.setAttribute("aria-label", controlLabel);
-  elements.entryBrowserToggleButton.removeAttribute("title");
   syncMobileDrawerBodyState();
   scheduleEntryBrowserHeightUpdate();
 }
@@ -4216,16 +4188,6 @@ function syncEntryVirtualListAfterBrowserLayoutChange(options = {}) {
   renderVirtualListWindow(entryVirtualList);
 }
 
-function toggleEntryBrowser() {
-  const view = "editor";
-  shellState.browserCollapsedByView[view] = !effectiveEntryBrowserCollapsed(view);
-  renderShellEntryBrowser();
-  if (!effectiveEntryBrowserCollapsed(view)) {
-    scheduleEntryBrowserHeightUpdate();
-    requestAnimationFrame(() => flushPendingEntryCardScroll());
-  }
-}
-
 function renderAvailability() {
   const hasDictionary = Boolean(activeDictionary());
   const settings = dictionarySettings();
@@ -4308,7 +4270,7 @@ function renderNewEntryButtons() {
     ? ["fullNewEntryTooltip", "quickNewEntryTooltip"]
     : ["quickNewEntryTooltip", "fullNewEntryTooltip"];
   const hint = formatText("newEntryShiftClickHint", { action: t(shiftLabelKey) });
-  [elements.entryListNewEntryButton, elements.collapsedNewEntryButton, elements.mobileNewEntryButton].forEach((button) => {
+  [elements.entryListNewEntryButton, elements.mobileNewEntryButton].forEach((button) => {
     button.dataset.i18nAriaLabel = labelKey;
     button.setAttribute("aria-label", t(labelKey));
     button.setAttribute("aria-description", hint);
@@ -18225,7 +18187,6 @@ elements.mobileEntryListButton.addEventListener("click", () => {
 });
 elements.mobileNewEntryButton.addEventListener("click", handleNewEntryButtonClick);
 elements.mobileDrawerBackdrop.addEventListener("click", closeMobileDrawers);
-elements.entryBrowserToggleButton.addEventListener("click", toggleEntryBrowser);
 elements.addDictionaryButton.addEventListener("click", prepareNewDictionary);
 elements.emptyCreateDictionaryButton.addEventListener("click", () => showView("manager"));
 elements.settingsOpenDictionaryManagerButton.addEventListener("click", () => showView("manager"));
@@ -18355,7 +18316,6 @@ elements.tagManagerZones.addEventListener("drop", (event) => {
   moveTagRow(tagModel.tagMoveToIndex(tagManagerRows(), tag, target.partOfSpeech, target.index));
 });
 elements.tagManagerZones.addEventListener("dragend", finishTagDrag);
-elements.collapsedNewEntryButton.addEventListener("click", handleNewEntryButtonClick);
 elements.entryListNewEntryButton.addEventListener("click", handleNewEntryButtonClick);
 elements.quickEntryPanel.addEventListener("keydown", handleQuickEntryKeydown);
 elements.quickEntryFields.addEventListener("input", (event) => {
@@ -19074,8 +19034,6 @@ async function focusEntrySearch() {
   }
   if (mobileShellMode()) {
     openMobileEntryBrowserDrawer();
-  } else if (effectiveEntryBrowserCollapsed()) {
-    toggleEntryBrowser();
   }
   elements.searchInput.focus();
   elements.searchInput.select();

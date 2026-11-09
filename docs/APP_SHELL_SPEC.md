@@ -14,7 +14,7 @@
 桌面中等宽度：
 
 ```text
-[强制收起的图标导航栏] [可收起词条列表] [主编辑/查看区]
+[强制收起的图标导航栏] [词条列表] [主编辑/查看区]
 ```
 
 竖屏移动端：
@@ -39,7 +39,6 @@ const shellState = {
   navCollapsed: false,
   wideNavCollapsed: false,
   navDrawerOpen: false,
-  browserCollapsedByView: {},
   browserDrawerOpen: false,
 };
 ```
@@ -57,7 +56,7 @@ const shellState = {
 
 ```text
 data-nav-state="expanded|rail|drawer"
-data-browser-state="expanded|collapsed|drawer"
+data-browser-state="expanded|drawer"
 ```
 
 - 桌面收起导航后只显示图标，并使用应用内 tooltip 和可访问名称。
@@ -78,7 +77,7 @@ data-browser-state="expanded|collapsed|drawer"
 - 搜索框内的按钮和表头按钮在三套皮肤里都是平面按钮：静止时没有底、边框和凸起阴影，悬浮和按下显示中性浅底，弹层打开时保留打开态底色；筛选生效时筛选按钮保留强调色边（`--control-context-border`）。新建保留强调色描边配方（快捷键与 tooltip 不变），在表头中改为强调色浅底、无边框无阴影，是表头里唯一默认带底的按钮。
 - 圆角由 `--entry-toolbar-radius` 决定：默认 `--radius-control`，液态玻璃覆盖为 `--radius-pill`。玻璃表面、tint 等材质留在皮肤文件。
 - 词根模式按钮常驻原位：有筛选时以 `aria-disabled` 禁用，tooltip 说明“清除筛选后可用”，不隐藏。词根模式与筛选互斥，二者共用表头下方的状态行：有筛选时显示筛选状态，处于词根模式时显示带图标和文字的“全部展开／全部收起”（高度与筛选行同为 `34px`），都不在时该行不显示。
-- 搜索设置、筛选和排序三个弹层是 `body` 的直接子节点（`.entry-workspace-menu`，fixed 定位，`--layer-floating-menu`），不在 sticky 列表或工具栏的层叠上下文里，也不增加覆盖视口的宿主容器。`lib/entry-toolbar-menus.js` 按触发器位置放置弹层，必要时避让视口边界；搜索设置／筛选面板宽 `340px`、排序菜单宽 `240px`，最大宽度为视口减 `24px`。外部点击同时检查触发器和弹层；Escape 关闭并返回触发器；滚动和 resize 只重新定位，Tab／失焦不关闭；所属工具栏隐藏（列表收起、抽屉关闭）或离开词条页时关闭。
+- 搜索设置、筛选和排序三个弹层是 `body` 的直接子节点（`.entry-workspace-menu`，fixed 定位，`--layer-floating-menu`），不在 sticky 列表或工具栏的层叠上下文里，也不增加覆盖视口的宿主容器。`lib/entry-toolbar-menus.js` 按触发器位置放置弹层，必要时避让视口边界；搜索设置／筛选面板宽 `340px`、排序菜单宽 `240px`，最大宽度为视口减 `24px`。外部点击同时检查触发器和弹层；Escape 关闭并返回触发器；滚动和 resize 只重新定位，Tab／失焦不关闭；所属工具栏隐藏（抽屉关闭）或离开词条页时关闭。
 
 ## 4. 交互与可访问性
 
@@ -101,7 +100,7 @@ data-browser-state="expanded|collapsed|drawer"
 
 ## 6. 当前收尾状态
 
-- 基础应用外壳、桌面导航收起、词条列表收起、移动端顶部应用栏、工具导航抽屉和词条列表抽屉已经实装。
+- 基础应用外壳、桌面导航收起、移动端顶部应用栏、工具导航抽屉和词条列表抽屉已经实装。桌面词条列表收起功能已于 2026-11-09 删除：它不记忆状态，搜索或筛选出结果时又会自动展开，实际很少能保持收起，而词典名旁的“⌄”开关容易被误认成切换词典的下拉菜单。
 - 触发标签、词性和高级筛选等词条结果入口时，移动端会打开词条列表抽屉，桌面端会展开已收起的词条列表。
 - 词条列表隐藏或抽屉关闭时触发跳转/保存后，会记录待聚焦词条，并在列表重新显示后滚动到当前词条。
 - 移动端抽屉打开时，通用确认弹窗层级高于抽屉。

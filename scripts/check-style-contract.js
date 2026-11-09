@@ -445,7 +445,7 @@ assert(disabledSelection?.[1].includes("--control-current-shadow: none")
 // Ordinary commands share neutral paint even inside optical parents; registration
 // remains the engine's responsibility, not an implication of semantic attributes.
 const ordinaryCommandIds = new Set([
-  "mobileNavButton", "mobileEntryListButton", "navCollapseButton", "entryBrowserToggleButton",
+  "mobileNavButton", "mobileEntryListButton", "navCollapseButton",
   "skinToggleButton", "themeToggleButton", "languageToggleButton", "rootModeToggleButton",
   "entrySearchClearButton", "entrySearchConfigButton", "entrySortButton", "entryFilterButton",
   "expandAllRootsButton", "collapseAllRootsButton",
@@ -478,7 +478,7 @@ const popupStateSelector = ':where(.entry-search-config-button, .entry-filter-bu
 assert(scopedBlock(styles, popupStateSelector)?.[1].includes("--control-current-background: var(--control-open-background"),
   "Popup expansion must map to persistent paint without changing command semantics");
 for (const id of ["mobileNavButton", "mobileEntryListButton", "navCollapseButton",
-  "entryBrowserToggleButton", "skinToggleButton"]) {
+  "skinToggleButton"]) {
   const markup = index.match(new RegExp('<button[^>]*id="' + id + '"[^>]*>'))?.[0] || "";
   assert(markup.includes("data-control-disclosure") && markup.includes("aria-expanded="),
     id + " must resolve disclosure paint from its existing expanded state");

@@ -85,8 +85,8 @@ body.app-booting .app-shell {
   visibility: hidden;
 }
 
-body.app-booting :where(.app-shell, .content-grid, .dictionary-panel, .entry-browser-toggle-icon, .nav-collapse-arrow, .theme-toggle-glyph),
-body.app-boot-settling :where(.app-shell, .content-grid, .dictionary-panel, .entry-browser-toggle-icon, .nav-collapse-arrow, .theme-toggle-glyph) {
+body.app-booting :where(.app-shell, .dictionary-panel, .nav-collapse-arrow, .theme-toggle-glyph),
+body.app-boot-settling :where(.app-shell, .dictionary-panel, .nav-collapse-arrow, .theme-toggle-glyph) {
   transition: none !important;
 }
 
@@ -367,30 +367,6 @@ body.english-locale .brand-row h1 {
   grid-template-columns: minmax(240px, 340px) minmax(320px, 1fr);
   gap: 20px;
   align-items: stretch;
-  transition: grid-template-columns 180ms ease;
-}
-
-.content-grid[data-browser-state="collapsed"] {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.secondary-button:is(.entry-browser-toggle, .entry-collapsed-new-button) {
-  position: relative;
-  top: 2px;
-  display: inline-grid;
-  width: 36px;
-  min-height: 36px;
-  padding: 0;
-  place-items: center;
-  flex: 0 0 36px;
-}
-
-.entry-browser-toggle-icon {
-  transition: transform 180ms ease;
-}
-
-.app-shell[data-browser-state="collapsed"] .entry-browser-toggle-icon {
-  transform: rotate(-90deg);
 }
 
 main :where(section, article, form, fieldset, div, label) {
@@ -776,10 +752,6 @@ fieldset {
 }
 
 @media (min-width: 800px) {
-  .content-grid[data-browser-state="collapsed"] .entry-browser-slot {
-    display: none;
-  }
-
   .content-grid[data-browser-state="expanded"] .entry-detail-panel {
     grid-column: 2;
   }
@@ -1819,7 +1791,7 @@ label span {
 }
 
 .entry-list {
-  --entry-list-fade-size: 20px;
+  --entry-list-fade-size: 12px;
   -webkit-mask-image:
     linear-gradient(to bottom, transparent, black var(--entry-list-fade-top), black calc(100% - var(--entry-list-fade-bottom)), transparent),
     linear-gradient(black, black);
@@ -7104,8 +7076,7 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
     -webkit-backdrop-filter: var(--material-entry-detail-mobile-filter);
   }
 
-  .content-grid,
-  .content-grid[data-browser-state="collapsed"] {
+  .content-grid {
     grid-template-columns: 1fr;
   }
 
@@ -7155,10 +7126,6 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
   }
 
   .nav-collapse-button {
-    display: none !important;
-  }
-
-  .entry-browser-toggle {
     display: none !important;
   }
 
@@ -7381,8 +7348,6 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
   .dictionary-panel,
   .nav-collapse-icon,
   .nav-collapse-arrow,
-  .content-grid,
-  .entry-browser-toggle-icon,
   .content-disclosure-icon,
   .display-section,
   .entry-display-header,
