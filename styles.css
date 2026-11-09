@@ -477,6 +477,91 @@ fieldset {
   transition: opacity 140ms ease;
 }
 
+/* List navigator (lib/list-navigator.js): replaces the native scrollbar of the
+   entry list in normal mode. The scroll container itself is unchanged; only its
+   scrollbar is hidden, and the navigator sits beside it inside the frame. */
+.entry-list-update-frame {
+  --list-navigator-width: 20px;
+}
+
+.entry-list-update-frame.has-list-navigator > .entry-list {
+  scrollbar-width: none;
+  padding-right: calc(var(--list-navigator-width) + 4px);
+}
+
+.entry-list-update-frame.has-list-navigator > .entry-list::-webkit-scrollbar {
+  display: none;
+}
+
+.list-navigator {
+  --list-navigator-thumb-width: 3px;
+  --list-navigator-thumb: color-mix(in srgb, var(--ui-text) 32%, transparent);
+  --list-navigator-line: transparent;
+  position: absolute;
+  top: 4px;
+  right: 0;
+  bottom: 4px;
+  z-index: 2;
+  width: var(--list-navigator-width);
+  touch-action: none;
+  user-select: none;
+  transition: opacity 140ms ease;
+}
+
+.list-navigator[hidden] {
+  display: none;
+}
+
+/* At rest the thumb is a thin line; hovering or dragging widens it and shows the track. */
+.list-navigator:is(:hover, .dragging) {
+  --list-navigator-thumb-width: 14px;
+  --list-navigator-thumb: color-mix(in srgb, var(--ui-text) 48%, transparent);
+  --list-navigator-line: color-mix(in srgb, var(--ui-text) 12%, transparent);
+}
+
+.list-navigator.dragging {
+  --list-navigator-thumb: var(--ui-accent);
+}
+
+.list-navigator::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 1px);
+  width: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--list-navigator-line);
+  content: "";
+}
+
+.list-navigator-thumb {
+  position: absolute;
+  top: 0;
+  left: calc(50% - var(--list-navigator-thumb-width) / 2);
+  width: var(--list-navigator-thumb-width);
+  border-radius: var(--radius-pill);
+  background: var(--list-navigator-thumb);
+  transition: width 120ms ease, left 120ms ease, background-color 120ms ease;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .list-navigator,
+  .list-navigator-thumb {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .list-navigator-thumb {
+    background: CanvasText;
+  }
+
+  .list-navigator.dragging .list-navigator-thumb {
+    background: Highlight;
+  }
+}
+
 .content-update-overlay {
   position: absolute;
   inset: 0;
@@ -524,7 +609,7 @@ fieldset {
   animation: contentUpdateSpin 720ms linear infinite;
 }
 
-.entry-list-update-frame.content-updating > .entry-list,
+.entry-list-update-frame.content-updating > :is(.entry-list, .list-navigator),
 .entry-detail-panel.content-updating > .entry-display {
   opacity: 0.56;
 }

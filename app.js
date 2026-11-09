@@ -293,6 +293,11 @@ let entryBrowserLayoutRefreshFrame = 0;
 let entryBrowserLayoutRefreshUntil = 0;
 let activeEntryContextMenu = null;
 const entryVirtualList = createVirtualListState(145);
+// The entry list's navigator replaces its native scrollbar in normal mode; root
+// mode keeps the native scrollbar until it gets its own navigator.
+let entryListNavigator = null;
+let entryListNavigatorHoldsLoads = false;
+let entryListNavigatorLayout = { items: null, rows: [], total: 0 };
 const corpusVirtualList = createVirtualListState(44);
 const CORPUS_PAGE_SIZE = 100;
 const masonryLayouts = new WeakMap();
@@ -5107,6 +5112,37 @@ function renderVirtualListWindow(virtualList) {
     visibleEnd: Math.min(items.length, virtualListIndexAt(offsets, container.scrollTop + viewportHeight) + 1),
     items: items.slice(start, end).map((item) => item.value),
   });
+  if (container === elements.entryList) {
+    entryListNavigator?.update();
+  }
+}
+
+function entryListNavigatorRows() {
+  const { items } = entryVirtualList;
+  if (entryListNavigatorLayout.items !== items) {
+    let end = 0;
+    const rows = items.map(({ value }) => {
+      const start = Number.isInteger(value.resultIndex) ? value.resultIndex : end;
+      const count = value.kind === "window-placeholder" ? value.resultCount : value.kind === "entry" ? 1 : 0;
+      end = start + count;
+      return { start, count };
+    });
+    entryListNavigatorLayout = { items, rows, total: end };
+  }
+  return { rows: entryListNavigatorLayout.rows, offsets: entryVirtualList.offsets, total: entryListNavigatorLayout.total };
+}
+
+function setEntryListNavigatorActive(active) {
+  entryListNavigator ||= window.ConlexiconListNavigator.createListNavigator({
+    frame: elements.entryListUpdateFrame,
+    list: elements.entryList,
+    getLayout: entryListNavigatorRows,
+    renderWindow: () => renderVirtualListWindow(entryVirtualList),
+    setLoadsHeld: (held) => {
+      entryListNavigatorHoldsLoads = held;
+    },
+  });
+  entryListNavigator.setActive(active);
 }
 
 function renderVirtualList(container, virtualList, items, options) {
@@ -5215,6 +5251,7 @@ function renderVirtualListEmpty(container, virtualList, content) {
   if (container === elements.entryList) {
     container.querySelectorAll(".content-disclosure-button").forEach((button) =>
       liquidGlassOpticalEngine?.unregisterMappedSurface(button));
+    setEntryListNavigatorActive(false);
   }
   container.replaceChildren(content);
 }
@@ -5462,25 +5499,31 @@ function renderEntryRows(entries = [], options = {}) {
     return;
   }
 
+  // Result indexes let the list navigator position by result instead of pixels.
+  const resultTotal = Number(options.pageInfo?.total) || 0;
   const rows = windowPages
     ? windowPages.flatMap((page) => page.status === "success"
-      ? page.items.map((entry) => ({
+      ? page.items.map((entry, position) => ({
         kind: "entry",
         entry,
         qualityIssues: entry.qualityIssues || [],
         windowPageIndex: page.index,
         windowEstimateScale: page.estimateScale || 1,
+        resultIndex: page.offset + position,
       }))
       : [{
         kind: "window-placeholder",
         windowPageIndex: page.index,
         status: page.status,
         estimatedHeight: Math.max(page.estimatedHeight || entryVirtualList.estimatedItemHeight, entryVirtualList.estimatedItemHeight),
+        resultIndex: page.offset,
+        resultCount: Math.max(0, Math.min(ENTRY_QUERY_WINDOW_PAGE_SIZE, resultTotal - page.offset)),
       }])
-    : entries.map((entry) => ({
+    : entries.map((entry, position) => ({
       kind: "entry",
       entry,
       qualityIssues: entry.qualityIssues || [],
+      resultIndex: position,
     }));
   if (!windowPages && options.pageInfo?.hasMore) {
     rows.push({
@@ -5524,6 +5567,7 @@ function renderEntryRows(entries = [], options = {}) {
       : createEntryCard(row.entry, { qualityIssues: row.qualityIssues }),
     onRangeChange: options.onRangeChange,
   });
+  setEntryListNavigatorActive(true);
 }
 
 function renderQueryWindowPlaceholder(row) {
@@ -5625,6 +5669,7 @@ function renderRootModeGroups(groups = [], options = {}) {
     });
   }
   const settingsSizeSignature = entryCardSettingsSizeSignature();
+  setEntryListNavigatorActive(false);
   renderVirtualList(elements.entryList, entryVirtualList, rows, {
     resetToken: entryVirtualResetToken(),
     getKey: (row) => row.kind === "truncation"
@@ -6704,6 +6749,10 @@ function handleEntryQueryWindowRange(dictionary, range) {
     range.items.map((row) => row?.windowPageIndex).filter((index) => Number.isInteger(index)),
   );
   entryQueryState.visiblePageIndexes = visiblePageIndexes;
+  // A navigator drag loads windows only once the pointer pauses.
+  if (entryListNavigatorHoldsLoads) {
+    return;
+  }
   visiblePageIndexes.forEach((index) => {
     const page = entryQueryState.pages.find((candidate) => candidate.index === index);
     if (!page) {
