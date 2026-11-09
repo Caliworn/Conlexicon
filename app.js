@@ -18656,6 +18656,13 @@ document.addEventListener("input", (event) => {
   field.setSelectionRange(nextStart, nextEnd);
 }, true);
 
+function isSaveShortcutEvent(event) {
+  return (event.ctrlKey || event.metaKey)
+    && !event.altKey
+    && !event.shiftKey
+    && event.key.toLocaleLowerCase() === "s";
+}
+
 function isEditableShortcutTarget(target) {
   return Boolean(target?.closest?.("input, textarea, select, [contenteditable='true'], [contenteditable=''], [role='textbox']"));
 }
@@ -18791,6 +18798,16 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
+  // In a save / discard / cancel prompt the save shortcut answers Save; in other
+  // confirmations it does nothing, so it never saves the form underneath.
+  if (confirmDialogResolver && isSaveShortcutEvent(event)) {
+    event.preventDefault();
+    if (confirmDialogResults.accept === "save" && !event.repeat) {
+      closeConfirmDialog("save");
+    }
+    return;
+  }
+
   if (event.key === "Escape" && !elements.infoDialog.hidden) {
     closeInfoDialog();
     return;
@@ -18824,11 +18841,7 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  const isSaveShortcut = (event.ctrlKey || event.metaKey)
-    && !event.altKey
-    && !event.shiftKey
-    && event.key.toLocaleLowerCase() === "s";
-  if (!isSaveShortcut) {
+  if (!isSaveShortcutEvent(event)) {
     return;
   }
 

@@ -61,7 +61,7 @@ Press `?` outside a text field to see every shortcut in the app. `Ctrl` and `Cmd
 - `Shift` + click on "+": use the other way of adding an entry. A dictionary setting chooses which one a plain click opens; the two `Enter` shortcuts above never change.
 - `Ctrl` + `E`: edit the current entry when focus is not in a text field.
 - With focus in an open full or local edit: `Ctrl` + `Enter` saves, and `Esc` cancels, asking first if there are unsaved changes.
-- `Ctrl` + `S`: save the active edit form or module when saving is available.
+- `Ctrl` + `S`: save the active edit form or module when saving is available. In a Save / Discard / Cancel prompt it chooses Save and closes the prompt.
 - `Alt` + arrow keys on a focused sort card or drag handle: move it one place.
 
 在文本框以外按 `?` 可以查看应用内的完整快捷键列表。`Ctrl` 和 `Cmd` 通用。常用的有：
@@ -71,7 +71,7 @@ Press `?` outside a text field to see every shortcut in the app. `Ctrl` and `Cmd
 - `Shift` + 点击“+”：改用另一种新建方式。普通点击打开哪一种由词典设置决定，上面两个 `Enter` 快捷键不受影响。
 - `Ctrl` + `E`：焦点不在文本框时编辑当前词条。
 - 焦点在打开的完整编辑或局部编辑内时：`Ctrl` + `Enter` 保存，`Esc` 取消，有未保存改动时先确认。
-- `Ctrl` + `S`：在当前表单或模块支持保存时执行保存。
+- `Ctrl` + `S`：在当前表单或模块支持保存时执行保存。在“保存 / 放弃更改 / 取消”弹窗中按下时选择保存并关闭弹窗。
 - 聚焦排序卡片或拖动把手后按 `Alt` + 方向键：移动一位。
 
 ## Run Locally / 本地运行
