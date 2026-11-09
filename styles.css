@@ -484,7 +484,11 @@ fieldset {
   --list-navigator-width: 20px;
 }
 
+/* The virtual list re-anchors itself as soon as row heights are measured
+   (immediateSizeUpdates in app.js); browser scroll anchoring would compensate a
+   second time, and it loses its anchor node whenever rows are replaced. */
 .entry-list-update-frame.has-list-navigator > .entry-list {
+  overflow-anchor: none;
   scrollbar-width: none;
   padding-right: calc(var(--list-navigator-width) + 4px);
 }

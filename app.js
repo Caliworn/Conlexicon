@@ -4663,6 +4663,11 @@ function createVirtualListState(estimatedItemHeight) {
     sizeCacheKeys: new Map(),
     heightCache: new Map(),
     onRangeChange: null,
+    // A list with a native scrollbar defers new heights while scrolling so the
+    // native thumb stays under the pointer. A list positioned by the list navigator
+    // applies them at once, before paint, which keeps content from jumping when
+    // newly rendered rows above the viewport differ from their estimates.
+    immediateSizeUpdates: false,
   };
 }
 
@@ -4720,7 +4725,8 @@ function initializeVirtualList(virtualList, container) {
     return;
   }
   virtualList.resizeObserver = new ResizeObserver((entries) => {
-    const activelyScrolling = virtualListIsActivelyScrolling(virtualList);
+    const activelyScrolling = !virtualList.immediateSizeUpdates && virtualListIsActivelyScrolling(virtualList);
+    // Read before any size changes: scrollTop still matches the old offsets.
     const anchor = activelyScrolling ? null : virtualListAnchor(virtualList);
     let changed = false;
     entries.forEach((entry) => {
@@ -4751,6 +4757,10 @@ function initializeVirtualList(virtualList, container) {
     }
     if (activelyScrolling) {
       scheduleVirtualListResizeIdleFlush(virtualList);
+      return;
+    }
+    if (virtualList.immediateSizeUpdates) {
+      applyVirtualListResizeNow(virtualList, anchor);
       return;
     }
     scheduleVirtualListResizeUpdate(virtualList, anchor);
@@ -4889,6 +4899,22 @@ function scheduleVirtualListResizeIdleFlush(virtualList) {
     virtualList.lastResizeFlushAt = performance.now();
     scheduleVirtualListResizeUpdate(virtualList, virtualListAnchor(virtualList));
   }, wait);
+}
+
+// Called from the ResizeObserver callback, which runs after layout and before
+// paint, so the corrected position is the first one painted.
+function applyVirtualListResizeNow(virtualList, anchor) {
+  if (virtualList.resizeFrame) {
+    // A deferred update from before the list switched modes holds an older anchor.
+    cancelAnimationFrame(virtualList.resizeFrame);
+    virtualList.resizeFrame = 0;
+    virtualList.pendingResizeAnchor = null;
+  }
+  applyVirtualListPendingSizeUpdates(virtualList);
+  rebuildVirtualListOffsets(virtualList);
+  restoreVirtualListAnchor(virtualList, anchor);
+  clampVirtualListScroll(virtualList);
+  scheduleVirtualListRender(virtualList);
 }
 
 function scheduleVirtualListResizeUpdate(virtualList, anchor) {
@@ -5175,6 +5201,8 @@ function setEntryListNavigatorActive(active) {
     },
   });
   entryListNavigator.setActive(active);
+  // Root mode keeps the native scrollbar, and with it the deferred height updates.
+  entryVirtualList.immediateSizeUpdates = active;
 }
 
 function renderVirtualList(container, virtualList, items, options) {
