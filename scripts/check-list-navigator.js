@@ -72,6 +72,24 @@ function checkThumbGeometry() {
   assert.equal(thumbGeometry({ trackHeight: 20, total: 1000, visible: 5, minThumb: 32 }).thumbHeight, 20, "the thumb never outgrows its track");
 }
 
+// Normal mode estimates every unmeasured card alike and scales the page to its
+// reserved height, so a loaded page spreads its results exactly as its
+// placeholder did: the result at any scroll position, and so a drag's landing,
+// stays put when the placeholder is replaced.
+function checkPlaceholderReplacement() {
+  const reserved = 26150;
+  const before = { rows: [{ start: 0, count: 200 }], offsets: [0, reserved], total: 200 };
+  const rowHeight = reserved / 200;
+  const after = {
+    rows: Array.from({ length: 200 }, (_, index) => ({ start: index, count: 1 })),
+    offsets: Array.from({ length: 201 }, (_, index) => index * rowHeight),
+    total: 200,
+  };
+  for (let top = 0; top < reserved; top += 97) {
+    assert.ok(Math.abs(indexAtScroll(before, top) - indexAtScroll(after, top)) < 1e-9, `scrollTop ${top} should name the same result before and after the window loads`);
+  }
+}
+
 function checkTickLayout() {
   const bucket = (start, count, label) => ({ start, count, full: label, short: label });
   const buckets = [bucket(0, 10, "a"), bucket(10, 1, "b"), bucket(11, 1, "c"), bucket(12, 78, "d"), bucket(90, 10, "e")];
@@ -117,6 +135,7 @@ function checkTickLayout() {
 }
 
 checkInverse();
+checkPlaceholderReplacement();
 checkTickLayout();
 checkPlaceholderInterpolation();
 checkBounds();

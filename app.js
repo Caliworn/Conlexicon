@@ -5690,7 +5690,7 @@ function renderEntryRows(entries = [], options = {}) {
       ? 44
       : row.kind === "window-placeholder"
         ? row.estimatedHeight
-      : estimateEntryCardHeight(row.entry, { qualityIssues: row.qualityIssues }) * (row.windowEstimateScale || 1),
+      : entryVirtualList.estimatedItemHeight * (row.windowEstimateScale || 1),
     getSizeCacheKey: (row) => row.kind === "truncation"
       ? `truncation:entries:${currentLanguage}:${row.loaded}:${row.total}`
       : row.kind === "window-placeholder"
@@ -6812,9 +6812,7 @@ function loadEntryQueryWindowPage(dictionary, page) {
       page.lastAccessAt = performance.now();
       preserveQueryWindowPageHeight(
         page,
-        result.items.reduce((total, entry) => (
-          total + estimateEntryCardHeight(entry, { qualityIssues: entry.qualityIssues || [] })
-        ), 0),
+        result.items.length * entryVirtualList.estimatedItemHeight,
         Boolean(entryQueryState.windowCursor),
       );
       populateQueryWindowPages(
@@ -7249,71 +7247,6 @@ function shouldUseCompactEntryCard(entry, options = {}) {
   return !meaningSummary && !searchSnippets;
 }
 
-const ENTRY_CARD_HEIGHT_ESTIMATES = {
-  compactNoFooter: 89,
-  compactFirstFooterLine: 33,
-  bodyNoFooter: 115,
-  bodyFirstFooterLine: 145,
-  noSubtitleReduction: 23,
-  noSubtitleWithFooterReduction: 7,
-  extraFooterLine: 30,
-  extraBodyLine: 23,
-};
-
-function estimateEntryQualityIssueLines(issues = []) {
-  if (!issues.length) {
-    return 0;
-  }
-  const listWidth = Math.max(0, entryVirtualList.container?.clientWidth || elements.entryList.clientWidth || 340);
-  const basePerLine = listWidth < 300 ? 2 : listWidth < 420 ? 3 : 4;
-  const longestTitle = Math.max(
-    ...issues.map((issue) => qualityIssueText(issue).title.length),
-  );
-  const perLine = longestTitle > 18 ? Math.max(1, basePerLine - 1) : basePerLine;
-  return Math.max(1, Math.ceil(issues.length / perLine));
-}
-
-function estimateSearchSnippetCount(searchSnippets = "") {
-  return (String(searchSnippets).match(/class="search-snippet"/g) || []).length;
-}
-
-function estimateEntryCardHeight(entry, options = {}) {
-  const settings = dictionarySettings();
-  const meaningSummary = options.meaningSummary ?? entryDefinitionSummary(entry, { rawParts: dictionarySettings().entryListRawPartDisplay });
-  const searchSnippets = options.searchSnippets ?? renderEntrySearchSnippets(entry);
-  const hasBody = Boolean(meaningSummary || searchSnippets);
-  const hasSubtitle = Boolean(entry.pronunciation || entryOwnPartText(entry, undefined, { raw: settings.entryListRawPartDisplay }));
-  const hasTagFooter = Boolean(
-    entryListTagItems(entry, { includePartTags: settings.entryListTagsIncludeParts }).length
-      && settings.entryListTagDisplayLimit > 0,
-  );
-  const qualityIssueLines = estimateEntryQualityIssueLines(options.qualityIssues || []);
-  const footerLines = (hasTagFooter ? 1 : 0) + qualityIssueLines;
-  const searchSnippetCount = estimateSearchSnippetCount(searchSnippets);
-  const bodyLines = (meaningSummary ? 1 : 0) + searchSnippetCount;
-  const extraBodyLines = hasBody ? Math.max(0, bodyLines - 1) : 0;
-  const bodyHeight = extraBodyLines * ENTRY_CARD_HEIGHT_ESTIMATES.extraBodyLine;
-  if (!hasBody) {
-    const estimated = ENTRY_CARD_HEIGHT_ESTIMATES.compactNoFooter
-      + (footerLines
-        ? ENTRY_CARD_HEIGHT_ESTIMATES.compactFirstFooterLine
-          + Math.max(0, footerLines - 1) * ENTRY_CARD_HEIGHT_ESTIMATES.extraFooterLine
-        : 0);
-    return Math.max(66, estimated - (hasSubtitle ? 0 : ENTRY_CARD_HEIGHT_ESTIMATES.noSubtitleReduction));
-  }
-  const estimated = (footerLines
-    ? ENTRY_CARD_HEIGHT_ESTIMATES.bodyFirstFooterLine
-      + Math.max(0, footerLines - 1) * ENTRY_CARD_HEIGHT_ESTIMATES.extraFooterLine
-    : ENTRY_CARD_HEIGHT_ESTIMATES.bodyNoFooter)
-    + bodyHeight;
-  const subtitleReduction = hasSubtitle
-    ? 0
-    : (footerLines
-      ? ENTRY_CARD_HEIGHT_ESTIMATES.noSubtitleWithFooterReduction
-      : ENTRY_CARD_HEIGHT_ESTIMATES.noSubtitleReduction);
-  return Math.max(footerLines ? 138 : 92, estimated - subtitleReduction);
-}
-
 function closeEntryContextMenu() {
   if (!activeEntryContextMenu) {
     return;
@@ -7723,9 +7656,7 @@ function startEntryQueryLocation(dictionary, entryId) {
       entryQueryState.windowCursor = result.pageInfo?.windowCursor || entryQueryState.windowCursor;
       preserveQueryWindowPageHeight(
         page,
-        result.items.reduce((total, entry) => (
-          total + estimateEntryCardHeight(entry, { qualityIssues: entry.qualityIssues || [] })
-        ), 0),
+        result.items.length * entryVirtualList.estimatedItemHeight,
         Boolean(entryQueryState.windowCursor),
       );
       syncEntryQueryWindowState();
