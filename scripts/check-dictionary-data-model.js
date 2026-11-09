@@ -33,14 +33,14 @@ function checkToolNavOrder() {
 function checkSettingsPreservation() {
   const settings = normalizeDictionarySettings({
     futureOption: { nested: true },
-    corpusAutoSave: false,
+    corpusAutoSave: true,
     docsAutoSave: false,
     entryListTagFiltering: false,
     allowEmptyTags: false,
     newEntryButtonAction: "full",
   });
   assert.deepEqual(settings.futureOption, { nested: true }, "unknown settings fields pass through");
-  assert.equal(settings.corpusAutoSave, false);
+  assert.equal(settings.corpusAutoSave, true);
   assert.equal(settings.docsAutoSave, false);
   assert.equal(settings.entryListTagFiltering, false);
   assert.equal(settings.allowEmptyTags, false);
@@ -48,7 +48,7 @@ function checkSettingsPreservation() {
   assert.equal(normalizeDictionarySettings({ newEntryButtonAction: "bogus" }).newEntryButtonAction, "quick");
 
   const defaults = normalizeDictionarySettings();
-  assert.equal(defaults.corpusAutoSave, true);
+  assert.equal(defaults.corpusAutoSave, false);
   assert.equal(defaults.newEntryButtonAction, "quick");
   assert.equal(defaults.glossStyles.ft.italic, true);
 }

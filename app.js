@@ -14446,18 +14446,50 @@ function createCorpusRow(row, viewState) {
     placeholder.setAttribute("aria-hidden", "true");
     return placeholder;
   }
-  const hasIssue = glossModel.parseGloss(item.content).issues.length > 0;
   const button = document.createElement("button");
   button.type = "button";
   button.className = `corpus-item-card${item.id === viewState.selectedItemId ? " selected" : ""}`;
   button.dataset.corpusItemId = item.id;
   button.setAttribute("aria-current", item.id === viewState.selectedItemId ? "true" : "false");
-  button.innerHTML = `
+  button.innerHTML = corpusItemCardHtml(corpusShownItem(item));
+  return button;
+}
+
+// The item being edited shows its draft name and content in the list as it is
+// typed, before the save comes back.
+function corpusShownItem(item) {
+  const draftState = corpusDraftState;
+  return draftState?.itemId === item.id
+    ? { ...item, name: draftState.draft.name.trim(), content: draftState.draft.content }
+    : item;
+}
+
+function corpusItemCardHtml(item) {
+  const hasIssue = glossModel.parseGloss(item.content).issues.length > 0;
+  return `
     <span class="corpus-item-label">${escapeHtml(corpusItemLabel(item))}</span>
     ${hasIssue ? `<svg class="nav-icon corpus-item-issue" viewBox="0 0 24 24" role="img" aria-label="${escapeHtml(t("corpusItemHasIssue"))}"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"></path></svg>` : ""}
     ${item.linkCount ? `<span class="corpus-item-link-count" role="img" aria-label="${escapeHtml(formatText("corpusItemLinkCount", { count: item.linkCount }))}"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>${escapeHtml(String(item.linkCount))}</span>` : ""}
   `;
-  return button;
+}
+
+// Only the edited row changes while typing; the label is one line, so the row
+// keeps its height and the rest of the list is left alone.
+function refreshCorpusDraftRow() {
+  const draftState = corpusDraftState;
+  if (!draftState) {
+    return;
+  }
+  const card = [...elements.corpusItemList.querySelectorAll("[data-corpus-item-id]")]
+    .find((element) => element.dataset.corpusItemId === draftState.itemId);
+  if (!card) {
+    return;
+  }
+  let listed = null;
+  corpusListState?.sources.forEach((source) => source.pages.forEach((page) => {
+    listed ||= page.items.find((item) => item.id === draftState.itemId) || null;
+  }));
+  card.innerHTML = corpusItemCardHtml(corpusShownItem(listed || draftState.item));
 }
 
 function corpusRowKey(row) {
@@ -14784,6 +14816,7 @@ function scheduleCorpusPreview() {
     if (preview && corpusDraftState) {
       preview.innerHTML = renderCorpusContentHtml(corpusDraftState.draft.content);
     }
+    refreshCorpusDraftRow();
   });
 }
 
@@ -14799,6 +14832,7 @@ function discardCorpusDraft() {
   corpusSaveRequested = false;
   if (corpusDraftState) {
     corpusDraftState.draft = { ...corpusDraftState.saved };
+    refreshCorpusDraftRow();
   }
 }
 
