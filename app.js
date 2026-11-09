@@ -604,6 +604,7 @@ const i18n = {
     searchFields: "搜索字段",
     defaultSearchFields: "默认搜索字段",
     searchDefaultsHelp: "设置当前词典在新会话中使用的默认搜索字段和匹配方式。列表控制栏中的调整仅在本次运行期间生效。",
+    clearSearch: "清空搜索",
     currentSearchSettings: "当前搜索设置",
     searchFieldMatchCount: "{count} 个命中词条",
     searchFieldMatchLoading: "正在统计命中词条",
@@ -1241,6 +1242,7 @@ const i18n = {
     searchFields: "Search Fields",
     defaultSearchFields: "Default Search Fields",
     searchDefaultsHelp: "Set the default search fields and matching behavior for this dictionary in new sessions. Changes in the entry-list toolbar last only for the current run.",
+    clearSearch: "Clear Search",
     currentSearchSettings: "Current Search Settings",
     searchFieldMatchCount: "{count} matching entries",
     searchFieldMatchLoading: "Counting matching entries",
@@ -3091,7 +3093,7 @@ function render(options = {}) {
   ensureValidAppState();
   if (state.activeView !== "editor") {
     setEntrySearchConfigOpen(false);
-    if (document.body.dataset.entryLayout === "mail") entryWorkspaceLayout?.closeMenus();
+    entryToolbarMenus?.closeMenus();
   }
   applyLocale();
   applyAppearance();
@@ -3383,7 +3385,7 @@ function applyLocale(root = document) {
   elements.languageToggleButton.setAttribute("aria-label", nextLanguageLabel);
   elements.rootModeToggleButton.querySelector("span").textContent = t("rootMode");
   elements.rootModeToggleButton.setAttribute("aria-pressed", String(rootMode));
-  entryWorkspaceLayout?.sync();
+  entryToolbarMenus?.sync();
   entrySortControl?.sync();
 }
 
@@ -3539,7 +3541,7 @@ function refreshEditableSurfaceLocale() {
   refreshCorpusEditorLocale();
 }
 
-let entryWorkspaceLayout;
+let entryToolbarMenus;
 let entrySortControl;
 
 function applyAppearance() {
@@ -3552,7 +3554,7 @@ function applyAppearance() {
   } else {
     delete document.body.dataset.uiSkin;
   }
-  entryWorkspaceLayout ||= window.createEntryWorkspaceLayout(document, {
+  entryToolbarMenus ||= window.createEntryToolbarMenus(document, {
     closeSort: () => entrySortControl?.close(),
   });
   entrySortControl ||= window.createEntrySortControl(document, {
@@ -3562,19 +3564,10 @@ function applyAppearance() {
       setEntrySearchConfigOpen(false);
       setEntryFilterMenuOpen(false);
     },
-    positionMenu: (menu, trigger) => entryWorkspaceLayout?.positionMenu(menu, trigger),
+    positionMenu: (menu, trigger) => entryToolbarMenus?.positionMenu(menu, trigger),
   });
-  const entryLayoutChanged = entryWorkspaceLayout.apply(currentSkin);
-  renderRootModeControls();
-  entryWorkspaceLayout.sync();
+  entryToolbarMenus.sync();
   entrySortControl.sync();
-  if (entryLayoutChanged) {
-    // Density can change even when the mobile drawer width stays identical.
-    requestAnimationFrame(() => {
-      syncEntryVirtualListAfterBrowserLayoutChange({ widthChanged: true });
-      scheduleEntryBrowserLayoutRefresh();
-    });
-  }
   if (!layeredGlassPointerEffectsEnabled()) {
     resetLayeredGlassPointerEffect(true);
   }
@@ -4068,7 +4061,7 @@ function renderShellEntryBrowser() {
     elements.appShell.dataset.browserState = shellState.browserDrawerOpen ? "drawer" : "expanded";
     elements.contentGrid.dataset.browserState = "expanded";
     elements.entryBrowser.hidden = !canOpenDrawer || !shellState.browserDrawerOpen;
-    entryWorkspaceLayout?.syncVisibility();
+    entryToolbarMenus?.syncVisibility();
     elements.entryBrowserToggleButton.hidden = true;
     elements.collapsedNewEntryButton.hidden = true;
     elements.mobileEntryListButton.setAttribute("aria-expanded", String(shellState.browserDrawerOpen));
@@ -4092,7 +4085,7 @@ function renderShellEntryBrowser() {
   elements.appShell.dataset.browserState = browserState;
   elements.contentGrid.dataset.browserState = browserState;
   elements.entryBrowser.hidden = collapsed;
-  entryWorkspaceLayout?.syncVisibility();
+  entryToolbarMenus?.syncVisibility();
   elements.entryBrowserToggleButton.hidden = !canToggle;
   elements.collapsedNewEntryButton.hidden = !collapsed;
   elements.entryBrowserToggleButton.setAttribute("aria-expanded", String(!collapsed));
@@ -4374,7 +4367,7 @@ function setEntrySearchConfigOpen(open) {
   if (entrySearchConfigOpen) {
     entrySortControl?.close();
     setEntryFilterMenuOpen(false);
-    entryWorkspaceLayout?.positionMenu(elements.entrySearchConfigMenu, elements.entrySearchConfigButton);
+    entryToolbarMenus?.positionMenu(elements.entrySearchConfigMenu, elements.entrySearchConfigButton);
   }
 }
 
@@ -4387,7 +4380,7 @@ function setEntryFilterMenuOpen(open) {
   }
   elements.entryFilterButton.setAttribute("aria-expanded", String(entryFilterMenuOpen));
   elements.entryFilterMenu.hidden = !entryFilterMenuOpen;
-  if (entryFilterMenuOpen) entryWorkspaceLayout?.positionMenu(elements.entryFilterMenu, elements.entryFilterButton);
+  if (entryFilterMenuOpen) entryToolbarMenus?.positionMenu(elements.entryFilterMenu, elements.entryFilterButton);
 }
 
 function currentFilterDisplayTitle(dictionary = activeDictionary()) {
@@ -4605,22 +4598,20 @@ function renderPartFilterControls(dictionary, usedParts = null) {
     elements.entryFilterButton.setAttribute("aria-label", t("filterEntries"));
   }
   renderRootModeControls();
-  entryWorkspaceLayout?.sync();
+  entryToolbarMenus?.sync();
   entrySortControl?.sync();
 }
 
-// The Mail toolbar keeps the root-mode toggle in place and disables it while
-// a filter applies, so applying a filter never shifts its buttons under the
-// pointer; the standard layout hides it. In both layouts expand/collapse only
-// appear in root mode, in the row the filter status uses otherwise.
+// The root-mode toggle stays in place and is disabled while a filter applies,
+// so applying a filter never shifts the toolbar under the pointer.
+// Expand/collapse only appear in root mode, in the row the filter status uses
+// otherwise.
 function renderRootModeControls() {
-  const mail = document.body.dataset.entryLayout === "mail";
   const filtered = Boolean(activeFilter);
   const rootAvailable = rootMode && !filtered;
   const hasRootSearch = Boolean(normalizeEntrySearchText(searchQuery));
   const rootGroupsReady = rootMode && rootGroupsQueryState.status === "success";
-  elements.rootModeToggleButton.hidden = filtered && !mail;
-  if (mail && filtered) {
+  if (filtered) {
     elements.rootModeToggleButton.setAttribute("aria-disabled", "true");
     elements.rootModeToggleButton.dataset.appTooltipLabel = `${t("rootMode")} · ${t("rootModeNeedsNoFilter")}`;
   } else {
@@ -17877,14 +17868,14 @@ document.addEventListener("pointerdown", (event) => {
     && !elements.skinToggleButton.contains(event.target)) {
     setSkinPickerOpen(false);
   }
-  if (entrySearchConfigOpen && (document.body.dataset.entryLayout === "mail"
-    ? !elements.entrySearchConfigButton.contains(event.target) && !elements.entrySearchConfigMenu.contains(event.target)
-    : !elements.entrySearchControl.contains(event.target))) {
+  if (entrySearchConfigOpen
+    && !elements.entrySearchConfigButton.contains(event.target)
+    && !elements.entrySearchConfigMenu.contains(event.target)) {
     setEntrySearchConfigOpen(false);
   }
-  if (entryFilterMenuOpen && (document.body.dataset.entryLayout === "mail"
-    ? !elements.entryFilterButton.contains(event.target) && !elements.entryFilterMenu.contains(event.target)
-    : !elements.entryFilterControl.contains(event.target))) {
+  if (entryFilterMenuOpen
+    && !elements.entryFilterButton.contains(event.target)
+    && !elements.entryFilterMenu.contains(event.target)) {
     setEntryFilterMenuOpen(false);
   }
 }, true);

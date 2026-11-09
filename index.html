@@ -176,72 +176,48 @@
           <section class="content-grid" id="editorContentGrid" data-browser-state="expanded">
             <div class="entry-browser-slot" id="entryBrowserSlot">
               <section class="entry-browser view-browser" id="entryBrowser" data-i18n-aria-label="entryBrowser" aria-label="词条列表">
-            <div class="filter-row entry-list-toolbar">
+            <div class="entry-list-toolbar">
                 <div class="entry-search-control" id="entrySearchControl">
                   <div class="entry-mail-search-surface" aria-hidden="true"></div>
                   <svg class="nav-icon entry-mail-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg>
                   <input id="searchInput" type="search" aria-keyshortcuts="Control+K Meta+K" data-i18n-placeholder="searchPlaceholder" placeholder="搜索词条">
-                  <button class="secondary-button entry-mail-clear" id="entrySearchClearButton" data-control-tone="neutral" type="button" hidden><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button>
+                  <button class="secondary-button entry-mail-clear" id="entrySearchClearButton" data-control-tone="neutral" type="button" data-i18n-aria-label="clearSearch" aria-label="清空搜索" hidden><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"></path></svg></button>
                   <button class="secondary-button entry-search-config-button" id="entrySearchConfigButton" data-control-tone="neutral" type="button" aria-controls="entrySearchConfigMenu" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="currentSearchSettings" aria-label="当前搜索设置">
                     <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
                       <path d="M4 7h10M18 7h2M14 5v4M4 17h2M10 17h10M10 15v4M4 12h5M13 12h7M9 10v4"></path>
                     </svg>
                   </button>
-                  <div class="entry-search-config-menu" id="entrySearchConfigMenu" role="dialog" data-i18n-aria-label="currentSearchSettings" aria-label="当前搜索设置" hidden>
-                    <strong data-i18n="currentSearchSettings">当前搜索设置</strong>
-                    <div class="entry-search-config-header" aria-hidden="true">
-                      <span data-i18n="searchField">字段</span>
-                      <span data-i18n="searchFieldEnabled">参与搜索</span>
-                      <span data-i18n="searchFieldFuzzy">模糊匹配</span>
-                    </div>
-                    <div class="entry-search-config-fields" id="entrySearchConfigFields"></div>
-                    <button class="secondary-button entry-search-default-button" id="entrySearchDefaultButton" data-control-tone="neutral" type="button" data-i18n="restoreSearchDefaults">恢复词典默认值</button>
-                  </div>
                 </div>
-                <div class="entry-mail-tools" id="entryMailTools" hidden>
-                  <div class="entry-mail-primary-tools" id="entryMailPrimaryTools"></div>
-                </div>
-                <div class="entry-filter-control" id="entryFilterControl">
-                  <button class="secondary-button entry-filter-button" id="entryFilterButton" data-control-tone="neutral" type="button" aria-controls="entryFilterMenu" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="filterEntries" aria-label="筛选词条">
-                    <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M4 5h16l-6 7v5l-4 2v-7L4 5z"></path>
-                    </svg>
-                  </button>
-                  <div class="entry-filter-menu" id="entryFilterMenu" role="dialog" data-i18n-aria-label="filterEntries" aria-label="筛选词条" hidden>
-                    <div class="entry-filter-field">
-                      <span id="partFilterHeading" data-i18n="activeFilterPartOfSpeech">词性</span>
-                      <div class="entry-filter-part-chips" id="partFilterChips" role="radiogroup" aria-labelledby="partFilterHeading"></div>
-                      <select id="partFilter" data-i18n-aria-label="partFilterLabel" aria-label="词性条件" hidden>
-                        <option value="" data-i18n="filterAny">不限</option>
+                <div class="entry-mail-tools" id="entryMailTools">
+                  <div class="entry-mail-primary-tools" id="entryMailPrimaryTools">
+                    <div class="entry-sort-control" id="entrySortControl">
+                      <button class="secondary-button entry-sort-button" id="entrySortButton" data-control-tone="neutral" type="button" aria-haspopup="menu" aria-controls="entrySortMenu" aria-expanded="false"></button>
+                      <select id="sortSelect" hidden data-i18n-aria-label="entrySortLabel" aria-label="词条排序">
+                        <option value="lemmaAsc" data-i18n="sortLemmaAsc">首字母正序</option>
+                        <option value="lemmaDesc" data-i18n="sortLemmaDesc">首字母倒序</option>
+                        <option value="updatedAsc" data-i18n="sortUpdatedAsc">编辑时间正序</option>
+                        <option value="updatedDesc" data-i18n="sortUpdatedDesc">编辑时间倒序</option>
+                        <option value="createdAsc" data-i18n="sortCreatedAsc">创建时间正序</option>
+                        <option value="createdDesc" data-i18n="sortCreatedDesc">创建时间倒序</option>
                       </select>
                     </div>
-                    <div class="entry-filter-menu-actions">
-                      <button class="secondary-button" id="entryFilterResetButton" data-control-tone="neutral" type="button" data-i18n="resetFilter">重置</button>
-                      <span></span>
-                      <button class="secondary-button" id="entryFilterCancelButton" data-control-tone="neutral" type="button" data-i18n="cancel">取消</button>
-                      <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="entryFilterApplyButton" type="button" data-i18n="applyFilter">应用</button>
+                    <div class="entry-filter-control" id="entryFilterControl">
+                      <button class="secondary-button entry-filter-button" id="entryFilterButton" data-control-tone="neutral" type="button" aria-controls="entryFilterMenu" aria-expanded="false" data-app-tooltip="always" data-i18n-aria-label="filterEntries" aria-label="筛选词条">
+                        <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M4 5h16l-6 7v5l-4 2v-7L4 5z"></path>
+                        </svg>
+                      </button>
                     </div>
+                    <button class="secondary-button" id="rootModeToggleButton" data-control-tone="neutral" data-control-selection aria-pressed="false" type="button" data-app-tooltip="always" data-i18n-aria-label="rootMode" aria-label="词根模式"><svg class="nav-icon entry-mail-root-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v7M5 20v-5h14v5M12 11v9"></path><circle cx="12" cy="4" r="2"></circle></svg><span data-i18n="rootMode">词根模式</span></button>
+                    <span class="entry-mail-divider" aria-hidden="true"></span>
+                    <button class="secondary-button entry-list-new-button" data-control-tone="accent" data-control-emphasis="outline" id="entryListNewEntryButton" type="button" data-app-tooltip="always" data-i18n-aria-label="quickNewEntryTooltip" aria-label="快速录入">
+                      <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 5v14M5 12h14"></path>
+                      </svg>
+                    </button>
                   </div>
                 </div>
-                <div class="entry-sort-control" id="entrySortControl">
-                  <button class="secondary-button entry-sort-button" id="entrySortButton" data-control-tone="neutral" type="button" aria-haspopup="menu" aria-controls="entrySortMenu" aria-expanded="false"></button>
-                  <div class="entry-search-config-menu entry-sort-menu" id="entrySortMenu" role="menu" hidden></div>
-                  <select id="sortSelect" hidden data-i18n-aria-label="entrySortLabel" aria-label="词条排序">
-                    <option value="lemmaAsc" data-i18n="sortLemmaAsc">首字母正序</option>
-                    <option value="lemmaDesc" data-i18n="sortLemmaDesc">首字母倒序</option>
-                    <option value="updatedAsc" data-i18n="sortUpdatedAsc">编辑时间正序</option>
-                    <option value="updatedDesc" data-i18n="sortUpdatedDesc">编辑时间倒序</option>
-                    <option value="createdAsc" data-i18n="sortCreatedAsc">创建时间正序</option>
-                    <option value="createdDesc" data-i18n="sortCreatedDesc">创建时间倒序</option>
-                  </select>
-                </div>
-                <button class="secondary-button entry-list-new-button" data-control-tone="accent" data-control-emphasis="outline" id="entryListNewEntryButton" type="button" data-app-tooltip="always" data-i18n-aria-label="quickNewEntryTooltip" aria-label="快速录入">
-                  <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M12 5v14M5 12h14"></path>
-                  </svg>
-                </button>
                 <div class="root-mode-controls">
-                  <button class="secondary-button" id="rootModeToggleButton" data-control-tone="neutral" data-control-selection aria-pressed="false" type="button"><svg class="nav-icon entry-mail-root-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v7M5 20v-5h14v5M12 11v9"></path><circle cx="12" cy="4" r="2"></circle></svg><span data-i18n="rootMode">词根模式</span></button>
                   <button class="secondary-button" id="expandAllRootsButton" data-control-tone="neutral" type="button" hidden><svg class="nav-icon entry-mail-root-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 5 6 6 6-6M6 13l6 6 6-6"></path></svg><span data-i18n="expandAll">全部展开</span></button>
                   <button class="secondary-button" id="collapseAllRootsButton" data-control-tone="neutral" type="button" hidden><svg class="nav-icon entry-mail-root-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 11 6-6 6 6M6 19l6-6 6 6"></path></svg><span data-i18n="collapseAll">全部收起</span></button>
                   <div class="active-filter-toolbar filter-status-toolbar" id="activeFilterToolbar" hidden>
@@ -1216,6 +1192,32 @@
       </article>
     </section>
 
+    <div class="entry-search-config-menu entry-workspace-menu" id="entrySearchConfigMenu" role="dialog" data-i18n-aria-label="currentSearchSettings" aria-label="当前搜索设置" hidden>
+      <strong data-i18n="currentSearchSettings">当前搜索设置</strong>
+      <div class="entry-search-config-header" aria-hidden="true">
+        <span data-i18n="searchField">字段</span>
+        <span data-i18n="searchFieldEnabled">参与搜索</span>
+        <span data-i18n="searchFieldFuzzy">模糊匹配</span>
+      </div>
+      <div class="entry-search-config-fields" id="entrySearchConfigFields"></div>
+      <button class="secondary-button entry-search-default-button" id="entrySearchDefaultButton" data-control-tone="neutral" type="button" data-i18n="restoreSearchDefaults">恢复词典默认值</button>
+    </div>
+    <div class="entry-filter-menu entry-workspace-menu" id="entryFilterMenu" role="dialog" data-i18n-aria-label="filterEntries" aria-label="筛选词条" hidden>
+      <div class="entry-filter-field">
+        <span id="partFilterHeading" data-i18n="activeFilterPartOfSpeech">词性</span>
+        <div class="entry-filter-part-chips" id="partFilterChips" role="radiogroup" aria-labelledby="partFilterHeading"></div>
+        <select id="partFilter" data-i18n-aria-label="partFilterLabel" aria-label="词性条件" hidden>
+          <option value="" data-i18n="filterAny">不限</option>
+        </select>
+      </div>
+      <div class="entry-filter-menu-actions">
+        <button class="secondary-button" id="entryFilterResetButton" data-control-tone="neutral" type="button" data-i18n="resetFilter">重置</button>
+        <span></span>
+        <button class="secondary-button" id="entryFilterCancelButton" data-control-tone="neutral" type="button" data-i18n="cancel">取消</button>
+        <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="entryFilterApplyButton" type="button" data-i18n="applyFilter">应用</button>
+      </div>
+    </div>
+    <div class="entry-search-config-menu entry-sort-menu entry-workspace-menu" id="entrySortMenu" role="menu" hidden></div>
     <div class="skin-picker-menu" id="skinPickerMenu" role="menu" aria-labelledby="skinToggleButton" hidden></div>
     <div class="app-tooltip" id="appTooltip" role="tooltip" hidden></div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
@@ -1234,7 +1236,7 @@
     <script src="lib/query-page-cache.js"></script>
     <script src="lib/liquid-glass-geometry.js"></script>
     <script src="lib/liquid-glass-engine.js"></script>
-    <script src="lib/entry-workspace-layout.js"></script>
+    <script src="lib/entry-toolbar-menus.js"></script>
     <script src="lib/entry-sort-control.js"></script>
     <script src="lib/list-navigator.js"></script>
     <script src="app.js"></script>

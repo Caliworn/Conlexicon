@@ -498,6 +498,11 @@ body[data-ui-skin="liquid-glass"] :is(.tag-manager-search, .corpus-search) > inp
   border-radius: inherit;
 }
 
+/* The entry list search field and header buttons are pills here only. */
+body[data-ui-skin="liquid-glass"] .entry-list-toolbar {
+  --entry-toolbar-radius: var(--radius-pill);
+}
+
 body[data-ui-skin="liquid-glass"] .entry-list-toolbar #rootModeToggleButton {
   --control-selected-background: var(--ui-accent-soft);
   --control-selected-hover-background: color-mix(in srgb, var(--ui-accent-soft) 90%, var(--ui-accent));

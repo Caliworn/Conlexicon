@@ -1413,8 +1413,6 @@
       const skin = opt("skin");
       if (skin === "classic") delete document.body.dataset.uiSkin;
       else document.body.dataset.uiSkin = skin;
-      if (skin === "liquid-glass") document.body.dataset.entryLayout = "mail";
-      else delete document.body.dataset.entryLayout;
       document.body.classList.toggle("dark-theme", opt("theme") === "dark");
       document.documentElement.lang = opt("lang") === "zh" ? "zh-CN" : "en";
       const width = opt("width");

@@ -137,10 +137,10 @@
       display: block;
     }
 
-    /* One large production Mail search capsule as the glass owner, like the content
+    /* One large production search capsule as the glass owner, like the content
        shell above. Only its capsule geometry (flex row, pill radius) is replaced;
        paint and optics stay with the production rules and the engine. */
-    body[data-entry-layout="mail"] .entry-search-control.cg-context-glass {
+    .entry-search-control.cg-context-glass {
       display: block;
       min-height: 0;
       padding: 16px;
@@ -432,7 +432,7 @@
         <div class="cg-scroll"><div class="cg-matrix" data-cg-context="shell" data-cg-rows="fields"></div></div>
       </article>
       <h3 class="cg-subhead">词条列表搜索框</h3>
-      <p class="cg-note">产品的列表工具栏搜索控件（液态玻璃中为 Mail 胶囊搜索框，其他皮肤为普通输入框）。</p>
+      <p class="cg-note">产品的列表工具栏搜索控件（三套皮肤结构相同，液态玻璃中为胶囊形玻璃搜索框）。</p>
       <div class="cg-specials" id="cgSearchFields"></div>
     </section>
 
@@ -468,7 +468,7 @@
         <figure><figcaption>弹窗</figcaption><section class="modal-panel" data-cg-role="modal"></section></figure>
         <figure><figcaption>词汇网络面板</figcaption><section class="network-panel" data-cg-role="network"></section></figure>
         <figure inert><figcaption>工具栏胶囊（尺寸夹具）</figcaption>
-          <div class="filter-row entry-list-toolbar cg-toolbar-fixture">
+          <div class="entry-list-toolbar cg-toolbar-fixture">
             <div class="entry-search-control">
               <div class="entry-mail-search-surface" aria-hidden="true" data-cg-role="toolbar" data-cg-natural-size></div>
               <svg class="nav-icon entry-mail-search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m16 16 4 4"></path></svg>
@@ -776,8 +776,8 @@
         });
       }
 
-      // The list toolbar search control as index.html writes it; Liquid Glass styles
-      // it only inside .entry-list-toolbar under the Mail layout.
+      // The list toolbar search control as index.html writes it; skins style it
+      // inside .entry-list-toolbar.
       function buildSearchFields(container) {
         FIELD_STATES.forEach(([stateId, stateLabel, attributes]) => {
           const cell = document.createElement("div");
@@ -786,7 +786,7 @@
           label.className = "cg-cell-state";
           label.textContent = stateLabel;
           const toolbar = document.createElement("div");
-          toolbar.className = "filter-row entry-list-toolbar";
+          toolbar.className = "entry-list-toolbar";
           toolbar.innerHTML = `
             <div class="entry-search-control">
               <div class="entry-mail-search-surface" aria-hidden="true"></div>
@@ -1127,12 +1127,6 @@
       function applyCombination(skin, theme) {
         document.body.dataset.uiSkin = skin;
         document.body.classList.toggle("dark-theme", theme === "dark");
-        // Mirrors lib/entry-workspace-layout.js: only Liquid Glass uses the Mail layout.
-        if (skin === "liquid-glass") {
-          document.body.dataset.entryLayout = "mail";
-        } else {
-          delete document.body.dataset.entryLayout;
-        }
         elements.glassSection.hidden = skin !== "liquid-glass";
         engine?.setEnabled(skin === "liquid-glass");
       }

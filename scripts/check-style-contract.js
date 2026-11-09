@@ -27,10 +27,10 @@ const app = fs.readFileSync(appPath, "utf8");
 const liquidGlassGeometryScriptPosition = index.indexOf('src="lib/liquid-glass-geometry.js"');
 const liquidGlassEngineScriptPosition = index.indexOf('src="lib/liquid-glass-engine.js"');
 const appScriptPosition = index.indexOf('src="app.js"');
-const workspaceLayoutScriptPosition = index.indexOf('src="lib/entry-workspace-layout.js"');
+const toolbarMenusScriptPosition = index.indexOf('src="lib/entry-toolbar-menus.js"');
 assert(
-  workspaceLayoutScriptPosition >= 0 && workspaceLayoutScriptPosition < appScriptPosition,
-  "Workspace layout must load before app.js so skin initialization and rollback can restore control positions",
+  toolbarMenusScriptPosition >= 0 && toolbarMenusScriptPosition < appScriptPosition,
+  "Toolbar menus must load before app.js, which creates them on its first appearance pass",
 );
 const sortControlScriptPosition = index.indexOf('src="lib/entry-sort-control.js"');
 assert(

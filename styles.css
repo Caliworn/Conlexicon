@@ -195,7 +195,6 @@ body.mobile-drawer-open {
 .top-bar,
 .form-heading,
 .heading-line,
-.filter-row,
 .form-actions,
 .dialog-actions,
 .top-actions,
@@ -365,7 +364,7 @@ body.english-locale .brand-row h1 {
 
 .content-grid {
   display: grid;
-  grid-template-columns: minmax(220px, 340px) minmax(320px, 1fr);
+  grid-template-columns: minmax(240px, 340px) minmax(320px, 1fr);
   gap: 20px;
   align-items: stretch;
   transition: grid-template-columns 180ms ease;
@@ -786,27 +785,18 @@ fieldset {
   }
 }
 
-.filter-row {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 40px;
-  gap: 10px;
-  margin-bottom: 0;
-  padding-bottom: 12px;
-  background: none;
-  backdrop-filter: none;
-}
-
-/* Optional workspace layout; skins opt in independently from its geometry. */
+/* Glass leaves only paint in the skins that style them. */
 .entry-mail-search-surface,
 .tag-manager-search-surface,
 .corpus-search-surface,
-.entry-mail-search-icon,
-.entry-mail-root-icon,
 .entry-mail-clear {
   display: none;
 }
 
-body[data-entry-layout="mail"] .entry-list-toolbar {
+/* Entry list toolbar: a search field on its own row, then a flat list header.
+   Skins set the corner shape; Liquid Glass makes it a pill. */
+.entry-list-toolbar {
+  --entry-toolbar-radius: var(--radius-control);
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -814,10 +804,10 @@ body[data-entry-layout="mail"] .entry-list-toolbar {
   padding: 0 0 12px;
 }
 
-body[data-entry-layout="mail"] .entry-search-control {
+.entry-search-control {
   position: relative;
   z-index: 1;
-  border-radius: var(--radius-pill);
+  border-radius: var(--entry-toolbar-radius);
   min-width: 0;
   display: flex;
   align-items: center;
@@ -825,23 +815,25 @@ body[data-entry-layout="mail"] .entry-search-control {
   min-height: 44px;
 }
 
-body[data-entry-layout="mail"] .entry-search-control > input {
+/* Outranks the generic text-input height and padding. */
+.entry-list-toolbar .entry-search-control > input[type="search"] {
   width: 100%;
+  min-width: 0;
   height: 44px;
   padding-left: 38px;
   padding-right: 44px;
   border-radius: inherit;
 }
 
-body[data-entry-layout="mail"] .entry-search-control:has(> .entry-mail-clear:not([hidden])) > input {
+.entry-list-toolbar .entry-search-control:has(> .entry-mail-clear:not([hidden])) > input[type="search"] {
   padding-right: 80px;
 }
 
-body[data-entry-layout="mail"] .entry-search-control > input::-webkit-search-cancel-button {
+.entry-search-control > input::-webkit-search-cancel-button {
   display: none;
 }
 
-body[data-entry-layout="mail"] .entry-mail-search-icon {
+.entry-mail-search-icon {
   display: block;
   position: absolute;
   left: 13px;
@@ -851,7 +843,7 @@ body[data-entry-layout="mail"] .entry-mail-search-icon {
   pointer-events: none;
 }
 
-body[data-entry-layout="mail"] .entry-search-control > :is(.entry-mail-clear:not([hidden]), .entry-search-config-button) {
+.entry-search-control > :is(.entry-mail-clear:not([hidden]), .entry-search-config-button) {
   display: grid;
   position: absolute;
   width: 36px;
@@ -860,20 +852,20 @@ body[data-entry-layout="mail"] .entry-search-control > :is(.entry-mail-clear:not
   min-height: 36px;
   padding: 0;
   place-items: center;
-  border-radius: var(--radius-pill);
+  border-radius: var(--entry-toolbar-radius);
 }
 
-body[data-entry-layout="mail"] .entry-search-control > .entry-search-config-button {
+.entry-search-control > .entry-search-config-button {
   right: 4px;
 }
 
-body[data-entry-layout="mail"] .entry-search-control > .entry-mail-clear {
+.entry-search-control > .entry-mail-clear {
   right: 40px;
 }
 
 /* A flat list header under the search field: the sort state reads as text on
-   the left; filter, root mode and "new" are icons on the right. No glass surface. */
-body[data-entry-layout="mail"] .entry-mail-tools {
+   the left; filter, root mode and "new" are icons on the right. */
+.entry-mail-tools {
   display: flex;
   align-items: center;
   width: 100%;
@@ -881,9 +873,10 @@ body[data-entry-layout="mail"] .entry-mail-tools {
   min-width: 0;
   min-height: 40px;
   margin-top: -4px;
+  container-type: inline-size;
 }
 
-body[data-entry-layout="mail"] .entry-mail-primary-tools {
+.entry-mail-primary-tools {
   display: flex;
   flex: 1 1 auto;
   align-items: center;
@@ -891,16 +884,15 @@ body[data-entry-layout="mail"] .entry-mail-primary-tools {
   min-width: 0;
 }
 
-body[data-entry-layout="mail"] .entry-mail-primary-tools > :is(.entry-filter-control, .entry-sort-control) {
-  position: static;
+.entry-mail-primary-tools > :is(.entry-filter-control, .entry-sort-control) {
   min-width: 0;
 }
 
-body[data-entry-layout="mail"] .entry-mail-primary-tools > .entry-sort-control {
+.entry-mail-primary-tools > .entry-sort-control {
   flex: 1 1 auto;
 }
 
-body[data-entry-layout="mail"] :is(.entry-mail-tools, .entry-search-control, .root-mode-controls) .nav-icon {
+:is(.entry-mail-tools, .entry-search-control, .root-mode-controls) .nav-icon {
   display: block;
   flex: 0 0 auto;
   width: 19px;
@@ -908,32 +900,11 @@ body[data-entry-layout="mail"] :is(.entry-mail-tools, .entry-search-control, .ro
   margin: 0;
 }
 
-body[data-entry-layout="mail"] .entry-mail-tools :is(button:disabled, button[aria-disabled="true"]) .nav-icon {
+.entry-mail-tools :is(button:disabled, button[aria-disabled="true"]) .nav-icon {
   opacity: 0.4;
 }
 
-body[data-entry-layout="mail"] .entry-mail-tools .entry-sort-button {
-  width: auto;
-  max-width: 100%;
-  gap: 6px;
-  padding: 0 10px;
-  border-radius: var(--radius-pill);
-  color: var(--ui-text-muted);
-  font-size: 0.82rem;
-}
-
-body[data-entry-layout="mail"] .entry-mail-tools .entry-sort-button .entry-sort-icon {
-  display: block;
-  width: 16px;
-  height: 16px;
-}
-
-body[data-entry-layout="mail"] .entry-mail-tools .entry-sort-button .entry-sort-chevron {
-  width: 15px;
-  height: 15px;
-}
-
-body[data-entry-layout="mail"] .entry-mail-primary-tools :is(#entryFilterButton, #rootModeToggleButton, #entryListNewEntryButton) {
+.entry-mail-primary-tools :is(#entryFilterButton, #rootModeToggleButton, #entryListNewEntryButton) {
   display: grid;
   width: 40px;
   height: 40px;
@@ -941,16 +912,16 @@ body[data-entry-layout="mail"] .entry-mail-primary-tools :is(#entryFilterButton,
   min-height: 40px;
   padding: 0;
   place-items: center;
-  border-radius: var(--radius-pill);
+  border-radius: var(--entry-toolbar-radius);
 }
 
-body[data-entry-layout="mail"] #rootModeToggleButton > span {
+#rootModeToggleButton > span {
   display: none;
 }
 
 /* "New" is the header's only filled icon: a weak accent fill marks the primary
    action without the outline recipe's border or raised shadow. */
-body[data-entry-layout="mail"] .entry-mail-primary-tools > #entryListNewEntryButton {
+.entry-mail-primary-tools > #entryListNewEntryButton {
   --control-background: var(--control-tone-tint);
   --control-hover-background: color-mix(in srgb, var(--control-tone-tint) 90%, var(--control-tone-color));
   --control-pressed-background: color-mix(in srgb, var(--control-tone-tint) 80%, var(--control-tone-color));
@@ -965,17 +936,13 @@ body[data-entry-layout="mail"] .entry-mail-primary-tools > #entryListNewEntryBut
 
 /* At 320px of viewport the drawer header leaves the sort text little room:
    drop the sort icon there; the chevron still marks the menu. */
-body[data-entry-layout="mail"] .entry-mail-tools {
-  container-type: inline-size;
-}
-
 @container (max-width: 280px) {
-  body[data-entry-layout="mail"] .entry-mail-tools .entry-sort-button .entry-sort-icon {
+  .entry-mail-tools .entry-sort-button .entry-sort-icon {
     display: none;
   }
 }
 
-body[data-entry-layout="mail"] .entry-mail-divider {
+.entry-mail-divider {
   flex: 0 0 auto;
   width: 1px;
   height: 20px;
@@ -985,7 +952,7 @@ body[data-entry-layout="mail"] .entry-mail-divider {
 
 /* Root mode shares the row under the toolbar with the filter status: the
    two never apply at once, so expand/collapse take the filter row's metrics. */
-body[data-entry-layout="mail"] .root-mode-controls > :is(#expandAllRootsButton, #collapseAllRootsButton) {
+.root-mode-controls > :is(#expandAllRootsButton, #collapseAllRootsButton) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -997,95 +964,35 @@ body[data-entry-layout="mail"] .root-mode-controls > :is(#expandAllRootsButton, 
   line-height: 1;
 }
 
-body[data-entry-layout="mail"] .root-mode-controls > :is(#expandAllRootsButton, #collapseAllRootsButton)[hidden] {
+.root-mode-controls > :is(#expandAllRootsButton, #collapseAllRootsButton)[hidden] {
   display: none;
 }
 
-body[data-entry-layout="mail"] .root-mode-controls .entry-mail-root-icon {
+.root-mode-controls .entry-mail-root-icon {
   width: 16px;
   height: 16px;
 }
 
+.root-mode-controls:not(:has(> :not([hidden]))) {
+  display: none;
+}
+
 /* Menus mount directly under body, outside the sticky list's stacking context. */
-body[data-entry-layout="mail"] .entry-workspace-menu {
+.entry-workspace-menu {
   position: fixed;
   z-index: var(--layer-floating-menu);
   pointer-events: auto;
-  right: auto;
   width: 340px;
   max-width: calc(100vw - 24px);
   max-height: min(520px, calc(100dvh - 24px));
 }
 
-body[data-entry-layout="mail"] .entry-workspace-menu.entry-sort-menu {
+.entry-workspace-menu.entry-sort-menu {
   width: min(240px, calc(100vw - 24px));
 }
 
-body[data-entry-layout="mail"] .entry-card {
-  min-height: 104px;
-  padding: 12px;
-}
-
-body[data-entry-layout="mail"] .entry-card p {
-  -webkit-line-clamp: 2;
-}
-
-body[data-entry-layout="mail"] .entry-card:is(.compact-entry-card, .body-only-entry-card) {
-  min-height: 0;
-}
-
-body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
-  display: none;
-}
-
-@media (min-width: 800px) {
-  body[data-entry-layout="mail"] .content-grid[data-browser-state="expanded"] {
-    grid-template-columns: minmax(240px, 340px) minmax(320px, 1fr);
-  }
-}
-
-.entry-search-control {
-  position: relative;
-  display: grid;
-  grid-column: 1 / -1;
-  grid-template-columns: minmax(0, 1fr) 40px;
-  gap: 10px;
-}
-
-.entry-search-control input {
-  grid-column: 1;
-  min-width: 0;
-}
-
-.filter-row select {
-  min-width: 0;
-}
-
-.secondary-button.entry-search-config-button {
-  display: grid;
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-  min-height: 40px;
-  padding: 0;
-  place-items: center;
-  background: var(--material-control-background);
-}
-
-.secondary-button.entry-search-config-button .nav-icon {
-  width: 19px;
-  height: 19px;
-  margin: 0;
-}
-
 .entry-search-config-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  z-index: 12;
   display: grid;
-  width: min(320px, 100%);
-  max-height: min(520px, calc(100dvh - 96px));
   gap: 10px;
   overflow: auto;
   border: 1px solid var(--material-floating-border);
@@ -1100,21 +1007,19 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
   font-size: 0.9rem;
 }
 
-/* One sort menu for every layout: the standard toolbar shows the state as text
-   where the native select used to be; the Mail layout shows a generic icon. */
-.entry-sort-control {
-  position: relative;
-  min-width: 0;
-}
-
+/* The sort trigger shows the current state as text on the list header. */
 .secondary-button.entry-sort-button {
   display: flex;
   align-items: center;
-  gap: 8px;
-  width: 100%;
+  gap: 6px;
+  width: auto;
+  max-width: 100%;
   min-width: 0;
   height: 40px;
-  padding: 0 10px 0 12px;
+  padding: 0 10px;
+  border-radius: var(--entry-toolbar-radius);
+  color: var(--ui-text-muted);
+  font-size: 0.82rem;
   text-align: start;
 }
 
@@ -1128,21 +1033,17 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
 }
 
 .entry-sort-button .entry-sort-icon {
-  display: none;
+  width: 16px;
+  height: 16px;
 }
 
 .entry-sort-button .entry-sort-chevron {
-  flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
-  margin: 0;
+  width: 15px;
+  height: 15px;
   color: var(--ui-text-muted);
 }
 
-/* Right-aligned with the trigger and no wider than the trigger plus the filter
-   button beside it, so a narrow drawer never clips its left edge. */
 .entry-search-config-menu.entry-sort-menu {
-  width: min(240px, calc(100% + 50px));
   gap: 0;
   padding: 6px;
 }
@@ -1213,11 +1114,6 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
   min-width: 0;
 }
 
-.entry-filter-control {
-  position: relative;
-  min-width: 0;
-}
-
 .secondary-button.entry-filter-button {
   display: grid;
   width: 40px;
@@ -1239,13 +1135,7 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
 }
 
 .entry-filter-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 12;
   display: grid;
-  width: min(320px, calc(100vw - 36px));
-  max-height: min(520px, calc(100dvh - 96px));
   gap: 14px;
   overflow: auto;
   border: 1px solid var(--material-floating-border);
@@ -1528,8 +1418,7 @@ body[data-entry-layout="mail"] .root-mode-controls:not(:has(> :not([hidden]))) {
   stroke-linejoin: round;
 }
 
-.filter-row input:disabled,
-.filter-row select:disabled {
+.entry-list-toolbar input:disabled {
   cursor: not-allowed;
   opacity: 0.58;
 }
@@ -1786,12 +1675,20 @@ label span {
   --control-hover-border: var(--ui-accent);
 }
 
-.entry-mail-clear[data-control-tone="neutral"] {
+/* Buttons inside the search field and on the list header are flat in every
+   skin: no fill, edge or raised shadow at rest. An effective filter keeps its
+   accent edge through --control-context-border. */
+:is(.entry-search-control > button, .entry-mail-primary-tools > button, .entry-mail-primary-tools > div > button)[data-control-tone="neutral"] {
   --control-background: transparent;
-  --control-border: transparent;
-  --control-hover-border: transparent;
+  --control-border: var(--control-context-border, transparent);
+  --control-hover-border: var(--control-context-border, transparent);
   --control-hover-background: color-mix(in srgb, var(--ui-text) 18%, transparent);
   --control-pressed-background: color-mix(in srgb, var(--ui-text) 28%, transparent);
+  --control-disabled-background: transparent;
+  --control-disabled-border: transparent;
+  --control-shadow: none;
+  --control-hover-shadow: none;
+  --control-pressed-shadow: none;
 }
 
 :where(.entry-search-config-button, .entry-filter-button, #entrySortButton, [data-control-disclosure])[data-control-tone][aria-expanded="true"]:not(:disabled):not([aria-disabled="true"]) {
@@ -3270,9 +3167,9 @@ span.pending-source {
   grid-template-rows: auto minmax(0, 1fr) auto;
   row-gap: 5px;
   align-self: start;
-  min-height: 126px;
+  min-height: 104px;
   min-width: 0;
-  padding: 14px;
+  padding: 12px;
   background: var(--material-list-item-background);
   color: var(--ui-text);
   box-shadow: var(--material-card-shadow);
@@ -3358,7 +3255,7 @@ span.pending-source {
   margin: 0 0 3px;
   overflow: hidden;
   line-height: 1.45;
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
 
@@ -7276,10 +7173,6 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
     -webkit-backdrop-filter: var(--material-browser-filter);
   }
 
-  .entry-filter-menu {
-    width: calc(min(380px, 100vw - 32px) - 28px);
-  }
-
   .entry-list:not(.virtualized-list) {
     overflow: visible;
     padding-right: 0;
@@ -7442,10 +7335,6 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
   .gloss-style-row select {
     padding-right: 18px;
     font-size: 0.74rem;
-  }
-
-  .filter-row {
-    display: grid;
   }
 
   .entry-display,
