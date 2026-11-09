@@ -512,6 +512,6 @@ CREATE TABLE entry_morphology_search_values (
 以下在真实需求或基准出现前不做；它们可以受益于 SQLite，但不应和无关改动混在一起：
 
 - **候选索引**（FTS、ngram 等）：fuzzy 仍线性扫描所选 projection records，只有真实词典基准确认它成为主要瓶颈后再选型。
-- 自定义滚动条、首字母/全局导航地图和 marker/overview 交互；现有原生滚动条、数据窗口与虚拟列表继续保留。
+- 自定义滚动条与首字母导航：已有设计草案，见 [Enhanced Scrollbar Plan](ENHANCED_SCROLLBAR_PLAN.md)；实施前现有原生滚动条、数据窗口与虚拟列表继续保留。
 - 高级形态分析或自动 gloss 系统。
 - 面向多窗口实时协同的 revision 机制；单词条条件保存见审计 A05 与 [Entry Incremental Save Plan](ENTRY_INCREMENTAL_SAVE_PLAN.md)。

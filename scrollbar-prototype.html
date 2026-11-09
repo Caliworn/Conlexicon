@@ -1,0 +1,1479 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>增强滚动条原型</title>
+  <!-- Development fixture for docs/ENHANCED_SCROLLBAR_PLAN.md; delete it, with its
+       static-server allowlist entry, once phase 1b is accepted. Cards and colors come
+       from the production stylesheets; only the navigator and page chrome are styled here. -->
+  <link rel="stylesheet" href="theme-classic.css">
+  <link rel="stylesheet" href="theme-layered-glass.css">
+  <link rel="stylesheet" href="theme-liquid-glass.css">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body.sp-body {
+      height: 100vh;
+      min-height: 0;
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto auto minmax(0, 1fr);
+      font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 13px;
+    }
+
+    .sp-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 14px;
+      align-items: center;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--ui-border);
+      background: var(--ui-canvas-bg);
+    }
+
+    .sp-toolbar label {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+
+    .sp-toolbar select,
+    .sp-toolbar button {
+      font: inherit;
+      color: var(--ui-text);
+      background: color-mix(in srgb, var(--ui-canvas-bg) 85%, var(--ui-text));
+      border: 1px solid var(--ui-border);
+      border-radius: 6px;
+      padding: 3px 6px;
+    }
+
+    .sp-toolbar .sp-s {
+      color: var(--ui-accent);
+      font-weight: 700;
+    }
+
+    .sp-status {
+      padding: 4px 14px;
+      border-bottom: 1px solid var(--ui-border);
+      color: var(--ui-text-muted);
+      font-variant-numeric: tabular-nums;
+      background: var(--ui-canvas-bg);
+    }
+
+    .sp-main {
+      display: flex;
+      gap: 20px;
+      min-height: 0;
+      padding: 16px;
+      overflow: hidden;
+    }
+
+    .sp-list-column {
+      flex: 0 0 auto;
+      width: var(--sp-list-width, 400px);
+      max-width: 100%;
+      min-height: 0;
+      display: grid;
+    }
+
+    .sp-frame {
+      position: relative;
+      min-height: 0;
+      height: 100%;
+    }
+
+    .sp-frame > .entry-list {
+      height: 100%;
+      box-sizing: border-box;
+    }
+
+    /* Navigator mode: the native scrollbar is hidden, the scroll container is unchanged. */
+    .sp-frame.sp-nav-mode > .entry-list {
+      scrollbar-width: none;
+      padding-right: calc(var(--sp-nav-width) + 6px);
+    }
+
+    .sp-frame.sp-nav-mode > .entry-list::-webkit-scrollbar {
+      display: none;
+    }
+
+    .query-window-placeholder {
+      display: grid;
+      place-items: start center;
+      padding-top: 24px;
+      box-sizing: border-box;
+      border: 1px dashed color-mix(in srgb, var(--ui-border) 70%, transparent);
+      border-radius: var(--radius-panel);
+      color: var(--ui-text-muted);
+      font-size: 12px;
+    }
+
+    .sp-nav {
+      position: absolute;
+      top: 4px;
+      right: 0;
+      bottom: 4px;
+      width: var(--sp-nav-width);
+      display: flex;
+      justify-content: flex-end;
+      touch-action: none;
+      user-select: none;
+      transition: opacity 160ms ease;
+    }
+
+    .sp-nav[hidden] {
+      display: none !important;
+    }
+
+    .sp-rail {
+      position: relative;
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    .sp-label {
+      position: absolute;
+      right: 3px;
+      transform: translateY(-50%);
+      padding: 0 2px;
+      border-radius: 3px;
+      color: var(--ui-text-muted);
+      font-size: var(--sp-label-size, 10px);
+      line-height: 1.3;
+      font-weight: 650;
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    .sp-rail {
+      cursor: pointer;
+    }
+
+    .sp-band {
+      position: absolute;
+      left: 2px;
+      right: 2px;
+      border-radius: 4px;
+      background: color-mix(in srgb, var(--ui-text) 9%, transparent);
+      pointer-events: none;
+    }
+
+    .sp-label.sp-merged {
+      font-size: calc(var(--sp-label-size, 10px) * 0.9);
+      letter-spacing: -0.02em;
+    }
+
+    .sp-label.sp-hover {
+      color: var(--ui-text);
+    }
+
+    .sp-label.sp-current {
+      color: var(--ui-accent);
+    }
+
+    /* The track element is the hit area; the visible track is its ::before line. */
+    .sp-track {
+      position: relative;
+      flex: 0 0 auto;
+      width: var(--sp-hit);
+      cursor: default;
+    }
+
+    .sp-track::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: calc(50% - var(--sp-line) / 2);
+      width: var(--sp-line);
+      border-radius: 999px;
+      background: var(--sp-line-color, transparent);
+    }
+
+    .sp-frame[data-handle="same"] {
+      --sp-line: var(--sp-thumb-width);
+    }
+
+    .sp-frame[data-handle="same"] .sp-nav:is(:hover, .sp-dragging) {
+      --sp-line-color: color-mix(in srgb, var(--ui-text) 7%, transparent);
+    }
+
+    .sp-frame[data-handle="wider"] {
+      --sp-line: 2px;
+      --sp-line-color: color-mix(in srgb, var(--ui-text) 14%, transparent);
+    }
+
+    .sp-frame[data-handle="grow"] {
+      --sp-line: 2px;
+      --sp-thumb-current: 3px;
+    }
+
+    .sp-frame[data-handle="grow"] .sp-nav:is(:hover, .sp-dragging) {
+      --sp-thumb-current: var(--sp-thumb-width);
+      --sp-line-color: color-mix(in srgb, var(--ui-text) 12%, transparent);
+    }
+
+    .sp-thumb {
+      position: absolute;
+      top: 0;
+      left: calc(50% - var(--sp-thumb-current, var(--sp-thumb-width)) / 2);
+      width: var(--sp-thumb-current, var(--sp-thumb-width));
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--ui-text) 32%, transparent);
+      transition: width 120ms ease, left 120ms ease;
+      will-change: transform;
+    }
+
+    .sp-frame[data-handle="wider"] .sp-thumb {
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--ui-canvas-bg) 70%, transparent);
+    }
+
+    /* Rail shown on demand: floats over the cards beside the track. */
+    .sp-frame[data-rail="hover"] .sp-rail {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      right: var(--sp-hit);
+      width: var(--sp-rail-width);
+      border: 1px solid var(--material-floating-border);
+      border-radius: 8px;
+      background: var(--material-floating-background);
+      box-shadow: var(--material-floating-shadow);
+      backdrop-filter: var(--material-floating-filter);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 140ms ease;
+    }
+
+    .sp-frame[data-rail="hover"] .sp-nav:is(:hover, .sp-dragging) .sp-rail {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .sp-thumb,
+      .sp-rail,
+      .sp-nav {
+        transition: none !important;
+      }
+    }
+
+    .sp-nav:hover .sp-thumb {
+      background: color-mix(in srgb, var(--ui-text) 48%, transparent);
+    }
+
+    .sp-nav.sp-dragging .sp-thumb {
+      background: var(--ui-accent);
+    }
+
+    .sp-bubble {
+      position: absolute;
+      right: calc(var(--sp-float-offset) + 10px);
+      transform: translateY(-50%);
+      min-width: 48px;
+      padding: 8px 12px;
+      border: 1px solid var(--material-floating-border);
+      border-radius: var(--radius-floating);
+      background: var(--material-floating-background);
+      box-shadow: var(--material-floating-shadow);
+      backdrop-filter: var(--material-floating-filter);
+      color: var(--ui-text);
+      text-align: center;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .sp-bubble strong {
+      display: block;
+      font-size: 22px;
+      line-height: 1.15;
+    }
+
+    .sp-bubble small {
+      display: block;
+      margin-top: 2px;
+      color: var(--ui-text-muted);
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .sp-tip {
+      position: absolute;
+      right: calc(var(--sp-float-offset) + 8px);
+      transform: translateY(-50%);
+      padding: 4px 8px;
+      border: 1px solid var(--material-floating-border);
+      border-radius: 6px;
+      background: var(--material-floating-background);
+      box-shadow: var(--material-floating-shadow);
+      backdrop-filter: var(--material-floating-filter);
+      color: var(--ui-text);
+      font-size: 12px;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 6;
+    }
+
+    .sp-frame.content-updating .sp-nav {
+      opacity: 0.45;
+    }
+
+    .sp-notes {
+      flex: 1 1 320px;
+      min-width: 0;
+      overflow: auto;
+      line-height: 1.6;
+      color: var(--ui-text);
+    }
+
+    .sp-notes h2 {
+      margin: 0 0 6px;
+      font-size: 15px;
+    }
+
+    .sp-notes ul {
+      margin: 0 0 12px;
+      padding-left: 18px;
+    }
+
+    .sp-notes code {
+      font-size: 12px;
+    }
+
+    @media (max-width: 760px) {
+      .sp-notes {
+        display: none;
+      }
+    }
+
+    @media (forced-colors: active) {
+      .sp-thumb,
+      .sp-nav.sp-dragging .sp-thumb {
+        background: CanvasText;
+      }
+      .sp-label.sp-current {
+        color: Highlight;
+      }
+    }
+  </style>
+</head>
+<body class="sp-body">
+  <div class="sp-toolbar">
+    <label>皮肤
+      <select id="skin">
+        <option value="classic">经典</option>
+        <option value="layered-glass">层叠玻璃</option>
+        <option value="liquid-glass">液态玻璃</option>
+      </select>
+    </label>
+    <label>主题
+      <select id="theme">
+        <option value="light">浅色</option>
+        <option value="dark">深色</option>
+      </select>
+    </label>
+    <label>语言
+      <select id="lang">
+        <option value="zh">中文</option>
+        <option value="en">English</option>
+      </select>
+    </label>
+    <label>对照
+      <select id="mode">
+        <option value="nav">导航条</option>
+        <option value="native">原生滚动条</option>
+      </select>
+    </label>
+    <label>条数
+      <select id="count">
+        <option value="30">30</option>
+        <option value="500">500</option>
+        <option value="10000" selected>10,000</option>
+        <option value="100000">100,000</option>
+      </select>
+    </label>
+    <label>排序
+      <select id="sort">
+        <option value="lemmaAsc">词形 A→Z</option>
+        <option value="lemmaDesc">词形 Z→A</option>
+        <option value="createdDesc">创建时间 新→旧</option>
+        <option value="createdAsc">创建时间 旧→新</option>
+      </select>
+    </label>
+    <label>列表宽
+      <select id="width">
+        <option value="320">320px</option>
+        <option value="400" selected>400px</option>
+        <option value="560">560px</option>
+        <option value="fill">填满</option>
+      </select>
+    </label>
+    <label>请求延迟
+      <select id="latency">
+        <option value="50">50ms</option>
+        <option value="250" selected>250ms</option>
+        <option value="800">800ms</option>
+      </select>
+    </label>
+    <button type="button" id="simulateUpdate">切换筛选（模拟“正在更新”）</button>
+    <span style="flex-basis: 100%; height: 0"></span>
+    <label><span class="sp-s">S1</span> 刻度门槛
+      <select id="threshold">
+        <option value="0">不设</option>
+        <option value="100" selected>100 条（已定）</option>
+        <option value="200">200 条</option>
+        <option value="1000">1,000 条</option>
+      </select>
+    </label>
+    <label><span class="sp-s">S2</span> 抓手
+      <select id="handleStyle">
+        <option value="same">与轨道同宽</option>
+        <option value="wider">宽于轨道（细线轨道）</option>
+        <option value="grow" selected>平时细，悬停变宽（已定）</option>
+      </select>
+    </label>
+    <label>抓手宽
+      <select id="thumbWidth">
+        <option value="4">4px</option>
+        <option value="6">6px</option>
+        <option value="8">8px</option>
+        <option value="10">10px</option>
+        <option value="14" selected>14px（已定）</option>
+      </select>
+    </label>
+    <label>最小长度
+      <select id="minThumb">
+        <option value="24">24px</option>
+        <option value="32" selected>32px</option>
+        <option value="48">48px</option>
+      </select>
+    </label>
+    <label>刻度栏
+      <select id="railMode">
+        <option value="always">常显</option>
+        <option value="hover" selected>悬停或拖动时浮出</option>
+        <option value="never">不显示</option>
+      </select>
+    </label>
+    <label>刻度栏宽
+      <select id="railWidth">
+        <option value="auto" selected>自动（按最宽标签）</option>
+        <option value="22">22px</option>
+        <option value="30">30px</option>
+        <option value="40">40px</option>
+        <option value="52">52px</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="hoverPreview" checked> 悬停预览（指针在轨道上移动时显示气泡）</label>
+    <label>高度修正
+      <select id="heightMode">
+        <option value="native" selected>立即测量＋立即对准（新）</option>
+        <option value="deferred">滚动中延迟＋手动锚点（现行产品）</option>
+      </select>
+    </label>
+    <label><span class="sp-s">S3</span> 拖动停顿后请求
+      <select id="dragIdle">
+        <option value="0">立即</option>
+        <option value="120" selected>120ms</option>
+        <option value="300">300ms</option>
+      </select>
+    </label>
+    <label><span class="sp-s">S4</span> 刻度放不下时
+      <select id="tickMode">
+        <option value="merge" selected>合并小段</option>
+        <option value="skip">隔几个显示</option>
+      </select>
+    </label>
+    <label>刻度字号
+      <select id="labelSize">
+        <option value="9">9px</option>
+        <option value="10">10px</option>
+        <option value="11">11px</option>
+        <option value="12">12px</option>
+        <option value="13" selected>13px（已定）</option>
+        <option value="15">15px</option>
+      </select>
+    </label>
+    <label>刻度最小间距
+      <select id="labelGap">
+        <option value="14">14px</option>
+        <option value="20" selected>20px</option>
+        <option value="28">28px</option>
+      </select>
+    </label>
+    <label><span class="sp-s">S5</span> 时间分段
+      <select id="timeGrain">
+        <option value="auto" selected>自动</option>
+        <option value="year">年</option>
+        <option value="month">月</option>
+        <option value="day">日</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="bubbleIndex" checked> 气泡显示序号</label>
+  </div>
+  <div class="sp-status" id="status"></div>
+  <main class="sp-main">
+    <div class="sp-list-column" id="listColumn">
+      <div class="sp-frame content-update-frame entry-list-update-frame sp-nav-mode" id="frame">
+        <div class="entry-list virtualized-list" id="list"></div>
+        <div class="sp-nav" id="nav" aria-hidden="true">
+          <div class="sp-rail" id="rail"></div>
+          <div class="sp-track" id="track"><div class="sp-thumb" id="thumb"></div></div>
+        </div>
+        <div class="sp-bubble" id="bubble" hidden><strong></strong><small></small></div>
+        <div class="sp-tip" id="tip" hidden></div>
+      </div>
+    </div>
+    <section class="sp-notes">
+      <h2>怎么看</h2>
+      <ul>
+        <li>拖滑块：滑块应紧跟指针，列表随后跟上，松手后列表不跳。拖过没加载的区域会先看到虚线占位，停住（S3）或松手后才加载。</li>
+        <li>点轨道空白处：按比例跳过去，并且可以接着拖。</li>
+        <li>点刻度：精确跳到该段第一条；悬停显示段名和条数。</li>
+        <li>指针停在导航条上滚滚轮：应滚动列表。</li>
+        <li>切到“原生滚动条”对照拖动手感，尤其是 10 万条。</li>
+        <li>按时间排序时，测试数据里有少量空日期和旧格式日期（<code>2024/05/03</code>），会出现“无日期”段，其中一段夹在 2024 年中间，这是按顺序切段的预期行为。</li>
+        <li>词形按码位排序：<code>é</code>、<code>ŋ</code>、<code>ð</code>、<code>ʔ</code> 排在 <code>z</code> 之后，以 <code>-</code> 开头的词缀排在最前，这是现有排序的行为。</li>
+      </ul>
+      <h2>待定的选择</h2>
+      <ul>
+        <li><b>S1（已定 100 条）</b> 结果少于门槛时只有抓手和气泡，没有刻度，刻度栏也隐藏；列表不能滚动时整个导航条隐藏（试 30 条）。</li>
+        <li><b>S2</b> 抓手样式（同宽、宽于细线轨道、悬停变宽）、抓手宽、最小长度；刻度栏常显、悬停或拖动时浮出、不显示；悬停预览：指针沿轨道移动时气泡显示点下去会跳到哪一段，可以代替常驻刻度。</li>
+        <li><b>S3</b> 拖动中停顿多久才开始请求窗口。</li>
+        <li><b>S4</b> 刻度放不下时合并成“a–c”，还是隔几个显示一个（窄高度下差别最明显）。</li>
+        <li><b>S5</b> 时间分段粒度；自动规则：跨度 60 天内按日、4 年内按月、更长按年。</li>
+        <li><b>S11</b> 点轨道按比例跳，点刻度精确跳。</li>
+        <li>“正在更新”时导航条随列表变淡。</li>
+      </ul>
+      <p>原型只模拟产品的分窗加载和高度测量，不连接后端；概览数据也在页面内计算，按“请求延迟”稍后到达。</p>
+    </section>
+  </main>
+
+  <script>
+  (() => {
+    "use strict";
+
+    const PAGE_SIZE = 200;
+    const MAX_LOADED = 5;
+    const ESTIMATE = 145;
+    const ACTIVE_SCROLL_MS = 180;
+    const RENDER_THROTTLE_MS = 50;
+
+    const $ = (id) => document.getElementById(id);
+    const list = $("list");
+    const frame = $("frame");
+    const nav = $("nav");
+    const rail = $("rail");
+    const track = $("track");
+    const thumb = $("thumb");
+    const bubble = $("bubble");
+    const tip = $("tip");
+    const statusLine = $("status");
+
+    const controls = Object.fromEntries([
+      "skin", "theme", "lang", "mode", "count", "sort", "width", "latency", "threshold",
+      "thumbWidth", "minThumb", "railWidth", "dragIdle", "tickMode", "timeGrain", "bubbleIndex",
+      "handleStyle", "railMode", "hoverPreview", "labelGap", "labelSize", "heightMode",
+    ].map((id) => [id, $(id)]));
+    const opt = (id) => controls[id].type === "checkbox" ? controls[id].checked : controls[id].value;
+
+    // ---------- Synthetic dictionary ----------
+
+    function seeded(seed) {
+      return () => {
+        seed = (seed + 0x6D2B79F5) | 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    const ONSETS = [
+      ["k", 14], ["t", 12], ["s", 11], ["m", 9], ["n", 8], ["l", 8], ["r", 7], ["p", 6], ["b", 5],
+      ["d", 5], ["g", 4], ["h", 4], ["v", 3], ["z", 2], ["a", 6], ["e", 4], ["i", 4], ["o", 3], ["u", 2],
+      ["ŋ", 2], ["é", 1.5], ["ð", 1], ["ʔ", 0.8], ["ch", 2], ["th", 1.5], ["w", 1], ["y", 0.6], ["f", 2],
+    ];
+    const VOWELS = ["a", "e", "i", "o", "u", "a", "e", "ā", "ō", "ə"];
+    const CODAS = ["", "", "", "n", "r", "s", "k", "l", "ŋ", "t"];
+    const PARTS = ["n", "v", "adj", "adv", "part", "n · v"];
+    const GLOSSES = [
+      "水；河流", "看见，注意到", "大的，宽阔的", "石头", "说话；讲述", "母亲", "火，炉火", "很快地",
+      "房子，住所", "走，行走", "红色的", "风", "名字", "吃", "夜晚", "古老的", "鸟", "手；手臂",
+      "（语法小品词）表示疑问", "山，高地", "一种用于祭祀的长柄器具，也指仪式本身", "冷的；冷淡的",
+      "朋友，同伴", "打开；开始", "星星", "路，道路；方法",
+    ];
+    const TAGS = ["常用", "古语", "借词", "口语", "书面", "地名", "宗教", "亲属称谓"];
+
+    function weightedPick(random, pairs) {
+      const total = pairs.reduce((sum, [, weight]) => sum + weight, 0);
+      let roll = random() * total;
+      for (const [value, weight] of pairs) {
+        roll -= weight;
+        if (roll <= 0) return value;
+      }
+      return pairs[pairs.length - 1][0];
+    }
+
+    function makeDictionary(count) {
+      const random = seeded(20261109 + count);
+      const start = Date.UTC(2023, 2, 1);
+      const span = Date.UTC(2026, 10, 1) - start;
+      const entries = [];
+      for (let id = 0; id < count; id += 1) {
+        const syllables = 1 + Math.floor(random() * 3);
+        let lemma = "";
+        for (let s = 0; s < syllables; s += 1) {
+          lemma += (s === 0 ? weightedPick(random, ONSETS) : weightedPick(random, ONSETS.slice(0, 14)))
+            + VOWELS[Math.floor(random() * VOWELS.length)]
+            + (s === syllables - 1 ? CODAS[Math.floor(random() * CODAS.length)] : "");
+        }
+        const roll = random();
+        if (roll < 0.02) lemma = `-${lemma}`;
+        else if (roll < 0.05) lemma = lemma[0].toUpperCase() + lemma.slice(1);
+        // Bursty creation dates: most entries arrive in clusters.
+        const cluster = Math.floor(random() * 18);
+        const time = start + Math.min(span, Math.max(0, (cluster / 18) * span + (random() - 0.3) * span / 14));
+        const dateRoll = random();
+        const createdAt = dateRoll < 0.006 ? ""
+          : dateRoll < 0.008 ? `2024/0${1 + Math.floor(random() * 9)}/1${Math.floor(random() * 9)}`
+            : new Date(time).toISOString();
+        const glossCount = random() < 0.12 ? 0 : 1 + Math.floor(random() * random() * 4);
+        const meaning = Array.from({ length: glossCount }, (_, index) =>
+          `${glossCount > 1 ? `${index + 1}. ` : ""}${GLOSSES[Math.floor(random() * GLOSSES.length)]}`).join("  ");
+        const tagCount = random() < 0.55 ? 0 : 1 + Math.floor(random() * 3);
+        const tags = Array.from({ length: tagCount }, () => TAGS[Math.floor(random() * TAGS.length)]);
+        entries.push({
+          id,
+          lemma,
+          sortKey: lemma.trim().toLowerCase(),
+          ipa: `/${lemma.replace(/^-/, "").toLowerCase()}/`,
+          part: PARTS[Math.floor(random() * PARTS.length)],
+          meaning,
+          tags: [...new Set(tags)],
+          createdAt,
+        });
+      }
+      return entries;
+    }
+
+    // Same order as SQLite BINARY on these strings (no astral characters in the data).
+    const compareText = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+    function sortEntries(entries, sort) {
+      const sorted = entries.slice();
+      const byLemma = (a, b) => compareText(a.sortKey, b.sortKey) || compareText(a.lemma, b.lemma) || a.id - b.id;
+      if (sort === "lemmaAsc") sorted.sort(byLemma);
+      if (sort === "lemmaDesc") sorted.sort((a, b) => -byLemma(a, b));
+      if (sort === "createdAsc") sorted.sort((a, b) => compareText(a.createdAt, b.createdAt) || byLemma(a, b));
+      if (sort === "createdDesc") sorted.sort((a, b) => -compareText(a.createdAt, b.createdAt) || -byLemma(a, b));
+      return sorted;
+    }
+
+    // ---------- Overview (what the backend endpoint would return) ----------
+
+    const ISO = /^\d{4}-\d{2}-\d{2}T/;
+    function firstSortUnit(entry) {
+      return String.fromCodePoint(entry.sortKey.codePointAt(0));
+    }
+
+    function timeGrain(entries) {
+      if (opt("timeGrain") !== "auto") return opt("timeGrain");
+      let min = Infinity;
+      let max = -Infinity;
+      entries.forEach((entry) => {
+        if (!ISO.test(entry.createdAt)) return;
+        const time = Date.parse(entry.createdAt);
+        min = Math.min(min, time);
+        max = Math.max(max, time);
+      });
+      const days = (max - min) / 86400000;
+      return days <= 60 ? "day" : days <= 4 * 366 ? "month" : "year";
+    }
+
+    function timeKey(entry, grain) {
+      if (!ISO.test(entry.createdAt)) return "none";
+      const date = new Date(entry.createdAt);
+      const y = date.getFullYear();
+      const m = date.getMonth() + 1;
+      const d = date.getDate();
+      return grain === "year" ? `${y}` : grain === "month" ? `${y}-${m}` : `${y}-${m}-${d}`;
+    }
+
+    const MONTHS_EN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    function timeLabels(key, grain) {
+      const zh = opt("lang") === "zh";
+      if (key === "none") return { full: zh ? "无日期" : "No date", short: "—" };
+      const [y, m, d] = key.split("-").map(Number);
+      if (grain === "year") return { full: zh ? `${y} 年` : `${y}`, short: `${y}` };
+      if (grain === "month") {
+        return {
+          full: zh ? `${y} 年 ${m} 月` : `${MONTHS_EN[m - 1]} ${y}`,
+          short: m === 1 ? `${y}` : zh ? `${m}月` : MONTHS_EN[m - 1],
+        };
+      }
+      return {
+        full: zh ? `${y} 年 ${m} 月 ${d} 日` : `${MONTHS_EN[m - 1]} ${d}, ${y}`,
+        short: d === 1 ? (zh ? `${m}月` : MONTHS_EN[m - 1]) : `${d}`,
+      };
+    }
+
+    // Cut runs of equal keys in result order; a key may appear in more than one run.
+    function buildOverview(entries, sort) {
+      const lemma = sort.startsWith("lemma");
+      const grain = lemma ? "" : timeGrain(entries);
+      const buckets = [];
+      entries.forEach((entry, index) => {
+        const key = lemma ? firstSortUnit(entry) : timeKey(entry, grain);
+        const last = buckets[buckets.length - 1];
+        if (last && last.key === key) {
+          last.count += 1;
+        } else {
+          const labels = lemma ? { full: key, short: key } : timeLabels(key, grain);
+          buckets.push({ key, start: index, count: 1, ...labels });
+        }
+      });
+      return { buckets, grain };
+    }
+
+    // ---------- Windowed result state (mirrors the product's entry list) ----------
+
+    let allEntries = [];
+    let filtered = false;
+    let results = [];
+    let pages = [];
+    let rows = [];
+    let pageFirstRow = [];
+    let offsets = [0];
+    const sizes = new Map();
+    const pendingSizes = new Map();
+    let overview = null;
+    let overviewToken = 0;
+    let requestCount = 0;
+    let generation = 0;
+    let selectedId = -1;
+
+    function resetResults({ regenerate = false } = {}) {
+      if (regenerate) allEntries = makeDictionary(Number(opt("count")));
+      const source = filtered ? allEntries.filter((entry) => entry.id % 8 < 3) : allEntries;
+      results = sortEntries(source, opt("sort"));
+      generation += 1;
+      pages = [];
+      for (let offset = 0, index = 0; offset < results.length; offset += PAGE_SIZE, index += 1) {
+        const count = Math.min(PAGE_SIZE, results.length - offset);
+        pages.push({ index, offset, count, status: "unloaded", reserved: count * ESTIMATE, scale: 1, lastAccess: 0 });
+      }
+      pendingSizes.clear();
+      overview = null;
+      buildRows();
+      list.scrollTop = 0;
+      if (pages.length) loadPage(pages[0]);
+      renderAt(0);
+      requestOverview();
+      updateNav(true);
+    }
+
+    function requestOverview() {
+      const token = ++overviewToken;
+      const latency = Number(opt("latency"));
+      setTimeout(() => {
+        if (token !== overviewToken) return;
+        overview = buildOverview(results, opt("sort"));
+        updateNav(true);
+      }, latency);
+    }
+
+    function rowHeight(row) {
+      if (row.kind === "placeholder") return row.page.reserved;
+      return sizes.get(row.entry.id) || ESTIMATE * row.page.scale;
+    }
+
+    let rowByKey = new Map();
+    function buildRows() {
+      rows = [];
+      pageFirstRow = [];
+      pages.forEach((page) => {
+        pageFirstRow[page.index] = rows.length;
+        if (page.status === "loaded") {
+          for (let k = 0; k < page.count; k += 1) {
+            rows.push({ kind: "entry", entry: results[page.offset + k], index: page.offset + k, page, key: `e${results[page.offset + k].id}` });
+          }
+        } else {
+          rows.push({ kind: "placeholder", page, key: `p${generation}:${page.index}` });
+        }
+      });
+      rowByKey = new Map(rows.map((row) => [row.key, row]));
+      rebuildOffsets();
+    }
+
+    function rebuildOffsets() {
+      offsets = new Array(rows.length + 1);
+      offsets[0] = 0;
+      rows.forEach((row, index) => {
+        offsets[index + 1] = offsets[index] + rowHeight(row);
+      });
+    }
+
+    const totalHeight = () => offsets[offsets.length - 1] || 0;
+    const scrollMax = () => Math.max(0, totalHeight() - list.clientHeight);
+
+    function rowAt(position) {
+      let low = 0;
+      let high = Math.max(0, offsets.length - 2);
+      while (low <= high) {
+        const middle = (low + high) >> 1;
+        if (offsets[middle + 1] <= position) low = middle + 1;
+        else if (offsets[middle] > position) high = middle - 1;
+        else return middle;
+      }
+      return Math.min(low, Math.max(0, offsets.length - 2));
+    }
+
+    // scrollTop -> fractional result index, and its exact inverse on the same layout.
+    function indexAtScroll(position) {
+      if (!rows.length) return 0;
+      if (position >= totalHeight()) return results.length;
+      const r = rowAt(Math.max(0, position));
+      const row = rows[r];
+      const fraction = Math.min(1, Math.max(0, (position - offsets[r]) / rowHeight(row)));
+      return row.kind === "entry" ? row.index + fraction : row.page.offset + fraction * row.page.count;
+    }
+
+    function scrollTopForIndex(index) {
+      if (!pages.length) return 0;
+      const i = Math.min(results.length, Math.max(0, index));
+      const page = pages[Math.min(pages.length - 1, Math.floor(i / PAGE_SIZE))];
+      const first = pageFirstRow[page.index];
+      const local = i - page.offset;
+      if (page.status === "loaded") {
+        const k = Math.min(page.count - 1, Math.floor(local));
+        const r = first + k;
+        return offsets[r] + (local - k) * rowHeight(rows[r]);
+      }
+      return offsets[first] + (local / page.count) * rowHeight(rows[first]);
+    }
+
+    // ---------- Loading and eviction ----------
+
+    function loadPage(page) {
+      if (page.status === "loading" || page.status === "loaded") return;
+      page.status = "loading";
+      requestCount += 1;
+      const token = generation;
+      markPlaceholder(page);
+      setTimeout(() => {
+        if (token !== generation) return;
+        relayout(() => {
+          // Keep the reserved height so the page lands where its placeholder was.
+          page.scale = page.reserved / (page.count * ESTIMATE);
+          page.status = "loaded";
+          page.lastAccess = performance.now();
+          evictDistant();
+        });
+      }, Number(opt("latency")) * (0.7 + Math.random() * 0.6));
+    }
+
+    function markPlaceholder(page) {
+      const node = list.querySelector(`[data-key="p${generation}:${page.index}"] .query-window-placeholder`);
+      if (node) node.textContent = page.status === "loading" ? placeholderText() : "";
+    }
+
+    const placeholderText = () => (opt("lang") === "zh" ? "加载中" : "Loading");
+
+    function visiblePageIndexes() {
+      const top = indexAtScroll(list.scrollTop);
+      const bottom = indexAtScroll(list.scrollTop + list.clientHeight);
+      const first = Math.floor(top / PAGE_SIZE);
+      const last = Math.min(pages.length - 1, Math.floor(Math.max(top, bottom - 0.001) / PAGE_SIZE));
+      const indexes = [];
+      for (let index = first; index <= last; index += 1) indexes.push(index);
+      return indexes;
+    }
+
+    function evictDistant() {
+      const loaded = pages.filter((page) => page.status === "loaded");
+      if (loaded.length <= MAX_LOADED) return;
+      const visible = visiblePageIndexes();
+      const center = visible.length ? (visible[0] + visible[visible.length - 1]) / 2 : 0;
+      loaded
+        .filter((page) => !visible.includes(page.index))
+        .sort((a, b) => Math.abs(b.index - center) - Math.abs(a.index - center))
+        .slice(0, loaded.length - MAX_LOADED)
+        .forEach((page) => {
+          page.reserved = pageHeight(page);
+          page.status = "evicted";
+        });
+    }
+
+    function pageHeight(page) {
+      const first = pageFirstRow[page.index];
+      let height = 0;
+      for (let r = first; r < first + page.count; r += 1) height += rowHeight(rows[r]);
+      return height;
+    }
+
+    let dragLoadsHeld = false;
+    function requestLoads() {
+      if (dragLoadsHeld) return;
+      const visible = visiblePageIndexes();
+      visible.forEach((index) => {
+        pages[index].lastAccess = performance.now();
+        loadPage(pages[index]);
+      });
+      const adjacent = new Set(visible.flatMap((index) => [index - 1, index + 1]));
+      adjacent.forEach((index) => {
+        if (pages[index]?.status === "unloaded") loadPage(pages[index]);
+      });
+    }
+
+    // ---------- Rendering and measurement ----------
+
+    let programmaticTop = -1;
+    // Result index the code last positioned the list at; cleared by any user scroll.
+    let pinnedIndex = null;
+    let lastUserScroll = 0;
+    let lastRender = 0;
+    let renderTimer = 0;
+    let idleTimer = 0;
+    const nodes = new Map();
+
+    const escapeHtml = (value) => String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+    function createRowNode(row) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "virtual-list-row";
+      wrapper.dataset.key = row.key;
+      if (row.kind === "placeholder") {
+        const placeholder = document.createElement("div");
+        placeholder.className = "query-window-placeholder";
+        placeholder.setAttribute("role", "status");
+        placeholder.textContent = row.page.status === "loading" ? placeholderText() : "";
+        wrapper.append(placeholder);
+        return wrapper;
+      }
+      const entry = row.entry;
+      const compact = !entry.meaning;
+      const footer = entry.tags.length
+        ? `<div class="entry-card-footer"><div class="chip-row">${entry.tags.map((tag) => `<span class="chip"><span class="chip-label">${escapeHtml(tag)}</span></span>`).join("")}</div></div>`
+        : "";
+      const classes = ["entry-card", compact ? "compact-entry-card" : "", !compact && !footer ? "body-only-entry-card" : "", entry.id === selectedId ? "active" : ""];
+      wrapper.innerHTML = `<button type="button" class="${classes.filter(Boolean).join(" ")}" data-id="${entry.id}">
+        <div class="entry-card-header"><strong>${escapeHtml(entry.lemma)}</strong><small>${escapeHtml(entry.ipa)} · ${escapeHtml(entry.part)}</small></div>
+        <div class="entry-card-body">${entry.meaning ? `<p>${escapeHtml(entry.meaning)}</p>` : ""}</div>${footer}</button>`;
+      return wrapper;
+    }
+
+    function renderAt(position) {
+      if (!rows.length) {
+        list.replaceChildren();
+        return;
+      }
+      const viewport = Math.max(1, list.clientHeight);
+      const overscan = Math.max(500, viewport);
+      const start = rowAt(Math.max(0, position - overscan));
+      const end = Math.min(rows.length, rowAt(position + viewport + overscan) + 1);
+      const topSpacer = document.createElement("div");
+      topSpacer.className = "virtual-list-spacer";
+      topSpacer.style.height = `${offsets[start]}px`;
+      const bottomSpacer = document.createElement("div");
+      bottomSpacer.className = "virtual-list-spacer";
+      bottomSpacer.style.height = `${Math.max(0, totalHeight() - offsets[end])}px`;
+      const next = [topSpacer];
+      const used = new Set();
+      for (let r = start; r < end; r += 1) {
+        const row = rows[r];
+        let node = nodes.get(row.key);
+        if (!node || (row.kind === "placeholder") !== Boolean(node.querySelector(".query-window-placeholder"))) {
+          node = createRowNode(row);
+          nodes.set(row.key, node);
+        }
+        if (row.kind === "placeholder") {
+          node.firstElementChild.style.height = `${Math.max(0, row.page.reserved - 12)}px`;
+        }
+        used.add(row.key);
+        next.push(node);
+      }
+      next.push(bottomSpacer);
+      nodes.forEach((_, key) => {
+        if (!used.has(key)) nodes.delete(key);
+      });
+      list.replaceChildren(...next);
+      lastRender = performance.now();
+      // Measure after the caller has finished positioning, never inside it.
+      if (!measureQueued) {
+        measureQueued = true;
+        queueMicrotask(measure);
+      }
+    }
+
+    let measureQueued = false;
+    function measure() {
+      measureQueued = false;
+      if (opt("heightMode") === "native") {
+        measureNow();
+        return;
+      }
+      const scrolling = performance.now() - lastUserScroll < ACTIVE_SCROLL_MS;
+      const measured = new Map();
+      for (const node of list.children) {
+        const row = rowByKey.get(node.dataset.key);
+        if (!row || row.kind !== "entry") continue;
+        const height = node.offsetHeight;
+        if (height > 0 && Math.abs(height - rowHeight(row)) > 0.5) {
+          (scrolling ? pendingSizes : measured).set(row.entry.id, height);
+        }
+      }
+      if (pendingSizes.size) scheduleIdleFlush();
+      if (measured.size) relayout(() => measured.forEach((height, id) => sizes.set(id, height)));
+    }
+
+    // New approach: apply real heights right after rendering, before paint, even while
+    // scrolling, and re-anchor at once by result index. The browser's own scroll anchoring
+    // is off for this mode (it loses its anchor node whenever rows are replaced).
+    // Deferring was only needed to keep the native scrollbar thumb still.
+    function measureNow() {
+      const measured = new Map();
+      for (const node of list.children) {
+        const row = rowByKey.get(node.dataset.key);
+        if (!row || row.kind !== "entry") continue;
+        const height = node.offsetHeight;
+        if (height > 0 && Math.abs(height - rowHeight(row)) > 0.5) measured.set(row.entry.id, height);
+      }
+      if (measured.size) relayout(() => measured.forEach((height, id) => sizes.set(id, height)));
+    }
+
+    function scheduleIdleFlush() {
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        if (performance.now() - lastUserScroll < ACTIVE_SCROLL_MS || dragging) {
+          scheduleIdleFlush();
+          return;
+        }
+        relayout(() => {
+          pendingSizes.forEach((height, id) => sizes.set(id, height));
+          pendingSizes.clear();
+        });
+      }, ACTIVE_SCROLL_MS);
+    }
+
+    function setScrollTop(value) {
+      const top = Math.min(scrollMax(), Math.max(0, value));
+      programmaticTop = top;
+      list.scrollTop = top;
+    }
+
+    // Rebuild after loads, evictions or new heights, keeping the same result index at the top.
+    // The anchor must be read before `mutate` changes heights or page states,
+    // while offsets and heights still describe the same layout.
+    function relayout(mutate = () => {}) {
+      const atBottom = scrollMax() > 0 && list.scrollTop >= scrollMax() - 1;
+      const anchor = indexAtScroll(list.scrollTop);
+      mutate();
+      buildRows();
+      const target = atBottom ? scrollMax() : scrollTopForIndex(anchor);
+      renderAt(target);
+      setScrollTop(target);
+      pinnedIndex = atBottom ? null : anchor;
+      updateNav();
+      if (!dragging) requestLoads();
+    }
+
+    function scheduleRender() {
+      if (renderTimer) return;
+      const wait = Math.max(0, RENDER_THROTTLE_MS - (performance.now() - lastRender));
+      renderTimer = setTimeout(() => {
+        renderTimer = 0;
+        renderAt(list.scrollTop);
+        requestLoads();
+      }, wait);
+    }
+
+    list.addEventListener("scroll", () => {
+      if (Math.abs(list.scrollTop - programmaticTop) > 1) {
+        lastUserScroll = performance.now();
+        if (!dragging) pinnedIndex = null;
+      }
+      programmaticTop = -1;
+      scheduleRender();
+      if (pendingSizes.size) scheduleIdleFlush();
+      updateNav();
+    }, { passive: true });
+
+    list.addEventListener("click", (event) => {
+      const card = event.target.closest(".entry-card");
+      if (!card) return;
+      selectedId = Number(card.dataset.id);
+      list.querySelectorAll(".entry-card").forEach((node) => node.classList.toggle("active", Number(node.dataset.id) === selectedId));
+    });
+
+    new ResizeObserver(() => {
+      const width = list.clientWidth;
+      relayout(() => {
+        if (width === list._width) return;
+        list._width = width;
+        sizes.clear();
+        pendingSizes.clear();
+      });
+      updateNav(true);
+    }).observe(list);
+
+    // ---------- Navigator ----------
+
+    let dragging = false;
+    let dragGrab = 0;
+    let dragVisible = 0;
+    let dragIdleTimer = 0;
+    let dragFrame = 0;
+    let dragTarget = null;
+    let dragFraction = 0;
+    let tickSignature = "";
+    let tickBands = [];
+    const bandHighlight = document.createElement("div");
+    bandHighlight.className = "sp-band";
+    bandHighlight.hidden = true;
+    let bubbleHideTimer = 0;
+
+    function geometry(visibleOverride) {
+      const trackHeight = track.clientHeight;
+      const total = results.length;
+      const top = indexAtScroll(list.scrollTop);
+      const visible = visibleOverride ?? Math.max(0.0001, indexAtScroll(list.scrollTop + list.clientHeight) - top);
+      const thumbHeight = Math.min(trackHeight, Math.max(Number(opt("minThumb")), (visible / Math.max(1, total)) * trackHeight));
+      const maxIndex = Math.max(0, total - visible);
+      return { trackHeight, total, top, visible, thumbHeight, maxIndex, travel: Math.max(0, trackHeight - thumbHeight) };
+    }
+
+    function fractionFromScroll(g) {
+      if (list.scrollTop <= 0) return 0;
+      if (list.scrollTop >= scrollMax() - 1) return 1;
+      return g.maxIndex ? Math.min(1, g.top / g.maxIndex) : 0;
+    }
+
+    // The bubble and hover preview need only the overview; the rail can be switched off.
+    // D6: below the threshold the bubble stays, only the ticks and their rail go away.
+    const hasOverview = () => Boolean(overview);
+    const showTicks = () => hasOverview() && results.length >= Number(opt("threshold")) && opt("railMode") !== "never";
+
+    function bucketAt(index) {
+      const buckets = overview.buckets;
+      let low = 0;
+      let high = buckets.length - 1;
+      while (low < high) {
+        const middle = (low + high + 1) >> 1;
+        if (buckets[middle].start <= index) low = middle;
+        else high = middle - 1;
+      }
+      return buckets[low];
+    }
+
+    function updateNav(force = false) {
+      const navMode = opt("mode") === "nav";
+      const scrollable = totalHeight() > list.clientHeight + 1;
+      nav.hidden = !navMode || !scrollable;
+      updateStatus();
+      if (nav.hidden) return;
+      const g = geometry(dragging ? dragVisible : undefined);
+      thumb.style.height = `${g.thumbHeight}px`;
+      if (!dragging) thumb.style.transform = `translateY(${fractionFromScroll(g) * g.travel}px)`;
+      renderTicks(g, force);
+      highlightCurrentTick(g);
+    }
+
+    function renderTicks(g, force) {
+      // Labels never overlap: the gap is at least one line of the chosen size.
+      const gap = Math.max(Number(opt("labelGap")), Math.ceil(Number(opt("labelSize")) * 1.3) + 2);
+      const signature = [showTicks(), overviewToken, overview ? 1 : 0, g.trackHeight, Math.round(g.thumbHeight), opt("tickMode"), opt("lang"), opt("railWidth"), opt("railMode"), gap, opt("labelSize")].join("|");
+      if (!force && signature === tickSignature) return;
+      tickSignature = signature;
+      rail.replaceChildren(bandHighlight);
+      bandHighlight.hidden = true;
+      tickBands = [];
+      applyRailWidth(opt("railWidth") === "auto" ? autoRailWidth : Number(opt("railWidth")));
+      if (!showTicks()) return;
+      const y = (start) => (g.maxIndex ? Math.min(1, start / g.maxIndex) : 0) * g.travel + g.thumbHeight / 2;
+      const groups = [];
+      overview.buckets.forEach((bucket) => {
+        const position = y(bucket.start);
+        const last = groups[groups.length - 1];
+        if (last && position < last.y + gap) {
+          last.members.push(bucket);
+        } else {
+          groups.push({ y: position, members: [bucket] });
+        }
+      });
+      const merge = opt("tickMode") === "merge";
+      groups.forEach((group, index) => {
+        const first = group.members[0];
+        const last = group.members[group.members.length - 1];
+        const label = document.createElement("span");
+        label.className = "sp-label";
+        label.style.top = `${group.y}px`;
+        const mergedShort = merge && group.members.length > 1;
+        label.textContent = mergedShort ? `${first.short}–${last.short}` : first.short;
+        if (mergedShort) label.classList.add("sp-merged");
+        const count = (merge ? group.members : [first]).reduce((sum, bucket) => sum + bucket.count, 0);
+        const zh = opt("lang") === "zh";
+        label.dataset.tip = `${mergedShort ? `${first.full} – ${last.full}` : first.full} · ${count.toLocaleString()}${zh ? " 条" : " entries"}`;
+        label.dataset.start = first.start;
+        label.dataset.end = merge ? last.start + last.count : first.start + first.count;
+        rail.append(label);
+        // Each label owns the whole rail width between the midpoints to its neighbours.
+        tickBands.push({
+          top: index === 0 ? 0 : (groups[index - 1].y + group.y) / 2,
+          bottom: index === groups.length - 1 ? g.trackHeight : (group.y + groups[index + 1].y) / 2,
+          label,
+        });
+      });
+      if (opt("railWidth") === "auto") {
+        // Fit the widest label; a rail that is too narrow clips labels on the left.
+        const widest = Math.max(...[...rail.querySelectorAll(".sp-label")].map((label) => label.getBoundingClientRect().width));
+        const width = Math.max(22, Math.ceil(widest + 8));
+        if (width !== autoRailWidth) {
+          autoRailWidth = width;
+          applyRailWidth(width);
+        }
+      }
+    }
+
+    function bandAt(event) {
+      const y = event.clientY - rail.getBoundingClientRect().top;
+      return tickBands.find((band) => y >= band.top && y < band.bottom) || null;
+    }
+
+    function hoverBand(band) {
+      rail.querySelectorAll(".sp-label.sp-hover").forEach((label) => label.classList.remove("sp-hover"));
+      if (!band) {
+        bandHighlight.hidden = true;
+        tip.hidden = true;
+        return;
+      }
+      band.label.classList.add("sp-hover");
+      bandHighlight.style.top = `${band.top}px`;
+      bandHighlight.style.height = `${band.bottom - band.top}px`;
+      bandHighlight.hidden = false;
+      tip.textContent = band.label.dataset.tip;
+      tip.style.top = `${4 + parseFloat(band.label.style.top)}px`;
+      tip.hidden = false;
+    }
+
+    function highlightCurrentTick(g) {
+      if (!showTicks()) return;
+      const index = dragging && dragTarget !== null ? dragTarget : g.top;
+      rail.querySelectorAll(".sp-label").forEach((label) => {
+        label.classList.toggle("sp-current", index >= Number(label.dataset.start) && index < Number(label.dataset.end));
+      });
+    }
+
+    function showBubble(index, thumbTop, g) {
+      if (!hasOverview()) {
+        bubble.hidden = true;
+        return;
+      }
+      clearTimeout(bubbleHideTimer);
+      const bucket = bucketAt(Math.min(results.length - 1, Math.floor(index)));
+      bubble.querySelector("strong").textContent = bucket.full;
+      const small = bubble.querySelector("small");
+      small.hidden = !opt("bubbleIndex");
+      small.textContent = `${(Math.floor(index) + 1).toLocaleString()} / ${results.length.toLocaleString()}`;
+      bubble.style.top = `${4 + thumbTop + g.thumbHeight / 2}px`;
+      bubble.hidden = false;
+    }
+
+    function trackY(event) {
+      return event.clientY - track.getBoundingClientRect().top;
+    }
+
+    function dragTo(event) {
+      const g = geometry(dragVisible);
+      const thumbTop = Math.min(g.travel, Math.max(0, trackY(event) - dragGrab));
+      dragFraction = g.travel ? thumbTop / g.travel : 0;
+      thumb.style.transform = `translateY(${thumbTop}px)`;
+      dragTarget = dragFraction * g.maxIndex;
+      showBubble(dragTarget, thumbTop, g);
+      highlightCurrentTick(g);
+      lastUserScroll = performance.now();
+      if (!dragFrame) {
+        dragFrame = requestAnimationFrame(() => {
+          dragFrame = 0;
+          const top = dragFraction >= 1 ? scrollMax() : scrollTopForIndex(dragTarget);
+          setScrollTop(top);
+          pinnedIndex = dragFraction >= 1 ? null : dragTarget;
+          renderAt(list.scrollTop);
+        });
+      }
+      clearTimeout(dragIdleTimer);
+      const idle = Number(opt("dragIdle"));
+      dragLoadsHeld = idle > 0;
+      if (idle > 0) {
+        dragIdleTimer = setTimeout(() => {
+          dragLoadsHeld = false;
+          requestLoads();
+          dragLoadsHeld = dragging;
+        }, idle);
+      } else {
+        requestLoads();
+      }
+    }
+
+    function startDrag(event, grab) {
+      event.preventDefault();
+      dragging = true;
+      dragGrab = grab;
+      dragVisible = geometry().visible;
+      nav.classList.add("sp-dragging");
+      track.setPointerCapture(event.pointerId);
+      dragTo(event);
+    }
+
+    track.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      const g = geometry();
+      const thumbTop = fractionFromScroll(g) * g.travel;
+      const y = trackY(event);
+      const onThumb = y >= thumbTop && y <= thumbTop + g.thumbHeight;
+      // Track click: jump proportionally, then keep dragging from the thumb's middle.
+      startDrag(event, onThumb ? y - thumbTop : g.thumbHeight / 2);
+    });
+
+    track.addEventListener("pointermove", (event) => {
+      if (dragging) {
+        dragTo(event);
+        return;
+      }
+      if (!opt("hoverPreview") || event.pointerType === "touch") return;
+      // Preview what a click here would jump to: the thumb centered on the pointer.
+      const g = geometry();
+      const thumbTop = Math.min(g.travel, Math.max(0, trackY(event) - g.thumbHeight / 2));
+      showBubble((g.travel ? thumbTop / g.travel : 0) * g.maxIndex, thumbTop, g);
+    });
+
+    track.addEventListener("pointerleave", () => {
+      if (!dragging) bubble.hidden = true;
+    });
+
+    function endDrag() {
+      if (!dragging) return;
+      dragging = false;
+      dragTarget = null;
+      clearTimeout(dragIdleTimer);
+      dragLoadsHeld = false;
+      nav.classList.remove("sp-dragging");
+      requestLoads();
+      bubbleHideTimer = setTimeout(() => {
+        bubble.hidden = true;
+      }, 350);
+      // Only the thumb resyncs to the list; the list itself does not move.
+      updateNav();
+    }
+
+    track.addEventListener("pointerup", endDrag);
+    track.addEventListener("pointercancel", endDrag);
+    track.addEventListener("lostpointercapture", endDrag);
+
+    rail.addEventListener("pointermove", (event) => hoverBand(bandAt(event)));
+    rail.addEventListener("pointerleave", () => hoverBand(null));
+
+    rail.addEventListener("click", (event) => {
+      const band = bandAt(event);
+      if (!band) return;
+      // Discrete jump: land on the bucket's first entry. Index anchoring keeps it there as pages load.
+      const top = scrollTopForIndex(Number(band.label.dataset.start));
+      renderAt(top);
+      setScrollTop(top);
+      pinnedIndex = Number(band.label.dataset.start);
+      updateNav();
+      requestLoads();
+    });
+
+    // The navigator sits beside the list, so wheel events over it are forwarded.
+    nav.addEventListener("wheel", (event) => {
+      event.preventDefault();
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? list.clientHeight : 1;
+      list.scrollBy({ top: event.deltaY * unit });
+    }, { passive: false });
+
+    // ---------- Status and controls ----------
+
+    function updateStatus() {
+      const top = indexAtScroll(list.scrollTop);
+      const bottom = indexAtScroll(list.scrollTop + list.clientHeight);
+      const loaded = pages.filter((page) => page.status === "loaded").length;
+      const loading = pages.filter((page) => page.status === "loading").length;
+      statusLine.textContent = `可见 ${Math.min(results.length, Math.floor(top) + 1).toLocaleString()}–${Math.min(results.length, Math.ceil(bottom)).toLocaleString()} / ${results.length.toLocaleString()}`
+        + ` · 已加载窗口 ${loaded}/${MAX_LOADED}${loading ? `，加载中 ${loading}` : ""} · 累计请求 ${requestCount}`
+        + ` · 分段 ${overview ? `${overview.buckets.length}${overview.grain ? `（${{ year: "年", month: "月", day: "日" }[overview.grain]}）` : ""}` : "加载中"}`
+        + `${filtered ? " · 已筛选" : ""}`;
+    }
+
+    function applyAppearance() {
+      const skin = opt("skin");
+      if (skin === "classic") delete document.body.dataset.uiSkin;
+      else document.body.dataset.uiSkin = skin;
+      if (skin === "liquid-glass") document.body.dataset.entryLayout = "mail";
+      else delete document.body.dataset.entryLayout;
+      document.body.classList.toggle("dark-theme", opt("theme") === "dark");
+      document.documentElement.lang = opt("lang") === "zh" ? "zh-CN" : "en";
+      const width = opt("width");
+      $("listColumn").style.setProperty("--sp-list-width", width === "fill" ? "100%" : `${width}px`);
+      $("listColumn").style.flex = width === "fill" ? "1 1 auto" : "0 0 auto";
+      const thumbWidth = Number(opt("thumbWidth"));
+      const railMode = opt("railMode");
+      frame.dataset.handle = opt("handleStyle");
+      frame.dataset.rail = railMode;
+      frame.style.setProperty("--sp-thumb-width", `${thumbWidth}px`);
+      frame.style.setProperty("--sp-hit", `${Math.max(thumbWidth + 6, 14)}px`);
+      frame.style.setProperty("--sp-label-size", `${opt("labelSize")}px`);
+      applyRailWidth(opt("railWidth") === "auto" ? autoRailWidth : Number(opt("railWidth")));
+      frame.classList.toggle("sp-nav-mode", opt("mode") === "nav");
+      // The deferred mode keeps the product's default (browser anchoring on).
+      list.style.overflowAnchor = opt("heightMode") === "native" ? "none" : "";
+    }
+
+    let autoRailWidth = 30;
+    function applyRailWidth(railWidth) {
+      const hit = Math.max(Number(opt("thumbWidth")) + 6, 14);
+      const ticks = showTicks();
+      rail.hidden = !ticks;
+      frame.style.setProperty("--sp-rail-width", `${railWidth}px`);
+      // Only a permanent rail takes layout width; a floating one overlays the cards.
+      frame.style.setProperty("--sp-nav-width", `${hit + (ticks && opt("railMode") === "always" ? railWidth : 0)}px`);
+      frame.style.setProperty("--sp-float-offset", `${hit + (ticks ? railWidth : 0)}px`);
+    }
+
+    ["skin", "theme", "lang", "width", "thumbWidth", "railWidth", "mode", "minThumb", "tickMode", "threshold", "bubbleIndex", "handleStyle", "railMode", "hoverPreview", "labelGap", "labelSize", "heightMode"].forEach((id) => {
+      controls[id].addEventListener("change", () => {
+        applyAppearance();
+        if (id === "lang") {
+          if (overview) overview = buildOverview(results, opt("sort"));
+          list.querySelectorAll(".query-window-placeholder").forEach((node) => {
+            if (node.textContent) node.textContent = placeholderText();
+          });
+        }
+        setTimeout(() => updateNav(true));
+      });
+    });
+
+    controls.count.addEventListener("change", () => resetResults({ regenerate: true }));
+    controls.sort.addEventListener("change", () => resetResults());
+    controls.timeGrain.addEventListener("change", () => {
+      overview = null;
+      requestOverview();
+      updateNav(true);
+    });
+
+    $("simulateUpdate").addEventListener("click", () => {
+      frame.classList.add("content-updating");
+      setTimeout(() => {
+        filtered = !filtered;
+        frame.classList.remove("content-updating");
+        resetResults();
+      }, 700);
+    });
+
+    applyAppearance();
+    resetResults({ regenerate: true });
+  })();
+  </script>
+</body>
+</html>

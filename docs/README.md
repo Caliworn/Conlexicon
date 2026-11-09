@@ -15,6 +15,7 @@
 | [Definition Tag Plan](DEFINITION_TAG_PLAN.md) | 阶段 1（存储与查询）、阶段 2（界面）已实施（2026-10-25），S1 待形态分配计划 D6 确认 | 释义标签与多词性词条：释义可带标签、词条整体取并集（只向上继承）且按标签排序配置排列，形态默认按有效标签匹配，分析页统计多词性词条与词性组合；已实施部分的契约见 API 契约"释义标签与有效标签"，本文保留界面设计、决定点与实施出入。 |
 | [Tag Manager Specification](TAG_MANAGER_SPEC.md) | 当前规范 | 标签管理页的布局、行内控件、搜索与添加、显示面板、压缩视图、键盘、窄屏、跳转和验收。数据语义见 API Contract 的标签登记表一节。 |
 | [Morphology Assignment Plan](MORPHOLOGY_ASSIGNMENT_PLAN.md) | 设计草案，已复评，未实施 | 形态分配重做：去掉形态组，表格以析取范式规则直接匹配；每张表属于一个槽位，槽位内按 elsewhere 由更具体者胜出、槽位间叠加，槽位顺序即显示顺序；覆写按表记录，旧数据转换结果不变；槽位面板、试算面板与影响范围的编辑界面。 |
+| [Enhanced Scrollbar Plan](ENHANCED_SCROLLBAR_PLAN.md) | 设计草案，已复评，未实施 | 词条列表的自定义导航条：按条目下标定位、跟随当前排序的分段索引、概览接口、隐藏原生滚动条后的滚轮转发与无障碍边界、与自定义字母表排序共用的排序单位函数；第一期只做普通列表。 |
 | [App Shell Specification](APP_SHELL_SPEC.md) | 阶段 A 已完成 | 响应式应用外壳：布局、外壳状态模型、DOM/CSS 边界、断点与验收。 |
 | [Touch, Focus and Accessibility Plan](TOUCH_FOCUS_A11Y_PLAN.md) | 阶段 A+ 未开始 | 触摸替代交互、输入能力判定、命中区域、焦点管理与无障碍验收。 |
 | [Lightweight Corpus Plan](CORPUS_LIGHTWEIGHT_PLAN.md) | 阶段 C 第 1、2 阶段已完成（2026-11-08），第 3、4 阶段未实施 | 语料库缩成一句一条的轻量结构：SQL 模型、释义连接、Gloss 格式、ExPex 复制、界面、JSON 导入与验收。 |
