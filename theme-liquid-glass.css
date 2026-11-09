@@ -468,7 +468,7 @@ body[data-ui-skin="liquid-glass"] .docs-editor-pane:focus-within {
 }
 
 /* Two independent decorative leaves; popup ancestors stay unfiltered. */
-body[data-ui-skin="liquid-glass"] :is(.entry-mail-search-surface, .entry-mail-tools-surface, .tag-manager-search-surface, .corpus-search-surface) {
+body[data-ui-skin="liquid-glass"] :is(.entry-mail-search-surface, .tag-manager-search-surface, .corpus-search-surface) {
   --liquid-glass-surface-tint: var(--liquid-glass-toolbar-surface-tint);
   /* Nothing scrolls behind these leaves. */
   --liquid-glass-surface-filter: none;
@@ -517,10 +517,7 @@ body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
   .entry-search-control > input,
   .entry-search-control > button,
   .entry-mail-primary-tools > button,
-  .entry-mail-root-actions > button,
   .entry-mail-primary-tools > div > button,
-  .entry-mail-group > button,
-  .entry-mail-group > div > button,
   .root-mode-controls button
 ) {
   --material-control-background: transparent;
@@ -875,7 +872,6 @@ body[data-ui-skin="liquid-glass"]:is([data-liquid-glass-optics-quality="q2"], [d
 body[data-ui-skin="liquid-glass"]:not(.dark-theme) :is(
   .dictionary-panel,
   .entry-mail-search-surface,
-  .entry-mail-tools-surface,
   .tag-manager-search-surface,
   .corpus-search-surface,
   [data-surface="content-shell"],

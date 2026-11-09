@@ -798,7 +798,6 @@ fieldset {
 
 /* Optional workspace layout; skins opt in independently from its geometry. */
 .entry-mail-search-surface,
-.entry-mail-tools-surface,
 .tag-manager-search-surface,
 .corpus-search-surface,
 .entry-mail-search-icon,
@@ -815,28 +814,27 @@ body[data-entry-layout="mail"] .entry-list-toolbar {
   padding: 0 0 12px;
 }
 
-body[data-entry-layout="mail"] .entry-search-control,
-body[data-entry-layout="mail"] .entry-mail-tools {
+body[data-entry-layout="mail"] .entry-search-control {
   position: relative;
   z-index: 1;
   border-radius: var(--radius-pill);
   min-width: 0;
-}
-
-body[data-entry-layout="mail"] .entry-search-control {
   display: flex;
   align-items: center;
   gap: 0;
   min-height: 44px;
-  width: 100%;
 }
 
 body[data-entry-layout="mail"] .entry-search-control > input {
   width: 100%;
   height: 44px;
   padding-left: 38px;
-  padding-right: 42px;
+  padding-right: 44px;
   border-radius: inherit;
+}
+
+body[data-entry-layout="mail"] .entry-search-control:has(> .entry-mail-clear:not([hidden])) > input {
+  padding-right: 80px;
 }
 
 body[data-entry-layout="mail"] .entry-search-control > input::-webkit-search-cancel-button {
@@ -853,87 +851,89 @@ body[data-entry-layout="mail"] .entry-mail-search-icon {
   pointer-events: none;
 }
 
-body[data-entry-layout="mail"] .entry-mail-clear:not([hidden]) {
+body[data-entry-layout="mail"] .entry-search-control > :is(.entry-mail-clear:not([hidden]), .entry-search-config-button) {
   display: grid;
   position: absolute;
-  right: 4px;
   width: 36px;
   min-width: 36px;
   height: 36px;
+  min-height: 36px;
   padding: 0;
   place-items: center;
   border-radius: var(--radius-pill);
 }
 
+body[data-entry-layout="mail"] .entry-search-control > .entry-search-config-button {
+  right: 4px;
+}
+
+body[data-entry-layout="mail"] .entry-search-control > .entry-mail-clear {
+  right: 40px;
+}
+
+/* A flat list header under the search field: the sort state reads as text on
+   the left; filter, root mode and "new" are icons on the right. No glass surface. */
 body[data-entry-layout="mail"] .entry-mail-tools {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  padding: 4px;
-  min-height: 48px;
-  gap: 4px;
   width: 100%;
   max-width: 100%;
-  align-self: stretch;
+  min-width: 0;
+  min-height: 40px;
+  margin-top: -4px;
 }
 
 body[data-entry-layout="mail"] .entry-mail-primary-tools {
-  position: relative;
   display: flex;
   flex: 1 1 auto;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px 8px;
-  min-width: 0;
-}
-
-/* Groups never split across rows: menus, root mode, and "new" wrap as units. */
-body[data-entry-layout="mail"] .entry-mail-group {
-  display: flex;
-  flex: 0 0 auto;
   align-items: center;
   gap: 4px;
   min-width: 0;
 }
 
-body[data-entry-layout="mail"] .entry-mail-group-new {
-  margin-left: auto;
+body[data-entry-layout="mail"] .entry-mail-primary-tools > :is(.entry-filter-control, .entry-sort-control) {
+  position: static;
+  min-width: 0;
 }
 
-body[data-entry-layout="mail"] .entry-mail-divider {
-  position: absolute;
-  width: 1px;
-  height: 22px;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  background: color-mix(in srgb, var(--ui-text) 22%, transparent);
+body[data-entry-layout="mail"] .entry-mail-primary-tools > .entry-sort-control {
+  flex: 1 1 auto;
 }
 
-/* Root actions stay visible in place; unavailable ones must read as unavailable. */
+body[data-entry-layout="mail"] :is(.entry-mail-tools, .entry-search-control, .root-mode-controls) .nav-icon {
+  display: block;
+  flex: 0 0 auto;
+  width: 19px;
+  height: 19px;
+  margin: 0;
+}
+
 body[data-entry-layout="mail"] .entry-mail-tools :is(button:disabled, button[aria-disabled="true"]) .nav-icon {
   opacity: 0.4;
 }
 
-body[data-entry-layout="mail"] .entry-mail-root-actions:not([hidden]) {
-  display: contents;
+body[data-entry-layout="mail"] .entry-mail-tools .entry-sort-button {
+  width: auto;
+  max-width: 100%;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  color: var(--ui-text-muted);
+  font-size: 0.82rem;
 }
 
-body[data-entry-layout="mail"] .entry-mail-tools.has-root-actions {
-  border-radius: min(var(--radius-pill), 24px);
+body[data-entry-layout="mail"] .entry-mail-tools .entry-sort-button .entry-sort-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
 }
 
-body[data-entry-layout="mail"] .entry-mail-group > :is(.entry-mail-settings, .entry-filter-control, .entry-sort-control) {
-  position: static;
-  flex: 0 0 40px;
+body[data-entry-layout="mail"] .entry-mail-tools .entry-sort-button .entry-sort-chevron {
+  width: 15px;
+  height: 15px;
 }
 
-body[data-entry-layout="mail"] .entry-mail-primary-tools > button,
-body[data-entry-layout="mail"] .entry-mail-primary-tools > div > button,
-body[data-entry-layout="mail"] .entry-mail-group > button,
-body[data-entry-layout="mail"] .entry-mail-group > div > button,
-body[data-entry-layout="mail"] .entry-mail-root-actions > button {
+body[data-entry-layout="mail"] .entry-mail-primary-tools :is(#entryFilterButton, #rootModeToggleButton, #entryListNewEntryButton) {
   display: grid;
   width: 40px;
   height: 40px;
@@ -944,17 +944,66 @@ body[data-entry-layout="mail"] .entry-mail-root-actions > button {
   border-radius: var(--radius-pill);
 }
 
-body[data-entry-layout="mail"] .entry-mail-tools .nav-icon,
-body[data-entry-layout="mail"] .entry-mail-clear .nav-icon {
-  display: block;
-  width: 19px;
-  height: 19px;
-  margin: 0;
+body[data-entry-layout="mail"] #rootModeToggleButton > span {
+  display: none;
 }
 
-body[data-entry-layout="mail"] #rootModeToggleButton > span,
-body[data-entry-layout="mail"] .entry-mail-root-actions > button > span {
+/* "New" is the header's only filled icon: a weak accent fill marks the primary
+   action without the outline recipe's border or raised shadow. */
+body[data-entry-layout="mail"] .entry-mail-primary-tools > #entryListNewEntryButton {
+  --control-background: var(--control-tone-tint);
+  --control-hover-background: color-mix(in srgb, var(--control-tone-tint) 90%, var(--control-tone-color));
+  --control-pressed-background: color-mix(in srgb, var(--control-tone-tint) 80%, var(--control-tone-color));
+  --control-color: var(--control-tone-hover-color);
+  --control-hover-color: var(--control-tone-hover-color);
+  --control-border: transparent;
+  --control-hover-border: transparent;
+  --control-shadow: none;
+  --control-hover-shadow: none;
+  --control-pressed-shadow: none;
+}
+
+/* At 320px of viewport the drawer header leaves the sort text little room:
+   drop the sort icon there; the chevron still marks the menu. */
+body[data-entry-layout="mail"] .entry-mail-tools {
+  container-type: inline-size;
+}
+
+@container (max-width: 280px) {
+  body[data-entry-layout="mail"] .entry-mail-tools .entry-sort-button .entry-sort-icon {
+    display: none;
+  }
+}
+
+body[data-entry-layout="mail"] .entry-mail-divider {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: color-mix(in srgb, var(--ui-text) 22%, transparent);
+}
+
+/* Root mode shares the row under the toolbar with the filter status: the
+   two never apply at once, so expand/collapse take the filter row's metrics. */
+body[data-entry-layout="mail"] .root-mode-controls > :is(#expandAllRootsButton, #collapseAllRootsButton) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 12px 0 10px;
+  border-radius: var(--radius-control);
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
+body[data-entry-layout="mail"] .root-mode-controls > :is(#expandAllRootsButton, #collapseAllRootsButton)[hidden] {
   display: none;
+}
+
+body[data-entry-layout="mail"] .root-mode-controls .entry-mail-root-icon {
+  width: 16px;
+  height: 16px;
 }
 
 /* Menus mount directly under body, outside the sticky list's stacking context. */
@@ -970,16 +1019,6 @@ body[data-entry-layout="mail"] .entry-workspace-menu {
 
 body[data-entry-layout="mail"] .entry-workspace-menu.entry-sort-menu {
   width: min(240px, calc(100vw - 24px));
-}
-
-/* Must outrank the Mail toolbar's ".entry-mail-tools .nav-icon" display rule,
-   or the chevron takes a second grid row under the icon. */
-body[data-entry-layout="mail"] .entry-mail-tools .entry-sort-button :is(.entry-sort-label, .entry-sort-chevron) {
-  display: none;
-}
-
-body[data-entry-layout="mail"] .entry-sort-button .entry-sort-icon {
-  display: block;
 }
 
 body[data-entry-layout="mail"] .entry-card {

@@ -137,11 +137,12 @@
       display: block;
     }
 
-    /* One large production Mail toolbar as the glass owner, like the content shell above.
-       Only its toolbar geometry (flex row, pill radius, 4px padding) is replaced;
+    /* One large production Mail search capsule as the glass owner, like the content
+       shell above. Only its capsule geometry (flex row, pill radius) is replaced;
        paint and optics stay with the production rules and the engine. */
-    body[data-entry-layout="mail"] .entry-mail-tools.cg-context-glass {
+    body[data-entry-layout="mail"] .entry-search-control.cg-context-glass {
       display: block;
+      min-height: 0;
       padding: 16px;
       border-radius: var(--radius-panel);
     }
@@ -416,9 +417,9 @@
 
     <section id="cgGlassSection">
       <h2>玻璃工具栏</h2>
-      <p class="cg-note">使用产品的 Mail 工具栏 <code>.entry-mail-tools</code>，只有液态玻璃有这一层：外壳带烘焙高光，内部控件不再单独注册、不带阴影。其他皮肤下本节隐藏。</p>
-      <div class="entry-mail-tools cg-context-glass">
-        <div class="entry-mail-tools-surface" aria-hidden="true"></div>
+      <p class="cg-note">使用产品的 Mail 搜索胶囊 <code>.entry-search-control</code>，只有液态玻璃有这一层：外壳带烘焙高光，内部控件（搜索设置、清空）不再单独注册、不带阴影。其他皮肤下本节隐藏。</p>
+      <div class="entry-search-control cg-context-glass">
+        <div class="entry-mail-search-surface" aria-hidden="true"></div>
         <div class="cg-scroll"><div class="cg-matrix" data-cg-context="glass"></div></div>
       </div>
     </section>
@@ -1046,8 +1047,8 @@
       }
 
       function containerSurface(element) {
-        // The Mail toolbar and search control paint through decorative surface leaves.
-        const leaf = element.querySelector?.(":scope > :is(.entry-mail-tools-surface, .entry-mail-search-surface)");
+        // The Mail search control paints through a decorative surface leaf.
+        const leaf = element.querySelector?.(":scope > .entry-mail-search-surface");
         return leaf && getComputedStyle(leaf).display !== "none" ? leaf : element;
       }
 

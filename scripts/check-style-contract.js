@@ -306,10 +306,9 @@ const mailControlPaint = liquidGlass.match(
   /body\[data-ui-skin="liquid-glass"\] \.entry-list-toolbar :where\(([\s\S]*?)\)\s*\{([^}]+)\}/,
 );
 assert(mailControlPaint, "Mail controls must consume their shared outer glass material");
-assert(mailControlPaint[1].includes(".entry-mail-primary-tools > button"),
-  "Mail ownership must include the new-entry quick action");
-assert(mailControlPaint[1].includes(".entry-mail-group > button") && mailControlPaint[1].includes(".entry-mail-group > div > button"),
-  "Mail controls moved into wrap groups must keep the shared outer glass material");
+assert(mailControlPaint[1].includes(".entry-mail-primary-tools > button")
+  && mailControlPaint[1].includes(".entry-mail-primary-tools > div > button"),
+  "Mail list controls, bare or inside their menu wrappers, must keep the shared outer glass material");
 const mailControlProperties = controlProperties(mailControlPaint[2]);
 assert.equal(mailControlProperties["--control-background"], "transparent",
   "Semantic controls inside Mail must not paint an independent panel block");
@@ -561,9 +560,10 @@ assert(!/--(?:material-)?control-(?:hover-|pressed-)?shadow/.test(
     "The source card's remove button must stay part of the card, without its own recipe");
   const engineOwners = liquidGlassEngineApi.SURFACE_ROLE_DEFINITIONS
     .filter(({ selector }) => !leafSurfaces.has(selector))
-    .flatMap(({ selector, controlsWithin }) => (controlsWithin || selector).split(",").map((value) => value.trim()));
+    .flatMap(({ selector, controlsWithin }) => (controlsWithin || selector).split(",").map((value) => value.trim()))
+    .concat(liquidGlassEngineApi.FLAT_CONTROL_SCOPE);
   assert.deepEqual([...cssOwners].sort(), [...new Set(engineOwners)].sort(),
-    "Flat nested controls must follow exactly the engine's backdrop owners that contain controls");
+    "Flat nested controls must follow exactly the engine's backdrop owners and flat scopes that contain controls");
 }
 assert.equal(opticalOutline["--control-background"], "var(--material-floating-background)",
   "Optical outlines use the translucent role material, not an opaque panel");
@@ -819,11 +819,11 @@ assert.deepEqual(liquidGlassSelectorsForRole("continuous"), new Set([".dictionar
   "The continuous role must cover the navigation card and drawer");
 assert.deepEqual(
   liquidGlassSelectorsForRole("toolbar"),
-  new Set([".entry-mail-search-surface", ".entry-mail-tools-surface", ".tag-manager-search-surface", ".corpus-search-surface"]),
-  "The toolbar role must cover the search and tool capsules as independent optical surfaces",
+  new Set([".entry-mail-search-surface", ".tag-manager-search-surface", ".corpus-search-surface"]),
+  "The toolbar role must cover the search capsules as independent optical surfaces",
 );
 assert(
-  ["entry-mail-search-surface", "entry-mail-tools-surface", "tag-manager-search-surface", "corpus-search-surface"].every((name) => index.includes(`<div class="${name}" aria-hidden="true"></div>`)),
+  ["entry-mail-search-surface", "tag-manager-search-surface", "corpus-search-surface"].every((name) => index.includes(`<div class="${name}" aria-hidden="true"></div>`)),
   "Mail optical surfaces must be decorative leaves, not backdrop-filter ancestors of popup menus",
 );
 assert(

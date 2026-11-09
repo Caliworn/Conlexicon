@@ -4609,9 +4609,10 @@ function renderPartFilterControls(dictionary, usedParts = null) {
   entrySortControl?.sync();
 }
 
-// The Mail toolbar keeps every root control in place and disables what is
-// unavailable, so entering root mode or applying a filter never shifts its
-// buttons under the pointer. The standard layout keeps hiding them.
+// The Mail toolbar keeps the root-mode toggle in place and disables it while
+// a filter applies, so applying a filter never shifts its buttons under the
+// pointer; the standard layout hides it. In both layouts expand/collapse only
+// appear in root mode, in the row the filter status uses otherwise.
 function renderRootModeControls() {
   const mail = document.body.dataset.entryLayout === "mail";
   const filtered = Boolean(activeFilter);
@@ -4626,8 +4627,8 @@ function renderRootModeControls() {
     elements.rootModeToggleButton.removeAttribute("aria-disabled");
     delete elements.rootModeToggleButton.dataset.appTooltipLabel;
   }
-  elements.expandAllRootsButton.hidden = !rootAvailable && !mail;
-  elements.collapseAllRootsButton.hidden = !rootAvailable && !mail;
+  elements.expandAllRootsButton.hidden = !rootAvailable;
+  elements.collapseAllRootsButton.hidden = !rootAvailable;
   elements.expandAllRootsButton.disabled = !rootAvailable || hasRootSearch || !rootGroupsReady
     || (rootExpansionMode === "all" && !collapsedRootEntries.size);
   elements.collapseAllRootsButton.disabled = !rootAvailable || hasRootSearch || !rootGroupsReady
