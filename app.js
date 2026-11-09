@@ -300,7 +300,11 @@ let entryListEdgeFrame = 0;
 let entryListScrollbarWidth = -1;
 let entryListNavigatorHoldsLoads = false;
 let entryListNavigatorLayout = { items: null, rows: [], total: 0 };
-const corpusVirtualList = createVirtualListState(44);
+// Corpus rows have fixed heights in styles.css (item card 44px, group header
+// 32px, each plus the row's 2px gap), so these estimates are exact.
+const CORPUS_ITEM_ROW_HEIGHT = 46;
+const CORPUS_GROUP_ROW_HEIGHT = 34;
+const corpusVirtualList = createVirtualListState(CORPUS_ITEM_ROW_HEIGHT);
 const CORPUS_PAGE_SIZE = 100;
 const masonryLayouts = new WeakMap();
 const VIRTUAL_LIST_RESIZE_EPSILON = 0.5;
@@ -14688,6 +14692,7 @@ function renderCorpusList() {
   renderVirtualList(elements.corpusItemList, corpusVirtualList, rows, {
     resetToken: `${dictionary.id}|${searchKey}`,
     getKey: corpusRowKey,
+    getEstimatedHeight: (row) => (row.kind === "group" ? CORPUS_GROUP_ROW_HEIGHT : CORPUS_ITEM_ROW_HEIGHT),
     getSizeCacheKey: (row, key) => {
       const item = row.kind === "item" ? corpusRowItem(row) : null;
       return item ? `${key}|${item.updatedAt}|${item.name}|${item.linkCount}` : key;
