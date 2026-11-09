@@ -934,11 +934,15 @@ fieldset {
   --control-pressed-shadow: none;
 }
 
-/* At 320px of viewport the drawer header leaves the sort text little room:
-   drop the sort icon there; the chevron still marks the menu. */
-@container (max-width: 280px) {
+/* In the drawer at 360px of viewport and below the header leaves the sort
+   text little room: drop the sort icon there; the chevron still marks the menu. */
+@container (max-width: 300px) {
   .entry-mail-tools .entry-sort-button .entry-sort-icon {
     display: none;
+  }
+
+  .entry-mail-tools .secondary-button.entry-sort-button {
+    padding: 0 6px;
   }
 }
 
