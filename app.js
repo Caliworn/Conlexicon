@@ -296,6 +296,8 @@ const entryVirtualList = createVirtualListState(145);
 // The entry list's navigator replaces its native scrollbar in normal mode; root
 // mode keeps the native scrollbar until it gets its own navigator.
 let entryListNavigator = null;
+let entryListEdgeFrame = 0;
+let entryListScrollbarWidth = -1;
 let entryListNavigatorHoldsLoads = false;
 let entryListNavigatorLayout = { items: null, rows: [], total: 0 };
 const corpusVirtualList = createVirtualListState(44);
@@ -5114,7 +5116,37 @@ function renderVirtualListWindow(virtualList) {
   });
   if (container === elements.entryList) {
     entryListNavigator?.update();
+    scheduleEntryListEdges();
   }
+}
+
+// The list fades its cards at an edge only while content is hidden past it, and
+// keeps a native scrollbar (root mode) out of the mask by its measured width.
+function updateEntryListEdges() {
+  entryListEdgeFrame = 0;
+  const list = elements.entryList;
+  list.toggleAttribute("data-fade-top", list.scrollTop > 1);
+  list.toggleAttribute("data-fade-bottom", list.scrollTop + list.clientHeight < list.scrollHeight - 1);
+  const scrollbarWidth = list.offsetWidth - list.clientWidth;
+  if (scrollbarWidth !== entryListScrollbarWidth) {
+    entryListScrollbarWidth = scrollbarWidth;
+    list.style.setProperty("--entry-list-scrollbar-width", `${scrollbarWidth}px`);
+  }
+}
+
+function scheduleEntryListEdges() {
+  if (!entryListEdgeFrame) {
+    entryListEdgeFrame = requestAnimationFrame(updateEntryListEdges);
+  }
+}
+
+// Positioning an entry keeps it clear of the edge fades.
+function virtualListEdgeInset(virtualList) {
+  if (virtualList !== entryVirtualList || !virtualList.container) {
+    return 0;
+  }
+  const fade = Number.parseFloat(getComputedStyle(virtualList.container).getPropertyValue("--entry-list-fade-size"));
+  return Math.min(fade, virtualList.container.clientHeight / 4);
 }
 
 function entryListNavigatorRows() {
@@ -5254,6 +5286,9 @@ function renderVirtualListEmpty(container, virtualList, content) {
     setEntryListNavigatorActive(false);
   }
   container.replaceChildren(content);
+  if (container === elements.entryList) {
+    scheduleEntryListEdges();
+  }
 }
 
 function scrollVirtualListItemIntoView(virtualList, key, behavior = "smooth") {
@@ -5284,12 +5319,13 @@ function virtualListNearestScrollTop(virtualList, index) {
   if (!container) {
     return 0;
   }
-  const start = virtualList.offsets[index];
-  const end = virtualList.offsets[index + 1];
+  const inset = virtualListEdgeInset(virtualList);
+  const start = virtualList.offsets[index] - inset;
+  const end = virtualList.offsets[index + 1] + inset;
   const viewportStart = container.scrollTop;
   const viewportEnd = viewportStart + container.clientHeight;
   if (start < viewportStart) {
-    return start;
+    return Math.max(0, start);
   }
   if (end > viewportEnd) {
     return Math.max(0, end - container.clientHeight);
@@ -5337,11 +5373,12 @@ function stabilizeVirtualListItemScroll(virtualList, key, options = {}) {
     if (row) {
       const rowRect = row.getBoundingClientRect();
       const containerRect = container.getBoundingClientRect();
+      const inset = virtualListEdgeInset(virtualList);
       let delta = 0;
-      if (rowRect.top < containerRect.top) {
-        delta = rowRect.top - containerRect.top;
-      } else if (rowRect.bottom > containerRect.bottom) {
-        delta = rowRect.bottom - containerRect.bottom;
+      if (rowRect.top < containerRect.top + inset) {
+        delta = rowRect.top - containerRect.top - inset;
+      } else if (rowRect.bottom > containerRect.bottom - inset) {
+        delta = rowRect.bottom - containerRect.bottom + inset;
       }
       if (Math.abs(delta) > 0.5) {
         container.scrollTop += delta;
@@ -17919,6 +17956,8 @@ elements.entryList.addEventListener("pointerover", (event) => {
   updateEntryQualityIssueTooltipPlacement(issue);
 });
 elements.entryList.addEventListener("scroll", updateHoveredEntryQualityIssueTooltipPlacement, { passive: true });
+elements.entryList.addEventListener("scroll", scheduleEntryListEdges, { passive: true });
+new ResizeObserver(scheduleEntryListEdges).observe(elements.entryList);
 
 document.addEventListener("pointerover", (event) => {
   const target = appTooltipTargetFromEvent(event);

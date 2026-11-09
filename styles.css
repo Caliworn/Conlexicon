@@ -1734,6 +1734,54 @@ label span {
   gap: 12px;
 }
 
+/* Edge fades: cards dissolve into whatever is behind the list instead of being
+   cut at its top and bottom, so every skin shares one rule. Each fade shows only
+   while content is hidden past that edge (app.js sets the attributes). A second,
+   opaque mask layer keeps a native scrollbar (root mode) unfaded; the navigator
+   is a sibling of the list and never masked. Mask colors only carry alpha. */
+@property --entry-list-fade-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --entry-list-fade-bottom {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+.entry-list {
+  --entry-list-fade-size: 20px;
+  -webkit-mask-image:
+    linear-gradient(to bottom, transparent, black var(--entry-list-fade-top), black calc(100% - var(--entry-list-fade-bottom)), transparent),
+    linear-gradient(black, black);
+  mask-image:
+    linear-gradient(to bottom, transparent, black var(--entry-list-fade-top), black calc(100% - var(--entry-list-fade-bottom)), transparent),
+    linear-gradient(black, black);
+  -webkit-mask-size: calc(100% - var(--entry-list-scrollbar-width, 0px)) 100%, var(--entry-list-scrollbar-width, 0px) 100%;
+  mask-size: calc(100% - var(--entry-list-scrollbar-width, 0px)) 100%, var(--entry-list-scrollbar-width, 0px) 100%;
+  -webkit-mask-position: left top, right top;
+  mask-position: left top, right top;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  transition: --entry-list-fade-top 140ms ease, --entry-list-fade-bottom 140ms ease;
+}
+
+.entry-list[data-fade-top] {
+  --entry-list-fade-top: var(--entry-list-fade-size);
+}
+
+.entry-list[data-fade-bottom] {
+  --entry-list-fade-bottom: var(--entry-list-fade-size);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entry-list {
+    transition: none;
+  }
+}
+
 .entry-list.virtualized-list,
 .corpus-item-list.virtualized-list {
   display: block;
