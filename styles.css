@@ -1841,6 +1841,12 @@ label span {
   padding-bottom: 12px;
 }
 
+/* A window placeholder's height already includes its rows' gaps (count ×
+   estimate); without this the rendered row is 12px taller than its offset. */
+.entry-list .virtual-list-row:has(> .query-window-placeholder) {
+  padding-bottom: 0;
+}
+
 .entry-list-truncation-notice {
   display: grid;
   place-items: center;

@@ -4786,14 +4786,17 @@ function virtualListAnchor(virtualList) {
   if (!virtualList.container || !virtualList.items.length) {
     return null;
   }
-  const totalHeight = virtualList.offsets[virtualList.offsets.length - 1] || 0;
-  const maxScrollTop = Math.max(0, totalHeight - virtualList.container.clientHeight);
-  const stickToBottom = maxScrollTop > 0 && virtualList.container.scrollTop >= maxScrollTop - 2;
-  const index = virtualListIndexAt(virtualList.offsets, virtualList.container.scrollTop);
+  // "At the bottom" is read from the rendered list, not the offsets: rows not yet
+  // measured can make the two differ, and the browser has already clamped
+  // scrollTop to the rendered height.
+  const container = virtualList.container;
+  const renderedBottom = container.scrollHeight - (container.scrollTop + container.clientHeight);
+  const stickToBottom = container.scrollHeight > container.clientHeight && renderedBottom <= 2;
+  const index = virtualListIndexAt(virtualList.offsets, container.scrollTop);
   return {
     key: virtualList.items[index]?.key || "",
-    offset: virtualList.container.scrollTop - virtualList.offsets[index],
-    bottomOffset: totalHeight - (virtualList.container.scrollTop + virtualList.container.clientHeight),
+    offset: container.scrollTop - virtualList.offsets[index],
+    bottomOffset: Math.max(0, renderedBottom),
     stickToBottom,
   };
 }
@@ -5215,6 +5218,11 @@ function renderVirtualList(container, virtualList, items, options) {
   clampVirtualListScroll(virtualList);
   restoreVirtualListAnchor(virtualList, preservedAnchor);
   renderVirtualListWindow(virtualList);
+  // Before the window rendered, the old spacers could be shorter than the new
+  // offsets and the browser clamped the bottom position; reapply it.
+  if (preservedAnchor?.stickToBottom) {
+    restoreVirtualListAnchor(virtualList, preservedAnchor);
+  }
 }
 
 function renderVirtualListEmpty(container, virtualList, content) {
