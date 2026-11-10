@@ -236,6 +236,7 @@ C09（数据库非空列与静态 DOM 兜底）与 C10（前端对服务端响�
 
 ## 6. 已评估、不处理
 
+- 列表概览的时间分段按 15 分钟 UTC 时段缓存当地日期（`lib/entry-overview-model.js` 的 `timeKeyFormatter()`），假设当地午夜总落在时段边界上。1972 年以后所有时区偏移都是整刻钟，成立；更早的时间戳在当时偏移不是整刻钟的时区（如利比里亚 UTC−0:44:30），跨当地午夜的两条记录可能被归入同一天。逐条换算或检查对齐会让所有时间排序的概览慢约 60%，2026-11-10 用户决定不为此兜底。
 - `RootTopologyCache` 的类型与参数检查：成本很低，且能明确报告调用错误。
 - `entries.position`：只记录导入／创建顺序，不进入 DTO，但用作所有排序的平局键、完整导出顺序，以及分析和质量 issue 的稳定顺序。旧 JSON 导入的 `createdAt` 可能为空或重复，不能替代它。隐式 rowid 目前与它几乎等价：新建取 max+1，导入按插入顺序分配，upsert 保存不改 rowid。但 SQLite 对没有 `INTEGER PRIMARY KEY` 的表不保证 VACUUM 后 rowid 不变。代码目前不执行 VACUUM，风险来自两处：外部工具对词典文件执行压缩，以及将来重建表（如 R10）时没有按 `position` 保序复制。改用 rowid 会让导出和质量 issue 顺序隐式依赖一个 SQLite 不承诺的值。保留。
 - `morphology_template_tables.row_count / column_count`：可以由 labels 数组长度推出，但写入时已保证一致，删除收益很小。保留。

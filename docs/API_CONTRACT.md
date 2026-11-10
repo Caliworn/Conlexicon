@@ -117,7 +117,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/dictionaries/:id/entries` | 读取词条列表 | `{ items, pageInfo, searchSummary }`，其中 `items` 固定为词条摘要 DTO | 支持结构化 JSON `filter`，以及现有 `q`、`fields`、`fuzzyFields`、`part`、`tags`、`tagMode`、`sort`、`cursor`、`windowOffset`、`limit`。结构化 `filter` 不得与平铺筛选参数混用。无参数请求也使用默认排序和窗口大小，不返回完整词条数组。 |
 | `POST` | `/api/dictionaries/:id/entries/filter-facts` | 批量读取结构筛选是否存在候选 | `{ dictionaryId, generation, facts }` | 最多接受 16 个 filter descriptor；只返回按请求 ID 对应的 `available` 布尔值，不接受搜索、排序或分页语义。 |
-| `GET` | `/api/dictionaries/:id/entries/overview` | 当前查询结果的分段概览，供列表导航条的刻度与气泡使用 | `{ total, sort, grain, buckets: [{ key, start, count }] }` | 接受与 `/entries` 相同的查询 descriptor（cursor 与分页无关），另加 `tz`（IANA 时区名，省略为 UTC；无效返回 400 `invalid_overview_time_zone`）。语义见下文“列表概览”。路由排在 `/entries/:entryId` 之前匹配。 |
+| `GET` | `/api/dictionaries/:id/entry-overview` | 当前查询结果的分段概览，供列表导航条的刻度与气泡使用 | `{ total, sort, grain, buckets: [{ key, start, count }] }` | 接受与 `/entries` 相同的查询 descriptor（cursor 与分页无关），另加 `tz`（IANA 时区名，省略为 UTC；无效返回 400 `invalid_overview_time_zone`）。语义见下文“列表概览”。路径不放在 `/entries/` 下：导入的词条 ID 格式不受限，`/entries/` 下的任何名字都可能是某个词条。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId/location` | 定位词条在当前查询中的窗口 | `{ items, pageInfo, searchSummary, location }` | 接受与 `/entries` 相同的查询 descriptor 和 `limit`，但不接受客户端 cursor；目标存在但被查询排除时返回 `location.found: false`。 |
 | `POST` | `/api/dictionaries/:id/entries` | 新建词条 | `{ entry, summary }` | 客户端不得携带词条 ID；后端为每次请求生成一次 UUID，并在 `entry.id` 返回。新建为非覆盖式写入，ID 已存在时返回 409 `duplicate_entity_ids_scoped`；不做其他实体 ID 检查，释义 ID 冲突由主键约束拒绝并整体回滚。`summary` 是写入后的轻量词典计数。 |
 | `GET` | `/api/dictionaries/:id/entries/:entryId` | 读取单个词条 | 词条 JSON | 未找到返回 `entry_not_found`。 |
@@ -413,7 +413,7 @@ GET /api/dictionaries/:id/entries/:entryId/location?filter=&q=&fields=&fuzzyFiel
 
 #### 列表概览
 
-`GET /api/dictionaries/:id/entries/overview` 把当前查询的完整结果按排序切成段，返回每段的键、起始结果下标和条数，供列表导航条（`lib/list-navigator.js`）显示刻度和气泡。分段逻辑在 `lib/entry-overview-model.js`：
+`GET /api/dictionaries/:id/entry-overview` 把当前查询的完整结果按排序切成段，返回每段的键、起始结果下标和条数，供列表导航条（`lib/list-navigator.js`）显示刻度和气泡。分段逻辑在 `lib/entry-overview-model.js`：
 
 - 按当前排序取出全部结果的分段键，按“相邻且键相同”切段，所以各段首尾相接、合计等于 `total`。同一个键可能出现在两处（如无法解析的日期夹在有效日期之间），这时分成两段，起点仍然正确。
 - 词形排序（`grain` 为空串）：键是 `sort_key` 的第一个码位，与码位排序一致；以后改为自定义字母表排序时，只替换 `firstSortUnit()`。

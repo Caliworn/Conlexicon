@@ -301,7 +301,7 @@ let entryListNavigatorHoldsLoads = false;
 let entryListNavigatorLayout = { items: null, rows: [], total: 0 };
 // Segments for the navigator's ticks and bubble, per entry query (key).
 let entryListOverview = { key: "", status: "idle", data: null, labeled: null, language: "" };
-// Result index a tick press is waiting to land on until its window loads.
+// A tick press waiting for its window to load: { index, queryKey }.
 let entryListPendingJump = null;
 // Corpus rows have fixed heights in styles.css (item card 44px, group header
 // 32px, each plus the row's 2px gap), so these estimates are exact.
@@ -5201,7 +5201,7 @@ function requestEntryListOverview() {
   entryListOverview = { key, status: "loading", data: null, labeled: null, language: "" };
   const params = entryQueryParams(dictionary);
   params.set("tz", Intl.DateTimeFormat().resolvedOptions().timeZone);
-  api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/overview?${params}`)
+  api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entry-overview?${params}`)
     .then((data) => {
       if (entryListOverview.key !== key) {
         return;
@@ -5265,7 +5265,8 @@ function syncEntryListOverview() {
 // first entry once that entry's window has loaded.
 function jumpEntryListToIndex(index) {
   elements.entryList.scrollTop = window.ConlexiconListNavigator.scrollTopForIndex(entryListNavigatorRows(), index);
-  entryListPendingJump = index;
+  // Bound to the query it was made in: the same index in another query is another entry.
+  entryListPendingJump = { index, queryKey: entryQueryState.key };
   renderVirtualListWindow(entryVirtualList);
   alignEntryListJump();
 }
@@ -5274,7 +5275,12 @@ function alignEntryListJump() {
   if (entryListPendingJump === null) {
     return;
   }
-  const index = entryVirtualList.items.findIndex(({ value }) => value.kind === "entry" && value.resultIndex === entryListPendingJump);
+  if (entryListPendingJump.queryKey !== entryQueryState.key) {
+    entryListPendingJump = null;
+    return;
+  }
+  const target = entryListPendingJump.index;
+  const index = entryVirtualList.items.findIndex(({ value }) => value.kind === "entry" && value.resultIndex === target);
   if (index < 0) {
     return;
   }

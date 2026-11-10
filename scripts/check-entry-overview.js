@@ -1,5 +1,7 @@
 const assert = require("node:assert/strict");
+const { Readable } = require("node:stream");
 const { createTempSqliteRepository, requireSqliteRuntime } = require("./sqlite-check-utils");
+const { createApiRouter } = require("../lib/api-routes");
 const { importDictionaryFromJsonPayload } = require("../lib/dictionary-conversion-service");
 const {
   NO_DATE_KEY,
@@ -83,15 +85,44 @@ function legacyDictionary() {
   return {
     id: DICTIONARY_ID,
     name: "Overview check",
-    entries: lemmas.map((lemma, index) => ({
-      id: `entry-${index}`,
-      lemma,
-      tags: ["n"],
-      definitions: [{ id: `def-${index}`, meaning: `meaning ${index}` }],
-      createdAt: index === 3 ? "2024/05/03" : new Date(Date.UTC(2026, index, 15)).toISOString(),
-      updatedAt: new Date(Date.UTC(2026, 9, 1 + index)).toISOString(),
-    })),
+    entries: [
+      ...lemmas.map((lemma, index) => ({
+        id: `entry-${index}`,
+        lemma,
+        tags: ["n"],
+        definitions: [{ id: `def-${index}`, meaning: `meaning ${index}` }],
+        createdAt: index === 3 ? "2024/05/03" : new Date(Date.UTC(2026, index, 15)).toISOString(),
+        updatedAt: new Date(Date.UTC(2026, 9, 1 + index)).toISOString(),
+      })),
+      // Imported IDs are free-form; this one must stay readable at /entries/overview.
+      {
+        id: "overview",
+        lemma: "ovo",
+        tags: ["n"],
+        definitions: [{ id: "def-overview", meaning: "egg" }],
+        createdAt: "2026-09-15T00:00:00.000Z",
+        updatedAt: "2026-10-01T00:00:00.000Z",
+      },
+    ],
   };
+}
+
+async function getRoute(repository, pathname) {
+  const request = Readable.from([]);
+  request.headers = {};
+  request.method = "GET";
+  let statusCode = 0;
+  let responseBody = "";
+  const response = {
+    writeHead(status) {
+      statusCode = status;
+    },
+    end(value) {
+      responseBody = value || "";
+    },
+  };
+  await createApiRouter({ repository })(request, response, new URL(pathname, "http://localhost"));
+  return { statusCode, body: JSON.parse(responseBody) };
 }
 
 async function checkRepository() {
@@ -105,10 +136,18 @@ async function checkRepository() {
     // Without a search the overview is read in SQL, in the list's own order.
     const lemma = await repository.getEntryQueryOverview(DICTIONARY_ID, { sort: "lemmaAsc" });
     assertTiles(lemma);
-    assert.deepEqual(lemma.buckets.map((bucket) => [bucket.key, bucket.count]), [["a", 2], ["b", 1], ["s", 2], ["t", 1], ["ŋ", 2]], "lemma segments follow the code point sort of the lowercased lemma");
+    assert.deepEqual(lemma.buckets.map((bucket) => [bucket.key, bucket.count]), [["a", 2], ["b", 1], ["o", 1], ["s", 2], ["t", 1], ["ŋ", 2]], "lemma segments follow the code point sort of the lowercased lemma");
     assert.equal(lemma.total, (await repository.queryEntries(DICTIONARY_ID, { sort: "lemmaAsc", limit: 1 })).pageInfo.total);
     const lemmaDesc = await repository.getEntryQueryOverview(DICTIONARY_ID, { sort: "lemmaDesc" });
-    assert.deepEqual(lemmaDesc.buckets.map((bucket) => bucket.key), ["ŋ", "t", "s", "b", "a"]);
+    assert.deepEqual(lemmaDesc.buckets.map((bucket) => bucket.key), ["ŋ", "t", "s", "o", "b", "a"]);
+
+    // The overview has its own path, so no entry ID can collide with it.
+    const entryRoute = await getRoute(repository, `/api/dictionaries/${DICTIONARY_ID}/entries/overview`);
+    assert.equal(entryRoute.statusCode, 200);
+    assert.equal(entryRoute.body.id, "overview", "/entries/overview reads the entry whose ID is overview");
+    const overviewRoute = await getRoute(repository, `/api/dictionaries/${DICTIONARY_ID}/entry-overview?sort=lemmaAsc`);
+    assert.equal(overviewRoute.statusCode, 200);
+    assert.deepEqual(overviewRoute.body, lemma);
 
     const created = await repository.getEntryQueryOverview(DICTIONARY_ID, { sort: "createdAsc", tz: "UTC" });
     assertTiles(created);

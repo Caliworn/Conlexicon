@@ -94,7 +94,7 @@
 ### 5.3 概览接口
 
 ```text
-GET /api/dictionaries/:id/entries/overview?<与 /entries 相同的查询参数>&tz=<IANA 时区>
+GET /api/dictionaries/:id/entry-overview?<与 /entries 相同的查询参数>&tz=<IANA 时区>
 → { total, sort, buckets: [{ label, start, count }] }
 ```
 
@@ -102,7 +102,7 @@ GET /api/dictionaries/:id/entries/overview?<与 /entries 相同的查询参数>&
 - 服务端不缓存结果；前端按查询 key（含词典版本）缓存，查询条件或词典版本变化后丢弃，下次悬停再请求。
 - 时间分段按用户本地时区划分，前端传 IANA 时区名。服务端先算出各段在 UTC 下的边界，再与时间戳字符串比较，避免逐行做时区格式化。没有日期或日期无法解析的词条归入“无日期”段。
 - 指针第一次移进导航条时才单独请求（实装时由代理改定：刻度和气泡只在悬停或拖动时出现，不碰导航条的用户不必请求），按查询 key 缓存，不并进首窗响应。少于 100 条的结果也要请求，因为气泡仍需要分段名（D6）。请求失败时抓手照常可用，只是没有刻度和气泡文字。
-- 路由须排在 `/entries/:entryId` 之前匹配（`/entries/filter-facts` 已有先例）。
+- 路径为独立的 `/entry-overview`，不放在 `/entries/` 下：导入的词条 ID 格式不受限，最初放在 `/entries/overview` 时会截走 ID 为 `overview` 的词条（2026-11-09 审计发现后改正）。
 - 第一期只覆盖 `GET /entries` 的结果。功能结果和质量结果筛选也按窗口读取，导航条仍可按下标显示滑块，但没有分段索引；是否以后补上，取决于那两条查询路径能否以较低成本给出有序结果的分段键。
 - 实装时同步写入 `docs/API_CONTRACT.md`。
 
