@@ -38,24 +38,8 @@ const shellState = {
 let activeAppTooltipTarget = null;
 const desktopNavMediaQuery = window.matchMedia("(min-width: 800px)");
 const wideNavMediaQuery = window.matchMedia("(min-width: 1280px)");
-const glassFinePointerMediaQuery = window.matchMedia("(hover: hover) and (pointer: fine)");
-const glassReducedMotionMediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
 const glassReducedTransparencyMediaQuery = window.matchMedia("(prefers-reduced-transparency: reduce)");
 const glassForcedColorsMediaQuery = window.matchMedia("(forced-colors: active)");
-const LAYERED_GLASS_POINTER_TARGET_SELECTOR = [
-  ".entry-search-config-menu",
-  ".entry-filter-menu",
-  ".source-suggestions",
-  ".entry-context-menu",
-  ".skin-picker-menu",
-  ".modal-panel",
-  ".network-panel",
-].join(", ");
-const LAYERED_GLASS_POINTER_EXIT_MS = 150;
-const layeredGlassPointerExitTimers = new WeakMap();
-let layeredGlassPointerTarget = null;
-let layeredGlassPointerFrame = 0;
-let pendingLayeredGlassPointer = null;
 const SKIN_OPTIONS = [
   { id: "classic", labelKey: "classicSkin" },
   { id: "layered-glass", labelKey: "layeredGlassSkin" },
@@ -3438,7 +3422,6 @@ function setSkinPickerOpen(open, focusMenu = false) {
   elements.skinToggleButton.setAttribute("aria-expanded", String(skinPickerOpen));
   elements.skinPickerMenu.hidden = !skinPickerOpen;
   if (!skinPickerOpen) {
-    resetGlassInteractiveEffects();
     return;
   }
   hideAppTooltip();
@@ -3567,140 +3550,7 @@ function applyAppearance() {
   });
   entryToolbarMenus.sync();
   entrySortControl.sync();
-  if (!layeredGlassPointerEffectsEnabled()) {
-    resetLayeredGlassPointerEffect(true);
-  }
   liquidGlassOpticalEngine?.setEnabled(currentSkin === "liquid-glass");
-}
-
-function layeredGlassPointerEffectsEnabled() {
-  return document.body.dataset.uiSkin === "layered-glass"
-    && glassFinePointerMediaQuery.matches
-    && !glassReducedMotionMediaQuery.matches
-    && !glassReducedTransparencyMediaQuery.matches
-    && !glassForcedColorsMediaQuery.matches;
-}
-
-function clearLayeredGlassPointerTarget(target, immediate = false) {
-  if (!target) {
-    return;
-  }
-  const existingTimer = layeredGlassPointerExitTimers.get(target);
-  if (existingTimer) {
-    clearTimeout(existingTimer);
-    layeredGlassPointerExitTimers.delete(target);
-  }
-  const clearStyles = () => {
-    target.removeAttribute("data-layered-glass-pointer");
-    target.style.removeProperty("--layered-glass-pointer-x");
-    target.style.removeProperty("--layered-glass-pointer-y");
-    target.style.removeProperty("--layered-glass-edge-top");
-    target.style.removeProperty("--layered-glass-edge-right");
-    target.style.removeProperty("--layered-glass-edge-bottom");
-    target.style.removeProperty("--layered-glass-edge-left");
-  };
-  if (immediate || !target.isConnected) {
-    clearStyles();
-    return;
-  }
-  target.dataset.layeredGlassPointer = "idle";
-  const timer = setTimeout(() => {
-    layeredGlassPointerExitTimers.delete(target);
-    if (target.dataset.layeredGlassPointer === "idle") {
-      clearStyles();
-    }
-  }, LAYERED_GLASS_POINTER_EXIT_MS);
-  layeredGlassPointerExitTimers.set(target, timer);
-}
-
-function resetLayeredGlassPointerEffect(immediate = false) {
-  if (layeredGlassPointerFrame) {
-    cancelAnimationFrame(layeredGlassPointerFrame);
-    layeredGlassPointerFrame = 0;
-  }
-  pendingLayeredGlassPointer = null;
-  clearLayeredGlassPointerTarget(layeredGlassPointerTarget, immediate);
-  layeredGlassPointerTarget = null;
-}
-
-function flushLayeredGlassPointerEffect() {
-  layeredGlassPointerFrame = 0;
-  const pending = pendingLayeredGlassPointer;
-  pendingLayeredGlassPointer = null;
-  if (!pending || !pending.target.isConnected || !layeredGlassPointerEffectsEnabled()) {
-    resetLayeredGlassPointerEffect();
-    return;
-  }
-
-  const bounds = pending.target.getBoundingClientRect();
-  if (!bounds.width || !bounds.height) {
-    resetLayeredGlassPointerEffect();
-    return;
-  }
-  if (layeredGlassPointerTarget && layeredGlassPointerTarget !== pending.target) {
-    resetLayeredGlassPointerEffect();
-  }
-
-  const normalizedX = Math.max(0, Math.min(1, (pending.clientX - bounds.left) / bounds.width));
-  const normalizedY = Math.max(0, Math.min(1, (pending.clientY - bounds.top) / bounds.height));
-  const pointerX = Math.round(normalizedX * 200) / 2;
-  const pointerY = Math.round(normalizedY * 200) / 2;
-  const edgeReach = 72;
-  const edgeStrength = (distance) => (
-    Math.round(Math.max(0, Math.min(1, 1 - distance / edgeReach)) * 50) / 50
-  );
-  layeredGlassPointerTarget = pending.target;
-  const exitTimer = layeredGlassPointerExitTimers.get(layeredGlassPointerTarget);
-  if (exitTimer) {
-    clearTimeout(exitTimer);
-    layeredGlassPointerExitTimers.delete(layeredGlassPointerTarget);
-  }
-  layeredGlassPointerTarget.dataset.layeredGlassPointer = "active";
-  layeredGlassPointerTarget.style.setProperty("--layered-glass-pointer-x", `${pointerX}%`);
-  layeredGlassPointerTarget.style.setProperty("--layered-glass-pointer-y", `${pointerY}%`);
-  layeredGlassPointerTarget.style.setProperty("--layered-glass-edge-top", edgeStrength(pending.clientY - bounds.top));
-  layeredGlassPointerTarget.style.setProperty("--layered-glass-edge-right", edgeStrength(bounds.right - pending.clientX));
-  layeredGlassPointerTarget.style.setProperty("--layered-glass-edge-bottom", edgeStrength(bounds.bottom - pending.clientY));
-  layeredGlassPointerTarget.style.setProperty("--layered-glass-edge-left", edgeStrength(pending.clientX - bounds.left));
-}
-
-function scheduleLayeredGlassPointerEffect(event) {
-  if (!layeredGlassPointerEffectsEnabled() || event.pointerType === "touch") {
-    resetLayeredGlassPointerEffect();
-    return;
-  }
-  const target = event.target instanceof Element
-    ? event.target.closest(LAYERED_GLASS_POINTER_TARGET_SELECTOR)
-    : null;
-  if (!target) {
-    resetLayeredGlassPointerEffect();
-    return;
-  }
-  pendingLayeredGlassPointer = {
-    target,
-    clientX: event.clientX,
-    clientY: event.clientY,
-  };
-  if (!layeredGlassPointerFrame) {
-    layeredGlassPointerFrame = requestAnimationFrame(flushLayeredGlassPointerEffect);
-  }
-}
-
-function resetGlassInteractiveEffects(immediate = false) {
-  resetLayeredGlassPointerEffect(immediate);
-}
-
-function scheduleGlassInteractiveEffect(event) {
-  if (document.body.dataset.uiSkin === "layered-glass") {
-    scheduleLayeredGlassPointerEffect(event);
-    return;
-  }
-  resetLayeredGlassPointerEffect(true);
-}
-
-function handleDocumentPointerMove(event) {
-  syncAppTooltipVisibility(event);
-  scheduleGlassInteractiveEffect(event);
 }
 
 function mobileShellMode() {
@@ -18031,7 +17881,7 @@ document.addEventListener("pointerout", (event) => {
     hideAppTooltip();
   }
 });
-document.addEventListener("pointermove", handleDocumentPointerMove, { passive: true });
+document.addEventListener("pointermove", syncAppTooltipVisibility, { passive: true });
 document.addEventListener("pointerdown", () => {
   document.body.dataset.inputModality = "pointer";
 }, { capture: true, passive: true });
@@ -18039,18 +17889,10 @@ document.addEventListener("keydown", () => {
   delete document.body.dataset.inputModality;
 }, { capture: true });
 document.addEventListener("pointercancel", hideAppTooltip);
-document.addEventListener("pointercancel", resetGlassInteractiveEffects);
-document.addEventListener("mouseleave", () => {
-  hideAppTooltip();
-  resetGlassInteractiveEffects();
-});
-window.addEventListener("blur", () => {
-  hideAppTooltip();
-  resetGlassInteractiveEffects(true);
-});
+document.addEventListener("mouseleave", hideAppTooltip);
+window.addEventListener("blur", hideAppTooltip);
 window.addEventListener("resize", () => {
   hideAppTooltip();
-  resetGlassInteractiveEffects(true);
   setSkinPickerOpen(false);
 });
 window.addEventListener("scroll", hideAppTooltip, { passive: true });
@@ -18062,17 +17904,13 @@ document.addEventListener("scroll", (event) => {
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     hideAppTooltip();
-    resetGlassInteractiveEffects(true);
     setSkinPickerOpen(false);
   }
 });
 [
-  glassFinePointerMediaQuery,
-  glassReducedMotionMediaQuery,
   glassReducedTransparencyMediaQuery,
   glassForcedColorsMediaQuery,
 ].forEach((mediaQuery) => mediaQuery.addEventListener("change", () => {
-  resetGlassInteractiveEffects(true);
   liquidGlassOpticalEngine?.setEnabled(currentSkin === "liquid-glass");
 }));
 // Runs after element handlers, so they can compare against the previous position.

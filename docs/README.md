@@ -21,7 +21,7 @@
 | [Lightweight Corpus Plan](CORPUS_LIGHTWEIGHT_PLAN.md) | 阶段 C 第 1、2 阶段已完成（2026-11-08），第 3、4 阶段未实施 | 语料库缩成一句一条的轻量结构：SQL 模型、释义连接、Gloss 格式、ExPex 复制、界面、JSON 导入与验收。 |
 | [Style Skin Plan](STYLE_SKIN_PLAN.md) | S0、控件材质职责收尾、控件对照页与开关控件已完成 / 视觉定稿待实施 | 样式 token、材质角色、视觉基线与通用皮肤边界；控件颜色语义、焦点与开关控件契约；普通控件材质职责收尾、控件对照页与视觉定稿的分批计划。 |
 | [Entry Editor Unboxing Plan](ENTRY_EDITOR_UNBOXING_PLAN.md) | U1–U3 已完成（2026-10-09～10）/ U4 待 tint 定稿，U5 搁置 | 完整编辑与局部编辑去框化：沿用详情分区分隔接口、框预算、字段与操作栏皮肤 token、分阶段实施与验收。 |
-| [Layered Glass Skin Specification](LAYERED_GLASS_SKIN_SPEC.md) | LG-1–LG-4C 已完成 | 层叠玻璃皮肤的层级、透明度、静态与指针响应光学层、运行期选择、降级与性能验收。 |
+| [Layered Glass Skin Specification](LAYERED_GLASS_SKIN_SPEC.md) | 现行 Fluent 皮肤规范 | 层叠玻璃的云母色、分层卡片、选中标记、临时亚克力和辅助模式。 |
 | [Liquid Glass Skin Specification](LIQUID_GLASS_SKIN_SPEC.md) | LQ-1–LQ-6 已完成 / LQ-7 待实施 | 液态玻璃的材质角色、生产光学引擎、正式表面覆盖、降级和性能边界；LQ-7 性能上限分析与待实测优化候选，Lab 整理方向，tint 与玻璃感的待验证方向。 |
 | [Liquid Glass Web Research](archive/LIQUID_GLASS_RESEARCH.md) | 历史归档，非现行规范 | Apple 公开设计边界、开源实现/许可、早期三条 Lab 基线的对照结论；SDF 与 Reference 已于 2026-10-01 放弃并删除。 |
 | [Handoff History](archive/HANDOFF_HISTORY.md) | 历史归档，非现行规范 | 2026-09-30 精简前的交接文档，含阶段 B 实施流水与当时的接手清单。 |

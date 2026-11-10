@@ -1695,8 +1695,7 @@ label span {
   outline-offset: 2px;
 }
 
-/* Navigation surfaces differ from the page (dark in Classic and Layered Glass),
-   so each skin picks the ring's accent for that surface, and destination rows draw
+/* Each skin picks a ring color for its navigation surface. Destination rows draw
    it inside the scrolling column that would clip an outer ring. */
 .dictionary-panel :focus-visible {
   outline-color: var(--material-navigation-focus);

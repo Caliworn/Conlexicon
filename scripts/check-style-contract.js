@@ -653,8 +653,8 @@ assert.equal(
 );
 assert.equal(
   layeredLightTokenValues.get("--material-navigation-control-pressed-transform"),
-  "scale(0.985)",
-  "Layered Glass navigation controls must retain their scale press feedback",
+  "none",
+  "Layered Glass navigation press feedback must leave the row geometry stable",
 );
 assert.equal(
   liquidLightTokenValues.get("--material-navigation-control-pressed-transform"),
@@ -1006,16 +1006,8 @@ assert.deepEqual(
   "Repeated surfaces must not receive Liquid Glass SVG refraction",
 );
 assert(
-  /@supports not \(\(backdrop-filter: blur\(1px\)\) or \(-webkit-backdrop-filter: blur\(1px\)\)\)/.test(layeredGlass),
-  "Layered Glass must provide a no-backdrop-filter fallback",
-);
-assert(
-  /@media \(prefers-reduced-transparency: reduce\)/.test(layeredGlass),
-  "Layered Glass must provide a reduced-transparency fallback",
-);
-assert(
-  /@media \(forced-colors: active\)/.test(layeredGlass),
-  "Layered Glass must provide a forced-colors fallback",
+  /@supports \(\(backdrop-filter: blur\(1px\)\) or \(-webkit-backdrop-filter: blur\(1px\)\)\) \{\s*@media \(not \(prefers-reduced-transparency: reduce\)\) and \(not \(forced-colors: active\)\)/.test(layeredGlass),
+  "Layered Glass Acrylic must opt in only when blur is available and transparency is allowed",
 );
 const layeredGlassStyleBlocks = [...layeredGlass.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
   .map((match) => ({ selector: match[1].trim(), declarations: match[2] }));
@@ -1073,28 +1065,10 @@ for (const [backgroundToken, filterToken] of [
   }
 }
 assert(
-  /body\[data-ui-skin="layered-glass"\] :where\(#entryForm\) \{[\s\S]*?border-color:\s*var\(--material-entry-detail-border\);[\s\S]*?background:\s*var\(--material-entry-detail-background\);[\s\S]*?box-shadow:\s*var\(--material-entry-detail-shadow\);[\s\S]*?backdrop-filter:\s*var\(--material-entry-detail-filter\);/.test(layeredGlass)
-    && /@media \(max-width: 799\.98px\) \{[\s\S]*?body\[data-ui-skin="layered-glass"\] :where\(#entryForm\) \{[\s\S]*?background:\s*var\(--material-entry-detail-mobile-background\);[\s\S]*?backdrop-filter:\s*var\(--material-entry-detail-mobile-filter\);/.test(layeredGlass),
-  "Layered Glass must treat the mutually exclusive primary entry form as the focused entry workspace shell",
+  scopedBlock(layeredGlass, 'body[data-ui-skin="layered-glass"] [data-surface="content-shell"]')[1]
+    .includes("background: var(--material-content-shell-background);"),
+  "Layered Glass detail, primary editor and tool cards must share the solid content shell",
 );
-const layeredGlassToastValues = [...layeredGlass.matchAll(/--material-toast-background:\s*([^;]+);/g)]
-  .map((match) => match[1]);
-assert(
-  layeredGlassToastValues.length >= 2
-    && layeredGlassToastValues.every((value) => !/gradient\(|rgba?\([^)]*,\s*0(?:\.\d+)?\s*\)/i.test(value)),
-  "Layered Glass toast must remain solid in light and dark themes",
-);
-const pointerLightingRule = layeredGlass.match(
-  /body\[data-ui-skin="layered-glass"\] :where\([^)]*\)\[data-layered-glass-pointer\] \{([\s\S]*?)\n\}/,
-);
-assert(pointerLightingRule, "LG-4C must declare a bounded pointer-lighting rule");
-assert(
-  /radial-gradient\(/i.test(pointerLightingRule[1])
-    && !/radial-gradient\(/i.test(layeredGlass.replace(pointerLightingRule[0], "")),
-  "Radial gradients may only serve the bounded LG-4C pointer response",
-);
-const pointerTargetContract = app.match(/const LAYERED_GLASS_POINTER_TARGET_SELECTOR = \[([\s\S]*?)\]\.join\(", "\);/);
-assert(pointerTargetContract, "LG-4C must declare an explicit pointer-responsive surface allowlist");
 assert(
   index.includes('aria-controls="skinPickerMenu"')
     && index.includes('id="skinPickerMenu" role="menu"'),
@@ -1121,61 +1095,6 @@ assert(
   numericLayer("--layer-drawer") < numericLayer("--layer-floating-menu")
     && numericLayer("--layer-floating-menu") < numericLayer("--layer-network-overlay"),
   "Top-level floating menus must render above mobile drawers and below full overlays",
-);
-for (const requiredTarget of [
-  "entry-search-config-menu",
-  "entry-filter-menu",
-  "source-suggestions",
-  "entry-context-menu",
-  "skin-picker-menu",
-  "modal-panel",
-  "network-panel",
-]) {
-  assert(
-    pointerTargetContract[1].includes(requiredTarget),
-    `LG-4C pointer allowlist must include ${requiredTarget}`,
-  );
-  assert(
-    pointerLightingRule[0].includes(`.${requiredTarget}`),
-    `LG-4C pointer styling must include ${requiredTarget}`,
-  );
-}
-assert(
-  !pointerTargetContract[1].includes("dictionary-panel"),
-  "LG-4C pointer response must remain limited to popup surfaces",
-);
-for (const forbiddenTarget of [
-  "entry-card",
-  "entry-display",
-  "entryForm",
-  "toast",
-  "analysis-card",
-  "table-row",
-  "network-node",
-]) {
-  assert(
-    !pointerTargetContract[1].includes(forbiddenTarget)
-      && !pointerLightingRule[0].includes(forbiddenTarget),
-    `LG-4C pointer response must remain off non-popup surface: ${forbiddenTarget}`,
-  );
-}
-assert(
-  !/data-layered-glass-pointer="active"[^}]*background-position/s.test(layeredGlass)
-    && /--layered-glass-pointer-surface/.test(layeredGlass)
-    && /--layered-glass-point-alpha/.test(layeredGlass)
-    && /--layered-glass-edge-alpha/.test(layeredGlass),
-  "LG-4C.1 must layer bounded point and edge lighting over a fixed base material",
-);
-for (const edge of ["top", "right", "bottom", "left"]) {
-  assert(app.includes(`--layered-glass-edge-${edge}`), `LG-4C.1 must calculate ${edge} edge proximity`);
-}
-assert(
-  (app.match(/document\.addEventListener\("pointermove",[^\n]+\{ passive: true \}\);/g) || []).length === 1
-    && app.includes('(hover: hover) and (pointer: fine)')
-    && app.includes('(prefers-reduced-motion: reduce)')
-    && app.includes('(prefers-reduced-transparency: reduce)')
-    && app.includes('(forced-colors: active)'),
-  "Interactive glass effects must share one passive pointer listener and honor assisted-mode guards",
 );
 assert(
   styles.includes("box-shadow: var(--material-navigation-control-hover-shadow);"),
@@ -1304,34 +1223,17 @@ assert(
   "Theme glyph motion must be suppressed during boot and when reduced motion is requested",
 );
 
-const layeredGlassTokenValues = (tokenName) => [
-  ...layeredGlass.matchAll(new RegExp(`${tokenName}\\s*:\\s*([^;]+);`, "g")),
-].map((match) => match[1]);
-for (const tokenName of [
-  "--material-floating-background",
-  "--material-mobile-bar-background",
-  "--material-navigation-background",
-  "--material-navigation-drawer-background",
-  "--material-overlay-panel-background",
-]) {
-  const themeValues = layeredGlassTokenValues(tokenName).slice(0, 2);
-  assert.equal(themeValues.length, 2, `${tokenName} must define light and dark Layered Glass values`);
-  assert(
-    themeValues.every((value) => !/gradient\(/.test(value)),
-    `${tokenName} must remain free of fixed optical gradients`,
-  );
-}
-for (const tokenName of [
-  "--material-panel-background",
-  "--material-list-item-background",
-  "--material-browser-background",
-]) {
-  const themeValues = layeredGlassTokenValues(tokenName).slice(0, 2);
-  assert.equal(themeValues.length, 2, `${tokenName} must define light and dark Layered Glass values`);
-  assert(
-    themeValues.every((value) => !/gradient\(/.test(value)),
-    `${tokenName} must remain a stable content surface without optical gradients`,
-  );
+const layeredGlassDarkTokens = new Map([
+  ...layeredLightTokenValues,
+  ...customPropertyMap(scopedBlock(layeredGlass, 'body.dark-theme[data-ui-skin="layered-glass"]')[1]),
+]);
+for (const tokens of [layeredLightTokenValues, layeredGlassDarkTokens]) {
+  for (const [name, value] of tokens) {
+    if (name.startsWith("--material-") && name.endsWith("-filter")) {
+      assert(value === "none" || /^var\(--material-[-a-z]+-filter\)$/.test(value),
+        `Layered Glass must keep ${name} unfiltered by default and apply blur only to the eligible popover`);
+    }
+  }
 }
 
 const componentTokenDefinitions = [...styles.matchAll(new RegExp(`(${skinTokenPattern.source})\\s*:`, "g"))]
