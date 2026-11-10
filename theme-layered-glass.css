@@ -8,7 +8,7 @@ body[data-ui-skin="layered-glass"] {
   --radius-floating: 8px;
   --radius-pill: 999px;
 
-  --ui-canvas-bg: #eef1f3;
+  --ui-canvas-bg: #e2e8ee;
   --ui-text: #172126;
   --ui-text-muted: #4d5a61;
   --ui-text-on-solid: #ffffff;
@@ -29,7 +29,7 @@ body[data-ui-skin="layered-glass"] {
   --ui-field-focus: var(--ui-accent);
   --ui-field-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ui-field-focus) 22%, transparent);
 
-  --material-panel-background: #f7f9fa;
+  --material-panel-background: #f0f3f6;
   --material-panel-border: var(--ui-border);
   --material-panel-shadow: none;
   --material-panel-soft-shadow: none;
@@ -42,13 +42,13 @@ body[data-ui-skin="layered-glass"] {
   --material-content-shell-background: var(--material-panel-background);
   --material-entry-detail-mobile-background: var(--material-entry-detail-background);
   --material-content-shell-border: var(--ui-border);
-  --material-content-shell-shadow: none;
+  --material-content-shell-shadow: 0 2px 6px rgb(26 38 49 / 10%);
   --material-content-shell-filter: none;
   --material-entry-detail-mobile-filter: var(--material-entry-detail-filter);
-  --material-entry-detail-section-background: #fcfcfd;
+  --material-entry-detail-section-background: #ffffff;
   --material-entry-detail-section-border: var(--ui-border);
   --material-entry-detail-header-divider: var(--ui-border);
-  --material-entry-detail-section-gap: 4px;
+  --material-entry-detail-section-gap: 8px;
   --material-entry-detail-section-padding: 14px;
   --material-entry-detail-section-bleed: 0px;
   --material-entry-detail-section-surface: var(--material-entry-detail-section-background);
@@ -140,7 +140,7 @@ body.dark-theme .skin-picker-preview-layered-glass,
 body.dark-theme[data-ui-skin="layered-glass"] {
   color-scheme: dark;
 
-  --ui-canvas-bg: #1f2224;
+  --ui-canvas-bg: #191d22;
   --ui-text: #edf2f4;
   --ui-text-muted: #b5bfc4;
   --ui-text-on-solid: #131b1d;
@@ -161,8 +161,9 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --ui-field-focus: var(--ui-accent-hover);
   --ui-field-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ui-field-focus) 26%, transparent);
 
-  --material-panel-background: #272a2c;
-  --material-entry-detail-section-background: #313436;
+  --material-panel-background: #252a30;
+  --material-content-shell-shadow: 0 2px 6px rgb(0 0 0 / 26%);
+  --material-entry-detail-section-background: #30373f;
   --material-control-background: #333739;
   --material-control-border: #899196;
   --material-floating-shadow: 0 0 2px rgb(0 0 0 / 24%), 0 4px 8px rgb(0 0 0 / 28%);
@@ -368,6 +369,7 @@ body[data-ui-skin="layered-glass"] .toast {
     --ui-accent-hover: Highlight;
     --ui-accent-soft: Canvas;
     --material-panel-background: Canvas;
+    --material-content-shell-shadow: none;
     --material-entry-detail-section-background: Canvas;
     --material-entry-detail-section-hover-surface: Canvas;
     --material-entry-detail-section-hover-outline: Highlight;

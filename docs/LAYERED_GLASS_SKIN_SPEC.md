@@ -12,15 +12,15 @@
 
 | 表面 | 浅色 | 暗色 | 规则 |
 | --- | --- | --- | --- |
-| 画布、工具导航、移动顶栏和词条抽屉 | `#eef1f3` | `#1f2224` | 实色云母。工具导航靠细边分隔，移动导航抽屉另有遮罩和投影。 |
-| 面板与内容外壳 | `#f7f9fa` | `#272a2c` | 不透明，1px 细边，外壳圆角 8px。词条查看、完整编辑与标有 `data-surface="content-shell"` 的工具卡片共用外壳材质。 |
-| 详情分区、词条卡片、内嵌底色 | `#fcfcfd` | `#313436` | 稳定的实色卡片。详情分区与词条卡片圆角 4px，详情分区间距 4px。 |
+| 画布、工具导航、移动顶栏和词条抽屉 | `#e2e8ee` | `#191d22` | 实色云母，比内容外壳暗一档。工具导航靠细边分隔，移动导航抽屉另有遮罩和投影。 |
+| 面板与内容外壳 | `#f0f3f6` | `#252a30` | 实色底与 1px 细边。词条查看、完整编辑与标有 `data-surface="content-shell"` 的工具卡片共用 8px 圆角和轻投影。 |
+| 详情分区、词条卡片、内嵌底色 | `#ffffff` | `#30373f` | 比外壳更亮的实色。详情分区与词条卡片使用 4px 圆角和细边，详情分区间距 8px。 |
 | 普通控件 | `#ffffff` | `#333739` | 普通和移动控件圆角 4px，字段使用清晰描边，独立按钮的底边比顶边深。 |
 | 小型菜单、来源建议、结构化 tooltip | 约 86% 不透明 | 约 91% 不透明 | 一层 `blur(30px)`、细边、8px 圆角与轻投影。 |
 | 应用内弹窗、词汇网络 | 约 94% 不透明 | 约 94% 不透明 | 一层 `blur(30px)`，下层由独立暗幕压暗。 |
 | 普通 tooltip、toast、质量提示与列表导航条标记 | 实色 | 实色 | 保持高对比，质量提示和导航条标记可以与其他浮层同时出现。 |
 
-浅色与暗色的云母色、亚克力模糊和不透明度是适配词典界面的 Web 参数。材质分工参考 Windows 的 Mica、Acrylic 和 Smoke。圆角沿用 Windows 11 的 4px 控件、8px 容器取值，详情间距采用 Fluent 2 的 4px 间距。 [Windows 材质](https://learn.microsoft.com/en-us/windows/apps/design/signature-experiences/materials) · [Windows 11 圆角](https://learn.microsoft.com/en-us/windows/apps/design/signature-experiences/geometry) · [Fluent 2 布局](https://fluent2.microsoft.design/layout)
+浅色与暗色的云母色、亚克力模糊和不透明度是适配词典界面的 Web 参数。材质分工参考 Windows 的 Mica、Acrylic 和 Smoke。圆角沿用 Windows 11 的 4px 控件、8px 容器取值，详情分区采用 Fluent 2 的 8px 间距。 [Windows 材质](https://learn.microsoft.com/en-us/windows/apps/design/signature-experiences/materials) · [Windows 11 圆角](https://learn.microsoft.com/en-us/windows/apps/design/signature-experiences/geometry) · [Fluent 2 布局](https://fluent2.microsoft.design/layout)
 
 亚克力以实色表面为基础，在浏览器支持 backdrop blur 且允许透明材质时增强。打开多层弹窗时，按现有覆盖顺序只给最上层模糊。弹窗优先于菜单，菜单优先于当前输入框的来源建议，独立的结构化 tooltip 在其余浮层都关闭时使用亚克力。这个层级把常驻 backdrop blur 控制为零，临时 backdrop blur 控制为最多一层。遮罩用背景色淡入，保留背后内容供浮层采样。
 
