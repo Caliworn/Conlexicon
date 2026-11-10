@@ -1,0 +1,555 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>层叠玻璃材质检视</title>
+  <link rel="stylesheet" href="theme-classic.css">
+  <link rel="stylesheet" href="theme-layered-glass.css">
+  <link rel="stylesheet" href="theme-liquid-glass.css">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+
+    .inspector {
+      width: min(1560px, 100%);
+      margin-inline: auto;
+      padding: 18px clamp(12px, 2.5vw, 30px) 24px;
+    }
+    .inspector h1 {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+    .inspector-intro {
+      margin: 5px 0 16px;
+      color: var(--ui-text-muted);
+      font-size: 0.875rem;
+    }
+    .inspector-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      gap: 10px;
+      margin-block-end: 12px;
+    }
+    .inspector-toolbar label {
+      display: grid;
+      gap: 3px;
+      color: var(--ui-text-muted);
+      font-size: 0.8rem;
+    }
+    .inspector-toolbar select {
+      width: auto;
+      min-width: 108px;
+      max-width: 100%;
+    }
+    .inspector-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(388px, 34%);
+      gap: 12px;
+      align-items: start;
+    }
+    .inspector-stage {
+      position: relative;
+      isolation: isolate;
+      height: clamp(560px, 75dvh, 860px);
+      overflow: hidden;
+      border: 1px solid var(--ui-border);
+      border-radius: 8px;
+      background: var(--ui-canvas-bg);
+    }
+    .inspector-stage > img,
+    .inspector-scrim {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    .inspector-stage > img {
+      object-fit: cover;
+    }
+    .inspector-scrim {
+      z-index: 1;
+      background: black;
+      opacity: 0;
+    }
+    .inspector-mover {
+      position: absolute;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 5px;
+      max-height: calc(100% - 24px);
+    }
+    #inspector-small-frame { width: min(340px, calc(100% - 24px)); }
+    #inspector-large-frame { width: min(560px, calc(100% - 24px)); }
+    .inspector-mover > :is(.entry-workspace-menu, .quick-entry-panel) {
+      position: relative;
+      inset: auto;
+      z-index: 2;
+      width: 100%;
+      min-height: 0;
+      max-height: 100%;
+      -webkit-backdrop-filter: var(--material-floating-filter);
+    }
+    .inspector-grip {
+      position: relative;
+      z-index: 4;
+      justify-self: start;
+      min-height: 30px;
+      padding: 4px 10px;
+      border: 1px solid var(--material-tooltip-border);
+      border-radius: var(--radius-control);
+      background: var(--material-tooltip-background);
+      color: var(--material-tooltip-text);
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+    }
+    .inspector-grip:active { cursor: grabbing; }
+    .inspector-mover.is-active > :is(.entry-workspace-menu, .quick-entry-panel) { z-index: 3; }
+    .inspector-mover.is-active > .inspector-grip { z-index: 5; }
+    .inspector-controls {
+      min-width: 0;
+      padding: 12px;
+      border: 1px solid var(--ui-border);
+      border-radius: 8px;
+      background: var(--material-panel-background);
+    }
+    .inspector-settings {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .inspector-settings > section {
+      min-width: 0;
+    }
+    .inspector-settings > section + section {
+      border-inline-start: 1px solid var(--ui-border);
+      padding-inline-start: 12px;
+    }
+    .inspector-settings h2 {
+      margin: 0 0 12px;
+      font-size: 0.95rem;
+    }
+    .inspector-options {
+      display: grid;
+      gap: 12px;
+    }
+    .inspector-toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+    }
+    .inspector-tint,
+    .inspector-range {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 4px 8px;
+      align-items: center;
+      font-size: 0.875rem;
+    }
+    .inspector-tint {
+      grid-template-columns: minmax(0, 1fr) auto auto;
+    }
+    .inspector-tint input {
+      width: 36px;
+      height: 26px;
+      padding: 1px;
+    }
+    .inspector-range output,
+    .inspector-tint output {
+      color: var(--ui-text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+    .inspector-range input {
+      grid-column: 1 / -1;
+      height: 18px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+      backdrop-filter: none;
+      accent-color: var(--ui-accent);
+    }
+    .inspector-overlay-setting {
+      margin-block-start: 13px;
+      padding-block-start: 12px;
+      border-block-start: 1px solid var(--ui-border);
+    }
+    @media (max-width: 1100px) {
+      .inspector-layout { grid-template-columns: 1fr; }
+      .inspector-stage { height: 650px; }
+    }
+    @media (max-width: 540px) {
+      .inspector-stage { height: 840px; }
+      .inspector-tint { grid-template-columns: minmax(0, 1fr) auto; }
+      .inspector-tint input { grid-column: 1 / -1; }
+    }
+  </style>
+</head>
+<body data-ui-skin="layered-glass">
+  <main class="inspector">
+    <h1>层叠玻璃材质检视</h1>
+    <p class="inspector-intro" id="inspector-instructions">拖动小面板和大面板，在两栏中分别调节参数。</p>
+
+    <div class="inspector-toolbar">
+      <label>主题
+        <select id="inspector-theme">
+          <option value="light">浅色</option>
+          <option value="dark">深色</option>
+        </select>
+      </label>
+      <label>背景原图
+        <select id="inspector-image">
+          <option value="assets/liquid-glass-lab/interior.jpg">室内</option>
+          <option value="assets/liquid-glass-lab/diamond-valley-lake-poppies.jpg">湖畔罂粟</option>
+          <option value="assets/liquid-glass-lab/people-in-dry-grass-field.jpg">草地人物</option>
+          <option value="assets/liquid-glass-lab/turquoise-shallow-water-rocks.jpg">碧水岩石</option>
+          <option value="assets/liquid-glass-lab/whangarei-falls-footbridge.jpg">瀑布步桥</option>
+        </select>
+      </label>
+      <label>配方
+        <select id="inspector-preset">
+          <option value="base">基础试值</option>
+          <option value="original">原配方</option>
+          <option value="color">基础 + 调色</option>
+          <option value="noise">基础 + 静态细噪点</option>
+          <option value="detail">浅色轮廓试值</option>
+          <option value="custom" disabled>自定</option>
+        </select>
+      </label>
+      <button type="button" class="secondary-button" data-control-tone="neutral" id="inspector-reset-position">重置位置</button>
+    </div>
+
+    <div class="inspector-layout">
+      <div class="inspector-stage" id="inspector-stage" aria-label="可拖动面板的照片背景">
+        <img id="inspector-backdrop" src="assets/liquid-glass-lab/interior.jpg" alt="">
+        <div class="inspector-scrim" id="inspector-scrim" aria-hidden="true"></div>
+        <div class="inspector-mover" id="inspector-small-frame">
+          <button type="button" class="inspector-grip" id="inspector-small-grip">拖动小面板</button>
+        <div class="entry-filter-menu entry-workspace-menu" id="entryFilterMenu" role="dialog" data-i18n-aria-label="filterEntries" aria-label="筛选词条">
+      <div class="entry-filter-field">
+        <span id="partFilterHeading" data-i18n="activeFilterPartOfSpeech">词性</span>
+        <div class="entry-filter-part-chips" id="partFilterChips" role="radiogroup" aria-labelledby="partFilterHeading"><button type="button" class="entry-filter-part-chip" role="radio" data-part-value="" aria-checked="true" tabindex="0">不限</button><button type="button" class="entry-filter-part-chip" role="radio" data-part-value="__conlexicon_no_part__" aria-checked="false" tabindex="-1">无词性</button><button type="button" class="entry-filter-part-chip" role="radio" data-part-value="n" data-app-tooltip="always" data-app-tooltip-wrap="true" data-app-tooltip-variant="tag-info" data-app-tooltip-label="n" data-app-tooltip-html="&lt;span class=&quot;app-tooltip-tag-info&quot;&gt;
+    &lt;span class=&quot;tag-tooltip-row&quot;&gt;
+      &lt;span class=&quot;tag-tooltip-label&quot;&gt;原始标签&lt;/span&gt;
+      &lt;span class=&quot;chip part-chip&quot;&gt;n&lt;/span&gt;
+    &lt;/span&gt;
+  &lt;/span&gt;" aria-checked="false" tabindex="-1">n</button><button type="button" class="entry-filter-part-chip" role="radio" data-part-value="v" data-app-tooltip="always" data-app-tooltip-wrap="true" data-app-tooltip-variant="tag-info" data-app-tooltip-label="v" data-app-tooltip-html="&lt;span class=&quot;app-tooltip-tag-info&quot;&gt;
+    &lt;span class=&quot;tag-tooltip-row&quot;&gt;
+      &lt;span class=&quot;tag-tooltip-label&quot;&gt;原始标签&lt;/span&gt;
+      &lt;span class=&quot;chip part-chip&quot;&gt;v&lt;/span&gt;
+    &lt;/span&gt;
+  &lt;/span&gt;" aria-checked="false" tabindex="-1">v</button><button type="button" class="entry-filter-part-chip" role="radio" data-part-value="adj" data-app-tooltip="always" data-app-tooltip-wrap="true" data-app-tooltip-variant="tag-info" data-app-tooltip-label="adj" data-app-tooltip-html="&lt;span class=&quot;app-tooltip-tag-info&quot;&gt;
+    &lt;span class=&quot;tag-tooltip-row&quot;&gt;
+      &lt;span class=&quot;tag-tooltip-label&quot;&gt;原始标签&lt;/span&gt;
+      &lt;span class=&quot;chip part-chip&quot;&gt;adj&lt;/span&gt;
+    &lt;/span&gt;
+  &lt;/span&gt;" aria-checked="false" tabindex="-1">adj</button></div>
+        <select id="partFilter" data-i18n-aria-label="partFilterLabel" aria-label="词性条件" hidden=""><option value="">不限</option><option value="__conlexicon_no_part__">无词性</option><option value="n">n</option><option value="v">v</option><option value="adj">adj</option></select>
+      </div>
+      <div class="entry-filter-menu-actions">
+        <button class="secondary-button" id="entryFilterResetButton" data-control-tone="neutral" type="button" data-i18n="resetFilter">重置</button>
+        <span></span>
+        <button class="secondary-button" id="entryFilterCancelButton" data-control-tone="neutral" type="button" data-i18n="cancel">取消</button>
+        <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="entryFilterApplyButton" type="button" data-i18n="applyFilter">应用</button>
+      </div>
+    </div>
+        </div>
+        <div class="inspector-mover" id="inspector-large-frame">
+          <button type="button" class="inspector-grip" id="inspector-large-grip">拖动大面板</button>
+        <article class="modal-panel quick-entry-panel" id="quickEntryPanel" role="dialog" aria-labelledby="quickEntryTitle">
+        <div class="modal-header">
+          <h2 id="quickEntryTitle" data-i18n="quickEntryTitle">快速录入</h2>
+          <button class="secondary-button" id="closeQuickEntryButton" data-control-tone="neutral" type="button" data-i18n="close">关闭</button>
+        </div>
+        <ul class="quick-entry-log" id="quickEntryLog" aria-live="polite" hidden=""></ul>
+        <div class="quick-entry-fields" id="quickEntryFields"><label class="quick-entry-row"><span class="quick-entry-label">词形</span><textarea class="ipa-single-line quick-entry-input" rows="1" data-quick-entry-index="0" autocomplete="off" spellcheck="false" maxlength="80" aria-required="true" placeholder="必填">atala</textarea><span class="quick-entry-hint" aria-hidden="true"></span></label><label class="quick-entry-row is-current"><span class="quick-entry-label">发音</span><textarea class="ipa-single-line quick-entry-input" rows="1" data-quick-entry-index="1" autocomplete="off" spellcheck="false" maxlength="120">/ˈta.la/</textarea><span class="quick-entry-hint" aria-hidden="true"></span></label><label class="quick-entry-row"><span class="quick-entry-label">标签</span><textarea class="ipa-single-line quick-entry-input" rows="1" data-quick-entry-index="2" autocomplete="off" spellcheck="false" maxlength="180"></textarea><span class="quick-entry-hint" aria-hidden="true"></span></label><label class="quick-entry-row"><span class="quick-entry-label">释义 1</span><textarea class="ipa-single-line quick-entry-input" rows="1" data-quick-entry-index="3" autocomplete="off" spellcheck="false"></textarea><span class="quick-entry-hint" aria-hidden="true"></span></label></div>
+        <p class="quick-entry-message" id="quickEntryMessage" role="status"></p>
+        <div class="quick-entry-footer">
+          <label class="switch-label">
+            <input id="quickEntryDefinitionTagsInput" class="switch" type="checkbox" role="switch" aria-keyshortcuts="Control+/ Meta+/">
+            <span data-i18n="definitionTags">释义标签</span>
+            <kbd class="quick-entry-shortcut">Ctrl /</kbd>
+          </label>
+          <p class="quick-entry-keys">
+            <span><kbd>Enter</kbd> <span data-i18n="quickEntryKeyNext">下一项</span></span>
+            <span><kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="quickEntryKeyMove">切换</span></span>
+            <span><kbd>Tab</kbd> <span data-i18n="quickEntryKeySuggest">填入建议</span></span>
+          </p>
+          <div class="quick-entry-actions">
+            <button class="secondary-button" id="quickEntryFullEditButton" data-control-tone="neutral" type="button" aria-keyshortcuts="Control+Shift+Enter Meta+Shift+Enter"><span data-i18n="quickEntryFullEdit">完整编辑</span><kbd class="quick-entry-shortcut">Ctrl Shift Enter</kbd></button>
+            <button class="secondary-button" id="quickEntrySubmitButton" data-control-tone="accent" data-control-emphasis="solid" type="button" aria-keyshortcuts="Control+Enter Meta+Enter"><span data-i18n="quickEntrySubmit">提交</span><kbd class="quick-entry-shortcut">Ctrl Enter</kbd></button>
+          </div>
+        </div>
+      </article>
+        </div>
+      </div>
+
+      <aside class="inspector-controls" aria-label="材质参数">
+        <div class="inspector-settings">
+          <section data-panel-settings="small" aria-labelledby="inspector-small-settings-title">
+            <h2 id="inspector-small-settings-title">小面板</h2>
+            <div class="inspector-options"></div>
+          </section>
+          <section data-panel-settings="large" aria-labelledby="inspector-large-settings-title">
+            <h2 id="inspector-large-settings-title">大面板</h2>
+            <div class="inspector-options"></div>
+          </section>
+        </div>
+        <template id="inspector-material-controls">
+          <label class="inspector-toggle">
+            <input type="checkbox" data-material="acrylic">
+            启用亚克力
+          </label>
+          <label class="inspector-tint">
+            底色 <output></output>
+            <input type="color" data-material="tint" value="#fcfdfd">
+          </label>
+          <label class="inspector-range">
+            底色不透明度 <output></output>
+            <input type="range" data-material="opacity" data-unit="%" min="0" max="100">
+          </label>
+          <label class="inspector-range">
+            背景模糊 <output></output>
+            <input type="range" data-material="blur" data-unit="px" min="0" max="60">
+          </label>
+          <label class="inspector-range">
+            背景亮度 <output></output>
+            <input type="range" data-material="brightness" data-unit="%" min="50" max="150">
+          </label>
+          <label class="inspector-range">
+            背景饱和度 <output></output>
+            <input type="range" data-material="saturation" data-unit="%" min="0" max="200">
+          </label>
+          <label class="inspector-range">
+            静态细噪点 <output></output>
+            <input type="range" data-material="grain" data-unit="/255" min="0" max="24">
+          </label>
+        </template>
+
+        <label class="inspector-range inspector-overlay-setting">
+          场景暗幕 <output id="inspector-scrim-value">0%</output>
+          <input id="inspector-scrim-opacity" type="range" min="0" max="70" value="0">
+        </label>
+      </aside>
+    </div>
+  </main>
+
+  <script>
+    (() => {
+      const stage = document.getElementById("inspector-stage");
+      const panels = {
+        small: document.getElementById("entryFilterMenu"),
+        large: document.getElementById("quickEntryPanel"),
+      };
+      const frames = {
+        small: document.getElementById("inspector-small-frame"),
+        large: document.getElementById("inspector-large-frame"),
+      };
+      const themeInput = document.getElementById("inspector-theme");
+      const presetInput = document.getElementById("inspector-preset");
+      const imageInput = document.getElementById("inspector-image");
+      const backdrop = document.getElementById("inspector-backdrop");
+      const scrim = document.getElementById("inspector-scrim");
+      const scrimInput = document.getElementById("inspector-scrim-opacity");
+      const scrimValue = document.getElementById("inspector-scrim-value");
+      const controls = new Map();
+      const controlsTemplate = document.getElementById("inspector-material-controls");
+      for (const column of document.querySelectorAll("[data-panel-settings]")) {
+        const name = column.dataset.panelSettings;
+        const options = column.querySelector(".inspector-options");
+        options.append(controlsTemplate.content.cloneNode(true));
+        controls.set(name, options.querySelectorAll("[data-material]"));
+        column.addEventListener("focusin", () => bringToFront(name));
+      }
+      const palettes = {
+        light: { tint: "#fcfdfd", solid: "#f0f3f6", opacity: 82, originalOpacity: 86, brightness: 104 },
+        dark: { tint: "#272a2c", solid: "#252a30", opacity: 87, originalOpacity: 91, brightness: 94 },
+      };
+
+      function materials(theme, preset) {
+        const p = palettes[theme];
+        const neutral = { saturation: 100, brightness: 100, grain: 0 };
+        const small = { ...neutral, acrylic: true, tint: p.tint, opacity: p.opacity, blur: 16 };
+        const large = { ...neutral, acrylic: false, tint: p.solid, opacity: 94, blur: 30 };
+
+        switch (preset) {
+          case "original":
+            Object.assign(small, { opacity: p.originalOpacity, blur: 30 });
+            Object.assign(large, { acrylic: true, tint: p.tint });
+            break;
+          case "color":
+            Object.assign(small, { saturation: 80, brightness: p.brightness });
+            break;
+          case "noise":
+            small.grain = 7;
+            break;
+          case "detail":
+            small.blur = theme === "light" ? 10 : 16;
+            break;
+        }
+
+        return { preset, small, large };
+      }
+
+      const settings = { light: materials("light", "base"), dark: materials("dark", "base") };
+      const tiles = new Map();
+      let drag = null;
+
+      function grainTexture(amount) {
+        if (!tiles.has(amount)) {
+          const canvas = document.createElement("canvas");
+          canvas.width = 96;
+          canvas.height = 96;
+          const context = canvas.getContext("2d");
+          const image = context.createImageData(canvas.width, canvas.height);
+          let seed = 20261110;
+          for (let i = 0; i < image.data.length; i += 4) {
+            seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+            image.data.fill(seed >>> 31 ? 255 : 0, i, i + 3);
+            image.data[i + 3] = Math.round(((seed >>> 24) & 7) * amount / 7);
+          }
+          context.putImageData(image, 0, 0);
+          tiles.set(amount, "url(" + canvas.toDataURL("image/png") + ")");
+        }
+        return tiles.get(amount);
+      }
+
+      function paint(name) {
+        const material = settings[themeInput.value][name];
+        const channels = material.tint.slice(1).match(/../g).map(channel => Number.parseInt(channel, 16));
+        const tint = material.acrylic ? "rgb(" + channels.join(" ") + " / " + material.opacity + "%)" : material.tint;
+        const filter = material.acrylic
+          ? "blur(" + material.blur + "px) saturate(" + material.saturation + "%) brightness(" + material.brightness + "%)"
+          : "none";
+        const surface = panels[name].style;
+        surface.setProperty("--material-floating-filter", filter);
+        surface.setProperty(name === "small" ? "--material-floating-background" : "--material-overlay-panel-background", tint);
+        surface.backgroundImage = material.acrylic && material.grain ? grainTexture(material.grain) : "none";
+      }
+
+      function syncControls() {
+        const state = settings[themeInput.value];
+        presetInput.value = state.preset;
+        for (const [name, options] of controls) {
+          const material = state[name];
+          for (const input of options) {
+            const key = input.dataset.material;
+            const value = material[key];
+            if (input.type === "checkbox") {
+              input.checked = value;
+            } else {
+              input.value = value;
+              input.disabled = key !== "tint" && !material.acrylic;
+              input.parentElement.querySelector("output").textContent = value + (input.dataset.unit || "");
+            }
+          }
+        }
+      }
+
+      function bringToFront(name) {
+        for (const [key, frame] of Object.entries(frames)) frame.classList.toggle("is-active", key === name);
+      }
+
+      function place(frame, left, top) {
+        frame.style.left = Math.round(Math.max(0, Math.min(left, stage.clientWidth - frame.offsetWidth))) + "px";
+        frame.style.top = Math.round(Math.max(0, Math.min(top, stage.clientHeight - frame.offsetHeight))) + "px";
+      }
+
+      function resetPositions() {
+        place(frames.small, 22, 24);
+        const left = stage.clientWidth - frames.large.offsetWidth - 22;
+        const sideBySide = left >= frames.small.offsetLeft + frames.small.offsetWidth + 12;
+        const top = sideBySide ? stage.clientHeight * 0.29 : frames.small.offsetTop + frames.small.offsetHeight + 18;
+        place(frames.large, left, top);
+      }
+
+      const deltas = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+      for (const [name, frame] of Object.entries(frames)) {
+        const grip = frame.querySelector(".inspector-grip");
+        frame.addEventListener("pointerdown", event => {
+          if (event.button !== 0 || drag) return;
+          const control = event.target.closest("button, input, textarea, select, a, label, [contenteditable]");
+          if (control && control !== grip) return;
+          bringToFront(name);
+          grip.focus({ preventScroll: true });
+          drag = { id: event.pointerId, frame, x: event.clientX, y: event.clientY, left: frame.offsetLeft, top: frame.offsetTop };
+          event.preventDefault();
+        });
+        grip.addEventListener("keydown", event => {
+          const delta = deltas[event.key];
+          if (!delta) return;
+          const step = event.shiftKey ? 24 : 8;
+          event.preventDefault();
+          bringToFront(name);
+          place(frame, frame.offsetLeft + delta[0] * step, frame.offsetTop + delta[1] * step);
+        });
+      }
+      window.addEventListener("pointermove", event => {
+        if (drag?.id !== event.pointerId) return;
+        if (event.pointerType === "mouse" && event.buttons === 0) {
+          drag = null;
+          return;
+        }
+        place(drag.frame, drag.left + event.clientX - drag.x, drag.top + event.clientY - drag.y);
+      }, { capture: true, passive: true });
+      for (const type of ["pointerup", "pointercancel"]) {
+        window.addEventListener(type, event => {
+          if (drag?.id === event.pointerId) drag = null;
+        }, { capture: true });
+      }
+      window.addEventListener("blur", () => { drag = null; });
+
+      for (const [name, options] of controls) {
+        for (const input of options) {
+          input.addEventListener("input", () => {
+            const state = settings[themeInput.value];
+            state.preset = "custom";
+            state[name][input.dataset.material] = input.type === "checkbox" ? input.checked
+              : input.type === "color" ? input.value : Number(input.value);
+            paint(name);
+            syncControls();
+          });
+        }
+      }
+      themeInput.addEventListener("change", () => {
+        document.body.classList.toggle("dark-theme", themeInput.value === "dark");
+        paint("small");
+        paint("large");
+        syncControls();
+      });
+      presetInput.addEventListener("change", () => {
+        settings[themeInput.value] = materials(themeInput.value, presetInput.value);
+        paint("small");
+        paint("large");
+        syncControls();
+      });
+      imageInput.addEventListener("change", () => {
+        backdrop.src = imageInput.value;
+      });
+      scrimInput.addEventListener("input", () => {
+        scrim.style.opacity = Number(scrimInput.value) / 100;
+        scrimValue.textContent = scrimInput.value + "%";
+      });
+      document.getElementById("inspector-reset-position").addEventListener("click", resetPositions);
+      window.addEventListener("resize", () => {
+        for (const frame of Object.values(frames)) place(frame, frame.offsetLeft, frame.offsetTop);
+      });
+
+      paint("small");
+      paint("large");
+      bringToFront("small");
+      syncControls();
+      resetPositions();
+      document.getElementById("inspector-instructions").textContent =
+        "用拖柄或面板空白处移动。触屏可按住拖柄，键盘可聚焦拖柄后按方向键。";
+      document.fonts.ready.then(resetPositions);
+    })();
+  </script>
+</body>
+</html>

@@ -47,6 +47,8 @@
 
 `lib/static-server.js` 的静态公开清单包含入口页面、应用脚本与样式、HTML 引用的前端模块、液态玻璃贴图 worker 及其通过 `importScripts` 引用的几何模块、Lab 图片和层叠玻璃的静态噪点贴图。`/` 映射到 `index.html`。服务按区分大小写的 URL pathname 精确匹配清单，路径保留原编码。
 
+层叠玻璃的两个外观调试入口为 `/layered-acrylic-inspector.html` 和 `/winui-acrylic-comparison.html`。
+
 `scripts/check-http-access.js` 扫描公开的 HTML、JS 和 CSS，双向核对清单与引用。页面脚本按站点根目录解析路径，worker 按自己的位置解析。除入口页外，清单中的文件都要由公开文件引用。GET 返回文件，HEAD 仅返回头部，类型和长度与 GET 一致。清单中的文件读取失败时照常抛出错误。
 
 LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印本机可用的局域网地址与警告：局域网内任何设备均可读写该数据目录，建议使用临时数据目录。

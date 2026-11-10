@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WinUI 亚克力网页对照</title>
+  <link rel="stylesheet" href="theme-layered-glass.css">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .acrylic-lab { width: min(1560px, 100%); margin: auto; padding: clamp(12px, 2.5vw, 28px); }
+    .acrylic-lab h1, .example h2 { margin: 0; }
+    .acrylic-lab h1 { font-size: 1.45rem; }
+    .description, .metrics, .source-note { color: var(--ui-text-muted); font-size: .875rem; }
+    .description { margin: 6px 0 16px; }
+    .lab-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-bottom: 16px; }
+    .lab-controls label { display: grid; gap: 4px; font-size: .875rem; }
+    .lab-controls select { width: auto; max-width: 100%; }
+    .lab-controls input[type="range"] { width: 156px; accent-color: var(--ui-accent); }
+    .examples { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .example h2 { font-size: 1rem; }
+    .metrics { margin: 4px 0 8px; min-height: 2.6em; }
+    .scene {
+      position: relative;
+      isolation: isolate;
+      height: clamp(430px, 62vh, 640px);
+      overflow: hidden;
+      border: 1px solid var(--ui-border);
+      border-radius: 8px;
+      background: var(--scene-picture) center / cover no-repeat, var(--ui-canvas-bg);
+    }
+    .specimen {
+      position: absolute;
+      display: grid;
+      gap: 5px;
+      width: min(340px, calc(100% - 16px));
+    }
+    .acrylic-lab[data-size="large"] .specimen { width: min(560px, calc(100% - 16px)); }
+    .acrylic-lab[data-size="large"] .scene { min-height: 500px; }
+    .drag-grip {
+      justify-self: start;
+      padding: 4px 8px;
+      border: 1px solid var(--ui-border-strong);
+      border-radius: 4px;
+      background: var(--material-panel-background);
+      color: var(--ui-text);
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+    }
+    .drag-grip:active { cursor: grabbing; }
+    .specimen .glass-surface {
+      position: relative;
+      inset: auto;
+      width: 100%;
+      min-width: 0;
+      margin: 0;
+    }
+    .glass-surface h3 { margin: 0; }
+    .specimen .modal-header h3 { font-size: 1.25rem; }
+    .specimen .quick-entry-row { min-width: 0; }
+    .product .glass-surface {
+      background-color: var(--layered-acrylic-tint);
+      background-image: var(--layered-acrylic-grain);
+      backdrop-filter: blur(15px);
+    }
+    .acrylic-lab[data-size="large"] .product .glass-surface {
+      background-color: var(--layered-overlay-tint);
+      backdrop-filter: blur(20px);
+    }
+    .reference .glass-surface { background-color: var(--reference-fallback); }
+    @supports (backdrop-filter: url("#winui-acrylic")) {
+      .reference .glass-surface {
+        background-color: transparent;
+        backdrop-filter: url("#winui-acrylic");
+      }
+      .reference .glass-surface::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background-image: var(--reference-noise);
+        opacity: .02;
+        pointer-events: none;
+      }
+      .reference .glass-surface > * { position: relative; }
+    }
+    .source-note { margin: 12px 0 0; }
+    @media (max-width: 740px) { .examples { grid-template-columns: minmax(0, 1fr); } }
+  </style>
+</head>
+<body data-ui-skin="layered-glass">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <filter id="winui-acrylic" x="-50%" y="-75%" width="200%" height="250%" color-interpolation-filters="sRGB">
+        <feFlood id="matte" result="matte"></feFlood>
+        <feComposite in="SourceGraphic" in2="matte" operator="over" result="opaque"></feComposite>
+        <feGaussianBlur in="opaque" stdDeviation="30" edgeMode="duplicate" result="blurred"></feGaussianBlur>
+        <feFlood id="luma" result="luma"></feFlood>
+        <feBlend in="luma" in2="blurred" mode="luminosity" result="balanced"></feBlend>
+        <feFlood id="tint" result="tint"></feFlood>
+        <feBlend in="tint" in2="balanced" mode="color"></feBlend>
+      </filter>
+    </defs>
+  </svg>
+  <main class="acrylic-lab" data-size="small">
+    <h1>WinUI 亚克力网页对照</h1>
+    <p class="description">两边使用相同的背景和面板。拖动任一拖柄会同步移动两边，聚焦拖柄后也可用方向键。</p>
+    <div class="lab-controls">
+      <label>主题 <select id="theme"><option value="light">浅色</option><option value="dark">深色</option></select></label>
+      <label>面板 <select id="size"><option value="small">筛选菜单</option><option value="large">快速录入</option></select></label>
+      <label>WinUI 配方 <select id="preset"><option value="default">Default</option><option value="base">Base</option></select></label>
+      <label>背景 <select id="picture">
+        <option value="assets/liquid-glass-lab/turquoise-shallow-water-rocks.jpg">海水和岩石</option>
+        <option value="assets/liquid-glass-lab/interior.jpg">室内</option>
+        <option value="assets/liquid-glass-lab/diamond-valley-lake-poppies.jpg">山坡</option>
+        <option value="swatches">纯色色块</option>
+      </select></label>
+      <label><span>WinUI 亮度层 <output id="luma-value" for="luma-opacity"></output></span>
+        <input id="luma-opacity" type="range" min="0" max="100">
+      </label>
+      <button class="secondary-button" id="reset" data-control-tone="neutral" type="button">复位</button>
+    </div>
+    <div class="examples">
+      <section class="example product">
+        <h2>Conlexicon 当前配方</h2>
+        <p class="metrics" id="product-metrics"></p>
+        <div class="scene"><div class="specimen"><button class="drag-grip" type="button">拖动面板</button><div class="specimen-content" inert></div></div></div>
+      </section>
+      <section class="example reference">
+        <h2>WinUI 应用内画刷（网页近似）</h2>
+        <p class="metrics" id="reference-metrics"></p>
+        <div class="scene"><div class="specimen"><button class="drag-grip" type="button">拖动面板</button><div class="specimen-content" inert></div></div></div>
+      </section>
+    </div>
+    <p class="source-note">右侧是 WinUI 应用内画刷的网页近似，使用 SVG 滤镜、页面照片与本地噪点。<span id="support-note"></span> <a href="https://learn.microsoft.com/en-us/windows/apps/develop/ui/in-app-acrylic">微软原生示例</a> · <a href="https://github.com/microsoft/microsoft-ui-xaml/blob/main/controls/dev/Materials/Acrylic/AcrylicBrush_themeresources.xaml">WinUI 主题资源</a> · <a href="https://github.com/microsoft/microsoft-ui-xaml/blob/main/controls/dev/Materials/Acrylic/AcrylicBrush.cpp">合成源码</a></p>
+  </main>
+  <template id="small">
+    <article class="entry-filter-menu entry-workspace-menu glass-surface">
+      <div class="entry-filter-field">
+        <strong>词性</strong>
+        <div class="entry-filter-part-chips">
+          <button class="entry-filter-part-chip" aria-checked="true">不限</button>
+          <button class="entry-filter-part-chip" aria-checked="false">无词性</button>
+          <button class="entry-filter-part-chip" aria-checked="false">n</button>
+          <button class="entry-filter-part-chip" aria-checked="false">v</button>
+        </div>
+      </div>
+      <div class="entry-filter-menu-actions">
+        <button class="secondary-button" data-control-tone="neutral">重置</button>
+        <span></span>
+        <button class="secondary-button" data-control-tone="neutral">取消</button>
+        <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid">应用</button>
+      </div>
+    </article>
+  </template>
+  <template id="large">
+    <article class="modal-panel quick-entry-panel glass-surface">
+      <header class="modal-header"><h3>快速录入</h3><button class="secondary-button" data-control-tone="neutral">关闭</button></header>
+      <div class="quick-entry-fields">
+        <label class="quick-entry-row"><span class="quick-entry-label">词形</span><textarea class="ipa-single-line quick-entry-input" rows="1">atala</textarea><span class="quick-entry-hint"></span></label>
+        <label class="quick-entry-row"><span class="quick-entry-label">发音</span><textarea class="ipa-single-line quick-entry-input" rows="1" placeholder="可选"></textarea><span class="quick-entry-hint"></span></label>
+        <label class="quick-entry-row"><span class="quick-entry-label">标签</span><textarea class="ipa-single-line quick-entry-input" rows="1" placeholder="可选"></textarea><span class="quick-entry-hint"></span></label>
+        <label class="quick-entry-row"><span class="quick-entry-label">释义 1</span><textarea class="ipa-single-line quick-entry-input" rows="1" placeholder="可选"></textarea><span class="quick-entry-hint"></span></label>
+      </div>
+      <div class="quick-entry-actions">
+        <button class="secondary-button" data-control-tone="neutral">完整编辑</button>
+        <button class="secondary-button" data-control-tone="accent" data-control-emphasis="solid">提交</button>
+      </div>
+    </article>
+  </template>
+  <script>
+    const lab = document.querySelector(".acrylic-lab");
+    const theme = document.querySelector("#theme");
+    const size = document.querySelector("#size");
+    const preset = document.querySelector("#preset");
+    const picture = document.querySelector("#picture");
+    const luma = document.querySelector("#luma-opacity");
+    const specimens = [...document.querySelectorAll(".specimen")];
+    const references = {
+      light: {
+        default: { color: "#fcfcfc", luma: 85, tint: 0, fallback: "#f9f9f9" },
+        base: { color: "#f3f3f3", luma: 90, tint: 0, fallback: "#eeeeee" },
+      },
+      dark: {
+        default: { color: "#2c2c2c", luma: 96, tint: 15, fallback: "#2c2c2c" },
+        base: { color: "#202020", luma: 96, tint: 50, fallback: "#1c1c1c" },
+      },
+    };
+    const center = { x: .5, y: .42 };
+    const position = { ...center };
+    const extent = frame => ({
+      x: Math.max(0, frame.parentElement.clientWidth - frame.offsetWidth),
+      y: Math.max(0, frame.parentElement.clientHeight - frame.offsetHeight),
+    });
+    const clamp = value => Math.min(1, Math.max(0, value));
+    let drag;
+    function place() {
+      for (const frame of specimens) {
+        const space = extent(frame);
+        frame.style.left = position.x * space.x + "px";
+        frame.style.top = position.y * space.y + "px";
+      }
+    }
+    for (const frame of specimens) {
+      const grip = frame.querySelector(".drag-grip");
+      grip.addEventListener("pointerdown", event => {
+        if (event.button !== 0 || drag) return;
+        drag = { id: event.pointerId, frame, x: event.clientX, y: event.clientY, start: { ...position } };
+        grip.focus({ preventScroll: true });
+        event.preventDefault();
+      });
+      grip.addEventListener("keydown", event => {
+        const step = event.shiftKey ? 24 : 8;
+        const delta = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[event.key];
+        if (!delta) return;
+        event.preventDefault();
+        const space = extent(frame);
+        if (space.x) position.x = clamp(position.x + delta[0] / space.x);
+        if (space.y) position.y = clamp(position.y + delta[1] / space.y);
+        place();
+      });
+    }
+    window.addEventListener("pointermove", event => {
+      if (drag?.id !== event.pointerId) return;
+      if (event.pointerType === "mouse" && event.buttons === 0) {
+        drag = undefined;
+        return;
+      }
+      const space = extent(drag.frame);
+      if (space.x) position.x = clamp(drag.start.x + (event.clientX - drag.x) / space.x);
+      if (space.y) position.y = clamp(drag.start.y + (event.clientY - drag.y) / space.y);
+      place();
+    }, { capture: true, passive: true });
+    for (const type of ["pointerup", "pointercancel"]) {
+      window.addEventListener(type, event => {
+        if (drag?.id === event.pointerId) drag = undefined;
+      }, { capture: true });
+    }
+    window.addEventListener("blur", () => { drag = undefined; });
+    function noiseTile() {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 256;
+      const context = canvas.getContext("2d");
+      const pixels = context.createImageData(256, 256);
+      let seed = 20261110;
+      for (let i = 0; i < pixels.data.length; i += 4) {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+        pixels.data.fill(seed >>> 24, i, i + 3);
+        pixels.data[i + 3] = 255;
+      }
+      context.putImageData(pixels, 0, 0);
+      return "url(" + canvas.toDataURL("image/png") + ")";
+    }
+    function updatePicture() {
+      const scene = picture.value === "swatches"
+        ? "linear-gradient(90deg, #243d83 0 25%, #dc7948 25% 50%, #358d72 50% 75%, #f4e8cd 75%)"
+        : 'url("' + picture.value + '")';
+      lab.style.setProperty("--scene-picture", scene);
+    }
+    function updateSize() {
+      lab.dataset.size = size.value;
+      const template = document.getElementById(size.value);
+      for (const frame of specimens) {
+        frame.querySelector(".specimen-content").replaceChildren(template.content.cloneNode(true));
+      }
+      place();
+    }
+    function updatePaint(resetLuma) {
+      document.body.classList.toggle("dark-theme", theme.value === "dark");
+      const reference = references[theme.value][preset.value];
+      if (resetLuma) luma.value = reference.luma;
+      const toAlpha = percent => Math.round(percent * 255 / 100) / 255;
+      document.querySelector("#matte").setAttribute("flood-color", reference.fallback);
+      for (const [id, opacity] of [["luma", Number(luma.value)], ["tint", reference.tint]]) {
+        const flood = document.getElementById(id);
+        flood.setAttribute("flood-color", reference.color);
+        flood.setAttribute("flood-opacity", toAlpha(opacity));
+      }
+      lab.style.setProperty("--reference-fallback", reference.fallback);
+      document.querySelector("#luma-value").textContent = luma.value + "%";
+      document.querySelector("#reference-metrics").textContent =
+        reference.color + " · 亮度 " + luma.value + "% · 染色 " + reference.tint + "% · 模糊 30 · 噪点层 2% · 回退 " + reference.fallback;
+      const large = size.value === "large";
+      const dark = theme.value === "dark";
+      const color = dark ? (large ? "#252a30" : "#272a2c") : (large ? "#f0f3f6" : "#fcfdfd");
+      document.querySelector("#product-metrics").textContent =
+        color + " · 普通底色覆盖 " + (dark ? 80 : 70) + "% · 模糊 " + (large ? 20 : 15) + "px · 噪点峰值 " + (dark ? 4 : 8) + "/255";
+    }
+    for (const control of [theme, preset]) control.addEventListener("change", () => updatePaint(true));
+    size.addEventListener("change", () => { updateSize(); updatePaint(false); });
+    luma.addEventListener("input", () => updatePaint(false));
+    picture.addEventListener("change", updatePicture);
+    document.querySelector("#reset").addEventListener("click", () => {
+      Object.assign(position, center);
+      updatePaint(true);
+      place();
+    });
+    window.addEventListener("resize", place);
+    if (!CSS.supports("backdrop-filter", 'url("#winui-acrylic")')) {
+      document.querySelector("#support-note").textContent = "此浏览器使用实色回退。";
+    }
+    lab.style.setProperty("--reference-noise", noiseTile());
+    updatePicture();
+    updateSize();
+    updatePaint(true);
+    document.fonts.ready.then(place);
+  </script>
+</body>
+</html>
