@@ -1729,7 +1729,8 @@ const elements = {
   rootModeToggleButton: document.querySelector("#rootModeToggleButton"),
   expandAllRootsButton: document.querySelector("#expandAllRootsButton"),
   collapseAllRootsButton: document.querySelector("#collapseAllRootsButton"),
-  activeFilterToolbar: document.querySelector("#activeFilterToolbar"),
+  entryListStatus: document.querySelector("#entryListStatus"),
+  entryListStatusCount: document.querySelector("#entryListStatusCount"),
   activeFilterLabel: document.querySelector("#activeFilterLabel"),
   activeFilterRefreshButton: document.querySelector("#activeFilterRefreshButton"),
   activeFilterCycleButton: document.querySelector("#activeFilterCycleButton"),
@@ -4435,7 +4436,7 @@ function renderPartFilterControls(dictionary, usedParts = null) {
   elements.entryFilterButton.classList.toggle("active", hasCurrentFilter);
   elements.rootModeToggleButton.querySelector("span").textContent = t("rootMode");
   elements.rootModeToggleButton.setAttribute("aria-pressed", String(rootMode));
-  elements.activeFilterToolbar.hidden = !hasCurrentFilter;
+  elements.entryListStatus.toggleAttribute("data-filtered", hasCurrentFilter);
   renderActiveFilterRefreshAvailability();
   elements.activeFilterCycleButton.hidden = !activeFilter || !canCycleActiveFilter();
   const filterTitle = currentFilterDisplayTitle(dictionary);
@@ -4470,12 +4471,55 @@ function renderRootModeControls() {
     elements.rootModeToggleButton.removeAttribute("aria-disabled");
     delete elements.rootModeToggleButton.dataset.appTooltipLabel;
   }
-  elements.expandAllRootsButton.hidden = !rootAvailable;
-  elements.collapseAllRootsButton.hidden = !rootAvailable;
-  elements.expandAllRootsButton.disabled = !rootAvailable || hasRootSearch || !rootGroupsReady
+  // A search expands the matching groups itself, so neither button applies.
+  elements.expandAllRootsButton.hidden = !rootAvailable || hasRootSearch;
+  elements.collapseAllRootsButton.hidden = !rootAvailable || hasRootSearch;
+  elements.expandAllRootsButton.disabled = !rootGroupsReady
     || (rootExpansionMode === "all" && !collapsedRootEntries.size);
-  elements.collapseAllRootsButton.disabled = !rootAvailable || hasRootSearch || !rootGroupsReady
+  elements.collapseAllRootsButton.disabled = !rootGroupsReady
     || (rootExpansionMode === "manual" && !expandedRootEntries.size);
+  renderEntryListStatus();
+}
+
+// The row under the list header: shown while a search, a filter or root mode
+// applies, with the number of results (root groups in root mode).
+function renderEntryListStatus() {
+  const dictionary = activeDictionary();
+  const root = rootMode && !activeFilter;
+  const searching = Boolean(dictionary && normalizeEntrySearchText(searchQuery, dictionary));
+  const shown = Boolean(dictionary) && (root || searching || Boolean(activeFilter));
+  const count = elements.entryListStatusCount;
+  elements.entryListStatus.hidden = !shown;
+  if (!shown) {
+    count.textContent = "";
+    count.dataset.kind = "";
+    return;
+  }
+  const kind = root ? "root" : "entries";
+  const queryState = root ? rootGroupsQueryState : entryQueryState;
+  const current = queryState.status === "success"
+    && queryState.key === (root ? rootGroupsQueryApiKey(dictionary) : entryQueryApiKey(dictionary));
+  if (!current) {
+    // While the next query loads, the previous count of the same kind stays, dimmed.
+    if (queryState.status === "error" || count.dataset.kind !== kind) {
+      count.textContent = "";
+    }
+    count.toggleAttribute("data-stale", Boolean(count.textContent));
+    return;
+  }
+  const total = queryState.pageInfo.total;
+  const number = total.toLocaleString();
+  count.dataset.kind = kind;
+  count.removeAttribute("data-stale");
+  if (root) {
+    count.textContent = searching
+      ? aText(`命中 ${number} 个词根组`, `${number} matching root ${total === 1 ? "group" : "groups"}`)
+      : aText(`${number} 个词根组`, `${number} root ${total === 1 ? "group" : "groups"}`);
+  } else if (activeFilter) {
+    count.textContent = aText(`${number} 条`, `${number} ${total === 1 ? "entry" : "entries"}`);
+  } else {
+    count.textContent = aText(`${number} 条结果`, `${number} ${total === 1 ? "result" : "results"}`);
+  }
 }
 
 function renderActiveFilterRefreshAvailability() {
@@ -5489,6 +5533,11 @@ function setupQualityMasonryLayouts() {
 }
 
 function renderEntries(options = {}) {
+  renderEntryListContent(options);
+  renderEntryListStatus();
+}
+
+function renderEntryListContent(options = {}) {
   const allowQueryStart = options.allowQueryStart !== false;
   const dictionary = activeDictionary();
   if (!dictionary) {
@@ -5671,11 +5720,14 @@ function renderRootModeGroups(groups = [], options = {}) {
     if (expanded) {
       const derivedState = rootGroupDerivedState(dictionary, group.root.id);
       if (derivedState?.status === "success") {
-        derivedState.items.forEach((entry) => rows.push({
+        derivedState.items.forEach((entry, index) => rows.push({
           kind: "derived",
           entry,
           rootId: group.root.id,
           windowPageIndex,
+          windowEstimateScale,
+          first: index === 0,
+          last: index === derivedState.items.length - 1,
         }));
       } else {
         rows.push({
@@ -5683,7 +5735,7 @@ function renderRootModeGroups(groups = [], options = {}) {
           rootId: group.root.id,
           windowPageIndex,
           status: derivedState?.status || "idle",
-          estimatedHeight: Math.max(44, group.derivedCount * 116) * (windowEstimateScale || 1),
+          estimatedHeight: rootDerivedPanelHeight(group.derivedCount) * (windowEstimateScale || 1),
         });
       }
     }
@@ -5697,7 +5749,7 @@ function renderRootModeGroups(groups = [], options = {}) {
           kind: "window-placeholder",
           windowPageIndex: page.index,
           status: page.status,
-          estimatedHeight: Math.max(page.estimatedHeight || 156, 156),
+          estimatedHeight: Math.max(page.estimatedHeight || entryVirtualList.estimatedItemHeight, entryVirtualList.estimatedItemHeight),
         });
       }
     });
@@ -5731,7 +5783,9 @@ function renderRootModeGroups(groups = [], options = {}) {
         ? row.estimatedHeight
       : row.kind === "truncation"
         ? 44
-        : (row.kind === "root" ? 156 : 116) * (row.windowEstimateScale || 1),
+        : (row.kind === "root"
+          ? rootCardRowHeight(row.expanded)
+          : ROOT_DERIVED_ROW_HEIGHT + (row.last ? ROOT_DERIVED_PANEL_END : 0)) * (row.windowEstimateScale || 1),
     getSizeCacheKey: (row) => row.kind === "truncation"
       ? `truncation:root-groups:${currentLanguage}:${row.loaded}:${row.total}`
       : row.kind === "window-placeholder"
@@ -5745,7 +5799,11 @@ function renderRootModeGroups(groups = [], options = {}) {
         derivedCount: row.group.derivedCount,
         settingsSizeSignature,
       })
-      : entryCardSizeCacheKey(row.entry, { role: "derived", rootId: row.rootId, settingsSizeSignature }),
+      : entryCardSizeCacheKey(row.entry, {
+        role: row.last ? "derived-last" : "derived",
+        rootId: row.rootId,
+        settingsSizeSignature,
+      }),
     updateItem: updateRootModeRow,
     renderItem: (row) => row.kind === "window-placeholder"
       ? renderQueryWindowPlaceholder(row)
@@ -5898,17 +5956,33 @@ function rootGroupIsExpanded(group) {
   return expandedRootEntries.has(rootId);
 }
 
-function rootGroupEstimatedHeight(group) {
-  const rootHeight = 156;
-  const derivedHeight = rootGroupIsExpanded(group)
-    ? rootGroupDerivedCount(group) * 116
-    : 0;
-  return rootHeight + derivedHeight;
+// Root mode row heights. A root's card is an ordinary entry card and takes the
+// list's estimate; a derived entry is one fixed-height line (styles.css
+// .derived-entry-row). An expanded root sits 4px above its panel instead of the
+// usual 12px gap, and the panel ends with its border and that 12px gap.
+const ROOT_DERIVED_ROW_HEIGHT = 44;
+const ROOT_DERIVED_PANEL_END = 13;
+const ROOT_EXPANDED_GAP_TRIM = 8;
+
+function rootCardRowHeight(expanded) {
+  return entryVirtualList.estimatedItemHeight - (expanded ? ROOT_EXPANDED_GAP_TRIM : 0);
 }
 
+function rootDerivedPanelHeight(derivedCount) {
+  return (derivedCount * ROOT_DERIVED_ROW_HEIGHT) + ROOT_DERIVED_PANEL_END;
+}
+
+function rootGroupEstimatedHeight(group) {
+  const expanded = rootGroupIsExpanded(group);
+  return rootCardRowHeight(expanded) + (expanded ? rootDerivedPanelHeight(rootGroupDerivedCount(group)) : 0);
+}
+
+// An unloaded window only knows its totals, not how many of its groups have
+// derived entries, so the few pixels each expanded panel adds are left out.
 function rootGroupWindowMetricHeight({ groupCount, derivedCount }) {
   const includeDerived = rootExpansionMode === "all" || rootSearchExpandsGroups();
-  return (groupCount * 156) + (includeDerived ? derivedCount * 116 : 0);
+  return (groupCount * entryVirtualList.estimatedItemHeight)
+    + (includeDerived ? derivedCount * ROOT_DERIVED_ROW_HEIGHT : 0);
 }
 
 function applyRootGroupWindowMetrics(state, pageInfo = null) {
@@ -6232,7 +6306,7 @@ function loadRootGroupsWindowPage(dictionary, page) {
         rootGroupsQueryState,
         page,
         ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE,
-        156,
+        entryVirtualList.estimatedItemHeight,
       );
       applyRootGroupWindowMetrics(rootGroupsQueryState, result.pageInfo);
       const naturalHeight = result.groups.reduce((total, group) => total + rootGroupEstimatedHeight(group), 0);
@@ -6347,7 +6421,7 @@ function startRootGroupsQueryApiCheck(dictionary) {
   const requestId = rootGroupsQueryState.requestId + 1;
   const updateToken = beginStaleContentUpdate("list", entryListHasSettledContent);
   const firstPage = createQueryWindowPage("", 0);
-  firstPage.estimatedHeight = ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE * 156;
+  firstPage.estimatedHeight = ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE * entryVirtualList.estimatedItemHeight;
   rootGroupsQueryState = {
     key,
     status: "loading",
@@ -6721,6 +6795,8 @@ function loadEntryQueryWindowPage(dictionary, page) {
       );
       entryQueryState.status = "success";
       entryQueryState.error = null;
+      // The toolbar render below reads the aggregate page info (the result count).
+      syncEntryQueryWindowState();
       if (page.index === 0) {
         if (activeFilterUsesRemoteQuery()) {
           if (activeFilter.selectFirstOnLoad) {
@@ -6740,7 +6816,6 @@ function loadEntryQueryWindowPage(dictionary, page) {
         entryQueryState.updateToken = 0;
         finishStaleContentUpdate("list", updateToken);
       }
-      syncEntryQueryWindowState();
       renderEntrySearchConfig();
       evictDistantQueryWindowPages(
         entryQueryState.pages,
@@ -6934,7 +7009,9 @@ function updateRootModeRow(wrapper, row) {
   if (row.kind === "derived") {
     if (!wrapper?.classList.contains("virtual-root-derived-row") || wrapper.dataset.rootId !== row.rootId
       || wrapper.firstElementChild?.dataset.entryId !== row.entry.id) return false;
-    reconcileVirtualCard(wrapper.firstElementChild, createEntryCard(row.entry, { derived: true, rootId: row.rootId }));
+    wrapper.classList.toggle("is-first", row.first);
+    wrapper.classList.toggle("is-last", row.last);
+    reconcileVirtualCard(wrapper.firstElementChild, createDerivedEntryRow(row.entry, row.rootId));
     return true;
   }
   if (row.kind !== "root" || !wrapper?.classList.contains("root-entry-group")
@@ -6947,13 +7024,23 @@ function updateRootModeRow(wrapper, row) {
   }
   // Keep the disclosure node and its Q3 resource; the card is replaced only when it changed.
   reconcileVirtualCard(wrapper.firstElementChild, createEntryCard(group.root, { root: true, rootId: group.root.id }));
+  wrapper.classList.toggle("expanded", expanded);
   if (toggle) {
     toggle.disabled = rootSearchExpandsGroups() && rootGroupMatchedDerivedCount(group) > 0;
     toggle.classList.toggle("expanded", expanded);
-    toggle.setAttribute("aria-label", expanded ? t("collapse") : t("expand"));
+    toggle.setAttribute("aria-label", rootToggleLabel(group, expanded));
     toggle.setAttribute("aria-expanded", String(expanded));
+    toggle.querySelector(".root-toggle-count").textContent = group.derivedCount.toLocaleString();
   }
   return true;
+}
+
+function rootToggleLabel(group, expanded) {
+  const count = group.derivedCount.toLocaleString();
+  const noun = group.derivedCount === 1 ? "entry" : "entries";
+  return expanded
+    ? aText(`收起 ${count} 个衍生词`, `Collapse ${count} derived ${noun}`)
+    : aText(`展开 ${count} 个衍生词`, `Expand ${count} derived ${noun}`);
 }
 
 function renderRootModeRow(row) {
@@ -6975,9 +7062,9 @@ function renderRootModeRow(row) {
   }
   if (row.kind === "derived") {
     const wrapper = document.createElement("div");
-    wrapper.className = "root-derived-list virtual-root-derived-row";
+    wrapper.className = `root-derived-list virtual-root-derived-row${row.first ? " is-first" : ""}${row.last ? " is-last" : ""}`;
     wrapper.dataset.rootId = row.rootId;
-    wrapper.append(createEntryCard(row.entry, { derived: true, rootId: row.rootId }));
+    wrapper.append(createDerivedEntryRow(row.entry, row.rootId));
     return wrapper;
   }
   const { group, expanded } = row;
@@ -6985,7 +7072,7 @@ function renderRootModeRow(row) {
     startRootGroupDerivedLoad(activeDictionary(), group.root.id);
   }
   const wrapper = document.createElement("article");
-  wrapper.className = "root-entry-group";
+  wrapper.className = `root-entry-group${expanded ? " expanded" : ""}`;
   wrapper.dataset.rootId = group.root.id;
   wrapper.append(createEntryCard(group.root, { root: true, rootId: group.root.id }));
   if (group.derivedCount) {
@@ -6997,9 +7084,10 @@ function renderRootModeRow(row) {
     toggle.dataset.controlTone = "neutral";
     toggle.dataset.controlDisclosure = "";
     toggle.dataset.appTooltip = "always";
-    toggle.setAttribute("aria-label", expanded ? t("collapse") : t("expand"));
+    toggle.setAttribute("aria-label", rootToggleLabel(group, expanded));
     toggle.setAttribute("aria-expanded", String(expanded));
-    toggle.innerHTML = '<svg class="content-disclosure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>';
+    toggle.innerHTML = '<svg class="content-disclosure-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg><span class="root-toggle-count"></span>';
+    toggle.querySelector(".root-toggle-count").textContent = group.derivedCount.toLocaleString();
     toggle.addEventListener("click", (event) => {
       event.stopPropagation();
       rootNavigationContextId = group.root.id;
@@ -7070,7 +7158,6 @@ function createEntryCard(entry, options = {}) {
     "entry-card",
     entry.id === state.selectedEntryId ? "active" : "",
     options.root ? "root-card" : "",
-    options.derived ? "derived-entry-card" : "",
     compactEntryCard ? "compact-entry-card" : "",
     bodyOnlyEntryCard ? "body-only-entry-card" : "",
   ].filter(Boolean).join(" ");
@@ -7097,8 +7184,51 @@ function createEntryCard(entry, options = {}) {
     </div>
     ${footerHtml ? `<div class="entry-card-footer">${footerHtml}</div>` : ""}
   `;
+  bindEntryCardActions(button, entry, options.rootId);
+  return signVirtualCard(button);
+}
+
+// A derived entry in root mode is one compact line in the panel under its
+// root's card: lemma, parts of speech and the first meaning. A search adds the
+// pronunciation and the matching snippets, so the reason for a hit stays visible.
+function createDerivedEntryRow(entry, rootId) {
+  const rawParts = dictionarySettings().entryListRawPartDisplay;
+  const { fields: searchFields, fuzzyFields } = entrySearchQueryOptions();
+  const searching = Boolean(normalizeEntrySearchText(searchQuery));
+  const partText = entryOwnPartText(entry, undefined, { raw: rawParts });
+  const subtitle = [
+    searching && searchFields.has("pronunciation") && entry.pronunciation
+      ? highlightSearchText(entry.pronunciation, fuzzyFields.has("pronunciation"), true)
+      : "",
+    partText ? highlightSearchText(partText, fuzzyFields.has("tags"), searchFields.has("tags")) : "",
+  ].filter(Boolean).join(" · ");
+  const [firstMeaning] = entryDefinitionSummaryItems(entry);
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `derived-entry-row${entry.id === state.selectedEntryId ? " active" : ""}`;
+  button.dataset.entryId = entry.id;
+  button.dataset.rootId = rootId;
+  if (entry.id === state.selectedEntryId) {
+    button.setAttribute("aria-current", "true");
+  }
+  button.innerHTML = `
+    <span class="derived-entry-line">
+      <strong>${highlightSearchText(entry.lemma, fuzzyFields.has("lemma"), searchFields.has("lemma"))}</strong>
+      ${subtitle ? `<small>${subtitle}</small>` : ""}
+      ${firstMeaning ? `<span class="derived-entry-meaning">${definitionSummaryItemHtml({ ...firstMeaning, number: 0 }, {
+        meaningHtml: (meaning) => highlightSearchText(meaning, fuzzyFields.has("definitions"), searchFields.has("definitions")),
+        rawParts,
+      })}</span>` : ""}
+    </span>
+    ${renderEntrySearchSnippets(entry)}
+  `;
+  bindEntryCardActions(button, entry, rootId);
+  return signVirtualCard(button);
+}
+
+function bindEntryCardActions(button, entry, rootId = "") {
   // A reused card keeps its listeners, so they read the latest entry data.
-  entryCardContexts.set(button, { entry, rootId: options.rootId || "" });
+  entryCardContexts.set(button, { entry, rootId });
   button.addEventListener("click", (event) => {
     const context = entryCardContexts.get(button);
     const tagTarget = event.target.closest("[data-entry-tag-index]");
@@ -7116,11 +7246,10 @@ function createEntryCard(entry, options = {}) {
     event.stopPropagation();
     showEntryContextMenu(event, context.entry, { rootId: context.rootId });
   });
-  return signVirtualCard(button);
 }
 
 function renderEntryListSelection() {
-  elements.entryList.querySelectorAll(".entry-card[data-entry-id]").forEach((card) => {
+  elements.entryList.querySelectorAll(":is(.entry-card, .derived-entry-row)[data-entry-id]").forEach((card) => {
     const selected = card.dataset.entryId === state.selectedEntryId;
     card.classList.toggle("active", selected);
     if (selected) {

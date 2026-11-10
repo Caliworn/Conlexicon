@@ -899,7 +899,7 @@ fieldset {
   flex: 1 1 auto;
 }
 
-:is(.entry-mail-tools, .entry-search-control, .root-mode-controls) .nav-icon {
+:is(.entry-mail-tools, .entry-search-control, .entry-list-status) .nav-icon {
   display: block;
   flex: 0 0 auto;
   width: 19px;
@@ -959,33 +959,6 @@ fieldset {
   height: 20px;
   margin: 0 4px;
   background: color-mix(in srgb, var(--ui-text) 22%, transparent);
-}
-
-/* Root mode shares the row under the toolbar with the filter status: the
-   two never apply at once, so expand/collapse take the filter row's metrics. */
-.root-mode-controls > :is(#expandAllRootsButton, #collapseAllRootsButton) {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 34px;
-  min-height: 34px;
-  padding: 0 12px 0 10px;
-  border-radius: var(--radius-control);
-  font-size: 0.78rem;
-  line-height: 1;
-}
-
-.root-mode-controls > :is(#expandAllRootsButton, #collapseAllRootsButton)[hidden] {
-  display: none;
-}
-
-.root-mode-controls .entry-mail-root-icon {
-  width: 16px;
-  height: 16px;
-}
-
-.root-mode-controls:not(:has(> :not([hidden]))) {
-  display: none;
 }
 
 /* Menus mount directly under body, outside the sticky list's stacking context. */
@@ -1327,20 +1300,10 @@ fieldset {
   transform: translateZ(0);
 }
 
-.root-mode-controls {
-  display: flex;
-  grid-column: 1 / -1;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.root-mode-controls .secondary-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.active-filter-toolbar {
+/* The row under the list header, shown while a search, a filter or root mode
+   narrows or regroups the list: what narrows it (a filter's name, which
+   truncates), the result count (never truncated), then the actions. */
+.entry-list-status {
   --active-filter-control-height: 34px;
   --active-filter-control-font-size: 0.78rem;
   display: flex;
@@ -1348,15 +1311,47 @@ fieldset {
   gap: 8px;
   min-width: 0;
   max-width: 100%;
-  flex: 1 1 100%;
-  flex-wrap: nowrap;
+  min-height: var(--active-filter-control-height);
 }
 
-.active-filter-toolbar[hidden] {
-  display: none !important;
+.entry-list-status:not([data-filtered]) > :is(.filter-status-icon, .active-filter-label, .active-filter-icon-button) {
+  display: none;
 }
 
-.filter-status-toolbar .filter-status-icon {
+.entry-list-status-count {
+  flex: 1 0 auto;
+  color: var(--ui-text-muted);
+  font-size: var(--active-filter-control-font-size);
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  transition: opacity 120ms ease;
+}
+
+/* The count of the previous query stays, dimmed, until the new one arrives. */
+.entry-list-status-count[data-stale] {
+  opacity: 0.5;
+}
+
+.entry-list-status > .entry-list-status-button {
+  display: grid;
+  flex: 0 0 auto;
+  width: var(--active-filter-control-height);
+  height: var(--active-filter-control-height);
+  min-width: var(--active-filter-control-height);
+  min-height: var(--active-filter-control-height);
+  padding: 0;
+  place-items: center;
+  border-radius: var(--radius-control);
+}
+
+/* "Expand all" and "collapse all" keep their places: the one that would do
+   nothing is not drawn, so the other does not move. */
+.entry-list-status > .entry-list-status-button:disabled {
+  visibility: hidden;
+}
+
+.entry-list-status .filter-status-icon {
   width: 18px;
   height: 18px;
   flex: 0 0 auto;
@@ -1367,7 +1362,7 @@ fieldset {
   stroke-linejoin: round;
 }
 
-.active-filter-toolbar .active-filter-label {
+.entry-list-status .active-filter-label {
   height: var(--active-filter-control-height);
   min-height: var(--active-filter-control-height);
   min-width: 0;
@@ -1375,7 +1370,7 @@ fieldset {
   align-items: center;
   justify-content: flex-start;
   gap: 6px;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   max-width: 100%;
   padding: 0 10px;
   border: 1px solid var(--ui-accent);
@@ -1388,7 +1383,7 @@ fieldset {
   overflow: visible;
 }
 
-.active-filter-toolbar .active-filter-label span {
+.entry-list-status .active-filter-label span {
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -1398,7 +1393,7 @@ fieldset {
   padding-block: 2px;
 }
 
-.active-filter-toolbar .active-filter-icon-button {
+.entry-list-status .active-filter-icon-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1417,7 +1412,7 @@ fieldset {
   cursor: pointer;
 }
 
-.active-filter-toolbar .active-filter-icon {
+.entry-list-status .active-filter-icon {
   display: inline-block;
   width: 18px;
   height: 18px;
@@ -1434,14 +1429,7 @@ fieldset {
   opacity: 0.58;
 }
 
-body.english-locale .root-mode-controls .secondary-button {
-  min-height: 34px;
-  padding: 7px 9px;
-  font-size: 0.76rem;
-  line-height: 1.1;
-}
-
-body.english-locale .root-mode-controls .active-filter-icon-button {
+body.english-locale .entry-list-status .active-filter-icon-button {
   width: var(--active-filter-control-height);
   height: var(--active-filter-control-height);
   padding: 0;
@@ -1689,7 +1677,7 @@ label span {
 /* Buttons inside the search field and on the list header are flat in every
    skin: no fill, edge or raised shadow at rest. An effective filter keeps its
    accent edge through --control-context-border. */
-:is(.entry-search-control > button, .entry-mail-primary-tools > button, .entry-mail-primary-tools > div > button)[data-control-tone="neutral"] {
+:is(.entry-search-control > button, .entry-mail-primary-tools > button, .entry-mail-primary-tools > div > button, .entry-list-status > button)[data-control-tone="neutral"] {
   --control-background: transparent;
   --control-border: var(--control-context-border, transparent);
   --control-hover-border: var(--control-context-border, transparent);
@@ -3240,36 +3228,145 @@ span.pending-source {
   border-color: var(--ui-accent);
 }
 
+/* Root mode. A root's card carries its expand control in the lower right
+   corner; its derived entries are compact rows in one panel under the card. */
 .root-entry-group {
-  display: grid;
-  gap: 8px;
+  position: relative;
   min-width: 0;
 }
 
-.root-card {
-  min-height: 108px;
+.root-entry-group > .root-toggle-button {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  width: auto;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px 0 5px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
-.root-toggle-button {
-  margin-left: 18px;
+/* The card's last line stays clear of the control. */
+.root-entry-group:has(> .root-toggle-button) > .root-card > :is(.entry-card-footer, .entry-card-body:last-child),
+.root-entry-group:has(> .root-toggle-button) > .root-card.compact-entry-card:not(:has(> .entry-card-footer)) > .entry-card-header {
+  padding-right: 76px;
+}
+
+/* Row heights here are mirrored by the estimates in app.js
+   (ROOT_DERIVED_ROW_HEIGHT and its neighbours): a derived row is 44px with its
+   top border, and the panel ends with a bottom border and the 12px list gap. */
+.entry-list .virtual-list-row:has(> .root-entry-group.expanded) {
+  padding-bottom: 4px;
+}
+
+.entry-list .virtual-list-row:has(> .virtual-root-derived-row) {
+  padding-bottom: 0;
+}
+
+.entry-list .virtual-list-row:has(> .virtual-root-derived-row.is-last) {
+  padding-bottom: 12px;
 }
 
 .root-derived-list {
+  min-width: 0;
+  margin-left: 14px;
+  overflow: hidden;
+  border: solid var(--ui-border);
+  border-width: 1px 1px 0;
+  background: var(--material-list-item-background);
+}
+
+.root-derived-list.is-first {
+  border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+}
+
+.root-derived-list.is-last {
+  border-bottom-width: 1px;
+  border-radius: 0 0 var(--radius-panel) var(--radius-panel);
+}
+
+.root-derived-list.is-first.is-last {
+  border-radius: var(--radius-panel);
+}
+
+.root-derived-placeholder {
+  margin-left: 14px;
+}
+
+.derived-entry-row {
   display: grid;
+  align-content: center;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  min-height: 43px;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ui-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.derived-entry-row:hover {
+  background: color-mix(in srgb, var(--ui-text) 6%, transparent);
+}
+
+/* A row has no edge of its own inside the panel, so selection is a fill. */
+.derived-entry-row.active {
+  background: var(--ui-accent-soft);
+}
+
+.derived-entry-line {
+  display: flex;
+  align-items: baseline;
   gap: 8px;
   min-width: 0;
-  margin-left: 22px;
-  padding-left: 12px;
-  border-left: 2px solid var(--ui-border);
+  white-space: nowrap;
 }
 
-.root-derived-list.virtual-root-derived-row {
-  gap: 0;
+.derived-entry-line > strong {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.derived-entry-card {
-  min-height: 104px;
-  background: color-mix(in srgb, var(--material-panel-background) 88%, var(--ui-canvas-bg));
+.derived-entry-line > small {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 700;
+}
+
+.derived-entry-meaning {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.derived-entry-line > small,
+.derived-entry-meaning {
+  color: var(--material-list-item-secondary-color);
+  opacity: var(--material-list-item-secondary-opacity);
+}
+
+.derived-entry-row mark {
+  border-radius: 3px;
+  padding: 0;
+  background: color-mix(in srgb, var(--ui-highlight) 45%, transparent);
+  color: inherit;
 }
 
 .entry-card p {

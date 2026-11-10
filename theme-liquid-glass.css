@@ -525,7 +525,7 @@ body[data-ui-skin="liquid-glass"] .entry-list-toolbar :where(
   .entry-search-control > button,
   .entry-mail-primary-tools > button,
   .entry-mail-primary-tools > div > button,
-  .root-mode-controls button
+  .entry-list-status button
 ) {
   --material-control-background: transparent;
   --material-control-border: transparent;

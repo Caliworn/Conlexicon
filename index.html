@@ -207,32 +207,31 @@
                     </button>
                   </div>
                 </div>
-                <div class="root-mode-controls">
-                  <button class="secondary-button" id="expandAllRootsButton" data-control-tone="neutral" type="button" hidden><svg class="nav-icon entry-mail-root-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 5 6 6 6-6M6 13l6 6 6-6"></path></svg><span data-i18n="expandAll">全部展开</span></button>
-                  <button class="secondary-button" id="collapseAllRootsButton" data-control-tone="neutral" type="button" hidden><svg class="nav-icon entry-mail-root-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 11 6-6 6 6M6 19l6-6 6 6"></path></svg><span data-i18n="collapseAll">全部收起</span></button>
-                  <div class="active-filter-toolbar filter-status-toolbar" id="activeFilterToolbar" hidden>
-                    <svg class="filter-status-icon" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M4 5h16l-6 7v5l-4 2v-7L4 5z"></path>
+                <div class="entry-list-status" id="entryListStatus" hidden>
+                  <svg class="filter-status-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 5h16l-6 7v5l-4 2v-7L4 5z"></path>
+                  </svg>
+                  <span class="active-filter-label" id="activeFilterLabel" data-app-tooltip="overflow" data-app-tooltip-wrap="true" tabindex="0"></span>
+                  <span class="entry-list-status-count" id="entryListStatusCount" aria-live="polite"></span>
+                  <button class="secondary-button entry-list-status-button" id="expandAllRootsButton" data-control-tone="neutral" type="button" data-app-tooltip="always" data-i18n-aria-label="expandAll" aria-label="全部展开" hidden><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 5 6 6 6-6M6 13l6 6 6-6"></path></svg></button>
+                  <button class="secondary-button entry-list-status-button" id="collapseAllRootsButton" data-control-tone="neutral" type="button" data-app-tooltip="always" data-i18n-aria-label="collapseAll" aria-label="全部收起" hidden><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 11 6-6 6 6M6 19l6-6 6 6"></path></svg></button>
+                  <button class="secondary-button active-filter-icon-button" data-control-tone="accent" data-control-emphasis="outline" id="activeFilterRefreshButton" type="button" data-app-tooltip="always" data-i18n-aria-label="refreshActiveFilter">
+                    <svg class="active-filter-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M20 6v5h-5"></path>
+                      <path d="M19 11a7 7 0 1 0-2.05 4.95"></path>
                     </svg>
-                    <span class="active-filter-label" id="activeFilterLabel" data-app-tooltip="overflow" data-app-tooltip-wrap="true" tabindex="0"></span>
-                    <button class="secondary-button active-filter-icon-button" data-control-tone="accent" data-control-emphasis="outline" id="activeFilterRefreshButton" type="button" data-app-tooltip="always" data-i18n-aria-label="refreshActiveFilter">
-                      <svg class="active-filter-icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M20 6v5h-5"></path>
-                        <path d="M19 11a7 7 0 1 0-2.05 4.95"></path>
-                      </svg>
-                    </button>
-                    <button class="secondary-button active-filter-icon-button" data-control-tone="accent" data-control-emphasis="outline" id="activeFilterCycleButton" type="button" data-app-tooltip="always" data-i18n-aria-label="cycleActiveFilter" hidden>
-                      <svg class="active-filter-icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M8 7h11m0 0-3-3m3 3-3 3"></path>
-                        <path d="M16 17H5m0 0 3 3m-3-3 3-3"></path>
-                      </svg>
-                    </button>
-                    <button class="secondary-button active-filter-icon-button filter-clear-button" data-control-tone="danger" data-control-emphasis="outline" id="activeFilterExitButton" type="button" data-app-tooltip="always" data-i18n-aria-label="clearFilter" aria-label="清除筛选">
-                      <svg class="active-filter-icon" viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M6 6l12 12M18 6 6 18"></path>
-                      </svg>
-                    </button>
-                  </div>
+                  </button>
+                  <button class="secondary-button active-filter-icon-button" data-control-tone="accent" data-control-emphasis="outline" id="activeFilterCycleButton" type="button" data-app-tooltip="always" data-i18n-aria-label="cycleActiveFilter" hidden>
+                    <svg class="active-filter-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M8 7h11m0 0-3-3m3 3-3 3"></path>
+                      <path d="M16 17H5m0 0 3 3m-3-3 3-3"></path>
+                    </svg>
+                  </button>
+                  <button class="secondary-button active-filter-icon-button filter-clear-button" data-control-tone="danger" data-control-emphasis="outline" id="activeFilterExitButton" type="button" data-app-tooltip="always" data-i18n-aria-label="clearFilter" aria-label="清除筛选">
+                    <svg class="active-filter-icon" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M6 6l12 12M18 6 6 18"></path>
+                    </svg>
+                  </button>
                 </div>
               </div>
               <div class="content-update-frame entry-list-update-frame" id="entryListUpdateFrame">
