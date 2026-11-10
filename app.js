@@ -4535,6 +4535,8 @@ function renderActiveFilterRefreshAvailability() {
 function createVirtualListState(estimatedItemHeight) {
   return {
     container: null,
+    topSpacer: null,
+    bottomSpacer: null,
     items: [],
     indexByKey: new Map(),
     offsets: [0],
@@ -4607,6 +4609,10 @@ function initializeVirtualList(virtualList, container) {
   virtualList.pendingResizeAnchor = null;
   virtualList.pendingSizeUpdates.clear();
   virtualList.container = container;
+  virtualList.topSpacer = document.createElement("div");
+  virtualList.topSpacer.className = "virtual-list-spacer";
+  virtualList.bottomSpacer = document.createElement("div");
+  virtualList.bottomSpacer.className = "virtual-list-spacer";
   virtualList.lastScrollAt = 0;
   virtualList.lastResizeFlushAt = 0;
   virtualList.scrollHandler = () => {
@@ -4951,7 +4957,7 @@ function reconcileVirtualCard(current, next) {
 }
 
 function renderVirtualListWindow(virtualList) {
-  const { container, items, offsets } = virtualList;
+  const { container, items, offsets, topSpacer, bottomSpacer } = virtualList;
   if (!container || !items.length || !virtualList.renderItem) {
     return;
   }
@@ -4969,11 +4975,8 @@ function renderVirtualListWindow(virtualList) {
   const focusedRow = focused?.closest(".virtual-list-row");
   const focusedKey = focusedRow?.dataset.virtualKey;
   const focusedIndex = focusedRow ? [...focusedRow.querySelectorAll(VIRTUAL_LIST_FOCUSABLE)].indexOf(focused) : -1;
-  const nextNodes = [];
-  const topSpacer = document.createElement("div");
-  topSpacer.className = "virtual-list-spacer";
+  const nextNodes = [topSpacer];
   topSpacer.style.height = `${offsets[start]}px`;
-  nextNodes.push(topSpacer);
   for (let index = start; index < end; index += 1) {
     const item = items[index];
     let row = previousRows.get(item.key);
@@ -4990,13 +4993,13 @@ function renderVirtualListWindow(virtualList) {
     }
     nextNodes.push(row);
   }
-  const bottomSpacer = document.createElement("div");
-  bottomSpacer.className = "virtual-list-spacer";
   bottomSpacer.style.height = `${Math.max(0, offsets[offsets.length - 1] - offsets[end])}px`;
   nextNodes.push(bottomSpacer);
   virtualList.resizeObserver?.disconnect();
   // Leave retained roots connected: detaching them would cancel CSS transitions
   // and keyboard focus even if the same button object were inserted again.
+  // Keep the spacers in place as well. Removing a focused row can force layout
+  // and clamp scrollTop if a spacer is temporarily missing.
   if (virtualList.updateItem) {
     const retained = new Set(nextNodes);
     [...container.children].forEach((node) => {
