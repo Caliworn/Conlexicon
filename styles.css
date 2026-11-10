@@ -1318,6 +1318,14 @@ fieldset {
   display: none;
 }
 
+/* With nothing but the count (a search alone, in either mode) the row has no
+   control to make room for: it is one line of text, pulled up toward the header. */
+.entry-list-status:not([data-filtered]):not(:has(> .entry-list-status-button:not([hidden]))) {
+  min-height: 0;
+  margin-top: -4px;
+  padding-left: 2px;
+}
+
 .entry-list-status-count {
   flex: 1 0 auto;
   color: var(--ui-text-muted);
