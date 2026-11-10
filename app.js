@@ -107,7 +107,6 @@ let docsSavePromise = null;
 let docsSaveRequested = false;
 let corpusSaveTimer = null;
 let corpusSavePromise = null;
-let corpusSaveRequested = false;
 let corpusSearchTimer = null;
 let corpusPreviewFrame = null;
 let corpusListState = null;
@@ -14712,6 +14711,7 @@ function renderCorpusList() {
   }
   const viewState = activeCorpusViewState();
   const searchKey = corpusSearchKey(viewState);
+  const listKey = `${dictionary.id}|${searchKey}`;
   if (searchKey && !corpusListSource(searchKey).pages.has(0)) {
     void loadCorpusPage(dictionary, searchKey, 0);
   }
@@ -14721,6 +14721,10 @@ function renderCorpusList() {
     : corpusListState.status === "loading";
   elements.corpusPanel.classList.toggle("is-empty", !loading && !rows.length && !searchKey);
   if (!rows.length) {
+    // Keep the current window while a save refreshes the same list.
+    if (loading && corpusVirtualList.resetToken === listKey && corpusVirtualList.items.length) {
+      return;
+    }
     const empty = document.createElement("p");
     empty.className = "corpus-empty-list";
     empty.textContent = loading ? t("loading") : t(searchKey ? "noCorpusMatches" : "noCorpusItems");
@@ -14728,7 +14732,7 @@ function renderCorpusList() {
     return;
   }
   renderVirtualList(elements.corpusItemList, corpusVirtualList, rows, {
-    resetToken: `${dictionary.id}|${searchKey}`,
+    resetToken: listKey,
     getKey: corpusRowKey,
     getEstimatedHeight: (row) => (row.kind === "group" ? CORPUS_GROUP_ROW_HEIGHT : CORPUS_ITEM_ROW_HEIGHT),
     getSizeCacheKey: (row, key) => {
@@ -14780,8 +14784,8 @@ function corpusTextsEqual(left, right) {
   return a.name === b.name && a.group === b.group && a.content === b.content;
 }
 
-// One item is edited at a time. `saved` is what the server last returned, so a
-// save that comes back while the user keeps typing leaves the newer draft.
+// A new draft has an empty item ID and uses its initial fields as the baseline.
+// Saved items use the last server response as the baseline.
 function setCorpusDraft(dictionary, item) {
   corpusDraftState = {
     dictionaryId: dictionary.id,
@@ -14789,11 +14793,14 @@ function setCorpusDraft(dictionary, item) {
     item,
     saved: corpusTextOf(item),
     draft: { name: item.name, group: item.group, content: item.content },
-    links: null,
-    linksStatus: "loading",
+    creating: null,
+    links: [],
+    linksStatus: item.id ? "loading" : "success",
   };
   renderCorpusEditor();
-  void loadCorpusItemLinks(dictionary, corpusDraftState);
+  if (item.id) {
+    void loadCorpusItemLinks(dictionary, corpusDraftState);
+  }
 }
 
 function cachedCorpusItem(itemId) {
@@ -14822,6 +14829,9 @@ async function openCorpusDraft(dictionary, itemId) {
     setCorpusDraft(dictionary, item);
     return true;
   } catch (error) {
+    if (activeDictionary()?.id !== dictionary.id || activeCorpusViewState().selectedItemId !== itemId) {
+      return false;
+    }
     if (error.code === "corpus_item_not_found") {
       activeCorpusViewState().selectedItemId = "";
       renderCorpusEditor();
@@ -14853,16 +14863,23 @@ async function loadCorpusItemLinks(dictionary, draftState) {
 // Leaving the edited item saves it under auto-save; otherwise the user
 // chooses to save, discard or stay. Resolves false when the user stays.
 async function resolveCorpusDraft() {
-  if (!corpusFormIsDirty()) {
-    return true;
-  }
-  if (dictionarySettings().corpusAutoSave) {
-    try {
-      return await saveCorpus(false);
-    } catch (error) {
-      showApiErrorToast(error, "saveFailed");
-      return false;
+  syncCorpusEditorToDraft();
+  try {
+    if (corpusSavePromise) {
+      await corpusSavePromise;
     }
+    if (!corpusFormIsDirty()) {
+      if (corpusDraftState?.itemId === "") {
+        discardCorpusDraft();
+      }
+      return true;
+    }
+    if (dictionarySettings().corpusAutoSave) {
+      return await saveCorpus(false);
+    }
+  } catch (error) {
+    showApiErrorToast(error, "saveFailed");
+    return false;
   }
   return confirmUnsavedChanges(t("unsavedCorpusConfirm"), {
     save: () => saveCorpus(false),
@@ -14929,8 +14946,8 @@ function renderCorpusContentHtml(content) {
 }
 
 // The open form is kept while it shows the same item, so renders never replace
-// the fields being typed in or their undo history; `force` rebuilds it for a
-// language change.
+// the fields being typed in or their undo history. Language changes and
+// explicit discards rebuild the form.
 function renderCorpusEditor({ force = false } = {}) {
   const draftState = corpusDraftState;
   if (!draftState) {
@@ -14955,7 +14972,7 @@ function renderCorpusEditor({ force = false } = {}) {
           <p class="eyebrow" data-i18n="corpusItem">${escapeHtml(t("corpusItem"))}</p>
           <p class="corpus-item-meta" data-corpus-meta>${escapeHtml(corpusGroupLabel(draftState.saved.group))}</p>
         </div>
-        <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="delete-corpus-item" data-i18n="deleteCorpusItem">${escapeHtml(t("deleteCorpusItem"))}</button>
+        <button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="delete-corpus-item" data-i18n="deleteCorpusItem"${draftState.itemId ? "" : " hidden"}>${escapeHtml(t("deleteCorpusItem"))}</button>
       </div>
       <div class="corpus-rendered" data-corpus-preview>${renderCorpusContentHtml(draftState.draft.content)}</div>
       <div class="form-grid">
@@ -15036,68 +15053,75 @@ function corpusFormIsDirty(dictionary = activeDictionary()) {
 function discardCorpusDraft() {
   clearTimeout(corpusSaveTimer);
   corpusSaveTimer = null;
-  corpusSaveRequested = false;
-  if (corpusDraftState) {
+  if (corpusDraftState.itemId) {
     corpusDraftState.draft = { ...corpusDraftState.saved };
     refreshCorpusDraftRow();
+  } else {
+    corpusDraftState = null;
   }
+  renderCorpusEditor({ force: true });
 }
 
 // Saved text goes back into every cached window; a new group changes the item
 // position, so the list is read again.
 function applyCorpusItemSaved(dictionary, draftState, result) {
+  const created = !draftState.itemId;
   const groupChanged = draftState.saved.group !== result.item.group;
+  draftState.itemId = result.item.id;
   draftState.item = result.item;
   draftState.saved = corpusTextOf(result.item);
-  updateLoadedDictionary(dictionary.id, { updatedAt: result.updatedAt });
-  if (corpusListState?.dictionaryId === dictionary.id) {
-    corpusListState.syncedUpdatedAt = result.updatedAt;
-    if (groupChanged) {
-      const listState = corpusListState;
-      void resetCorpusListData(dictionary).then(() => {
-        if (corpusListState === listState) {
-          corpusListState.syncedUpdatedAt = result.updatedAt;
-        }
-      });
+  draftState.creating = null;
+  if (corpusDraftState === draftState && activeDictionary()?.id === dictionary.id) {
+    const form = elements.corpusEditor.querySelector(".corpus-form");
+    if (created) {
+      // Adopt the server ID without replacing the fields or their undo history.
+      activeCorpusViewState().selectedItemId = result.item.id;
+      form.dataset.corpusItemId = result.item.id;
+      form.querySelector('[data-action="delete-corpus-item"]').hidden = false;
+    }
+    form.querySelector("[data-corpus-meta]").textContent = corpusGroupLabel(draftState.saved.group);
+  }
+  const savedDictionary = updateLoadedDictionary(dictionary.id, { updatedAt: result.updatedAt });
+  if (savedDictionary && corpusListState?.dictionaryId === dictionary.id) {
+    if (created || groupChanged) {
+      void resetCorpusListData(savedDictionary);
     } else {
+      corpusListState.syncedUpdatedAt = result.updatedAt;
       corpusListState.sources.forEach((source) => source.pages.forEach((page) => {
         page.items = page.items.map((item) => (item.id === result.item.id ? result.item : item));
       }));
       renderCorpusList();
     }
   }
-  const meta = elements.corpusEditor.querySelector("[data-corpus-meta]");
-  if (meta && corpusDraftState === draftState) {
-    meta.textContent = corpusGroupLabel(draftState.saved.group);
-  }
   if (result.item.linkCount) {
     resetEntryReadStateAfterSave();
   }
 }
 
-async function runCorpusSaveQueue() {
-  let savedAny = false;
-  while (corpusSaveRequested) {
-    corpusSaveRequested = false;
-    const dictionary = activeDictionary();
-    const draftState = corpusDraftState;
-    if (!dictionary || !draftState || draftState.dictionaryId !== dictionary.id) {
-      return savedAny;
-    }
+async function runCorpusSaveQueue(dictionary, draftState) {
+  do {
     const snapshot = { ...draftState.draft };
-    const result = await api(corpusItemApiPath(dictionary, draftState.itemId), {
-      method: "PUT",
-      body: JSON.stringify({ item: snapshot }),
-    });
-    savedAny = true;
-    clearTimeout(corpusSaveTimer);
-    corpusSaveTimer = null;
-    applyCorpusItemSaved(dictionary, draftState, result);
-    if (corpusDraftState === draftState && !corpusTextsEqual(draftState.draft, draftState.saved)) {
-      corpusSaveRequested = true;
+    const body = JSON.stringify({ item: snapshot });
+    const creating = !draftState.itemId;
+    // The browser can finish a small first auto-save after the page closes.
+    const keepalive = creating && dictionarySettings(dictionary).corpusAutoSave
+      && new Blob([body]).size <= 64 * 1024;
+    if (creating) {
+      draftState.creating = { snapshot, keepalive };
     }
-  }
-  return savedAny;
+    const path = creating ? corpusApiPath(dictionary, "/items") : corpusItemApiPath(dictionary, draftState.itemId);
+    const result = await api(path, {
+      method: creating ? "POST" : "PUT",
+      body,
+      keepalive,
+    });
+    if (corpusDraftState === draftState) {
+      clearTimeout(corpusSaveTimer);
+      corpusSaveTimer = null;
+    }
+    applyCorpusItemSaved(dictionary, draftState, result);
+  } while (corpusDraftState === draftState && corpusFormIsDirty());
+  return true;
 }
 
 function saveCorpus(showSavedToast = true) {
@@ -15109,15 +15133,17 @@ function saveCorpus(showSavedToast = true) {
   syncCorpusEditorToDraft();
   clearTimeout(corpusSaveTimer);
   corpusSaveTimer = null;
-  if (!corpusFormIsDirty(dictionary)) {
-    if (showSavedToast) {
-      showToast(t("noChangesToSave"));
-    }
-    return Promise.resolve(true);
-  }
-  corpusSaveRequested = true;
   if (!corpusSavePromise) {
-    corpusSavePromise = runCorpusSaveQueue().finally(() => {
+    const draftState = corpusDraftState;
+    const saveEmptyDraft = showSavedToast && draftState?.dictionaryId === dictionary.id && !draftState.itemId;
+    if (!saveEmptyDraft && !corpusFormIsDirty(dictionary)) {
+      if (showSavedToast) {
+        showToast(t("noChangesToSave"));
+      }
+      return Promise.resolve(true);
+    }
+    corpusSavePromise = runCorpusSaveQueue(dictionary, draftState).finally(() => {
+      draftState.creating = null;
       corpusSavePromise = null;
     });
   }
@@ -15147,30 +15173,22 @@ function scheduleCorpusSave() {
   }, 700);
 }
 
-// New items join the group of the item being edited, so a longer text can be
-// written sentence by sentence.
-async function createCorpusItem() {
+// Start with the current item's saved group so a text can be entered sentence by sentence.
+async function startNewCorpusDraft() {
   const dictionary = activeDictionary();
+  const previousDraft = corpusDraftState;
   if (!dictionary || !(await resolveCorpusDraft())) {
     return;
   }
-  const group = corpusDraftState?.saved.group || "";
-  try {
-    const result = await api(corpusApiPath(dictionary, "/items"), {
-      method: "POST",
-      body: JSON.stringify({ item: { name: "", group, content: "" } }),
-    });
-    updateLoadedDictionary(dictionary.id, { updatedAt: result.updatedAt });
-    const viewState = activeCorpusViewState();
-    viewState.selectedItemId = result.item.id;
-    setCorpusDraft(dictionary, result.item);
-    await resetCorpusListData(dictionary);
-    corpusListState.syncedUpdatedAt = result.updatedAt;
-    await revealCorpusItem(dictionary, result.item.id);
-    elements.corpusEditor.querySelector('[data-field="content"]')?.focus();
-  } catch (error) {
-    showApiErrorToast(error, "saveFailed");
-  }
+  const group = previousDraft?.saved.group || "";
+  const viewState = activeCorpusViewState();
+  viewState.selectedItemId = "";
+  viewState.query = "";
+  viewState.collapsedGroups.delete(group);
+  elements.corpusSearchInput.value = "";
+  setCorpusDraft(dictionary, { id: "", name: "", group, content: "" });
+  renderCorpusList();
+  elements.corpusEditor.querySelector('[data-field="content"]').focus();
 }
 
 function corpusLinkSummary(links) {
@@ -15183,7 +15201,7 @@ function corpusLinkSummary(links) {
 async function deleteCorpusItem() {
   const dictionary = activeDictionary();
   const draftState = corpusDraftState;
-  if (!dictionary || !draftState) {
+  if (!dictionary || !draftState?.itemId) {
     return;
   }
   const path = corpusItemApiPath(dictionary, draftState.itemId);
@@ -15199,7 +15217,8 @@ async function deleteCorpusItem() {
       return;
     }
     const result = await api(links.length ? `${path}?unlink=true` : path, { method: "DELETE" });
-    discardCorpusDraft();
+    clearTimeout(corpusSaveTimer);
+    corpusSaveTimer = null;
     corpusDraftState = null;
     activeCorpusViewState().selectedItemId = "";
     updateLoadedDictionary(dictionary.id, { updatedAt: result.updatedAt });
@@ -15234,7 +15253,7 @@ function renderCorpus(dictionary = activeDictionary()) {
   }
   renderCorpusList();
   const itemId = corpusDraftState?.itemId || viewState.selectedItemId;
-  if (itemId && (!corpusDraftState || (stale && !corpusFormIsDirty(dictionary)))) {
+  if (itemId && (!corpusDraftState || (stale && !corpusSavePromise && !corpusFormIsDirty(dictionary)))) {
     renderCorpusEditor();
     void openCorpusDraft(dictionary, itemId);
   } else {
@@ -17602,19 +17621,8 @@ async function confirmLeaveUnsavedConfigView() {
       discard: discardDocsDraft,
     });
   }
-  if (state.activeView === "corpus" && corpusFormIsDirty()) {
-    if (settings.corpusAutoSave) {
-      try {
-        return await saveCorpus(false);
-      } catch (error) {
-        console.error(error);
-        return false;
-      }
-    }
-    return confirmUnsavedChanges(t("unsavedCorpusConfirm"), {
-      save: () => saveCorpus(false),
-      discard: discardCorpusDraft,
-    });
+  if (state.activeView === "corpus") {
+    return resolveCorpusDraft();
   }
   return true;
 }
@@ -17629,15 +17637,18 @@ function showToast(message) {
   }, 2200);
 }
 
-function hasManualModuleChangesOnExit() {
+function hasUnsavedChangesOnExit() {
   const dictionary = activeDictionary();
   if (!dictionary) {
     return false;
   }
   const settings = dictionarySettings(dictionary);
+  const creation = corpusDraftState?.dictionaryId === dictionary.id ? corpusDraftState.creating : null;
   return (
     (!settings.docsAutoSave && docsFormIsDirty(dictionary))
     || (!settings.corpusAutoSave && corpusFormIsDirty(dictionary))
+    // A first save needs its response before any newer edits can be sent by ID.
+    || Boolean(creation && (!creation.keepalive || !corpusTextsEqual(creation.snapshot, corpusDraftState.draft)))
     || quickEntryHasDraft()
   );
 }
@@ -17657,7 +17668,11 @@ function flushAutomaticModuleSaves() {
     };
   }
   if (settings.corpusAutoSave && corpusFormIsDirty(dictionary)) {
-    body.corpusItem = { id: corpusDraftState.itemId, ...corpusDraftState.draft };
+    if (corpusDraftState.itemId) {
+      body.corpusItem = { id: corpusDraftState.itemId, ...corpusDraftState.draft };
+    } else {
+      saveCorpus(false).catch((error) => showApiErrorToast(error, "saveFailed"));
+    }
   }
   if (!body.docs && !body.corpusItem) {
     return;
@@ -18526,7 +18541,7 @@ setupListDragSort(elements.entrySectionOrderList, { item: ".tool-order-card", on
 elements.toolNavOrderResetButton.addEventListener("click", () => renderToolNavOrderEditor());
 elements.entrySectionOrderResetButton.addEventListener("click", () => renderEntrySectionOrderEditor());
 elements.newCorpusItemButton.addEventListener("click", () => {
-  createCorpusItem().catch((error) => console.error(error));
+  startNewCorpusDraft().catch((error) => console.error(error));
 });
 elements.corpusSearchInput.addEventListener("input", () => {
   clearTimeout(corpusSearchTimer);
@@ -19140,7 +19155,7 @@ document.addEventListener("keydown", (event) => {
 
 window.addEventListener("beforeunload", (event) => {
   flushAutomaticModuleSaves();
-  if (!hasManualModuleChangesOnExit()) {
+  if (!hasUnsavedChangesOnExit()) {
     return;
   }
   event.preventDefault();

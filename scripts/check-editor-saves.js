@@ -3,14 +3,14 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
 
-// app.js is not modular yet, so this check slices source between known
-// function declarations and runs it in a VM with stubbed globals. The slices
-// assume ensureDocsDraft() … createCorpusViewState() hold the docs save functions and
-// closePendingEditsForPageSwitch() … activeFilterVariantUsesEntryQuery() hold the switch flow.
+// Run the editor save and navigation functions from app.js in a VM with
+// stubbed browser globals.
 // Reordering app.js or adding functions inside those ranges makes this check
 // fail loudly; update the boundaries (or the stubs) rather than the behaviour.
 const app = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
 const docsFunctions = app.slice(app.indexOf("function ensureDocsDraft("), app.indexOf("function createCorpusViewState("));
+const corpusFunctions = app.slice(app.indexOf("function corpusTextOf("), app.indexOf("function corpusLinkSummary("));
+const exitFunctions = app.slice(app.indexOf("function hasUnsavedChangesOnExit("), app.indexOf("function escapeHtml("));
 const switchFunction = app.slice(app.indexOf("async function closePendingEditsForPageSwitch("), app.indexOf("function activeFilterVariantUsesEntryQuery("));
 const fullEditCancelFunction = app.slice(app.indexOf("async function requestFullEditCancel("), app.indexOf("async function saveEntry("));
 const tick = () => new Promise((resolve) => setImmediate(resolve));
@@ -112,6 +112,137 @@ async function checkDocsSaves() {
   assert.equal(failed.context.docsFormIsDirty(), false);
 }
 
+function corpusHarness(corpusAutoSave = false) {
+  const dictionary = { id: "one", settings: { corpusAutoSave } };
+  const view = { selectedItemId: "", query: "", collapsedGroups: new Set() };
+  let form = null;
+  const editor = {
+    set innerHTML(markup) {
+      const itemId = markup.match(/data-corpus-item-id="([^"]*)"/)?.[1];
+      if (itemId === undefined) {
+        form = null;
+        return;
+      }
+      const controls = new Map();
+      form = {
+        dataset: { corpusItemId: itemId },
+        querySelector(selector) {
+          if (!controls.has(selector)) {
+            controls.set(selector, { focus() {} });
+          }
+          return controls.get(selector);
+        },
+      };
+    },
+    querySelector: (selector) => selector === ".corpus-form" ? form : form?.querySelector(selector),
+  };
+  const requests = [];
+  const errors = [];
+  const context = vm.createContext({
+    activeDictionary: () => dictionary,
+    activeCorpusViewState: () => view,
+    dictionarySettings: () => dictionary.settings,
+    elements: { corpusSearchInput: {}, corpusEditor: editor },
+    corpusApiPath: (_, suffix) => `/corpus${suffix}`,
+    corpusItemApiPath: (_, itemId, suffix = "") => `/corpus/items/${itemId}${suffix}`,
+    api: (url, options) => {
+      if (url.endsWith("/links")) {
+        return Promise.resolve({ links: [] });
+      }
+      return new Promise((resolve, reject) => {
+        requests.push({ url, method: options.method, keepalive: options.keepalive, item: JSON.parse(options.body).item, resolve, reject });
+      });
+    },
+    updateLoadedDictionary: () => dictionary,
+    renderCorpusList() {},
+    corpusGroupLabel: (group) => group,
+    escapeHtml: (text) => text,
+    observeAutoHeightTextareas() {},
+    docsFormIsDirty: () => false,
+    quickEntryHasDraft: () => false,
+    confirmUnsavedChanges: (_, { discard }) => { discard(); return true; },
+    showToast() {},
+    showApiErrorToast: (error) => errors.push(error),
+    clearTimeout() {},
+    t: (key) => key,
+    Blob,
+  });
+  vm.runInContext("let corpusDraftState = null; let corpusSaveTimer = null; let corpusSavePromise = null; let corpusListState = null;", context);
+  vm.runInContext(corpusFunctions + exitFunctions, context);
+  context.renderCorpusContentHtml = (content) => content;
+  context.refreshCorpusDraftRow = () => {};
+  const draft = () => vm.runInContext("corpusDraftState", context);
+  const content = () => form.querySelector('[data-field="content"]');
+  return {
+    context, dictionary, draft, requests, errors, view, content,
+    form: () => form,
+    edit(text) {
+      content().value = text;
+      context.syncCorpusEditorToDraft();
+    },
+    resolve(index) {
+      const request = requests[index];
+      request.resolve({ updatedAt: String(index), item: { ...request.item, id: "corpus-created", linkCount: 0 } });
+    },
+  };
+}
+
+async function checkCorpusSaves() {
+  const manual = corpusHarness();
+  manual.context.setCorpusDraft(manual.dictionary, { id: "existing", name: "", group: "story", content: "saved" });
+  manual.edit("discard this edit");
+  assert.equal(await manual.context.resolveCorpusDraft(), true);
+  assert.equal(manual.draft().draft.content, "saved");
+  assert.equal(manual.content().value, "saved", "Discard must also restore the input fields");
+  await manual.context.startNewCorpusDraft();
+  assert.equal(manual.draft().draft.group, "story");
+  manual.edit("discard this new draft");
+  assert.equal(await manual.context.resolveCorpusDraft(), true);
+  assert.equal(manual.draft(), null);
+  assert.equal(manual.form(), null);
+  assert.equal(manual.requests.length, 0, "Starting and discarding a draft requires no write");
+
+  await manual.context.startNewCorpusDraft();
+  manual.edit("retry this draft");
+  const failed = manual.context.saveCorpus();
+  const error = new Error("save failed");
+  manual.requests[0].reject(error);
+  assert.equal(await failed, false);
+  assert.equal(manual.errors[0], error);
+  assert.equal(manual.draft().itemId, "");
+  assert.equal(manual.draft().draft.content, "retry this draft");
+  const retry = manual.context.saveCorpus();
+  assert.equal(manual.requests[1].method, "POST");
+  manual.resolve(1);
+  assert.equal(await retry, true);
+  assert.equal(manual.view.selectedItemId, "corpus-created");
+
+  const automatic = corpusHarness(true);
+  await automatic.context.startNewCorpusDraft();
+  const liveInput = automatic.content();
+  automatic.edit("first snapshot");
+  automatic.context.flushAutomaticModuleSaves();
+  automatic.context.flushAutomaticModuleSaves();
+  assert.equal(automatic.requests.length, 1, "Repeated exit events must share the first create request");
+  assert.equal(automatic.requests[0].method, "POST");
+  assert.equal(automatic.requests[0].keepalive, true);
+  assert.equal(automatic.context.hasUnsavedChangesOnExit(), false);
+  automatic.edit("typed while creating");
+  assert.equal(automatic.context.hasUnsavedChangesOnExit(), true, "Newer text needs the server ID to be saved");
+  const leave = automatic.context.resolveCorpusDraft();
+  automatic.resolve(0);
+  await tick();
+  assert.equal(automatic.form().dataset.corpusItemId, "corpus-created");
+  assert.equal(automatic.content(), liveInput, "First autosave must keep the live input element");
+  assert.equal(automatic.requests.length, 2);
+  assert.equal(automatic.requests[1].method, "PUT");
+  assert.equal(automatic.requests[1].url, "/corpus/items/corpus-created");
+  assert.equal(automatic.requests[1].item.content, "typed while creating");
+  automatic.resolve(1);
+  assert.equal(await leave, true);
+  assert.equal(automatic.context.corpusFormIsDirty(), false);
+}
+
 async function checkEditSwitchErrors() {
   const errors = [];
   const error = new Error("unexpected dirty check error");
@@ -193,6 +324,7 @@ async function checkFullEditCancel() {
 
 async function main() {
   await checkDocsSaves();
+  await checkCorpusSaves();
   await checkEditSwitchErrors();
   await checkFullEditCancel();
   console.log("Editor save and navigation checks passed.");

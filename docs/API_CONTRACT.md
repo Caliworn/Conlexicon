@@ -95,7 +95,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `PUT` | `/api/dictionaries/:id/docs` | 保存语言文档 | `{ id, updatedAt, docs }` | 不做实体 ID 检查。 |
 | `PUT` | `/api/dictionaries/:id/morphology` | 保存自动形态学模块 | `{ id, updatedAt, morphology }` | 请求仍表示完整替换形态模块；后端检查提交内组与表 ID 不重复（不查词条与语料）、规则语法和函数配置，并按稳定组/表 ID 增量写入模板。纯名称、说明、表格标题或行列标签变化不重建生成投影；规则、函数、表结构或自动分配变化只重建实际受影响词条的形态搜索 projection。完全相同的规范化 payload 作为 no-op 返回既有 `updatedAt`。删除组、删除/移动表格或缩小表格会使既有词条形态组或覆写悬空时返回 `morphology_references_in_use`。 |
 | `PUT` | `/api/dictionaries/:id/settings/ipa` | 保存自动 IPA 设置 | `{ id, updatedAt, settings }` | 请求体是 `settings.ipa` 的字段，可另带 `ipaKeyboard`，两者在同一事务里写入 `settings`；不带时保留已有键盘。IPA 映射是按顺序保存的纯文本规则 `{ from, to, before, after }`，没有实体 ID，也不参与实体 ID 防撞。`syllable.vowels`、`onsetClusters`、`codaClusters`、`complexPhonemes` 都是字符串数组；写入字符串或含分隔符的数组项时，按空白、逗号、顿号拆开。 |
-| `POST` | `/api/dictionaries/:id/autosave` | 页面卸载时保存文档／正在编辑的语料 | `{ id, updatedAt, docs?, corpusItem? }` | `corpusItem` 为 `{ id, name, group, content }`，按 `PUT /corpus/items/:itemId` 保存；请求至少须携带 `docs` 或带 `id` 的 `corpusItem`，否则返回 `invalid_autosave_payload`。 |
+| `POST` | `/api/dictionaries/:id/autosave` | 页面卸载时保存文档／已有语料 | `{ id, updatedAt, docs?, corpusItem? }` | `corpusItem` 为 `{ id, name, group, content }`，按 `PUT /corpus/items/:itemId` 保存。新草稿首次保存走 `POST /corpus/items`。请求至少须携带 `docs` 或带 `id` 的 `corpusItem`，否则返回 `invalid_autosave_payload`。 |
 
 ### 语料与例句连接
 
