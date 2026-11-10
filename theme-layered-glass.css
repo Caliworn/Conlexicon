@@ -128,8 +128,9 @@ body[data-ui-skin="layered-glass"] {
   --layered-control-pressed-background: #dce4e7;
   --layered-danger-hover: #8a2731;
   --layered-button-edge-ink: #6e787e;
-  --layered-acrylic-tint: rgb(252 253 253 / 86%);
-  --layered-overlay-tint: rgb(252 253 253 / 94%);
+  --layered-acrylic-tint: rgb(252 253 253 / 70%);
+  --layered-overlay-tint: rgb(240 243 246 / 70%);
+  --layered-acrylic-grain: url("assets/layered-glass/acrylic-grain-light.png");
   --layered-control-transition:
     background-color var(--theme-paint-duration, 150ms) ease-out,
     border-color var(--theme-paint-duration, 150ms) ease-out;
@@ -178,8 +179,9 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --layered-control-pressed-background: #292d2f;
   --layered-danger-hover: #ff9da5;
   --layered-button-edge-ink: #17191a;
-  --layered-acrylic-tint: rgb(39 42 44 / 91%);
-  --layered-overlay-tint: rgb(39 42 44 / 94%);
+  --layered-acrylic-tint: rgb(39 42 44 / 80%);
+  --layered-overlay-tint: rgb(37 42 48 / 80%);
+  --layered-acrylic-grain: url("assets/layered-glass/acrylic-grain-dark.png");
 }
 
 body[data-ui-skin="layered-glass"] [data-surface="content-shell"] {
@@ -293,17 +295,18 @@ body[data-ui-skin="layered-glass"] .toast {
   color: var(--material-tooltip-text);
 }
 
-/* Solid by default. The top overlay gets Acrylic first, then one flyout,
-   then the focused source suggestions or a standalone structured tooltip. */
+/* Only the foremost popup samples the backdrop. Its grain is a static tile
+   painted over the tint so it shares the surface's clipping and geometry. */
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   @media (not (prefers-reduced-transparency: reduce)) and (not (forced-colors: active)) {
     body[data-ui-skin="layered-glass"] {
-      --layered-acrylic-filter: blur(30px);
+      --layered-acrylic-filter: blur(15px);
     }
 
     body[data-ui-skin="layered-glass"] > :nth-last-child(1 of :is(.network-overlay, .modal-overlay):not([hidden])) > :is(.network-panel, .modal-panel) {
       --material-overlay-panel-background: var(--layered-overlay-tint);
-      --material-floating-filter: var(--layered-acrylic-filter);
+      --material-floating-filter: blur(20px);
+      background-image: var(--layered-acrylic-grain);
       -webkit-backdrop-filter: var(--material-floating-filter);
     }
 
@@ -311,12 +314,14 @@ body[data-ui-skin="layered-glass"] .toast {
     body[data-ui-skin="layered-glass"]:not(:has(> :is(.network-overlay, .modal-overlay, .entry-workspace-menu, .skin-picker-menu, .entry-context-menu):not([hidden]))) .source-reference-field:focus-within > .source-suggestions:not([hidden]) {
       --material-floating-background: var(--layered-acrylic-tint);
       --material-floating-filter: var(--layered-acrylic-filter);
+      background-image: var(--layered-acrylic-grain);
       -webkit-backdrop-filter: var(--material-floating-filter);
     }
 
-    body[data-ui-skin="layered-glass"]:not(:has(:is(.network-overlay, .modal-overlay, .entry-workspace-menu, .skin-picker-menu, .entry-context-menu, .source-suggestions):not([hidden]))) > .app-tooltip {
+    body[data-ui-skin="layered-glass"]:not(:has(:is(.network-overlay, .modal-overlay, .entry-workspace-menu, .skin-picker-menu, .entry-context-menu, .source-suggestions):not([hidden]))) > .app-tooltip:is(.chip-list-tooltip, .tag-info-tooltip, .rich-tooltip) {
       --material-rich-tooltip-background: var(--layered-acrylic-tint);
       --material-rich-tooltip-filter: var(--layered-acrylic-filter);
+      background-image: var(--layered-acrylic-grain);
     }
   }
 }

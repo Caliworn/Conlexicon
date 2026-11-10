@@ -131,7 +131,7 @@ async function checkWrites(port) {
 async function checkStaticResources(port) {
   const expectedTypes = {
     ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
-    ".js": "text/javascript; charset=utf-8", ".jpg": "image/jpeg", ".ttf": "font/ttf",
+    ".js": "text/javascript; charset=utf-8", ".jpg": "image/jpeg", ".png": "image/png", ".ttf": "font/ttf",
   };
   for (const file of PUBLIC_STATIC_FILES) {
     const content = await fs.readFile(path.join(ROOT_DIR, file));
