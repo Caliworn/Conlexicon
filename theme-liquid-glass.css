@@ -369,14 +369,14 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button {
   box-shadow: none;
   color: var(--material-navigation-text);
   transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease;
+    background-color var(--theme-paint-duration, 160ms) ease,
+    border-color var(--theme-paint-duration, 160ms) ease,
+    color var(--theme-paint-duration, 160ms) ease;
 }
 
 body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button .tool-icon {
   opacity: 0.82;
-  transition: color 160ms ease, opacity 160ms ease;
+  transition: color var(--theme-paint-duration, 160ms) ease, opacity 160ms ease;
 }
 
 body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button .tool-label {
@@ -399,9 +399,9 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel :where(.utility-button, .nav
   box-shadow: var(--control-current-shadow);
   color: var(--control-current-color);
   transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease;
+    background-color var(--theme-paint-duration, 160ms) ease,
+    border-color var(--theme-paint-duration, 160ms) ease,
+    color var(--theme-paint-duration, 160ms) ease;
 }
 
 body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button.active {

@@ -77,6 +77,38 @@ body {
   color: var(--ui-text);
 }
 
+html.theme-switching,
+html.theme-switching-instant {
+  --theme-paint-duration: 0ms;
+}
+
+html.theme-switching {
+  --theme-switch-duration: 160ms;
+}
+
+html.theme-switching::view-transition-group(root) {
+  animation-duration: var(--theme-switch-duration);
+}
+
+html.theme-switching::view-transition-old(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+html.theme-switching::view-transition-new(root) {
+  animation: reveal-theme var(--theme-switch-duration) ease-out both;
+  mix-blend-mode: normal;
+  /* Blend the old and new palettes only along the moving edge. */
+  mask-image: linear-gradient(90deg, black calc(50% - 18px), transparent calc(50% + 18px));
+  mask-size: calc(200% + 48px) 100%;
+  mask-repeat: no-repeat;
+}
+
+@keyframes reveal-theme {
+  from { mask-position: 100% 0; }
+  to { mask-position: 0 0; }
+}
+
 [hidden] {
   display: none !important;
 }
@@ -237,9 +269,12 @@ body.mobile-drawer-open {
 }
 
 .theme-toggle-glyph {
+  --theme-glyph-duration: var(--theme-switch-duration, var(--theme-paint-duration, 180ms));
   transform-box: fill-box;
   transform-origin: center;
-  transition: opacity 180ms cubic-bezier(0.22, 0.75, 0.25, 1), transform 180ms cubic-bezier(0.22, 0.75, 0.25, 1);
+  transition:
+    opacity var(--theme-glyph-duration) cubic-bezier(0.22, 0.75, 0.25, 1),
+    transform var(--theme-glyph-duration) cubic-bezier(0.22, 0.75, 0.25, 1);
 }
 
 .theme-toggle-button[data-theme-state="light"] .theme-toggle-sun,
@@ -520,7 +555,7 @@ fieldset {
   width: var(--list-navigator-thumb-width);
   border-radius: var(--radius-pill);
   background: var(--list-navigator-thumb);
-  transition: width 120ms ease, left 120ms ease, background-color 120ms ease;
+  transition: width 120ms ease, left 120ms ease, background-color var(--theme-paint-duration, 120ms) ease;
   will-change: transform;
 }
 
@@ -1426,7 +1461,7 @@ textarea {
   color: var(--ui-text);
   font-weight: 600;
   outline: none;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  transition: border-color var(--theme-paint-duration, 120ms) ease, box-shadow var(--theme-paint-duration, 120ms) ease;
 }
 
 input:not([type="checkbox"]):not([type="radio"]),
@@ -2009,7 +2044,10 @@ label span {
   border: 1px solid transparent;
   border-radius: 6px;
   padding: var(--entry-display-header-inset) var(--entry-display-header-inset) 20px;
-  transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+  transition:
+    background-color var(--theme-paint-duration, 140ms) ease,
+    border-color var(--theme-paint-duration, 140ms) ease,
+    box-shadow var(--theme-paint-duration, 140ms) ease;
 }
 
 .entry-display-header::after {
@@ -2252,7 +2290,10 @@ label span {
   padding: var(--material-entry-detail-section-padding);
   background: var(--material-entry-detail-section-surface);
   box-shadow: var(--material-entry-detail-section-edge);
-  transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+  transition:
+    background-color var(--theme-paint-duration, 140ms) ease,
+    border-color var(--theme-paint-duration, 140ms) ease,
+    box-shadow var(--theme-paint-duration, 140ms) ease;
 }
 
 .display-section::before {
@@ -5948,7 +5989,10 @@ input[type="checkbox"].switch {
   color: var(--switch-current-thumb);
   appearance: none;
   cursor: pointer;
-  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+  transition:
+    background-color var(--theme-paint-duration, 120ms) ease,
+    border-color var(--theme-paint-duration, 120ms) ease,
+    color var(--theme-paint-duration, 120ms) ease;
 }
 
 input[type="checkbox"].switch::before {
@@ -6807,7 +6851,10 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
   stroke-width: 1.5;
   vector-effect: non-scaling-stroke;
   filter: var(--material-network-node-shadow);
-  transition: fill 180ms ease, stroke 180ms ease, filter 180ms ease;
+  transition:
+    fill var(--theme-paint-duration, 180ms) ease,
+    stroke var(--theme-paint-duration, 180ms) ease,
+    filter var(--theme-paint-duration, 180ms) ease;
 }
 
 .network-svg-node:hover rect,
@@ -7349,6 +7396,11 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html.theme-switching::view-transition-group(root),
+  html.theme-switching::view-transition-new(root) {
+    animation: none;
+  }
+
   .app-shell,
   .dictionary-panel,
   .nav-collapse-icon,

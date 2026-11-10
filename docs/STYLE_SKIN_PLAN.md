@@ -71,7 +71,12 @@ aria-checked、aria-selected 或 aria-pressed。selected/selected-hover/selected
 Enter/Space 手动激活，跳过禁用项，重绘后恢复焦点。质量分组属于同一 tablist。
 词根模式通过 aria-pressed 接入选中配方，设置名保持恒定；词根状态由应用更新，
 不随皮肤或布局创建、移除。语言切换仍为目标语言命令，不添加 pressed。
-主题保留固定名称和 aria-pressed，但用太阳／月亮表达当前状态，不启用常驻选中底；仍复用导航的普通交互配方。
+主题按钮使用固定名称和 `aria-pressed`，太阳／月亮显示当前状态。按钮复用导航的普通交互配方。
+
+三套皮肤的明暗按钮共用同一条转场。JS 在 `startViewTransition()` 的更新回调一次性提交主题及图标状态。CSS 在 `html.theme-switching` 作用域通过 `--theme-paint-duration` 暂停局部换色。整页遮罩和太阳／月亮的旋转淡换共用 `--theme-switch-duration` 的 160ms 时长。遮罩从导航侧揭示新画面，前后画面只在 36px 的柔边内混合。减少动态、页面隐藏或浏览器缺少转场能力时，`html.theme-switching-instant` 即时更新配色和图标。
+
+更新完成后开始异步保存主题偏好。转场结束即恢复局部控件的过渡配方。应用在转场和保存都结束后接收下一次主题激活，并保留按钮焦点。保存失败时即时恢复原主题并显示提示。
+
 内容折叠、整个列表、导航展开与皮肤菜单使用静态 data-control-disclosure 标记，
 直接读取已有 aria-expanded；箭头和布局仍由原组件负责。展开配方解析背景、边框与阴影，
 hover/pressed/disabled 优先，展开不等于选中。

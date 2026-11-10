@@ -25,6 +25,7 @@ let entrySort = "lemmaAsc";
 let toastTimer = null;
 let editorMode = "display";
 let currentTheme = "light";
+let themeChangePending = false;
 let currentSkin = "classic";
 let currentLanguage = "zh";
 let loadedDictionaryIds = new Set();
@@ -3115,6 +3116,39 @@ function renderAppearanceChange() {
   applyAppearance();
   applyLocale();
   liquidGlassOpticalEngine?.syncMappedSurfaces();
+}
+
+function changeThemeAppearance(theme, animate = false) {
+  const root = document.documentElement;
+  const update = () => {
+    currentTheme = theme;
+    state.uiTheme = theme;
+    cacheUiPreferences({ uiTheme: theme });
+    renderAppearanceChange();
+  };
+  const canAnimate = animate && !document.hidden
+    && !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    && typeof document.startViewTransition === "function"
+    && CSS.supports("mask-image", "linear-gradient(black, transparent)");
+
+  const scope = canAnimate ? "theme-switching" : "theme-switching-instant";
+  let transition = null;
+  root.classList.add(scope);
+  try {
+    if (canAnimate) {
+      transition = document.startViewTransition(update);
+      return {
+        applied: transition.updateCallbackDone,
+        finished: transition.finished.finally(() => root.classList.remove(scope)),
+      };
+    }
+    update();
+    // Commit the new styles before restoring component transitions in this task.
+    void document.body.offsetHeight;
+    return null;
+  } finally {
+    if (!transition) root.classList.remove(scope);
+  }
 }
 
 function renderActiveView(options = {}) {
@@ -18585,33 +18619,30 @@ elements.ipaForm.addEventListener("click", (event) => {
 elements.deleteDictionaryButton.addEventListener("click", deleteSelectedDictionary);
 elements.importInput.addEventListener("change", importData);
 elements.themeToggleButton.addEventListener("click", async () => {
+  if (themeChangePending) return;
+  themeChangePending = true;
   const previousTheme = currentTheme;
   const nextTheme = currentTheme === "dark" ? "light" : "dark";
-  currentTheme = nextTheme;
-  state.uiTheme = nextTheme;
-  cacheUiPreferences({ uiTheme: nextTheme });
-  renderAppearanceChange();
-  if (!backendAvailable) {
-    return;
-  }
-  elements.themeToggleButton.disabled = true;
   try {
-    const saved = await api("/api/preferences", {
-      method: "PUT",
-      body: JSON.stringify({ uiTheme: nextTheme }),
+    const appearance = changeThemeAppearance(nextTheme, true);
+    const save = Promise.resolve(appearance?.applied).then(async () => {
+      if (!backendAvailable) return nextTheme;
+      const saved = await api("/api/preferences", {
+        method: "PUT",
+        body: JSON.stringify({ uiTheme: nextTheme }),
+      });
+      return normalizeUiTheme(saved.uiTheme);
     });
-    currentTheme = normalizeUiTheme(saved.uiTheme);
-    state.uiTheme = currentTheme;
-    cacheUiPreferences({ uiTheme: currentTheme });
-    renderAppearanceChange();
-  } catch (error) {
-    currentTheme = previousTheme;
-    state.uiTheme = previousTheme;
-    cacheUiPreferences({ uiTheme: previousTheme });
-    renderAppearanceChange();
-    showApiErrorToast(error, "themeSaveFailed");
+    // Reconcile the saved preference after the shared transition releases its paint scope.
+    const [saveResult] = await Promise.allSettled([save, appearance?.finished]);
+    if (saveResult.status === "rejected") {
+      changeThemeAppearance(previousTheme);
+      showApiErrorToast(saveResult.reason, "themeSaveFailed");
+    } else if (saveResult.value !== currentTheme) {
+      changeThemeAppearance(saveResult.value);
+    }
   } finally {
-    elements.themeToggleButton.disabled = false;
+    themeChangePending = false;
   }
 });
 elements.skinToggleButton.addEventListener("click", () => {
