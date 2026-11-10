@@ -1,3 +1,4 @@
+.skin-picker-preview-layered-glass,
 body[data-ui-skin="layered-glass"] {
   color-scheme: light;
 
@@ -133,6 +134,7 @@ body[data-ui-skin="layered-glass"] {
   --layered-selection-background: color-mix(in srgb, var(--ui-accent) 7%, var(--material-list-item-background));
 }
 
+body.dark-theme .skin-picker-preview-layered-glass,
 body.dark-theme[data-ui-skin="layered-glass"] {
   color-scheme: dark;
 
@@ -403,10 +405,10 @@ body[data-ui-skin="layered-glass"] .toast {
   }
 }
 
-/* Picker previews remain unscoped so every candidate renders under every active skin. */
+/* The preview reads its own token scope (see the first rule of this file). */
 .skin-picker-preview.skin-picker-preview-layered-glass {
-  border-color: #c0c9ce;
-  background: #e5eaed;
+  border-color: var(--ui-border-strong);
+  background: var(--ui-canvas-bg);
 }
 
 .skin-picker-preview.skin-picker-preview-layered-glass::before,
@@ -415,9 +417,9 @@ body[data-ui-skin="layered-glass"] .toast {
   right: 3px;
   left: 14px;
   height: 7px;
-  border: 1px solid #cdd5d9;
+  border: 1px solid var(--ui-border);
   border-radius: 2px;
-  background: #fcfcfd;
+  background: var(--material-entry-detail-section-background);
   content: "";
 }
 
@@ -427,5 +429,5 @@ body[data-ui-skin="layered-glass"] .toast {
 
 .skin-picker-preview.skin-picker-preview-layered-glass::after {
   bottom: 3px;
-  box-shadow: -7px 0 0 -2px #0f6cbd;
+  box-shadow: -7px 0 0 -2px var(--ui-accent);
 }

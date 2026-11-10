@@ -12,6 +12,7 @@ body:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-glass"])) .di
   --control-selected-disabled-color: var(--material-navigation-muted);
 }
 
+.skin-picker-preview-classic,
 body:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-glass"])) {
   color-scheme: light;
 
@@ -141,6 +142,7 @@ body:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-glass"])) {
   --material-network-status-filter: blur(10px);
 }
 
+body.dark-theme .skin-picker-preview-classic,
 body.dark-theme:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-glass"])) {
   color-scheme: dark;
   --ui-canvas-bg: #151a1d;
@@ -212,7 +214,6 @@ body.dark-theme:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-gl
   --material-overlay-panel-background: var(--material-floating-background);
 }
 
-/* Picker previews remain unscoped so every candidate renders under every active skin. */
 .skin-picker-preview.skin-picker-preview-classic::before {
   position: absolute;
   inset: 0 62% 0 0;

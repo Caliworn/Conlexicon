@@ -1090,6 +1090,15 @@ for (const [skinName, source, previewClass] of [
     source.includes(`.skin-picker-preview.skin-picker-preview-${previewClass}`),
     `${skinName} must own its skin picker preview appearance`,
   );
+  // The picker lists every skin under whichever skin is active; a preview that reads the
+  // active skin's tokens shows the wrong candidate, so it must be a token scope of its own skin.
+  assert(
+    source.includes(`.skin-picker-preview-${previewClass},
+body`)
+      && source.includes(`body.dark-theme .skin-picker-preview-${previewClass},
+body.dark-theme`),
+    `${skinName} preview must share its skin's light and dark token scopes`,
+  );
 }
 assert(
   numericLayer("--layer-drawer") < numericLayer("--layer-floating-menu")

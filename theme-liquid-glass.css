@@ -1,3 +1,4 @@
+.skin-picker-preview-liquid-glass,
 body[data-ui-skin="liquid-glass"] {
   color-scheme: light;
 
@@ -164,6 +165,7 @@ body[data-ui-skin="liquid-glass"] {
   --liquid-glass-modal-surface-tint: rgba(235, 246, 248, 0.32);
 }
 
+body.dark-theme .skin-picker-preview-liquid-glass,
 body.dark-theme[data-ui-skin="liquid-glass"] {
   color-scheme: dark;
 
@@ -1196,7 +1198,7 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
   }
 }
 
-/* Picker previews remain unscoped so every candidate renders under every active skin. */
+/* The preview reads its own token scope (see the first rule of this file). */
 .skin-picker-preview.skin-picker-preview-liquid-glass {
   overflow: hidden;
   border-color: color-mix(in srgb, var(--ui-text-on-solid) 48%, transparent);
