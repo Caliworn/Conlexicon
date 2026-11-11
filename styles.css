@@ -2596,6 +2596,7 @@ button.derived-link:hover {
   color: var(--ui-text-muted);
   font-size: 0.78rem;
   font-weight: 800;
+  overflow-wrap: anywhere;
 }
 
 /* Still resolving whether the source exists: a placeholder, not a control. */

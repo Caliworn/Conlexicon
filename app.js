@@ -3010,12 +3010,15 @@ function entryParts(entry, dictionary = activeDictionary()) {
   return tagModel.entryParts({ tags: entryEffectiveTags(entry, dictionary) }, tagRegistry(dictionary));
 }
 
-// Card subtitles show only the parts of speech on the entry itself; parts on
-// definitions lead their meanings instead.
-function entryOwnPartText(entry, dictionary = activeDictionary(), { raw = false } = {}) {
-  return entryParts({ tags: entry.tags || [] }, dictionary)
+function entryPartText(entry, dictionary = activeDictionary(), { raw = false } = {}) {
+  return entryParts(entry, dictionary)
     .map((part) => partLabelText(part, raw, dictionary))
     .join(", ");
+}
+
+// Definition parts of speech appear with their meanings in list and hover cards.
+function entryOwnPartText(entry, dictionary, options) {
+  return entryPartText({ tags: entry.tags || [] }, dictionary, options);
 }
 
 // Part-of-speech text shows the display replacement unless the raw tag is asked for.
@@ -8990,7 +8993,7 @@ function renderDerivedEntryList(container, derived = [], dictionary = activeDict
       card.type = "button";
     }
     card.className = interactive ? "derived-link" : "derived-link derived-readonly";
-    const partText = entryOwnPartText(derivedEntry, dictionary);
+    const partText = entryPartText(derivedEntry, dictionary);
     card.innerHTML = `
       <strong>${escapeHtml(derivedEntry.lemma)}</strong>
       ${partText ? `<span>${escapeHtml(partText)}</span>` : ""}
@@ -9340,7 +9343,7 @@ function updateLexicalNetworkNodeElement(group, node, position) {
   group.dataset.appTooltipVariant = "rich";
   group.dataset.appTooltipHtml = entrySummaryTooltipHtml(node.entry);
   const pronunciationText = String(node.entry.pronunciation || "");
-  const partText = entryOwnPartText(node.entry);
+  const partText = entryPartText(node.entry);
   group.setAttribute("aria-label", [node.entry.lemma, pronunciationText, partText].filter(Boolean).join(", "));
   group.classList.toggle("focus", node.role === "focus");
   group.classList.toggle("source", node.role === "source");
