@@ -27,8 +27,34 @@
           document.body.classList.remove("dark-theme");
           delete document.body.dataset.uiSkin;
         }
+        // An engine can accept the CSS syntax without painting an SVG backdrop.
+        if (/\b(?:Headless)?Chrom(?:e|ium)\/\d/.test(navigator.userAgent)
+            && CSS.supports("backdrop-filter", 'url("#layered-acrylic-light")')) {
+          document.body.dataset.layeredAcrylic = "winui";
+        }
       })();
     </script>
+    <svg width="0" height="0" aria-hidden="true" focusable="false" style="position: absolute; pointer-events: none">
+      <defs>
+        <!-- The WinUI brush rounds each blend opacity to an eight-bit alpha. -->
+        <filter id="layered-acrylic-light" x="-50%" y="-75%" width="200%" height="250%" color-interpolation-filters="sRGB">
+          <feFlood flood-color="#f9f9f9" result="matte"/>
+          <feComposite in="SourceGraphic" in2="matte" operator="over" result="opaque"/>
+          <feGaussianBlur in="opaque" stdDeviation="30" edgeMode="duplicate" result="blurred"/>
+          <feFlood flood-color="#fcfcfc" flood-opacity="0.85098039" result="luminosity"/>
+          <feBlend in="luminosity" in2="blurred" mode="luminosity"/>
+        </filter>
+        <filter id="layered-acrylic-dark" x="-50%" y="-75%" width="200%" height="250%" color-interpolation-filters="sRGB">
+          <feFlood flood-color="#2c2c2c" result="matte"/>
+          <feComposite in="SourceGraphic" in2="matte" operator="over" result="opaque"/>
+          <feGaussianBlur in="opaque" stdDeviation="30" edgeMode="duplicate" result="blurred"/>
+          <feFlood flood-color="#2c2c2c" flood-opacity="0.96078431" result="luminosity"/>
+          <feBlend in="luminosity" in2="blurred" mode="luminosity" result="balanced"/>
+          <feFlood flood-color="#2c2c2c" flood-opacity="0.14901961" result="tint"/>
+          <feBlend in="tint" in2="balanced" mode="color"/>
+        </filter>
+      </defs>
+    </svg>
     <svg id="liquidGlassFilterDefs" width="0" height="0" aria-hidden="true" focusable="false" style="position: absolute; overflow: hidden; pointer-events: none">
       <defs></defs>
     </svg>

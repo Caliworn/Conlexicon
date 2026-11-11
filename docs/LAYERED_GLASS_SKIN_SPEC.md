@@ -16,13 +16,17 @@
 | 面板与内容外壳 | `#f0f3f6` | `#252a30` | 实色底与 1px 细边。词条查看、完整编辑与标有 `data-surface="content-shell"` 的工具卡片共用 8px 圆角和轻投影。 |
 | 详情分区、词条卡片、内嵌底色 | `#ffffff` | `#30373f` | 比外壳更亮的实色。详情分区与词条卡片使用 4px 圆角和细边，详情分区间距 8px。 |
 | 普通控件 | `#ffffff` | `#333739` | 普通和移动控件圆角 4px，字段使用清晰描边，独立按钮的底边比顶边深。 |
-| 小型菜单、来源建议、结构化 tooltip | `#fcfdfd`，70% 不透明 | `#272a2c`，80% 不透明 | `blur(15px)`、细边、8px 圆角与轻投影。 |
-| 应用内弹窗、词汇网络 | `#f0f3f6`，70% 不透明 | `#252a30`，80% 不透明 | `blur(20px)`、边框与投影。弹窗暗幕为浅色 28%、暗色 42%，词汇网络暗幕为浅色 34%、暗色 48%。 |
+| 小型菜单、来源建议、结构化 tooltip | WinUI 浅色亚克力 | WinUI 暗色亚克力 | 细边、8px 圆角与轻投影。 |
+| 应用内弹窗、词汇网络 | WinUI 浅色亚克力 | WinUI 暗色亚克力 | 边框与投影。弹窗暗幕为浅色 28%、暗色 42%，词汇网络暗幕为浅色 34%、暗色 48%。 |
 | 普通 tooltip、toast、质量提示与列表导航条标记 | 实色 | 实色 | 保持高对比，质量提示和导航条标记可以与其他浮层同时出现。 |
 
-浅色与暗色的云母色、亚克力模糊和不透明度是适配词典界面的 Web 参数。材质分工参考 Windows 的 Mica、Acrylic 和 Smoke。圆角沿用 Windows 11 的 4px 控件、8px 容器取值，详情分区采用 Fluent 2 的 8px 间距。 [Windows 材质](https://learn.microsoft.com/en-us/windows/apps/design/signature-experiences/materials) · [Windows 11 圆角](https://learn.microsoft.com/en-us/windows/apps/design/signature-experiences/geometry) · [Fluent 2 布局](https://fluent2.microsoft.design/layout)
+材质分工参考 Windows 的 Mica、Acrylic 和 Smoke。圆角沿用 Windows 11 的 4px 控件、8px 容器取值，详情分区采用 Fluent 2 的 8px 间距。 [Windows 材质](https://learn.microsoft.com/en-us/windows/apps/design/signature-experiences/materials) · [Windows 11 圆角](https://learn.microsoft.com/en-us/windows/apps/design/signature-experiences/geometry) · [Fluent 2 布局](https://fluent2.microsoft.design/layout)
 
-亚克力以实色表面为基础，在浏览器支持 backdrop blur 且允许透明材质时增强。采样优先给最前方的弹窗或词汇网络，其次是最前方的菜单，再其次是当前输入框的来源建议和独立的结构化 tooltip。下层浮层使用实色，常驻 backdrop blur 为零，临时 backdrop blur 最多一层。背景亮度和饱和度均为 100%。底色上平铺 96 × 96 的静态噪点，像素不透明度上限为浅色 8/255、暗色 4/255。移动抽屉沿用独立遮罩。
+产品在支持 SVG 背景滤镜的 Chromium 浏览器使用 WinUI 应用内画刷 Default 的网页配方。先用不透明衬底补齐背景，再在 sRGB 中用标准差 30px 的高斯模糊、亮度混合与染色混合处理。浅色用 `#fcfcfc`、85% 亮度层、0% 染色层和 `#f9f9f9` 衬底，暗色用 `#2c2c2c`、96% 亮度层、15% 染色层和同色衬底。两种主题共用一张 256 × 256 的静态细噪点贴图，不透明度为 5/255。 [WinUI 主题资源](https://github.com/microsoft/microsoft-ui-xaml/blob/main/controls/dev/Materials/Acrylic/AcrylicBrush_themeresources.xaml#L43-L105) · [合成源码](https://github.com/microsoft/microsoft-ui-xaml/blob/main/controls/dev/Materials/Acrylic/AcrylicBrush.cpp#L347-L377)
+
+其他支持普通背景模糊的浏览器使用原有配方。小浮层模糊 15px，底色为浅色 `#fcfdfd`、暗色 `#272a2c`。弹窗和词汇网络模糊 20px，底色为浅色 `#f0f3f6`、暗色 `#252a30`。底色不透明度为浅色 70%、暗色 80%，细噪点不透明度峰值分别为 8/255 和 4/255。
+
+采样优先给最前方的弹窗或词汇网络，其次是最前方的菜单，再其次是当前输入框的来源建议和独立的结构化 tooltip。下层浮层使用实色，常驻背景模糊为零，临时背景模糊最多一层。移动抽屉使用独立遮罩。
 
 ## 选中、按压与焦点
 

@@ -131,6 +131,7 @@ body[data-ui-skin="layered-glass"] {
   --layered-acrylic-tint: rgb(252 253 253 / 70%);
   --layered-overlay-tint: rgb(240 243 246 / 70%);
   --layered-acrylic-grain: url("assets/layered-glass/acrylic-grain-light.png");
+  --layered-winui-acrylic-filter: url("#layered-acrylic-light");
   --layered-control-transition:
     background-color var(--theme-paint-duration, 150ms) ease-out,
     border-color var(--theme-paint-duration, 150ms) ease-out;
@@ -182,6 +183,7 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --layered-acrylic-tint: rgb(39 42 44 / 80%);
   --layered-overlay-tint: rgb(37 42 48 / 80%);
   --layered-acrylic-grain: url("assets/layered-glass/acrylic-grain-dark.png");
+  --layered-winui-acrylic-filter: url("#layered-acrylic-dark");
 }
 
 body[data-ui-skin="layered-glass"] [data-surface="content-shell"] {
@@ -295,32 +297,34 @@ body[data-ui-skin="layered-glass"] .toast {
   color: var(--material-tooltip-text);
 }
 
-/* Only the foremost popup samples the backdrop. Its grain is a static tile
-   painted over the tint so it shares the surface's clipping and geometry. */
+/* Only one eligible popup samples the backdrop. Its grain is a static
+   background image, clipped together with the rest of the surface. */
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   @media (not (prefers-reduced-transparency: reduce)) and (not (forced-colors: active)) {
-    body[data-ui-skin="layered-glass"] {
-      --layered-acrylic-filter: blur(15px);
+    body[data-ui-skin="layered-glass"][data-layered-acrylic="winui"] {
+      --layered-acrylic-filter: var(--layered-winui-acrylic-filter);
+      --layered-acrylic-fill: transparent;
+      --layered-acrylic-grain: url("assets/layered-glass/acrylic-grain-winui.png");
     }
 
     body[data-ui-skin="layered-glass"] > :nth-last-child(1 of :is(.network-overlay, .modal-overlay):not([hidden])) > :is(.network-panel, .modal-panel) {
-      --material-overlay-panel-background: var(--layered-overlay-tint);
-      --material-floating-filter: blur(20px);
+      --material-overlay-panel-background: var(--layered-acrylic-fill, var(--layered-overlay-tint));
+      --material-floating-filter: var(--layered-acrylic-filter, blur(20px));
       background-image: var(--layered-acrylic-grain);
       -webkit-backdrop-filter: var(--material-floating-filter);
     }
 
     body[data-ui-skin="layered-glass"]:not(:has(> :is(.network-overlay, .modal-overlay):not([hidden]))) > :nth-last-child(1 of :is(.entry-workspace-menu, .skin-picker-menu, .entry-context-menu):not([hidden])),
     body[data-ui-skin="layered-glass"]:not(:has(> :is(.network-overlay, .modal-overlay, .entry-workspace-menu, .skin-picker-menu, .entry-context-menu):not([hidden]))) .source-reference-field:focus-within > .source-suggestions:not([hidden]) {
-      --material-floating-background: var(--layered-acrylic-tint);
-      --material-floating-filter: var(--layered-acrylic-filter);
+      --material-floating-background: var(--layered-acrylic-fill, var(--layered-acrylic-tint));
+      --material-floating-filter: var(--layered-acrylic-filter, blur(15px));
       background-image: var(--layered-acrylic-grain);
       -webkit-backdrop-filter: var(--material-floating-filter);
     }
 
     body[data-ui-skin="layered-glass"]:not(:has(:is(.network-overlay, .modal-overlay, .entry-workspace-menu, .skin-picker-menu, .entry-context-menu, .source-suggestions):not([hidden]))) > .app-tooltip:is(.chip-list-tooltip, .tag-info-tooltip, .rich-tooltip) {
-      --material-rich-tooltip-background: var(--layered-acrylic-tint);
-      --material-rich-tooltip-filter: var(--layered-acrylic-filter);
+      --material-rich-tooltip-background: var(--layered-acrylic-fill, var(--layered-acrylic-tint));
+      --material-rich-tooltip-filter: var(--layered-acrylic-filter, blur(15px));
       background-image: var(--layered-acrylic-grain);
     }
   }
