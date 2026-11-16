@@ -494,9 +494,10 @@ fieldset {
   --list-navigator-width: 20px;
 }
 
-/* The virtual list re-anchors itself as soon as row heights are measured
-   (immediateSizeUpdates in app.js); browser scroll anchoring would compensate a
-   second time, and it loses its anchor node whenever rows are replaced. */
+/* The virtual list re-anchors itself as soon as row heights are measured (its
+   ResizeObserver in app.js); browser scroll anchoring would compensate a second
+   time, and it loses its anchor node whenever rows are replaced. The corpus
+   list keeps browser anchoring: its rows have fixed heights and never remeasure. */
 .entry-list-update-frame.has-list-navigator > .entry-list {
   overflow-anchor: none;
   scrollbar-width: none;
