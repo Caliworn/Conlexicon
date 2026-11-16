@@ -4230,6 +4230,22 @@ span.pending-source {
   min-width: 0;
 }
 
+/* Tags lead the meaning as they do in the detail view; the narrow column
+   keeps the meaning the main field. */
+.definition-meaning-row {
+  display: grid;
+  grid-template-columns: minmax(0, 7em) minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .definition-meaning-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .definition-remove-button {
   display: inline-grid;
   place-items: center;

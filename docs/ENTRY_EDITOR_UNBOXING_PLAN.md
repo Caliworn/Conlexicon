@@ -48,7 +48,7 @@ form#entryForm                         外壳（不变：editor-panel / 皮肤 e
   section.display-section.entry-editor-section[data-entry-form-section=definitions]
     .section-heading 释义                         [添加释义]
     .definition-form-list
-      .definition-form-card（无框）  编号槽 1 | 含义 / 例句 / 释义备注 / [+例句][+备注]  [移除]
+      .definition-form-card（无框）  编号槽 1 | 标签 + 含义 / 例句 / 释义备注 / [+例句][+备注]  [移除]
       细线或间距
       .definition-form-card（无框）  编号槽 2 | …
   section … etymology / derived（只读）/ morphology / notes

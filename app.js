@@ -378,7 +378,7 @@ const i18n = {
     rowLabels: "行标签",
     columnLabels: "列标签",
     autoMatchTags: "自动匹配词条标签",
-    autoMatchTagsHelp: "词条包含其中任一标签时，将匹配此表格组；若多个表格组同时匹配，只使用排序最前的组。多个标签可用半角逗号、全角逗号或顿号分隔。",
+    autoMatchTagsHelp: "词条包含其中任一标签时，将匹配此表格组；若多个表格组同时匹配，只使用排序最前的组。多个标签用逗号或顿号分隔。",
     applySize: "应用尺寸",
     removeTable: "删除表格",
     removeMorphologyTableGroup: "删除表格组",
@@ -393,11 +393,11 @@ const i18n = {
     restoreAutoMorphologyConfirm: "恢复自动匹配将放弃当前手动形态组及其标题、备注和单元格覆盖。是否继续？",
     addEntryMorphologyGroup: "添加形态组",
     removeEntryMorphologyGroup: "移除形态组",
-    entryMorphologyGroupTitle: "组标题覆盖",
+    entryMorphologyGroupTitle: "组标题",
     entryMorphologyGroupNotes: "词条形态备注",
     morphologyGroupNote: "形态组备注",
     useTemplateGroupTitle: "留空则使用表格组标题",
-    morphologyOverrideHelp: "留空则使用表格规则；填写内容会覆盖对应栏目。",
+    morphologyOverrideHelp: "单元格留空则使用表格规则。",
     morphologySyntaxTitle: "形态语法",
     morphologySyntaxInfo: "查看形态语法",
     corpusSyntaxTitle: "语料格式说明",
@@ -553,11 +553,11 @@ const i18n = {
     pronunciation: "发音",
     autoIpa: "自动 IPA",
     tagsLabel: "标签",
-    tagsHelp: "填写词条标签；词性也作为标签在这里输入。多个标签可用半角逗号、全角逗号或顿号分隔。已配置为词性的标签会按词性显示。",
+    tagsHelp: "用逗号或顿号分隔。词性也写在这里。",
     addDefinition: "添加释义",
     sourceEntry: "来源词条",
-    sourceReferenceHint: "选择建议添加引用；纯文本保留在输入框，以逗号分隔。拖动卡片排序，或聚焦卡片后按 Alt+方向键。",
-    sourceReferenceHintShort: "选择候选以链接词条，纯文本用逗号分隔。",
+    sourceReferenceHint: "选择候选以连接词条；纯文本保留在输入框，以逗号或顿号分隔。拖动卡片排序，或聚焦卡片后按 Alt+方向键。",
+    sourceReferenceHintShort: "选择候选以连接词条，纯文本用逗号或顿号分隔。",
     sourceCandidatesLoading: "正在查找…",
     sourceCandidatesMore: "共 {total} 项，继续输入以缩小范围",
     sourceCandidatesFailed: "候选加载失败",
@@ -745,7 +745,7 @@ const i18n = {
     entries: "个词条",
     roots: "个词根",
     noEntries: "还没有词条",
-    noEntriesBody: "新建第一个词条后，这里会显示词条详情。",
+    noEntriesBody: "新建的词条会显示在这里。",
     noMatch: "没有匹配的词条",
     noMatchBody: "可以新建词条，或调整搜索与筛选条件。",
     entryResultsTruncated: "当前仅加载 {loaded} / {total} 个词条",
@@ -760,7 +760,6 @@ const i18n = {
     example: "例句",
     definitionNote: "释义备注",
     definitionTags: "释义标签",
-    definitionTagsHelp: "填写这条释义的标签，例如它的词性。多个标签可用半角逗号、全角逗号或顿号分隔。",
     removeDefinition: "删除释义",
     none: "无",
     requiredEntry: "请填写词形",
@@ -812,8 +811,8 @@ const i18n = {
     writeNewExample: "写新例句",
     newExamplePlaceholder: "写下例句，保存词条时会存入语料库",
     removeNewExample: "移除这条新例句",
-    exampleSearchPlaceholder: "检索语料，空白时按 Tab 填入词形",
-    exampleSearchLabel: "检索要连接的语料",
+    exampleSearchPlaceholder: "搜索语料，空白时按 Tab 填入词形",
+    exampleSearchLabel: "搜索要连接的语料",
     exampleAlreadyLinked: "已连接",
     noExampleMatches: "没有包含这段文字的语料",
     apiErrorCorpusItemNotFound: "这条语料已不存在",
@@ -1017,7 +1016,7 @@ const i18n = {
     rowLabels: "Row Labels",
     columnLabels: "Column Labels",
     autoMatchTags: "Automatic Entry Tag Matching",
-    autoMatchTagsHelp: "An entry matches this table group when it contains any listed tag. If multiple groups match, only the first group in the current order is used. Separate multiple tags with halfwidth commas, fullwidth commas, or ideographic commas.",
+    autoMatchTagsHelp: "An entry matches this table group when it contains any listed tag. If multiple groups match, only the first group in the current order is used. Separate tags with commas.",
     applySize: "Apply Size",
     removeTable: "Delete Table",
     removeMorphologyTableGroup: "Delete Table Group",
@@ -1032,11 +1031,11 @@ const i18n = {
     restoreAutoMorphologyConfirm: "Restoring auto matching will discard the current manual morphology groups, titles, notes, and cell overrides. Continue?",
     addEntryMorphologyGroup: "Add Morphology Group",
     removeEntryMorphologyGroup: "Remove Morphology Group",
-    entryMorphologyGroupTitle: "Group Title Override",
+    entryMorphologyGroupTitle: "Group Title",
     entryMorphologyGroupNotes: "Entry Morphology Notes",
     morphologyGroupNote: "Morphology Group Note",
     useTemplateGroupTitle: "Leave blank to use the template group title",
-    morphologyOverrideHelp: "Leave blank to use table rules; filled cells override that slot.",
+    morphologyOverrideHelp: "Blank cells use the table rules.",
     morphologySyntaxTitle: "Morphology Syntax",
     morphologySyntaxInfo: "Show morphology syntax",
     corpusSyntaxTitle: "Corpus Syntax",
@@ -1192,7 +1191,7 @@ const i18n = {
     pronunciation: "Pronunciation",
     autoIpa: "Auto IPA",
     tagsLabel: "Tags",
-    tagsHelp: "Enter entry tags here; parts of speech are tags too. Separate multiple tags with halfwidth commas, fullwidth commas, or ideographic commas. Configured part-of-speech tags are displayed as parts of speech.",
+    tagsHelp: "Separate with commas. Parts of speech go here too.",
     addDefinition: "Add Definition",
     sourceEntry: "Source Entry",
     sourceReferenceHint: "Choose a suggestion to link an entry. Keep plain text here, separated by commas. Drag a card, or focus it and press Alt+arrow keys to reorder.",
@@ -1384,7 +1383,7 @@ const i18n = {
     entries: "entries",
     roots: "roots",
     noEntries: "No entries yet",
-    noEntriesBody: "Create the first entry to show details here.",
+    noEntriesBody: "New entries appear here.",
     noMatch: "No matching entries",
     noMatchBody: "Create an entry, or adjust search and filters.",
     entryResultsTruncated: "Loaded {loaded} of {total} entries",
@@ -1400,9 +1399,7 @@ const i18n = {
     definitionNote: "Definition Note",
     addExample: "Add Example",
     addDefinitionNote: "Add Definition Note",
-    addDefinitionTags: "Add Definition Tags",
     definitionTags: "Definition Tags",
-    definitionTagsHelp: "Tags for this definition, such as its part of speech. Separate tags with halfwidth commas, fullwidth commas, or ideographic commas.",
     removeDefinition: "Remove Definition",
     none: "None",
     requiredEntry: "Fill lemma",
@@ -1612,7 +1609,6 @@ const i18n = {
 
 i18n.zh.addExample = "添加例句";
 i18n.zh.addDefinitionNote = "添加释义备注";
-i18n.zh.addDefinitionTags = "添加释义标签";
 i18n.zh.createSourceEntry = "新建来源词条：{source}";
 
 const SHORTCUT_HELP_GROUPS = Object.freeze([
@@ -5589,10 +5585,17 @@ function renderEntryListContent(options = {}) {
   entryListHasSettledContent = true;
 }
 
+// An empty dictionary and a search or filter without results read differently.
+function entryListEmptyState() {
+  return dictionaryEntryCount(activeDictionary()) === 0
+    ? emptyState(t("noEntries"), t("noEntriesBody"))
+    : emptyState(t("noMatch"), t("noMatchBody"));
+}
+
 function renderEntryRows(entries = [], options = {}) {
   const windowPages = Array.isArray(options.windowPages) ? options.windowPages : null;
   if (!entries.length && !windowPages?.some((page) => page.status !== "success" || page.items.length)) {
-    renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noMatch"), t("noMatchBody")));
+    renderVirtualListEmpty(elements.entryList, entryVirtualList, entryListEmptyState());
     return;
   }
 
@@ -5713,7 +5716,7 @@ function renderRootModeEntries(options = {}) {
 function renderRootModeGroups(groups = [], options = {}) {
   const windowPages = Array.isArray(options.windowPages) ? options.windowPages : null;
   if (!groups.length && !windowPages?.some((page) => page.status !== "success" || page.items.length)) {
-    renderVirtualListEmpty(elements.entryList, entryVirtualList, emptyState(t("noMatch"), t("noMatchBody")));
+    renderVirtualListEmpty(elements.entryList, entryVirtualList, entryListEmptyState());
     return;
   }
 
@@ -8697,29 +8700,26 @@ function renderDetail(options = {}) {
     return;
   }
 
+  // With nothing selected the panel stays empty; the list explains why.
   elements.entryDisplay.hidden = !entry && !state.selectedEntryId;
 
   if (!entry) {
-    elements.entryDisplay.hidden = false;
-    renderEmptyDetail();
     entryDetailHasSettledContent = false;
     if (state.selectedEntryId) {
-      if (selectedEntryDetailState.status === "error") {
-        elements.displayLemma.textContent = aText("无法加载词条详情", "Could not load entry details");
-      } else {
-        elements.displayLemma.textContent = aText("加载中", "Loading");
-      }
+      renderDetailStatus(selectedEntryDetailState.status === "error"
+        ? aText("无法加载词条详情", "Could not load entry details")
+        : aText("加载中", "Loading"));
     }
     return;
   }
 
-  elements.entryDisplay.hidden = false;
   renderEntryDisplay(entry);
   entryDetailHasSettledContent = true;
 }
 
-function renderEmptyDetail() {
-  elements.displayLemma.textContent = t("noEntries");
+// A selected entry that is loading or failed to load shows its status alone.
+function renderDetailStatus(title) {
+  elements.displayLemma.textContent = title;
   elements.displayPronunciation.textContent = "";
   elements.displayPronunciation.hidden = true;
   elements.displayPart.textContent = "";
@@ -8728,9 +8728,8 @@ function renderEmptyDetail() {
   delete elements.displayPart.dataset.entryTagIndex;
   delete elements.displayPart.dataset.entryTagValue;
   elements.displayTags.innerHTML = "";
-  elements.displayDefinitionsSection.hidden = false;
+  elements.displayDefinitionsSection.hidden = true;
   elements.displayDefinitions.innerHTML = "";
-  elements.displayDefinitions.append(emptyState(t("noEntries"), t("noEntriesBody")));
   elements.displayEtymologySection.hidden = true;
   elements.displayDerivedSection.hidden = true;
   elements.displayMorphologySection.hidden = true;
@@ -11886,7 +11885,7 @@ function renderMorphologyEntryControls(host, entry = {}, { full = false } = {}) 
         <select data-field="addMorphologyGroup">${availableGroups.map((group) => `<option value="${escapeHtml(group.id)}">${escapeHtml(group.name)}</option>`).join("")}</select>
         <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" type="button" data-action="add-entry-morphology-group" data-i18n="addEntryMorphologyGroup">${escapeHtml(t("addEntryMorphologyGroup"))}</button>
       </div>` : ""}
-    <p class="field-help" data-i18n="morphologyOverrideHelp">${escapeHtml(t("morphologyOverrideHelp"))}</p>
+    ${groups.length ? `<p class="field-help" data-i18n="morphologyOverrideHelp">${escapeHtml(t("morphologyOverrideHelp"))}</p>` : ""}
     <div class="entry-morphology-group-list">${groups.map(({ templateGroup, entryGroup }, index) => renderEntryMorphologyGroupEditor(templateGroup, entryGroup, previewEntry, state.morphologyMode, index, groups.length)).join("")}</div>
   `;
 }
@@ -11894,14 +11893,10 @@ function renderMorphologyEntryControls(host, entry = {}, { full = false } = {}) 
 function renderEntryMorphologyGroupEditor(templateGroup, entryGroup, entry, mode, index = 0, total = 1) {
   const group = entryGroup || { templateGroupId: templateGroup.id, title: "", notes: "", overrides: {} };
   const tables = templateGroup.tables.map((table) => renderEntryMorphologyOverrideTable(table, group, entry)).join("");
-  const modeLabelKey = mode === "auto" ? "morphologyAuto" : "morphologyManual";
   return `
     <section class="entry-morphology-group-card" data-template-group-id="${escapeHtml(templateGroup.id)}">
       <div class="entry-morphology-group-heading">
-        <div>
-          <strong>${escapeHtml(templateGroup.name)}</strong>
-          <span class="field-help" data-i18n="${modeLabelKey}">${escapeHtml(t(modeLabelKey))}</span>
-        </div>
+        <strong>${escapeHtml(templateGroup.name)}</strong>
         ${mode === "manual" ? `<div class="panel-actions"><button class="secondary-button" type="button" data-control-tone="neutral" data-action="move-entry-morphology-group-up" data-i18n="moveUp" ${index === 0 ? "disabled" : ""}>${escapeHtml(t("moveUp"))}</button><button class="secondary-button" type="button" data-control-tone="neutral" data-action="move-entry-morphology-group-down" data-i18n="moveDown" ${index === total - 1 ? "disabled" : ""}>${escapeHtml(t("moveDown"))}</button><button class="danger-ghost" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="remove-entry-morphology-group" data-i18n="removeEntryMorphologyGroup">${escapeHtml(t("removeEntryMorphologyGroup"))}</button></div>` : ""}
       </div>
       <div class="entry-morphology-group-fields">
@@ -11994,16 +11989,14 @@ function renderPartialMorphologyControls(entry) {
 }
 
 function definitionFormStateFromCard(card) {
-  const tagsInput = card.querySelector('[data-field="tags"]');
   return {
     id: card.dataset.definitionId || uid("def"),
     meaning: card.querySelector('[data-field="meaning"]')?.value.trim() || "",
     note: card.querySelector('[data-field="note"]')?.value.trim() || "",
-    tags: tagsInput ? parseTagListText(tagsInput.value) : [],
+    tags: parseTagListText(card.querySelector('[data-field="tags"]').value),
     examples: definitionExamplesFromCard(card),
     showExample: Boolean(card.querySelector("[data-definition-examples]")),
     showNote: Boolean(card.querySelector('[data-field="note"]')),
-    showTags: Boolean(tagsInput),
   };
 }
 
@@ -12028,22 +12021,14 @@ function definitionOptionalActionHtml(field, labelKey) {
   return `<button class="secondary-button additive-button" data-control-tone="accent" data-control-emphasis="outline" type="button" data-action="add-definition-optional" data-optional-definition-field="${field}" data-i18n="${escapeHtml(labelKey)}">${escapeHtml(t(labelKey))}</button>`;
 }
 
-function definitionShowsTags(definition = {}) {
-  return Boolean((definition.tags || []).length || definition.showTags);
-}
-
-// The tags field sits above the meaning, the way tags precede a meaning in the
-// detail view; like the example and note, it appears on demand.
-function definitionTagsFieldHtml(definition = {}) {
-  if (!definitionShowsTags(definition)) {
-    return "";
-  }
+// The tags lead the meaning on one row, the way they do in the detail view.
+// The number column and the placeholder stand in for visible field labels.
+function definitionMeaningRowHtml(definition = {}) {
   return `
-    <label>
-      <span data-i18n="definitionTags">${escapeHtml(t("definitionTags"))}</span>
-      <input data-field="tags" maxlength="180" value="${escapeHtml(serializeTagList(arrangedTags(definition.tags || [])))}">
-      <small class="field-help" data-i18n="definitionTagsHelp">${escapeHtml(t("definitionTagsHelp"))}</small>
-    </label>
+    <div class="definition-meaning-row">
+      <input data-field="tags" maxlength="180" value="${escapeHtml(serializeTagList(arrangedTags(definition.tags || [])))}" data-i18n-placeholder="tagsLabel" placeholder="${escapeHtml(t("tagsLabel"))}" data-i18n-aria-label="definitionTags" aria-label="${escapeHtml(t("definitionTags"))}">
+      <textarea data-field="meaning" rows="3" data-i18n-aria-label="meaning" aria-label="${escapeHtml(t("meaning"))}">${escapeHtml(definitionFormValue(definition, "meaning"))}</textarea>
+    </div>
   `;
 }
 
@@ -12056,7 +12041,6 @@ function definitionOptionalFieldsHtml(definition = {}) {
     showNote ? definitionOptionalFieldHtml("note", "definitionNote", note) : "",
   ].filter(Boolean);
   const actions = [
-    definitionShowsTags(definition) ? "" : definitionOptionalActionHtml("tags", "addDefinitionTags"),
     showExample ? "" : definitionOptionalActionHtml("example", "addExample"),
     showNote ? "" : definitionOptionalActionHtml("note", "addDefinitionNote"),
   ].filter(Boolean);
@@ -12074,11 +12058,7 @@ function definitionFormCardHtml(definition, index, removeAction) {
   return `
     <span class="definition-number"><span class="visually-hidden" data-i18n="definitions">${escapeHtml(t("definitions"))}</span> ${index + 1}</span>
     <div class="definition-form-fields">
-      ${definitionTagsFieldHtml(definition)}
-      <label>
-        <span data-i18n="meaning">${escapeHtml(t("meaning"))}</span>
-        <textarea data-field="meaning" rows="3">${escapeHtml(definitionFormValue(definition, "meaning"))}</textarea>
-      </label>
+      ${definitionMeaningRowHtml(definition)}
       ${definitionOptionalFieldsHtml(definition)}
     </div>
     <button class="danger-ghost definition-remove-button" data-control-tone="danger" data-control-emphasis="tinted" type="button" data-action="${removeAction}" data-app-tooltip="always" data-i18n-aria-label="removeDefinition" aria-label="${escapeHtml(t("removeDefinition"))}">
@@ -12122,8 +12102,6 @@ function renderDefinitionFormCardInPlace(card, fieldToShow) {
     definition.showExample = true;
   } else if (fieldToShow === "note") {
     definition.showNote = true;
-  } else if (fieldToShow === "tags") {
-    definition.showTags = true;
   }
   const index = [...list.querySelectorAll(".definition-form-card")].indexOf(card);
   card.innerHTML = definitionFormCardHtml(
@@ -16120,7 +16098,8 @@ async function openPartialEdit(section) {
     return;
   }
 
-  body.querySelector("input, textarea")?.focus();
+  // Definitions open on the meaning; the tags field before it is secondary.
+  (body.querySelector('[data-field="meaning"]') || body.querySelector("input, textarea"))?.focus();
   return true;
 }
 
