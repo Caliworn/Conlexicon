@@ -5532,6 +5532,21 @@ function renderEntryRows(entries = [], options = {}) {
     });
   }
   const settingsSizeSignature = entryCardSettingsSizeSignature();
+  const sizeCacheKey = (row) => row.kind === "truncation"
+    ? `truncation:entries:${currentLanguage}:${row.loaded}:${row.total}`
+    : row.kind === "window-placeholder"
+      ? `window-placeholder:entries:${row.windowPageIndex}:${Math.round(row.estimatedHeight)}`
+    : entryCardSizeCacheKey(row.entry, {
+      qualityIssues: row.qualityIssues,
+      role: "entry",
+      settingsSizeSignature,
+    });
+  if (windowPages) {
+    settleQueryWindowEstimateScales(windowPages, rows, {
+      naturalHeight: () => entryVirtualList.estimatedItemHeight,
+      sizeCacheKey,
+    });
+  }
   renderVirtualList(elements.entryList, entryVirtualList, rows, {
     resetToken: entryVirtualResetToken(),
     getKey: (row) => row.kind === "truncation"
@@ -5544,15 +5559,7 @@ function renderEntryRows(entries = [], options = {}) {
       : row.kind === "window-placeholder"
         ? row.estimatedHeight
       : entryVirtualList.estimatedItemHeight * (row.windowEstimateScale || 1),
-    getSizeCacheKey: (row) => row.kind === "truncation"
-      ? `truncation:entries:${currentLanguage}:${row.loaded}:${row.total}`
-      : row.kind === "window-placeholder"
-        ? `window-placeholder:entries:${row.windowPageIndex}:${Math.round(row.estimatedHeight)}`
-      : entryCardSizeCacheKey(row.entry, {
-        qualityIssues: row.qualityIssues,
-        role: "entry",
-        settingsSizeSignature,
-      }),
+    getSizeCacheKey: sizeCacheKey,
     updateItem: (card, row) => {
       if (row.kind !== "entry" || !card?.matches(".entry-card") || card.dataset.entryId !== row.entry.id) return false;
       reconcileVirtualCard(card, createEntryCard(row.entry, { qualityIssues: row.qualityIssues }));
@@ -5695,6 +5702,31 @@ function renderRootModeGroups(groups = [], options = {}) {
     });
   }
   const settingsSizeSignature = entryCardSettingsSizeSignature();
+  const sizeCacheKey = (row) => row.kind === "truncation"
+    ? `truncation:root-groups:${currentLanguage}:${row.loaded}:${row.total}`
+    : row.kind === "window-placeholder"
+      ? `window-placeholder:root-groups:${row.windowPageIndex}:${Math.round(row.estimatedHeight)}`
+    : row.kind === "derived-placeholder"
+      ? `derived-status:${currentLanguage}:${row.rootId}:${row.status}:${Math.round(row.estimatedHeight)}`
+    : row.kind === "root"
+    ? entryCardSizeCacheKey(row.group.root, {
+      role: "root",
+      expanded: row.expanded,
+      derivedCount: row.group.derivedCount,
+      settingsSizeSignature,
+    })
+    : entryCardSizeCacheKey(row.entry, {
+      role: row.last ? "derived-last" : "derived",
+      rootId: row.rootId,
+      settingsSizeSignature,
+    });
+  if (windowPages) {
+    settleQueryWindowEstimateScales(windowPages, rows, {
+      naturalHeight: (row) => row.weight,
+      // A placeholder for derived entries is as tall as it is told to be.
+      sizeCacheKey: (row) => (row.kind === "derived-placeholder" ? "" : sizeCacheKey(row)),
+    });
+  }
   setEntryListNavigatorActive(true);
   renderVirtualList(elements.entryList, entryVirtualList, rows, {
     resetToken: entryVirtualResetToken(),
@@ -5714,24 +5746,7 @@ function renderRootModeGroups(groups = [], options = {}) {
       : row.kind === "truncation"
         ? 44
         : row.weight * (row.windowEstimateScale || 1),
-    getSizeCacheKey: (row) => row.kind === "truncation"
-      ? `truncation:root-groups:${currentLanguage}:${row.loaded}:${row.total}`
-      : row.kind === "window-placeholder"
-        ? `window-placeholder:root-groups:${row.windowPageIndex}:${Math.round(row.estimatedHeight)}`
-      : row.kind === "derived-placeholder"
-        ? `derived-status:${currentLanguage}:${row.rootId}:${row.status}:${Math.round(row.estimatedHeight)}`
-      : row.kind === "root"
-      ? entryCardSizeCacheKey(row.group.root, {
-        role: "root",
-        expanded: row.expanded,
-        derivedCount: row.group.derivedCount,
-        settingsSizeSignature,
-      })
-      : entryCardSizeCacheKey(row.entry, {
-        role: row.last ? "derived-last" : "derived",
-        rootId: row.rootId,
-        settingsSizeSignature,
-      }),
+    getSizeCacheKey: sizeCacheKey,
     updateItem: updateRootModeRow,
     renderItem: (row) => row.kind === "window-placeholder"
       ? renderQueryWindowPlaceholder(row)
@@ -5887,6 +5902,7 @@ function createQueryWindowPage(cursor = "", index = 0, status = "loading") {
     error: null,
     estimatedHeight: 0,
     estimateScale: 1,
+    reservedHeight: 0,
     windowMetric: null,
     lastAccessAt: performance.now(),
   };
@@ -5993,6 +6009,7 @@ function refreshRootGroupWindowHeightEstimates() {
   const toggledByWindow = rootToggledGroupsByWindow();
   rootGroupsQueryState.pages.forEach((page) => {
     page.estimateScale = 1;
+    page.reservedHeight = 0;
     if (page.status !== "success" && page.windowMetric) {
       page.estimatedHeight = rootGroupWindowEstimate(page, toggledByWindow);
     }
@@ -6006,15 +6023,55 @@ function resetRootExpansionState() {
   refreshRootGroupWindowHeightEstimates();
 }
 
+/* A window that replaces its placeholder keeps the placeholder's height, so the
+   rows below it do not move. The scale that does this is settled at the next
+   render (settleQueryWindowEstimateScales), which knows which of the window's
+   rows come back at a height measured before the window was evicted. */
 function preserveQueryWindowPageHeight(page, naturalHeight, hasWindowCursor) {
   const safeNaturalHeight = Math.max(0, Number(naturalHeight) || 0);
   const reservedHeight = Math.max(0, Number(page.estimatedHeight) || 0);
+  page.estimateScale = 1;
   if (hasWindowCursor && reservedHeight > 0 && safeNaturalHeight > 0) {
-    page.estimateScale = reservedHeight / safeNaturalHeight;
+    page.reservedHeight = reservedHeight;
     return;
   }
+  page.reservedHeight = 0;
   page.estimatedHeight = safeNaturalHeight;
-  page.estimateScale = 1;
+}
+
+/* Rows with a cached height render at that height whatever their estimate, so
+   only the others can make up the difference to the placeholder. Scaling every
+   row by placeholder / natural counted the measured rows' deviation twice and
+   left a reloaded window taller or shorter than the placeholder it replaced. */
+function settleQueryWindowEstimateScales(pages, rows, { naturalHeight, sizeCacheKey }) {
+  pages.forEach((page) => {
+    if (page.status !== "success" || !page.reservedHeight) {
+      return;
+    }
+    const pageRows = rows.filter((row) => row.windowPageIndex === page.index);
+    let cached = 0;
+    let uncached = 0;
+    pageRows.forEach((row) => {
+      const rawKey = sizeCacheKey(row);
+      const height = rawKey
+        ? cachedVirtualListHeight(entryVirtualList, virtualListSizeCacheKey(entryVirtualList, String(rawKey)))
+        : 0;
+      if (height) {
+        cached += height;
+      } else {
+        uncached += naturalHeight(row);
+      }
+    });
+    const scale = (page.reservedHeight - cached) / uncached;
+    page.estimateScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+    page.reservedHeight = 0;
+    pageRows.forEach((row) => {
+      row.windowEstimateScale = page.estimateScale;
+      if (row.kind === "derived-placeholder") {
+        row.estimatedHeight = row.weight * page.estimateScale;
+      }
+    });
+  });
 }
 
 function queryWindowLoadedItems(pages = []) {
