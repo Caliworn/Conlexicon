@@ -136,7 +136,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/dictionaries/:id/tag-registry` | 读取标签登记表与使用数 | `{ id, generation, tags }` | 见[标签登记表](#标签登记表)。 |
 | `POST` | `/api/dictionaries/:id/tag-registry/changes` | 修改标签登记表，一次一个操作 | `{ id, updatedAt, tagRegistry }` | 见[标签登记表](#标签登记表)。 |
-| `GET` | `/api/dictionaries/:id/entry-relations/:entryId` | 读取词源/衍生/同根关系 | `{ entryId, sources, derivedEntries, rootGroup }` | SQLite 路径复用稳定词根拓扑的反向索引，并按需读取关系 DTO；来源只按精确目标 ID 匹配，不按同名 lemma 猜测。 |
+| `GET` | `/api/dictionaries/:id/entry-relations/:entryId` | 读取词源与衍生关系 | `{ entryId, sources, derivedEntries }` | 只读该词条的来源和直接衍生词，不读词根拓扑；来源只按精确目标 ID 匹配，不按同名 lemma 猜测。 |
 | `POST` | `/api/dictionaries/:id/source-candidates/query` | 来源补全候选（只读） | `{ items, total, limit }`，其中 `items` 固定为词条摘要 DTO | 请求体 `{ q, ownerEntryId?, excludeEntryIds?, limit? }`。复用 lemma 搜索 projection、查询规范化和共享 matcher，由 `settings.search.etymologyAutocomplete.fuzzy` 决定是否启用 fuzzy；不使用 cursor，详见[输入、补全与唯一性](#输入补全与唯一性)。 |
 | `GET` | `/api/dictionaries/:id/root-groups` | 读取词根模式分组 | `{ items, pageInfo, searchSummary }` | 支持 `q`、`fields`、`fuzzyFields`、`sort`、`cursor`、`windowOffset`、`limit`。前端词根模式正常路径以该 API 为准，并按窗口加载。 |
 | `GET` | `/api/dictionaries/:id/root-group-overview` | 词根模式当前查询的分段概览，供列表导航条使用 | `{ total, sort, grain, buckets: [{ key, start, count, derivedCount, derivedGroupCount, matchedGroupCount, matchedGroupDerivedCount }] }` | 接受与 `/root-groups` 相同的 `q`、`fields`、`fuzzyFields`、`sort`（cursor 与分页无关），另加 `tz`，规则同 `/entry-overview`。语义见下文“列表概览”。路径不放在 `/root-groups/` 下：该前缀下的路径段是词根的词条 ID。 |
@@ -633,7 +633,7 @@ tagRegistry: [{ tag, partOfSpeech, displayLabel, color, displayAmbiguous }]
 GET /api/dictionaries/:id/entry-relations/:entryId
 ```
 
-返回当前词条的来源匹配、衍生词和同根组：
+返回当前词条的来源匹配和直接衍生词：
 
 ```js
 {
@@ -643,19 +643,13 @@ GET /api/dictionaries/:id/entry-relations/:entryId
   ],
   derivedEntries: [
     { id, lemma, pronunciation, tags, definitionPreviews, createdAt, updatedAt }
-  ],
-  rootGroup: {
-    rootKey,
-    entries: [
-      { id, lemma, pronunciation, tags, definitionPreviews, createdAt, updatedAt }
-    ]
-  }
+  ]
 }
 ```
 
 `targetEntryId` 是来源保存的目标 ID（未绑定时为空字符串）；`matchedEntry` 是该 ID 对应的 summary DTO，未绑定时为 `null`。词条详情和词汇网络直接消费 DTO，不回到完整活动词典扫描；同名词条不参与猜测匹配，`matchedEntryId` 只来自精确目标 ID。
 
-词汇网络详情视图和词根模式均已接入后端关系/词根读取端点。词根模式和词汇网络同根组复用 SQLite repository 的稳定词根拓扑；词典摘要的严格 `rootCount` 独立按无来源词条轻量计算。来源匹配与直接衍生词仍由相同 repository 关系边界返回，不再由前端扫描完整活动词典。
+词汇网络详情视图和词根模式均已接入后端关系/词根读取端点。词根模式复用 SQLite repository 的稳定词根拓扑，关系端点不读拓扑，也不返回同根组；词典摘要的严格 `rootCount` 独立按无来源词条轻量计算。来源匹配与直接衍生词仍由相同 repository 关系边界返回，不再由前端扫描完整活动词典。
 
 词根拓扑语义（由 `lib/etymology-graph-model.js` 计算）：
 

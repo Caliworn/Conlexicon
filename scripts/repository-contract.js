@@ -18,7 +18,7 @@ const ipaModel = require("../lib/ipa-model");
 const { DEFAULT_TOOL_NAV_ORDER } = require("../lib/dictionary-data-model");
 const tagModel = require("../lib/tag-model");
 const entrySearchModel = require("../lib/entry-search-model");
-const { rootModeGroups } = require("./root-groups-reference");
+const { compareEntriesInListOrder, rootModeGroups } = require("./root-groups-reference");
 const { parseGloss } = require("../lib/gloss-model");
 
 const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
@@ -805,33 +805,6 @@ function testEntryMatches(entry, dictionary, query = {}) {
   });
 }
 
-function testCompareEntries(sort = "lemmaAsc") {
-  return (a, b) => {
-    const lemmaCompare = String(a.lemma || "").localeCompare(String(b.lemma || ""), "zh-CN");
-    const idCompare = String(a.id || "").localeCompare(String(b.id || ""));
-    const dateCompare = (left, right, direction = 1) => {
-      const diff = new Date(left || 0).getTime() - new Date(right || 0).getTime();
-      return (diff * direction) || (lemmaCompare * direction) || idCompare;
-    };
-    if (sort === "lemmaDesc") {
-      return -lemmaCompare || idCompare;
-    }
-    if (sort === "updatedAsc") {
-      return dateCompare(a.updatedAt, b.updatedAt);
-    }
-    if (sort === "updatedDesc") {
-      return dateCompare(a.updatedAt, b.updatedAt, -1);
-    }
-    if (sort === "createdAsc") {
-      return dateCompare(a.createdAt, b.createdAt);
-    }
-    if (sort === "createdDesc") {
-      return dateCompare(a.createdAt, b.createdAt, -1);
-    }
-    return lemmaCompare || idCompare;
-  };
-}
-
 // Saved examples reference corpus items; the shared matcher reads their text
 // the way entry DTOs carry it.
 function entriesWithExampleContents(dictionary) {
@@ -848,7 +821,7 @@ function entriesWithExampleContents(dictionary) {
 function expectedEntryIds(dictionary, query = {}) {
   return entriesWithExampleContents(dictionary)
     .filter((entry) => testEntryMatches(entry, dictionary, query))
-    .sort(testCompareEntries(query.sort || "lemmaAsc"))
+    .sort(compareEntriesInListOrder(query.sort || "lemmaAsc"))
     .map((entry) => entry.id);
 }
 
@@ -900,7 +873,7 @@ function expectedRootGroupSnapshot(dictionary, query = {}) {
   return rootModeGroups(dictionary, {
     query: normalizedQuery,
     normalizeText: testNormalize,
-    compareEntries: testCompareEntries(query.sort || "lemmaAsc"),
+    compareEntries: compareEntriesInListOrder(query.sort || "lemmaAsc"),
     matchesEntry: (entry) => entrySearchModel.entryMatchesSearchText(entry, dictionary, query.q || query.query || "", {
       fields: entrySearchModel.normalizeSearchFields(query.fields || query.searchFields),
       fuzzyFields: entrySearchModel.normalizeFuzzyFields(query.fuzzyFields),
@@ -1800,19 +1773,6 @@ async function checkRootTopologyShapes(repository) {
     await assertRootGroupQueryConsistency(repository, dictionary, {});
     await assertRootGroupQueryConsistency(repository, dictionary, { q: "xi" });
     await assertRootGroupQueryConsistency(repository, dictionary, { sort: "lemmaDesc" });
-
-    const relationRoot = async (key) => {
-      const result = await callApi(repository, "GET", `${base}/entry-relations/${encodeURIComponent(id(key))}`);
-      assert.equal(result.statusCode, 200);
-      return {
-        rootKey: result.body.rootGroup.rootKey,
-        entryIds: result.body.rootGroup.entries.map((item) => item.id).sort(),
-      };
-    };
-    assert.deepEqual(await relationRoot("d"), { rootKey: "tree", entryIds: ["d", "l", "r", "t"].map(id).sort() });
-    assert.deepEqual(await relationRoot("r"), { rootKey: "tree", entryIds: ["d", "l", "r", "t"].map(id).sort() });
-    assert.deepEqual(await relationRoot("x"), { rootKey: "alef", entryIds: ["a", "b", "x"].map(id).sort() });
-    assert.deepEqual(await relationRoot("q"), { rootKey: "under", entryIds: ["p", "q", "u"].map(id).sort() });
 
     const locate = (key, extra = "") => callApi(
       repository,

@@ -518,10 +518,6 @@ async function checkRepositoryIntegration() {
     const derivedWholeGroup = await repository.queryRootGroupEntries(dictionary.id, "entry-root");
     assert.equal(derivedWholeGroup.items.length, 206, "the product UI should be able to read a realistic root group at once");
     assert.equal("pageInfo" in derivedWholeGroup, false, "derived groups should not expose a pagination contract");
-    const derivedRelations = await repository.getEntryRelations(dictionary.id, "entry-derived");
-    assert.equal(derivedRelations.rootGroup.entries.length, 207);
-    assert.equal(derivedRelations.rootGroup.entries[0].id, "entry-root");
-    assert.equal(topologyBuilds, 1, "relation reads should reuse the indexed stable topology");
     [...repository.querySessionCache.sessions.entries()]
       .filter(([, session]) => session.kind === "rootGroups")
       .forEach(([key]) => repository.querySessionCache.remove(key));

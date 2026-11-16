@@ -431,7 +431,7 @@ cursor 由 `lib/result-window-cursor.js` 编码，绑定 process epoch、`cacheG
 | `getEntryQueryOverview()` | 列表概览：与 `queryEntries()` 同一查询的全部结果按排序切段（API 契约“列表概览”）。无搜索时在 SQL 中只读排序键列，有搜索时复用查询会话的有序命中 ID | 否 | 不缓存；10 万条时无搜索路径同样受 R09 的排序成本影响 |
 | 严格 / fuzzy / 形态搜索 | 按字段读取两张 projection（第 9、10 节），首次查询建立有序命中 ID 会话，总数、窗口和定位复用同一结果；统一返回 `searchHits`；fuzzy 通过连接级确定性函数复用共享评分 | 否；fuzzy 线性扫描所选 projection records | 候选索引见第 11 节 |
 | `getTagRegistry()` / `changeTagRegistry()` | 读取登记行，使用数由 SQL 聚合并按 generation 缓存，按有效标签每个词条计一次；修改在单事务内整表写回 | 否 | — |
-| `getEntryRelations()` | 用 `entry_sources`/`entries` 查询来源和直接衍生，并复用稳定词根拓扑的反向索引组装同根组 | 否 | 衍生词逐个读取完整详情再取摘要（审计 A19） |
+| `getEntryRelations()` | 用 `entry_sources`/`entries` 查询来源和直接衍生，不读词根拓扑 | 否 | 衍生词逐个读取完整详情再取摘要（审计 A19） |
 | `queryRootGroups()` | 词根拓扑按 relation generation 稳定缓存，查询只生成排序/匹配视图，搜索命中直接读取两张 projection | 否 | 极大单个家族的响应体积见审计 R03 |
 | 数据分析 / 功能结果 / 质量检查 | `/analysis/query` 直接查询 SQLite 聚合与稳定拓扑；IPA 与形态 feature result、质量结果分别由服务从最小事实读取（如 `qualityInputRecords()`）构建会话 | 否 | 30k 质量冷构建的同步读取约阻塞 380 ms，复评门槛见 API Contract |
 | 契约测试 | SQLite repository 跑完整当前 repository contract；模型、旧 JSON 转换和目录迁移分别运行定向检查 | 否 | — |

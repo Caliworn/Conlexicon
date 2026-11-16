@@ -8621,28 +8621,6 @@ function dictionaryRootCountSummary(dictionary) {
   return Number.isFinite(summaryCount) ? summaryCount : null;
 }
 
-function compareEntries(a, b) {
-  const lemmaCompare = a.lemma.localeCompare(b.lemma, "zh-CN");
-  const updatedCompare = new Date(a.updatedAt || 0).getTime() - new Date(b.updatedAt || 0).getTime();
-  const createdCompare = new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
-
-  switch (entrySort) {
-    case "lemmaDesc":
-      return -lemmaCompare;
-    case "updatedAsc":
-      return updatedCompare || lemmaCompare;
-    case "updatedDesc":
-      return -updatedCompare || lemmaCompare;
-    case "createdAsc":
-      return createdCompare || lemmaCompare;
-    case "createdDesc":
-      return -createdCompare || lemmaCompare;
-    case "lemmaAsc":
-    default:
-      return lemmaCompare;
-  }
-}
-
 function textMatches(text, query, fuzzyEnabled = false) {
   const searchOptions = entrySearchQueryOptions();
   return entrySearchModel.textMatches(text, query, {
@@ -9689,24 +9667,15 @@ function entryRelationStateForEntry(dictionary, entry) {
 function lexicalNetworkRelationForEntry(dictionary, entry) {
   const relationState = entryRelationStateForEntry(dictionary, entry);
   if (relationState.status !== "success") {
-    return { status: relationState.status, sources: [], derivedEntries: [], rootGroup: null };
+    return { status: relationState.status, sources: [], derivedEntries: [] };
   }
   return { status: "success", ...apiLexicalNetworkRelation(relationState.relation) };
 }
 
 function apiLexicalNetworkRelation(relation) {
-  const relatedEntries = [
-    ...(relation.derivedEntries || []),
-    ...(relation.rootGroup?.entries || []),
-    ...(relation.sources || []).map((source) => source.matchedEntry).filter(Boolean),
-  ];
-  const byId = new Map(relatedEntries.map((entry) => [entry.id, entry]));
   return {
-    sources: (relation.sources || [])
-      .map((source) => source.matchedEntry || byId.get(source.matchedEntryId))
-      .filter(Boolean),
-    derivedEntries: relation.derivedEntries || [],
-    rootGroup: relation.rootGroup || null,
+    sources: relation.sources.map((source) => source.matchedEntry).filter(Boolean),
+    derivedEntries: relation.derivedEntries,
   };
 }
 

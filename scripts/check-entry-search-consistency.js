@@ -6,6 +6,7 @@ const entrySearchModel = require("../lib/entry-search-model");
 const morphologyModel = require("../lib/morphology-model");
 const searchNormalizationModel = require("../lib/search-normalization-model");
 const tagModel = require("../lib/tag-model");
+const { compareEntriesInListOrder } = require("./root-groups-reference");
 const {
   createTempSqliteRepository,
   requireSqliteRuntime,
@@ -30,31 +31,6 @@ function queryOffset(cursor) {
   } catch {
     return 0;
   }
-}
-
-function compareEntries(left, right, sort = "lemmaAsc") {
-  const lemmaCompare = String(left.lemma || "").localeCompare(String(right.lemma || ""), "zh-CN");
-  const idCompare = String(left.id || "").localeCompare(String(right.id || ""));
-  const dateCompare = (a, b, direction = 1) => {
-    const difference = new Date(a || 0).getTime() - new Date(b || 0).getTime();
-    return (difference * direction) || (lemmaCompare * direction) || idCompare;
-  };
-  if (sort === "lemmaDesc") {
-    return -lemmaCompare || idCompare;
-  }
-  if (sort === "updatedAsc") {
-    return dateCompare(left.updatedAt, right.updatedAt);
-  }
-  if (sort === "updatedDesc") {
-    return dateCompare(left.updatedAt, right.updatedAt, -1);
-  }
-  if (sort === "createdAsc") {
-    return dateCompare(left.createdAt, right.createdAt);
-  }
-  if (sort === "createdDesc") {
-    return dateCompare(left.createdAt, right.createdAt, -1);
-  }
-  return lemmaCompare || idCompare;
 }
 
 // Saved examples reference corpus items; the shared matcher reads their text
@@ -103,7 +79,7 @@ function expectedEntryIds(dictionary, query = {}) {
       }
       return true;
     })
-    .sort((left, right) => compareEntries(left, right, query.sort || "lemmaAsc"))
+    .sort(compareEntriesInListOrder(query.sort || "lemmaAsc"))
     .map((entry) => entry.id);
 }
 
