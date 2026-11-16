@@ -7197,8 +7197,9 @@ function createEntryCard(entry, options = {}) {
 }
 
 // A derived entry in root mode is one compact line in the panel under its
-// root's card: lemma, parts of speech and the first meaning. A search adds the
-// pronunciation and the matching snippets, so the reason for a hit stays visible.
+// root's card: lemma, parts of speech and the same meaning summary as an entry
+// card, cut off at the row's end. A search adds the pronunciation and the
+// matching snippets, so the reason for a hit stays visible.
 function createDerivedEntryRow(entry, rootId) {
   const rawParts = dictionarySettings().entryListRawPartDisplay;
   const { fields: searchFields, fuzzyFields } = entrySearchQueryOptions();
@@ -7210,7 +7211,12 @@ function createDerivedEntryRow(entry, rootId) {
       : "",
     partText ? highlightSearchText(partText, fuzzyFields.has("tags"), searchFields.has("tags")) : "",
   ].filter(Boolean).join(" · ");
-  const [firstMeaning] = entryDefinitionSummaryItems(entry);
+  const meaningsHtml = entryDefinitionSummaryItems(entry)
+    .map((item) => definitionSummaryItemHtml(item, {
+      meaningHtml: (meaning) => highlightSearchText(meaning, fuzzyFields.has("definitions"), searchFields.has("definitions")),
+      rawParts,
+    }))
+    .join("  ");
   const button = document.createElement("button");
   button.type = "button";
   button.className = `derived-entry-row${entry.id === state.selectedEntryId ? " active" : ""}`;
@@ -7223,10 +7229,7 @@ function createDerivedEntryRow(entry, rootId) {
     <span class="derived-entry-line">
       <strong>${highlightSearchText(entry.lemma, fuzzyFields.has("lemma"), searchFields.has("lemma"))}</strong>
       ${subtitle ? `<small>${subtitle}</small>` : ""}
-      ${firstMeaning ? `<span class="derived-entry-meaning">${definitionSummaryItemHtml({ ...firstMeaning, number: 0 }, {
-        meaningHtml: (meaning) => highlightSearchText(meaning, fuzzyFields.has("definitions"), searchFields.has("definitions")),
-        rawParts,
-      })}</span>` : ""}
+      ${meaningsHtml ? `<span class="derived-entry-meaning">${meaningsHtml}</span>` : ""}
     </span>
     ${renderEntrySearchSnippets(entry)}
   `;
