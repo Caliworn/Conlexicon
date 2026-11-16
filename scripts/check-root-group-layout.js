@@ -6,6 +6,7 @@ const {
   groupHeight,
   groupIsExpanded,
   rootCardHeight,
+  segmentStarts,
   windowHeight,
 } = require("../lib/root-group-layout");
 
@@ -113,6 +114,31 @@ function checkWeightedLayout() {
   }
 }
 
+// Segments cut the groups differently from windows; a tick must sit where its
+// first group starts under the current expansion, with toggles before it counted.
+function checkSegmentStarts() {
+  const groups = [group(0), group(4), group(2, 0), group(300, 7), group(1, 1), group(0), group(9, 0)];
+  const cuts = [0, 2, 3, 6, groups.length];
+  const segments = cuts.slice(0, -1).map((start, index) => {
+    const { groupCount, ...totals } = metricOf(groups.slice(start, cuts[index + 1]));
+    return { start, count: groupCount, ...totals };
+  });
+  STATES.forEach((state) => {
+    [[], [1], [2, 6], [0, 3, 4]].forEach((toggledIndexes) => {
+      const toggled = new Set(toggledIndexes);
+      const heights = groups.map((item, index) => groupHeight(CARD, item, groupIsExpanded(item, state, toggled.has(index))));
+      const expected = cuts.map((cut) => heights.slice(0, cut).reduce((a, b) => a + b, 0));
+      assert.deepEqual(
+        segmentStarts(CARD, segments, state, toggledIndexes.map((index) => ({ ...groups[index], groupIndex: index }))),
+        expected,
+        `segment starts for ${JSON.stringify(state)} with toggles ${toggledIndexes}`,
+      );
+      assert.equal(expected[expected.length - 1], windowHeight(CARD, metricOf(groups), state, toggledIndexes.map((index) => groups[index])));
+    });
+  });
+}
+
+checkSegmentStarts();
 checkExpansion();
 checkRowsAddUpToGroup();
 checkWindowMatchesItsGroups();

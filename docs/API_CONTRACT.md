@@ -139,6 +139,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `GET` | `/api/dictionaries/:id/entry-relations/:entryId` | 读取词源/衍生/同根关系 | `{ entryId, sources, derivedEntries, rootGroup }` | SQLite 路径复用稳定词根拓扑的反向索引，并按需读取关系 DTO；来源只按精确目标 ID 匹配，不按同名 lemma 猜测。 |
 | `POST` | `/api/dictionaries/:id/source-candidates/query` | 来源补全候选（只读） | `{ items, total, limit }`，其中 `items` 固定为词条摘要 DTO | 请求体 `{ q, ownerEntryId?, excludeEntryIds?, limit? }`。复用 lemma 搜索 projection、查询规范化和共享 matcher，由 `settings.search.etymologyAutocomplete.fuzzy` 决定是否启用 fuzzy；不使用 cursor，详见[输入、补全与唯一性](#输入补全与唯一性)。 |
 | `GET` | `/api/dictionaries/:id/root-groups` | 读取词根模式分组 | `{ items, pageInfo, searchSummary }` | 支持 `q`、`fields`、`fuzzyFields`、`sort`、`cursor`、`windowOffset`、`limit`。前端词根模式正常路径以该 API 为准，并按窗口加载。 |
+| `GET` | `/api/dictionaries/:id/root-group-overview` | 词根模式当前查询的分段概览，供列表导航条使用 | `{ total, sort, grain, buckets: [{ key, start, count, derivedCount, derivedGroupCount, matchedGroupCount, matchedGroupDerivedCount }] }` | 接受与 `/root-groups` 相同的 `q`、`fields`、`fuzzyFields`、`sort`（cursor 与分页无关），另加 `tz`，规则同 `/entry-overview`。语义见下文“列表概览”。路径不放在 `/root-groups/` 下：该前缀下的路径段是词根的词条 ID。 |
 | `GET` | `/api/dictionaries/:id/root-groups/location` | 定位词条所属的父级词根窗口 | `{ items, pageInfo, searchSummary, location }` | 必须传 `entryId`；可传 `preferredRootId` 消除多来源词条的父级歧义，其余参数沿用 `/root-groups` descriptor。 |
 | `GET` | `/api/dictionaries/:id/root-groups/:rootId/entries` | 按需读取单个词根组的全部衍生词 | `{ items }`，其中 `items` 固定为词条摘要 DTO | 支持与词根组查询相同的搜索、排序和字段参数，但不分页；折叠组不预载衍生词，展开后一次读取整组。 |
 | `POST` | `/api/dictionaries/:id/analysis/query` | 按需读取轻量分析 widgets | `{ dictionaryId, generation, cacheKey, widgets, diagnostics }` | 同步聚合端点；多个 widget 由 planner 合并为共享 SQLite 任务，不读取或返回完整词典 snapshot。 |
@@ -424,6 +425,13 @@ GET /api/dictionaries/:id/entries/:entryId/location?filter=&q=&fields=&fuzzyFiel
 - 时间排序：按 `created_at` 或 `updated_at` 在 `tz` 时区的本地日期切段。粒度按有效时间跨度自动选择：60 天内为 `day`（键 `YYYY-MM-DD`），4 年内为 `month`（`YYYY-MM`），更长为 `year`（`YYYY`）。不是 ISO 时间戳的值归入键 `none`。
 - 无搜索时在 SQL 中按 `sqlOrderClause()` 读取分段键；有搜索时按查询会话的有序命中 ID 读取，与列表窗口同序。结果不缓存。
 - 标签由前端按界面语言生成，接口只返回键。前端在指针第一次移进导航条时才请求，并按查询 key 缓存；查询条件或词典版本变化后丢弃，下次悬停再请求。功能结果与质量结果筛选不请求概览，只显示滑块。
+
+`GET /api/dictionaries/:id/root-group-overview` 是词根模式的对应接口，复用同一套分段逻辑：
+
+- 把查询会话中的全部词根组按顺序切段，键取词根自身的分段键（词形排序取词根 `sort_key` 的第一个码位，时间排序取词根的 `created_at` 或 `updated_at`）。`start` 和 `count` 以组为单位，`total` 是组总数，等于 `/root-groups` 的 `pageInfo.total`。
+- 每段另带四个合计，含义与 `pageInfo.windowMetrics` 的同名字段相同，只是按段而不是按窗统计；各段之和等于各窗之和。前端用它们按当前展开状态把每段的起点换算成导航条的位置（`lib/root-group-layout.js` 的 `segmentStarts()`），展开状态变化时不重新请求。
+- 词根组及组内衍生词的顺序与 `/entries` 相同（`compareEntryRecordsInSqlOrder()` 是 `sqlOrderClause()` 的内存版本，两者须保持一致），所以两种模式切出的段一致。
+- 请求时机与缓存同上：指针第一次移进导航条时请求，按查询 key 缓存。
 
 #### 逐值检索与命中定位契约
 

@@ -482,6 +482,26 @@ async function checkRepositoryIntegration() {
       rootSecond.items.filter((group) => group.derivedCount).length,
       "root-group window metrics should count the groups that have derived entries",
     );
+    // The navigator places root-group segments by the same totals the windows carry.
+    const rootOverview = await repository.getRootGroupQueryOverview(dictionary.id, { fields: "lemma,tags" });
+    assert.equal(rootOverview.total, rootFirst.pageInfo.total);
+    let nextSegmentStart = 0;
+    rootOverview.buckets.forEach((bucket) => {
+      assert.equal(bucket.start, nextSegmentStart, "root-group segments should tile the groups in order");
+      nextSegmentStart += bucket.count;
+    });
+    assert.equal(nextSegmentStart, rootOverview.total);
+    ["derivedCount", "derivedGroupCount", "matchedGroupCount", "matchedGroupDerivedCount"].forEach((field) => {
+      assert.equal(
+        rootOverview.buckets.reduce((total, bucket) => total + bucket[field], 0),
+        rootFirst.pageInfo.windowMetrics.reduce((total, metric) => total + metric[field], 0),
+        `root-group segments and windows should agree on ${field}`,
+      );
+    });
+    await assert.rejects(
+      () => repository.getRootGroupQueryOverview(dictionary.id, { sort: "createdAsc", tz: "Mars/Base" }),
+      { status: 400, code: "invalid_overview_time_zone" },
+    );
     assert.ok(rootFirst.pageInfo.nextCursor, "the first root-group page should expose a versioned cursor");
     assert.ok(rootFirst.pageInfo.windowCursor, "the first root-group page should expose a dedicated window cursor");
     const rootFirstWindow = await repository.queryRootGroups(dictionary.id, {

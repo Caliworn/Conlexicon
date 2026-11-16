@@ -448,6 +448,26 @@ async function main() {
       rootOnlySearch.pageInfo.windowMetrics[0].derivedCount,
       rootOnlySearch.items.reduce((total, group) => total + group.derivedCount, 0),
     );
+    // The overview cuts the same groups into segments by their roots' sort keys.
+    for (const search of [derivedRootSearch, rootOnlySearch]) {
+      const query = search === derivedRootSearch
+        ? { q: "DerivedDefinition", fields: "definitions" }
+        : { q: derivedRootSearch.items[0].root.lemma, fields: "lemma" };
+      const overview = await repository.getRootGroupQueryOverview(dictionary.id, query);
+      assert.equal(overview.total, search.pageInfo.total);
+      assert.deepEqual(
+        overview.buckets.flatMap((bucket) => Array(bucket.count).fill(bucket.key)),
+        search.items.map((group) => String.fromCodePoint(group.root.lemma.trim().toLowerCase().codePointAt(0))),
+        "root-group segments follow the roots' own first sort unit",
+      );
+      ["derivedCount", "derivedGroupCount", "matchedGroupCount", "matchedGroupDerivedCount"].forEach((field) => {
+        assert.equal(
+          overview.buckets.reduce((total, bucket) => total + bucket[field], 0),
+          search.pageInfo.windowMetrics.reduce((total, metric) => total + metric[field], 0),
+          `searched root-group segments and windows should agree on ${field}`,
+        );
+      });
+    }
     assert.deepEqual(derivedRootSearch.searchSummary, {
       matchedEntryCount: 1,
       fields: [{ field: "definitions", matching: "strict", entryCount: 1 }],

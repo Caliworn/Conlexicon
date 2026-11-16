@@ -287,7 +287,7 @@ let entryListEdgeFrame = 0;
 let entryListNavigatorHoldsLoads = false;
 let entryListNavigatorLayout = { items: null, rows: [], total: 0 };
 // Segments for the navigator's ticks and bubble, per entry query (key).
-let entryListOverview = { key: "", status: "idle", data: null, labeled: null, language: "" };
+let entryListOverview = { key: "", status: "idle", data: null, labeled: null, signature: "" };
 // A tick press waiting for its window to load: { index, queryKey }.
 let entryListPendingJump = null;
 // Corpus rows have fixed heights in styles.css (item card 44px, group header
@@ -5107,9 +5107,14 @@ function setEntryListNavigatorActive(active) {
       }
     },
     requestOverview: requestEntryListOverview,
-    jumpToIndex: jumpEntryListToIndex,
-    formatCount: (count) => aText(`${count.toLocaleString()} 条`, `${count.toLocaleString()} ${count === 1 ? "entry" : "entries"}`),
-    formatPosition: (position, total) => `${position.toLocaleString()} / ${total.toLocaleString()}`,
+    jumpToSegment: jumpEntryListToSegment,
+    formatCount: (buckets) => {
+      const count = buckets.reduce((total, bucket) => total + bucket.items, 0);
+      return rootMode
+        ? aText(`${count.toLocaleString()} 组`, `${count.toLocaleString()} ${count === 1 ? "group" : "groups"}`)
+        : aText(`${count.toLocaleString()} 条`, `${count.toLocaleString()} ${count === 1 ? "entry" : "entries"}`);
+    },
+    formatPosition: entryListPositionText,
   });
   entryListNavigator.setActive(active);
   entryVirtualList.immediateSizeUpdates = active;
@@ -5118,10 +5123,45 @@ function setEntryListNavigatorActive(active) {
   }
 }
 
-// Only plain entry queries have segments; feature and quality results show the
-// thumb alone (plan D21), and so does root mode until it gets its own overview.
+// Plain entry queries and root mode have segments; feature and quality results
+// show the thumb alone (plan D21).
 function entryListOverviewApplies() {
-  return !rootMode && entryQueryState.status === "success" && !activeFilterUsesFeatureQuery();
+  return rootMode
+    ? rootGroupsQueryState.status === "success"
+    : entryQueryState.status === "success" && !activeFilterUsesFeatureQuery();
+}
+
+// The two modes build their query keys alike, so the mode is part of the key.
+function entryListOverviewKey() {
+  return rootMode ? `root\u0000${rootGroupsQueryState.key}` : `entries\u0000${entryQueryState.key}`;
+}
+
+// The bubble's position. Normal mode counts results. Root mode positions by
+// weight but reads in groups: exact on a loaded row, and inside a window that
+// has not loaded an even share of its groups, which is approximate while its
+// groups differ in height (expand all, or a search).
+function entryListPositionText(index) {
+  const { rows, total } = entryListNavigatorRows();
+  if (!rootMode) {
+    return `${Math.min(total, Math.floor(index) + 1).toLocaleString()} / ${total.toLocaleString()}`;
+  }
+  let low = 0;
+  let high = rows.length - 1;
+  while (low < high) {
+    const middle = (low + high + 1) >> 1;
+    if (rows[middle].start <= index) {
+      low = middle;
+    } else {
+      high = middle - 1;
+    }
+  }
+  const { value } = entryVirtualList.items[low];
+  const groupIndex = value.kind === "window-placeholder"
+    ? value.groupStart + Math.min(value.groupCount - 1, Math.floor(((index - rows[low].start) / rows[low].count) * value.groupCount))
+    : value.groupIndex;
+  const position = (groupIndex + 1).toLocaleString();
+  const groups = rootGroupsQueryState.pageInfo.total.toLocaleString();
+  return aText(`${position} / ${groups} 组`, `${position} / ${groups} groups`);
 }
 
 function requestEntryListOverview() {
@@ -5129,14 +5169,14 @@ function requestEntryListOverview() {
   if (!dictionary || !entryListOverviewApplies()) {
     return;
   }
-  const key = entryQueryState.key;
+  const key = entryListOverviewKey();
   if (entryListOverview.key === key && entryListOverview.status !== "error") {
     return;
   }
-  entryListOverview = { key, status: "loading", data: null, labeled: null, language: "" };
-  const params = entryQueryParams(dictionary);
+  entryListOverview = { key, status: "loading", data: null, labeled: null, signature: "" };
+  const params = rootMode ? rootGroupsQueryParams(dictionary) : entryQueryParams(dictionary);
   params.set("tz", Intl.DateTimeFormat().resolvedOptions().timeZone);
-  api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entry-overview?${params}`)
+  api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/${rootMode ? "root-group-overview" : "entry-overview"}?${params}`)
     .then((data) => {
       if (entryListOverview.key !== key) {
         return;
@@ -5181,27 +5221,54 @@ function entryListOverviewLabels(key, grain) {
   };
 }
 
+/* The navigator's segments: `start` and `count` in its layout's units, `items`
+   the size its tick tip states, `target` the result or group a tick press
+   lands on. In normal mode all of these count results. Root mode places a
+   segment by weight, which follows the expansion state, so the segments are
+   laid out again whenever that changes; the overview itself is not asked again. */
 function syncEntryListOverview() {
   const { data } = entryListOverview;
   const current = entryListOverview.status === "success"
-    && entryListOverview.key === entryQueryState.key
+    && entryListOverview.key === entryListOverviewKey()
     && entryListOverviewApplies();
-  if (current && entryListOverview.language !== currentLanguage) {
-    entryListOverview.labeled = {
-      total: data.total,
-      buckets: data.buckets.map(({ key, start, count }) => ({ start, count, ...entryListOverviewLabels(key, data.grain) })),
-    };
-    entryListOverview.language = currentLanguage;
+  if (current) {
+    const cardHeight = entryVirtualList.estimatedItemHeight;
+    const toggled = rootMode ? rootToggledGroupRecords() : [];
+    const signature = rootMode
+      ? [
+        currentLanguage,
+        cardHeight,
+        rootExpansionMode,
+        rootSearchExpandsGroups(),
+        ...toggled.map((record) => `${record.groupIndex}:${record.derivedCount}:${record.matchedDerivedCount}`),
+      ].join("|")
+      : currentLanguage;
+    if (entryListOverview.signature !== signature) {
+      const starts = rootMode
+        ? rootGroupLayout.segmentStarts(cardHeight, data.buckets, rootExpansionState(), toggled)
+        : null;
+      entryListOverview.labeled = {
+        size: data.total,
+        buckets: data.buckets.map(({ key, start, count }, index) => ({
+          start: starts ? starts[index] : start,
+          count: starts ? starts[index + 1] - starts[index] : count,
+          items: count,
+          target: start,
+          ...entryListOverviewLabels(key, data.grain),
+        })),
+      };
+      entryListOverview.signature = signature;
+    }
   }
   entryListNavigator.setOverview(current ? entryListOverview.labeled : null);
 }
 
 // A tick press scrolls to the estimate at once, then lands on the segment's
-// first entry once that entry's window has loaded.
-function jumpEntryListToIndex(index) {
-  elements.entryList.scrollTop = window.ConlexiconListNavigator.scrollTopForIndex(entryListNavigatorRows(), index);
+// first entry, or first root, once its window has loaded.
+function jumpEntryListToSegment(bucket) {
+  elements.entryList.scrollTop = window.ConlexiconListNavigator.scrollTopForIndex(entryListNavigatorRows(), bucket.start);
   // Bound to the query it was made in: the same index in another query is another entry.
-  entryListPendingJump = { index, queryKey: entryQueryState.key };
+  entryListPendingJump = { kind: rootMode ? "root" : "entry", index: bucket.target, queryKey: entryListOverviewKey() };
   renderVirtualListWindow(entryVirtualList);
   alignEntryListJump();
 }
@@ -5210,12 +5277,14 @@ function alignEntryListJump() {
   if (entryListPendingJump === null) {
     return;
   }
-  if (entryListPendingJump.queryKey !== entryQueryState.key) {
+  if (entryListPendingJump.queryKey !== entryListOverviewKey()) {
     entryListPendingJump = null;
     return;
   }
-  const target = entryListPendingJump.index;
-  const index = entryVirtualList.items.findIndex(({ value }) => value.kind === "entry" && value.resultIndex === target);
+  const target = entryListPendingJump;
+  const index = entryVirtualList.items.findIndex(({ value }) => (
+    value.kind === target.kind && (value.kind === "root" ? value.groupIndex : value.resultIndex) === target.index
+  ));
   if (index < 0) {
     return;
   }
@@ -5729,11 +5798,14 @@ function renderRootModeGroups(groups = [], options = {}) {
   const toggledByWindow = rootToggledGroupsByWindow();
   // `weight` is a row's estimate before its window's scale; the navigator
   // positions by it (entryListNavigatorRows).
-  const appendGroupRows = (group, windowPageIndex = null, windowEstimateScale = 1) => {
+  // `groupIndex` is the group's place in the whole result, which the
+  // navigator's bubble and tick presses go by.
+  const appendGroupRows = (group, groupIndex, windowPageIndex = null, windowEstimateScale = 1) => {
     const expanded = rootGroupIsExpanded(group);
     rows.push({
       kind: "root",
       group,
+      groupIndex,
       expanded,
       windowPageIndex,
       windowEstimateScale,
@@ -5746,6 +5818,7 @@ function renderRootModeGroups(groups = [], options = {}) {
           kind: "derived",
           entry,
           rootId: group.root.id,
+          groupIndex,
           windowPageIndex,
           windowEstimateScale,
           first: index === 0,
@@ -5757,6 +5830,7 @@ function renderRootModeGroups(groups = [], options = {}) {
         rows.push({
           kind: "derived-placeholder",
           rootId: group.root.id,
+          groupIndex,
           windowPageIndex,
           status: derivedState?.status || "idle",
           estimatedHeight: weight * windowEstimateScale,
@@ -5768,12 +5842,14 @@ function renderRootModeGroups(groups = [], options = {}) {
   if (windowPages) {
     windowPages.forEach((page) => {
       if (page.status === "success") {
-        page.items.forEach((group) => appendGroupRows(group, page.index, page.estimateScale || 1));
+        page.items.forEach((group, position) => appendGroupRows(group, page.offset + position, page.index, page.estimateScale || 1));
       } else {
         const estimatedHeight = Math.max(page.estimatedHeight || cardHeight, cardHeight);
         rows.push({
           kind: "window-placeholder",
           windowPageIndex: page.index,
+          groupStart: page.offset,
+          groupCount: page.windowMetric?.groupCount,
           status: page.status,
           estimatedHeight,
           // The first window has no totals until it loads.
@@ -5782,7 +5858,7 @@ function renderRootModeGroups(groups = [], options = {}) {
       }
     });
   } else {
-    groups.forEach((group) => appendGroupRows(group));
+    groups.forEach((group, index) => appendGroupRows(group, index));
   }
   if (!windowPages && options.pageInfo?.hasMore) {
     rows.push({
@@ -5836,6 +5912,7 @@ function renderRootModeGroups(groups = [], options = {}) {
       : renderRootModeRow(row),
     onRangeChange: options.onRangeChange,
   });
+  alignEntryListJump();
 }
 
 function entryVirtualResetToken() {
@@ -6045,12 +6122,14 @@ function recordRootToggledGroups() {
   });
 }
 
+// The toggled groups whose place in the current query is known.
+function rootToggledGroupRecords() {
+  return [...rootToggledGroups.values()].filter((record) => record?.queryKey === rootGroupsQueryState.key);
+}
+
 function rootToggledGroupsByWindow() {
   const byWindow = new Map();
-  rootToggledGroups.forEach((record) => {
-    if (record?.queryKey !== rootGroupsQueryState.key) {
-      return;
-    }
+  rootToggledGroupRecords().forEach((record) => {
     const index = Math.floor(record.groupIndex / ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE);
     byWindow.set(index, [...(byWindow.get(index) || []), record]);
   });

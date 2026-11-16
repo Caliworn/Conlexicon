@@ -95,10 +95,10 @@ function checkTickLayout() {
   const buckets = [bucket(0, 10, "a"), bucket(10, 1, "b"), bucket(11, 1, "c"), bucket(12, 78, "d"), bucket(90, 10, "e")];
   const ticks = layoutTicks({ buckets, trackHeight: 200, thumbHeight: 32, travel: 168, maxIndex: 95, gap: 20 });
   // b and c land within 20px of a and merge into its tick; d and e stand alone.
-  assert.deepEqual(ticks.map((tick) => [tick.first.short, tick.last.short, tick.start, tick.end, tick.count]), [
-    ["a", "c", 0, 12, 12],
-    ["d", "d", 12, 90, 78],
-    ["e", "e", 90, 100, 10],
+  assert.deepEqual(ticks.map((tick) => [tick.first.short, tick.last.short, tick.start, tick.end, tick.members.length]), [
+    ["a", "c", 0, 12, 3],
+    ["d", "d", 12, 90, 1],
+    ["e", "e", 90, 100, 1],
   ]);
   assert.equal(ticks[0].y, 16, "a segment starting at the top sits at the thumb's middle");
   assert.equal(ticks[0].top, 0, "the first band starts at the top of the rail");

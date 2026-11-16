@@ -169,6 +169,26 @@ async function checkRepository() {
       "search segments line up with the search results",
     );
 
+    // Root mode orders its groups as the entry list orders entries, so a letter
+    // with a diacritic is not interleaved with its base letter and the segments
+    // stay whole. No entry here has a source: every entry is a root group.
+    for (const sort of ["lemmaAsc", "lemmaDesc", "createdAsc", "createdDesc", "updatedAsc", "updatedDesc"]) {
+      const entries = await repository.queryEntries(DICTIONARY_ID, { sort, limit: 200 });
+      const groups = await repository.queryRootGroups(DICTIONARY_ID, { sort, limit: 100 });
+      assert.deepEqual(
+        groups.items.map((group) => group.root.id),
+        entries.items.map((entry) => entry.id),
+        `root groups sorted by ${sort} follow the entry list's order`,
+      );
+      const rootOverview = await repository.getRootGroupQueryOverview(DICTIONARY_ID, { sort, tz: "UTC" });
+      const entryOverview = await repository.getEntryQueryOverview(DICTIONARY_ID, { sort, tz: "UTC" });
+      assert.deepEqual(
+        rootOverview.buckets.map(({ key, start, count }) => ({ key, start, count })),
+        entryOverview.buckets,
+        `root-group segments for ${sort} match the entry list's`,
+      );
+    }
+
     await assert.rejects(
       () => repository.getEntryQueryOverview(DICTIONARY_ID, { sort: "createdAsc", tz: "Mars/Base" }),
       { status: 400, code: "invalid_overview_time_zone" },
