@@ -5922,6 +5922,39 @@ function queryPageCacheKey(kind, key) {
   return `${kind}\u0000${key}`;
 }
 
+// Sends one first-window request at a time and, of those that arrive meanwhile,
+// only the latest. The server answers queries one after another and cannot drop
+// one it has received, so every prefix typed during a slow search would
+// otherwise queue a full scan whose result nobody reads. A task returns its
+// request's promise, or nothing when its query has been replaced.
+function createLatestRequestGate() {
+  let inFlight = false;
+  let waiting = null;
+  const run = (task) => {
+    if (inFlight) {
+      waiting = task;
+      return;
+    }
+    const request = task();
+    if (!request) {
+      return;
+    }
+    inFlight = true;
+    request.finally(() => {
+      inFlight = false;
+      const next = waiting;
+      waiting = null;
+      if (next) {
+        run(next);
+      }
+    });
+  };
+  return run;
+}
+
+const sendEntryQueryFirstWindow = createLatestRequestGate();
+const sendRootGroupsFirstWindow = createLatestRequestGate();
+
 function createQueryWindowPage(cursor = "", index = 0, status = "loading") {
   return {
     index,
@@ -6443,7 +6476,9 @@ function startRootGroupsQueryApiCheck(dictionary) {
     windowCursor: "",
     updateToken,
   };
-  loadRootGroupsWindowPage(dictionary, firstPage);
+  sendRootGroupsFirstWindow(() => (
+    rootGroupsQueryState.requestId === requestId ? loadRootGroupsWindowPage(dictionary, firstPage) : null
+  ));
 }
 
 function entryQueryCanUseApi(dictionary = activeDictionary()) {
@@ -6929,7 +6964,9 @@ function startEntryQueryApiCheck(dictionary) {
     windowCursor: "",
     updateToken,
   };
-  loadEntryQueryWindowPage(dictionary, firstPage);
+  sendEntryQueryFirstWindow(() => (
+    entryQueryState.requestId === requestId ? loadEntryQueryWindowPage(dictionary, firstPage) : null
+  ));
 }
 
 function tagUsageApiKey(dictionary = activeDictionary()) {

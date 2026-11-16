@@ -348,7 +348,7 @@ GET /api/dictionaries/:id/entries?filter=&q=&fields=&fuzzyFields=&part=&tags=&ta
 
 编辑器选择状态不通过完整词典 snapshot 预检目标 ID。没有当前选择时，普通列表首窗的第一项可作为初始选择；搜索或筛选排除当前词条时仍保留既有详情。显式导航直接读取 `/entries/:entryId`，`entry_not_found` 时恢复导航前选择并提示。删除当前词条只从虚拟列表已加载顺序选择下一项或上一项，没有已加载候选时等待刷新后的普通首窗；删除未选中词条不改变选择。词汇网络内部导航只消费已加载节点 DTO，不为选择目标扫描完整词典。
 
-当前搜索输入采用 250ms debounce，连续输入会重置计时；前端用递增请求 ID 忽略迟到的旧响应。后端所有排序以词条 ID 作为最终稳定键，避免同词形或同时间记录跨窗口边界漂移。`nextCursor` 表示顺序下一页，最后一页为空；`windowCursor` 始终绑定同一结果集合的起点，即使当前响应来自最后一页也可继续用于任意 `windowOffset`。两类 cursor 都绑定当前服务进程 epoch、词典查询缓存 generation 和规范化查询 descriptor；会话被 TTL/LRU 淘汰时后端可重建查询并继续读取，服务重启、成功写入或查询条件变化则返回 `query_cursor_stale`。前端收到 stale cursor 后从首窗重建查询。
+当前搜索输入采用 250ms debounce，连续输入会重置计时；前端用递增请求 ID 忽略迟到的旧响应。普通词条和词根组的首窗请求各自一次只发一个：上一个首窗尚未返回时，新查询的状态照常切换，但请求等它返回后才发出，其间被更新的查询替换掉的不再发送（`app.js` 的 `createLatestRequestGate()`）。服务端同步执行、无法丢弃已收到的查询，这样慢查询期间连续输入最多多算一次。后续窗口、定位和概览请求不经过这道闸门。后端所有排序以词条 ID 作为最终稳定键，避免同词形或同时间记录跨窗口边界漂移。`nextCursor` 表示顺序下一页，最后一页为空；`windowCursor` 始终绑定同一结果集合的起点，即使当前响应来自最后一页也可继续用于任意 `windowOffset`。两类 cursor 都绑定当前服务进程 epoch、词典查询缓存 generation 和规范化查询 descriptor；会话被 TTL/LRU 淘汰时后端可重建查询并继续读取，服务重启、成功写入或查询条件变化则返回 `query_cursor_stale`。前端收到 stale cursor 后从首窗重建查询。
 
 目标词条位于尚未加载的窗口时，当前前端不会根据完整词典 snapshot 猜测页号，而会请求：
 
