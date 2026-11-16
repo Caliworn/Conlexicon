@@ -298,7 +298,6 @@ const corpusVirtualList = createVirtualListState(CORPUS_ITEM_ROW_HEIGHT);
 const CORPUS_PAGE_SIZE = 100;
 const masonryLayouts = new WeakMap();
 const VIRTUAL_LIST_RESIZE_EPSILON = 0.5;
-const VIRTUAL_LIST_ACTIVE_SCROLL_MS = 180;
 const VIRTUAL_LIST_RENDER_THROTTLE_MS = 50;
 const VIRTUAL_LIST_HEIGHT_CACHE_WIDTH_BUCKET = 24;
 const VIRTUAL_LIST_HEIGHT_CACHE_LIMIT = 50000;
@@ -4548,7 +4547,6 @@ function createVirtualListState(estimatedItemHeight) {
     resizeObserver: null,
     viewportObserver: null,
     scrollHandler: null,
-    lastScrollAt: 0,
     lastRenderAt: 0,
     renderThrottleTimer: 0,
     sizeCacheKeys: new Map(),
@@ -4587,11 +4585,7 @@ function initializeVirtualList(virtualList, container) {
   virtualList.topSpacer.className = "virtual-list-spacer";
   virtualList.bottomSpacer = document.createElement("div");
   virtualList.bottomSpacer.className = "virtual-list-spacer";
-  virtualList.lastScrollAt = 0;
-  virtualList.scrollHandler = () => {
-    virtualList.lastScrollAt = performance.now();
-    scheduleVirtualListThrottledRender(virtualList);
-  };
+  virtualList.scrollHandler = () => scheduleVirtualListThrottledRender(virtualList);
   container.addEventListener("scroll", virtualList.scrollHandler, { passive: true });
   if (typeof ResizeObserver === "undefined") {
     return;
@@ -4693,10 +4687,6 @@ function refreshVirtualListCachedSizes(virtualList) {
       }
     }
   });
-}
-
-function virtualListIsActivelyScrolling(virtualList) {
-  return performance.now() - (virtualList.lastScrollAt || 0) < VIRTUAL_LIST_ACTIVE_SCROLL_MS;
 }
 
 function rebuildVirtualListOffsets(virtualList) {
@@ -5153,8 +5143,9 @@ function alignEntryListJump() {
 
 function renderVirtualList(container, virtualList, items, options) {
   initializeVirtualList(virtualList, container);
+  // Also while the list is scrolling: rows that change height above the
+  // viewport would otherwise move what is on screen.
   const preservedAnchor = virtualList.resetToken === options.resetToken
-    && !virtualListIsActivelyScrolling(virtualList)
     ? virtualListAnchor(virtualList)
     : null;
   if (virtualList.renderThrottleTimer) {
