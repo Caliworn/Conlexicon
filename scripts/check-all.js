@@ -23,6 +23,7 @@ const CHECK_GROUPS = [
       "check-entry-query-model.js",
       "check-query-page-cache.js",
       "check-list-navigator.js",
+      "check-root-group-layout.js",
       "check-liquid-glass-geometry.js",
       "check-http-request-limits.js",
       "check-style-contract.js",

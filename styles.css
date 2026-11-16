@@ -488,7 +488,7 @@ fieldset {
 }
 
 /* List navigator (lib/list-navigator.js): replaces the native scrollbar of the
-   entry list in normal mode. The scroll container itself is unchanged; only its
+   entry list. The scroll container itself is unchanged; only its
    scrollbar is hidden, and the navigator sits beside it inside the frame. */
 .entry-list-update-frame {
   --list-navigator-width: 20px;
@@ -1805,9 +1805,9 @@ label span {
 
 /* Edge fades: cards dissolve into whatever is behind the list instead of being
    cut at its top and bottom, so every skin shares one rule. Each fade shows only
-   while content is hidden past that edge (app.js sets the attributes). A second,
-   opaque mask layer keeps a native scrollbar (root mode) unfaded; the navigator
-   is a sibling of the list and never masked. Mask colors only carry alpha. */
+   while content is hidden past that edge (app.js sets the attributes). The
+   navigator is a sibling of the list and never masked. Mask colors only carry
+   alpha. */
 @property --entry-list-fade-top {
   syntax: "<length>";
   inherits: false;
@@ -1822,18 +1822,8 @@ label span {
 
 .entry-list {
   --entry-list-fade-size: 12px;
-  -webkit-mask-image:
-    linear-gradient(to bottom, transparent, black var(--entry-list-fade-top), black calc(100% - var(--entry-list-fade-bottom)), transparent),
-    linear-gradient(black, black);
-  mask-image:
-    linear-gradient(to bottom, transparent, black var(--entry-list-fade-top), black calc(100% - var(--entry-list-fade-bottom)), transparent),
-    linear-gradient(black, black);
-  -webkit-mask-size: calc(100% - var(--entry-list-scrollbar-width, 0px)) 100%, var(--entry-list-scrollbar-width, 0px) 100%;
-  mask-size: calc(100% - var(--entry-list-scrollbar-width, 0px)) 100%, var(--entry-list-scrollbar-width, 0px) 100%;
-  -webkit-mask-position: left top, right top;
-  mask-position: left top, right top;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--entry-list-fade-top), black calc(100% - var(--entry-list-fade-bottom)), transparent);
+  mask-image: linear-gradient(to bottom, transparent, black var(--entry-list-fade-top), black calc(100% - var(--entry-list-fade-bottom)), transparent);
   transition: --entry-list-fade-top 140ms ease, --entry-list-fade-bottom 140ms ease;
 }
 
@@ -3266,8 +3256,8 @@ span.pending-source {
   padding-right: 76px;
 }
 
-/* Row heights here are mirrored by the estimates in app.js
-   (ROOT_DERIVED_ROW_HEIGHT and its neighbours): a derived row is 44px with its
+/* Row heights here are mirrored by the estimates in lib/root-group-layout.js
+   (DERIVED_ROW_HEIGHT and its neighbours): a derived row is 44px with its
    top border, and the panel ends with a bottom border and the 12px list gap. */
 .entry-list .virtual-list-row:has(> .root-entry-group.expanded) {
   padding-bottom: 4px;

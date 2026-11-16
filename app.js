@@ -60,6 +60,7 @@ const searchNormalizationModel = window.ConlexiconSearchNormalization;
 const ENTRY_SEARCH_FIELD_KEYS = entrySearchModel.ENTRY_SEARCH_FIELD_KEYS;
 const glossModel = window.ConlexiconGloss;
 const sourceReferenceModel = window.ConlexiconSourceReferences;
+const rootGroupLayout = window.ConlexiconRootGroupLayout;
 const dictionaryDataModel = window.ConlexiconDictionaryData;
 const {
   DEFAULT_ENTRY_SECTION_ORDER,
@@ -141,8 +142,11 @@ let partialEditHost = null;
 const expandedMorphologyTables = new Set();
 let rootMode = false;
 let rootExpansionMode = "manual";
-const expandedRootEntries = new Set();
-const collapsedRootEntries = new Set();
+// Root groups the user toggled against the mode: expanded by hand, or collapsed
+// under "expand all". A value records where the group sits in the query it was
+// last loaded in (null until then), so a window that is no longer loaded can
+// still be sized (recordRootToggledGroups).
+const rootToggledGroups = new Map();
 let rootNavigationContextId = "";
 let entryDraft = null;
 // Summaries for sources prefilled into an unsaved draft, which has no relation DTO yet.
@@ -276,11 +280,10 @@ let entryBrowserLayoutRefreshFrame = 0;
 let entryBrowserLayoutRefreshUntil = 0;
 let activeEntryContextMenu = null;
 const entryVirtualList = createVirtualListState(145);
-// The entry list's navigator replaces its native scrollbar in normal mode; root
-// mode keeps the native scrollbar until it gets its own navigator.
+// The entry list's navigator replaces its native scrollbar. Root mode has the
+// thumb alone for now, positioned by estimated row heights.
 let entryListNavigator = null;
 let entryListEdgeFrame = 0;
-let entryListScrollbarWidth = -1;
 let entryListNavigatorHoldsLoads = false;
 let entryListNavigatorLayout = { items: null, rows: [], total: 0 };
 // Segments for the navigator's ticks and bubble, per entry query (key).
@@ -4473,9 +4476,9 @@ function renderRootModeControls() {
   elements.expandAllRootsButton.hidden = !rootAvailable || hasRootSearch;
   elements.collapseAllRootsButton.hidden = !rootAvailable || hasRootSearch;
   elements.expandAllRootsButton.disabled = !rootGroupsReady
-    || (rootExpansionMode === "all" && !collapsedRootEntries.size);
+    || (rootExpansionMode === "all" && !rootToggledGroups.size);
   elements.collapseAllRootsButton.disabled = !rootGroupsReady
-    || (rootExpansionMode === "manual" && !expandedRootEntries.size);
+    || (rootExpansionMode === "manual" && !rootToggledGroups.size);
   renderEntryListStatus();
 }
 
@@ -4559,10 +4562,11 @@ function createVirtualListState(estimatedItemHeight) {
     sizeCacheKeys: new Map(),
     heightCache: new Map(),
     onRangeChange: null,
-    // A list with a native scrollbar defers new heights while scrolling so the
-    // native thumb stays under the pointer. A list positioned by the list navigator
-    // applies them at once, before paint, which keeps content from jumping when
-    // newly rendered rows above the viewport differ from their estimates.
+    // A list with a native scrollbar (the corpus) defers new heights while
+    // scrolling so the native thumb stays under the pointer. A list positioned by
+    // the list navigator applies them at once, before paint, which keeps content
+    // from jumping when newly rendered rows above the viewport differ from their
+    // estimates.
     immediateSizeUpdates: false,
   };
 }
@@ -5046,18 +5050,12 @@ function renderVirtualListWindow(virtualList) {
   }
 }
 
-// The list fades its cards at an edge only while content is hidden past it, and
-// keeps a native scrollbar (root mode) out of the mask by its measured width.
+// The list fades its cards at an edge only while content is hidden past it.
 function updateEntryListEdges() {
   entryListEdgeFrame = 0;
   const list = elements.entryList;
   list.toggleAttribute("data-fade-top", list.scrollTop > 1);
   list.toggleAttribute("data-fade-bottom", list.scrollTop + list.clientHeight < list.scrollHeight - 1);
-  const scrollbarWidth = list.offsetWidth - list.clientWidth;
-  if (scrollbarWidth !== entryListScrollbarWidth) {
-    entryListScrollbarWidth = scrollbarWidth;
-    list.style.setProperty("--entry-list-scrollbar-width", `${scrollbarWidth}px`);
-  }
 }
 
 function scheduleEntryListEdges() {
@@ -5075,13 +5073,19 @@ function virtualListEdgeInset(virtualList) {
   return Math.min(fade, virtualList.container.clientHeight / 4);
 }
 
+// Normal mode positions by result index: an entry covers one result and an
+// unloaded window its whole range. Root mode rows carry a weight instead, their
+// estimated height (lib/root-group-layout.js), and cover that much each.
 function entryListNavigatorRows() {
   const { items } = entryVirtualList;
   if (entryListNavigatorLayout.items !== items) {
     let end = 0;
     const rows = items.map(({ value }) => {
-      const start = Number.isInteger(value.resultIndex) ? value.resultIndex : end;
-      const count = value.kind === "window-placeholder" ? value.resultCount : value.kind === "entry" ? 1 : 0;
+      const weighted = Number.isFinite(value.weight);
+      const start = !weighted && Number.isInteger(value.resultIndex) ? value.resultIndex : end;
+      const count = weighted
+        ? value.weight
+        : value.kind === "window-placeholder" ? value.resultCount : value.kind === "entry" ? 1 : 0;
       end = start + count;
       return { start, count };
     });
@@ -5108,7 +5112,6 @@ function setEntryListNavigatorActive(active) {
     formatPosition: (position, total) => `${position.toLocaleString()} / ${total.toLocaleString()}`,
   });
   entryListNavigator.setActive(active);
-  // Root mode keeps the native scrollbar, and with it the deferred height updates.
   entryVirtualList.immediateSizeUpdates = active;
   if (active) {
     syncEntryListOverview();
@@ -5116,9 +5119,9 @@ function setEntryListNavigatorActive(active) {
 }
 
 // Only plain entry queries have segments; feature and quality results show the
-// thumb alone (plan D21).
+// thumb alone (plan D21), and so does root mode until it gets its own overview.
 function entryListOverviewApplies() {
-  return entryQueryState.status === "success" && !activeFilterUsesFeatureQuery();
+  return !rootMode && entryQueryState.status === "success" && !activeFilterUsesFeatureQuery();
 }
 
 function requestEntryListOverview() {
@@ -5722,9 +5725,20 @@ function renderRootModeGroups(groups = [], options = {}) {
 
   const rows = [];
   const dictionary = activeDictionary();
+  const cardHeight = entryVirtualList.estimatedItemHeight;
+  const toggledByWindow = rootToggledGroupsByWindow();
+  // `weight` is a row's estimate before its window's scale; the navigator
+  // positions by it (entryListNavigatorRows).
   const appendGroupRows = (group, windowPageIndex = null, windowEstimateScale = 1) => {
     const expanded = rootGroupIsExpanded(group);
-    rows.push({ kind: "root", group, expanded, windowPageIndex, windowEstimateScale });
+    rows.push({
+      kind: "root",
+      group,
+      expanded,
+      windowPageIndex,
+      windowEstimateScale,
+      weight: rootGroupLayout.rootCardHeight(cardHeight, expanded),
+    });
     if (expanded) {
       const derivedState = rootGroupDerivedState(dictionary, group.root.id);
       if (derivedState?.status === "success") {
@@ -5736,14 +5750,17 @@ function renderRootModeGroups(groups = [], options = {}) {
           windowEstimateScale,
           first: index === 0,
           last: index === derivedState.items.length - 1,
+          weight: rootGroupLayout.derivedRowHeight(index === derivedState.items.length - 1),
         }));
       } else {
+        const weight = rootGroupLayout.derivedPanelHeight(group.derivedCount);
         rows.push({
           kind: "derived-placeholder",
           rootId: group.root.id,
           windowPageIndex,
           status: derivedState?.status || "idle",
-          estimatedHeight: rootDerivedPanelHeight(group.derivedCount) * (windowEstimateScale || 1),
+          estimatedHeight: weight * windowEstimateScale,
+          weight,
         });
       }
     }
@@ -5753,11 +5770,14 @@ function renderRootModeGroups(groups = [], options = {}) {
       if (page.status === "success") {
         page.items.forEach((group) => appendGroupRows(group, page.index, page.estimateScale || 1));
       } else {
+        const estimatedHeight = Math.max(page.estimatedHeight || cardHeight, cardHeight);
         rows.push({
           kind: "window-placeholder",
           windowPageIndex: page.index,
           status: page.status,
-          estimatedHeight: Math.max(page.estimatedHeight || entryVirtualList.estimatedItemHeight, entryVirtualList.estimatedItemHeight),
+          estimatedHeight,
+          // The first window has no totals until it loads.
+          weight: page.windowMetric ? rootGroupWindowEstimate(page, toggledByWindow) : estimatedHeight,
         });
       }
     });
@@ -5773,7 +5793,7 @@ function renderRootModeGroups(groups = [], options = {}) {
     });
   }
   const settingsSizeSignature = entryCardSettingsSizeSignature();
-  setEntryListNavigatorActive(false);
+  setEntryListNavigatorActive(true);
   renderVirtualList(elements.entryList, entryVirtualList, rows, {
     resetToken: entryVirtualResetToken(),
     getKey: (row) => row.kind === "truncation"
@@ -5791,9 +5811,7 @@ function renderRootModeGroups(groups = [], options = {}) {
         ? row.estimatedHeight
       : row.kind === "truncation"
         ? 44
-        : (row.kind === "root"
-          ? rootCardRowHeight(row.expanded)
-          : ROOT_DERIVED_ROW_HEIGHT + (row.last ? ROOT_DERIVED_PANEL_END : 0)) * (row.windowEstimateScale || 1),
+        : row.weight * (row.windowEstimateScale || 1),
     getSizeCacheKey: (row) => row.kind === "truncation"
       ? `truncation:root-groups:${currentLanguage}:${row.loaded}:${row.total}`
       : row.kind === "window-placeholder"
@@ -5983,51 +6001,76 @@ function rootGroupMatchedDerivedCount(group) {
   return group.matchedDerivedCount;
 }
 
+function rootExpansionState() {
+  return { expandAll: rootExpansionMode === "all", search: rootSearchExpandsGroups() };
+}
+
 function rootGroupIsExpanded(group) {
-  const rootId = group.root.id;
-  if (!rootGroupDerivedCount(group)) {
-    return false;
-  }
-  if (rootSearchExpandsGroups() && rootGroupMatchedDerivedCount(group)) {
-    return true;
-  }
+  return rootGroupLayout.groupIsExpanded(group, rootExpansionState(), rootToggledGroups.has(group.root.id));
+}
+
+// Navigating to a derived entry needs its group open.
+function expandRootGroup(rootId) {
   if (rootExpansionMode === "all") {
-    return !collapsedRootEntries.has(rootId);
+    rootToggledGroups.delete(rootId);
+  } else if (!rootToggledGroups.has(rootId)) {
+    rootToggledGroups.set(rootId, null);
   }
-  return expandedRootEntries.has(rootId);
-}
-
-// Root mode row heights. A root's card is an ordinary entry card and takes the
-// list's estimate; a derived entry is one fixed-height line (styles.css
-// .derived-entry-row). An expanded root sits 4px above its panel instead of the
-// usual 12px gap, and the panel ends with its border and that 12px gap.
-const ROOT_DERIVED_ROW_HEIGHT = 44;
-const ROOT_DERIVED_PANEL_END = 13;
-const ROOT_EXPANDED_GAP_TRIM = 8;
-
-function rootCardRowHeight(expanded) {
-  return entryVirtualList.estimatedItemHeight - (expanded ? ROOT_EXPANDED_GAP_TRIM : 0);
-}
-
-function rootDerivedPanelHeight(derivedCount) {
-  return (derivedCount * ROOT_DERIVED_ROW_HEIGHT) + ROOT_DERIVED_PANEL_END;
 }
 
 function rootGroupEstimatedHeight(group) {
-  const expanded = rootGroupIsExpanded(group);
-  return rootCardRowHeight(expanded) + (expanded ? rootDerivedPanelHeight(rootGroupDerivedCount(group)) : 0);
+  return rootGroupLayout.groupHeight(entryVirtualList.estimatedItemHeight, group, rootGroupIsExpanded(group));
 }
 
-// An unloaded window only knows its totals, not how many of its groups have
-// derived entries, so the few pixels each expanded panel adds are left out.
-function rootGroupWindowMetricHeight({ groupCount, derivedCount }) {
-  const includeDerived = rootExpansionMode === "all" || rootSearchExpandsGroups();
-  return (groupCount * entryVirtualList.estimatedItemHeight)
-    + (includeDerived ? derivedCount * ROOT_DERIVED_ROW_HEIGHT : 0);
+// A group index holds only for the query it was read in: after the search or the
+// sort changes, a toggled group counts again once its window has loaded.
+function recordRootToggledGroups() {
+  if (!rootToggledGroups.size) {
+    return;
+  }
+  rootGroupsQueryState.pages.forEach((page) => {
+    if (page.status !== "success") {
+      return;
+    }
+    page.items.forEach((group, position) => {
+      if (rootToggledGroups.has(group.root.id)) {
+        rootToggledGroups.set(group.root.id, {
+          queryKey: rootGroupsQueryState.key,
+          groupIndex: page.offset + position,
+          derivedCount: group.derivedCount,
+          matchedDerivedCount: group.matchedDerivedCount,
+        });
+      }
+    });
+  });
+}
+
+function rootToggledGroupsByWindow() {
+  const byWindow = new Map();
+  rootToggledGroups.forEach((record) => {
+    if (record?.queryKey !== rootGroupsQueryState.key) {
+      return;
+    }
+    const index = Math.floor(record.groupIndex / ROOT_GROUP_QUERY_WINDOW_PAGE_SIZE);
+    byWindow.set(index, [...(byWindow.get(index) || []), record]);
+  });
+  return byWindow;
+}
+
+// What a window that is not loaded comes to, from its totals and the groups in
+// it the user toggled; the rows that replace it add up to the same.
+function rootGroupWindowEstimate(page, toggledByWindow) {
+  return rootGroupLayout.windowHeight(
+    entryVirtualList.estimatedItemHeight,
+    page.windowMetric,
+    rootExpansionState(),
+    toggledByWindow.get(page.index),
+  );
 }
 
 function applyRootGroupWindowMetrics(state, pageInfo = null) {
   const metrics = pageInfo?.windowMetrics || [];
+  const toggledByWindow = rootToggledGroupsByWindow();
   metrics.forEach((metric, index) => {
     const page = state.pages[index];
     if (!page) {
@@ -6035,25 +6078,25 @@ function applyRootGroupWindowMetrics(state, pageInfo = null) {
     }
     page.windowMetric = metric;
     if (page.status !== "success") {
-      page.estimatedHeight = rootGroupWindowMetricHeight(metric);
+      page.estimatedHeight = rootGroupWindowEstimate(page, toggledByWindow);
       page.estimateScale = 1;
     }
   });
 }
 
 function refreshRootGroupWindowHeightEstimates() {
+  const toggledByWindow = rootToggledGroupsByWindow();
   rootGroupsQueryState.pages.forEach((page) => {
     page.estimateScale = 1;
     if (page.status !== "success" && page.windowMetric) {
-      page.estimatedHeight = rootGroupWindowMetricHeight(page.windowMetric);
+      page.estimatedHeight = rootGroupWindowEstimate(page, toggledByWindow);
     }
   });
 }
 
 function resetRootExpansionState() {
   rootExpansionMode = "manual";
-  expandedRootEntries.clear();
-  collapsedRootEntries.clear();
+  rootToggledGroups.clear();
   rootGroupDerivedStates.clear();
   refreshRootGroupWindowHeightEstimates();
 }
@@ -6234,6 +6277,11 @@ function rootGroupDerivedState(dictionary, rootId) {
 }
 
 function startRootGroupDerivedLoad(dictionary, rootId) {
+  // A navigator drag passes many expanded groups; only those in view once the
+  // pointer pauses are worth a request (handleRootGroupsWindowRange).
+  if (entryListNavigatorHoldsLoads) {
+    return;
+  }
   const key = rootGroupDerivedStateKey(dictionary, rootId);
   const current = rootGroupDerivedStates.get(key);
   if (current && ["loading", "success", "error"].includes(current.status)) {
@@ -6288,6 +6336,7 @@ function startRootGroupDerivedLoad(dictionary, rootId) {
 function syncRootGroupsQueryWindowState() {
   rootGroupsQueryState.groups = queryWindowLoadedItems(rootGroupsQueryState.pages);
   rootGroupsQueryState.pageInfo = queryWindowAggregatePageInfo(rootGroupsQueryState.pages);
+  recordRootToggledGroups();
 }
 
 function rootGroupsPageCacheKey(key, cursor = "") {
@@ -6343,6 +6392,9 @@ function loadRootGroupsWindowPage(dictionary, page) {
       rootGroupsQueryState.searchSummary = result.searchSummary;
       page.error = null;
       page.lastAccessAt = performance.now();
+      // A query's first window replaces no placeholder: the height read above
+      // then belongs to whatever the list showed before, not to this window.
+      const replacesPlaceholder = Boolean(rootGroupsQueryState.windowCursor);
       populateQueryWindowPages(
         rootGroupsQueryState,
         page,
@@ -6351,11 +6403,7 @@ function loadRootGroupsWindowPage(dictionary, page) {
       );
       applyRootGroupWindowMetrics(rootGroupsQueryState, result.pageInfo);
       const naturalHeight = result.groups.reduce((total, group) => total + rootGroupEstimatedHeight(group), 0);
-      preserveQueryWindowPageHeight(
-        page,
-        naturalHeight,
-        Boolean(rootGroupsQueryState.windowCursor),
-      );
+      preserveQueryWindowPageHeight(page, naturalHeight, replacesPlaceholder);
       rootGroupsQueryState.status = "success";
       rootGroupsQueryState.error = null;
       if (page.index === 0) {
@@ -6422,6 +6470,16 @@ function handleRootGroupsWindowRange(dictionary, range) {
     range.items.map((row) => row?.windowPageIndex).filter((index) => Number.isInteger(index)),
   );
   rootGroupsQueryState.visiblePageIndexes = visiblePageIndexes;
+  // A navigator drag loads windows only once the pointer pauses.
+  if (entryListNavigatorHoldsLoads) {
+    return;
+  }
+  // Groups rendered during the drag did not ask for their derived entries.
+  range.items.forEach((row) => {
+    if (row?.kind === "derived-placeholder" && row.status === "idle") {
+      startRootGroupDerivedLoad(dictionary, row.rootId);
+    }
+  });
   visiblePageIndexes.forEach((index) => {
     const page = rootGroupsQueryState.pages.find((candidate) => candidate.index === index);
     if (!page) {
@@ -7136,23 +7194,17 @@ function renderRootModeRow(row) {
     toggle.addEventListener("click", (event) => {
       event.stopPropagation();
       rootNavigationContextId = group.root.id;
-      if (rootExpansionMode === "all") {
-        if (collapsedRootEntries.has(group.root.id)) {
-          collapsedRootEntries.delete(group.root.id);
-        } else {
-          collapsedRootEntries.add(group.root.id);
-          rootGroupDerivedStates.delete(rootGroupDerivedStateKey(activeDictionary(), group.root.id));
-        }
-      } else if (expandedRootEntries.has(group.root.id)) {
-        expandedRootEntries.delete(group.root.id);
-        rootGroupDerivedStates.delete(rootGroupDerivedStateKey(activeDictionary(), group.root.id));
-      } else {
-        const derivedKey = rootGroupDerivedStateKey(activeDictionary(), group.root.id);
-        if (rootGroupDerivedStates.get(derivedKey)?.status === "error") {
-          rootGroupDerivedStates.delete(derivedKey);
-        }
-        expandedRootEntries.add(group.root.id);
+      const derivedKey = rootGroupDerivedStateKey(activeDictionary(), group.root.id);
+      // Collapsing drops the derived entries; expanding retries a failed load.
+      if (rootGroupIsExpanded(group) || rootGroupDerivedStates.get(derivedKey)?.status === "error") {
+        rootGroupDerivedStates.delete(derivedKey);
       }
+      if (rootToggledGroups.has(group.root.id)) {
+        rootToggledGroups.delete(group.root.id);
+      } else {
+        rootToggledGroups.set(group.root.id, null);
+      }
+      recordRootToggledGroups();
       renderPartFilter();
       renderEntries();
     });
@@ -7640,11 +7692,7 @@ function prepareRootModeEntryNavigation(entryId, options = {}) {
   const isDerivedEntry = rootId !== entryId;
   rootNavigationContextId = rootId;
   if (isDerivedEntry) {
-    if (rootExpansionMode === "all") {
-      collapsedRootEntries.delete(rootId);
-    } else {
-      expandedRootEntries.add(rootId);
-    }
+    expandRootGroup(rootId);
   }
   return { ...options, rootId };
 }
@@ -7801,11 +7849,7 @@ function startRootGroupQueryLocation(dictionary, entryId, options = {}) {
       }
       rootNavigationContextId = rootId;
       if (rootId !== entryId) {
-        if (rootExpansionMode === "all") {
-          collapsedRootEntries.delete(rootId);
-        } else {
-          expandedRootEntries.add(rootId);
-        }
+        expandRootGroup(rootId);
       }
       pendingEntryCardScroll.options = {
         ...pendingEntryCardScroll.options,
@@ -7899,11 +7943,7 @@ function ensureQueryWindowForEntryScroll(entryId, options = {}) {
   }
   rootNavigationContextId = rootId;
   if (rootId !== entryId) {
-    if (rootExpansionMode === "all") {
-      collapsedRootEntries.delete(rootId);
-    } else {
-      expandedRootEntries.add(rootId);
-    }
+    expandRootGroup(rootId);
     if (!rootGroupDerivedState(dictionary, rootId)) {
       startRootGroupDerivedLoad(dictionary, rootId);
     }
@@ -17890,8 +17930,7 @@ elements.expandAllRootsButton.addEventListener("click", () => {
     return;
   }
   rootExpansionMode = "all";
-  expandedRootEntries.clear();
-  collapsedRootEntries.clear();
+  rootToggledGroups.clear();
   refreshRootGroupWindowHeightEstimates();
   renderPartFilter();
   renderEntries();

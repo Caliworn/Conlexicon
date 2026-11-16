@@ -472,6 +472,16 @@ async function checkRepositoryIntegration() {
       rootFirst.pageInfo.windowMetrics.reduce((total, metric) => total + metric.derivedCount, 0) >= 206,
       "root-group window metrics should include derived-entry counts",
     );
+    rootSecond.pageInfo.windowMetrics.forEach((metric) => {
+      assert.ok(metric.derivedGroupCount <= metric.groupCount);
+      assert.equal(metric.matchedGroupCount, metric.derivedGroupCount, "without a search every group with derived entries counts as matched");
+      assert.equal(metric.matchedGroupDerivedCount, metric.derivedCount);
+    });
+    assert.equal(
+      rootSecond.pageInfo.windowMetrics.reduce((total, metric) => total + metric.derivedGroupCount, 0),
+      rootSecond.items.filter((group) => group.derivedCount).length,
+      "root-group window metrics should count the groups that have derived entries",
+    );
     assert.ok(rootFirst.pageInfo.nextCursor, "the first root-group page should expose a versioned cursor");
     assert.ok(rootFirst.pageInfo.windowCursor, "the first root-group page should expose a dedicated window cursor");
     const rootFirstWindow = await repository.queryRootGroups(dictionary.id, {

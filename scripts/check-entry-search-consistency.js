@@ -421,6 +421,33 @@ async function main() {
     assert.deepEqual(derivedRootSearch.items.map((group) => group.root.id), ["entry-alpha-root"]);
     assert.equal(derivedRootSearch.items[0].rootMatches, false);
     assert.equal(derivedRootSearch.items[0].matchedDerivedCount, 1);
+    assert.deepEqual(derivedRootSearch.pageInfo.windowMetrics, [{
+      groupCount: 1,
+      derivedCount: 1,
+      derivedGroupCount: 1,
+      matchedGroupCount: 1,
+      matchedGroupDerivedCount: 1,
+    }], "a group shown for its derived match alone counts as one the search expands");
+    const rootOnlySearch = await repository.queryRootGroups(dictionary.id, {
+      q: derivedRootSearch.items[0].root.lemma,
+      fields: "lemma",
+      limit: 100,
+    });
+    const rootOnlyGroup = rootOnlySearch.items.find((group) => group.root.id === "entry-alpha-root");
+    assert.equal(rootOnlyGroup.rootMatches, true);
+    // A search expands only the groups with a matching derived entry, so the
+    // list must not reserve room for the derived entries of the others.
+    assert.deepEqual(
+      rootOnlySearch.pageInfo.windowMetrics.map((metric) => [metric.matchedGroupCount, metric.matchedGroupDerivedCount]),
+      [[
+        rootOnlySearch.items.filter((group) => group.matchedDerivedCount).length,
+        rootOnlySearch.items.reduce((total, group) => total + (group.matchedDerivedCount ? group.derivedCount : 0), 0),
+      ]],
+    );
+    assert.equal(
+      rootOnlySearch.pageInfo.windowMetrics[0].derivedCount,
+      rootOnlySearch.items.reduce((total, group) => total + group.derivedCount, 0),
+    );
     assert.deepEqual(derivedRootSearch.searchSummary, {
       matchedEntryCount: 1,
       fields: [{ field: "definitions", matching: "strict", entryCount: 1 }],

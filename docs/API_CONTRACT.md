@@ -342,7 +342,7 @@ GET /api/dictionaries/:id/entries?filter=&q=&fields=&fuzzyFields=&part=&tags=&ta
 - `windowOffset`：可选的结果窗口起点。非零值必须与同一查询返回的有效 `windowCursor` 一起发送；省略时沿用 cursor 自身的位置。该参数用于纯滚动列表直接读取远端窗口，不是 UI 页码。
 - `limit`：分页大小，必须为 1–200；超限返回 `invalid_entry_query_limit`。
 
-前端普通列表以每窗 200 条读取，最多保留 5 个已加载窗口；未加载和已淘汰窗口使用等高占位，从而让原生滚动条始终代表完整结果集。请求失败时显示失败状态，不回退到前端完整词典快照。基准和诊断使用同一产品窗口，通过会话 `buildMs`、缓存统计和 cursor 窗口分别测量匹配构建与响应开销，不开放大页旁路。
+前端普通列表以每窗 200 条读取，最多保留 5 个已加载窗口；未加载和已淘汰窗口使用等高占位，从而让列表的滚动范围始终代表完整结果集。请求失败时显示失败状态，不回退到前端完整词典快照。基准和诊断使用同一产品窗口，通过会话 `buildMs`、缓存统计和 cursor 窗口分别测量匹配构建与响应开销，不开放大页旁路。
 
 前端以 `QueryPageCache` 缓存成功的窗口响应（key 含词典 `updatedAt` 与规范化查询，只缓存成功响应，迟到但仍属于当前词典版本的响应也写入缓存），成功写入后按词典清空；单条详情 `/entries/:entryId` 使用独立的小型缓存，保存响应直接更新其中的当前词条。查询首窗或词条详情请求进行中采用两段式 stale-while-revalidate：开始后 200 ms 内保持旧内容，但旧详情立即设为 `inert`，不可再通过鼠标、键盘或辅助技术操作；超过 200 ms 后详情显示遮罩，列表保留旧内容并轻微变淡，二者用同一套覆盖式“正在更新”提示。首次加载没有旧内容时直接显示加载状态；滚动补载后续窗口只使用窗口局部占位。请求失败直接进入错误状态，不重试、不回滚，也不把旧内容冒充为成功结果；成功提交新内容后立即清除更新状态。词条切换只更新选中态、详情、词汇网络状态和必要的滚动状态，不重建未变化的列表窗口。
 
@@ -685,12 +685,12 @@ GET /api/dictionaries/:id/root-groups?q=&fields=&fuzzyFields=&sort=&cursor=&wind
     windowCursor,
     hasMore,
     total,
-    windowMetrics: [{ groupCount, derivedCount }]
+    windowMetrics: [{ groupCount, derivedCount, derivedGroupCount, matchedGroupCount, matchedGroupDerivedCount }]
   }
 }
 ```
 
-`windowMetrics` 通常只在 offset 为 0 的父级响应中提供，按本次 `limit` 划分全部父级窗口；词根定位响应即使位于后续窗口也会携带它，以便前端直接重建完整父级占位。它只包含每窗词根组数和衍生词总数，不携带词条内容。前端用它在“全部展开”和搜索自动展开状态下估算尚未加载窗口的完整高度。普通后续窗口响应可以省略该数组。
+`windowMetrics` 通常只在 offset 为 0 的父级响应中提供，按本次 `limit` 划分全部父级窗口；词根定位响应即使位于后续窗口也会携带它，以便前端直接重建完整父级占位。它只包含每窗的合计，不携带词条内容：`groupCount` 是词根组数，`derivedCount` 是各组可见衍生词的总数，`derivedGroupCount` 是有衍生词的组数，`matchedGroupCount` 是有衍生词命中搜索的组数，`matchedGroupDerivedCount` 是这些命中组的衍生词总数；未搜索时后两个等于 `derivedGroupCount` 和 `derivedCount`。前端用它按当前展开状态估算尚未加载窗口的高度（`lib/root-group-layout.js` 的 `windowHeight()`）：全部展开时所有有衍生词的组都展开，取 `derivedGroupCount` 与 `derivedCount`；手动模式下搜索只自动展开有衍生词命中的组，取后两个；手动模式未搜索时不计衍生词。普通后续窗口响应可以省略该数组。
 
 父级词根组 `limit` 必须为 1–100；超限返回 `invalid_root_group_query_limit`。普通查询与定位端点使用相同上限。
 
@@ -728,7 +728,7 @@ GET /api/dictionaries/:id/root-groups/:rootId/entries?q=&fields=&fuzzyFields=&so
 - repository 以独立 relation generation 缓存与搜索条件无关的 `rootId -> derivedIds` 稳定拓扑，并同时维护 `entryId -> rootIds`、`rootId -> group` 反向索引；词根查询会话进一步维护 `rootId -> resultIndex`。`/root-groups`、组内子项和 `/entry-relations/:entryId` 复用该拓扑，词典摘要计数不依赖它。拓扑组和查询结果位置的定位均为 O(1)，关系响应仍需按实际返回条目数读取并构建 DTO。词条增删、来源目标变化、整库替换和词典删除会使其失效；lemma 改名及其他普通词条保存/patch 仅同步轻量排序记录，其他模块保存不触碰拓扑。查询 session/cursor 的 cache generation 仍按查询一致性要求独立失效。
 - `/root-groups` 搜索直接从 `entry_search_values` / `entry_morphology_search_values` 获取命中 ID，再筛选稳定拓扑，不导出完整词典 snapshot。`entry-relations/:entryId` 复用同一拓扑的反向索引。质量检查的来源循环不读取该缓存，而是在自己的最小事实读取上调用同一 `etymology-graph-model`。
 - SQLite 后端用 `entry_sources(target_entry_id)` 索引支持词根分组和词汇网络查询；`source_text` 保留显示/搜索文本，旧 JSON conversion 与 migration 不参与运行期查询。
-- 前端词根模式正常路径以 `/root-groups` 为准；请求失败时显示失败状态，不回退前端本地完整分组。父级未加载窗口以 `pageInfo.total` 和 `windowMetrics` 建立占位，因此滚动条可在折叠、搜索自动展开及全局展开状态下代表完整词根组集合。全局展开采用状态意图：父级页进入可见范围后才加载各组衍生词；单组收起作为例外保留到重新展开或“全部收起/全部展开”重置。组内衍生词不建立第二层分页窗口。
+- 前端词根模式正常路径以 `/root-groups` 为准；请求失败时显示失败状态，不回退前端本地完整分组。父级未加载窗口以 `pageInfo.total` 和 `windowMetrics` 建立占位，因此滚动范围和导航条可在折叠、搜索自动展开及全局展开状态下代表完整词根组集合。全局展开采用状态意图：父级页进入可见范围后才加载各组衍生词；单组收起作为例外保留到重新展开或“全部收起/全部展开”重置。组内衍生词不建立第二层分页窗口。
 
 ### 分析、功能结果与质量查询
 
