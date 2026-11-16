@@ -35,6 +35,12 @@
 - 独立描边和实色按钮以填充、边框区分悬浮与按下，按压时把较深的边移到顶边。词条工具栏沿用平面按钮配方。导航按压以填充反馈。
 - 控件过渡、应用 tooltip 和词汇网络入场采用 150ms，toast 采用 160ms。浮层入场位移最大 3px。 [Fluent 2 动效](https://fluent2.microsoft.design/motion) · [Fluent UI durationFast](https://github.com/microsoft/fluentui/blob/master/packages/tokens/src/global/durations.ts)
 
+## 亚克力 Lab
+
+`layered-acrylic-lab.html` 可直接打开或通过本地服务使用。两侧共享主题、背景和暗幕，各自选择配方。主题可选浅色和深色，默认浅色。大面板采用产品快速录入的宽度、字段和布局。两组原尺寸预览并排放不下时上下排列。舞台高度随大小面板调整。在任一侧拖动面板的非控件区域，可同步移动另一侧同尺寸的面板。各组参数默认展开，调参只在当前页面会话生效。
+
+「当前产品」沿用产品的滤镜能力判断。两者共用 `lib/layered-acrylic.js` 的 WinUI Default 配方及 SVG 合成逻辑，普通模糊参数和静态噪点取自 `theme-layered-glass.css`。WinUI Base 是应用内画刷的网页对照预设。
+
 ## 辅助模式与验收
 
 - 禁用透明材质或浏览器不支持 backdrop blur 时，菜单、弹窗和结构化提示使用同角色的实色填充。强制颜色使用系统色描边、`Highlight` 选中标记和实色动作配色。减少动态时，皮肤的控件过渡与浮层位移动画关闭。

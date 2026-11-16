@@ -128,10 +128,18 @@ body[data-ui-skin="layered-glass"] {
   --layered-control-pressed-background: #dce4e7;
   --layered-danger-hover: #8a2731;
   --layered-button-edge-ink: #6e787e;
-  --layered-acrylic-tint: rgb(252 253 253 / 70%);
-  --layered-overlay-tint: rgb(240 243 246 / 70%);
+  --layered-acrylic-color: 252 253 253;
+  --layered-overlay-color: 240 243 246;
+  --layered-acrylic-opacity: 70%;
+  --layered-acrylic-tint: rgb(var(--layered-acrylic-color) / var(--layered-acrylic-opacity));
+  --layered-overlay-tint: rgb(var(--layered-overlay-color) / var(--layered-acrylic-opacity));
+  --layered-acrylic-blur: 15px;
+  --layered-overlay-blur: 20px;
   --layered-acrylic-grain: url("assets/layered-glass/acrylic-grain-light.png");
+  --layered-acrylic-grain-peak: 8;
   --layered-winui-acrylic-filter: url("#layered-acrylic-light");
+  --layered-winui-acrylic-grain: url("assets/layered-glass/acrylic-grain-winui.png");
+  --layered-winui-acrylic-grain-peak: 5;
   --layered-control-transition:
     background-color var(--theme-paint-duration, 150ms) ease-out,
     border-color var(--theme-paint-duration, 150ms) ease-out;
@@ -180,9 +188,11 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --layered-control-pressed-background: #292d2f;
   --layered-danger-hover: #ff9da5;
   --layered-button-edge-ink: #17191a;
-  --layered-acrylic-tint: rgb(39 42 44 / 80%);
-  --layered-overlay-tint: rgb(37 42 48 / 80%);
+  --layered-acrylic-color: 39 42 44;
+  --layered-overlay-color: 37 42 48;
+  --layered-acrylic-opacity: 80%;
   --layered-acrylic-grain: url("assets/layered-glass/acrylic-grain-dark.png");
+  --layered-acrylic-grain-peak: 4;
   --layered-winui-acrylic-filter: url("#layered-acrylic-dark");
 }
 
@@ -304,12 +314,12 @@ body[data-ui-skin="layered-glass"] .toast {
     body[data-ui-skin="layered-glass"][data-layered-acrylic="winui"] {
       --layered-acrylic-filter: var(--layered-winui-acrylic-filter);
       --layered-acrylic-fill: transparent;
-      --layered-acrylic-grain: url("assets/layered-glass/acrylic-grain-winui.png");
+      --layered-acrylic-grain: var(--layered-winui-acrylic-grain);
     }
 
     body[data-ui-skin="layered-glass"] > :nth-last-child(1 of :is(.network-overlay, .modal-overlay):not([hidden])) > :is(.network-panel, .modal-panel) {
       --material-overlay-panel-background: var(--layered-acrylic-fill, var(--layered-overlay-tint));
-      --material-floating-filter: var(--layered-acrylic-filter, blur(20px));
+      --material-floating-filter: var(--layered-acrylic-filter, blur(var(--layered-overlay-blur)));
       background-image: var(--layered-acrylic-grain);
       -webkit-backdrop-filter: var(--material-floating-filter);
     }
@@ -317,14 +327,14 @@ body[data-ui-skin="layered-glass"] .toast {
     body[data-ui-skin="layered-glass"]:not(:has(> :is(.network-overlay, .modal-overlay):not([hidden]))) > :nth-last-child(1 of :is(.entry-workspace-menu, .skin-picker-menu, .entry-context-menu):not([hidden])),
     body[data-ui-skin="layered-glass"]:not(:has(> :is(.network-overlay, .modal-overlay, .entry-workspace-menu, .skin-picker-menu, .entry-context-menu):not([hidden]))) .source-reference-field:focus-within > .source-suggestions:not([hidden]) {
       --material-floating-background: var(--layered-acrylic-fill, var(--layered-acrylic-tint));
-      --material-floating-filter: var(--layered-acrylic-filter, blur(15px));
+      --material-floating-filter: var(--layered-acrylic-filter, blur(var(--layered-acrylic-blur)));
       background-image: var(--layered-acrylic-grain);
       -webkit-backdrop-filter: var(--material-floating-filter);
     }
 
     body[data-ui-skin="layered-glass"]:not(:has(:is(.network-overlay, .modal-overlay, .entry-workspace-menu, .skin-picker-menu, .entry-context-menu, .source-suggestions):not([hidden]))) > .app-tooltip:is(.chip-list-tooltip, .tag-info-tooltip, .rich-tooltip) {
       --material-rich-tooltip-background: var(--layered-acrylic-fill, var(--layered-acrylic-tint));
-      --material-rich-tooltip-filter: var(--layered-acrylic-filter, blur(15px));
+      --material-rich-tooltip-filter: var(--layered-acrylic-filter, blur(var(--layered-acrylic-blur)));
       background-image: var(--layered-acrylic-grain);
     }
   }

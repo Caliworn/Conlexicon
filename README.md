@@ -126,11 +126,11 @@ A standalone tuning and geometry diagnostic page is available at `http://localho
 
 `http://localhost:4173/control-gallery.html` 用生产样式表并排展示各语义控件配方及其状态，可切换皮肤与明暗，并在页内检查对比度和状态区分；不调用应用 API，也不保存任何内容。必须通过本地服务打开，直接打开文件时浏览器不允许读取样式规则，悬浮等状态无法强制显示。详见[样式皮肤规范](docs/STYLE_SKIN_PLAN.md)第 5 节。
 
-### Layered Glass Acrylic / 层叠玻璃亚克力
+### Acrylic Lab / 亚克力 Lab
 
-The Acrylic inspector lets you drag and tune small and large panels independently. The WinUI comparison places Conlexicon's previous recipe beside the browser approximation of WinUI's in-app brush. You can open both HTML files directly from the project root. [Acrylic inspector](http://localhost:4173/layered-acrylic-inspector.html) · [WinUI comparison](http://localhost:4173/winui-acrylic-comparison.html)
+The Acrylic Lab shows small and large panels on both sides. Choose a recipe independently for each side and tune each panel in its expanded settings. Dragging either panel from its background moves both panels of that size. Open `layered-acrylic-lab.html` from the project root or use the local server. [Acrylic Lab](http://localhost:4173/layered-acrylic-lab.html)
 
-亚克力调试页可独立拖动和调整大小面板。WinUI 对照页把上一版配方和 WinUI 应用内画刷的网页近似放在同一背景上比较。两页也可从项目根目录直接打开。 [亚克力调试页](http://localhost:4173/layered-acrylic-inspector.html) · [WinUI 对照页](http://localhost:4173/winui-acrylic-comparison.html)
+亚克力 Lab 在两侧同时展示大小面板。左右可独立选配方，各面板的参数默认展开。拖动非控件区域时，两侧同尺寸的面板同步移动。可从项目根目录直接打开 `layered-acrylic-lab.html`，也可通过本地服务访问。 [亚克力 Lab](http://localhost:4173/layered-acrylic-lab.html)
 
 ## Data Storage / 数据存储
 

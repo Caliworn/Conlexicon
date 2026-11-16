@@ -1,0 +1,731 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Conlexicon Acrylic Lab</title>
+  <link rel="stylesheet" href="theme-layered-glass.css">
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body { margin: 0; padding: clamp(8px, 2vw, 24px); background: var(--ui-canvas-bg); }
+    #acrylicLab {
+      color-scheme: light;
+      max-width: 1440px;
+      margin-inline: auto;
+      --app-surface: light-dark(#f0f3f6, #20252c);
+      --app-input: light-dark(#fbfcfd, #30353d);
+      --app-text: light-dark(#19232c, #f1f4f6);
+      --app-muted: light-dark(#4e5d6a, #b8c1cd);
+      --app-line: light-dark(#c7d0da, #46505c);
+      --app-blue: light-dark(#0f6cbd, #79b9f8);
+      --app-blue-bg: light-dark(#daeafa, #263f59);
+      --app-primary: light-dark(#0f6cbd, #479ef5);
+      --app-on-primary: light-dark(#fff, #081828);
+      --glass-stroke: light-dark(#ffffffc2, #ffffff36);
+      --glass-shadow: light-dark(#182c4633, #070c1470);
+      --photo-fill: light-dark(#a5bacb, #293b4d);
+      color: var(--app-text);
+      font: 400 14px/1.4 "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", system-ui, sans-serif;
+    }
+    #acrylicLab[data-theme="dark"] { color-scheme: dark; }
+    #acrylicLab *,
+    #acrylicLab *::before,
+    #acrylicLab *::after { box-sizing: border-box; }
+    #acrylicLab [hidden] { display: none !important; }
+    #acrylicLab .workbench {
+      overflow: hidden;
+      background: var(--app-surface);
+      border: 1px solid var(--app-line);
+      border-radius: 10px;
+    }
+    #acrylicLab .app-bar {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--app-line);
+    }
+    #acrylicLab h1 { margin: 0; font-size: 19px; font-weight: 600; }
+    #acrylicLab button,
+    #acrylicLab select,
+    #acrylicLab input { font: inherit; }
+    #acrylicLab button,
+    #acrylicLab select,
+    #acrylicLab input[type="color"] {
+      color: var(--app-text);
+      background: var(--app-input);
+      border: 1px solid var(--app-line);
+      border-radius: 4px;
+    }
+    #acrylicLab button:focus-visible,
+    #acrylicLab select:focus-visible,
+    #acrylicLab input:focus-visible,
+    #acrylicLab summary:focus-visible {
+      outline: 2px solid var(--app-blue);
+      outline-offset: 2px;
+    }
+    #acrylicLab .workspace { padding: 12px 16px 16px; }
+    #acrylicLab .environment {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      gap: 10px 12px;
+      margin-block-end: 14px;
+    }
+    #acrylicLab .field {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+      font: inherit;
+    }
+    #acrylicLab .field > span,
+    #acrylicLab .setting-label { color: var(--app-muted); font-size: 12px; }
+    #acrylicLab select {
+      padding: 5px 8px;
+      height: 34px;
+      max-width: 100%;
+    }
+    #acrylicLab .scrim-field { flex: 1 1 112px; max-width: 200px; }
+    #acrylicLab .setting-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 6px;
+    }
+    #acrylicLab output {
+      color: var(--app-text);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    #acrylicLab input[type="range"] {
+      display: block;
+      width: 100%;
+      min-width: 0;
+      height: 26px;
+      margin: 0;
+      accent-color: var(--app-primary);
+    }
+    #acrylicLab .scrim-field input { height: 34px; }
+    #acrylicLab .panes {
+      display: grid;
+      /* Keep room for the 560px production dialog plus its drag margins. */
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 620px), 1fr));
+      gap: 18px;
+      align-items: start;
+    }
+    #acrylicLab .pane { min-width: 0; }
+    #acrylicLab .recipe-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: end;
+      justify-content: space-between;
+      gap: 5px 8px;
+      margin-block-end: 8px;
+    }
+    #acrylicLab .recipe-head .field { flex: 1 1 125px; }
+    #acrylicLab .effective {
+      align-self: end;
+      color: var(--app-muted);
+      font-size: 12px;
+      line-height: 34px;
+      white-space: nowrap;
+    }
+    #acrylicLab .scene {
+      position: relative;
+      isolation: isolate;
+      height: var(--scene-height, 600px);
+      overflow: hidden;
+      border: 1px solid var(--app-line);
+      border-radius: 8px;
+      background: var(--scene-image) center 53% / cover no-repeat, var(--photo-fill);
+    }
+    #acrylicLab[data-scene="swatches"] .scene {
+      background: linear-gradient(115deg, #233d82 0 25%, #008cad 25% 47%, #eda020 47% 68%, #b64455 68% 83%, #efe3c5 83%);
+    }
+    #acrylicLab .scene-shade {
+      position: absolute;
+      inset: 0;
+      background: #000;
+      opacity: var(--scrim, 0);
+      pointer-events: none;
+    }
+    #acrylicLab .movement-area { position: absolute; inset: 12px; }
+    #acrylicLab .sample {
+      position: absolute;
+      top: 0;
+      left: 0;
+      isolation: isolate;
+      border: 1px solid var(--glass-stroke);
+      border-radius: 8px;
+      background: var(--sample-fill, var(--app-input));
+      box-shadow: 0 6px 22px var(--glass-shadow);
+      -webkit-backdrop-filter: var(--sample-filter, none);
+      backdrop-filter: var(--sample-filter, none);
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+      will-change: transform;
+    }
+    #acrylicLab .sample[data-size="small"] { width: min(225px, calc(100% - 34px)); }
+    #acrylicLab .quick-entry-panel {
+      max-width: calc(100% - 34px);
+      max-height: none;
+      overflow: visible;
+      font: 400 16px/normal var(--font-ui);
+    }
+    #acrylicLab .scene[data-front="small"] .sample[data-size="small"],
+    #acrylicLab .scene[data-front="large"] .sample[data-size="large"] { z-index: 1; }
+    #acrylicLab .sample.is-dragging,
+    #acrylicLab .sample.is-dragging .handle { cursor: grabbing; }
+    #acrylicLab .sample::before {
+      content: "";
+      position: absolute;
+      z-index: -1;
+      inset: 0;
+      border-radius: inherit;
+      background-image: var(--grain-tile);
+      opacity: var(--grain-opacity, 0);
+      pointer-events: none;
+    }
+    #acrylicLab .sample-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 3px 11px 1px;
+      font-weight: 600;
+    }
+    #acrylicLab .handle {
+      min-height: 29px;
+      padding: 3px 4px;
+      border: 0;
+      background: transparent;
+      color: var(--app-muted);
+      font-size: 11px;
+      cursor: grab;
+    }
+    #acrylicLab .quick-entry-panel .handle {
+      min-height: 38px;
+      padding: 0 14px;
+      border: 1px solid var(--app-line);
+      background: var(--app-input);
+      color: var(--app-text);
+      font-size: inherit;
+    }
+    #acrylicLab .quick-entry-panel .quick-entry-input {
+      display: flex;
+      align-items: center;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+    #acrylicLab .quick-entry-panel .quick-entry-actions .secondary-button {
+      display: inline-flex;
+      align-items: center;
+    }
+    #acrylicLab .sample-body { display: grid; gap: 9px; padding: 0 11px 10px; }
+    #acrylicLab .sample-key { color: var(--app-muted); font-size: 12px; }
+    #acrylicLab .chips,
+    #acrylicLab .sample-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+    #acrylicLab .chips span,
+    #acrylicLab .sample-actions span {
+      padding: 3px 8px;
+      border: 1px solid var(--app-line);
+      border-radius: 4px;
+      background: var(--app-input);
+      font-size: 12px;
+    }
+    #acrylicLab [data-sample-control] { cursor: default; }
+    #acrylicLab .chips .picked { color: var(--app-blue); background: var(--app-blue-bg); }
+    #acrylicLab .sample-actions { justify-content: flex-end; }
+    #acrylicLab .sample-actions .primary {
+      color: var(--app-on-primary);
+      background: var(--app-primary);
+      border-color: transparent;
+    }
+    #acrylicLab .parameter-groups {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0 12px;
+      margin-block-start: 9px;
+    }
+    #acrylicLab .parameters {
+      min-width: 0;
+      border-block-start: 1px solid var(--app-line);
+    }
+    #acrylicLab summary { color: var(--app-muted); padding-block: 7px; font-size: 12px; }
+    #acrylicLab .settings {
+      display: grid;
+      gap: 5px;
+      padding-block-start: 4px;
+    }
+    #acrylicLab .settings label { min-width: 0; font: inherit; }
+    #acrylicLab .color-setting { display: grid; align-content: start; gap: 4px; }
+    #acrylicLab input[type="color"] {
+      width: 100%;
+      height: 25px;
+      padding: 2px 4px;
+    }
+    @media (max-width: 580px) {
+      #acrylicLab .workspace,
+      #acrylicLab .app-bar { padding-inline: 11px; }
+      #acrylicLab .environment .field { flex: 1 1 120px; max-width: none; }
+    }
+    @media (pointer: coarse) {
+      #acrylicLab .handle,
+      #acrylicLab select,
+      #acrylicLab input[type="range"],
+      #acrylicLab input[type="color"],
+      #acrylicLab summary { min-height: 44px; }
+    }
+    @media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+      #acrylicLab .sample {
+        background: var(--sample-solid, var(--app-input));
+        -webkit-backdrop-filter: none;
+        backdrop-filter: none;
+      }
+      #acrylicLab .sample::before { opacity: 0; }
+    }
+  </style>
+</head>
+<body data-ui-skin="layered-glass">
+  <script src="lib/layered-acrylic.js"></script>
+  <main id="acrylicLab" aria-label="Acrylic Lab" data-theme="light">
+  <div class="workbench">
+    <header class="app-bar">
+      <h1>Acrylic Lab</h1>
+    </header>
+    <div class="workspace">
+      <div class="environment" role="group" aria-label="共用场景">
+        <label class="field">
+          <span>背景</span>
+          <select data-environment="scene">
+            <option value="assets/liquid-glass-lab/diamond-valley-lake-poppies.jpg">罂粟山坡</option>
+            <option value="assets/liquid-glass-lab/interior.jpg">室内</option>
+            <option value="assets/liquid-glass-lab/people-in-dry-grass-field.jpg">草地人物</option>
+            <option value="assets/liquid-glass-lab/turquoise-shallow-water-rocks.jpg">海水岩石</option>
+            <option value="assets/liquid-glass-lab/whangarei-falls-footbridge.jpg">瀑布步桥</option>
+            <option value="swatches">彩色色带</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>主题</span>
+          <select data-environment="theme">
+            <option value="light">浅色</option>
+            <option value="dark">深色</option>
+          </select>
+        </label>
+        <label class="field scrim-field">
+          <span class="setting-label"><span>场景暗幕</span><output data-scrim-value>0%</output></span>
+          <input data-environment="scrim" type="range" min="0" max="70" value="0" aria-label="场景暗幕">
+        </label>
+      </div>
+      <div class="panes"></div>
+    </div>
+  </div>
+  <svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;pointer-events:none">
+    <defs></defs>
+  </svg>
+  <template class="pane-template">
+    <section class="pane">
+      <div class="recipe-head">
+        <label class="field">
+          <span data-recipe-label></span>
+          <select data-recipe>
+            <option value="product">当前产品</option>
+            <option value="fallback">普通模糊回退</option>
+            <option value="winui-default">WinUI Default</option>
+            <option value="winui-base">WinUI Base</option>
+            <option value="solid">实色</option>
+            <option value="custom">自定义</option>
+          </select>
+        </label>
+        <span class="effective" data-effective aria-live="polite"></span>
+      </div>
+      <div class="scene">
+        <div class="scene-shade"></div>
+        <div class="movement-area">
+          <div class="sample" data-size="small">
+            <div class="sample-heading">
+              <span>筛选词条</span>
+              <button type="button" class="handle">⠿ 移动</button>
+            </div>
+            <div class="sample-body" aria-hidden="true">
+              <span class="sample-key">词性</span>
+              <div class="chips"><span class="picked" data-sample-control>不限</span><span data-sample-control>名词</span><span data-sample-control>动词</span></div>
+              <div class="sample-actions"><span data-sample-control>取消</span><span class="primary" data-sample-control>应用</span></div>
+            </div>
+          </div>
+          <div class="sample modal-panel quick-entry-panel" data-size="large">
+            <div class="modal-header">
+              <h2>快速录入</h2>
+              <button type="button" class="handle">⠿ 移动</button>
+            </div>
+            <div class="quick-entry-fields" aria-hidden="true">
+              <div class="quick-entry-row is-current">
+                <span class="quick-entry-label">词形</span>
+                <span class="quick-entry-input" data-sample-control>atala</span>
+                <span class="quick-entry-hint"></span>
+              </div>
+              <div class="quick-entry-row">
+                <span class="quick-entry-label">发音</span>
+                <span class="quick-entry-input" data-sample-control>/ta.la/</span>
+                <span class="quick-entry-hint"></span>
+              </div>
+              <div class="quick-entry-row">
+                <span class="quick-entry-label">标签</span>
+                <span class="quick-entry-input" data-sample-control></span>
+                <span class="quick-entry-hint"></span>
+              </div>
+              <div class="quick-entry-row">
+                <span class="quick-entry-label">释义 1</span>
+                <span class="quick-entry-input" data-sample-control>山脊上的常绿乔木</span>
+                <span class="quick-entry-hint"></span>
+              </div>
+            </div>
+            <p class="quick-entry-message" aria-hidden="true"></p>
+            <div class="quick-entry-footer" aria-hidden="true">
+              <label class="switch-label" data-sample-control>
+                <input class="switch" type="checkbox" disabled>
+                <span>释义标签</span>
+                <kbd class="quick-entry-shortcut">Ctrl /</kbd>
+              </label>
+              <p class="quick-entry-keys">
+                <span><kbd>Enter</kbd> 下一项</span>
+                <span><kbd>↑</kbd><kbd>↓</kbd> 切换</span>
+                <span><kbd>Tab</kbd> 填入建议</span>
+              </p>
+              <div class="quick-entry-actions">
+                <span class="secondary-button" data-control-tone="neutral" data-sample-control>完整编辑<kbd class="quick-entry-shortcut">Ctrl Shift Enter</kbd></span>
+                <span class="secondary-button" data-control-tone="accent" data-control-emphasis="solid" data-sample-control>提交<kbd class="quick-entry-shortcut">Ctrl Enter</kbd></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="parameter-groups">
+        <details class="parameters" data-size="small" open><summary>小面板参数</summary><div class="settings"></div></details>
+        <details class="parameters" data-size="large" open><summary>大面板参数</summary><div class="settings"></div></details>
+      </div>
+    </section>
+  </template>
+  <script>
+    (() => {
+      const root = document.getElementById("acrylicLab");
+      const acrylic = window.ConlexiconAcrylic;
+      const sizes = ["small", "large"];
+      const sharedInputs = [...root.querySelectorAll("[data-environment]")];
+      const forced = matchMedia("(forced-colors: active)");
+      const reduced = matchMedia("(prefers-reduced-transparency: reduce)");
+      const blurSupported = CSS.supports("backdrop-filter", "blur(1px)") || CSS.supports("-webkit-backdrop-filter", "blur(1px)");
+      const svgSupported = acrylic.supportsWinuiBackdrop();
+      const state = {
+        theme: "light", scene: root.querySelector('[data-environment="scene"]').value, scrim: 0,
+        sides: ["product", "fallback"].map(preset => ({ preset, basis: preset, drafts: {} })),
+        positions: { small: [0.18, 0.08], large: [0.82, 0.94] },
+        front: "large",
+      };
+      const labels = {
+        luma: ["亮度混合", 0, 100, "%"], tint: ["染色", 0, 100, "%"],
+        opacity: ["底色不透明度", 0, 100, "%"], blur: ["模糊", 0, 60, "px"],
+        grain: ["细噪点", 0, 20, "/255"], brightness: ["背景亮度", 50, 150, "%"],
+        saturation: ["背景饱和度", 0, 200, "%"], color: ["底色"],
+      };
+      const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
+      const winuiBase = {
+        light: { color: "#f3f3f3", matte: "#eeeeee", luma: 90, tint: 0 },
+        dark: { color: "#202020", matte: "#1c1c1c", luma: 96, tint: 50 },
+      };
+      let palette;
+      function readPalette() {
+        const computed = getComputedStyle(document.body);
+        const token = name => computed.getPropertyValue(name).trim();
+        const hex = name => "#" + token(name).split(/\s+/)
+          .map(channel => Number(channel).toString(16).padStart(2, "0")).join("");
+        const solid = token("--material-panel-background");
+        const grain = Number(token("--layered-acrylic-grain-peak"));
+        const base = {
+          engine: "css", matte: solid, opacity: parseFloat(token("--layered-acrylic-opacity")),
+          grain, grainPeak: grain, grainImage: token("--layered-acrylic-grain"),
+          brightness: 100, saturation: 100,
+        };
+        const winuiPeak = Number(token("--layered-winui-acrylic-grain-peak"));
+        return {
+          solid,
+          small: { ...base, color: hex("--layered-acrylic-color"), blur: parseFloat(token("--layered-acrylic-blur")) },
+          large: { ...base, color: hex("--layered-overlay-color"), blur: parseFloat(token("--layered-overlay-blur")) },
+          winui: { grain: winuiPeak, grainPeak: winuiPeak, grainImage: token("--layered-winui-acrylic-grain") },
+        };
+      }
+      function recipe(name, size, theme) {
+        const fallback = palette[size];
+        if (name === "solid") return { ...fallback, engine: "solid", color: palette.large.color };
+        if (name === "fallback" || (name === "product" && !svgSupported)) return fallback;
+        return {
+          ...acrylic.winuiDefault[theme],
+          ...(name === "winui-base" ? winuiBase[theme] : {}),
+          ...palette.winui,
+          engine: "winui",
+        };
+      }
+      function model(index, size) {
+        const choice = state.sides[index], theme = state.theme;
+        if (choice.preset === "custom") return choice.drafts[theme]?.[size] || recipe(choice.basis, size, theme);
+        return recipe(choice.preset, size, theme);
+      }
+      let extraGrain;
+      function noiseTile() {
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = 256;
+        const ctx = canvas.getContext("2d");
+        const grain = ctx.createImageData(256, 256);
+        let seed = 20261110;
+        for (let i = 0; i < grain.data.length; i += 4) {
+          seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+          grain.data.fill(seed >>> 24, i, i + 3);
+          grain.data[i + 3] = 255;
+        }
+        ctx.putImageData(grain, 0, 0);
+        return 'url("' + canvas.toDataURL("image/png") + '")';
+      }
+      function addSetting(side, sample, key, target) {
+        const [labelText, min, max, unit] = labels[key];
+        const label = document.createElement("label");
+        if (key === "color") label.className = "color-setting";
+        const description = document.createElement("span");
+        description.className = "setting-label";
+        const text = document.createElement("span");
+        text.textContent = labelText;
+        const output = document.createElement("output");
+        description.append(text, output);
+        const input = document.createElement("input");
+        input.type = unit ? "range" : "color";
+        input.id = "cx-acrylic-setting-" + side.index + "-" + sample.size + "-" + key;
+        input.setAttribute("aria-label", labelText);
+        if (unit) {
+          input.min = min;
+          input.max = max;
+        }
+        output.htmlFor = input.id;
+        input.addEventListener("input", () => {
+          const chosen = state.sides[side.index];
+          const theme = state.theme;
+          const material = model(side.index, sample.size);
+          if (chosen.preset !== "custom") {
+            chosen.basis = chosen.preset;
+            chosen.drafts[theme] = {};
+          }
+          (chosen.drafts[theme] ||= {})[sample.size] = { ...material, [key]: unit ? Number(input.value) : input.value };
+          chosen.preset = "custom";
+          paintSide(side);
+        });
+        label.append(description, input);
+        target.append(label);
+        sample.settings[key] = { label, input, output, unit };
+      }
+      const panes = root.querySelector(".panes");
+      const sides = state.sides.map((_, index) => {
+        const node = root.querySelector(".pane-template").content.firstElementChild.cloneNode(true);
+        node.dataset.side = index;
+        const select = node.querySelector("[data-recipe]");
+        const label = ["左侧配方", "右侧配方"][index];
+        node.querySelector("[data-recipe-label]").textContent = label;
+        const side = {
+          index, select, scene: node.querySelector(".scene"), area: node.querySelector(".movement-area"),
+          effective: node.querySelector("[data-effective]"), samples: {},
+        };
+        for (const size of sizes) {
+          const filter = acrylic.createWinuiFilter("lab-acrylic-" + index + "-" + size);
+          root.querySelector("defs").append(filter.filter);
+          const surface = node.querySelector('.sample[data-size="' + size + '"]');
+          const handle = surface.querySelector(".handle");
+          handle.setAttribute("aria-label", ["左侧", "右侧"][index] + (size === "small" ? "小面板" : "大面板") + "，用方向键移动");
+          const sample = { size, side, filter, surface, handle, settings: {}, space: [0, 0] };
+          side.samples[size] = sample;
+          const settings = node.querySelector('.parameters[data-size="' + size + '"] .settings');
+          for (const key of Object.keys(labels)) addSetting(side, sample, key, settings);
+        }
+        select.addEventListener("change", () => {
+          const data = state.sides[index];
+          if (select.value === "custom" && !data.drafts[state.theme] && data.preset !== "custom") data.basis = data.preset;
+          data.preset = select.value;
+          paintSide(side);
+        });
+        panes.append(node);
+        return side;
+      });
+      function paintSide(side) {
+        side.select.value = state.sides[side.index].preset;
+        const summaries = sizes.map(size => paint(side.samples[size]));
+        const displayLabel = summaries[0] === summaries[1] ? summaries[0] : "大小面板独立配方";
+        if (side.effective.textContent !== displayLabel) side.effective.textContent = displayLabel;
+      }
+      function paint(sample) {
+        const { size, side, filter, surface } = sample;
+        const settings = model(side.index, size);
+        const activeEngine = forced.matches || reduced.matches || !blurSupported ? "solid"
+          : settings.engine === "winui" && !svgSupported ? "css" : settings.engine;
+        const shown = activeEngine === "css" && settings.engine === "winui"
+          ? recipe("fallback", size, state.theme) : settings;
+        const displayLabel = activeEngine === "winui" ? "SVG 亮度混合"
+          : activeEngine === "css" ? (settings.engine === "winui" ? "CSS 模糊回退" : "CSS 背景模糊")
+          : settings.engine === "solid" ? "实色" : "实色回退";
+        const style = surface.style;
+        const solid = side.select.value === "product" ? palette.solid
+          : settings.engine === "solid" ? settings.color : settings.matte;
+        style.setProperty("--sample-solid", solid);
+        if (activeEngine === "winui") {
+          filter.setMaterial(shown);
+          style.setProperty("--sample-fill", "transparent");
+          style.setProperty("--sample-filter", 'url("#' + filter.filter.id + '")');
+        } else if (activeEngine === "css") {
+          const channels = [1, 3, 5].map(index => parseInt(shown.color.slice(index, index + 2), 16)).join(" ");
+          style.setProperty("--sample-fill", "rgb(" + channels + " / " + shown.opacity + "%)");
+          style.setProperty("--sample-filter", "blur(" + shown.blur + "px) brightness(" + shown.brightness + "%) saturate(" + shown.saturation + "%)");
+        } else {
+          style.setProperty("--sample-fill", solid);
+          style.setProperty("--sample-filter", "none");
+        }
+        const useAsset = shown.grain <= shown.grainPeak;
+        style.setProperty("--grain-tile", activeEngine === "solid" ? "none"
+          : useAsset ? shown.grainImage : (extraGrain ||= noiseTile()));
+        style.setProperty("--grain-opacity", activeEngine === "solid" ? 0
+          : useAsset ? shown.grain / shown.grainPeak : shown.grain / 255);
+        const keys = {
+          winui: ["luma", "tint", "blur", "grain", "color"],
+          css: ["opacity", "blur", "grain", "color", "brightness", "saturation"],
+          solid: ["color"],
+        }[settings.engine];
+        for (const [key, { label, input, output, unit }] of Object.entries(sample.settings)) {
+          label.hidden = !keys.includes(key);
+          if (label.hidden) continue;
+          input.disabled = activeEngine !== settings.engine;
+          input.value = settings[key];
+          output.value = settings[key] + (unit || "");
+          if (unit) input.setAttribute("aria-valuetext", output.value);
+        }
+        return displayLabel;
+      }
+      const pairs = Object.fromEntries(sizes.map(size => [size, sides.map(side => side.samples[size])]));
+      const pixels = sample => sample.space.map((range, axis) => state.positions[sample.size][axis] * range);
+      function placePair(size) {
+        for (const sample of pairs[size]) {
+          const [x, y] = pixels(sample);
+          sample.surface.style.transform = "translate3d(" + x + "px," + y + "px,0)";
+        }
+      }
+      function movePair(sample, point) {
+        const position = state.positions[sample.size];
+        for (const axis of [0, 1]) {
+          const range = sample.space[axis];
+          if (range) position[axis] = clamp(point[axis] / range, 0, 1);
+        }
+        placePair(sample.size);
+      }
+      let sceneHeight = 0;
+      function measureScenes() {
+        const stackedHeight = Math.max(...sides.map(({ samples }) =>
+          samples.small.surface.offsetHeight + samples.large.surface.offsetHeight));
+        // Allow for the stage insets and leave a gap between the parked panels.
+        const requiredHeight = stackedHeight + 98;
+        if (sceneHeight !== requiredHeight) {
+          sceneHeight = requiredHeight;
+          root.style.setProperty("--scene-height", sceneHeight + "px");
+        }
+        for (const size of sizes) {
+          for (const sample of pairs[size]) {
+            const { area } = sample.side;
+            sample.space = [
+              Math.max(0, area.clientWidth - sample.surface.offsetWidth),
+              Math.max(0, area.clientHeight - sample.surface.offsetHeight),
+            ];
+          }
+          placePair(size);
+        }
+      }
+      function bringForward(size) {
+        state.front = size;
+        for (const side of sides) side.scene.dataset.front = size;
+      }
+      let drag;
+      function drawDrag() {
+        drag.frame = 0;
+        const { sample, position, start, latest } = drag;
+        movePair(sample, position.map((value, axis) => value + latest[axis] - start[axis]));
+      }
+      function endDrag(event) {
+        if (!drag || (event && drag.id !== event.pointerId)) return;
+        if (event?.type === "pointerup") drag.latest = [event.clientX, event.clientY];
+        if (drag.frame) cancelAnimationFrame(drag.frame);
+        drawDrag();
+        const { id, sample } = drag;
+        drag = undefined;
+        sample.surface.classList.remove("is-dragging");
+        if (sample.surface.hasPointerCapture(id)) sample.surface.releasePointerCapture(id);
+      }
+      const directions = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+      const observer = new ResizeObserver(measureScenes);
+      for (const side of sides) observer.observe(side.area);
+      for (const sample of Object.values(pairs).flat()) {
+        observer.observe(sample.surface);
+        sample.surface.addEventListener("pointerdown", event => {
+          if (event.button !== 0 || drag) return;
+          const control = event.target.closest("button, input, textarea, select, a, label, [contenteditable], [data-sample-control]");
+          if (control && control !== sample.handle) return;
+          const start = [event.clientX, event.clientY];
+          drag = { id: event.pointerId, sample, start, latest: start, position: pixels(sample), frame: 0 };
+          bringForward(sample.size);
+          sample.surface.classList.add("is-dragging");
+          sample.surface.setPointerCapture(event.pointerId);
+          if (control === sample.handle) sample.handle.focus({ preventScroll: true });
+          event.preventDefault();
+        });
+        sample.surface.addEventListener("pointermove", event => {
+          if (drag?.id !== event.pointerId) return;
+          drag.latest = [event.clientX, event.clientY];
+          if (!drag.frame) drag.frame = requestAnimationFrame(drawDrag);
+        });
+        sample.surface.addEventListener("pointerup", endDrag);
+        sample.surface.addEventListener("pointercancel", endDrag);
+        sample.surface.addEventListener("lostpointercapture", endDrag);
+        sample.handle.addEventListener("keydown", event => {
+          const delta = directions[event.key];
+          if (!delta) return;
+          event.preventDefault();
+          bringForward(sample.size);
+          const step = event.shiftKey ? 25 : 10;
+          movePair(sample, pixels(sample).map((value, axis) => value + delta[axis] * step));
+        });
+      }
+      window.addEventListener("blur", () => endDrag());
+      function render() {
+        document.body.classList.toggle("dark-theme", state.theme === "dark");
+        palette = readPalette();
+        root.dataset.theme = state.theme;
+        root.dataset.scene = state.scene;
+        if (state.scene !== "swatches") root.style.setProperty("--scene-image", 'url("' + state.scene + '")');
+        root.style.setProperty("--scrim", state.scrim / 100);
+        root.querySelector("[data-scrim-value]").value = state.scrim + "%";
+        for (const input of sharedInputs) input.value = state[input.dataset.environment];
+        for (const side of sides) paintSide(side);
+        bringForward(state.front);
+        measureScenes();
+      }
+      for (const input of sharedInputs) {
+        if (input.dataset.environment === "scrim") {
+          input.addEventListener("input", () => {
+            state.scrim = Number(input.value);
+            root.style.setProperty("--scrim", state.scrim / 100);
+            root.querySelector("[data-scrim-value]").value = state.scrim + "%";
+          });
+        } else {
+          input.addEventListener("change", () => { state[input.dataset.environment] = input.value; render(); });
+        }
+      }
+      [forced, reduced].forEach(media => media.addEventListener("change", render));
+      render();
+    })();
+  </script>
+  </main>
+</body>
+</html>

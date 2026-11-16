@@ -167,8 +167,7 @@ async function checkPublicResourceContract() {
     "index.html",
     "liquid-glass-lab.html",
     "control-gallery.html",
-    "layered-acrylic-inspector.html",
-    "winui-acrylic-comparison.html",
+    "layered-acrylic-lab.html",
   ]);
   const staticPath = /["'`(]((?:\.\/)?(?:[\w-]+\/)*[\w.-]+\.(?:js|css|html|png|jpe?g|svg|json|ttf))["'`)]/g;
   const referenced = new Set();
