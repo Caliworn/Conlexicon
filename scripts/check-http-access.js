@@ -169,7 +169,6 @@ async function checkPublicResourceContract() {
     "control-gallery.html",
     "layered-acrylic-inspector.html",
     "winui-acrylic-comparison.html",
-    "scrollbar-prototype.html",
   ]);
   const staticPath = /["'`(]((?:\.\/)?(?:[\w-]+\/)*[\w.-]+\.(?:js|css|html|png|jpe?g|svg|json|ttf))["'`)]/g;
   const referenced = new Set();
