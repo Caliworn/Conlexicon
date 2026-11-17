@@ -2253,7 +2253,7 @@ label span {
   line-height: 1.25;
 }
 
-/* Provisional until the visual review (Definition Tag Plan U7): a dashed ring
+/* Provisional until the visual review (docs/DEFINITION_TAG_SPEC.md 3.2): a dashed ring
    outside the chip marks its layer state, grey for a tag from the definitions
    and red for a repeat or mixed part-of-speech levels; the tooltip and
    accessible name say it too. The ring leaves the chip's own border alone, so

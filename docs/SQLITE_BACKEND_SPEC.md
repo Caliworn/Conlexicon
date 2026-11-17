@@ -513,6 +513,5 @@ CREATE TABLE entry_morphology_search_values (
 以下在真实需求或基准出现前不做；它们可以受益于 SQLite，但不应和无关改动混在一起：
 
 - **候选索引**（FTS、ngram 等）：严格与 fuzzy 都线性扫描所选 projection records，只有真实词典基准确认它成为主要瓶颈后再选型。扫描依赖连接的内存映射读取（`openDictionaryDatabase()` 设置 `PRAGMA mmap_size`，2026-11-16）：SQLite 默认页缓存只有 2MB，不映射时每次搜索都要重读整张 projection。基准显示数据在内存中时 `idx_entry_search_values_field` 对少数字段的搜索有利、对全字段搜索无害，不要为搜索禁用它；加大 `cache_size` 不如映射，因为它按连接占用且必须大于 projection 才有效。
-- 自定义滚动条与首字母导航：已有设计草案，见 [Enhanced Scrollbar Plan](ENHANCED_SCROLLBAR_PLAN.md)；实施前现有原生滚动条、数据窗口与虚拟列表继续保留。
 - 高级形态分析或自动 gloss 系统。
 - 面向多窗口实时协同的 revision 机制；单词条条件保存见审计 A05 与 [Entry Incremental Save Plan](ENTRY_INCREMENTAL_SAVE_PLAN.md)。
