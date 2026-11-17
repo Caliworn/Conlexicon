@@ -196,6 +196,23 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --layered-winui-acrylic-filter: url("#layered-acrylic-dark");
 }
 
+body[data-ui-skin="layered-glass"] {
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", "Noto Sans", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  font-family: var(--font-ui);
+}
+
+body[data-ui-skin="layered-glass"] :is(.primary-button, .secondary-button, .danger-button, .danger-ghost, .icon-button),
+body[data-ui-skin="layered-glass"] .tool-button .tool-label,
+body[data-ui-skin="layered-glass"] :is(.analysis-page-tabs, .analysis-subpage-tabs) button,
+body[data-ui-skin="layered-glass"] .entry-card-header > small,
+body[data-ui-skin="layered-glass"] .entry-filter-part-chip {
+  font-weight: 400;
+}
+
+body[data-ui-skin="layered-glass"] :is(.top-bar h2, .entry-card-header > strong, .entry-card-footer .chip) {
+  font-weight: 600;
+}
+
 body[data-ui-skin="layered-glass"] [data-surface="content-shell"] {
   border-color: var(--material-content-shell-border);
   background: var(--material-content-shell-background);

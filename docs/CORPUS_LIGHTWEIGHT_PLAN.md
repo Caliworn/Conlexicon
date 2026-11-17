@@ -88,11 +88,13 @@ corpus: { items: [{ id, name, group, content, createdAt, updatedAt }] }
 | `\glpreamble`，以及第一个层标记之前的文字 | 前言，显示在 Gloss 上方 |
 | `\ex`（含 `[...]`、`<...>`）、`\xe`、`\begingl`、`\endgl` | 跳过；出现在层中时结束该层 |
 | 行首 `%` | 注释，不显示，可搜索 |
-| 整条没有层标记 | 纯文本，原样显示并保持换行 |
+| 整条没有层标记 | 纯文本，保持换行，整条使用前言样式 |
 | `\gla` 中的 `+`、`@`、`\nogloss{…}` | ExPex 的特殊项，见下 |
 | 层内其他命令，如 `$_i$`、`\"o` | 当文字显示，复制时原样输出 |
 | 层外以命令开头的段落，如 `\lingset{…}`、`\pex` | 跳过，记入解析结果的 `notices`，质量检查以低级别“未识别的命令”报告 |
 | `//` 结束一层之后、下一个层标记之前的文字；重复的层（含两处前言） | 记入 `issues`：不阻止保存，这一条按原文显示并说明原因 |
+
+设置中的 `\glpreamble` 一行单独控制前言的字体、字号、粗体和斜体。语料预览、词条详情和编辑中的已关联例句都用该样式渲染前言及纯文本正文。旧设置缺少这项时的补齐规则见 [API 契约](API_CONTRACT.md)中的 `settings.glossStyles`。
 
 分隔规则：
 
@@ -138,7 +140,7 @@ corpus: { items: [{ id, name, group, content, createdAt, updatedAt }] }
 
 旧阶段 D 计划中“按宽度测量切分行组”和三种显示模式的设计不再采用。
 
-设置里保留各层的字体、字号、粗体和斜体。删除 `\glb` 的 small caps 开关：`glossStyles.glb.smallCaps`、设置页控件、`renderSmallCaps()`。开过这个开关的词典失去小型大写效果，不自动转换，因为旧规则分不清哪些是语法标记。
+设置里保留前言及各层的字体、字号、粗体和斜体。删除 `\glb` 的 small caps 开关：`glossStyles.glb.smallCaps`、设置页控件、`renderSmallCaps()`。开过这个开关的词典失去小型大写效果，不自动转换，因为旧规则分不清哪些是语法标记。
 
 ## 5. 复制 ExPex
 
@@ -270,7 +272,7 @@ corpus: { items: [{ id, name, group, content, createdAt, updatedAt }] }
 
 ## 10. 设置与实施阶段
 
-设置：第 2 阶段把语料卡片和单元标题的渲染对象与对齐开关合并为 `corpusRenderPattern`、`corpusGlossAlign`；之后（2026-11-08）语料和词条例句的渲染对象与对齐开关全部删除，Gloss 有什么就渲染什么：前言、按项对齐的 `\gla`／`\glb`／`\glc`、自由翻译，导入时丢弃这些旧字段。设置页只保留各层的字体、字号、粗体和斜体。`corpusAutoSave` 保留，新词典默认关闭（2026-11-09）。
+设置：第 2 阶段把语料卡片和单元标题的渲染对象与对齐开关合并为 `corpusRenderPattern`、`corpusGlossAlign`；之后（2026-11-08）语料和词条例句的渲染对象与对齐开关全部删除，Gloss 有什么就渲染什么：前言、按项对齐的 `\gla`／`\glb`／`\glc`、自由翻译，导入时丢弃这些旧字段。设置页保留前言及各层的字体、字号、粗体和斜体。`corpusAutoSave` 保留，新词典默认关闭（2026-11-09）。
 
 各阶段独立提交：
 

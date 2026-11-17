@@ -71,6 +71,30 @@ function checkStability() {
   assert.ok(Object.isFrozen(DEFAULT_TOOL_NAV_ORDER), "shared defaults cannot be edited in place");
 }
 
+function checkGlossPreambleSettings() {
+  assert.deepEqual(normalizeDictionarySettings().glossStyles.preamble, {
+    fontFamily: "serif", fontSize: "medium", bold: false, italic: false,
+  }, "new dictionaries get regular, medium serif preambles");
+
+  const gla = { fontFamily: "mono", fontSize: "large", bold: true, italic: true };
+  const { glossStyles: legacy } = normalizeDictionarySettings({ glossStyles: { gla } });
+  assert.deepEqual(legacy.preamble, {
+    fontFamily: "mono", fontSize: "large", bold: false, italic: false,
+  }, "older settings inherit gla's font and size without inheriting its emphasis");
+
+  const { glossStyles: partial } = normalizeDictionarySettings({
+    glossStyles: { gla, preamble: { fontFamily: "sans", italic: true } },
+  });
+  assert.deepEqual(partial.preamble, {
+    fontFamily: "sans", fontSize: "large", bold: false, italic: true,
+  }, "missing preamble fields are filled alongside any saved choices");
+
+  const { glossStyles: changed } = normalizeDictionarySettings({
+    glossStyles: { ...partial, gla: { ...gla, fontSize: "small" } },
+  });
+  assert.deepEqual(changed.preamble, partial.preamble, "a saved preamble style stays independent of later gla edits");
+}
+
 function checkIdGeneration() {
   assert.equal(dataModel.ensureEntityId(" kept ", "def"), "kept");
   assert.match(dataModel.ensureEntityId("", "def"), /^def-[0-9a-f-]{36}$/);
@@ -102,6 +126,7 @@ function checkBrowserLoadOrder() {
 checkToolNavOrder();
 checkSettingsPreservation();
 checkStability();
+checkGlossPreambleSettings();
 checkIdGeneration();
 checkBrowserLoadOrder();
 console.log("Dictionary data model checks passed.");

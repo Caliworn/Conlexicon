@@ -4,8 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Conlexicon</title>
-    <link rel="preload" href="assets/fonts/noto-sans/NotoSans-Regular.ttf" as="font" type="font/ttf" crossorigin>
-    <link rel="preload" href="assets/fonts/noto-sans/NotoSans-Bold.ttf" as="font" type="font/ttf" crossorigin>
+    <link rel="preload" href="assets/fonts/noto-sans/NotoSans-Variable.ttf" as="font" type="font/ttf" crossorigin>
     <link rel="stylesheet" href="theme-classic.css">
     <link rel="stylesheet" href="theme-layered-glass.css">
     <link rel="stylesheet" href="theme-liquid-glass.css">
@@ -508,6 +507,21 @@
                   </div>
                 </div>
                 <div class="gloss-style-list">
+                  <div class="gloss-style-row" data-gloss-style="preamble">
+                    <code>\glpreamble</code>
+                    <select name="gloss-preamble-font" data-gloss-style-font data-app-tooltip="always" data-i18n-aria-label="glossFontFamily">
+                      <option value="serif" data-i18n="fontSerif">衬线</option>
+                      <option value="sans" data-i18n="fontSans">无衬线</option>
+                      <option value="mono" data-i18n="fontMono">等宽</option>
+                    </select>
+                    <select name="gloss-preamble-size" data-gloss-style-size data-app-tooltip="always" data-i18n-aria-label="glossFontSize">
+                      <option value="small" data-i18n="fontSizeSmall">小</option>
+                      <option value="medium" data-i18n="fontSizeMedium">中</option>
+                      <option value="large" data-i18n="fontSizeLarge">大</option>
+                    </select>
+                    <label class="gloss-style-toggle" data-control-tone="neutral" data-control-selection data-app-tooltip="always" data-i18n-aria-label="glossStyleBold"><input name="gloss-preamble-bold" type="checkbox" data-gloss-style-bold><strong aria-hidden="true">B</strong></label>
+                    <label class="gloss-style-toggle" data-control-tone="neutral" data-control-selection data-app-tooltip="always" data-i18n-aria-label="glossStyleItalic"><input name="gloss-preamble-italic" type="checkbox" data-gloss-style-italic><em aria-hidden="true">I</em></label>
+                  </div>
                   <div class="gloss-style-row" data-gloss-style="gla">
                     <code>\gla</code>
                     <select name="gloss-gla-font" data-gloss-style-font data-app-tooltip="always" data-i18n-aria-label="glossFontFamily">

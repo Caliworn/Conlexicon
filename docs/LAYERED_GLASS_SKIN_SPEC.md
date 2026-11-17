@@ -6,7 +6,8 @@
 
 - 用户可见名称为「层叠玻璃 / Layered Glass」，公开 ID 为 `layered-glass`。选择结果作为全局偏好写入 `data/index.json`，本地镜像负责首屏预着色。
 - `theme-layered-glass.css` 负责明暗配色、材质和皮肤专属状态，包括所有皮肤下可见的候选缩略图。普通组件继续复用共享 DOM、布局、断点、z-index 和虚拟列表。
-- 画布、导航、内容、控件和短时浮层通过角色 token 接入。同一套语义色贯穿明暗主题，强调色为 Fluent 品牌蓝（浅色 `#0f6cbd`，暗色 `#479ef5`，取自 Fluent UI 的 brandWeb 色阶 80 与 100），警告为琥珀，危险为红。实色按钮浅色用白字，暗色用深字。界面与词形沿用 Noto Sans 和 Charis SIL。
+- 画布、导航、内容、控件和短时浮层通过角色 token 接入。同一套语义色贯穿明暗主题，强调色为 Fluent 品牌蓝（浅色 `#0f6cbd`，暗色 `#479ef5`，取自 Fluent UI 的 brandWeb 色阶 80 与 100），警告为琥珀，危险为红。实色按钮浅色用白字，暗色用深字。
+- 界面字体按 `Segoe UI Variable Text → Segoe UI → Noto Sans → Microsoft YaHei UI → Microsoft YaHei → sans-serif` 选择，Segoe 使用本机字体。普通按钮、左栏导航文字、数据分析两级页签、词条卡片副标题和词性筛选选项使用字重 400，页面标题、卡片词形和标签使用 600。选中状态以配色和指示条表达。皮肤字体会改变默认行高，带标签的卡片样例从 108px 缩至 106px，具体高度随内容而变。词形、发音、IPA 工具和 Gloss 的衬线选项通过 `--font-phonetic` 使用 Charis，Gloss 的无衬线与等宽选项分别通过 `--font-sans` 和 `--font-mono` 使用 Noto Sans 和 Noto Sans Mono。
 
 ## 材质与几何
 

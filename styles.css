@@ -1,30 +1,30 @@
 @font-face {
-  font-family: "Charis SIL";
-  src: url("assets/fonts/charis-sil/CharisSIL-Regular.ttf") format("truetype");
+  font-family: "Charis";
+  src: url("assets/fonts/charis/Charis-Regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Charis SIL";
-  src: url("assets/fonts/charis-sil/CharisSIL-Bold.ttf") format("truetype");
+  font-family: "Charis";
+  src: url("assets/fonts/charis/Charis-Bold.ttf") format("truetype");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Charis SIL";
-  src: url("assets/fonts/charis-sil/CharisSIL-Italic.ttf") format("truetype");
+  font-family: "Charis";
+  src: url("assets/fonts/charis/Charis-Italic.ttf") format("truetype");
   font-weight: 400;
   font-style: italic;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Charis SIL";
-  src: url("assets/fonts/charis-sil/CharisSIL-BoldItalic.ttf") format("truetype");
+  font-family: "Charis";
+  src: url("assets/fonts/charis/Charis-BoldItalic.ttf") format("truetype");
   font-weight: 700;
   font-style: italic;
   font-display: swap;
@@ -32,23 +32,25 @@
 
 @font-face {
   font-family: "Noto Sans";
-  src: url("assets/fonts/noto-sans/NotoSans-Regular.ttf") format("truetype");
-  font-weight: 400;
+  src: url("assets/fonts/noto-sans/NotoSans-Variable.ttf") format("truetype");
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: "Noto Sans";
-  src: url("assets/fonts/noto-sans/NotoSans-Bold.ttf") format("truetype");
-  font-weight: 700;
+  font-family: "Noto Sans Mono";
+  src: url("assets/fonts/noto-sans-mono/NotoSansMono-Variable.ttf") format("truetype");
+  font-weight: 100 900;
   font-style: normal;
   font-display: swap;
 }
 
 :root {
-  --font-ui: "Noto Sans", "Segoe UI", "Microsoft YaHei", sans-serif;
-  --font-phonetic: "Charis SIL", "Times New Roman", serif;
+  --font-sans: "Noto Sans", "Segoe UI", "Microsoft YaHei", sans-serif;
+  --font-ui: var(--font-sans);
+  --font-phonetic: "Charis", "Times New Roman", serif;
+  --font-mono: "Noto Sans Mono", Consolas, monospace;
   --layer-mobile-app-bar: 80;
   --layer-drawer-backdrop: 82;
   --layer-drawer: 90;
@@ -127,6 +129,12 @@ input:not([type="checkbox"]):not([type="radio"]),
 select,
 textarea {
   font: inherit;
+}
+
+code,
+kbd,
+pre {
+  font-family: var(--font-mono);
 }
 
 input,
@@ -2129,7 +2137,14 @@ label span {
   display: block;
 }
 
+/* The headword scales with the detail panel, not the window, so a narrow panel
+   beside the entry list gets the same size as a narrow window. */
+.entry-detail-panel {
+  container-type: inline-size;
+}
+
 .entry-title-row {
+  --entry-headword-size: clamp(2.25rem, 6cqi, 2.75rem);
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -2139,9 +2154,28 @@ label span {
 .entry-title-row h3 {
   margin: 0;
   font-family: var(--font-phonetic);
-  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-size: var(--entry-headword-size);
   line-height: 1.16;
   letter-spacing: 0;
+}
+
+/* The pronunciation and part-of-speech boxes stand on the headword's baseline:
+   a box reads as aligned when it sits between the baseline and the cap height,
+   and centring it let the fixed-size boxes drop below the baseline whenever
+   the headword was small. Trimming the headword's box to its baseline keeps
+   this independent of the font's metrics. The padding and row gap restore the
+   space the untrimmed line box left below the baseline for descenders.
+   Browsers without text-box trimming keep the centred row. */
+@supports (text-box: trim-end text alphabetic) {
+  .entry-title-row {
+    row-gap: calc(12px + 0.165 * var(--entry-headword-size));
+    align-items: flex-end;
+    padding-block-end: calc(0.165 * var(--entry-headword-size));
+  }
+
+  .entry-title-row h3 {
+    text-box: trim-end text alphabetic;
+  }
 }
 
 .entry-display-header .chip-row {
@@ -2161,9 +2195,12 @@ label span {
   font-weight: 800;
 }
 
+/* A fixed line height keeps the box as tall as the part-of-speech badges
+   (30px) whatever the phonetic font's default line spacing. */
 .pronunciation-pill {
   color: var(--ui-text-muted);
   font-family: var(--font-phonetic);
+  line-height: 20px;
   font-size: 1.1rem;
 }
 
@@ -2654,12 +2691,12 @@ span.pending-source {
 }
 
 .gloss-font-sans {
-  --gloss-font-family: var(--font-ui);
+  --gloss-font-family: var(--font-sans);
   font-family: var(--gloss-font-family);
 }
 
 .gloss-font-mono {
-  --gloss-font-family: Consolas, "Cascadia Mono", "Noto Sans Mono", monospace;
+  --gloss-font-family: var(--font-mono);
   font-family: var(--gloss-font-family);
 }
 
@@ -4326,11 +4363,12 @@ span.pending-source {
 .gloss-style-list {
   display: grid;
   gap: 8px;
+  container: gloss-styles / inline-size;
 }
 
 .gloss-style-row {
   display: grid;
-  grid-template-columns: 40px minmax(72px, 1fr) minmax(64px, 0.65fr) 36px 36px;
+  grid-template-columns: 6rem minmax(72px, 1fr) minmax(64px, 0.65fr) 36px 36px;
   align-items: center;
   gap: 6px;
   min-width: 0;
@@ -4346,6 +4384,22 @@ span.pending-source {
   min-width: 0;
   height: 38px;
   padding: 7px 26px 7px 8px;
+}
+
+@container gloss-styles (max-width: 22rem) {
+  .gloss-style-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) 30px 30px;
+    gap: 3px;
+  }
+
+  .gloss-style-row > code {
+    grid-column: 1 / -1;
+  }
+
+  .gloss-style-row select {
+    padding-inline: 6px 4px;
+    font-size: 0.74rem;
+  }
 }
 
 .gloss-style-toggle {
@@ -4682,7 +4736,7 @@ span.pending-source {
 .corpus-form textarea[data-field="content"] {
   min-height: calc(7 * 1.6em + 22px);
   max-height: max(calc(7 * 1.6em + 22px), min(calc(18 * 1.6em + 22px), 60vh));
-  font-family: Consolas, "Cascadia Mono", "Noto Sans Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.86rem;
   line-height: 1.6;
 }
@@ -4783,7 +4837,7 @@ span.pending-source {
 /* Up to 10 lines; the shared 92px minimum stays. */
 .definition-example-new textarea {
   max-height: max(92px, min(calc(10 * 1.55em + 22px), 60vh));
-  font-family: Consolas, "Cascadia Mono", "Noto Sans Mono", monospace;
+  font-family: var(--font-mono);
   font-size: 0.86rem;
 }
 
@@ -5724,7 +5778,7 @@ button.analysis-bar-label:hover,
   padding: 18px;
   background: transparent;
   color: var(--ui-text);
-  font-family: Consolas, "Cascadia Mono", monospace;
+  font-family: var(--font-mono);
   font-weight: 500;
   line-height: 1.65;
   resize: vertical;
@@ -6660,7 +6714,6 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
   border: 1px solid var(--ui-border);
   border-radius: 4px;
   color: inherit;
-  font-family: Consolas, "Cascadia Mono", monospace;
   font-size: 0.75rem;
   line-height: 1.5;
 }
@@ -6754,7 +6807,6 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
   border-radius: 4px;
   padding: 1px 4px;
   background: var(--material-inset-background);
-  font-family: Consolas, "Cascadia Mono", monospace;
   font-size: 0.86em;
   overflow-wrap: anywhere;
 }
@@ -7461,16 +7513,6 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
   .ipa-rule-grid .icon-danger-button {
     grid-column: 3;
     grid-row: 1;
-  }
-
-  .gloss-style-row {
-    grid-template-columns: 34px minmax(58px, 1fr) minmax(52px, 0.75fr) 30px 30px;
-    gap: 3px;
-  }
-
-  .gloss-style-row select {
-    padding-right: 18px;
-    font-size: 0.74rem;
   }
 
   .entry-display,

@@ -45,7 +45,7 @@
 | 静态资源不在公开清单 | 404 | 纯文本。 |
 | 静态请求使用 GET／HEAD 以外的方法 | 405 | 纯文本。 |
 
-`lib/static-server.js` 的静态公开清单包含入口页面、应用脚本与样式、HTML 引用的前端模块、液态玻璃贴图 worker 及其通过 `importScripts` 引用的几何模块、Lab 图片和层叠玻璃的静态噪点贴图。`/` 映射到 `index.html`。服务按区分大小写的 URL pathname 精确匹配清单，路径保留原编码。
+`lib/static-server.js` 的静态公开清单包含入口页面、应用脚本与样式、HTML 引用的前端模块、液态玻璃贴图 worker 及其通过 `importScripts` 引用的几何模块、样式引用的本地字体（`font/ttf`）、Lab 图片和层叠玻璃的静态噪点贴图。`/` 映射到 `index.html`。服务按区分大小写的 URL pathname 精确匹配清单，路径保留原编码。
 
 层叠玻璃的外观调试入口为 `/layered-acrylic-lab.html`。
 
@@ -96,6 +96,8 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `PUT` | `/api/dictionaries/:id/morphology` | 保存自动形态学模块 | `{ id, updatedAt, morphology }` | 请求仍表示完整替换形态模块；后端检查提交内组与表 ID 不重复（不查词条与语料）、规则语法和函数配置，并按稳定组/表 ID 增量写入模板。纯名称、说明、表格标题或行列标签变化不重建生成投影；规则、函数、表结构或自动分配变化只重建实际受影响词条的形态搜索 projection。完全相同的规范化 payload 作为 no-op 返回既有 `updatedAt`。删除组、删除/移动表格或缩小表格会使既有词条形态组或覆写悬空时返回 `morphology_references_in_use`。 |
 | `PUT` | `/api/dictionaries/:id/settings/ipa` | 保存自动 IPA 设置 | `{ id, updatedAt, settings }` | 请求体是 `settings.ipa` 的字段，可另带 `ipaKeyboard`，两者在同一事务里写入 `settings`；不带时保留已有键盘。IPA 映射是按顺序保存的纯文本规则 `{ from, to, before, after }`，没有实体 ID，也不参与实体 ID 防撞。`syllable.vowels`、`onsetClusters`、`codaClusters`、`complexPhonemes` 都是字符串数组；写入字符串或含分隔符的数组项时，按空白、逗号、顿号拆开。 |
 | `POST` | `/api/dictionaries/:id/autosave` | 页面卸载时保存文档／已有语料 | `{ id, updatedAt, docs?, corpusItem? }` | `corpusItem` 为 `{ id, name, group, content }`，按 `PUT /corpus/items/:itemId` 保存。新草稿首次保存走 `POST /corpus/items`。请求至少须携带 `docs` 或带 `id` 的 `corpusItem`，否则返回 `invalid_autosave_payload`。 |
+
+`settings.glossStyles` 按 `preamble`、`gla`、`glb`、`glc` 和 `ft` 保存字体、字号、粗体与斜体。每项字段为 `fontFamily`（`serif`、`sans`、`mono`）、`fontSize`（`small`、`medium`、`large`）及布尔值 `bold`、`italic`。旧工作区读出的设置可以缺少 `preamble` 或其部分字段。共享模型在前端载入、导入和保存设置时补齐这项，缺省字体和字号取 `gla` 的对应值，缺省粗体和斜体均为 `false`。保存后各项独立。前言的适用范围见 [Gloss 格式](CORPUS_LIGHTWEIGHT_PLAN.md#3-gloss-格式)。
 
 ### 语料与例句连接
 

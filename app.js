@@ -2115,7 +2115,7 @@ const CORPUS_SYNTAX_HELP = Object.freeze({
           "`\\gla`（或 `\\a`）：原文，按空格切成对齐项。",
           "`\\glb`（或 `\\b`）、`\\glc`（或 `\\c`）：逐项注释，与 `\\gla` 的项依次对齐。",
           "`\\glft`（或 `\\ft`）：自由翻译。",
-          "`\\glpreamble`：前言，显示在 Gloss 上方。第一个层标记之前的文字也算前言。",
+          "`\\glpreamble`：前言，显示在 Gloss 上方。第一个层标记之前的文字也算前言，纯文本语料整条使用前言样式。",
         ],
         code: ["Mary ist sicher.", "\\gla Mary ist sicher. //", "\\glb Mary is sure //", "\\glft Mary is sure. //"],
       },
@@ -2171,7 +2171,7 @@ const CORPUS_SYNTAX_HELP = Object.freeze({
           "`\\gla` (or `\\a`): the original text, split into aligned items at spaces.",
           "`\\glb` (or `\\b`) and `\\glc` (or `\\c`): item-by-item glosses, aligned with the `\\gla` items in order.",
           "`\\glft` (or `\\ft`): the free translation.",
-          "`\\glpreamble`: the preamble, shown above the gloss. Text before the first level marker is also the preamble.",
+          "`\\glpreamble`: the preamble, shown above the gloss. Text before the first level marker and entire plain-text items use the preamble style.",
         ],
         code: ["Mary ist sicher.", "\\gla Mary ist sicher. //", "\\glb Mary is sure //", "\\glft Mary is sure. //"],
       },
@@ -9672,7 +9672,7 @@ function renderExampleHtml(example, settings = dictionarySettings()) {
     return `<p>${glossSourceLines(example).map(escapeHtml).join("<br>")}</p>${glossParseHintHtml(parsed.issues)}`;
   }
   if (parsed.kind !== "gloss") {
-    return `<p>${parsed.plainLines.map(renderGlossInlineHtml).join("<br>")}</p>`;
+    return `<p class="${glossStyleClassNames("preamble", settings)}">${parsed.plainLines.map(renderGlossInlineHtml).join("<br>")}</p>`;
   }
   return `<div class="gloss-block">${renderGlossBodyHtml(parsed.gloss, settings)}</div>`;
 }
@@ -14914,18 +14914,20 @@ async function openCorpusItem(itemId) {
 }
 
 function renderCorpusContentHtml(content) {
-  const renderLines = (lines, renderLine) => {
+  const renderLines = (lines, renderLine, styleClasses = "") => {
     const rendered = lines.map((line) => `<span>${line ? renderLine(line) : "&nbsp;"}</span>`).join("");
-    return `<span class="corpus-content corpus-content-raw">${rendered || escapeHtml(t("corpusItemFallback"))}</span>`;
+    const classes = ["corpus-content", "corpus-content-raw", rendered && styleClasses].filter(Boolean).join(" ");
+    return `<span class="${classes}">${rendered || escapeHtml(t("corpusItemFallback"))}</span>`;
   };
   const parsed = glossModel.parseGloss(content);
   if (parsed.issues.length) {
     return `${renderLines(glossSourceLines(content), escapeHtml)}${glossParseHintHtml(parsed.issues)}`;
   }
+  const settings = dictionarySettings();
   if (parsed.kind !== "gloss") {
-    return renderLines(parsed.plainLines, renderGlossInlineHtml);
+    return renderLines(parsed.plainLines, renderGlossInlineHtml, glossStyleClassNames("preamble", settings));
   }
-  return `<span class="corpus-content corpus-content-gloss">${renderGlossBodyHtml(parsed.gloss, dictionarySettings())}</span>`;
+  return `<span class="corpus-content corpus-content-gloss">${renderGlossBodyHtml(parsed.gloss, settings)}</span>`;
 }
 
 // The open form is kept while it shows the same item, so renders never replace
@@ -15278,11 +15280,8 @@ function renderGlossBodyHtml(gloss, settings) {
   return output.join("") || escapeHtml(t("corpusItemFallback"));
 }
 
-// The preamble is object-language text, so it takes the \gla font and size
-// but neither its bold nor its italic.
 function renderCorpusGlossPreamble(preamble, settings) {
-  const style = settings.glossStyles.gla;
-  return `<span class="corpus-gloss-group corpus-gloss-preamble gloss-font-${style.fontFamily} gloss-size-${style.fontSize}">${renderGlossInlineHtml(preamble)}</span>`;
+  return `<span class="corpus-gloss-group corpus-gloss-preamble ${glossStyleClassNames("preamble", settings)}">${renderGlossInlineHtml(preamble)}</span>`;
 }
 
 // A lone \gla row keeps its layout as text: + breaks the line and @ joins
