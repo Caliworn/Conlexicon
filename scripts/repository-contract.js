@@ -1787,6 +1787,22 @@ async function checkRootTopologyShapes(repository) {
     );
     located = await locate("d");
     assert.deepEqual([located.body.location.rootId, located.body.location.groupIndex], [id("t"), 4]);
+    located = await locate("k");
+    assert.equal(located.body.location.rootId, id("m"), "without a position, the first candidate group wins");
+    located = await locate("k", "&nearGroupIndex=6");
+    assert.deepEqual(
+      [located.body.location.rootId, located.body.location.groupIndex],
+      [id("n"), 3],
+      "a multi-root entry is located under the candidate group nearest the given position",
+    );
+    located = await locate("k", "&nearGroupIndex=1");
+    assert.equal(located.body.location.rootId, id("m"));
+    located = await locate("k", `&nearGroupIndex=6&preferredRootId=${encodeURIComponent(id("m"))}`);
+    assert.equal(located.body.location.rootId, id("m"), "a preferred root overrides the position");
+    await assert.rejects(
+      () => locate("k", "&nearGroupIndex=-1"),
+      (error) => error?.status === 400 && error?.code === "invalid_near_group_index",
+    );
     await assert.rejects(
       () => locate("d", `&preferredRootId=${encodeURIComponent(id("r"))}`),
       (error) => error?.status === 400 && error?.code === "invalid_root_context",

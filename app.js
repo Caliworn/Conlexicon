@@ -3695,18 +3695,13 @@ function flushPendingEntryCardScroll() {
     const stableScrollOptions = {
       isCurrent: () => requestId === entryCardScrollRequestId,
     };
-    if (scrollVirtualListItemIntoViewStable(entryVirtualList, key, stableScrollOptions)) {
-      if (pendingEntryCardScroll?.entryId === entryId) {
-        pendingEntryCardScroll = null;
-      }
-      return;
-    }
-    const row = entryVirtualList.items.find((item) => item.value?.entry?.id === entryId || item.value?.group?.root?.id === entryId);
-    if (row) {
-      const scrolled = scrollVirtualListItemIntoViewStable(entryVirtualList, row.key, stableScrollOptions);
-      if (scrolled && pendingEntryCardScroll?.entryId === entryId) {
-        pendingEntryCardScroll = null;
-      }
+    // Until the row is rendered (its window or its group's derived entries
+    // still loading), the request stays pending and a later render flushes it.
+    if (
+      scrollVirtualListItemIntoViewStable(entryVirtualList, key, stableScrollOptions)
+      && pendingEntryCardScroll?.entryId === entryId
+    ) {
+      pendingEntryCardScroll = null;
     }
   });
 }
@@ -5001,13 +4996,31 @@ function entryListPositionText(index) {
       high = middle - 1;
     }
   }
-  const { value } = entryVirtualList.items[low];
-  const groupIndex = value.kind === "window-placeholder"
-    ? value.groupStart + Math.min(value.groupCount - 1, Math.floor(((index - rows[low].start) / rows[low].count) * value.groupCount))
-    : value.groupIndex;
+  const groupIndex = rootRowGroupIndex(entryVirtualList.items[low].value, (index - rows[low].start) / rows[low].count);
   const position = (groupIndex + 1).toLocaleString();
   const groups = rootGroupsQueryState.pageInfo.total.toLocaleString();
   return aText(`${position} / ${groups} 组`, `${position} / ${groups} groups`);
+}
+
+// The group a root-mode row belongs to. A window placeholder stands for many
+// groups; `fraction` (0–1) is how far into it the position falls.
+function rootRowGroupIndex(value, fraction) {
+  return value.kind === "window-placeholder"
+    ? value.groupStart + Math.min(value.groupCount - 1, Math.floor(fraction * value.groupCount))
+    : value.groupIndex;
+}
+
+// The group at the middle of the list's viewport. Locating an entry that
+// belongs to several root groups picks the group nearest to it.
+function rootViewportGroupIndex() {
+  const { container, offsets, items } = entryVirtualList;
+  if (!items.length) {
+    return 0;
+  }
+  const position = container.scrollTop + container.clientHeight / 2;
+  const index = virtualListIndexAt(offsets, position);
+  const height = offsets[index + 1] - offsets[index];
+  return rootRowGroupIndex(items[index].value, height > 0 ? (position - offsets[index]) / height : 0);
 }
 
 function requestEntryListOverview() {
@@ -7630,14 +7643,8 @@ function prepareRootModeEntryNavigation(entryId, options = {}) {
       .find((group) => group.root.id === entryId);
     rootId = loadedRoot?.root?.id || "";
   }
-  if (!rootId) {
-    for (const [key, derivedState] of rootGroupDerivedStates) {
-      if (derivedState.status === "success" && derivedState.items.some((entry) => entry.id === entryId)) {
-        rootId = key.slice(key.lastIndexOf("\u0000") + 1);
-        break;
-      }
-    }
-  }
+  // A derived entry may belong to several groups, and only the backend knows
+  // them all: the scroll asks it for the group nearest the viewport.
   if (!rootId) {
     return options;
   }
@@ -7764,14 +7771,16 @@ function startRootGroupQueryLocation(dictionary, entryId, options = {}) {
   const key = rootGroupsQueryState.key;
   const requestId = rootGroupsQueryState.requestId;
   const preferredRootId = String(options.rootId || "");
-  const requestKey = `root-location\u0000${key}\u0000${entryId}\u0000${preferredRootId}`;
+  const nearGroupIndex = preferredRootId ? "" : String(options.nearGroupIndex ?? "");
+  const target = `${key}\u0000${entryId}\u0000${preferredRootId}\u0000${nearGroupIndex}`;
+  const requestKey = `root-location\u0000${target}`;
   if (!markPendingEntryLocationRequest(entryId, requestKey)) {
     return;
   }
   queryPageCache.load({
-    key: queryPageCacheKey("root-group-location", `${key}\u0000${entryId}\u0000${preferredRootId}`),
+    key: queryPageCacheKey("root-group-location", target),
     dictionaryId: dictionary.id,
-    load: () => api(rootGroupsLocationUrl(dictionary, entryId, { preferredRootId })),
+    load: () => api(rootGroupsLocationUrl(dictionary, entryId, { preferredRootId, nearGroupIndex })),
     transform: (result) => ({
       ...compactRootGroupsQueryResult(result),
       location: result?.location || null,
@@ -7808,36 +7817,40 @@ function startRootGroupQueryLocation(dictionary, entryId, options = {}) {
         ...pendingEntryCardScroll.options,
         rootId,
       };
-      page.estimatedHeight = queryWindowPageHeight(entryVirtualList, page.index, page.estimatedHeight);
-      page.offset = result.location.windowOffset;
-      page.cursor = result.pageInfo?.windowCursor || rootGroupsQueryState.windowCursor;
-      page.status = "success";
-      page.items = result.groups;
-      page.pageInfo = result.pageInfo;
-      page.error = null;
-      page.lastAccessAt = performance.now();
-      rootGroupsQueryState.windowCursor = result.pageInfo?.windowCursor || rootGroupsQueryState.windowCursor;
-      applyRootGroupWindowMetrics(rootGroupsQueryState, result.pageInfo);
-      preserveQueryWindowPageHeight(
-        page,
-        result.groups.reduce((total, group) => total + rootGroupEstimatedHeight(group), 0),
-        Boolean(rootGroupsQueryState.windowCursor),
-      );
-      syncRootGroupsQueryWindowState();
-      evictDistantQueryWindowPages(
-        rootGroupsQueryState.pages,
-        entryVirtualList,
-        new Set([page.index]),
-        new Set([rootId, entryId]),
-        {
-          onEvict: (evictedPage) => {
-            evictedPage.items.forEach((group) => {
-              rootGroupDerivedStates.delete(rootGroupDerivedStateKey(dictionary, group.root.id));
-            });
+      // The nearest group is often in a window already on screen; that window
+      // is kept as it is, measured heights and all.
+      if (page.status !== "success") {
+        page.estimatedHeight = queryWindowPageHeight(entryVirtualList, page.index, page.estimatedHeight);
+        page.offset = result.location.windowOffset;
+        page.cursor = result.pageInfo?.windowCursor || rootGroupsQueryState.windowCursor;
+        page.status = "success";
+        page.items = result.groups;
+        page.pageInfo = result.pageInfo;
+        page.error = null;
+        page.lastAccessAt = performance.now();
+        rootGroupsQueryState.windowCursor = result.pageInfo?.windowCursor || rootGroupsQueryState.windowCursor;
+        applyRootGroupWindowMetrics(rootGroupsQueryState, result.pageInfo);
+        preserveQueryWindowPageHeight(
+          page,
+          result.groups.reduce((total, group) => total + rootGroupEstimatedHeight(group), 0),
+          Boolean(rootGroupsQueryState.windowCursor),
+        );
+        syncRootGroupsQueryWindowState();
+        evictDistantQueryWindowPages(
+          rootGroupsQueryState.pages,
+          entryVirtualList,
+          new Set([page.index]),
+          new Set([rootId, entryId]),
+          {
+            onEvict: (evictedPage) => {
+              evictedPage.items.forEach((group) => {
+                rootGroupDerivedStates.delete(rootGroupDerivedStateKey(dictionary, group.root.id));
+              });
+            },
           },
-        },
-      );
-      syncRootGroupsQueryWindowState();
+        );
+        syncRootGroupsQueryWindowState();
+      }
       renderEntries();
       if (rootId !== entryId && !rootGroupDerivedState(dictionary, rootId)) {
         startRootGroupDerivedLoad(dictionary, rootId);
@@ -7880,17 +7893,13 @@ function ensureQueryWindowForEntryScroll(entryId, options = {}) {
   if (!rootId && loadedGroups.some((group) => group.root.id === entryId)) {
     rootId = entryId;
   }
-  if (!rootId) {
-    for (const group of loadedGroups) {
-      const derivedState = rootGroupDerivedState(dictionary, group.root.id);
-      if (derivedState?.status === "success" && derivedState.items.some((entry) => entry.id === entryId)) {
-        rootId = group.root.id;
-        break;
-      }
-    }
-  }
   const loadedGroup = rootId ? loadedGroups.find((group) => group.root.id === rootId) : null;
   if (!loadedGroup) {
+    // A derived entry may belong to several groups, loaded or not; the backend
+    // picks the one nearest the viewport, measured once per scroll request.
+    if (!rootId) {
+      options.nearGroupIndex ??= rootViewportGroupIndex();
+    }
     startRootGroupQueryLocation(dictionary, entryId, options);
     return;
   }

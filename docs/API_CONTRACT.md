@@ -142,7 +142,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `POST` | `/api/dictionaries/:id/source-candidates/query` | 来源补全候选（只读） | `{ items, total, limit }`，其中 `items` 固定为词条摘要 DTO | 请求体 `{ q, ownerEntryId?, excludeEntryIds?, limit? }`。复用 lemma 搜索 projection、查询规范化和共享 matcher，由 `settings.search.etymologyAutocomplete.fuzzy` 决定是否启用 fuzzy；不使用 cursor，详见[输入、补全与唯一性](#输入补全与唯一性)。 |
 | `GET` | `/api/dictionaries/:id/root-groups` | 读取词根模式分组 | `{ items, pageInfo, searchSummary }` | 支持 `q`、`fields`、`fuzzyFields`、`sort`、`cursor`、`windowOffset`、`limit`。前端词根模式正常路径以该 API 为准，并按窗口加载。 |
 | `GET` | `/api/dictionaries/:id/root-group-overview` | 词根模式当前查询的分段概览，供列表导航条使用 | `{ total, sort, grain, buckets: [{ key, start, count, derivedCount, derivedGroupCount, matchedGroupCount, matchedGroupDerivedCount }] }` | 接受与 `/root-groups` 相同的 `q`、`fields`、`fuzzyFields`、`sort`（cursor 与分页无关），另加 `tz`，规则同 `/entry-overview`。语义见下文“列表概览”。路径不放在 `/root-groups/` 下：该前缀下的路径段是词根的词条 ID。 |
-| `GET` | `/api/dictionaries/:id/root-groups/location` | 定位词条所属的父级词根窗口 | `{ items, pageInfo, searchSummary, location }` | 必须传 `entryId`；可传 `preferredRootId` 消除多来源词条的父级歧义，其余参数沿用 `/root-groups` descriptor。 |
+| `GET` | `/api/dictionaries/:id/root-groups/location` | 定位词条所属的父级词根窗口 | `{ items, pageInfo, searchSummary, location }` | 必须传 `entryId`；可传 `preferredRootId` 指定父级，或传 `nearGroupIndex` 让多词根词条取最近的父级组；其余参数沿用 `/root-groups` descriptor。 |
 | `GET` | `/api/dictionaries/:id/root-groups/:rootId/entries` | 按需读取单个词根组的全部衍生词 | `{ items }`，其中 `items` 固定为词条摘要 DTO | 支持与词根组查询相同的搜索、排序和字段参数，但不分页；折叠组不预载衍生词，展开后一次读取整组。 |
 | `POST` | `/api/dictionaries/:id/analysis/query` | 按需读取轻量分析 widgets | `{ dictionaryId, generation, cacheKey, widgets, diagnostics }` | 同步聚合端点；多个 widget 由 planner 合并为共享 SQLite 任务，不读取或返回完整词典 snapshot。 |
 | `POST` | `/api/dictionaries/:id/analysis/features/query` | 读取派生功能结果摘要或窗口 | summary 模式返回 `{ dictionaryId, generation, resultKey, source, summary, diagnostics }`；items 模式另带 `{ items, pageInfo, searchSummary }` | 当前支持 `ipaAutoCompare`、`ipaDistribution` 和 `morphologyAnalysis` v1；基础算法结果保存在有界进程缓存中，分类、搜索、排序和窗口不触发功能算法重算。 |
@@ -255,6 +255,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `invalid_entry_location_target` | 词根窗口定位请求未提供目标词条 ID。 |
 | `invalid_overview_time_zone` | 列表概览的 `tz` 不是可识别的 IANA 时区名。 |
 | `invalid_root_context` | `preferredRootId` 不是目标词条的可用词根上下文。 |
+| `invalid_near_group_index` | 词根窗口定位的 `nearGroupIndex` 不是非负整数。 |
 | `root_group_not_found` | 请求的词根组不存在于当前查询结果。 |
 | `invalid_settings_payload` | 设置请求体格式无效。 |
 | `invalid_search_normalization_rule` | 设置保存、带 settings 的批量 patch 或导入中的搜索自定义规则无效，整次拒绝。`details.errors` 为 `{ index, variantIndex?, variant?, code }[]`，`code` 为 `invalid_rules`（规则列表不是数组）、`invalid_rule`、`invalid_canonical`、`empty_canonical`、`invalid_variants`、`empty_variants`、`invalid_variant`、`empty_variant` 或 `conflicting_variant`，与设置表单的本地检查相同，前端复用同一组提示。 |
@@ -701,10 +702,10 @@ GET /api/dictionaries/:id/root-groups?q=&fields=&fuzzyFields=&sort=&cursor=&wind
 目标词条所在父级窗口由以下端点定位：
 
 ```text
-GET /api/dictionaries/:id/root-groups/location?entryId=&preferredRootId=&q=&fields=&fuzzyFields=&sort=&limit=
+GET /api/dictionaries/:id/root-groups/location?entryId=&preferredRootId=&nearGroupIndex=&q=&fields=&fuzzyFields=&sort=&limit=
 ```
 
-后端先通过稳定拓扑的 `entryId -> rootIds` 取得候选父级，再用查询会话的 `rootId -> resultIndex` 定位当前 descriptor 下的父级窗口；不会扫描所有词根组。多来源词条可传 `preferredRootId` 指定当前导航上下文。成功响应的 `location` 为：
+后端先通过稳定拓扑的 `entryId -> rootIds` 取得候选父级，再用查询会话的 `rootId -> resultIndex` 定位当前 descriptor 下的父级窗口；不会扫描所有词根组。一个衍生词可能属于多个词根组：传 `preferredRootId` 时只用这个父级；否则在当前结果包含目标的候选组中，取组下标与 `nearGroupIndex` 距离最小的一个，距离相同取下标较小的。`nearGroupIndex` 省略时按 0 处理，即取最靠前的候选组。前端在父级未定时传视口中部所在的组下标，使定位就近；已知父级（如点击某组内的衍生词卡片、查询游标失效后重建窗口）时传 `preferredRootId`。成功响应的 `location` 为：
 
 ```js
 {
