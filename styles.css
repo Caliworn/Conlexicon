@@ -6804,39 +6804,228 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
   width: min(560px, calc(100vw - 48px));
 }
 
-.quick-entry-log {
+.quick-entry-body,
+.quick-entry-main {
   display: grid;
-  gap: 4px;
-  margin: 0;
-  padding: 0 0 10px;
-  border-bottom: 1px solid var(--ui-border);
-  list-style: none;
+  gap: 12px;
+  min-width: 0;
 }
 
-.quick-entry-log[hidden] {
+.quick-entry-main {
+  align-content: start;
+}
+
+/* Recent entries: entries this opening created, then earlier ones by creation
+   time. Narrow panels fold the list into a bar under the footer; from 900px
+   (app.js QUICK_ENTRY_SIDE_COLUMN_QUERY) it is a column beside the fields
+   whose height follows the fields, so the panel keeps its size and the
+   fields never move when an entry is added. */
+.quick-entry-recent {
+  display: grid;
+  min-width: 0;
+  border-top: 1px solid var(--ui-border);
+}
+
+.quick-entry-recent-heading {
   display: none;
 }
 
-.quick-entry-log-item {
+.quick-entry-recent-toggle {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
+  width: 100%;
   min-width: 0;
+  min-height: 36px;
+  border: 0;
+  border-radius: var(--radius-control);
+  padding: 8px 4px 0;
+  background: none;
   color: var(--ui-text-muted);
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
 }
 
-.quick-entry-log-item strong {
+.quick-entry-recent-chevron {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.15s ease;
+}
+
+.quick-entry-recent-toggle[aria-expanded="false"] .quick-entry-recent-chevron {
+  transform: rotate(-90deg);
+}
+
+/* The latest lemma gives way before the count. */
+.quick-entry-recent-summary {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.quick-entry-recent-summary strong {
   min-width: 0;
   overflow: hidden;
   color: var(--ui-text);
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+
+.quick-entry-recent-summary span {
+  flex: 0 0 auto;
+}
+
+/* The inline and bottom padding keep the rows’ focus outline inside the
+   scroll box, which clips everything past its padding. */
+.quick-entry-recent-scroller {
+  max-height: min(240px, 35vh);
+  overflow-y: auto;
+  padding: 6px 4px 4px;
+}
+
+.quick-entry-recent-toggle[aria-expanded="false"] + .quick-entry-recent-scroller {
+  display: none;
+}
+
+.quick-entry-recent-list {
+  display: grid;
+  gap: 2px;
+}
+
+.quick-entry-recent-group {
+  margin: 0;
+  padding: 6px 8px 2px;
+  color: var(--ui-text-muted);
+  font-size: 0.75rem;
+}
+
+.quick-entry-recent-group.is-earlier {
+  margin-top: 4px;
+  border-top: 1px solid var(--ui-border);
+  padding-top: 8px;
+}
+
+/* Rows follow the derived entry rows: no edge of their own, a fill on hover. */
+.quick-entry-recent-item {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  padding: 6px 8px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ui-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.quick-entry-recent-item:hover {
+  background: color-mix(in srgb, var(--ui-text) 6%, transparent);
+}
+
+.quick-entry-recent-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+/* A long lemma gives way first; the part of speech keeps up to half the row. */
+.quick-entry-recent-line > strong {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.quick-entry-recent-line > small {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 700;
+}
+
+.quick-entry-recent-meaning {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.875rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.quick-entry-log-item .quick-entry-open-button {
-  min-height: 30px;
-  margin-left: auto;
-  padding: 0 10px;
+.quick-entry-recent-line > small,
+.quick-entry-recent-meaning {
+  color: var(--material-list-item-secondary-color);
+  opacity: var(--material-list-item-secondary-opacity);
+}
+
+.quick-entry-recent-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  color: var(--ui-text-muted);
+  font-size: 0.8125rem;
+}
+
+.quick-entry-recent-status:empty {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .quick-entry-panel {
+    width: min(840px, calc(100vw - 48px));
+  }
+
+  .quick-entry-body {
+    grid-template-columns: minmax(0, 1fr) 260px;
+    gap: 20px;
+  }
+
+  .quick-entry-recent {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-top: 0;
+    border-left: 1px solid var(--ui-border);
+    padding-left: 12px;
+  }
+
+  .quick-entry-recent-heading {
+    display: block;
+    margin: 0;
+    padding: 0 12px 4px;
+    color: var(--ui-text-muted);
+    font-size: 0.875rem;
+    font-weight: 400;
+  }
+
+  .quick-entry-recent-toggle {
+    display: none;
+  }
+
+  /* A zero basis keeps the list out of the row height; it fills what the
+     fields leave. */
+  .quick-entry-recent-scroller,
+  .quick-entry-recent-toggle[aria-expanded="false"] + .quick-entry-recent-scroller {
+    display: block;
+    flex: 1 1 0;
+    height: 0;
+    min-height: 0;
+    max-height: none;
+    padding-top: 0;
+  }
 }
 
 .quick-entry-fields {

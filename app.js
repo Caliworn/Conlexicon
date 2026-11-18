@@ -473,10 +473,14 @@ const i18n = {
     quickEntryDefinitionLabel: "释义 {n}",
     quickEntryDefinitionTagsLabel: "释义 {n} 标签",
     quickEntryDefinitionTagsLocked: "清空所有释义标签后才能关闭",
-    quickEntryCreated: "已创建",
-    quickEntryDefinitionCount: "{count} 条释义",
-    quickEntryDefinitionCountOne: "1 条释义",
-    quickEntryOpen: "打开",
+    quickEntryRecentTitle: "最近创建",
+    quickEntryRecentThisSession: "本次",
+    quickEntryRecentEarlier: "更早",
+    quickEntryRecentSessionCount: "本次 {count}",
+    quickEntryRecentEmpty: "还没有词条",
+    quickEntryRecentLoadFailed: "最近创建加载失败",
+    quickEntryRecentRetry: "重试",
+    quickEntryRecentAnnouncement: "已创建 {lemma}",
     quickEntryHintIpa: "Tab 填入自动 IPA",
     quickEntryHintTags: "Tab 沿用：{tags}",
     quickEntryHintRemoveDefinition: "Backspace 删除此行",
@@ -1118,10 +1122,14 @@ const i18n = {
     quickEntryDefinitionLabel: "Definition {n}",
     quickEntryDefinitionTagsLabel: "Definition {n} tags",
     quickEntryDefinitionTagsLocked: "Clear all definition tags to turn this off",
-    quickEntryCreated: "created",
-    quickEntryDefinitionCount: "{count} definitions",
-    quickEntryDefinitionCountOne: "1 definition",
-    quickEntryOpen: "Open",
+    quickEntryRecentTitle: "Recent entries",
+    quickEntryRecentThisSession: "This session",
+    quickEntryRecentEarlier: "Earlier",
+    quickEntryRecentSessionCount: "{count} this session",
+    quickEntryRecentEmpty: "No entries yet",
+    quickEntryRecentLoadFailed: "Couldn't load recent entries",
+    quickEntryRecentRetry: "Retry",
+    quickEntryRecentAnnouncement: "Created {lemma}",
     quickEntryHintIpa: "Tab: auto IPA",
     quickEntryHintTags: "Tab: reuse {tags}",
     quickEntryHintRemoveDefinition: "Backspace removes this line",
@@ -1921,7 +1929,12 @@ const elements = {
   closeInfoDialogButton: document.querySelector("#closeInfoDialogButton"),
   quickEntryDialog: document.querySelector("#quickEntryDialog"),
   quickEntryPanel: document.querySelector("#quickEntryPanel"),
-  quickEntryLog: document.querySelector("#quickEntryLog"),
+  quickEntryRecentToggle: document.querySelector("#quickEntryRecentToggle"),
+  quickEntryRecentSummary: document.querySelector("#quickEntryRecentSummary"),
+  quickEntryRecentScroller: document.querySelector("#quickEntryRecentScroller"),
+  quickEntryRecentList: document.querySelector("#quickEntryRecentList"),
+  quickEntryRecentStatus: document.querySelector("#quickEntryRecentStatus"),
+  quickEntryAnnouncement: document.querySelector("#quickEntryAnnouncement"),
   quickEntryFields: document.querySelector("#quickEntryFields"),
   quickEntryDefinitionTagsInput: document.querySelector("#quickEntryDefinitionTagsInput"),
   quickEntryMessage: document.querySelector("#quickEntryMessage"),
@@ -16574,8 +16587,13 @@ async function beginDerivedEntry(sourceEntry) {
   showToast(t("derivedEntryDraft"));
 }
 
-const QUICK_ENTRY_LOG_LIMIT = 3;
+// Matches the styles.css breakpoint that puts recent entries beside the fields.
+const QUICK_ENTRY_SIDE_COLUMN_QUERY = window.matchMedia("(min-width: 900px)");
+const QUICK_ENTRY_RECENT_PAGE_SIZE = 50;
+// Distance from the list's end, in pixels, at which the next page loads.
+const QUICK_ENTRY_RECENT_LOAD_MARGIN = 160;
 let quickEntryState = null;
+let quickEntryRecentRequestSerial = 0;
 // Tags of the last entry created through the overlay, scoped to its dictionary.
 let quickEntryLastTags = { dictionaryId: "", tags: [] };
 
@@ -16912,28 +16930,191 @@ function toggleQuickEntryDefinitionTags() {
   updateQuickEntryRowState();
 }
 
-function appendQuickEntryLog(entry) {
-  const item = document.createElement("li");
-  item.className = "quick-entry-log-item";
-  const lemma = document.createElement("strong");
-  lemma.textContent = entry.lemma;
-  const status = document.createElement("span");
-  const definitionCount = entry.definitions.filter((definition) => definition.meaning).length;
-  status.textContent = definitionCount
-    ? `${t("quickEntryCreated")} · ${(definitionCount === 1 ? t("quickEntryDefinitionCountOne") : formatText("quickEntryDefinitionCount", { count: definitionCount }))}`
-    : t("quickEntryCreated");
-  const open = document.createElement("button");
-  open.type = "button";
-  open.className = "secondary-button quick-entry-open-button";
-  open.dataset.controlTone = "neutral";
-  open.dataset.quickEntryOpen = entry.id;
-  open.textContent = t("quickEntryOpen");
-  item.append(lemma, status, open);
-  elements.quickEntryLog.append(item);
-  while (elements.quickEntryLog.children.length > QUICK_ENTRY_LOG_LIMIT) {
-    elements.quickEntryLog.firstElementChild.remove();
+// Recent entries: the entries this opening created ("session", newest first),
+// then the dictionary's entries by creation time ("earlier", pages of the
+// entry query). The list loads once it is visible: at once beside the fields,
+// on first unfolding in a narrow panel.
+function createQuickEntryRecentState() {
+  return {
+    session: [],
+    earlier: [],
+    nextCursor: "",
+    status: "idle",
+    error: null,
+    expanded: false,
+    requestId: 0,
+  };
+}
+
+function quickEntryRecentVisible() {
+  return QUICK_ENTRY_SIDE_COLUMN_QUERY.matches || quickEntryState.recent.expanded;
+}
+
+function quickEntryRecentItemButton(entry) {
+  const rawParts = dictionarySettings().entryListRawPartDisplay;
+  const partText = entryOwnPartText(entry, undefined, { raw: rawParts });
+  const meaningsHtml = entryDefinitionSummaryItems(entry)
+    .map((item) => definitionSummaryItemHtml(item, { rawParts }))
+    .join("  ");
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "quick-entry-recent-item";
+  button.dataset.quickEntryOpen = entry.id;
+  button.innerHTML = `
+    <span class="quick-entry-recent-line">
+      <strong>${escapeHtml(entry.lemma)}</strong>
+      ${partText ? `<small>${escapeHtml(partText)}</small>` : ""}
+    </span>
+    ${meaningsHtml ? `<span class="quick-entry-recent-meaning">${meaningsHtml}</span>` : ""}
+  `;
+  return button;
+}
+
+function quickEntryRecentGroupLabel(key) {
+  const label = document.createElement("p");
+  label.className = "quick-entry-recent-group";
+  label.textContent = t(key);
+  return label;
+}
+
+// Two sections, each led by its label; the labels show only when this
+// opening has created entries.
+function resetQuickEntryRecentList() {
+  const session = document.createElement("div");
+  session.dataset.quickEntryRecentSection = "session";
+  session.append(quickEntryRecentGroupLabel("quickEntryRecentThisSession"));
+  const earlier = document.createElement("div");
+  earlier.dataset.quickEntryRecentSection = "earlier";
+  const earlierLabel = quickEntryRecentGroupLabel("quickEntryRecentEarlier");
+  earlierLabel.classList.add("is-earlier");
+  earlier.append(earlierLabel);
+  elements.quickEntryRecentList.replaceChildren(session, earlier);
+  elements.quickEntryRecentScroller.scrollTop = 0;
+}
+
+function quickEntryRecentSection(name) {
+  return elements.quickEntryRecentList.querySelector(`[data-quick-entry-recent-section="${name}"]`);
+}
+
+function appendQuickEntryRecentEarlier(entries) {
+  const sessionIds = new Set(quickEntryState.recent.session.map((entry) => entry.id));
+  quickEntryRecentSection("earlier").append(...entries
+    .filter((entry) => !sessionIds.has(entry.id))
+    .map(quickEntryRecentItemButton));
+}
+
+function updateQuickEntryRecentChrome() {
+  const recent = quickEntryState.recent;
+  const sessionCount = recent.session.length;
+  const sessionSection = quickEntryRecentSection("session");
+  const earlierSection = quickEntryRecentSection("earlier");
+  const hasEarlier = earlierSection.childElementCount > 1;
+  sessionSection.hidden = !sessionCount;
+  earlierSection.firstElementChild.hidden = !sessionCount || !hasEarlier;
+  elements.quickEntryRecentToggle.setAttribute("aria-expanded", String(recent.expanded));
+  elements.quickEntryRecentSummary.innerHTML = sessionCount
+    ? `<strong>${escapeHtml(recent.session[0].lemma)}</strong><span>· ${escapeHtml(formatText("quickEntryRecentSessionCount", { count: sessionCount }))}</span>`
+    : "";
+  const status = elements.quickEntryRecentStatus;
+  if (recent.status === "loading") {
+    status.textContent = t("loading");
+  } else if (recent.status === "error") {
+    const message = document.createElement("span");
+    message.textContent = apiErrorToastMessage(recent.error, "quickEntryRecentLoadFailed");
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.className = "secondary-button";
+    retry.dataset.controlTone = "neutral";
+    retry.dataset.quickEntryRecentRetry = "";
+    retry.textContent = t("quickEntryRecentRetry");
+    status.replaceChildren(message, retry);
+  } else if (recent.status === "ready" && !sessionCount && !hasEarlier) {
+    status.textContent = t("quickEntryRecentEmpty");
+  } else {
+    status.replaceChildren();
   }
-  elements.quickEntryLog.hidden = false;
+}
+
+// A restart reads from the newest entry again, as many entries as are loaded
+// plus a page: for the first page, and after a write made the cursor stale.
+async function loadQuickEntryRecentPage(restart) {
+  const recent = quickEntryState.recent;
+  if (recent.status === "loading" || (!restart && !recent.nextCursor)) {
+    return;
+  }
+  const params = new URLSearchParams({ sort: "createdDesc" });
+  if (restart) {
+    params.set("limit", String(Math.min(ENTRY_QUERY_WINDOW_PAGE_SIZE, recent.earlier.length + QUICK_ENTRY_RECENT_PAGE_SIZE)));
+  } else {
+    params.set("limit", String(QUICK_ENTRY_RECENT_PAGE_SIZE));
+    params.set("cursor", recent.nextCursor);
+  }
+  const requestId = ++quickEntryRecentRequestSerial;
+  recent.requestId = requestId;
+  recent.status = "loading";
+  recent.error = null;
+  updateQuickEntryRecentChrome();
+  let page;
+  try {
+    page = await api(`/api/dictionaries/${encodeURIComponent(activeDictionary().id)}/entries?${params}`);
+  } catch (error) {
+    if (quickEntryState?.recent !== recent || recent.requestId !== requestId) {
+      return;
+    }
+    recent.status = "idle";
+    if (!restart && error.code === "query_cursor_stale") {
+      await loadQuickEntryRecentPage(true);
+      return;
+    }
+    recent.status = "error";
+    recent.error = error;
+    updateQuickEntryRecentChrome();
+    return;
+  }
+  if (quickEntryState?.recent !== recent || recent.requestId !== requestId) {
+    return;
+  }
+  const earlierSection = quickEntryRecentSection("earlier");
+  if (restart) {
+    recent.earlier = page.items;
+    earlierSection.replaceChildren(earlierSection.firstElementChild);
+  } else {
+    recent.earlier = [...recent.earlier, ...page.items];
+  }
+  appendQuickEntryRecentEarlier(page.items);
+  recent.nextCursor = page.pageInfo.nextCursor || "";
+  recent.status = "ready";
+  updateQuickEntryRecentChrome();
+  loadQuickEntryRecentPageNearEnd();
+}
+
+function loadQuickEntryRecentPageNearEnd() {
+  const scroller = elements.quickEntryRecentScroller;
+  if (
+    scroller.clientHeight
+    && scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - QUICK_ENTRY_RECENT_LOAD_MARGIN
+  ) {
+    void loadQuickEntryRecentPage(false);
+  }
+}
+
+function ensureQuickEntryRecentLoaded() {
+  if (quickEntryState.recent.status === "idle" && quickEntryRecentVisible()) {
+    void loadQuickEntryRecentPage(true);
+  }
+}
+
+function toggleQuickEntryRecent() {
+  quickEntryState.recent.expanded = !quickEntryState.recent.expanded;
+  updateQuickEntryRecentChrome();
+  ensureQuickEntryRecentLoaded();
+}
+
+function addQuickEntryRecentSessionEntry(entry) {
+  quickEntryState.recent.session.unshift(entry);
+  quickEntryRecentSection("session").firstElementChild.after(quickEntryRecentItemButton(entry));
+  elements.quickEntryAnnouncement.textContent = formatText("quickEntryRecentAnnouncement", { lemma: entry.lemma });
+  updateQuickEntryRecentChrome();
 }
 
 async function submitQuickEntry() {
@@ -16967,7 +17148,7 @@ async function submitQuickEntry() {
     resetEntryReadStateAfterSave();
     render({ preserveEditorSurface: Boolean(editorMode === "edit" || partialEditForm()) });
     quickEntryLastTags = { dictionaryId: dictionary.id, tags: arrangedTags(savedEntry.tags) };
-    appendQuickEntryLog(savedEntry);
+    addQuickEntryRecentSessionEntry(savedEntry);
     quickEntryState.draft = createQuickEntryDraft();
     setQuickEntryMessage();
     renderQuickEntryFields();
@@ -17010,14 +17191,17 @@ async function openQuickEntry() {
     current: 0,
     submitting: false,
     returnFocus: document.activeElement,
+    recent: createQuickEntryRecentState(),
   };
-  elements.quickEntryLog.replaceChildren();
-  elements.quickEntryLog.hidden = true;
+  resetQuickEntryRecentList();
+  updateQuickEntryRecentChrome();
+  elements.quickEntryAnnouncement.textContent = "";
   setQuickEntryMessage();
   renderQuickEntryFields();
   updateQuickEntryDefinitionTagsSwitch();
   elements.quickEntryDialog.hidden = false;
   focusQuickEntryField(0);
+  ensureQuickEntryRecentLoaded();
   return true;
 }
 
@@ -17025,7 +17209,9 @@ function hideQuickEntry({ restoreFocus = true } = {}) {
   const returnFocus = quickEntryState?.returnFocus;
   elements.quickEntryDialog.hidden = true;
   elements.quickEntryFields.replaceChildren();
-  elements.quickEntryLog.replaceChildren();
+  elements.quickEntryRecentList.replaceChildren();
+  elements.quickEntryRecentStatus.replaceChildren();
+  elements.quickEntryAnnouncement.textContent = "";
   quickEntryState = null;
   if (restoreFocus && returnFocus?.isConnected && returnFocus.getClientRects().length) {
     returnFocus.focus({ preventScroll: true });
@@ -18456,10 +18642,22 @@ elements.quickEntryFields.addEventListener("focusin", (event) => {
     moveQuickEntryFocus(index);
   }
 });
-elements.quickEntryLog.addEventListener("click", (event) => {
+elements.quickEntryRecentList.addEventListener("click", (event) => {
   const button = event.target.closest("[data-quick-entry-open]");
   if (button) {
     void openQuickEntryCreatedEntry(button.dataset.quickEntryOpen);
+  }
+});
+elements.quickEntryRecentStatus.addEventListener("click", (event) => {
+  if (event.target.closest("[data-quick-entry-recent-retry]")) {
+    void loadQuickEntryRecentPage(!quickEntryState.recent.earlier.length);
+  }
+});
+elements.quickEntryRecentToggle.addEventListener("click", toggleQuickEntryRecent);
+elements.quickEntryRecentScroller.addEventListener("scroll", loadQuickEntryRecentPageNearEnd, { passive: true });
+QUICK_ENTRY_SIDE_COLUMN_QUERY.addEventListener("change", () => {
+  if (quickEntryIsOpen()) {
+    ensureQuickEntryRecentLoaded();
   }
 });
 elements.closeQuickEntryButton.addEventListener("click", () => requestCloseQuickEntry());

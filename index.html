@@ -1163,25 +1163,41 @@
           <h2 id="quickEntryTitle" data-i18n="quickEntryTitle">快速录入</h2>
           <button class="secondary-button" id="closeQuickEntryButton" data-control-tone="neutral" type="button" data-i18n="close">关闭</button>
         </div>
-        <ul class="quick-entry-log" id="quickEntryLog" aria-live="polite" hidden></ul>
-        <div class="quick-entry-fields" id="quickEntryFields"></div>
-        <p class="quick-entry-message" id="quickEntryMessage" role="status"></p>
-        <div class="quick-entry-footer">
-          <label class="switch-label">
-            <input id="quickEntryDefinitionTagsInput" class="switch" type="checkbox" role="switch" aria-keyshortcuts="Control+/ Meta+/">
-            <span data-i18n="definitionTags">释义标签</span>
-            <kbd class="quick-entry-shortcut">Ctrl /</kbd>
-          </label>
-          <p class="quick-entry-keys">
-            <span><kbd>Enter</kbd> <span data-i18n="quickEntryKeyNext">下一项</span></span>
-            <span><kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="quickEntryKeyMove">切换</span></span>
-            <span><kbd>Tab</kbd> <span data-i18n="quickEntryKeySuggest">填入建议</span></span>
-          </p>
-          <div class="quick-entry-actions">
-            <button class="secondary-button" id="quickEntryFullEditButton" data-control-tone="neutral" type="button" aria-keyshortcuts="Control+Shift+Enter Meta+Shift+Enter"><span data-i18n="quickEntryFullEdit">完整编辑</span><kbd class="quick-entry-shortcut">Ctrl Shift Enter</kbd></button>
-            <button class="secondary-button" id="quickEntrySubmitButton" data-control-tone="accent" data-control-emphasis="solid" type="button" aria-keyshortcuts="Control+Enter Meta+Enter"><span data-i18n="quickEntrySubmit">提交</span><kbd class="quick-entry-shortcut">Ctrl Enter</kbd></button>
+        <div class="quick-entry-body">
+          <div class="quick-entry-main">
+            <div class="quick-entry-fields" id="quickEntryFields"></div>
+            <p class="quick-entry-message" id="quickEntryMessage" role="status"></p>
+            <div class="quick-entry-footer">
+              <label class="switch-label">
+                <input id="quickEntryDefinitionTagsInput" class="switch" type="checkbox" role="switch" aria-keyshortcuts="Control+/ Meta+/">
+                <span data-i18n="definitionTags">释义标签</span>
+                <kbd class="quick-entry-shortcut">Ctrl /</kbd>
+              </label>
+              <p class="quick-entry-keys">
+                <span><kbd>Enter</kbd> <span data-i18n="quickEntryKeyNext">下一项</span></span>
+                <span><kbd>↑</kbd><kbd>↓</kbd> <span data-i18n="quickEntryKeyMove">切换</span></span>
+                <span><kbd>Tab</kbd> <span data-i18n="quickEntryKeySuggest">填入建议</span></span>
+              </p>
+              <div class="quick-entry-actions">
+                <button class="secondary-button" id="quickEntryFullEditButton" data-control-tone="neutral" type="button" aria-keyshortcuts="Control+Shift+Enter Meta+Shift+Enter"><span data-i18n="quickEntryFullEdit">完整编辑</span><kbd class="quick-entry-shortcut">Ctrl Shift Enter</kbd></button>
+                <button class="secondary-button" id="quickEntrySubmitButton" data-control-tone="accent" data-control-emphasis="solid" type="button" aria-keyshortcuts="Control+Enter Meta+Enter"><span data-i18n="quickEntrySubmit">提交</span><kbd class="quick-entry-shortcut">Ctrl Enter</kbd></button>
+              </div>
+            </div>
           </div>
+          <section class="quick-entry-recent" id="quickEntryRecent" aria-labelledby="quickEntryRecentHeading">
+            <h3 class="quick-entry-recent-heading" id="quickEntryRecentHeading" data-i18n="quickEntryRecentTitle">最近创建</h3>
+            <button class="quick-entry-recent-toggle" id="quickEntryRecentToggle" type="button" aria-expanded="false" aria-controls="quickEntryRecentScroller">
+              <svg class="nav-icon quick-entry-recent-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+              <span data-i18n="quickEntryRecentTitle">最近创建</span>
+              <span class="quick-entry-recent-summary" id="quickEntryRecentSummary"></span>
+            </button>
+            <div class="quick-entry-recent-scroller" id="quickEntryRecentScroller">
+              <div class="quick-entry-recent-list" id="quickEntryRecentList"></div>
+              <div class="quick-entry-recent-status" id="quickEntryRecentStatus"></div>
+            </div>
+          </section>
         </div>
+        <p class="visually-hidden" id="quickEntryAnnouncement" aria-live="polite"></p>
       </article>
     </section>
 
