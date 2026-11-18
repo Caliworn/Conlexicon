@@ -2582,6 +2582,7 @@ async function runRepositoryContractTests(options = {}) {
       uiLanguage: "en",
       uiTheme: "dark",
       uiSkin: "layered-glass",
+      uiEntryCardDensity: "auto",
     });
     state = await repository.readState();
     assert.equal(state.uiLanguage, "en");
@@ -2601,6 +2602,18 @@ async function runRepositoryContractTests(options = {}) {
       "invalid UI skin",
     );
     assert.equal(invalidSkinError.code, "invalid_ui_skin");
+
+    apiResult = await callApi(repository, "PUT", "/api/preferences", { uiEntryCardDensity: "compact" });
+    assert.equal(apiResult.statusCode, 200);
+    assert.equal(apiResult.body.uiEntryCardDensity, "compact");
+    assert.equal((await repository.readState()).uiEntryCardDensity, "compact");
+    const invalidDensityError = await assertRejectStatus(
+      callApi(repository, "PUT", "/api/preferences", { uiEntryCardDensity: "dense" }),
+      400,
+      "invalid entry card density",
+    );
+    assert.equal(invalidDensityError.code, "invalid_ui_entry_card_density");
+    assert.equal((await repository.readState()).uiEntryCardDensity, "compact");
 
     await assertRejectStatus(repository.importDictionary(first), 409, "duplicate import");
     await repository.importDictionary({ ...first, name: "First Overwritten" }, { overwrite: true });

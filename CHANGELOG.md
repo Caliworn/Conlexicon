@@ -8,6 +8,8 @@
 
 ### 新增
 
+- 皮肤菜单新增“词条卡片”一组：自动（随窗口高度）、紧凑、舒适。自动沿用紧凑档阈值，紧凑和舒适在任何窗口高度下都固定使用该样式，大屏也能一屏多看几张卡片。设置是全局界面偏好，与皮肤一样保存在 `data/index.json` 的 `uiEntryCardDensity`，经 `PUT /api/preferences` 写入，未知值返回 400 `invalid_ui_entry_card_density`。结构同时调整：前端统一算出当前密度并写在 `body` 的 `data-entry-card-density` 上，卡片的紧凑样式和列表的估算卡片高度都只看这一个属性，不再各自匹配媒体查询。仓库契约和 SQLite 生命周期检查覆盖默认值、保存与非法值；无头 Edge 用临时词典核对了三种取值在 1920×1000 与 1280×610 下的卡片高度、刷新后的保留、菜单的方向键顺序、`Esc` 关闭、中英文标签不截断，以及菜单在 610px 高的窗口里完整显示。完整检查通过。 [API 契约](docs/API_CONTRACT.md) · [待验收项](NEXT_IMPLEMENTATION_HANDOFF.md)
+
 - Gloss 样式加入独立的 `\glpreamble` 设置，可选字体、字号、粗体和斜体。语料预览、词条例句和编辑时的关联例句共用该前言样式，纯文本整条使用它并保留换行。旧词典缺少前言的字体或字号时沿用 `\gla` 对应设置，粗体和斜体默认关闭。检查脚本覆盖默认值和缺键补齐，无头 Edge 核对了旧 SQLite 设置的加载、保存和重读。 [格式规范](docs/CORPUS_LIGHTWEIGHT_PLAN.md#3-gloss-格式) · [待验收项](NEXT_IMPLEMENTATION_HANDOFF.md)
 
 ### 改进

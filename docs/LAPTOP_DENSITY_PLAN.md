@@ -193,3 +193,11 @@
 - 页面内边距、导航内边距、面板间距和底部按钮合并仍按阈值切换。
 
 实测（无头 Edge，1280 宽，关闭过渡）：经典 610px 时 41.8px／间距 2.25px，760px 时 52px／6px，920px 和 921px 时都是 54px／10px；液态玻璃 610px 时 37.7px，760px 起 50px；图标栏 1100×650 时 40.1px，1100×1000 时 50px。三套皮肤各高度 11/11 可见。
+
+## 12. 词条卡片密度偏好（2026-11-18，用户提出）
+
+皮肤菜单分隔线下的“词条卡片”一组提供自动、紧凑、舒适三档，全局保存为 `data/index.json` 的 `uiEntryCardDensity`（接口见 [API 契约](API_CONTRACT.md)）。用户确认按代理建议做成三档、放在皮肤一侧，并顺带调整结构：
+
+- `app.js` 的 `resolvedEntryCardDensity()` 把偏好解析成 `compact` 或 `comfortable`（自动时按 `compactDensityMediaQuery`），`applyEntryCardDensity()` 写到 `body[data-entry-card-density]` 并更新估算卡片高度。卡片的紧凑样式只按这个属性生效；页头和详情仍按紧凑档媒体查询。
+- 偏好改变、窗口跨过阈值（媒体查询事件或 resize）时，`syncEntryCardDensity()` 在估算高度变化时清掉已测高度并重排列表。
+- 菜单方向键在皮肤和卡片两组之间连续移动，Tab 只停在当前皮肤上。英文“Auto (window height)”和中文“自动（随窗口高度）”在 256px 宽的菜单里不截断。

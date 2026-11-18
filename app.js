@@ -6,6 +6,7 @@ let state = {
   uiLanguage: "zh",
   uiTheme: "light",
   uiSkin: "classic",
+  uiEntryCardDensity: "auto",
   dictionaries: [],
 };
 
@@ -27,6 +28,7 @@ let editorMode = "display";
 let currentTheme = "light";
 let themeChangePending = false;
 let currentSkin = "classic";
+let currentEntryCardDensity = "auto";
 let currentLanguage = "zh";
 let loadedDictionaryIds = new Set();
 const UI_PREFERENCES_STORAGE_KEY = "conlexicon:ui-preferences";
@@ -47,6 +49,11 @@ const SKIN_OPTIONS = [
   { id: "classic", labelKey: "classicSkin" },
   { id: "layered-glass", labelKey: "layeredGlassSkin" },
   { id: "liquid-glass", labelKey: "liquidGlassSkin" },
+];
+const ENTRY_CARD_DENSITY_OPTIONS = [
+  { id: "auto", labelKey: "entryCardDensityAuto" },
+  { id: "compact", labelKey: "entryCardDensityCompact" },
+  { id: "comfortable", labelKey: "entryCardDensityComfortable" },
 ];
 const entryQueryModel = window.ConlexiconEntryQuery;
 const ipaModel = window.ConlexiconIpa;
@@ -78,6 +85,7 @@ const {
   normalizeGlossStyles,
   normalizeNewEntryButtonAction,
   normalizeToolNavOrder,
+  normalizeUiEntryCardDensity,
   normalizeUiLanguage,
   normalizeUiSkin,
   normalizeUiTheme,
@@ -285,10 +293,34 @@ let activeEntryContextMenu = null;
 // The compact card is about 91px with a one-line definition (styles.css
 // "Compact density"); both keep the comfortable estimate's ~10% margin.
 const ENTRY_CARD_ESTIMATED_HEIGHT = { comfortable: 145, compact: 100 };
+// The viewer's preference; "auto" follows the compact density's media query.
+function resolvedEntryCardDensity() {
+  if (currentEntryCardDensity === "auto") {
+    return compactDensityMediaQuery.matches ? "compact" : "comfortable";
+  }
+  return currentEntryCardDensity;
+}
 function entryCardEstimatedHeight() {
-  return compactDensityMediaQuery.matches
-    ? ENTRY_CARD_ESTIMATED_HEIGHT.compact
-    : ENTRY_CARD_ESTIMATED_HEIGHT.comfortable;
+  return ENTRY_CARD_ESTIMATED_HEIGHT[resolvedEntryCardDensity()];
+}
+// Sets the card density attribute (styles.css) and the matching estimate;
+// measured sizes were taken at the old density, so they are dropped.
+function applyEntryCardDensity() {
+  document.body.dataset.entryCardDensity = resolvedEntryCardDensity();
+  const estimate = entryCardEstimatedHeight();
+  if (entryVirtualList.estimatedItemHeight === estimate) {
+    return false;
+  }
+  entryVirtualList.estimatedItemHeight = estimate;
+  entryVirtualList.sizes.clear();
+  return true;
+}
+function syncEntryCardDensity() {
+  if (!applyEntryCardDensity()) {
+    return;
+  }
+  renderEntryListContent({ allowQueryStart: false });
+  scheduleEntryBrowserLayoutRefresh();
 }
 const entryVirtualList = createVirtualListState(entryCardEstimatedHeight());
 // The entry list's navigator replaces its native scrollbar. Root mode has the
@@ -797,6 +829,11 @@ const i18n = {
     languageSaveFailed: "界面语言保存失败",
     themeSaveFailed: "界面主题保存失败",
     skinSaveFailed: "界面皮肤保存失败",
+    entryCardDensity: "词条卡片",
+    entryCardDensityAuto: "自动（随窗口高度）",
+    entryCardDensityCompact: "紧凑",
+    entryCardDensityComfortable: "舒适",
+    entryCardDensitySaveFailed: "词条卡片密度保存失败",
     apiErrorRequestBodyTooLarge: "保存内容过大",
     apiErrorInvalidJsonBody: "请求内容不是有效 JSON",
     apiErrorInvalidUiLanguage: "界面语言值无效",
@@ -1437,6 +1474,11 @@ const i18n = {
     languageSaveFailed: "Failed to save the interface language",
     themeSaveFailed: "Failed to save the interface theme",
     skinSaveFailed: "Failed to save the interface skin",
+    entryCardDensity: "Entry cards",
+    entryCardDensityAuto: "Auto (window height)",
+    entryCardDensityCompact: "Compact",
+    entryCardDensityComfortable: "Comfortable",
+    entryCardDensitySaveFailed: "Failed to save the entry card density",
     apiErrorRequestBodyTooLarge: "Saved content is too large",
     apiErrorInvalidJsonBody: "Request body is not valid JSON",
     apiErrorInvalidUiLanguage: "Invalid interface language value",
@@ -2022,6 +2064,9 @@ function readCachedUiPreferences() {
       ...(SKIN_OPTIONS.some((option) => option.id === preferences.uiSkin)
         ? { uiSkin: preferences.uiSkin }
         : {}),
+      ...(ENTRY_CARD_DENSITY_OPTIONS.some((option) => option.id === preferences.uiEntryCardDensity)
+        ? { uiEntryCardDensity: preferences.uiEntryCardDensity }
+        : {}),
     };
   } catch (error) {
     return {};
@@ -2033,6 +2078,9 @@ function cacheUiPreferences(preferences = {}) {
   const next = {
     uiTheme: normalizeUiTheme(preferences.uiTheme ?? cached.uiTheme ?? currentTheme),
     uiSkin: normalizeUiSkin(preferences.uiSkin ?? cached.uiSkin ?? currentSkin),
+    uiEntryCardDensity: normalizeUiEntryCardDensity(
+      preferences.uiEntryCardDensity ?? cached.uiEntryCardDensity ?? currentEntryCardDensity,
+    ),
   };
   try {
     localStorage.setItem(UI_PREFERENCES_STORAGE_KEY, JSON.stringify(next));
@@ -2045,8 +2093,10 @@ function hydrateInitialUiPreferences() {
   const cached = readCachedUiPreferences();
   currentTheme = normalizeUiTheme(cached.uiTheme ?? currentTheme);
   currentSkin = normalizeUiSkin(cached.uiSkin ?? currentSkin);
+  currentEntryCardDensity = normalizeUiEntryCardDensity(cached.uiEntryCardDensity ?? currentEntryCardDensity);
   state.uiTheme = currentTheme;
   state.uiSkin = currentSkin;
+  state.uiEntryCardDensity = currentEntryCardDensity;
   applyAppearance();
 }
 
@@ -2446,7 +2496,8 @@ async function loadState() {
     currentLanguage = serverState.uiLanguage;
     currentTheme = serverState.uiTheme;
     currentSkin = serverState.uiSkin;
-    cacheUiPreferences({ uiTheme: currentTheme, uiSkin: currentSkin });
+    currentEntryCardDensity = serverState.uiEntryCardDensity;
+    cacheUiPreferences({ uiTheme: currentTheme, uiSkin: currentSkin, uiEntryCardDensity: currentEntryCardDensity });
     await applyServerState({
       ...serverState,
       selectedEntryId: state.selectedEntryId,
@@ -2538,6 +2589,7 @@ function normalizeState(source) {
     uiLanguage: source.uiLanguage,
     uiTheme: source.uiTheme,
     uiSkin: source.uiSkin,
+    uiEntryCardDensity: source.uiEntryCardDensity,
     dictionaries: source.dictionaries.map(normalizeDictionaryMetadata),
   };
 }
@@ -3421,22 +3473,45 @@ function skinOptionLabel(skinId) {
   return t(option.labelKey);
 }
 
+const SKIN_PICKER_CHECK_ICON = '<svg class="skin-picker-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>';
+
+// The appearance menu: skins, then the entry card density. Arrow keys move
+// through both groups; only the selected skin is in the Tab order.
 function renderSkinPicker() {
-  if (elements.skinPickerMenu.childElementCount !== SKIN_OPTIONS.length) {
-    elements.skinPickerMenu.innerHTML = SKIN_OPTIONS.map((option) => `
-      <button class="skin-picker-option" type="button" role="menuitemradio" data-skin-option="${option.id}" aria-checked="false" tabindex="-1">
-        <span class="skin-picker-preview skin-picker-preview-${option.id}" aria-hidden="true"></span>
-        <span class="skin-picker-option-label"></span>
-        <svg class="skin-picker-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>
-      </button>
-    `).join("");
+  if (!elements.skinPickerMenu.firstElementChild) {
+    elements.skinPickerMenu.innerHTML = `
+      ${SKIN_OPTIONS.map((option) => `
+        <button class="skin-picker-option" type="button" role="menuitemradio" data-skin-option="${option.id}" aria-checked="false" tabindex="-1">
+          <span class="skin-picker-preview skin-picker-preview-${option.id}" aria-hidden="true"></span>
+          <span class="skin-picker-option-label"></span>
+          ${SKIN_PICKER_CHECK_ICON}
+        </button>
+      `).join("")}
+      <div class="skin-picker-separator" role="separator"></div>
+      <div class="skin-picker-group" role="group" aria-labelledby="entryCardDensityLabel">
+        <div class="skin-picker-group-label" id="entryCardDensityLabel"></div>
+        ${ENTRY_CARD_DENSITY_OPTIONS.map((option) => `
+          <button class="skin-picker-option density-option" type="button" role="menuitemradio" data-entry-card-density-option="${option.id}" aria-checked="false" tabindex="-1">
+            <span class="skin-picker-option-label"></span>
+            ${SKIN_PICKER_CHECK_ICON}
+          </button>
+        `).join("")}
+      </div>
+    `;
   }
   elements.skinPickerMenu.querySelectorAll("[data-skin-option]").forEach((button) => {
     const option = SKIN_OPTIONS.find((item) => item.id === button.dataset.skinOption);
-    const selected = option?.id === currentSkin;
-    button.querySelector(".skin-picker-option-label").textContent = option ? t(option.labelKey) : "";
+    const selected = option.id === currentSkin;
+    button.querySelector(".skin-picker-option-label").textContent = t(option.labelKey);
     button.setAttribute("aria-checked", String(selected));
     button.tabIndex = selected ? 0 : -1;
+  });
+  elements.skinPickerMenu.querySelector("#entryCardDensityLabel").textContent = t("entryCardDensity");
+  elements.skinPickerMenu.querySelectorAll("[data-entry-card-density-option]").forEach((button) => {
+    const option = ENTRY_CARD_DENSITY_OPTIONS.find((item) => item.id === button.dataset.entryCardDensityOption);
+    button.querySelector(".skin-picker-option-label").textContent = t(option.labelKey);
+    button.setAttribute("aria-checked", String(option.id === currentEntryCardDensity));
+    button.tabIndex = -1;
   });
 }
 
@@ -3527,6 +3602,54 @@ async function selectUiSkin(nextSkin) {
   }
 }
 
+function setSkinPickerBusy(busy) {
+  elements.skinToggleButton.disabled = busy;
+  elements.skinPickerMenu.querySelectorAll("button").forEach((button) => {
+    button.disabled = busy;
+  });
+}
+
+async function selectEntryCardDensity(nextDensity) {
+  const density = normalizeUiEntryCardDensity(nextDensity);
+  if (density === currentEntryCardDensity) {
+    setSkinPickerOpen(false);
+    elements.skinToggleButton.focus();
+    return;
+  }
+  const previousDensity = currentEntryCardDensity;
+  const applyDensity = (value) => {
+    currentEntryCardDensity = value;
+    state.uiEntryCardDensity = value;
+    cacheUiPreferences({ uiEntryCardDensity: value });
+    syncEntryCardDensity();
+    renderSkinPicker();
+  };
+  applyDensity(density);
+  if (!backendAvailable) {
+    setSkinPickerOpen(false);
+    elements.skinToggleButton.focus();
+    return;
+  }
+  setSkinPickerBusy(true);
+  try {
+    const saved = await api("/api/preferences", {
+      method: "PUT",
+      body: JSON.stringify({ uiEntryCardDensity: density }),
+    });
+    applyDensity(normalizeUiEntryCardDensity(saved.uiEntryCardDensity));
+    setSkinPickerOpen(false);
+    elements.skinToggleButton.focus();
+  } catch (error) {
+    applyDensity(previousDensity);
+    showApiErrorToast(error, "entryCardDensitySaveFailed");
+  } finally {
+    setSkinPickerBusy(false);
+    if (skinPickerOpen) {
+      elements.skinPickerMenu.querySelector(`[data-entry-card-density-option="${currentEntryCardDensity}"]`)?.focus();
+    }
+  }
+}
+
 function refreshEditableSurfaceLocale() {
   const entryIsExisting = Boolean(elements.entryId.value);
   elements.entryMode.textContent = entryIsExisting ? t("edit") : t("new");
@@ -3580,6 +3703,7 @@ function applyAppearance() {
   } else {
     delete document.body.dataset.uiSkin;
   }
+  applyEntryCardDensity();
   entryToolbarMenus ||= window.createEntryToolbarMenus(document, {
     closeSort: () => entrySortControl?.close(),
   });
@@ -17556,7 +17680,8 @@ async function refreshState() {
   currentLanguage = serverState.uiLanguage;
   currentTheme = serverState.uiTheme;
   currentSkin = serverState.uiSkin;
-  cacheUiPreferences({ uiTheme: currentTheme, uiSkin: currentSkin });
+  currentEntryCardDensity = serverState.uiEntryCardDensity;
+  cacheUiPreferences({ uiTheme: currentTheme, uiSkin: currentSkin, uiEntryCardDensity: currentEntryCardDensity });
   await applyServerState({
     ...serverState,
     selectedEntryId: state.selectedEntryId,
@@ -18812,11 +18937,16 @@ elements.skinPickerMenu.addEventListener("click", (event) => {
   const option = event.target.closest("[data-skin-option]");
   if (option && !option.disabled) {
     selectUiSkin(option.dataset.skinOption);
+    return;
+  }
+  const densityOption = event.target.closest("[data-entry-card-density-option]");
+  if (densityOption && !densityOption.disabled) {
+    selectEntryCardDensity(densityOption.dataset.entryCardDensityOption);
   }
 });
 
 elements.skinPickerMenu.addEventListener("keydown", (event) => {
-  const options = Array.from(elements.skinPickerMenu.querySelectorAll("[data-skin-option]:not(:disabled)"));
+  const options = Array.from(elements.skinPickerMenu.querySelectorAll(":is([data-skin-option], [data-entry-card-density-option]):not(:disabled)"));
   const currentIndex = options.indexOf(document.activeElement);
   let nextIndex = -1;
   if (event.key === "ArrowDown") {
@@ -19189,22 +19319,12 @@ wideNavMediaQuery.addEventListener("change", () => {
   renderMobileAppBar();
   scheduleEntryBrowserLayoutRefresh();
 });
-// Like the navigation, the density follows both the media query and resize.
-function syncEntryCardEstimate() {
-  const estimate = entryCardEstimatedHeight();
-  if (entryVirtualList.estimatedItemHeight === estimate) {
-    return;
-  }
-  entryVirtualList.estimatedItemHeight = estimate;
-  entryVirtualList.sizes.clear();
-  renderEntryListContent({ allowQueryStart: false });
-  scheduleEntryBrowserLayoutRefresh();
-}
-compactDensityMediaQuery.addEventListener("change", syncEntryCardEstimate);
+// Like the navigation, "auto" follows both the media query and resize.
+compactDensityMediaQuery.addEventListener("change", syncEntryCardDensity);
 window.addEventListener("resize", () => {
   renderShellNav();
   renderMobileAppBar();
-  syncEntryCardEstimate();
+  syncEntryCardDensity();
   scheduleEntryBrowserLayoutRefresh(120);
   scheduleLexicalNetworkLayout();
 });

@@ -70,8 +70,8 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 
 | 方法 | 路径 | 用途 | 响应 | 备注 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/state` | 读取轻量应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme, uiSkin }` | `dictionaries` 只包含 metadata 和 summary；所有词典都通过轻量 SQL 返回 `entryCount` 和严格的 `rootCount`。前端把它当轻量索引，并按需读取当前词典的工作区；未加载词典不会因此建立词根拓扑。`uiSkin` 为 `classic`、`layered-glass` 或 `liquid-glass`。 |
-| `PUT` | `/api/preferences` | 保存全局界面偏好 | `{ uiLanguage, uiTheme, uiSkin }` | 支持独立更新 `uiLanguage`、`uiTheme` 和 `uiSkin`；皮肤与明暗主题正交。未知皮肤值不会写入，并返回 `invalid_ui_skin`。 |
+| `GET` | `/api/state` | 读取轻量应用状态 | `{ activeDictionaryId, dictionaries, uiLanguage, uiTheme, uiSkin, uiEntryCardDensity }` | `dictionaries` 只包含 metadata 和 summary；所有词典都通过轻量 SQL 返回 `entryCount` 和严格的 `rootCount`。前端把它当轻量索引，并按需读取当前词典的工作区；未加载词典不会因此建立词根拓扑。`uiSkin` 为 `classic`、`layered-glass` 或 `liquid-glass`；`uiEntryCardDensity` 为 `auto`、`compact` 或 `comfortable`，`auto` 由前端按紧凑密度的媒体查询决定，缺省为 `auto`。 |
+| `PUT` | `/api/preferences` | 保存全局界面偏好 | `{ uiLanguage, uiTheme, uiSkin, uiEntryCardDensity }` | 支持独立更新 `uiLanguage`、`uiTheme`、`uiSkin` 和 `uiEntryCardDensity`；皮肤与明暗主题正交。未知皮肤值不会写入，并返回 `invalid_ui_skin`；未知词条卡片密度返回 `invalid_ui_entry_card_density`。 |
 
 ### 导入、导出与词典生命周期
 
@@ -237,6 +237,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `invalid_ui_language` | 全局界面语言值无效。 |
 | `invalid_ui_theme` | 全局主题值无效。 |
 | `invalid_ui_skin` | 全局皮肤值无效。 |
+| `invalid_ui_entry_card_density` | 全局词条卡片密度不是 `auto`、`compact` 或 `comfortable`。 |
 | `invalid_import_payload` | 导入内容不是可识别词典。 |
 | `unsupported_import_profile` | 导入 profile 暂不支持。 |
 | `unsupported_export_format` | 导出格式暂不支持。 |

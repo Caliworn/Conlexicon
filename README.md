@@ -28,7 +28,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - **Tags**: a dedicated page keeps one ordered registry of parts of speech, display names, red emphasis, and tag order, saving every change at once. With many tags, a compact view shows several per line for reordering by drag. Each tag's actions are in its right-click menu or the ⋯ button.
 - **Settings**: per-dictionary options for parts of speech, tag separators and display replacements (the entry list and the filter menu can each show raw tags instead), a tag order that every entry save applies (Apply arranges existing entries; after the order changes, saving the settings offers to do so), whether the entry list's tag row repeats part-of-speech tags, whether the list's part-of-speech text (subtitle and before definitions) shows raw tags, search defaults, gloss rendering, how unsaved edits are handled when navigating, auto-save, IPA keyboard symbols, and navigation order.
 - **Fonts**: Layered Glass prioritizes locally installed Segoe UI Variable Text and Segoe UI, with bundled variable Noto Sans as a fallback. The primary UI face's glyph coverage depends on the installed Segoe version. Classic and Liquid Glass use Noto Sans. Headwords, pronunciations, IPA tools, and serif gloss use bundled Charis, while sans-serif gloss uses Noto Sans with browser-synthesized italics. Monospace gloss, corpus and example text editors, Markdown source and code, and shortcut hints prioritize bundled Noto Sans Mono. See the SIL Open Font License in each `OFL.txt` under `assets/fonts/`.
-- **Appearance**: Classic, Layered Glass, and Liquid Glass skins, light and dark themes, and Chinese or English UI; the global skin, theme, and language are remembered in `data/index.json`. Liquid Glass is still being tuned and falls back to plain materials when its optics are unavailable or accessibility modes are on.
+- **Appearance**: Classic, Layered Glass, and Liquid Glass skins, light and dark themes, and Chinese or English UI; the global skin, theme, language, and entry card density are remembered in `data/index.json`. Desktop windows up to 920px tall use a compact density; the skin menu also sets entry cards to follow it (auto), or to stay compact or comfortable. Liquid Glass is still being tuned and falls back to plain materials when its optics are unavailable or accessibility modes are on.
 - **Layout**: a responsive shell with collapsible navigation and entry list, and mobile drawers. The + button in the entry-list toolbar (also beside the list toggle when the list is collapsed, and in the mobile top bar) opens quick entry: an overlay that asks for lemma, pronunciation, tags and definitions one line at a time (its Definition Tags switch adds a tag line before each definition), submits an entry, and starts a fresh draft without leaving the current entry. Its Full Edit button carries the draft into the full editor for sources, examples, notes or morphology. Other pages return to the editor through the navigation.
 
 - **词典**：新建、切换、导入、导出、配置和删除词典；导入与现有词典 ID 相同的词典前会确认是否覆盖。
@@ -49,7 +49,7 @@ See [docs/README.md](docs/README.md) for architecture, API, migration, and featu
 - **数据分析**：按需加载的总览（词汇规模、资料覆盖、词性分布、编辑活动），以及标签与标签集合排行、多词性词条与词性组合、词根家族、正写法、IPA 检查与分布、形态统计；多数统计项可直接打开对应词条。质量检查有独立页面，按优先度和检查模块分组。
 - **标签**：独立的标签管理页，用一张有序的登记表管理词性、显示名、红色强调和所有标签的顺序，每次改动立即保存。标签很多时可切换到压缩视图，一行显示多个标签，专门用来拖动排序；每个标签的操作在右键菜单或 ⋯ 按钮里。词性区永远在普通标签之前；新标签保存词条时自动登记，未使用的标签显示为灰色，在用标签不能删除。词条列表、筛选菜单和悬浮卡片的标签显示选项也在这一页。
 - **设置**：默认搜索方式、Gloss 渲染、导航时未保存编辑的处理方式、新建按钮默认打开的编辑器、自动保存和导航排序。
-- **外观**提供经典、层叠玻璃和液态玻璃三套皮肤，支持浅色与深色主题及中英文界面。明暗切换共用 160ms 柔边转场，太阳与月亮同时旋转淡换。开启减少动态或浏览器缺少转场能力时即时换色。层叠玻璃用云母底、轻投影外壳和更亮的实色卡片分层，最前方的小型浮层、弹窗或词汇网络使用带亮度混合和细噪点的 WinUI 风格亚克力。液态玻璃仍在调校中，光学效果不可用或开启辅助模式时使用普通材质。皮肤、主题和语言保存在 `data/index.json`。
+- **外观**提供经典、层叠玻璃和液态玻璃三套皮肤，支持浅色与深色主题及中英文界面。明暗切换共用 160ms 柔边转场，太阳与月亮同时旋转淡换。开启减少动态或浏览器缺少转场能力时即时换色。层叠玻璃用云母底、轻投影外壳和更亮的实色卡片分层，最前方的小型浮层、弹窗或词汇网络使用带亮度混合和细噪点的 WinUI 风格亚克力。液态玻璃仍在调校中，光学效果不可用或开启辅助模式时使用普通材质。皮肤、主题、语言和词条卡片密度保存在 `data/index.json`。高度不超过 920px 的桌面窗口使用紧凑密度；皮肤菜单里还可以让词条卡片随之切换（自动），或始终紧凑、始终舒适。
 - **布局**：响应式外壳，导航可以收起，移动端的导航和词条列表使用抽屉。词条列表顶部是搜索框和一行列表表头（左边排序，右边筛选、词根模式和新建），三套皮肤相同。词条列表工具栏的“+”（移动端在顶栏）默认打开快速录入，`Shift` + 点击改为在完整编辑器中新建；其他设置里可以交换这两种行为，这是词典级设置。快速录入：浮层中逐行填写词形、发音、标签和释义（底栏的“释义标签”开关可在每条释义前加一行释义标签），提交后留在浮层并开始下一条草稿，不离开当前词条；“完整编辑”把草稿带入完整编辑器，用于补充来源、例句、备注或形态学。其他页面通过导航返回词条编辑。
 
 ## Keyboard Shortcuts / 快捷键
@@ -135,7 +135,7 @@ The Acrylic Lab shows small and large panels on both sides. Choose a recipe inde
 ## Data Storage / 数据存储
 
 ```text
-data/index.json              dictionary index, active dictionary, UI language, theme, and skin
+data/index.json              dictionary index, active dictionary, UI language, theme, skin, and entry card density
 data/dictionaries/*.sqlite   one file per dictionary: content and settings
 ```
 
@@ -147,7 +147,7 @@ The SQLite schema is not versioned or upgraded at startup during development. Wh
 
 Run only one server process per data directory at a time. Index reads and updates are serialized within that process, and writes use atomic file replacement; this does not coordinate multiple server processes.
 
-`data/index.json` 保存词典索引、当前词典及全局界面语言、主题和皮肤；每个词典的内容与设置保存在 `data/dictionaries/*.sqlite`。`data/` 已被 Git 忽略，个人词库不会被提交。
+`data/index.json` 保存词典索引、当前词典及全局界面语言、主题、皮肤和词条卡片密度；每个词典的内容与设置保存在 `data/dictionaries/*.sqlite`。`data/` 已被 Git 忽略，个人词库不会被提交。
 
 2026-10-30 起，自动 IPA 的元音音位必须用空格、逗号或顿号分隔。旧 JSON 导入时会自动转换；已有词典要在 IPA 页重新输入一次元音（例如 `a e i o u`），否则连在一起的元音会算成一项，音节不再切分。
 
