@@ -68,7 +68,9 @@
    inputs; the compact values replace them for every skin. The compact entry
    list, entry detail and page heading rules sit after their base rules (search
    "Compact density"); app.js matches the same media query for the entry
-   card's estimated height. */
+   card's estimated height. Navigation items are not tied to the threshold:
+   their rows share the list's height between the minimum and maximum, and
+   their gap follows the window height (2px at about 600px, full at 920px). */
 body {
   --shell-gutter: 28px;
   --view-header-min-height: 72px;
@@ -76,11 +78,11 @@ body {
   --nav-width: var(--skin-nav-width, 300px);
   --nav-padding: var(--skin-nav-padding, 24px);
   --nav-section-gap: 20px;
-  --nav-item-min-height: 50px;
-  --nav-item-padding-block: var(--skin-nav-item-padding-block, 14px);
+  --nav-item-min-height: 36px;
+  --nav-item-max-height: var(--skin-nav-item-max-height, 54px);
+  --nav-rail-item-max-height: 50px;
   --nav-item-padding-inline: var(--skin-nav-item-padding-inline, 14px);
-  --nav-item-gap: var(--skin-nav-item-gap, 10px);
-  --nav-rail-item-padding: 12px;
+  --nav-item-gap: clamp(2px, calc(2.5vh - 13px), var(--skin-nav-item-gap, 10px));
   --nav-rail-section-gap: 16px;
   --nav-utility-min-height: 44px;
 }
@@ -94,10 +96,6 @@ body {
     --nav-item-padding-inline: 10px;
     --nav-padding: 16px;
     --nav-section-gap: 10px;
-    --nav-item-min-height: 36px;
-    --nav-item-padding-block: 5px;
-    --nav-item-gap: 2px;
-    --nav-rail-item-padding: 5px;
     --nav-rail-section-gap: 10px;
     --nav-utility-min-height: 36px;
   }
@@ -109,9 +107,14 @@ body {
   }
 }
 
-@media (min-width: 800px) and (max-height: 920px) and (pointer: coarse) {
+@media (pointer: coarse) {
   body {
     --nav-item-min-height: 44px;
+  }
+}
+
+@media (min-width: 800px) and (max-height: 920px) and (pointer: coarse) {
+  body {
     --nav-utility-min-height: 44px;
   }
 }
@@ -1862,6 +1865,14 @@ label span {
   gap: var(--nav-item-gap);
 }
 
+/* Rows share the list's height: the list shrinks to the space the navigation
+   leaves it, and the rows shrink with it down to the minimum, then scroll.
+   Items stretch to their row. */
+.tool-list {
+  grid-auto-rows: minmax(var(--nav-item-min-height), var(--nav-item-max-height));
+  align-items: stretch;
+}
+
 .entry-list {
   gap: 12px;
 }
@@ -1978,7 +1989,7 @@ label span {
   justify-content: flex-start;
   gap: 10px;
   min-height: var(--nav-item-min-height);
-  padding: var(--nav-item-padding-block) var(--nav-item-padding-inline);
+  padding: 4px var(--nav-item-padding-inline);
   background: var(--material-navigation-control-background);
   box-shadow: var(--material-navigation-control-shadow);
   color: var(--material-navigation-text);
@@ -6120,13 +6131,14 @@ textarea.ipa-single-line::-webkit-scrollbar {
 .app-nav[data-nav-state="rail"] .tool-list {
   width: 100%;
   padding-right: 0;
+  grid-auto-rows: minmax(var(--nav-item-min-height), var(--nav-rail-item-max-height));
 }
 
 .app-nav[data-nav-state="rail"] .tool-button {
   min-height: var(--nav-item-min-height);
   justify-content: center;
   gap: 0;
-  padding: var(--nav-rail-item-padding) 12px;
+  padding: 4px 12px;
   text-align: center;
 }
 

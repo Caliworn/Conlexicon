@@ -151,8 +151,8 @@
 
 第一轮按第 3 节实装导航与页头后，用户在同日看过结果，提出第 10 节的修订。现行取值以 `styles.css` 开头的密度 token 和 "Compact density" 两段规则为准，这里只记与草案不同的结构性决定：
 
-- 密度 token 声明在 `body` 上，皮肤通过 `--skin-nav-width`、`--skin-nav-padding`、`--skin-nav-item-padding-block`、`--skin-nav-item-padding-inline`、`--skin-nav-item-gap` 提供舒适值，紧凑档直接覆盖密度 token。样式契约检查禁止皮肤直接声明密度 token。液态玻璃的展开宽度 `--liquid-glass-navigation-expanded-width` 改为读取 `--nav-width`。
-- 增加图标栏和底部按钮的 token（`--nav-rail-item-padding`、`--nav-rail-section-gap`、`--nav-utility-min-height`），800–1279px 的图标栏在矮窗口里也收紧。
+- 密度 token 声明在 `body` 上，皮肤通过 `--skin-nav-width`、`--skin-nav-padding`、`--skin-nav-item-max-height`、`--skin-nav-item-padding-inline`、`--skin-nav-item-gap` 提供舒适值，紧凑档直接覆盖密度 token。样式契约检查禁止皮肤直接声明密度 token。液态玻璃的展开宽度 `--liquid-glass-navigation-expanded-width` 改为读取 `--nav-width`。
+- 增加图标栏和底部按钮的 token（`--nav-rail-item-max-height`、`--nav-rail-section-gap`、`--nav-utility-min-height`；第 11 节起导航项高度由行分配），800–1279px 的图标栏在矮窗口里也收紧。
 - 底部三个按钮合成一行后，由 `app.js` 的 `navLabelHidden()` 为标签被隐藏的按钮打开 tooltip。
 - 词条列表的估算卡片高度由 `app.js` 的 `ENTRY_CARD_ESTIMATED_HEIGHT` 按同一条媒体查询取 145 或 100px；跨过阈值时由 `syncEntryCardEstimate()` 更新并重排列表。样式契约检查要求两边的媒体查询一致。
 
@@ -182,3 +182,14 @@
 5. **词条详情缩小**：内边距 28px → 16px 18px，分区间距最多 12px，词头 clamp(2.25rem, 6cqi, 2.75rem) → clamp(1.75rem, 5cqi, 2.125rem)，正文 0.9375rem，释义 1.18rem → 1rem，分区标题 0.875rem，形态表单元格内边距 10px → 6px 8px、字号 0.875rem、最小列宽 112px → 88px。
 
 第 2 节目标 4"正文字号不变"对词条卡片、词条详情和页头不再适用；导航文字和表单控件仍不缩小。卡片和详情的具体数值都是代理选择，待用户看过后调整。
+
+## 11. 导航项自适应（2026-11-18，用户提出）
+
+导航项原本跟着阈值跳档（54px → 36px），窗口刚低于 920px 时按钮变扁、下方空出一大块。改为：
+
+- `.tool-list` 的行为 `minmax(var(--nav-item-min-height), var(--nav-item-max-height))`，按钮拉伸到行高。列表作为导航面板的弹性子项收缩到剩余空间，行随之在 36px 与最大值之间等分，再不够才滚动。最大值舒适档沿用改动前的实际高度：经典与层叠玻璃 54px，液态玻璃 50px（`--skin-nav-item-max-height`），图标栏 50px（`--nav-rail-item-max-height`）。按钮上下内边距固定为 4px，高度由行决定。
+- 项间距 `clamp(2px, calc(2.5vh - 13px), 皮肤值)`：约 600px 高时 2px，920px 时到经典 10px；液态玻璃最多 4px。
+- `@media (pointer: coarse)` 在所有尺寸下把最小行高提到 44px（原先只在紧凑档内）。手机抽屉的列表也会收缩，11 项在 812px 高的手机上以 44px 放下，不再滚动。
+- 页面内边距、导航内边距、面板间距和底部按钮合并仍按阈值切换。
+
+实测（无头 Edge，1280 宽，关闭过渡）：经典 610px 时 41.8px／间距 2.25px，760px 时 52px／6px，920px 和 921px 时都是 54px／10px；液态玻璃 610px 时 37.7px，760px 起 50px；图标栏 1100×650 时 40.1px，1100×1000 时 50px。三套皮肤各高度 11/11 可见。

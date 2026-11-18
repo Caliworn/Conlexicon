@@ -1285,12 +1285,18 @@ assert(
     && styles.includes("@media (min-width: 800px) and (max-height: 920px) {"),
   "app.js must match the compact density's media query for the entry card estimate",
 );
-const compactDensityBlock = styles.match(/@media \(min-width: 800px\) and \(max-height: 920px\) and \(pointer: coarse\) \{\s*body \{([^}]*)\}/);
-assert(compactDensityBlock, "The compact density must restore touch targets for coarse pointers");
-for (const token of ["--nav-item-min-height", "--nav-utility-min-height"]) {
+// Navigation rows shrink with the window down to --nav-item-min-height, so a
+// coarse pointer must raise that floor at every size; the utility row is only
+// compacted below the threshold.
+const coarseBlocks = [
+  [/@media \(pointer: coarse\) \{\s*body \{([^}]*)\}/, "--nav-item-min-height"],
+  [/@media \(min-width: 800px\) and \(max-height: 920px\) and \(pointer: coarse\) \{\s*body \{([^}]*)\}/, "--nav-utility-min-height"],
+];
+for (const [pattern, token] of coarseBlocks) {
+  const block = styles.match(pattern);
   assert(
-    new RegExp(`${token}:\\s*44px;`).test(compactDensityBlock[1]),
-    `Compact density must keep ${token} at 44px for coarse pointers`,
+    block && new RegExp(`${token}:\\s*44px;`).test(block[1]),
+    `Coarse pointers must keep ${token} at 44px`,
   );
 }
 

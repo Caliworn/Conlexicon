@@ -17,7 +17,7 @@ body[data-ui-skin="liquid-glass"] {
   --liquid-glass-mobile-navigation-radius: 22px;
   --skin-nav-width: 288px;
   --skin-nav-padding: 18px;
-  --skin-nav-item-padding-block: 11px;
+  --skin-nav-item-max-height: 50px;
   --skin-nav-item-gap: 4px;
   --skin-nav-item-padding-inline: 12px;
 
@@ -363,7 +363,7 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel {
 
 body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button {
   min-height: var(--nav-item-min-height);
-  padding: var(--nav-item-padding-block) var(--nav-item-padding-inline);
+  padding: 4px var(--nav-item-padding-inline);
   border-color: transparent;
   border-radius: 10px;
   background: transparent;
