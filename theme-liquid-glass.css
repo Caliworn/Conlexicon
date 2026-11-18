@@ -9,12 +9,17 @@ body[data-ui-skin="liquid-glass"] {
   --radius-pill: 999px;
 
   --liquid-glass-navigation-inset: 16px;
-  --liquid-glass-navigation-expanded-width: 288px;
+  --liquid-glass-navigation-expanded-width: var(--nav-width);
   --liquid-glass-navigation-rail-width: 72px;
   --liquid-glass-navigation-radius: 24px;
   --liquid-glass-navigation-rail-radius: 22px;
   --liquid-glass-mobile-navigation-inset: 10px;
   --liquid-glass-mobile-navigation-radius: 22px;
+  --skin-nav-width: 288px;
+  --skin-nav-padding: 18px;
+  --skin-nav-item-padding-block: 11px;
+  --skin-nav-item-gap: 4px;
+  --skin-nav-item-padding-inline: 12px;
 
   --ui-canvas-bg: #eaf0f2;
   --ui-text: #122026;
@@ -320,7 +325,7 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
     z-index: 20;
     width: var(--liquid-glass-navigation-width);
     height: auto;
-    padding: 18px;
+    padding: var(--nav-padding);
     border: 1px solid var(--material-navigation-action-border);
     border-radius: var(--liquid-glass-navigation-radius);
     overflow: hidden;
@@ -346,7 +351,7 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
 
   body[data-ui-skin="liquid-glass"] .workspace {
     grid-column: 1;
-    padding-left: calc(var(--liquid-glass-navigation-width) + var(--liquid-glass-navigation-inset) + 28px);
+    padding-left: calc(var(--liquid-glass-navigation-width) + var(--liquid-glass-navigation-inset) + var(--shell-gutter));
     transition: padding-left 180ms cubic-bezier(0.22, 0.75, 0.25, 1);
   }
 }
@@ -356,13 +361,9 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel {
   box-shadow: var(--material-navigation-shadow);
 }
 
-body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-list {
-  gap: 4px;
-}
-
 body[data-ui-skin="liquid-glass"] .dictionary-panel .tool-button {
-  min-height: 50px;
-  padding: 11px 12px;
+  min-height: var(--nav-item-min-height);
+  padding: var(--nav-item-padding-block) var(--nav-item-padding-inline);
   border-color: transparent;
   border-radius: 10px;
   background: transparent;
@@ -432,7 +433,7 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel .utility-actions {
 }
 
 body[data-ui-skin="liquid-glass"] .dictionary-panel .utility-actions .utility-button {
-  min-height: 44px;
+  min-height: var(--nav-utility-min-height);
   --control-border: transparent;
   --control-hover-border: transparent;
   --control-selected-border: transparent;

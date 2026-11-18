@@ -39,6 +39,8 @@ const shellState = {
 let activeAppTooltipTarget = null;
 const desktopNavMediaQuery = window.matchMedia("(min-width: 800px)");
 const wideNavMediaQuery = window.matchMedia("(min-width: 1280px)");
+// Same media query as the compact density in styles.css.
+const compactDensityMediaQuery = window.matchMedia("(min-width: 800px) and (max-height: 920px)");
 const glassReducedTransparencyMediaQuery = window.matchMedia("(prefers-reduced-transparency: reduce)");
 const glassForcedColorsMediaQuery = window.matchMedia("(forced-colors: active)");
 const SKIN_OPTIONS = [
@@ -279,7 +281,16 @@ let entryBrowserHeightFrame = 0;
 let entryBrowserLayoutRefreshFrame = 0;
 let entryBrowserLayoutRefreshUntil = 0;
 let activeEntryContextMenu = null;
-const entryVirtualList = createVirtualListState(145);
+// Estimated entry card heights per density; measured cards replace them.
+// The compact card is about 91px with a one-line definition (styles.css
+// "Compact density"); both keep the comfortable estimate's ~10% margin.
+const ENTRY_CARD_ESTIMATED_HEIGHT = { comfortable: 145, compact: 100 };
+function entryCardEstimatedHeight() {
+  return compactDensityMediaQuery.matches
+    ? ENTRY_CARD_ESTIMATED_HEIGHT.compact
+    : ENTRY_CARD_ESTIMATED_HEIGHT.comfortable;
+}
+const entryVirtualList = createVirtualListState(entryCardEstimatedHeight());
 // The entry list's navigator replaces its native scrollbar. Root mode has the
 // thumb alone for now, positioned by estimated row heights.
 let entryListNavigator = null;
@@ -3807,7 +3818,14 @@ function appTooltipEnabledFor(target) {
     return appTooltipTargetOverflows(target);
   }
   return elements.appNav.contains(target)
-    && (shellState.navCollapsed || target.classList.contains("icon-button"));
+    && (shellState.navCollapsed || target.classList.contains("icon-button") || navLabelHidden(target));
+}
+
+// The compact density hides the utility buttons' labels while the navigation
+// stays expanded (styles.css), so their names move to the tooltip.
+function navLabelHidden(target) {
+  const label = target.querySelector(".utility-label");
+  return Boolean(label) && label.getClientRects().length === 0;
 }
 
 function appTooltipTargetOverflows(target) {
@@ -19171,9 +19189,22 @@ wideNavMediaQuery.addEventListener("change", () => {
   renderMobileAppBar();
   scheduleEntryBrowserLayoutRefresh();
 });
+// Like the navigation, the density follows both the media query and resize.
+function syncEntryCardEstimate() {
+  const estimate = entryCardEstimatedHeight();
+  if (entryVirtualList.estimatedItemHeight === estimate) {
+    return;
+  }
+  entryVirtualList.estimatedItemHeight = estimate;
+  entryVirtualList.sizes.clear();
+  renderEntryListContent({ allowQueryStart: false });
+  scheduleEntryBrowserLayoutRefresh();
+}
+compactDensityMediaQuery.addEventListener("change", syncEntryCardEstimate);
 window.addEventListener("resize", () => {
   renderShellNav();
   renderMobileAppBar();
+  syncEntryCardEstimate();
   scheduleEntryBrowserLayoutRefresh(120);
   scheduleLexicalNetworkLayout();
 });

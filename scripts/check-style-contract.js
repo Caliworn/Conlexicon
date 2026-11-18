@@ -1271,4 +1271,27 @@ for (const match of styles.matchAll(/box-shadow\s*:\s*([^;]+);/gi)) {
   );
 }
 
+// Density tokens (docs/LAPTOP_DENSITY_PLAN.md): the compact values in
+// styles.css replace the comfortable ones for every skin. A skin that declares
+// a density token itself shadows the compact value, so skins feed their
+// comfortable values through --skin-* inputs only.
+const densityTokenPattern = /(--(?:shell-gutter|view-header-[a-z-]+|nav-[a-z-]+))\s*:/g;
+for (const [name, source] of [["classic", classic], ["layered glass", layeredGlass], ["liquid glass", liquidGlass]]) {
+  const declared = [...source.matchAll(densityTokenPattern)].map((match) => match[1]);
+  assert.deepEqual(declared, [], `The ${name} skin must feed density through --skin-* inputs, not declare ${declared.join(", ")}`);
+}
+assert(
+  app.includes('window.matchMedia("(min-width: 800px) and (max-height: 920px)")')
+    && styles.includes("@media (min-width: 800px) and (max-height: 920px) {"),
+  "app.js must match the compact density's media query for the entry card estimate",
+);
+const compactDensityBlock = styles.match(/@media \(min-width: 800px\) and \(max-height: 920px\) and \(pointer: coarse\) \{\s*body \{([^}]*)\}/);
+assert(compactDensityBlock, "The compact density must restore touch targets for coarse pointers");
+for (const token of ["--nav-item-min-height", "--nav-utility-min-height"]) {
+  assert(
+    new RegExp(`${token}:\\s*44px;`).test(compactDensityBlock[1]),
+    `Compact density must keep ${token} at 44px for coarse pointers`,
+  );
+}
+
 console.log("Style skin contract checks passed.");
