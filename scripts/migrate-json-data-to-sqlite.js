@@ -6,7 +6,7 @@ const {
   DEFAULT_INDEX,
   assertUniqueDictionaryEntityIds,
   normalizeDictionary,
-  normalizeUiEntryCardDensity,
+  normalizeUiDensity,
   normalizeUiLanguage,
   normalizeUiSkin,
   normalizeUiTheme,
@@ -122,7 +122,7 @@ async function readLegacyDataIndex(sourceDataDir) {
     uiLanguage: normalizeUiLanguage(source.uiLanguage),
     uiTheme: normalizeUiTheme(source.uiTheme),
     uiSkin: normalizeUiSkin(source.uiSkin),
-    uiEntryCardDensity: normalizeUiEntryCardDensity(source.uiEntryCardDensity),
+    uiDensity: normalizeUiDensity(source.uiDensity),
   };
 }
 
@@ -209,7 +209,7 @@ async function migrateJsonDataDirectoryToSqlite({
       uiLanguage: targetRepository.normalizeUiLanguage(sourceIndex.uiLanguage),
       uiTheme: targetRepository.normalizeUiTheme(sourceIndex.uiTheme),
       uiSkin: targetRepository.normalizeUiSkin(sourceIndex.uiSkin),
-      uiEntryCardDensity: sourceIndex.uiEntryCardDensity,
+      uiDensity: sourceIndex.uiDensity,
     }));
     report.targetActiveDictionaryId = activeDictionaryId;
     report.finishedAt = new Date().toISOString();

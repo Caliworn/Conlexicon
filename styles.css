@@ -62,13 +62,14 @@
   font-family: var(--font-ui);
 }
 
-/* Density (docs/LAPTOP_DENSITY_PLAN.md): desktop windows up to 920px tall,
-   typically laptops scaled to 125–150%, get the compact values. Declared on
-   body so skins can feed their own comfortable values through the --skin-*
-   inputs; the compact values replace them for every skin. The compact entry
-   list, entry detail and page heading rules sit after their base rules (search
-   "Compact density"); app.js matches the same media query for the entry
-   card's estimated height. Navigation items are not tied to the threshold:
+/* Density (docs/LAPTOP_DENSITY_PLAN.md): app.js (applyDensity) sets
+   body[data-density] to "compact" or "comfortable" from the viewer's
+   preference; "auto" picks compact for desktop windows up to 920px tall,
+   typically laptops scaled to 125–150%. Tokens are declared on body so skins
+   can feed their own comfortable values through the --skin-* inputs; the
+   compact values replace them for every skin. The compact navigation, entry
+   card, page heading and entry detail rules sit after their base rules
+   (search "Compact density"). Navigation items do not follow the density:
    their rows share the list's height between the minimum and maximum, and
    their gap follows the window height (2px at about 600px, full at 920px). */
 body {
@@ -87,34 +88,30 @@ body {
   --nav-utility-min-height: 44px;
 }
 
-@media (min-width: 800px) and (max-height: 920px) {
-  body {
-    --shell-gutter: 18px;
-    --view-header-min-height: 0px;
-    --view-header-gap: 12px;
-    --nav-width: 220px;
-    --nav-item-padding-inline: 10px;
-    --nav-padding: 16px;
-    --nav-section-gap: 10px;
-    --nav-rail-section-gap: 10px;
-    --nav-utility-min-height: 36px;
-  }
+body[data-density="compact"] {
+  --shell-gutter: 18px;
+  --view-header-min-height: 0px;
+  --view-header-gap: 12px;
+  --nav-width: 220px;
+  --nav-item-padding-inline: 10px;
+  --nav-padding: 16px;
+  --nav-section-gap: 10px;
+  --nav-rail-section-gap: 10px;
+  --nav-utility-min-height: 36px;
+}
 
-  /* English labels are wider: "Morphology Functions" needs about 237px of
-     button in the bundled Noto Sans, and the English brand about 232px. */
-  body.english-locale {
-    --nav-width: 272px;
-  }
+/* English labels are wider: "Morphology Functions" needs about 237px of
+   button in the bundled Noto Sans, and the English brand about 232px. */
+body[data-density="compact"].english-locale {
+  --nav-width: 272px;
 }
 
 @media (pointer: coarse) {
   body {
     --nav-item-min-height: 44px;
   }
-}
 
-@media (min-width: 800px) and (max-height: 920px) and (pointer: coarse) {
-  body {
+  body[data-density="compact"] {
     --nav-utility-min-height: 44px;
   }
 }
@@ -6012,7 +6009,7 @@ textarea.ipa-single-line::-webkit-scrollbar {
   position: fixed;
   z-index: var(--layer-floating-menu);
   display: grid;
-  width: min(256px, calc(100vw - 24px));
+  width: min(284px, calc(100vw - 24px));
   max-height: min(440px, calc(100dvh - 24px));
   gap: 4px;
   overflow: auto;
@@ -6078,9 +6075,11 @@ textarea.ipa-single-line::-webkit-scrollbar {
   gap: 4px;
 }
 
+/* Density labels line up with the skin labels after their previews. */
 .skin-picker-option.density-option {
   min-height: 36px;
   grid-template-columns: minmax(0, 1fr) 20px;
+  padding-inline-start: 52px;
 }
 
 @media (pointer: coarse) {
@@ -6189,44 +6188,41 @@ textarea.ipa-single-line::-webkit-scrollbar {
   padding: 0;
 }
 
-/* Compact density: skin, theme and language share one row of icon buttons;
-   their names move to the tooltip (app.js appTooltipEnabledFor). */
-@media (min-width: 800px) and (max-height: 920px) {
-  .app-nav[data-nav-state="expanded"] .utility-actions {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .app-nav[data-nav-state="expanded"] .skin-toggle-button {
-    grid-column: auto;
-  }
-
-  .app-nav[data-nav-state="expanded"] .utility-label {
-    display: none;
-  }
+/* Compact density: appearance, theme and language share one row of icon
+   buttons; their names move to the tooltip (app.js appTooltipEnabledFor). */
+body[data-density="compact"] .app-nav[data-nav-state="expanded"] .utility-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-/* Compact entry cards put the pronunciation beside the headword. app.js
-   (applyEntryCardDensity) sets the attribute from the viewer's preference,
-   following the compact density's media query when it is "auto". Change the
-   card's height together with ENTRY_CARD_ESTIMATED_HEIGHT in app.js. */
-body[data-entry-card-density="compact"] .entry-card {
+body[data-density="compact"] .app-nav[data-nav-state="expanded"] .skin-toggle-button {
+  grid-column: auto;
+}
+
+body[data-density="compact"] .app-nav[data-nav-state="expanded"] .utility-label {
+  display: none;
+}
+
+/* Compact density: entry cards put the pronunciation beside the headword.
+   Change the card's height together with ENTRY_CARD_ESTIMATED_HEIGHT in
+   app.js. */
+body[data-density="compact"] .entry-card {
   min-height: 0;
   padding: 8px 10px;
   row-gap: 3px;
 }
 
-body[data-entry-card-density="compact"] .entry-card-header {
+body[data-density="compact"] .entry-card-header {
   display: flex;
   align-items: baseline;
   gap: 8px;
   min-width: 0;
 }
 
-body[data-entry-card-density="compact"] .entry-card-header strong {
+body[data-density="compact"] .entry-card-header strong {
   flex: 0 1 auto;
 }
 
-body[data-entry-card-density="compact"] .entry-card-header small {
+body[data-density="compact"] .entry-card-header small {
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -6234,75 +6230,73 @@ body[data-entry-card-density="compact"] .entry-card-header small {
   white-space: nowrap;
 }
 
-body[data-entry-card-density="compact"] .entry-card p {
+body[data-density="compact"] .entry-card p {
   margin-bottom: 0;
   font-size: 0.875rem;
   line-height: 1.4;
 }
 
-body[data-entry-card-density="compact"] .entry-card.compact-entry-card .entry-card-footer {
+body[data-density="compact"] .entry-card.compact-entry-card .entry-card-footer {
   margin-top: 4px;
 }
 
 /* Compact density: the page heading and entry detail. The heading's counts
    sit after the title on its line. */
-@media (min-width: 800px) and (max-height: 920px) {
-  .dictionary-heading {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: baseline;
-    column-gap: 12px;
-    row-gap: 2px;
-  }
+body[data-density="compact"] .dictionary-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 12px;
+  row-gap: 2px;
+}
 
-  .dictionary-heading > .eyebrow {
-    order: 1;
-  }
+body[data-density="compact"] .dictionary-heading > .eyebrow {
+  order: 1;
+}
 
-  .top-bar h2 {
-    margin-top: 0;
-    font-size: 1.375rem;
-  }
+body[data-density="compact"] .top-bar h2 {
+  margin-top: 0;
+  font-size: 1.375rem;
+}
 
-  .entry-display {
-    gap: min(var(--material-entry-detail-section-gap), 12px);
-    padding: 16px 18px;
-    font-size: 0.9375rem;
-  }
+body[data-density="compact"] .entry-display {
+  gap: min(var(--material-entry-detail-section-gap), 12px);
+  padding: 16px 18px;
+  font-size: 0.9375rem;
+}
 
-  .entry-display .section-heading {
-    font-size: 0.875rem;
-  }
+body[data-density="compact"] .entry-display .section-heading {
+  font-size: 0.875rem;
+}
 
-  .entry-display .definition-meaning {
-    font-size: 1rem;
-  }
+body[data-density="compact"] .entry-display .definition-meaning {
+  font-size: 1rem;
+}
 
-  .entry-display .morphology-table :is(th, td) {
-    padding: 6px 8px;
-    font-size: 0.875rem;
-  }
+body[data-density="compact"] .entry-display .morphology-table :is(th, td) {
+  padding: 6px 8px;
+  font-size: 0.875rem;
+}
 
-  .entry-display .morphology-table th:not(:first-child),
-  .entry-display .morphology-table td {
-    min-width: 88px;
-  }
+body[data-density="compact"] .entry-display .morphology-table th:not(:first-child),
+body[data-density="compact"] .entry-display .morphology-table td {
+  min-width: 88px;
+}
 
-  .entry-display-header {
-    padding-bottom: 12px;
-  }
+body[data-density="compact"] .entry-display-header {
+  padding-bottom: 12px;
+}
 
-  .entry-display-header .chip-row {
-    margin-top: 8px;
-  }
+body[data-density="compact"] .entry-display-header .chip-row {
+  margin-top: 8px;
+}
 
-  .entry-title-row {
-    --entry-headword-size: clamp(1.75rem, 5cqi, 2.125rem);
-  }
+body[data-density="compact"] .entry-title-row {
+  --entry-headword-size: clamp(1.75rem, 5cqi, 2.125rem);
+}
 
-  .display-section {
-    gap: 10px;
-  }
+body[data-density="compact"] .display-section {
+  gap: 10px;
 }
 
 .toggle-row {

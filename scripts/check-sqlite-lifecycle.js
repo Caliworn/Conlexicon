@@ -18,7 +18,7 @@ async function runSqliteLifecycleCheck() {
       uiLanguage: "zh",
       uiTheme: "light",
       uiSkin: "classic",
-      uiEntryCardDensity: "auto",
+      uiDensity: "auto",
     });
 
     const first = await repository.createDictionary(normalizeDictionary({
@@ -94,7 +94,7 @@ async function runSqliteLifecycleCheck() {
       uiLanguage: "en",
       uiTheme: "dark",
       uiSkin: "layered-glass",
-      uiEntryCardDensity: "auto",
+      uiDensity: "auto",
     });
     state = await repository.readState();
     assert.equal(state.uiLanguage, "en");

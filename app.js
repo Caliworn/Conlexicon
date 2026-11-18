@@ -6,7 +6,7 @@ let state = {
   uiLanguage: "zh",
   uiTheme: "light",
   uiSkin: "classic",
-  uiEntryCardDensity: "auto",
+  uiDensity: "auto",
   dictionaries: [],
 };
 
@@ -28,7 +28,7 @@ let editorMode = "display";
 let currentTheme = "light";
 let themeChangePending = false;
 let currentSkin = "classic";
-let currentEntryCardDensity = "auto";
+let currentDensity = "auto";
 let currentLanguage = "zh";
 let loadedDictionaryIds = new Set();
 const UI_PREFERENCES_STORAGE_KEY = "conlexicon:ui-preferences";
@@ -41,7 +41,7 @@ const shellState = {
 let activeAppTooltipTarget = null;
 const desktopNavMediaQuery = window.matchMedia("(min-width: 800px)");
 const wideNavMediaQuery = window.matchMedia("(min-width: 1280px)");
-// Same media query as the compact density in styles.css.
+// The "auto" density is compact in desktop windows up to 920px tall.
 const compactDensityMediaQuery = window.matchMedia("(min-width: 800px) and (max-height: 920px)");
 const glassReducedTransparencyMediaQuery = window.matchMedia("(prefers-reduced-transparency: reduce)");
 const glassForcedColorsMediaQuery = window.matchMedia("(forced-colors: active)");
@@ -50,10 +50,10 @@ const SKIN_OPTIONS = [
   { id: "layered-glass", labelKey: "layeredGlassSkin" },
   { id: "liquid-glass", labelKey: "liquidGlassSkin" },
 ];
-const ENTRY_CARD_DENSITY_OPTIONS = [
-  { id: "auto", labelKey: "entryCardDensityAuto" },
-  { id: "compact", labelKey: "entryCardDensityCompact" },
-  { id: "comfortable", labelKey: "entryCardDensityComfortable" },
+const DENSITY_OPTIONS = [
+  { id: "auto", labelKey: "densityAuto" },
+  { id: "compact", labelKey: "densityCompact" },
+  { id: "comfortable", labelKey: "densityComfortable" },
 ];
 const entryQueryModel = window.ConlexiconEntryQuery;
 const ipaModel = window.ConlexiconIpa;
@@ -85,7 +85,7 @@ const {
   normalizeGlossStyles,
   normalizeNewEntryButtonAction,
   normalizeToolNavOrder,
-  normalizeUiEntryCardDensity,
+  normalizeUiDensity,
   normalizeUiLanguage,
   normalizeUiSkin,
   normalizeUiTheme,
@@ -293,20 +293,20 @@ let activeEntryContextMenu = null;
 // The compact card is about 91px with a one-line definition (styles.css
 // "Compact density"); both keep the comfortable estimate's ~10% margin.
 const ENTRY_CARD_ESTIMATED_HEIGHT = { comfortable: 145, compact: 100 };
-// The viewer's preference; "auto" follows the compact density's media query.
-function resolvedEntryCardDensity() {
-  if (currentEntryCardDensity === "auto") {
+// The viewer's density preference resolved to the body attribute's value.
+function resolvedUiDensity() {
+  if (currentDensity === "auto") {
     return compactDensityMediaQuery.matches ? "compact" : "comfortable";
   }
-  return currentEntryCardDensity;
+  return currentDensity;
 }
 function entryCardEstimatedHeight() {
-  return ENTRY_CARD_ESTIMATED_HEIGHT[resolvedEntryCardDensity()];
+  return ENTRY_CARD_ESTIMATED_HEIGHT[resolvedUiDensity()];
 }
-// Sets the card density attribute (styles.css) and the matching estimate;
+// Sets body[data-density] (styles.css) and the matching card estimate;
 // measured sizes were taken at the old density, so they are dropped.
-function applyEntryCardDensity() {
-  document.body.dataset.entryCardDensity = resolvedEntryCardDensity();
+function applyUiDensity() {
+  document.body.dataset.density = resolvedUiDensity();
   const estimate = entryCardEstimatedHeight();
   if (entryVirtualList.estimatedItemHeight === estimate) {
     return false;
@@ -315,8 +315,8 @@ function applyEntryCardDensity() {
   entryVirtualList.sizes.clear();
   return true;
 }
-function syncEntryCardDensity() {
-  if (!applyEntryCardDensity()) {
+function syncUiDensity() {
+  if (!applyUiDensity()) {
     return;
   }
   renderEntryListContent({ allowQueryStart: false });
@@ -462,7 +462,7 @@ const i18n = {
     classicSkin: "经典皮肤",
     layeredGlassSkin: "层叠玻璃",
     liquidGlassSkin: "液态玻璃",
-    selectSkinCurrent: "选择皮肤，当前：{skin}",
+    appearanceCurrent: "外观，当前：{skin}，界面密度：{density}",
     quickNewEntryTooltip: "快速录入",
     quickEntryTitle: "快速录入",
     quickEntryKeyNext: "下一项",
@@ -829,11 +829,13 @@ const i18n = {
     languageSaveFailed: "界面语言保存失败",
     themeSaveFailed: "界面主题保存失败",
     skinSaveFailed: "界面皮肤保存失败",
-    entryCardDensity: "词条卡片",
-    entryCardDensityAuto: "自动（随窗口高度）",
-    entryCardDensityCompact: "紧凑",
-    entryCardDensityComfortable: "舒适",
-    entryCardDensitySaveFailed: "词条卡片密度保存失败",
+    densityGroup: "界面密度",
+    skinGroup: "皮肤",
+    appearance: "外观",
+    densityAuto: "自动（随窗口高度）",
+    densityCompact: "紧凑",
+    densityComfortable: "舒适",
+    densitySaveFailed: "界面密度保存失败",
     apiErrorRequestBodyTooLarge: "保存内容过大",
     apiErrorInvalidJsonBody: "请求内容不是有效 JSON",
     apiErrorInvalidUiLanguage: "界面语言值无效",
@@ -1105,7 +1107,7 @@ const i18n = {
     classicSkin: "Classic Skin",
     layeredGlassSkin: "Layered Glass",
     liquidGlassSkin: "Liquid Glass",
-    selectSkinCurrent: "Choose skin, current: {skin}",
+    appearanceCurrent: "Appearance, current: {skin}, density: {density}",
     quickNewEntryTooltip: "Quick Entry",
     quickEntryTitle: "Quick Entry",
     quickEntryKeyNext: "Next",
@@ -1474,11 +1476,13 @@ const i18n = {
     languageSaveFailed: "Failed to save the interface language",
     themeSaveFailed: "Failed to save the interface theme",
     skinSaveFailed: "Failed to save the interface skin",
-    entryCardDensity: "Entry cards",
-    entryCardDensityAuto: "Auto (window height)",
-    entryCardDensityCompact: "Compact",
-    entryCardDensityComfortable: "Comfortable",
-    entryCardDensitySaveFailed: "Failed to save the entry card density",
+    densityGroup: "Density",
+    skinGroup: "Skin",
+    appearance: "Appearance",
+    densityAuto: "Auto (window height)",
+    densityCompact: "Compact",
+    densityComfortable: "Comfortable",
+    densitySaveFailed: "Failed to save the density",
     apiErrorRequestBodyTooLarge: "Saved content is too large",
     apiErrorInvalidJsonBody: "Request body is not valid JSON",
     apiErrorInvalidUiLanguage: "Invalid interface language value",
@@ -2064,8 +2068,8 @@ function readCachedUiPreferences() {
       ...(SKIN_OPTIONS.some((option) => option.id === preferences.uiSkin)
         ? { uiSkin: preferences.uiSkin }
         : {}),
-      ...(ENTRY_CARD_DENSITY_OPTIONS.some((option) => option.id === preferences.uiEntryCardDensity)
-        ? { uiEntryCardDensity: preferences.uiEntryCardDensity }
+      ...(DENSITY_OPTIONS.some((option) => option.id === preferences.uiDensity)
+        ? { uiDensity: preferences.uiDensity }
         : {}),
     };
   } catch (error) {
@@ -2078,8 +2082,8 @@ function cacheUiPreferences(preferences = {}) {
   const next = {
     uiTheme: normalizeUiTheme(preferences.uiTheme ?? cached.uiTheme ?? currentTheme),
     uiSkin: normalizeUiSkin(preferences.uiSkin ?? cached.uiSkin ?? currentSkin),
-    uiEntryCardDensity: normalizeUiEntryCardDensity(
-      preferences.uiEntryCardDensity ?? cached.uiEntryCardDensity ?? currentEntryCardDensity,
+    uiDensity: normalizeUiDensity(
+      preferences.uiDensity ?? cached.uiDensity ?? currentDensity,
     ),
   };
   try {
@@ -2093,10 +2097,10 @@ function hydrateInitialUiPreferences() {
   const cached = readCachedUiPreferences();
   currentTheme = normalizeUiTheme(cached.uiTheme ?? currentTheme);
   currentSkin = normalizeUiSkin(cached.uiSkin ?? currentSkin);
-  currentEntryCardDensity = normalizeUiEntryCardDensity(cached.uiEntryCardDensity ?? currentEntryCardDensity);
+  currentDensity = normalizeUiDensity(cached.uiDensity ?? currentDensity);
   state.uiTheme = currentTheme;
   state.uiSkin = currentSkin;
-  state.uiEntryCardDensity = currentEntryCardDensity;
+  state.uiDensity = currentDensity;
   applyAppearance();
 }
 
@@ -2496,8 +2500,8 @@ async function loadState() {
     currentLanguage = serverState.uiLanguage;
     currentTheme = serverState.uiTheme;
     currentSkin = serverState.uiSkin;
-    currentEntryCardDensity = serverState.uiEntryCardDensity;
-    cacheUiPreferences({ uiTheme: currentTheme, uiSkin: currentSkin, uiEntryCardDensity: currentEntryCardDensity });
+    currentDensity = serverState.uiDensity;
+    cacheUiPreferences({ uiTheme: currentTheme, uiSkin: currentSkin, uiDensity: currentDensity });
     await applyServerState({
       ...serverState,
       selectedEntryId: state.selectedEntryId,
@@ -2589,7 +2593,7 @@ function normalizeState(source) {
     uiLanguage: source.uiLanguage,
     uiTheme: source.uiTheme,
     uiSkin: source.uiSkin,
-    uiEntryCardDensity: source.uiEntryCardDensity,
+    uiDensity: source.uiDensity,
     dictionaries: source.dictionaries.map(normalizeDictionaryMetadata),
   };
 }
@@ -3455,10 +3459,7 @@ function applyLocale(root = document) {
   elements.themeToggleButton.removeAttribute("title");
   elements.themeToggleButton.setAttribute("aria-label", themeToggleLabel);
   renderSkinPicker();
-  const currentSkinLabel = skinOptionLabel(currentSkin);
-  elements.skinToggleLabel.textContent = currentSkinLabel;
-  elements.skinToggleButton.removeAttribute("title");
-  elements.skinToggleButton.setAttribute("aria-label", formatText("selectSkinCurrent", { skin: currentSkinLabel }));
+  renderAppearanceButton();
   const nextLanguageLabel = currentLanguage === "zh" ? "English" : "中文";
   elements.languageToggleButton.removeAttribute("title");
   elements.languageToggleButton.setAttribute("aria-label", nextLanguageLabel);
@@ -3468,6 +3469,18 @@ function applyLocale(root = document) {
   entrySortControl?.sync();
 }
 
+// The appearance button keeps a fixed label; the current skin and density are
+// in its accessible name, which is also its tooltip when the label is hidden.
+function renderAppearanceButton() {
+  const density = DENSITY_OPTIONS.find((option) => option.id === currentDensity);
+  elements.skinToggleLabel.textContent = t("appearance");
+  elements.skinToggleButton.removeAttribute("title");
+  elements.skinToggleButton.setAttribute("aria-label", formatText("appearanceCurrent", {
+    skin: skinOptionLabel(currentSkin),
+    density: t(density.labelKey),
+  }));
+}
+
 function skinOptionLabel(skinId) {
   const option = SKIN_OPTIONS.find((item) => item.id === skinId) || SKIN_OPTIONS[0];
   return t(option.labelKey);
@@ -3475,11 +3488,13 @@ function skinOptionLabel(skinId) {
 
 const SKIN_PICKER_CHECK_ICON = '<svg class="skin-picker-check" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"></path></svg>';
 
-// The appearance menu: skins, then the entry card density. Arrow keys move
+// The appearance menu: skins, then the density. Arrow keys move
 // through both groups; only the selected skin is in the Tab order.
 function renderSkinPicker() {
   if (!elements.skinPickerMenu.firstElementChild) {
     elements.skinPickerMenu.innerHTML = `
+      <div class="skin-picker-group" role="group" aria-labelledby="skinGroupLabel">
+        <div class="skin-picker-group-label" id="skinGroupLabel"></div>
       ${SKIN_OPTIONS.map((option) => `
         <button class="skin-picker-option" type="button" role="menuitemradio" data-skin-option="${option.id}" aria-checked="false" tabindex="-1">
           <span class="skin-picker-preview skin-picker-preview-${option.id}" aria-hidden="true"></span>
@@ -3487,11 +3502,12 @@ function renderSkinPicker() {
           ${SKIN_PICKER_CHECK_ICON}
         </button>
       `).join("")}
+      </div>
       <div class="skin-picker-separator" role="separator"></div>
-      <div class="skin-picker-group" role="group" aria-labelledby="entryCardDensityLabel">
-        <div class="skin-picker-group-label" id="entryCardDensityLabel"></div>
-        ${ENTRY_CARD_DENSITY_OPTIONS.map((option) => `
-          <button class="skin-picker-option density-option" type="button" role="menuitemradio" data-entry-card-density-option="${option.id}" aria-checked="false" tabindex="-1">
+      <div class="skin-picker-group" role="group" aria-labelledby="densityGroupLabel">
+        <div class="skin-picker-group-label" id="densityGroupLabel"></div>
+        ${DENSITY_OPTIONS.map((option) => `
+          <button class="skin-picker-option density-option" type="button" role="menuitemradio" data-density-option="${option.id}" aria-checked="false" tabindex="-1">
             <span class="skin-picker-option-label"></span>
             ${SKIN_PICKER_CHECK_ICON}
           </button>
@@ -3506,11 +3522,12 @@ function renderSkinPicker() {
     button.setAttribute("aria-checked", String(selected));
     button.tabIndex = selected ? 0 : -1;
   });
-  elements.skinPickerMenu.querySelector("#entryCardDensityLabel").textContent = t("entryCardDensity");
-  elements.skinPickerMenu.querySelectorAll("[data-entry-card-density-option]").forEach((button) => {
-    const option = ENTRY_CARD_DENSITY_OPTIONS.find((item) => item.id === button.dataset.entryCardDensityOption);
+  elements.skinPickerMenu.querySelector("#skinGroupLabel").textContent = t("skinGroup");
+  elements.skinPickerMenu.querySelector("#densityGroupLabel").textContent = t("densityGroup");
+  elements.skinPickerMenu.querySelectorAll("[data-density-option]").forEach((button) => {
+    const option = DENSITY_OPTIONS.find((item) => item.id === button.dataset.densityOption);
     button.querySelector(".skin-picker-option-label").textContent = t(option.labelKey);
-    button.setAttribute("aria-checked", String(option.id === currentEntryCardDensity));
+    button.setAttribute("aria-checked", String(option.id === currentDensity));
     button.tabIndex = -1;
   });
 }
@@ -3609,22 +3626,23 @@ function setSkinPickerBusy(busy) {
   });
 }
 
-async function selectEntryCardDensity(nextDensity) {
-  const density = normalizeUiEntryCardDensity(nextDensity);
-  if (density === currentEntryCardDensity) {
+async function selectUiDensity(nextDensity) {
+  const density = normalizeUiDensity(nextDensity);
+  if (density === currentDensity) {
     setSkinPickerOpen(false);
     elements.skinToggleButton.focus();
     return;
   }
-  const previousDensity = currentEntryCardDensity;
-  const applyDensity = (value) => {
-    currentEntryCardDensity = value;
-    state.uiEntryCardDensity = value;
-    cacheUiPreferences({ uiEntryCardDensity: value });
-    syncEntryCardDensity();
+  const previousDensity = currentDensity;
+  const setDensity = (value) => {
+    currentDensity = value;
+    state.uiDensity = value;
+    cacheUiPreferences({ uiDensity: value });
+    syncUiDensity();
     renderSkinPicker();
+    renderAppearanceButton();
   };
-  applyDensity(density);
+  setDensity(density);
   if (!backendAvailable) {
     setSkinPickerOpen(false);
     elements.skinToggleButton.focus();
@@ -3634,18 +3652,18 @@ async function selectEntryCardDensity(nextDensity) {
   try {
     const saved = await api("/api/preferences", {
       method: "PUT",
-      body: JSON.stringify({ uiEntryCardDensity: density }),
+      body: JSON.stringify({ uiDensity: density }),
     });
-    applyDensity(normalizeUiEntryCardDensity(saved.uiEntryCardDensity));
+    setDensity(normalizeUiDensity(saved.uiDensity));
     setSkinPickerOpen(false);
     elements.skinToggleButton.focus();
   } catch (error) {
-    applyDensity(previousDensity);
-    showApiErrorToast(error, "entryCardDensitySaveFailed");
+    setDensity(previousDensity);
+    showApiErrorToast(error, "densitySaveFailed");
   } finally {
     setSkinPickerBusy(false);
     if (skinPickerOpen) {
-      elements.skinPickerMenu.querySelector(`[data-entry-card-density-option="${currentEntryCardDensity}"]`)?.focus();
+      elements.skinPickerMenu.querySelector(`[data-density-option="${currentDensity}"]`)?.focus();
     }
   }
 }
@@ -3703,7 +3721,7 @@ function applyAppearance() {
   } else {
     delete document.body.dataset.uiSkin;
   }
-  applyEntryCardDensity();
+  applyUiDensity();
   entryToolbarMenus ||= window.createEntryToolbarMenus(document, {
     closeSort: () => entrySortControl?.close(),
   });
@@ -17680,8 +17698,8 @@ async function refreshState() {
   currentLanguage = serverState.uiLanguage;
   currentTheme = serverState.uiTheme;
   currentSkin = serverState.uiSkin;
-  currentEntryCardDensity = serverState.uiEntryCardDensity;
-  cacheUiPreferences({ uiTheme: currentTheme, uiSkin: currentSkin, uiEntryCardDensity: currentEntryCardDensity });
+  currentDensity = serverState.uiDensity;
+  cacheUiPreferences({ uiTheme: currentTheme, uiSkin: currentSkin, uiDensity: currentDensity });
   await applyServerState({
     ...serverState,
     selectedEntryId: state.selectedEntryId,
@@ -18939,14 +18957,14 @@ elements.skinPickerMenu.addEventListener("click", (event) => {
     selectUiSkin(option.dataset.skinOption);
     return;
   }
-  const densityOption = event.target.closest("[data-entry-card-density-option]");
+  const densityOption = event.target.closest("[data-density-option]");
   if (densityOption && !densityOption.disabled) {
-    selectEntryCardDensity(densityOption.dataset.entryCardDensityOption);
+    selectUiDensity(densityOption.dataset.densityOption);
   }
 });
 
 elements.skinPickerMenu.addEventListener("keydown", (event) => {
-  const options = Array.from(elements.skinPickerMenu.querySelectorAll(":is([data-skin-option], [data-entry-card-density-option]):not(:disabled)"));
+  const options = Array.from(elements.skinPickerMenu.querySelectorAll(":is([data-skin-option], [data-density-option]):not(:disabled)"));
   const currentIndex = options.indexOf(document.activeElement);
   let nextIndex = -1;
   if (event.key === "ArrowDown") {
@@ -19320,11 +19338,11 @@ wideNavMediaQuery.addEventListener("change", () => {
   scheduleEntryBrowserLayoutRefresh();
 });
 // Like the navigation, "auto" follows both the media query and resize.
-compactDensityMediaQuery.addEventListener("change", syncEntryCardDensity);
+compactDensityMediaQuery.addEventListener("change", syncUiDensity);
 window.addEventListener("resize", () => {
   renderShellNav();
   renderMobileAppBar();
-  syncEntryCardDensity();
+  syncUiDensity();
   scheduleEntryBrowserLayoutRefresh(120);
   scheduleLexicalNetworkLayout();
 });

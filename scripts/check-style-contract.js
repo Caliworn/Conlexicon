@@ -1280,24 +1280,24 @@ for (const [name, source] of [["classic", classic], ["layered glass", layeredGla
   const declared = [...source.matchAll(densityTokenPattern)].map((match) => match[1]);
   assert.deepEqual(declared, [], `The ${name} skin must feed density through --skin-* inputs, not declare ${declared.join(", ")}`);
 }
+// The viewer can force either density, so compact rules key on the body
+// attribute app.js sets; a rule keyed on the window height would ignore the
+// preference. "auto" resolves through app.js's media query.
+assert(
+  !/@media[^{]*max-height:\s*920px/.test(styles),
+  "Compact density rules must key on body[data-density], not on the window height",
+);
 assert(
   app.includes('window.matchMedia("(min-width: 800px) and (max-height: 920px)")')
-    && styles.includes("@media (min-width: 800px) and (max-height: 920px) {"),
-  "app.js must match the compact density's media query for the entry card estimate",
+    && /document\.body\.dataset\.density = resolvedUiDensity\(\);/.test(app),
+  "app.js must resolve the \"auto\" density with the compact media query and set body[data-density]",
 );
 // Navigation rows shrink with the window down to --nav-item-min-height, so a
 // coarse pointer must raise that floor at every size; the utility row is only
-// compacted below the threshold.
-const coarseBlocks = [
-  [/@media \(pointer: coarse\) \{\s*body \{([^}]*)\}/, "--nav-item-min-height"],
-  [/@media \(min-width: 800px\) and \(max-height: 920px\) and \(pointer: coarse\) \{\s*body \{([^}]*)\}/, "--nav-utility-min-height"],
-];
-for (const [pattern, token] of coarseBlocks) {
-  const block = styles.match(pattern);
-  assert(
-    block && new RegExp(`${token}:\\s*44px;`).test(block[1]),
-    `Coarse pointers must keep ${token} at 44px`,
-  );
-}
+// compacted in the compact density.
+const coarseBlock = styles.match(/@media \(pointer: coarse\) \{\s*body \{([^}]*)\}\s*body\[data-density="compact"\] \{([^}]*)\}/);
+assert(coarseBlock, "Coarse pointers must restore the navigation's touch targets");
+assert(/--nav-item-min-height:\s*44px;/.test(coarseBlock[1]), "Coarse pointers must keep --nav-item-min-height at 44px");
+assert(/--nav-utility-min-height:\s*44px;/.test(coarseBlock[2]), "Coarse pointers must keep --nav-utility-min-height at 44px in the compact density");
 
 console.log("Style skin contract checks passed.");
