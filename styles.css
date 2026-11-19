@@ -6299,6 +6299,68 @@ body[data-density="compact"] .display-section {
   gap: 10px;
 }
 
+/* Compact density: full edit keeps the detail view's compact padding, header
+   divider and section gap, so switching modes still does not reflow. Text
+   keeps its size; spacing, the lemma and the default height of multi-line
+   boxes shrink. Boxes the viewer resized keep their own height. */
+body[data-density="compact"] #entryForm {
+  gap: min(var(--material-entry-detail-section-gap), 12px);
+  padding: 16px 18px;
+}
+
+body[data-density="compact"] #entryForm label,
+body[data-density="compact"] #entryForm .source-reference-field {
+  gap: 4px;
+}
+
+body[data-density="compact"] .entry-editor-header {
+  gap: 10px;
+  padding-bottom: 12px;
+}
+
+body[data-density="compact"] #entryForm .entry-editor-lemma textarea {
+  font-size: clamp(1.5rem, 2.2vw, 1.875rem);
+}
+
+body[data-density="compact"] #entryForm textarea.ipa-single-line:not(#lemmaInput) {
+  min-height: 42px;
+  height: 42px;
+  padding: 7px 12px;
+}
+
+body[data-density="compact"] #entryForm .ipa-keyboard {
+  margin-top: -4px;
+}
+
+body[data-density="compact"] #entryForm .section-heading > span {
+  font-size: 0.875rem;
+}
+
+body[data-density="compact"] #entryForm textarea:not(.ipa-single-line):not([data-auto-height]) {
+  min-height: 0;
+  height: calc(2lh + 22px);
+}
+
+body[data-density="compact"] #entryForm #notesInput {
+  height: calc(3lh + 22px);
+}
+
+body[data-density="compact"] #entryForm :is(.definition-form-list, .entry-morphology-group-list) {
+  gap: min(var(--material-entry-editor-item-gap), 10px);
+}
+
+body[data-density="compact"] #entryForm :is(.definition-form-card, .entry-morphology-group-card) + :is(.definition-form-card, .entry-morphology-group-card) {
+  padding-top: min(var(--material-entry-editor-item-gap), 10px);
+}
+
+body[data-density="compact"] #entryForm :is(.definition-form-fields, .definition-optional-fields, .entry-morphology-controls, .entry-morphology-group-card) {
+  gap: 8px;
+}
+
+body[data-density="compact"] #entryForm :is(.morphology-table, .morphology-edit-table) :is(th, td) {
+  padding: 6px 8px;
+}
+
 .toggle-row {
   display: flex;
   align-items: center;
