@@ -2432,29 +2432,27 @@ label span {
   font-weight: 900;
 }
 
-.example-box,
-.definition-note {
+/* The box and the gloss layout mark examples; notes read as muted asides.
+   Neither needs a label. */
+.example-box {
   display: grid;
   gap: 8px;
   min-width: 0;
   max-width: 100%;
-}
-
-.example-box {
   border-radius: var(--radius-control);
   padding: 10px 12px;
   background: color-mix(in srgb, var(--ui-text) 5%, transparent);
 }
 
-.example-box > span,
-.definition-note > span {
+.definition-note {
+  min-width: 0;
+  max-width: 100%;
   color: var(--ui-text-muted);
-  font-size: 0.78rem;
-  font-weight: 900;
+  font-size: 0.92rem;
 }
 
 .example-box p,
-.definition-note p,
+.definition-note,
 .entry-note-body,
 .etymology-view p {
   margin: 0;

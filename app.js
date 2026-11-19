@@ -594,6 +594,7 @@ const i18n = {
     definitions: "释义",
     etymology: "词源",
     entryNotes: "词条备注",
+    displayNotes: "备注",
     delete: "删除",
     deleteEntry: "删除词条",
     lemma: "词形",
@@ -1243,6 +1244,7 @@ const i18n = {
     definitions: "Definitions",
     etymology: "Etymology",
     entryNotes: "Entry Notes",
+    displayNotes: "Notes",
     delete: "Delete",
     deleteEntry: "Delete Entry",
     lemma: "Lemma",
@@ -9042,8 +9044,8 @@ function renderEntryDisplay(entry) {
         <p class="definition-meaning">${(definition.tags || []).length
           ? `<span class="definition-tags">${definitionTagsHtml(definitionStates.get(definition))}</span>`
           : ""}${escapeHtml(definition.meaning)}</p>
-        ${(definition.examples || []).length ? `<div class="example-box"><span>${escapeHtml(t("example"))}</span>${definition.examples.map((example) => `<div class="example-item">${renderExampleHtml(example.content)}</div>`).join("")}</div>` : ""}
-        ${definition.note ? `<div class="definition-note"><span>${escapeHtml(t("definitionNote"))}</span><p>${escapeHtml(definition.note)}</p></div>` : ""}
+        ${(definition.examples || []).length ? `<div class="example-box">${definition.examples.map((example) => `<div class="example-item">${renderExampleHtml(example.content)}</div>`).join("")}</div>` : ""}
+        ${definition.note ? `<p class="definition-note">${escapeHtml(definition.note)}</p>` : ""}
       </div>
     `;
     elements.displayDefinitions.append(item);
