@@ -544,7 +544,7 @@ tagRegistry: [{ tag, partOfSpeech, displayLabel, color, displayAmbiguous }]
 - **规范序**：标签在词条和释义中是集合，不存储顺序。响应里的标签数组（详情、摘要、保存响应、`PATCH` 响应）一律按标签值的二进制序，`effectiveTags` 是词条标签后接各释义新增的标签，保存响应与之后读取的结果相同。规范序没有业务含义，不用于显示。
 - **显示顺序**：标签的先后只由登记表决定：词性区在前，区内按登记顺序。比较函数是共享模型的 `tagRank`，前端在渲染时用 `arrangeTags` 排列所有标签，已保存词条和草稿共用；服务端只在需要最终顺序的地方用它，即 JSON 导出和分析页的组合。这样登记表移动后，前端已缓存的列表页不会显示过期的顺序。尚未登记的标签（只在未保存的草稿中出现）排在所有已登记标签之后，保持输入顺序。
 - **使用范围**：EntryFilter 的全部标签条件、`/tag-registry` 的使用数、分析页的词性与标签统计、`missing_tags` 质量规则、`allowEmptyTags` 保存校验和自动形态匹配都按有效标签。`near_duplicate_tags` 与 `tag_too_long` 同时检查两层标签；`duplicate_definition_tag`、`mixed_part_of_speech_levels` 与 `missing_definition_part_of_speech` 检查两层之间的关系。标签显示替换与红色强调对两层同样生效。
-- **自动形态**：模板组匹配把有效标签作为唯一输入，规则不变（任一标签与组的 `matchTags` 相同即匹配，只取最前的组）。这是在形态分配重做（见 [Morphology Assignment Plan](MORPHOLOGY_ASSIGNMENT_PLAN.md) 的 D6）决定匹配上下文之前的默认行为；释义都没有标签时，结果与只用词条标签相同。
+- **自动形态**：模板组匹配把有效标签作为唯一输入，规则不变（任一标签与组的 `matchTags` 相同即匹配，只取最前的组）。这是形态分配重做（见 [Morphology Assignment Plan](MORPHOLOGY_ASSIGNMENT_PLAN.md)，已定为按释义匹配）实施前的行为；释义都没有标签时，结果与只用词条标签相同。
 - **搜索**：`tags` 字段同时投影释义标签，命中的 `sourceType` 为 `definitionTag`，`sourceId` 为释义 ID，`sourcePosition` 为该标签在释义内的位置。
 
 ### 词源与词根关系
