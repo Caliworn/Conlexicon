@@ -68,27 +68,32 @@ function morphologyResultText(result) {
 }
 
 function morphologyResultCellHtml(result) {
-  if (result.kind === "absent") {
-    return `<span aria-hidden="true">—</span><span class="visually-hidden">${escapeHtml(aText("不存在", "Absent"))}</span>`;
-  }
-  return escapeHtml(morphologyResultText(result));
+  const value = result.kind === "absent"
+    ? `<span aria-hidden="true">—</span><span class="visually-hidden">${escapeHtml(aText("不存在", "Absent"))}</span>`
+    : escapeHtml(morphologyResultText(result));
+  return result.overridden ? `${value}<span class="visually-hidden"> ${escapeHtml(aText("已覆写", "Overridden"))}</span>` : value;
+}
+
+function morphologyResultCellClasses(result) {
+  const classes = [];
+  if (result.kind === "absent") classes.push("is-absent");
+  if (result.overridden) classes.push("is-overridden");
+  return classes;
 }
 
 function morphologySemanticTableHtml(shape, grid, className, caption) {
   return `<table class="${className}">
     ${caption ? `<caption class="visually-hidden">${escapeHtml(caption)}</caption>` : ""}
     <thead><tr><td class="morphology-corner"></td>${shape.columns.map((column, index) => `<th scope="col">${escapeHtml(morphologyAxisLabel(shape.columns, index))}</th>`).join("")}</tr></thead>
-    <tbody>${shape.rows.map((row, rowIndex) => `<tr><th scope="row">${escapeHtml(morphologyAxisLabel(shape.rows, rowIndex))}</th>${grid[rowIndex].map((result) => `<td${result.kind === "absent" ? ' class="is-absent"' : ""}>${morphologyResultCellHtml(result)}</td>`).join("")}</tr>`).join("")}</tbody>
+    <tbody>${shape.rows.map((row, rowIndex) => `<tr><th scope="row">${escapeHtml(morphologyAxisLabel(shape.rows, rowIndex))}</th>${grid[rowIndex].map((result) => `<td class="${morphologyResultCellClasses(result).join(" ")}">${morphologyResultCellHtml(result)}</td>`).join("")}</tr>`).join("")}</tbody>
   </table>`;
 }
 
-// Resolves every cell once. Merged syncretism regions get a visual table with spans (hidden from
+// Resolves every cell once. Merged regions get a visual table with spans (hidden from
 // assistive technology) plus a visually hidden semantic table that keeps every coordinate.
 function morphologyReadonlyTableHtml(shape, resolveCell, { caption = "" } = {}) {
   const grid = shape.rows.map(({ id: rowId }) => shape.columns.map(({ id: columnId }) => resolveCell(rowId, columnId)));
-  const regions = window.ConlexiconMorphology.morphologyMergeRegions(shape, (rowId, columnId) => (
-    grid[shape.rows.findIndex(({ id }) => id === rowId)][shape.columns.findIndex(({ id }) => id === columnId)]
-  ));
+  const regions = window.ConlexiconMorphology.morphologyMergeRegions(grid);
   if (!regions.length) {
     return `<div class="morphology-table-scroll" tabindex="0" role="group" aria-label="${escapeHtml(caption)}">${morphologySemanticTableHtml(shape, grid, "morphology-table", caption)}</div>`;
   }
@@ -109,11 +114,12 @@ function morphologyReadonlyTableHtml(shape, resolveCell, { caption = "" } = {}) 
   const visualRows = grid.map((cells, row) => cells.map((result, column) => {
     const key = `${row},${column}`;
     if (covered.has(key)) return "";
+    const classes = morphologyResultCellClasses(result);
     if (!regionOf.has(key)) {
-      return `<td${result.kind === "absent" ? ' class="is-absent"' : ""}>${escapeHtml(morphologyResultText(result))}</td>`;
+      return `<td class="${classes.join(" ")}">${escapeHtml(morphologyResultText(result))}</td>`;
     }
     const span = spans.get(key);
-    const classes = ["is-merged"];
+    classes.push("is-merged");
     // The spanning cell keeps its outline; the other cells of the region open the edges they
     // share with it or with each other, which collapsed borders resolve per segment.
     if (!span) {
@@ -129,7 +135,9 @@ function morphologyReadonlyTableHtml(shape, resolveCell, { caption = "" } = {}) 
     <thead><tr><td class="morphology-corner"></td>${shape.columns.map((column, index) => `<th>${escapeHtml(morphologyAxisLabel(shape.columns, index))}</th>`).join("")}</tr></thead>
     <tbody>${shape.rows.map((row, rowIndex) => `<tr><th>${escapeHtml(morphologyAxisLabel(shape.rows, rowIndex))}</th>${visualRows[rowIndex]}</tr>`).join("")}</tbody>
   </table>`;
-  return `<div class="morphology-table-scroll" tabindex="0" role="group" aria-label="${escapeHtml(caption)}">${visual}${morphologySemanticTableHtml(shape, grid, "visually-hidden", caption)}</div>`;
+  return `<div class="morphology-table-scroll" tabindex="0" role="group" aria-label="${escapeHtml(caption)}">
+    <div class="visually-hidden">${morphologySemanticTableHtml(shape, grid, "", caption)}</div>${visual}
+  </div>`;
 }
 
 // ---- Detail section ------------------------------------------------------------------------

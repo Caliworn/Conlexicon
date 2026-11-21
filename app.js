@@ -407,8 +407,12 @@ const i18n = {
     morphologyRightVObjects: "rightV 识别对象",
     invalidMorphologyFunctionObjects: "形态配置中存在未配置的函数对象",
     morphologyTableNote: "形态表备注",
+    morphologyTablesInfoTitle: "形态表格说明",
+    morphologyTablesInfo: "查看形态表格说明",
+    morphologyRuleMatchingHelp: "同一行的条件要全部满足，任一行成立就匹配。",
+    morphologySlotAssignmentHelp: "不同槽位分别匹配，生效的表会叠加。同一槽位内，更具体的匹配行覆盖较宽泛的行。条件相同或互不包含的匹配行可以让多张表同时生效。",
+    morphologySavedCountsHelp: "词条数基于已保存的配置。",
     morphologySyntaxTitle: "形态语法",
-    morphologySyntaxInfo: "查看形态语法",
     corpusSyntaxTitle: "语料格式说明",
     corpusSyntaxInfo: "查看语料格式说明",
     morphologySyntaxIntro: "每个单元格最终输出一个字符串。普通字符会原样输出，{} 会引用当前词条的词形。系统会先展开所有 {} / {X = Y}，然后再执行 /.../ 条件判断。",
@@ -1034,8 +1038,12 @@ const i18n = {
     morphologyRightVObjects: "rightV Objects",
     invalidMorphologyFunctionObjects: "Morphology config contains unconfigured function objects",
     morphologyTableNote: "Morphology Table Note",
+    morphologyTablesInfoTitle: "Table Help",
+    morphologyTablesInfo: "Show morphology table help",
+    morphologyRuleMatchingHelp: "A table matches when all conditions in at least one of its rule rows are met.",
+    morphologySlotAssignmentHelp: "Slots are matched independently, and their applicable tables are combined. Within a slot, a more specific matching row overrides a broader one. Matching rows that do not outrank each other can make their tables apply together.",
+    morphologySavedCountsHelp: "Entry counts reflect the saved configuration.",
     morphologySyntaxTitle: "Morphology Syntax",
-    morphologySyntaxInfo: "Show morphology syntax",
     corpusSyntaxTitle: "Corpus Syntax",
     corpusSyntaxInfo: "Show corpus syntax",
     morphologySyntaxIntro: "Each cell outputs one string. Plain text is emitted as written, and {} references the current entry lemma. All {} / {X = Y} references are expanded first, then /.../ conditions are evaluated.",
@@ -1873,7 +1881,7 @@ const elements = {
   morphologyTablesPanel: document.querySelector("#morphologyTablesPanel"),
   morphologyLeftVObjectsInput: document.querySelector("#morphologyLeftVObjectsInput"),
   morphologyRightVObjectsInput: document.querySelector("#morphologyRightVObjectsInput"),
-  morphologySyntaxButton: document.querySelector("#morphologySyntaxButton"),
+  morphologyTablesInfoButton: document.querySelector("#morphologyTablesInfoButton"),
   corpusSyntaxButton: document.querySelector("#corpusSyntaxButton"),
   infoDialog: document.querySelector("#infoDialog"),
   infoDialogTitle: document.querySelector("#infoDialogTitle"),
@@ -2115,9 +2123,13 @@ function infoDialogTextHtml(text) {
     .join("");
 }
 
-function morphologySyntaxInfoHtml() {
+function morphologyTablesInfoHtml() {
   return `
+    <p>${escapeHtml(t("morphologyRuleMatchingHelp"))}</p>
+    <p>${escapeHtml(t("morphologySlotAssignmentHelp"))}</p>
+    <p>${escapeHtml(t("morphologySavedCountsHelp"))}</p>
     <div class="syntax-help">
+      <h3>${escapeHtml(t("morphologySyntaxTitle"))}</h3>
       <p>${escapeHtml(t("morphologySyntaxIntro"))}</p>
       <ul>
         <li>${escapeHtml(t("morphologySyntaxLemma"))}</li>
@@ -18350,9 +18362,9 @@ elements.docsPreview.addEventListener("scroll", rememberDocsPaneScroll, { passiv
 elements.saveDocsButton.addEventListener("click", () => saveLanguageDocs(true));
 elements.morphologyFunctionsForm.addEventListener("submit", saveMorphologyFunctions);
 bindMorphologyTemplatePage();
-elements.morphologySyntaxButton.addEventListener("click", () => {
-  appInfoDialog(t("morphologySyntaxTitle"), {
-    html: morphologySyntaxInfoHtml(),
+elements.morphologyTablesInfoButton.addEventListener("click", () => {
+  appInfoDialog(t("morphologyTablesInfoTitle"), {
+    html: morphologyTablesInfoHtml(),
   });
 });
 elements.corpusSyntaxButton.addEventListener("click", () => {
@@ -18816,7 +18828,7 @@ document.addEventListener("keydown", (event) => {
 
   if (state.activeView === "morphology-tables" && !elements.morphologyTablesPanel.hidden) {
     event.preventDefault();
-    if (!event.repeat && !elements.morphologyTablesPanel.inert) {
+    if (!event.repeat && !elements.morphologyTablesPanel.inert && !morphologyModalIsOpen()) {
       saveMorphologyTemplates().catch((error) => console.error(error));
     }
   }

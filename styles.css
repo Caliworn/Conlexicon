@@ -442,8 +442,9 @@ body.english-locale .brand-row h1 {
 }
 
 .workspace {
+  --workspace-gutter: var(--shell-gutter);
   min-width: 0;
-  padding: var(--shell-gutter);
+  padding: var(--workspace-gutter);
 }
 
 .view {
@@ -3008,6 +3009,8 @@ span.pending-source {
 }
 
 .morphology-table-scroll {
+  /* Keep the visually hidden caption inside the workspace's scroll container. */
+  position: relative;
   width: fit-content;
 }
 
@@ -3058,9 +3061,13 @@ span.pending-source {
   color: var(--ui-text-muted);
 }
 
-/* A syncretism region reads as one cell: a faint tint, and no edges inside it. */
+/* A merged region reads as one cell with a faint tint and no internal edges. */
 .morphology-table td.is-merged {
   background: color-mix(in srgb, var(--ui-accent) 7%, transparent);
+}
+
+.morphology-table td.is-overridden {
+  background: var(--ui-warning-badge-background);
 }
 
 .morphology-table td.open-top { border-top-style: hidden; }
@@ -3243,6 +3250,8 @@ span.pending-source {
 /* ---- Template page ---- */
 
 .morphology-template-page {
+  --morphology-rail-top: calc(var(--morphology-toolbar-height, 0px) + 12px);
+  --morphology-rail-height: calc(var(--morphology-workspace-height, 100dvh) - var(--morphology-rail-top) - 12px);
   display: grid;
   gap: 16px;
   min-width: 0;
@@ -3250,35 +3259,154 @@ span.pending-source {
 }
 
 .morphology-page-toolbar {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 6;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "main actions" "undo undo";
+  align-items: center;
+  column-gap: 12px;
+  margin-inline: calc(-1 * var(--workspace-gutter));
+  padding: 3px var(--workspace-gutter);
+  border-block-end: 1px solid var(--ui-border);
+  background: var(--ui-canvas-bg);
+}
+
+.morphology-toolbar-main,
+.morphology-toolbar-actions {
   display: flex;
   align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.morphology-toolbar-main {
+  grid-area: main;
   justify-content: space-between;
-  gap: 10px 16px;
-  flex-wrap: wrap;
 }
 
-.morphology-page-savebar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+.morphology-toolbar-actions {
+  grid-area: actions;
 }
 
-.morphology-undo-notice {
+.morphology-view-switch {
+  display: flex;
+  flex: none;
+}
+
+.morphology-toolbar-button {
+  min-height: 38px;
+  padding: 0 7px;
+  border: 0;
+  background: transparent;
+  color: var(--ui-text);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.morphology-toolbar-button:hover:not(:disabled) {
+  color: var(--ui-accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.morphology-toolbar-button:focus-visible {
+  outline-offset: -2px;
+}
+
+.morphology-toolbar-button:disabled {
+  color: var(--ui-text-muted);
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.morphology-view-switch > [role="tab"] {
+  border-block-end: 2px solid transparent;
+  color: var(--ui-text-muted);
+}
+
+.morphology-view-switch > [aria-selected="true"] {
+  border-block-end-color: var(--ui-accent);
+  color: var(--ui-accent-hover);
+}
+
+.morphology-toolbar-save:not(:disabled) {
+  color: var(--ui-accent-hover);
+}
+
+.morphology-toolbar-main > :is(.morphology-toolbar-drawers, .morphology-table-select) {
+  min-width: 0;
+  border-inline-start: 1px solid var(--ui-border);
+  padding-inline-start: 4px;
+}
+
+.morphology-toolbar-drawers {
   display: flex;
   align-items: center;
-  gap: 10px;
-  max-width: 34rem;
-  padding: 4px 4px 4px 12px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-control);
-  background: var(--material-inset-background);
+  gap: 4px;
+}
+
+.morphology-toolbar-drawers [data-pane="trial"] {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 44px;
+}
+
+.morphology-toolbar-drawers [data-pane="properties"] {
+  flex: none;
+}
+
+.morphology-toolbar-trial-summary {
+  overflow: hidden;
+  color: var(--ui-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.morphology-toolbar-trial-summary:not([hidden])::before {
+  content: "· ";
+}
+
+.morphology-undo-notice:not([hidden]) {
+  grid-area: undo;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding-inline-start: 7px;
+  border-block-start: 1px solid var(--ui-border);
+}
+
+.morphology-undo-message {
+  max-block-size: 4.5em;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
 }
 
 .morphology-dirty-status {
   color: var(--ui-text-muted);
   font-size: 0.88rem;
+}
+
+@container (width < 760px) {
+  .morphology-page-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "main" "actions" "undo";
+  }
+
+  .morphology-dirty-status { margin-inline-end: auto; }
+}
+
+@container (width < 350px) {
+  .morphology-toolbar-main .morphology-toolbar-button { padding-inline: 5px; }
+}
+
+.morphology-page-body [data-mtp-focus] {
+  scroll-margin-block-start: var(--morphology-rail-top);
 }
 
 .text-link-button {
@@ -3303,74 +3431,133 @@ span.pending-source {
 
 .morphology-structure {
   display: grid;
-  grid-template-areas: "trial" "slots";
   gap: 18px;
   min-width: 0;
 }
 
-@container (min-width: 760px) {
-  .morphology-structure {
-    grid-template-columns: minmax(0, 1fr) clamp(320px, 30cqi, 360px);
-    grid-template-areas: "slots trial" "slots properties";
-    grid-template-rows: auto 1fr;
-    align-items: start;
-  }
+.morphology-structure-rail {
+  display: none;
 }
 
-.morphology-structure-trial { grid-area: trial; }
-.morphology-structure-slots { grid-area: slots; }
-.morphology-structure-properties { grid-area: properties; }
+@container (width >= 760px) {
+  .morphology-structure {
+    grid-template-columns: minmax(0, 1fr) clamp(320px, 30cqi, 360px);
+    grid-template-areas: "slots rail";
+    align-items: start;
+  }
+
+  .morphology-toolbar-drawers { display: none; }
+
+  .morphology-structure-rail {
+    grid-area: rail;
+    position: sticky;
+    inset-block-start: var(--morphology-rail-top);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-block-size: var(--morphology-rail-height);
+  }
+
+  .morphology-structure-rail .morphology-structure-trial {
+    display: flex;
+    flex-direction: column;
+    flex: none;
+    max-block-size: max(10rem, calc(var(--morphology-rail-height) * 0.55));
+  }
+
+  .morphology-structure-rail .morphology-structure-trial > :not(.morphology-trial-report) {
+    flex: none;
+  }
+
+  .morphology-structure-rail .morphology-trial-report,
+  .morphology-structure-rail .morphology-structure-properties {
+    overflow-y: auto;
+    min-block-size: 0;
+    overscroll-behavior: contain;
+  }
+
+  .morphology-structure-rail .morphology-trial-entry .source-suggestions {
+    position: absolute;
+    inset: 100% 0 auto;
+    z-index: 2;
+  }
+
+  .morphology-structure-rail .morphology-trial-entry-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .morphology-structure-rail .morphology-context-switch {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 3px;
+  }
+
+  .morphology-structure-rail .morphology-context-switch > button {
+    flex: none;
+  }
+
+  .morphology-structure-slots { grid-area: slots; }
+}
 
 .morphology-structure-trial,
 .morphology-structure-properties {
   display: grid;
   gap: 10px;
   min-width: 0;
+  align-content: start;
   padding: 14px;
   border: 1px solid var(--ui-border);
   border-radius: var(--radius-panel);
   background: var(--material-panel-background);
 }
 
-.morphology-structure-trial h3,
-.morphology-structure-properties h3 {
+.morphology-pane-heading h3 {
   margin: 0;
   font-size: 1rem;
 }
 
-.morphology-drawer-close {
+.morphology-structure-rail .morphology-drawer-close {
   display: none;
 }
 
-/* Narrow workspaces edit properties in a drawer over the page. The trial sits above the slots
-   and keeps only its input and context: the cards already show each verdict. */
-@container (max-width: 759px) {
-  .morphology-structure-properties {
-    display: none;
-  }
-
-  .morphology-structure-trial .morphology-trial-list {
-    display: none;
-  }
-
-  .morphology-structure.drawer-open .morphology-structure-properties {
-    position: fixed;
-    inset: 0 0 0 auto;
-    z-index: 60;
-    display: grid;
-    align-content: start;
-    width: min(380px, 100vw);
-    overflow-y: auto;
-    border-radius: 0;
-    box-shadow: var(--material-card-shadow);
-  }
-
-  .morphology-drawer-close {
-    display: inline-flex;
-  }
+.morphology-drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(400px, 100%);
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+  background: transparent;
+  box-shadow: var(--material-floating-shadow);
 }
 
-.morphology-properties-head {
+.morphology-drawer::backdrop {
+  background: var(--material-overlay-drawer-background);
+}
+
+.morphology-drawer > section {
+  block-size: 100%;
+  grid-auto-rows: max-content;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 0;
+  border-radius: 0;
+  background: var(--material-overlay-panel-background);
+  backdrop-filter: var(--material-floating-filter);
+  color: var(--ui-text);
+}
+
+:is(.morphology-structure-rail, .morphology-drawer) [data-mtp-focus] {
+  scroll-margin-block-start: 8px;
+}
+
+.morphology-pane-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3386,15 +3573,6 @@ span.pending-source {
 
 .morphology-structure-slots > .additive-button {
   justify-self: start;
-}
-
-.morphology-structure-help,
-.morphology-count-note {
-  margin: 0;
-}
-
-.morphology-count-note:empty {
-  display: none;
 }
 
 .morphology-slot-list {
@@ -3420,27 +3598,10 @@ span.pending-source {
   background: color-mix(in srgb, var(--material-inset-background) 55%, transparent);
 }
 
-.morphology-slot-head {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-}
-
 .morphology-slot-name {
+  min-width: 0;
   max-width: 320px;
   font-weight: 800;
-}
-
-.morphology-slot-notes {
-  max-width: 560px;
-  min-height: 0;
-  resize: vertical;
-}
-
-.morphology-slot-rule {
-  margin: 0;
-  color: var(--ui-text-muted);
-  font-size: 0.84rem;
 }
 
 .morphology-slot.is-competing .morphology-card-row {
@@ -3463,15 +3624,16 @@ span.pending-source {
   min-width: min(100%, 220px);
   max-width: 320px;
   padding: 10px 12px;
-  border: 1px solid var(--ui-border);
+  border: 1px solid var(--morphology-card-border, var(--ui-border));
   border-radius: var(--radius-panel);
-  background: var(--material-panel-background);
+  background: var(--morphology-card-background, var(--material-panel-background));
+  box-shadow: var(--morphology-card-shadow, none);
   cursor: pointer;
 }
 
 .morphology-table-card.is-selected {
   border-color: var(--ui-accent);
-  box-shadow: inset 0 0 0 1px var(--ui-accent);
+  box-shadow: inset 0 0 0 1px var(--ui-accent), var(--morphology-card-shadow, 0 0 transparent);
 }
 
 .morphology-table-card:focus-visible {
@@ -3559,12 +3721,12 @@ span.pending-source {
 
 /* Trial results: applying tables stand out, the others step back until pointed at. */
 .morphology-table-card[data-trial-state="effective"] {
-  background: color-mix(in srgb, var(--ui-accent) 12%, var(--material-panel-background));
-  box-shadow: inset 4px 0 0 var(--ui-accent);
+  background: color-mix(in srgb, var(--ui-accent) 12%, var(--morphology-card-background, var(--material-panel-background)));
+  box-shadow: inset 4px 0 0 var(--ui-accent), var(--morphology-card-shadow, 0 0 transparent);
 }
 
 .morphology-table-card.is-selected[data-trial-state="effective"] {
-  box-shadow: inset 4px 0 0 var(--ui-accent), inset 0 0 0 1px var(--ui-accent);
+  box-shadow: inset 4px 0 0 var(--ui-accent), inset 0 0 0 1px var(--ui-accent), var(--morphology-card-shadow, 0 0 transparent);
 }
 
 .morphology-table-card[data-trial-state="effective"] .morphology-trial-badge {
@@ -3610,10 +3772,6 @@ span.pending-source {
   font-weight: 900;
 }
 
-.morphology-rule-editor .field-help {
-  margin: 0;
-}
-
 .morphology-rule-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
@@ -3651,6 +3809,7 @@ span.pending-source {
 
 .morphology-trial-mode {
   justify-self: start;
+  align-self: start;
 }
 
 .morphology-trial-input input,
@@ -3670,6 +3829,20 @@ span.pending-source {
 
 .morphology-trial-output:empty {
   display: none;
+}
+
+.morphology-trial-report:has(> .morphology-trial-details[hidden]) {
+  display: none;
+}
+
+.morphology-trial-details summary {
+  margin-block: 4px;
+  color: var(--ui-accent-hover);
+  cursor: pointer;
+}
+
+.morphology-trial-entry-name {
+  overflow-wrap: anywhere;
 }
 
 .morphology-trial-output p {
@@ -3755,7 +3928,6 @@ span.pending-source {
 
 .morphology-tables {
   display: grid;
-  grid-template-areas: "select" "editor";
   gap: 16px;
   min-width: 0;
 }
@@ -3774,12 +3946,31 @@ span.pending-source {
 }
 
 .morphology-table-select {
-  grid-area: select;
   max-width: 360px;
 }
 
-@container (min-width: 760px) {
-  .morphology-table-list { display: block; }
+.morphology-toolbar-main .morphology-table-select > select {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  font-size: 0.88rem;
+}
+
+@container (width >= 760px) {
+  .morphology-table-list {
+    position: sticky;
+    inset-block-start: var(--morphology-rail-top);
+    display: block;
+    max-block-size: var(--morphology-rail-height);
+    padding: 3px;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
   .morphology-table-select { display: none; }
 }
 
@@ -7973,6 +8164,11 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
   gap: 12px;
 }
 
+.syntax-help > h3 {
+  margin: 4px 0 0;
+  font-size: 0.95rem;
+}
+
 .syntax-help p,
 .syntax-help ul {
   margin: 0;
@@ -8474,13 +8670,18 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
   }
 
   .workspace {
+    --workspace-gutter: 14px;
     grid-column: 1;
     grid-row: 2;
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: none;
-    padding: 14px 14px 24px;
+    padding: var(--workspace-gutter) var(--workspace-gutter) 24px;
   }
+
+  /* Place the top inset with the scrolling title so the toolbar sticks flush to the app bar. */
+  .workspace:has(> #morphologyTablesView.active) { padding-block-start: 0; }
+  #morphologyTablesView { padding-block-start: var(--workspace-gutter); }
 
   .entry-display {
     background: var(--material-entry-detail-mobile-background);
@@ -8613,7 +8814,11 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
     height: auto;
   }
 
-  .workspace,
+  .workspace {
+    --workspace-gutter: 18px;
+    padding: var(--workspace-gutter);
+  }
+
   .dictionary-panel {
     padding: 18px;
   }

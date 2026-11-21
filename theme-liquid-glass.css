@@ -546,8 +546,8 @@ body[data-ui-skin="liquid-glass"] .dictionary-panel[data-nav-state="drawer"] {
   --liquid-glass-surface-tint: var(--liquid-glass-navigation-drawer-surface-tint);
 }
 
-/* Content shells: page-level panels that hold a tool's or an entry's content,
-   declared with data-surface. Everything that treats them alike reads that. */
+/* Fixed morphology panes share the page-level content shell material. */
+body[data-ui-skin="liquid-glass"] .morphology-structure-rail > section,
 body[data-ui-skin="liquid-glass"] [data-surface="content-shell"] {
   --liquid-glass-surface-tint: var(--liquid-glass-focus-surface-tint);
   border-color: var(--material-content-shell-border);
@@ -882,6 +882,7 @@ body[data-ui-skin="liquid-glass"]:not(.dark-theme) :is(
   .entry-mail-search-surface,
   .tag-manager-search-surface,
   .corpus-search-surface,
+  .morphology-structure-rail > section,
   [data-surface="content-shell"],
   .entry-search-config-menu,
   .entry-filter-menu,
@@ -905,6 +906,12 @@ body[data-ui-skin="liquid-glass"] .tool-order-card {
   background: var(--material-list-item-background);
   border-color: var(--liquid-glass-list-card-border);
   box-shadow: var(--liquid-glass-entry-card-shadow);
+}
+
+body[data-ui-skin="liquid-glass"] .morphology-table-card {
+  --morphology-card-background: var(--material-list-item-background);
+  --morphology-card-border: var(--liquid-glass-list-card-border);
+  --morphology-card-shadow: var(--liquid-glass-entry-card-shadow);
 }
 
 body[data-ui-skin="liquid-glass"] .entry-card:hover {
@@ -1059,6 +1066,16 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
     -webkit-backdrop-filter: none;
   }
 
+}
+
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+  body[data-ui-skin="liquid-glass"] .morphology-table-card {
+    --morphology-card-shadow: 0 0 transparent;
+  }
+
+  body[data-ui-skin="liquid-glass"] .morphology-structure-rail > section {
+    box-shadow: none;
+  }
 }
 
 @media (forced-colors: active) {

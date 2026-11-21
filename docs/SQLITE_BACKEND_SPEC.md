@@ -234,7 +234,6 @@ CREATE TABLE morphology_slots (
   id TEXT PRIMARY KEY,
   position INTEGER NOT NULL,
   name TEXT NOT NULL DEFAULT '',
-  notes TEXT NOT NULL DEFAULT '',
   created_at TEXT,
   updated_at TEXT
 );

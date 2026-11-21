@@ -123,15 +123,19 @@ function checkCellResolution() {
   const { morphology, parent } = inheritedMorphology();
   const resolver = createMorphologyResolver(normalizeMorphologyInput(morphology));
   assert.deepEqual(evaluateCell(resolver, "grandchild", 0, 2), {
-    kind: "form", value: "test-child", referred: true, source: at(parent, 0, 0),
+    kind: "form", value: "test-child", referred: true, overridden: false, source: at(parent, 0, 0),
   });
   assert.equal(evaluateCell(resolver, "grandchild", 2, 2).kind, "absent", "child absence propagates through references");
   assert.equal(evaluateCell(resolver, "parent", 1, 2).kind, "blank", "a reference to an empty generating rule is blank");
   assert.equal(evaluateCell(resolver, "parent", 2, 1).kind, "absent");
-  assert.equal(evaluateCell(resolver, "child", 0, 2, [absent(parent, 0, 0)]).kind, "absent");
+  const absentOverride = [absent(parent, 0, 0)];
+  const referredAbsent = evaluateCell(resolver, "child", 0, 2, absentOverride);
+  assert.equal(referredAbsent.kind, "absent");
+  assert.equal(referredAbsent.overridden, false, "following an overridden source does not mark the referring cell");
+  assert.equal(evaluateCell(resolver, "child", 0, 0, absentOverride).overridden, true, "an explicit absence is an override");
   assert.equal(evaluateCell(resolver, "child", 0, 2, [morphologyFormOverride(parent, 0, 0, "changed")]).value, "changed");
   const broken = evaluateCell(resolver, "child", 0, 1, [morphologyFormOverride(parent, 0, 1, "broken")]);
-  assert.deepEqual(broken, { kind: "form", value: "broken", referred: false, source: at(parent, 0, 1) });
+  assert.deepEqual(broken, { kind: "form", value: "broken", referred: false, overridden: true, source: at(parent, 0, 1) });
   const single = morphologyTableFixture("single", { columnLabels: ["", ""] });
   single.cells.push(refer(single, 0, 0, 0, 1));
   const singleModule = normalizeMorphologyInput({ slots: [slot("single-slot", single)] });
@@ -193,19 +197,17 @@ function checkDisplayAlgorithms() {
   ]);
   assert.deepEqual(morphologySlotDisplayGroups(primary, [ctx("d1"), ctx("d2", "c")]), []);
   const rectangles = (pattern) => {
-    const shape = {
-      rows: pattern.map((_, row) => ({ id: row })),
-      columns: [...pattern[0]].map((_, column) => ({ id: column })),
-    };
-    return morphologyMergeRegions(shape, (row, column) => {
-      const marker = pattern[row][column];
+    const grid = pattern.map((markers, row) => Array.from(markers, (marker, column) => {
       if (marker === ".") return { kind: "blank" };
+      if (marker === "-" || marker === "!") return { kind: "absent", overridden: marker === "!" };
       return {
         kind: "form",
         value: "same spelling",
-        source: marker === "A" ? { rowId: 0, columnId: 0 } : { rowId: row, columnId: column },
+        overridden: marker === "a",
+        source: marker === "A" || marker === "a" ? { rowId: 0, columnId: 0 } : { rowId: row, columnId: column },
       };
-    }).map(({ rectangle }) => [rectangle.row, rectangle.column, rectangle.rowSpan, rectangle.colSpan]);
+    }));
+    return morphologyMergeRegions(grid).map(({ rectangle }) => [rectangle.row, rectangle.column, rectangle.rowSpan, rectangle.colSpan]);
   };
   assert.deepEqual(rectangles(["A", "A", "A"]), [[0, 0, 3, 1]]);
   assert.deepEqual(rectangles(["AAA"]), [[0, 0, 1, 3]]);
@@ -215,6 +217,11 @@ function checkDisplayAlgorithms() {
   assert.deepEqual(rectangles(["AA.AA"]), [[0, 0, 1, 2], [0, 3, 1, 2]]);
   assert.deepEqual(rectangles(["AXA", ".AA"]), [[1, 1, 1, 2]]);
   assert.deepEqual(rectangles(["A.", ".A"]), []);
+  assert.deepEqual(rectangles(["---", "---"]), [[0, 0, 2, 3]]);
+  assert.deepEqual(rectangles(["--.", "-!.", "..-"]), [[0, 0, 1, 2]], "mixed absences share a region and keep distinct backgrounds");
+  assert.deepEqual(rectangles(["--.--X--"]), [[0, 0, 1, 2], [0, 3, 1, 2], [0, 6, 1, 2]]);
+  assert.deepEqual(rectangles(["-.", ".-"]), []);
+  assert.deepEqual(rectangles(["aAA"]), [[0, 1, 1, 2]], "same-source forms share a region without extending the override background");
 }
 
 function legacyAssignedTables(legacy, entry, tags) {

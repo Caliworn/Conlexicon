@@ -6,13 +6,15 @@ const morphologyPageStates = new Map();
 let morphologyDragState = null;
 let morphologyModalCleanup = null;
 let morphologyTrialRequestId = 0;
+let morphologyLayoutObserver;
+let morphologyCompactTrial;
 
 function morphologyDraftModel() {
   return window.ConlexiconMorphologyDraft;
 }
 
 function morphologyModalIsOpen() {
-  return Boolean(morphologyModalCleanup);
+  return Boolean(morphologyModalCleanup || elements.morphologyTablesPanel.querySelector(".morphology-drawer[open]"));
 }
 
 // ---- State ----------------------------------------------------------------------------------
@@ -24,7 +26,7 @@ function newMorphologyPageState(dictionary) {
     selectedTableId: "",
     trial: { mode: "tags", tagsText: "", entryQuery: "", entry: null, entryStatus: "idle", contextKey: "merged" },
     formTrial: { lemma: "", autoFilled: false },
-    drawerOpen: false,
+    drawer: null,
     pick: null,
     ...morphologyPageBase(dictionary),
   };
@@ -86,7 +88,7 @@ async function confirmLeaveMorphologyTemplates() {
   }
   page.undo = null;
   page.pick = null;
-  page.drawerOpen = false;
+  page.drawer = null;
   return true;
 }
 
@@ -255,22 +257,46 @@ function morphologyTrialVerdicts(page, trialState) {
 
 // ---- Rendering: page frame ---------------------------------------------------------------------
 
+function morphologyToolbarHtml(page) {
+  return `<div class="morphology-page-toolbar">
+    <div class="morphology-toolbar-main">
+      <div class="morphology-view-switch" role="tablist" aria-label="${escapeHtml(aText("视图", "View"))}">
+        ${[["structure", aText("结构", "Structure")], ["tables", aText("表格", "Tables")]].map(([view, label]) => `
+          <button class="morphology-toolbar-button" type="button" role="tab" data-mtp-action="view" data-view-name="${view}" data-mtp-focus="view:${view}" aria-selected="${page.view === view}">${escapeHtml(label)}</button>
+        `).join("")}
+      </div>
+      ${page.view === "structure" ? `<div class="morphology-toolbar-drawers">
+        <button class="morphology-toolbar-button" type="button" data-mtp-action="open-drawer" data-pane="trial" data-mtp-focus="drawer:trial" aria-haspopup="dialog" aria-controls="morphologyDrawer" aria-expanded="false">
+          <span>${escapeHtml(aText("试算", "Trial"))}</span><span class="morphology-toolbar-trial-summary" data-mtp-region="trial-summary" hidden></span>
+        </button>
+        <button class="morphology-toolbar-button" type="button" data-mtp-action="open-drawer" data-pane="properties" data-mtp-focus="drawer:properties" aria-haspopup="dialog" aria-controls="morphologyDrawer" aria-expanded="false"${page.selectedTableId ? "" : " disabled"}>${escapeHtml(aText("属性", "Properties"))}</button>
+      </div>` : morphologyTableSelectHtml(page)}
+    </div>
+    <div class="morphology-toolbar-actions">
+      <span class="morphology-dirty-status" role="status" data-mtp-region="save-status"></span>
+      <button class="morphology-toolbar-button" type="button" data-mtp-action="discard" data-mtp-focus="discard">${escapeHtml(t("editSwitchDiscard"))}</button>
+      <button class="morphology-toolbar-button morphology-toolbar-save" type="button" data-mtp-action="save" data-mtp-focus="save">${escapeHtml(t("save"))}</button>
+    </div>
+    <div class="morphology-undo-notice" hidden>
+      <span class="morphology-undo-message" role="status" data-mtp-region="undo-message"></span>
+      <button class="morphology-toolbar-button" type="button" data-mtp-action="undo" data-mtp-focus="undo">${escapeHtml(aText("撤销", "Undo"))}</button>
+    </div>
+  </div>`;
+}
+
 function renderMorphologyTemplatePage(dictionary = activeDictionary()) {
   const panel = elements.morphologyTablesPanel;
   if (!dictionary || panel.hidden) return;
   const page = morphologyPageState(dictionary);
+  if (page.view === "tables" && !page.selectedTableId) page.selectedTableId = page.draft.slots[0]?.tables[0].id || "";
   const focus = morphologyFocusSnapshot(panel);
+  const scroll = [...panel.querySelectorAll("[data-mtp-scroll]")].map((node) => [node.dataset.mtpScroll, node.scrollTop]);
+  const drawer = panel.querySelector(".morphology-drawer[open]");
+  if (drawer) hideMorphologyDrawer(drawer);
   panel.innerHTML = `
-    <div class="morphology-page-toolbar">
-      <div class="segmented-control morphology-view-switch" role="tablist" aria-label="${escapeHtml(aText("视图", "View"))}">
-        ${[["structure", aText("结构", "Structure")], ["tables", aText("表格", "Tables")]].map(([view, label]) => `
-          <button type="button" role="tab" data-control-tone="neutral" data-control-selection data-mtp-action="view" data-view-name="${view}" aria-selected="${page.view === view}" class="${page.view === view ? "active" : ""}">${escapeHtml(label)}</button>
-        `).join("")}
-      </div>
-      <div class="morphology-page-savebar" data-mtp-region="savebar"></div>
-    </div>
+    ${morphologyToolbarHtml(page)}
     <div class="morphology-page-body" data-view="${page.view}">
-      ${page.view === "structure" ? morphologyStructureViewHtml(page, dictionary) : morphologyTablesViewHtml(page, dictionary)}
+      ${page.view === "structure" ? morphologyStructureViewHtml(page) : morphologyTablesViewHtml(page)}
     </div>
   `;
   panel.inert = page.saving;
@@ -281,7 +307,17 @@ function renderMorphologyTemplatePage(dictionary = activeDictionary()) {
       onPick: (summary) => void morphologyPickTrialEntry(summary),
     });
   }
+  if (page.view === "structure" && page.drawer && morphologyStructureIsNarrow()) {
+    showMorphologyDrawer(page);
+  } else {
+    page.drawer = null;
+  }
   renderMorphologyTemplateDerived(dictionary);
+  observeMorphologyLayout();
+  for (const [name, top] of scroll) {
+    const node = panel.querySelector(`[data-mtp-scroll="${CSS.escape(name)}"]`);
+    if (node) node.scrollTop = top;
+  }
   morphologyRestoreFocus(panel, focus);
 }
 
@@ -291,19 +327,46 @@ function renderMorphologyTemplateDerived(dictionary = activeDictionary()) {
   if (!dictionary || panel.hidden || !panel.firstElementChild) return;
   const page = morphologyPageState(dictionary);
   const problems = morphologyDraftProblems(page);
-  const savebar = panel.querySelector('[data-mtp-region="savebar"]');
-  const dirty = morphologyPageIsDirty(page);
-  savebar.innerHTML = `
-    ${page.undo ? `<div class="morphology-undo-notice" role="status"><span>${escapeHtml(page.undo.message)}</span><button class="secondary-button" type="button" data-control-tone="neutral" data-mtp-action="undo">${escapeHtml(aText("撤销", "Undo"))}</button></div>` : ""}
-    <span class="morphology-dirty-status">${escapeHtml(dirty ? aText("有未保存的更改", "Unsaved changes") : aText("已保存", "Saved"))}</span>
-    <button class="secondary-button" type="button" data-control-tone="neutral" data-mtp-action="discard" ${dirty ? "" : "disabled"}>${escapeHtml(t("editSwitchDiscard"))}</button>
-    <button class="primary-button" type="button" data-control-tone="accent" data-control-emphasis="solid" data-mtp-action="save" ${dirty ? "" : "disabled"}>${escapeHtml(t("save"))}</button>
-  `;
+  renderMorphologyToolbarState(page);
   if (page.view === "structure") {
     renderMorphologyStructureDerived(page, dictionary, problems);
   } else {
     renderMorphologyTablesDerived(page, dictionary, problems);
   }
+}
+
+function renderMorphologyToolbarState(page) {
+  const panel = elements.morphologyTablesPanel;
+  const dirty = morphologyPageIsDirty(page);
+  const status = panel.querySelector('[data-mtp-region="save-status"]');
+  const text = page.saving ? aText("正在保存", "Saving")
+    : dirty ? aText("未保存", "Unsaved") : aText("已保存", "Saved");
+  if (status.textContent !== text) status.textContent = text;
+  panel.querySelector('[data-mtp-action="discard"]').disabled = !dirty || page.saving;
+  panel.querySelector('[data-mtp-action="save"]').disabled = !dirty || page.saving;
+  const notice = panel.querySelector(".morphology-undo-notice");
+  const message = notice.querySelector('[data-mtp-region="undo-message"]');
+  notice.hidden = !page.undo;
+  if (message.textContent !== (page.undo?.message || "")) message.textContent = page.undo?.message || "";
+}
+
+function observeMorphologyLayout() {
+  const panel = elements.morphologyTablesPanel;
+  const toolbar = panel.querySelector(".morphology-page-toolbar");
+  const workspace = panel.closest(".workspace");
+  const update = () => {
+    if (state.activeView !== "morphology-tables" || panel.hidden) return;
+    panel.style.setProperty("--morphology-toolbar-height", `${toolbar.offsetHeight}px`);
+    panel.style.setProperty("--morphology-workspace-height", mobileShellMode() ? `${workspace.clientHeight}px` : "100dvh");
+    if (panel.querySelector(".morphology-drawer[open]") && !morphologyStructureIsNarrow()) {
+      closeMorphologyDrawer({ docked: true });
+    }
+  };
+  morphologyLayoutObserver?.disconnect();
+  morphologyLayoutObserver = new ResizeObserver(update);
+  morphologyLayoutObserver.observe(toolbar);
+  morphologyLayoutObserver.observe(workspace);
+  update();
 }
 
 function morphologyFocusSnapshot(panel) {
@@ -312,7 +375,7 @@ function morphologyFocusSnapshot(panel) {
   return { key: active.dataset.mtpFocus, start: active.selectionStart, end: active.selectionEnd };
 }
 
-function morphologyRestoreFocus(panel, snapshot) {
+function morphologyRestoreFocus(panel, snapshot, { preventScroll = false } = {}) {
   const page = morphologyPageState();
   const key = page.pendingFocus || snapshot?.key;
   page.pendingFocus = "";
@@ -320,7 +383,7 @@ function morphologyRestoreFocus(panel, snapshot) {
   const target = panel.querySelector(`[data-mtp-focus="${CSS.escape(key)}"]`)
     || document.querySelector(`[data-mtp-focus="${CSS.escape(key)}"]`);
   if (!target) return;
-  target.focus({ preventScroll: false });
+  target.focus({ preventScroll });
   if (snapshot && snapshot.key === key && typeof snapshot.start === "number" && target.setSelectionRange) {
     target.setSelectionRange(snapshot.start, snapshot.end);
   }
@@ -332,18 +395,74 @@ function morphologyFocusAfterRender(key) {
 
 // ---- Structure view ----------------------------------------------------------------------------
 
-function morphologyStructureViewHtml(page, dictionary) {
+function morphologyStructureViewHtml(page) {
   const selected = page.selectedTableId ? morphologyDraftModel().findTable(page.draft, page.selectedTableId) : null;
-  return `<div class="morphology-structure${page.drawerOpen ? " drawer-open" : ""}">
-    <section class="morphology-structure-trial" aria-labelledby="morphologyTrialHeading">${morphologyTrialHtml(page)}</section>
+  return `<div class="morphology-structure">
+    <aside class="morphology-structure-rail">
+      <section class="morphology-structure-trial" data-mtp-pane="trial" data-mtp-scroll="trial" aria-labelledby="morphologyTrialHeading">${morphologyTrialHtml(page)}</section>
+      <section class="morphology-structure-properties" data-mtp-pane="properties" data-mtp-scroll="properties:${escapeHtml(page.selectedTableId)}" aria-labelledby="morphologyPropertiesHeading">
+        ${morphologyPaneHeadingHtml("morphologyPropertiesHeading", aText("表格属性", "Table properties"))}
+        ${selected ? morphologyPropertiesHtml(page, selected) : `<p class="muted-text">${escapeHtml(aText("选择一张表来编辑标题、备注和匹配规则。", "Select a table to edit its title, notes and match rules."))}</p>`}
+      </section>
+    </aside>
     <section class="morphology-structure-slots" aria-label="${escapeHtml(aText("槽位", "Slots"))}">
-      <p class="field-help morphology-structure-help">${escapeHtml(aText("不同槽位的表都会生效；同一槽位里的表互相竞争，更具体的规则胜出。", "Tables in different slots all apply; tables in one slot compete and the more specific rule wins."))}</p>
-      <p class="field-help morphology-count-note" data-mtp-region="count-note"></p>
       <ol class="morphology-slot-list" data-mtp-region="slots">${morphologySlotListHtml(page)}</ol>
       <button class="secondary-button additive-button" type="button" data-control-tone="accent" data-control-emphasis="outline" data-mtp-action="new-table" data-mtp-focus="new-table">${escapeHtml(aText("新建表格", "New table"))}</button>
     </section>
-    <section class="morphology-structure-properties" aria-labelledby="morphologyPropertiesHeading">${selected ? morphologyPropertiesHtml(page, selected) : `<h3 id="morphologyPropertiesHeading">${escapeHtml(aText("表格属性", "Table properties"))}</h3><p class="muted-text">${escapeHtml(aText("选择一张表来编辑标题、备注和匹配规则。", "Select a table to edit its title, notes and match rules."))}</p>`}</section>
+    <dialog class="morphology-drawer" id="morphologyDrawer"></dialog>
   </div>`;
+}
+
+function morphologyPaneHeadingHtml(id, label) {
+  return `<div class="morphology-pane-heading">
+    <h3 id="${id}">${escapeHtml(label)}</h3>
+    <button class="secondary-button morphology-drawer-close" type="button" data-control-tone="neutral" data-mtp-action="close-drawer" data-mtp-focus="close:${id}">${escapeHtml(t("close"))}</button>
+  </div>`;
+}
+
+// Move the original pane into the dialog so its controls and IDs stay unique across layouts.
+function showMorphologyDrawer(page) {
+  const panel = elements.morphologyTablesPanel;
+  const { pane } = page.drawer;
+  const drawer = panel.querySelector(".morphology-drawer");
+  const section = panel.querySelector(`[data-mtp-pane="${pane}"]`);
+  drawer.setAttribute("aria-labelledby", section.getAttribute("aria-labelledby"));
+  drawer.append(section);
+  panel.querySelector(`[data-mtp-action="open-drawer"][data-pane="${pane}"]`).setAttribute("aria-expanded", "true");
+  hideAppTooltip();
+  // Put tooltips on the same top layer as their controls.
+  drawer.append(elements.appTooltip);
+  drawer.showModal();
+  syncMorphologyTrialDetails(page);
+}
+
+function hideMorphologyDrawer(drawer) {
+  hideAppTooltip();
+  document.body.append(elements.appTooltip);
+  drawer.close();
+}
+
+function closeMorphologyDrawer({ docked = false } = {}) {
+  const page = morphologyPageState();
+  const panel = elements.morphologyTablesPanel;
+  const { pane, returnFocus } = page.drawer;
+  const drawer = panel.querySelector(".morphology-drawer");
+  const section = drawer.firstElementChild;
+  const focus = morphologyFocusSnapshot(panel);
+  const rail = panel.querySelector(".morphology-structure-rail");
+  page.drawer = null;
+  hideMorphologyDrawer(drawer);
+  if (pane === "trial") rail.prepend(section);
+  else rail.append(section);
+  panel.querySelector(`[data-mtp-action="open-drawer"][data-pane="${pane}"]`).setAttribute("aria-expanded", "false");
+  syncMorphologyTrialDetails(page);
+
+  if (docked) {
+    const firstField = pane === "properties" ? "prop-title" : `trial-${page.trial.mode}`;
+    morphologyRestoreFocus(panel, focus && !focus.key.startsWith("close:") ? focus : { key: firstField });
+  } else {
+    morphologyRestoreFocus(panel, { key: returnFocus }, { preventScroll: true });
+  }
 }
 
 function morphologySlotListHtml(page) {
@@ -355,11 +474,7 @@ function morphologySlotListHtml(page) {
     const handle = `<button class="morphology-drag-handle" type="button" draggable="true" data-mtp-drag="slot" data-mtp-action="slot-menu" data-mtp-focus="slot-handle:${escapeHtml(slot.id)}" aria-haspopup="menu" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" aria-label="${escapeHtml(aText(`槽位 ${slotIndex + 1}：拖动或按 Alt+方向键调整顺序`, `Slot ${slotIndex + 1}: drag or press Alt+arrow keys to reorder`))}" data-app-tooltip="always">⋮⋮</button>`;
     return `<li class="morphology-slot${multi ? " is-competing" : ""}" data-slot-id="${escapeHtml(slot.id)}">
       ${handle}
-      ${multi ? `<div class="morphology-slot-head">
-        <input class="morphology-slot-name" data-mtp-slot-field="name" data-mtp-focus="slot-name:${escapeHtml(slot.id)}" value="${escapeHtml(slot.name)}" placeholder="${escapeHtml(aText("未命名槽位", "Untitled slot"))}" aria-label="${escapeHtml(aText("槽位名称", "Slot name"))}">
-        <textarea class="morphology-slot-notes" rows="1" data-mtp-slot-field="notes" data-mtp-focus="slot-notes:${escapeHtml(slot.id)}" placeholder="${escapeHtml(aText("槽位备注", "Slot notes"))}" aria-label="${escapeHtml(aText("槽位备注", "Slot notes"))}">${escapeHtml(slot.notes)}</textarea>
-        <p class="morphology-slot-rule">${escapeHtml(aText("同一槽位内更具体的规则胜出；条件不分高下时同时生效", "Within a slot the more specific rule wins; rules that do not outrank each other apply together"))}</p>
-      </div>` : ""}
+      ${multi ? `<input class="morphology-slot-name" data-mtp-slot-name data-mtp-focus="slot-name:${escapeHtml(slot.id)}" value="${escapeHtml(slot.name)}" placeholder="${escapeHtml(aText("未命名槽位", "Untitled slot"))}" aria-label="${escapeHtml(aText("槽位名称", "Slot name"))}">` : ""}
       <div class="morphology-card-row" data-mtp-drop="slot">${slot.tables.map((table) => morphologyCardHtml(page, table)).join("")}</div>
     </li>`;
   }).join("");
@@ -414,11 +529,7 @@ function morphologyPropertiesHtml(page, table) {
   const rules = table.matchRules.length ? table.matchRules : [{ all: [], none: [] }];
   const parent = table.inheritsFrom ? draftModel.findTable(page.draft, table.inheritsFrom) : null;
   const children = draftModel.childTableIds(page.draft, table.id);
-  return `<div class="morphology-properties-head">
-      <h3 id="morphologyPropertiesHeading">${escapeHtml(aText("表格属性", "Table properties"))}</h3>
-      <button class="secondary-button morphology-drawer-close" type="button" data-control-tone="neutral" data-mtp-action="close-drawer">${escapeHtml(t("close"))}</button>
-    </div>
-    <label><span>${escapeHtml(aText("标题", "Title"))}</span><input data-mtp-prop="title" data-mtp-focus="prop-title" value="${escapeHtml(table.title)}" placeholder="${escapeHtml(aText("未命名表格", "Untitled table"))}"></label>
+  return `<label><span>${escapeHtml(aText("标题", "Title"))}</span><input data-mtp-prop="title" data-mtp-focus="prop-title" value="${escapeHtml(table.title)}" placeholder="${escapeHtml(aText("未命名表格", "Untitled table"))}"></label>
     <label><span>${escapeHtml(aText("备注", "Notes"))}</span><textarea rows="2" data-mtp-prop="notes" data-mtp-focus="prop-notes">${escapeHtml(table.notes)}</textarea></label>
     <div class="morphology-properties-parent">
       ${parent
@@ -428,7 +539,6 @@ function morphologyPropertiesHtml(page, table) {
     </div>
     <fieldset class="morphology-rule-editor">
       <legend>${escapeHtml(aText("匹配规则", "Match rules"))}</legend>
-      <p class="field-help">${escapeHtml(aText("同一行的条件要全部满足；任一行满足就匹配。", "All conditions in a row must hold; any row may match."))}</p>
       ${rules.map((rule, index) => `
         ${index ? `<p class="morphology-rule-or-line">${escapeHtml(aText("或", "or"))}</p>` : ""}
         <div class="morphology-rule-row" data-rule-index="${index}">
@@ -444,7 +554,7 @@ function morphologyPropertiesHtml(page, table) {
 
 function morphologyTrialHtml(page) {
   const { trial } = page;
-  return `<h3 id="morphologyTrialHeading">${escapeHtml(aText("分配试算", "Assignment trial"))}</h3>
+  return `${morphologyPaneHeadingHtml("morphologyTrialHeading", aText("分配试算", "Assignment trial"))}
     <div class="segmented-control morphology-trial-mode" role="radiogroup" aria-label="${escapeHtml(aText("试算输入", "Trial input"))}">
       ${[["tags", aText("输入标签", "Enter tags")], ["entry", aText("选择词条", "Pick an entry")]].map(([mode, label]) => `
         <button type="button" role="radio" data-control-tone="neutral" data-control-selection data-mtp-action="trial-mode" data-trial-mode="${mode}" aria-checked="${trial.mode === mode}" class="${trial.mode === mode ? "active" : ""}">${escapeHtml(label)}</button>`).join("")}
@@ -452,7 +562,18 @@ function morphologyTrialHtml(page) {
     ${trial.mode === "tags"
       ? `<label class="morphology-trial-input"><span class="visually-hidden">${escapeHtml(aText("试算标签", "Trial tags"))}</span><input data-mtp-trial="tags" data-mtp-focus="trial-tags" value="${escapeHtml(trial.tagsText)}" placeholder="${escapeHtml(aText("例如：n, 不规则", "For example: n, irregular"))}"></label>`
       : `<div class="source-reference-field morphology-trial-entry"><label class="visually-hidden" for="morphologyTrialEntryInput">${escapeHtml(aText("搜索词条", "Search entries"))}</label><input id="morphologyTrialEntryInput" data-mtp-trial="entry" data-mtp-focus="trial-entry" value="${escapeHtml(trial.entryQuery)}" placeholder="${escapeHtml(aText("输入词形查找词条", "Type a lemma to find an entry"))}"><div class="source-suggestions" data-source-suggestions hidden></div></div>`}
-    <div class="morphology-trial-output" data-mtp-region="trial-output" aria-live="polite"></div>`;
+    <div class="morphology-trial-output" data-mtp-region="trial-output" aria-live="polite"></div>
+    <div class="morphology-trial-report" data-mtp-scroll="trial-report">
+      <details class="morphology-trial-details" hidden>
+      <summary tabindex="0" data-mtp-action="trial-details" data-mtp-focus="trial-details"></summary>
+        <div data-mtp-region="trial-explanations"></div>
+      </details>
+    </div>`;
+}
+
+function syncMorphologyTrialDetails(page) {
+  const details = elements.morphologyTablesPanel.querySelector(".morphology-trial-details");
+  details.open = page.trial.detailsOpen ?? (page.drawer?.pane === "trial" || !morphologyCompactTrial.matches);
 }
 
 // Which tags one context matches with: the entry tags, plus the definition's own tags. A context
@@ -477,28 +598,30 @@ function morphologyTrialOutputHtml(page, trialState, problems) {
   if (trialState.status === "error") return `<p class="is-error">${escapeHtml(aText("无法读取词条", "Could not load the entry"))}</p>`;
   if (trialState.status !== "ready") return "";
   const entryLine = page.trial.mode === "entry" ? `<p class="morphology-trial-entry-name"><strong>${escapeHtml(page.trial.entry.lemma)}</strong></p>` : "";
-  const note = trialState.entryNote ? `<p class="field-help">${escapeHtml(trialState.entryNote)}</p>` : "";
   const switcher = trialState.options.length > 1 ? `<div class="morphology-context-switch" role="radiogroup" aria-label="${escapeHtml(aText("上下文", "Context"))}">
       ${[{ key: "merged", label: aText("合并", "Combined") }, ...trialState.options].map(({ key, label }) => `
         <button type="button" role="radio" class="chip-button${trialState.key === key ? " active" : ""}" aria-checked="${trialState.key === key}" data-mtp-action="trial-context" data-context-key="${escapeHtml(key)}">${escapeHtml(label)}</button>`).join("")}
     </div>` : "";
-  let detail = "";
+  return `${entryLine}${switcher}`;
+}
+
+function morphologyTrialExplanationsHtml(page, trialState) {
+  const note = trialState.entryNote ? `<p class="field-help">${escapeHtml(trialState.entryNote)}</p>` : "";
   if (trialState.key === "merged") {
     const byTable = new Map();
     trialState.explained.contexts.forEach((context) => context.tableIds.forEach((id) => {
       if (!byTable.has(id)) byTable.set(id, []);
       byTable.get(id).push(context.definitionId);
     }));
-    detail = byTable.size
+    const results = byTable.size
       ? `<ul class="morphology-trial-list">${[...byTable].map(([id, definitionIds]) => `<li class="is-effective"><strong>${escapeHtml(morphologyTableLabel(page.draft, id))}</strong><span>${escapeHtml(trialState.label(definitionIds))}</span></li>`).join("")}</ul>`
       : `<p class="muted-text">${escapeHtml(aText("没有表生效", "No table applies"))}</p>`;
-  } else {
-    const option = trialState.options.find(({ key }) => key === trialState.key);
-    const source = page.trial.mode === "entry" ? morphologyTrialTagSourceHtml(page.trial.entry, option.context.definitionId) : "";
-    detail = `${source}<ul class="morphology-trial-list">${option.context.slots.flatMap((slot) => slot.tables).map((explanation) => `
-      <li class="${explanation.status === "effective" || explanation.status === "coeffective" ? "is-effective" : ""}"><strong>${escapeHtml(morphologyTableLabel(page.draft, explanation.tableId))}</strong><span>${escapeHtml(morphologyExplanationText(page, explanation))}</span></li>`).join("")}</ul>`;
+    return note + results;
   }
-  return `${entryLine}${note}${switcher}${detail}`;
+  const option = trialState.options.find(({ key }) => key === trialState.key);
+  const source = page.trial.mode === "entry" ? morphologyTrialTagSourceHtml(page.trial.entry, option.context.definitionId) : "";
+  return `${note}${source}<ul class="morphology-trial-list">${option.context.slots.flatMap((slot) => slot.tables).map((explanation) => `
+    <li class="${explanation.status === "effective" || explanation.status === "coeffective" ? "is-effective" : ""}"><strong>${escapeHtml(morphologyTableLabel(page.draft, explanation.tableId))}</strong><span>${escapeHtml(morphologyExplanationText(page, explanation))}</span></li>`).join("")}</ul>`;
 }
 
 function renderMorphologyStructureDerived(page, dictionary, problems) {
@@ -508,10 +631,6 @@ function renderMorphologyStructureDerived(page, dictionary, problems) {
   const verdicts = morphologyTrialVerdicts(page, trialState);
   const savedIds = new Set(morphologyDraftModel().allTables(page.saved).map(({ id }) => id));
   const errorTables = new Set(problems.ruleErrors.map(({ tableId }) => tableId));
-  const dirty = morphologyPageIsDirty(page);
-  panel.querySelector('[data-mtp-region="count-note"]').textContent = dirty && counts.status === "ready"
-    ? aText("词条数基于已保存的配置。", "Entry counts reflect the saved configuration.")
-    : "";
   page.draft.slots.forEach((slot) => {
     const coverage = morphologyDraftModel().slotCoverage(slot);
     slot.tables.forEach((table) => {
@@ -533,6 +652,21 @@ function renderMorphologyStructureDerived(page, dictionary, problems) {
   });
   const output = panel.querySelector('[data-mtp-region="trial-output"]');
   if (output) output.innerHTML = morphologyTrialOutputHtml(page, trialState, problems);
+  const details = panel.querySelector(".morphology-trial-details");
+  const ready = trialState.status === "ready";
+  details.hidden = !ready;
+  if (ready) {
+    const count = [...verdicts.values()].filter(({ effective }) => effective).length;
+    const summary = details.querySelector("summary");
+    const label = aText(`${count} 张表生效 · 判定详情`, `${count} ${count === 1 ? "table applies" : "tables apply"} · Details`);
+    if (summary.textContent !== label) summary.textContent = label;
+    details.querySelector('[data-mtp-region="trial-explanations"]').innerHTML = morphologyTrialExplanationsHtml(page, trialState);
+  }
+  syncMorphologyTrialDetails(page);
+  const toolbarSummary = panel.querySelector('[data-mtp-region="trial-summary"]');
+  const trialInput = page.trial.mode === "entry" ? page.trial.entry?.lemma : page.trial.tagsText.trim();
+  toolbarSummary.hidden = !trialInput;
+  if (toolbarSummary.textContent !== (trialInput || "")) toolbarSummary.textContent = trialInput || "";
   const usage = morphologyTagUsage(dictionary);
   const selected = page.selectedTableId && morphologyDraftModel().findTable(page.draft, page.selectedTableId);
   if (selected) {
@@ -559,13 +693,17 @@ function renderMorphologyStructureDerived(page, dictionary, problems) {
 
 // ---- Tables view -------------------------------------------------------------------------------
 
+function morphologyTableSelectHtml(page) {
+  if (!page.selectedTableId) return "";
+  const choices = morphologyTableChoices(page.draft);
+  return `<label class="morphology-table-select"><span class="visually-hidden">${escapeHtml(aText("选择表格", "Choose table"))}</span><select data-mtp-field="table-select" data-mtp-focus="table-select">${choices.map(({ id, label }) => `<option value="${escapeHtml(id)}"${id === page.selectedTableId ? " selected" : ""}>${escapeHtml(label)}</option>`).join("")}</select></label>`;
+}
+
 function morphologyTablesViewHtml(page) {
   const draftModel = morphologyDraftModel();
-  const tables = draftModel.allTables(page.draft);
-  if (!tables.length) {
+  if (!page.selectedTableId) {
     return `<div class="morphology-tables-empty"><p class="muted-text">${escapeHtml(aText("还没有形态表，先在结构视图里新建。", "No morphology tables yet. Create one in the structure view."))}</p></div>`;
   }
-  if (!page.selectedTableId) page.selectedTableId = tables[0].id;
   const table = draftModel.findTable(page.draft, page.selectedTableId);
   const list = page.draft.slots.map((slot) => {
     const items = slot.tables.map((item) => `<li><button type="button" class="morphology-table-list-item${item.id === table.id ? " active" : ""}" data-mtp-action="select-table" data-target-table-id="${escapeHtml(item.id)}" aria-current="${item.id === table.id}">${morphologyTableTitleHtml(item)}</button></li>`).join("");
@@ -573,10 +711,8 @@ function morphologyTablesViewHtml(page) {
       ? `<li class="morphology-table-list-group"><span>${escapeHtml(slot.name || aText("未命名槽位", "Untitled slot"))}</span><ul>${items}</ul></li>`
       : items;
   }).join("");
-  const choices = morphologyTableChoices(page.draft);
   return `<div class="morphology-tables">
-    <nav class="morphology-table-list" aria-label="${escapeHtml(aText("表格列表", "Tables"))}"><ul>${list}</ul></nav>
-    <label class="morphology-table-select"><span class="visually-hidden">${escapeHtml(aText("选择表格", "Choose table"))}</span><select data-mtp-field="table-select">${choices.map(({ id, label }) => `<option value="${escapeHtml(id)}"${id === table.id ? " selected" : ""}>${escapeHtml(label)}</option>`).join("")}</select></label>
+    <nav class="morphology-table-list" data-mtp-scroll="table-list" aria-label="${escapeHtml(aText("表格列表", "Tables"))}"><ul>${list}</ul></nav>
     <section class="morphology-table-editor" data-table-id="${escapeHtml(table.id)}">
       <input class="morphology-table-title-input" data-mtp-prop="title" data-mtp-focus="table-title" value="${escapeHtml(table.title)}" placeholder="${escapeHtml(aText("未命名表格", "Untitled table"))}" aria-label="${escapeHtml(aText("标题", "Title"))}">
       <div class="morphology-table-summary" data-mtp-region="table-summary"></div>
@@ -746,7 +882,9 @@ function morphologyApply(result, { undoMessage = "", rerender = true, focus = ""
   page.draft = result.morphology;
   if (select) {
     page.selectedTableId = select;
-    page.drawerOpen = page.view === "structure" && morphologyStructureIsNarrow();
+    if (page.view === "structure" && morphologyStructureIsNarrow()) {
+      page.drawer = { pane: "properties", returnFocus: `card:${select}` };
+    }
   }
   if (result.undo) page.undo = { record: result.undo, message: undoMessage };
   if (focus) morphologyFocusAfterRender(focus);
@@ -776,16 +914,18 @@ function morphologySelectTable(tableId, { view, focus, openDrawer = false } = {}
   page.selectedTableId = tableId;
   page.pick = null;
   if (view) page.view = view;
-  const drawer = openDrawer && page.view === "structure" && morphologyStructureIsNarrow();
-  if (drawer) page.drawerOpen = true;
+  if (page.view === "structure" && openDrawer && morphologyStructureIsNarrow()) {
+    page.drawer = { pane: "properties", returnFocus: `card:${tableId}` };
+  }
   // An opened drawer takes the focus unless the caller names a field inside it.
-  const focusKey = drawer && (!focus || focus.startsWith("card:")) ? "prop-title" : focus;
+  const focusKey = page.view === "structure" && page.drawer?.pane === "properties" && (!focus || focus.startsWith("card:"))
+    ? "prop-title" : focus;
   if (focusKey) morphologyFocusAfterRender(focusKey);
   renderMorphologyTemplatePage();
 }
 
 function morphologyStructureIsNarrow() {
-  return elements.morphologyTablesPanel.clientWidth < 760;
+  return elements.morphologyTablesPanel.getBoundingClientRect().width < 760;
 }
 
 function morphologyAxisName(axis, item, shape) {
@@ -879,9 +1019,10 @@ function morphologyMoveTableBy(tableId, delta) {
   morphologyApply(morphologyDraftModel().moveTableInSlot(page.draft, tableId, index + delta), { focus: `card:${tableId}` });
 }
 
-function openMorphologySlotMenu(handle, event) {
+function openMorphologySlotMenu(slot, event) {
   const page = morphologyPageState();
-  const slotId = handle.closest("[data-slot-id]").dataset.slotId;
+  const { slotId } = slot.dataset;
+  const handle = slot.querySelector('[data-mtp-action="slot-menu"]');
   const index = page.draft.slots.findIndex(({ id }) => id === slotId);
   showContextMenu(morphologyMenuPosition(event, handle), aText("槽位操作", "Slot actions"), [
     { key: "up", label: `${aText("上移", "Move up")}  Alt+↑`, disabledReason: index === 0 ? aText("已在最上面", "Already first") : "", handler: () => morphologyMoveSlotBy(slotId, -1) },
@@ -1243,6 +1384,7 @@ function morphologyLocateProblem(problems) {
 async function saveMorphologyTemplates() {
   const dictionary = activeDictionary();
   const page = morphologyPageState(dictionary);
+  const panel = elements.morphologyTablesPanel;
   const draftModel = morphologyDraftModel();
   const problems = morphologyDraftProblems(page);
   if (problems.ruleErrors.length || problems.cycles.length || problems.cellErrors.length) {
@@ -1255,8 +1397,10 @@ async function saveMorphologyTemplates() {
     detachments: draftModel.detachmentsForSave(page.draft, page.saved, page.lineage),
   };
   const clearedTemplateReferences = draftModel.clearedTemplateReferenceCount(page.saved, page.draft);
+  const focus = morphologyFocusSnapshot(panel);
   page.saving = true;
-  elements.morphologyTablesPanel.inert = true;
+  panel.inert = true;
+  renderMorphologyToolbarState(page);
   let confirmation = {};
   let navigateTo = "";
   try {
@@ -1296,11 +1440,15 @@ async function saveMorphologyTemplates() {
     return false;
   } finally {
     page.saving = false;
-    elements.morphologyTablesPanel.inert = false;
+    panel.inert = false;
     // A successful save replaced the dictionary object; rendering the one captured before the
     // request would read the old module as "saved" and reset the page to it.
     if (state.activeView === "morphology-tables" && activeDictionary()?.id === dictionary.id) {
       renderMorphologyTemplatePage(activeDictionary());
+      if (focus?.key === "save" && !navigateTo && document.activeElement === document.body) {
+        const key = morphologyPageIsDirty(page) ? focus.key : `view:${page.view}`;
+        morphologyRestoreFocus(panel, { key }, { preventScroll: true });
+      }
     }
     if (navigateTo) setTimeout(() => void navigateToEntryFromReport(navigateTo));
   }
@@ -1464,11 +1612,16 @@ function handleMorphologyPageInput(event) {
   const target = event.target;
   if (target.dataset.mtpProp) {
     morphologyApply(draftModel.updateTable(page.draft, page.selectedTableId, { [target.dataset.mtpProp]: target.value }), { rerender: false });
+    if (page.view === "tables" && target.dataset.mtpProp === "title") {
+      const select = elements.morphologyTablesPanel.querySelector('[data-mtp-field="table-select"]');
+      const choices = morphologyTableChoices(page.draft);
+      choices.forEach(({ label }, index) => { select.options[index].textContent = label; });
+    }
     return;
   }
-  if (target.dataset.mtpSlotField) {
+  if (target.hasAttribute("data-mtp-slot-name")) {
     const slotId = target.closest("[data-slot-id]").dataset.slotId;
-    morphologyApply(draftModel.updateSlot(page.draft, slotId, { [target.dataset.mtpSlotField]: target.value }), { rerender: false });
+    morphologyApply(draftModel.renameSlot(page.draft, slotId, target.value), { rerender: false });
     return;
   }
   if (target.dataset.mtpRuleField) {
@@ -1507,6 +1660,10 @@ function handleMorphologyPageInput(event) {
 function handleMorphologyPageClick(event) {
   const page = morphologyPageState();
   const draftModel = morphologyDraftModel();
+  if (event.target.matches(".morphology-drawer")) {
+    closeMorphologyDrawer();
+    return;
+  }
   if (page.pick) {
     const cell = event.target.closest(".morphology-grid-cell, .morphology-axis-header");
     if (cell && elements.morphologyTablesPanel.querySelector('[data-mtp-region="grid"]').contains(cell)) {
@@ -1536,10 +1693,9 @@ function handleMorphologyPageClick(event) {
     case "view":
       page.view = actionNode.dataset.viewName;
       page.pick = null;
-      page.drawerOpen = false;
-      morphologyFocusAfterRender("");
+      page.drawer = null;
+      morphologyFocusAfterRender(`view:${page.view}`);
       renderMorphologyTemplatePage();
-      elements.morphologyTablesPanel.querySelector(`[data-view-name="${page.view}"]`)?.focus();
       break;
     case "save":
       void saveMorphologyTemplates();
@@ -1561,7 +1717,7 @@ function handleMorphologyPageClick(event) {
       openMorphologyCardMenu(card, event);
       break;
     case "slot-menu":
-      openMorphologySlotMenu(actionNode, event);
+      openMorphologySlotMenu(actionNode.closest("[data-slot-id]"), event);
       break;
     case "axis-menu":
       openMorphologyAxisMenu(actionNode.closest(".morphology-axis-header"), event);
@@ -1572,10 +1728,12 @@ function handleMorphologyPageClick(event) {
     case "select-table":
       morphologySelectTable(tableId, { focus: page.view === "structure" ? `card:${tableId}` : "table-title" });
       break;
+    case "open-drawer":
+      page.drawer = { pane: actionNode.dataset.pane, returnFocus: actionNode.dataset.mtpFocus };
+      showMorphologyDrawer(page);
+      break;
     case "close-drawer":
-      page.drawerOpen = false;
-      morphologyFocusAfterRender(page.selectedTableId ? `card:${page.selectedTableId}` : "");
-      renderMorphologyTemplatePage();
+      closeMorphologyDrawer();
       break;
     case "add-rule": {
       const table = draftModel.findTable(page.draft, page.selectedTableId);
@@ -1619,6 +1777,9 @@ function handleMorphologyPageClick(event) {
       renderMorphologyTemplateDerived();
       elements.morphologyTablesPanel.querySelector(`[data-context-key="${CSS.escape(page.trial.contextKey)}"]`)?.focus();
       break;
+    case "trial-details":
+      page.trial.detailsOpen = !actionNode.parentElement.open;
+      break;
     case "locate-rule":
       morphologySelectTable(tableId, { focus: `rule:${actionNode.dataset.ruleIndex}:all`, openDrawer: true });
       break;
@@ -1639,6 +1800,8 @@ function handleMorphologyPageKeydown(event) {
   if (page.pick && handleMorphologyPickKeydown(event)) return;
   if (event.isComposing || event.keyCode === 229) return;
   const target = event.target;
+  const drawer = target.closest(".morphology-drawer[open]");
+  if (drawer && trapFocusWithin(drawer, event)) return;
   const draftModel = morphologyDraftModel();
   if (isMorphologyMenuKey(event)) {
     const cell = target.closest(".morphology-grid-cell");
@@ -1649,16 +1812,9 @@ function handleMorphologyPageKeydown(event) {
       event.preventDefault();
       if (cell) openMorphologyCellMenu(cell, null);
       else if (header) openMorphologyAxisMenu(header, null);
-      else if (handle) openMorphologySlotMenu(handle, null);
+      else if (handle) openMorphologySlotMenu(handle.closest("[data-slot-id]"), null);
       else openMorphologyCardMenu(card, null);
     }
-    return;
-  }
-  if (event.key === "Escape" && page.drawerOpen) {
-    event.preventDefault();
-    page.drawerOpen = false;
-    morphologyFocusAfterRender(page.selectedTableId ? `card:${page.selectedTableId}` : "");
-    renderMorphologyTemplatePage();
     return;
   }
   if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
@@ -1695,9 +1851,21 @@ function bindMorphologyTemplatePage() {
   panel.addEventListener("input", handleMorphologyPageInput);
   panel.addEventListener("click", handleMorphologyPageClick);
   panel.addEventListener("keydown", handleMorphologyPageKeydown);
+  panel.addEventListener("cancel", (event) => {
+    if (event.target.matches(".morphology-drawer")) {
+      event.preventDefault();
+      closeMorphologyDrawer();
+    }
+  }, true);
+  morphologyCompactTrial = window.matchMedia("(max-height: 700px)");
+  morphologyCompactTrial.addEventListener("change", () => {
+    if (state.activeView === "morphology-tables" && panel.querySelector(".morphology-trial-details")) {
+      syncMorphologyTrialDetails(morphologyPageState());
+    }
+  });
   panel.addEventListener("change", (event) => {
     if (event.target.dataset.mtpField === "table-select") {
-      morphologySelectTable(event.target.value, { focus: "table-title" });
+      morphologySelectTable(event.target.value, { focus: "table-select" });
     }
   });
   panel.addEventListener("contextmenu", (event) => {
@@ -1705,14 +1873,17 @@ function bindMorphologyTemplatePage() {
       event.preventDefault();
       return;
     }
-    const cell = event.target.closest(".morphology-grid-cell");
-    const header = event.target.closest(".morphology-axis-header");
-    const card = event.target.closest(".morphology-table-card");
-    if (!cell && !header && !card) return;
+    const target = event.target;
+    const cell = target.closest(".morphology-grid-cell");
+    const header = target.closest(".morphology-axis-header");
+    const card = target.closest(".morphology-table-card");
+    const slot = target.matches("[data-mtp-slot-name]") ? null : target.closest("[data-slot-id]");
+    if (!cell && !header && !card && !slot) return;
     event.preventDefault();
     if (cell) openMorphologyCellMenu(cell, event);
     else if (header) openMorphologyAxisMenu(header, event);
-    else openMorphologyCardMenu(card, event);
+    else if (card) openMorphologyCardMenu(card, event);
+    else openMorphologySlotMenu(slot, event);
   });
   panel.addEventListener("dragstart", (event) => {
     const source = event.target.closest?.("[data-mtp-drag]");

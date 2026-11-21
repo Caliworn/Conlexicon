@@ -498,7 +498,7 @@ SQLite projection 查询中，带 `q` 的分页结果会为每个命中词条附
 morphology: {
   functions: { leftV, rightV },
   slots: [{
-    id, name, notes, createdAt, updatedAt,
+    id, name, createdAt, updatedAt,
     tables: [{
       id, title, notes, matchRules: [{ all, none }], inheritsFrom, createdAt, updatedAt,
       rows: [{ id, label }], columns: [{ id, label }], cells: [Cell]
