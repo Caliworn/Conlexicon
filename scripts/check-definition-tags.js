@@ -5,9 +5,9 @@ const assert = require("node:assert/strict");
 
 const { createDictionaryConversionService } = require("../lib/dictionary-conversion-service");
 const { normalizeDictionary } = require("../lib/dictionary-model");
-const { resolveAutomaticTemplateGroups } = require("../lib/morphology-model");
+const { morphologyMatchContexts, resolveAutomaticTables } = require("../lib/morphology-model");
 const { buildQualityIssues } = require("../lib/quality-model");
-const { createTempSqliteRepository, requireSqliteRuntime } = require("./sqlite-check-utils");
+const { createTempSqliteRepository, morphologyTableFixture, requireSqliteRuntime } = require("./sqlite-check-utils");
 
 const NO_PART = "__conlexicon_no_part__";
 const PARTS = ["n", "v", "adj"];
@@ -35,17 +35,14 @@ function layoutDictionary(id, layout) {
     name: id,
     tagRegistry: PART_RANK.map((tag) => ({ tag, partOfSpeech: true })),
     morphology: {
-      templateGroups: [{
-        id: "morph-noun",
+      slots: [{
+        id: "mslot-noun",
         name: "Nouns",
-        matchTags: ["n"],
-        tables: [{
-          id: "mtable-noun",
+        tables: [morphologyTableFixture("mtable-noun", {
           title: "Cases",
-          rowCount: 1,
-          columnCount: 1,
-          cells: { "0,0": { sourceText: "{}-s" } },
-        }],
+          matchRules: [{ all: ["n"], none: [] }],
+          sources: [["{}-s"]],
+        })],
       }],
     },
     entries: ENTRY_SPECS.map((spec) => {
@@ -256,12 +253,13 @@ async function checkMorphologyInput(repository) {
   const who = await repository.getEntry(dictionaryId, "who");
   const dictionary = await repository.exportDictionary(dictionaryId);
   assert.deepEqual(
-    resolveAutomaticTemplateGroups(who, dictionary).map((group) => group.id),
-    ["morph-noun"],
+    resolveAutomaticTables(morphologyMatchContexts(who), dictionary.morphology).tableIds,
+    ["mtable-noun"],
     "automatic morphology matches a part of speech stored on a definition",
   );
   const featureInput = repository.morphologyAnalysisFeatureInput(dictionaryId).entries.find((entry) => entry.id === "who");
-  assert.deepEqual(featureInput.tags, ["adj", "n", "v"], "entry tags, then each definition's new tags");
+  assert.deepEqual(featureInput.tags, [], "only entry-level tags are at the entry level");
+  assert.deepEqual(featureInput.definitions.map(({ tags }) => tags), [["adj", "n"], ["v"]]);
   const db = repository.openDictionaryDatabase(dictionaryId);
   assert.ok(
     db.prepare("SELECT 1 FROM entry_morphology_search_values WHERE entry_id = 'who'").get(),
@@ -270,7 +268,10 @@ async function checkMorphologyInput(repository) {
 
   await repository.saveMorphology(dictionaryId, {
     ...dictionary.morphology,
-    templateGroups: dictionary.morphology.templateGroups.map((group) => ({ ...group, matchTags: ["particle"] })),
+    slots: dictionary.morphology.slots.map((slot) => ({
+      ...slot,
+      tables: slot.tables.map((table) => ({ ...table, matchRules: [{ all: ["particle"], none: [] }] })),
+    })),
   });
   assert.equal(
     db.prepare("SELECT 1 FROM entry_morphology_search_values WHERE entry_id = 'who'").get(),

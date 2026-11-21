@@ -19,6 +19,7 @@ const { DEFAULT_TOOL_NAV_ORDER } = require("../lib/dictionary-data-model");
 const tagModel = require("../lib/tag-model");
 const entrySearchModel = require("../lib/entry-search-model");
 const { compareEntriesInListOrder, rootModeGroups } = require("./root-groups-reference");
+const { morphologyFormOverride, morphologyTableFixture } = require("./sqlite-check-utils");
 const { parseGloss } = require("../lib/gloss-model");
 
 const NO_PART_FILTER_VALUE = "__conlexicon_no_part__";
@@ -131,19 +132,9 @@ async function checkEntityIdSaveScopeInvariants(repository) {
       items: [{ id: "corpus-unit-contract", content: "corpus unit" }],
     },
     morphology: {
-      templateGroups: [{
-        id: "morph-group-contract",
-        name: "Contract group",
-        matchTags: [],
-        tables: [{
-          id: "morph-table-contract",
-          title: "Contract table",
-          rowCount: 1,
-          columnCount: 1,
-          rowLabels: [""],
-          columnLabels: [""],
-          cells: {},
-        }],
+      slots: [{
+        id: "mslot-contract",
+        tables: [morphologyTableFixture("mtable-contract", { title: "Contract table" })],
       }],
     },
   }));
@@ -214,11 +205,11 @@ async function checkEntityIdSaveScopeInvariants(repository) {
     const morphologyBefore = (await repository.getDictionarySnapshot(dictionary.id)).morphology;
     const duplicateTables = await assertRejectStatus(
       repository.saveMorphology(dictionary.id, {
-        templateGroups: [{
-          ...morphologyBefore.templateGroups[0],
+        slots: [{
+          ...morphologyBefore.slots[0],
           tables: [
-            morphologyBefore.templateGroups[0].tables[0],
-            { ...morphologyBefore.templateGroups[0].tables[0], title: "Same id" },
+            morphologyBefore.slots[0].tables[0],
+            { ...morphologyTableFixture("another-table", { title: "Same id" }), id: "mtable-contract" },
           ],
         }],
       }),
@@ -228,7 +219,7 @@ async function checkEntityIdSaveScopeInvariants(repository) {
     assert.equal(duplicateTables.code, "duplicate_entity_ids_scoped");
     assert.deepEqual((await repository.getDictionarySnapshot(dictionary.id)).morphology, morphologyBefore);
     const unchangedMorphology = await repository.saveMorphology(dictionary.id, dictionary.morphology);
-    assert.equal(unchangedMorphology.morphology.templateGroups[0].id, "morph-group-contract");
+    assert.equal(unchangedMorphology.morphology.slots[0].id, "mslot-contract");
   } finally {
     try {
       await repository.deleteDictionary(dictionary.id);
@@ -950,7 +941,7 @@ function checkModelNormalization() {
       tagListSeparatorStyle: "ideographicComma",
     },
     morphology: {
-      templateGroups: [{ name: "group", matchTags: [" n ", "n"], tables: [] }],
+      slots: [{ tables: [morphologyTableFixture("table", { matchRules: [{ all: [" n ", "n"], none: [] }] })] }],
     },
   });
   assert.deepEqual(normalizedTagLists.entries[0].tags, ["n", "null"]);
@@ -960,7 +951,7 @@ function checkModelNormalization() {
     { tag: "null", partOfSpeech: false, displayLabel: "", color: "" },
   ], "the first row of a tag wins, parts of speech come first, entry tags are registered");
   assert.equal(normalizedTagLists.settings.tagListSeparatorStyle, "ideographicComma");
-  assert.deepEqual(normalizedTagLists.morphology.templateGroups[0].matchTags, ["n"]);
+  assert.deepEqual(normalizedTagLists.morphology.slots[0].tables[0].matchRules, [{ all: ["n"], none: [] }]);
   const registry = [
     { tag: "n", partOfSpeech: true, displayLabel: "noun", color: "" },
     { tag: "v", partOfSpeech: true, displayLabel: "", color: "" },
@@ -1192,16 +1183,6 @@ function checkModelNormalization() {
       { body: "a=o", unterminated: false },
     ],
   );
-  assert.equal(
-    morphologyModel.morphologyCellDefaultValue(
-      { lemma: "root" },
-      { rowCount: 1, columnCount: 1, cells: { "0,0": { sourceText: "" } } },
-      0,
-      0,
-      {},
-    ),
-    "",
-  );
   assert.deepEqual(
     morphologyModel.extractMorphologyFunctionCalls("/rightV(a)(x)=x;else=y/").map((call) => ({
       name: call.name,
@@ -1209,220 +1190,68 @@ function checkModelNormalization() {
     })),
     [{ name: "rightV", invalidOffset: true }],
   );
-  assert.deepEqual(
-    morphologyModel.validateMorphologyReferenceSyntax({
-      templateGroups: [{ name: "Bad", tables: [{ title: "Bad", rowCount: 1, columnCount: 1, cells: { "0,0": { sourceText: "{a}" } } }] }],
-    }),
-    ["Bad: 1 / 1: {a} - missing ="],
-  );
-  assert.deepEqual(
-    morphologyModel.validateMorphologyFunctionUsage({
-      functions: { leftV: "a" },
-      templateGroups: [{ name: "BadFn", tables: [{ title: "BadFn", rowCount: 1, columnCount: 1, cells: { "0,0": { sourceText: "/rightV(a)=x/" } } }] }],
-    }),
-    ["BadFn: rightV not configured"],
-  );
-  const morphologyWithoutPersistentIds = morphologyModel.normalizeMorphology({
-    templateGroups: [
-      { name: "First", tables: [{ title: "First table" }] },
-      { name: "Second", tables: [{ title: "Second table" }] },
-    ],
+  const withTable = (table, functions) => morphologyModel.normalizeMorphology({
+    functions, slots: [{ tables: [table] }],
   });
   assert.deepEqual(
-    morphologyWithoutPersistentIds.templateGroups.map((group) => group.id),
-    ["", ""],
-    "shared morphology normalization must not allocate persistent template group IDs",
+    morphologyModel.validateMorphologyReferenceSyntax(withTable(morphologyTableFixture("bad", { title: "Bad", sources: [["{a}"]] }))),
+    ["Bad: 1·1: {a} - missing ="],
   );
   assert.deepEqual(
-    morphologyWithoutPersistentIds.templateGroups.flatMap((group) => group.tables.map((table) => table.id)),
-    ["", ""],
-    "shared morphology normalization must not allocate persistent template table IDs",
+    morphologyModel.validateMorphologyFunctionUsage(withTable(morphologyTableFixture("bad-function", {
+      title: "BadFn", sources: [["/rightV(a)=x/"]],
+    }), { leftV: "a" })),
+    ["BadFn: rightV not configured"],
   );
-  const automaticMorphologyDictionary = {
-    morphology: {
-      templateGroups: [{
-        id: "morph-auto",
-        name: "Auto group",
-        matchTags: ["n"],
-        tables: [{
-          id: "mtable-auto",
-          title: "Auto table",
-          rowCount: 1,
-          columnCount: 1,
-          cells: { "0,0": { sourceText: "{lemma}-generated" } },
-        }],
-      }],
-    },
-  };
-  assert.deepEqual(
-    morphologyModel.morphologySearchStrings({
-      lemma: "root",
-      tags: ["n"],
-      morphologyMode: "auto",
-      morphologyGroups: [{ templateGroupId: "morph-auto", overrides: { "mtable-auto": { "0,0": "roots" } } }],
-    }, automaticMorphologyDictionary),
-    ["roots"],
-  );
-  assert.deepEqual(
-    morphologyModel.morphologySearchStrings({
-      lemma: "root",
-      tags: ["n"],
-      morphologyMode: "manual",
-      morphologyGroups: [],
-    }, automaticMorphologyDictionary),
-    [],
-  );
+  const unsaved = withTable({ ...morphologyTableFixture("draft"), id: "" });
+  assert.equal(unsaved.slots[0].id, "", "shared normalization leaves allocating slot IDs to callers");
+  assert.equal(unsaved.slots[0].tables[0].id, "", "shared normalization leaves allocating table IDs to callers");
 
-  const canonicalMorphologyDictionary = {
-    morphology: {
-      templateGroups: [
-        automaticMorphologyDictionary.morphology.templateGroups[0],
-        {
-          id: "morph-manual",
-          name: "Manual group",
-          matchTags: ["v"],
-          tables: [{
-            id: "mtable-manual",
-            title: "Manual table",
-            rowCount: 1,
-            columnCount: 1,
-            cells: { "0,0": { sourceText: "{lemma}-manual" } },
-          }],
-        },
-      ],
-    },
-  };
-  const autoOverlayEntry = {
-    lemma: "root",
-    tags: ["n"],
-    morphologyMode: "auto",
-    morphologyGroups: [{
-      templateGroupId: "morph-auto",
-      title: "Irregular auto group",
-      notes: "Entry-specific note",
-      overrides: { "mtable-auto": { "0,0": "roots" } },
-    }],
-  };
-  const autoOverlayResolution = morphologyModel.resolveCanonicalEntryMorphologyGroups(
-    autoOverlayEntry,
-    canonicalMorphologyDictionary,
-  );
-  assert.equal(autoOverlayResolution.length, 1);
-  assert.equal(autoOverlayResolution[0].templateGroup.id, "morph-auto");
-  assert.equal(autoOverlayResolution[0].entryGroup.title, "Irregular auto group");
-  assert.equal(
-    morphologyModel.morphologyCellValue(
-      autoOverlayEntry,
-      autoOverlayResolution[0].entryGroup,
-      autoOverlayResolution[0].templateGroup.tables[0],
-      0,
-      0,
-      canonicalMorphologyDictionary,
-    ),
-    "roots",
-  );
-  assert.deepEqual(
-    morphologyModel.materializeAutomaticMorphologyGroups({
-      ...autoOverlayEntry,
-      morphologyGroups: [
-        ...autoOverlayEntry.morphologyGroups,
-        { templateGroupId: "morph-manual", notes: "keep dormant", overrides: {} },
-      ],
-    }, canonicalMorphologyDictionary).map((group) => group.templateGroupId),
-    ["morph-auto", "morph-manual"],
-  );
-  assert.deepEqual(
-    morphologyModel.resolveCanonicalEntryMorphologyGroups({
-      lemma: "root",
-      tags: ["n"],
-      morphologyMode: "manual",
-      morphologyGroups: [{ templateGroupId: "morph-manual" }],
-    }, canonicalMorphologyDictionary).map(({ templateGroup }) => templateGroup.id),
-    ["morph-manual"],
-  );
-  assert.deepEqual(
-    morphologyModel.resolveCanonicalEntryMorphologyGroups({
-      lemma: "root",
-      tags: ["n"],
-      morphologyMode: "manual",
-      morphologyGroups: [],
-    }, canonicalMorphologyDictionary),
-    [],
-  );
-  assert.deepEqual(
-    morphologyModel.normalizeEntryMorphologyState({
-      morphologyMode: "auto",
-      morphologyGroups: [
-        { templateGroupId: "morph-auto" },
-        { templateGroupId: "morph-manual", notes: "keep" },
-      ],
-    }).morphologyGroups.map((group) => group.templateGroupId),
-    ["morph-manual"],
-  );
-  assert.deepEqual(
-    morphologyModel.validateCanonicalEntryMorphology({
-      morphologyMode: "auto",
-      morphologyGroups: [{
-        templateGroupId: "morph-auto",
-        overrides: { "mtable-auto": { "1,0": "out of range" } },
-      }],
-    }, canonicalMorphologyDictionary),
-    ["invalid morphology override cell: mtable-auto:1,0"],
-  );
-  assert.deepEqual(
-    morphologyModel.validateCanonicalEntryMorphology({
-      morphologyMode: "manual",
-      morphologyGroups: [{ templateGroupId: "auto" }],
-    }, canonicalMorphologyDictionary),
-    ["invalid morphology template group: auto"],
-  );
-  assert.deepEqual(
-    morphologyModel.validateCanonicalEntryMorphology({
-      morphologyMode: "manual",
-      morphologyGroups: [
-        { templateGroupId: "morph-manual" },
-        { templateGroupId: "morph-manual", notes: "duplicate" },
-      ],
-    }, canonicalMorphologyDictionary),
-    ["duplicate entry morphology group: morph-manual"],
-  );
-  const migratedLegacyMorphology = migrateLegacyDictionary({
-    morphology: canonicalMorphologyDictionary.morphology,
-    entries: [
-      {
-        id: "legacy-auto",
-        lemma: "root",
-        tags: ["n"],
-        morphology: { tableId: "auto", overrides: { "0,0": "roots" } },
-      },
-      {
-        id: "legacy-manual",
-        lemma: "root",
-        tags: ["n"],
-        morphology: { id: "emorph-legacy", tableId: "morph-manual", overrides: { "0,0": "root-manual" } },
-      },
-      {
-        id: "legacy-none",
-        lemma: "root",
-        tags: ["n"],
-        morphology: { tableId: "none" },
-      },
+  const table = morphologyTableFixture("mtable-auto", {
+    matchRules: [{ all: ["n"], none: [] }],
+    sources: [["{lemma}-generated", ""]],
+    columnLabels: ["", ""],
+  });
+  const morphology = morphologyModel.normalizeMorphology({ slots: [
+    { id: "mslot-auto", tables: [table] },
+    { id: "mslot-manual", tables: [morphologyTableFixture("mtable-manual")] },
+  ] });
+  const resolver = morphologyModel.createMorphologyResolver(morphology);
+  const overlay = { tableId: table.id, notes: "Entry-specific note", overrides: [morphologyFormOverride(table, 0, 0, "roots")] };
+  const dormant = { tableId: "mtable-manual", notes: "keep dormant", overrides: [] };
+  const auto = { lemma: "root", tags: ["n"], morphologyMode: "auto", morphologyTables: [overlay, dormant] };
+  assert.deepEqual(morphologyModel.morphologySearchStrings(auto, { morphology }), ["roots"]);
+  const resolveCell = resolver.cellResolver(table.id, auto.lemma, overlay.overrides);
+  assert.equal(resolveCell(table.rows[0].id, table.columns[1].id).kind, "blank");
+  assert.deepEqual(morphologyModel.materializeAutomaticMorphologyTables(auto, morphology).map(({ tableId, notes }) => [tableId, notes]), [
+    [table.id, overlay.notes],
+    [dormant.tableId, dormant.notes],
+  ]);
+  assert.deepEqual(resolver.entryTableIds({ ...auto, morphologyMode: "manual" }), [table.id, dormant.tableId]);
+  assert.deepEqual(morphologyModel.morphologySearchStrings({ ...auto, morphologyMode: "manual", morphologyTables: [] }, { morphology }), []);
+  assert.deepEqual(morphologyModel.normalizeEntryMorphologyState({
+    ...auto, morphologyTables: [{ tableId: table.id }, dormant],
+  }).morphologyTables.map(({ tableId }) => tableId), ["mtable-manual"]);
+
+  const legacyMorphology = {
+    templateGroups: [
+      { id: "morph-auto", name: "Auto", matchTags: ["n"], tables: [{ id: "mtable-auto", rowCount: 1, columnCount: 1 }] },
+      { id: "morph-manual", name: "Manual", matchTags: ["v"], tables: [{ id: "mtable-manual", rowCount: 1, columnCount: 1 }] },
     ],
-  }).dictionary.entries;
-  assert.deepEqual(
-    migratedLegacyMorphology.map((entry) => entry.morphologyMode),
-    ["auto", "manual", "manual"],
-  );
-  assert.deepEqual(
-    migratedLegacyMorphology[0].morphologyGroups[0].overrides,
-    { "mtable-auto": { "0,0": "roots" } },
-  );
-  assert.deepEqual(
-    migratedLegacyMorphology[1].morphologyGroups[0].overrides,
-    { "mtable-manual": { "0,0": "root-manual" } },
-  );
-  assert.equal(Object.hasOwn(migratedLegacyMorphology[1].morphologyGroups[0], "id"), false);
-  assert.equal(Object.hasOwn(migratedLegacyMorphology[0], "morphology"), false);
+  };
+  const migrated = migrateLegacyDictionary({
+    morphology: legacyMorphology,
+    entries: [
+      { id: "legacy-auto", lemma: "root", tags: ["n"], morphology: { tableId: "auto", overrides: { "0,0": "roots" } } },
+      { id: "legacy-manual", lemma: "root", tags: ["n"], morphology: { tableId: "morph-manual", overrides: { "0,0": "root-manual" } } },
+      { id: "legacy-none", lemma: "root", tags: ["n"], morphology: { tableId: "none" } },
+    ],
+  }).dictionary;
+  assert.deepEqual(migrated.entries.map((entry) => entry.morphologyMode), ["auto", "manual", "manual"]);
+  assert.deepEqual(migrated.entries.map((entry) => morphologyModel.morphologySearchStrings(entry, migrated)), [
+    ["roots"], ["root-manual"], [],
+  ]);
+
 
   const normalized = normalizeDictionary({
     name: "Current",
@@ -1567,7 +1396,7 @@ function checkModelNormalization() {
 
   const obsoleteChildIds = migrateLegacyDictionary({
     id: "dict-obsolete-child-ids",
-    morphology: canonicalMorphologyDictionary.morphology,
+    morphology: legacyMorphology,
     entries: [{
       id: "shared-obsolete-id",
       lemma: "legacy",
@@ -1576,7 +1405,7 @@ function checkModelNormalization() {
     }],
     settings: { ipa: { mappings: [{ id: "shared-obsolete-id", from: "a", to: "b" }] } },
   }).dictionary;
-  assert.equal(Object.hasOwn(obsoleteChildIds.entries[0].morphologyGroups[0], "id"), false);
+  assert.equal(obsoleteChildIds.entries[0].morphologyTables[0].tableId, "mtable-manual");
   assert.equal(Object.hasOwn(obsoleteChildIds.settings.ipa.mappings[0], "id"), false);
   assert.doesNotThrow(() => assertUniqueDictionaryEntityIds(normalizeDictionary(obsoleteChildIds)));
   assert.equal(legacyConvertedImport.dictionary.settings.search.fields.lemma.fuzzy, true);
@@ -1667,7 +1496,7 @@ function checkModelNormalization() {
       const duplicate = normalizeDictionary({
         entries: [{ id: "shared-cross-type-id", lemma: "a" }],
         settings: { ipa: { mappings: [{ from: "a", to: "b" }] } },
-        morphology: { templateGroups: [{ id: "shared-cross-type-id", name: "A", tables: [] }] },
+        morphology: { slots: [{ id: "shared-cross-type-id", tables: [morphologyTableFixture("table")] }] },
         corpus: { items: [{ id: "shared-cross-type-id", content: "x" }] },
       });
       assertUniqueDictionaryEntityIds(duplicate);
@@ -1700,7 +1529,7 @@ function checkModelNormalization() {
     () => {
       const duplicate = normalizeDictionary({
         entries: [{ id: "shared-config-id", lemma: "a" }],
-        morphology: { templateGroups: [{ id: "shared-config-id", name: "A", tables: [] }] },
+        morphology: { slots: [{ id: "shared-config-id", tables: [morphologyTableFixture("table")] }] },
       });
       assertUniqueDictionaryEntityIds(duplicate);
     },
@@ -1828,6 +1657,12 @@ async function checkRootTopologyShapes(repository) {
 
 async function checkReadApiConsistency(repository) {
   const previousState = await repository.readState();
+  const table = morphologyTableFixture("mtable-n-main", {
+    title: "N table",
+    matchRules: [{ all: ["n"], none: [] }],
+    columnLabels: ["", ""],
+    sources: [["{lemma}-generated", "{a=o}"]],
+  });
   const dictionary = await repository.createDictionary(normalizeDictionary({
     id: "dict-read-api-consistency",
     name: "Read API Consistency",
@@ -1839,23 +1674,7 @@ async function checkReadApiConsistency(repository) {
     ],
     morphology: {
       functions: { leftV: "a,e,i,o,u", rightV: "a,e,i,o,u" },
-      templateGroups: [
-        {
-          id: "morph-n-group",
-          name: "N table",
-          matchTags: ["n"],
-          tables: [{
-            id: "mtable-n-main",
-            title: "N table",
-            rowCount: 1,
-            columnCount: 2,
-            cells: {
-              "0,0": { sourceText: "{lemma}-generated" },
-              "0,1": { sourceText: "{a=o}" },
-            },
-          }],
-        },
-      ],
+      slots: [{ id: "mslot-n", tables: [table] }],
     },
     corpus: { items: [{ id: "corpus-read-alpha", content: "alpha example" }] },
     entries: [
@@ -1877,9 +1696,9 @@ async function checkReadApiConsistency(repository) {
         tags: ["v", "n", "derived"],
         definitions: [{ id: "def-beta", meaning: "movement" }],
         etymology: { sources: [{ entryId: "entry-alpha", text: "alpha" }, { entryId: "", text: "root" }], description: "" },
-        morphologyGroups: [{
-          templateGroupId: "morph-n-group",
-          overrides: { "mtable-n-main": { "0,0": "manual-beta-form" } },
+        morphologyTables: [{
+          tableId: table.id,
+          overrides: [morphologyFormOverride(table, 0, 0, "manual-beta-form")],
         }],
         createdAt: "2026-01-02T23:59:59.999Z",
         updatedAt: "2026-01-02T00:00:00.000Z",
@@ -2488,14 +2307,15 @@ async function runRepositoryContractTests(options = {}) {
     );
 
     apiResult = await callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/morphology`, {
-      templateGroups: [{ name: "Nouns", tables: [{ title: "Nouns", rowCount: 2, columnCount: 2 }] }],
+      slots: [{ name: "Nouns", tables: [{ ...morphologyTableFixture("api", { title: "Nouns" }), id: "" }] }],
     });
     assert.equal(apiResult.statusCode, 200);
-    assert.equal(apiResult.body.morphology.templateGroups[0].name, "Nouns");
-    assert.match(apiResult.body.morphology.templateGroups[0].id, /^morph-/);
+    assert.equal(apiResult.body.morphology.slots[0].name, "Nouns");
+    assert.match(apiResult.body.morphology.slots[0].id, /^mslot-/);
+    assert.match(apiResult.body.morphology.slots[0].tables[0].id, /^mtable-/);
     await assertRejectStatus(
       callApi(repository, "PUT", `/api/dictionaries/${encodeURIComponent(first.id)}/morphology`, {
-        templateGroups: [{ name: "Broken", tables: [{ title: "Broken", rowCount: 1, columnCount: 1, cells: { "0,0": { sourceText: "{a}" } } }] }],
+        morphology: { slots: [{ tables: [morphologyTableFixture("broken", { sources: [["{a}"]] })] }] },
       }),
       400,
       "invalid morphology syntax save",
@@ -2655,7 +2475,7 @@ async function runRepositoryContractTests(options = {}) {
         name: "Cross Type Import",
         entries: [{ id: "shared-import-id", lemma: "a" }],
         settings: { ipa: { mappings: [{ from: "a", to: "b" }] } },
-        morphology: { templateGroups: [{ id: "shared-import-id", name: "A", tables: [] }] },
+        morphology: { slots: [{ id: "shared-import-id", tables: [morphologyTableFixture("table")] }] },
         corpus: { items: [{ id: "shared-import-id", content: "x" }] },
       })),
       409,

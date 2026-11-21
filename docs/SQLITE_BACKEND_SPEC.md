@@ -93,7 +93,7 @@ data/dictionaries/<dictionary-id>.sqlite
 
 ## 5. 当前 SQLite schema
 
-本节记录当前 `SqliteDictionaryRepository` 实际创建的 schema：词条核心、释义、标签、来源、形态模板组、形态子表、词条形态组和 override 已经关系化；低频或尚未定型的模块继续放在 `module_blobs` 中。schema 变更只更新当前规范，不保存 schema 版本、不建 migration 表，也不在启动时升级旧库；开发中的旧数据库经 JSON 在新结构数据库中重新导入。正式发布前的旧库兼容方案见[审计清单](AUDIT_OPEN_ISSUES.md) R04。
+本节记录当前 `SqliteDictionaryRepository` 实际创建的 schema：词条核心、释义、标签、来源、形态槽位、表、行列、格与逐词覆写 已经关系化；低频或尚未定型的模块继续放在 `module_blobs` 中。schema 变更只更新当前规范，不保存 schema 版本、不建 migration 表，也不在启动时升级旧库；开发中的旧数据库经 JSON 在新结构数据库中重新导入。正式发布前的旧库兼容方案见[审计清单](AUDIT_OPEN_ISSUES.md) R04。
 
 ### 5.1 词典 metadata 与模块 blob
 
@@ -206,7 +206,7 @@ schema 不含 `entries.entry_json`：SQLite 不保存完整词条 JSON 副本，
 
 SQL 列名沿用表语义：`entries.notes` 映射词条对象的 `entry.notes`，`definitions.notes` 映射单条释义对象的 `definition.note`。运行期对象只使用 `note`，不接受旧 `definition.notes` 别名；旧字段转换仅由 legacy migration 处理。
 
-普通词条编辑走单词条 `POST` / `PUT` / `DELETE`；删除在同一事务中级联删除释义、释义标签、标签、来源、词条形态组和 override。词条写入目前仍整条重建子记录与搜索投影，按变化范围写入的设计见审计 A20 与 [Entry Incremental Save Plan](ENTRY_INCREMENTAL_SAVE_PLAN.md)。JSON 导入写入这些 SQL 表，JSON 导出从 SQL 表重新组装完整词典对象。子对象需要独立编辑或更强一致性时，继续在 SQL 主结构上扩展，不恢复完整词条 JSON 存储。
+普通词条编辑走单词条 `POST` / `PUT` / `DELETE`；删除在同一事务中级联删除释义、释义标签、标签、来源、词条形态表与覆写。词条写入目前仍整条重建子记录与搜索投影，按变化范围写入的设计见审计 A20 与 [Entry Incremental Save Plan](ENTRY_INCREMENTAL_SAVE_PLAN.md)。JSON 导入写入这些 SQL 表，JSON 导出从 SQL 表重新组装完整词典对象。子对象需要独立编辑或更强一致性时，继续在 SQL 主结构上扩展，不恢复完整词条 JSON 存储。
 
 ### 5.3 暂缓 SQL 化的模块
 
@@ -214,7 +214,7 @@ SQL 列名沿用表语义：`entries.notes` 映射词条对象的 `entry.notes`�
 
 - IPA 规则：保存在 `settings` 模块内的 `ipa`，由 IPA 模块端点单独替换。
 - 形态学旧 `leftV/rightV` 函数对象设置：暂时继续放 `module_blobs("morphology")`；后续 DSL v2 函数库落地时再移除。
-- 形态学模板组、子表、单元格、词条形态组和 override：已经拆为 SQL 结构化表。
+- 形态槽位、模板表、行列、格、词条形态表和覆写保存在关系表中。
 - 语言文档：`module_blobs("docs")`。
 
 约束：
@@ -227,93 +227,89 @@ SQL 列名沿用表语义：`entries.notes` 映射词条对象的 `entry.notes`�
 
 ### 5.4 形态学结构化 schema
 
-形态学 SQL 化必须继续遵守“先判断必要性”的原则：结构性主数据可以 SQL 化，语言规则源码保持文本化，派生结果只作为缓存或索引。不要为了“完全关系化”把 DSL 函数、集合、AST、诊断或生成结果拆成主表。
+槽位、模板表、行列、模板格与逐词覆写是结构化主数据。匹配规则以 JSON 数组存入表，规则源码保留在格中。形态函数的识别对象保存在 `module_blobs("morphology")`，生成形式由搜索投影承载。
 
-当前判断：
-
-- 形态模板组、模板组内子表、子表单元格、词条使用的模板组实例和词条级单元格 override 是结构性主数据，适合 SQL 化。
-- 函数和集合更像规则库源码，应保存为一段文本，供 parser 派生函数列表、集合列表、依赖图和诊断；不要把每个函数参数、条件分支或输出拆成 SQL 主数据。
-- 生成出的形态形式、解析 AST、错误诊断、函数引用关系可以后续做缓存或索引，但都不是用户数据真相来源。
-- 形态表格不需要 Excel 化；只保存子表标题、大小、行列标签和单元格规则文本，不预设样式、合并单元格、行高列宽等电子表格能力。
-- 词条的 `morphology_mode` 是必要的结构字段，取值仅为 `auto` 或 `manual`：自动模式由匹配规则决定展示组，`entry_morphology_groups` 是按真实模板组 ID 查询的 overlay，`position` 不参与自动展示排序；手动模式按显式组列表排序，空列表即明确不使用形态。
-
-当前已落地的 schema：
-
-```text
-morphology_template_groups(
+```sql
+CREATE TABLE morphology_slots (
   id TEXT PRIMARY KEY,
   position INTEGER NOT NULL,
-  name TEXT NOT NULL,
-  match_tags_json TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT '',
   notes TEXT NOT NULL DEFAULT '',
   created_at TEXT,
   updated_at TEXT
-)
+);
 
-morphology_template_tables(
+CREATE TABLE morphology_template_tables (
   id TEXT PRIMARY KEY,
-  group_id TEXT NOT NULL,
-  position INTEGER NOT NULL,
-  title TEXT NOT NULL,
-  row_count INTEGER NOT NULL,
-  column_count INTEGER NOT NULL,
-  row_labels_json TEXT NOT NULL,
-  column_labels_json TEXT NOT NULL,
-  created_at TEXT,
-  updated_at TEXT
-)
-
-morphology_template_cells(
-  table_id TEXT NOT NULL,
-  row_index INTEGER NOT NULL,
-  column_index INTEGER NOT NULL,
-  source_text TEXT NOT NULL,
-  PRIMARY KEY(table_id, row_index, column_index)
-)
-
-entry_morphology_groups(
-  entry_id TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
-  template_group_id TEXT NOT NULL,
+  slot_id TEXT NOT NULL REFERENCES morphology_slots(id),
   position INTEGER NOT NULL,
   title TEXT NOT NULL DEFAULT '',
   notes TEXT NOT NULL DEFAULT '',
+  match_rules_json TEXT NOT NULL,
+  inherits_from TEXT REFERENCES morphology_template_tables(id),
+  created_at TEXT,
+  updated_at TEXT
+);
+
+CREATE TABLE morphology_template_rows (
+  id TEXT PRIMARY KEY,
+  table_id TEXT NOT NULL REFERENCES morphology_template_tables(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL,
+  label TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE morphology_template_columns (
+  id TEXT PRIMARY KEY,
+  table_id TEXT NOT NULL REFERENCES morphology_template_tables(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL,
+  label TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE morphology_template_cells (
+  table_id TEXT NOT NULL REFERENCES morphology_template_tables(id) ON DELETE CASCADE,
+  row_id TEXT NOT NULL REFERENCES morphology_template_rows(id) ON DELETE CASCADE,
+  column_id TEXT NOT NULL REFERENCES morphology_template_columns(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK(kind IN ('rule', 'absent', 'refer')),
+  source_text TEXT,
+  target_row_id TEXT REFERENCES morphology_template_rows(id),
+  target_column_id TEXT REFERENCES morphology_template_columns(id),
+  PRIMARY KEY(table_id, row_id, column_id),
+  CHECK (
+    (kind = 'rule' AND source_text IS NOT NULL AND source_text <> '' AND target_row_id IS NULL AND target_column_id IS NULL)
+    OR (kind = 'absent' AND source_text IS NULL AND target_row_id IS NULL AND target_column_id IS NULL)
+    OR (kind = 'refer' AND source_text IS NULL AND target_row_id IS NOT NULL AND target_column_id IS NOT NULL)
+  )
+);
+
+CREATE TABLE entry_morphology_tables (
+  entry_id TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+  template_table_id TEXT NOT NULL REFERENCES morphology_template_tables(id),
+  position INTEGER NOT NULL,
+  notes TEXT NOT NULL DEFAULT '',
   created_at TEXT,
   updated_at TEXT,
-  PRIMARY KEY(entry_id, template_group_id)
-)
+  PRIMARY KEY(entry_id, template_table_id)
+);
 
-entry_morphology_cell_overrides(
+CREATE TABLE entry_morphology_cell_overrides (
   entry_id TEXT NOT NULL,
-  template_group_id TEXT NOT NULL,
   template_table_id TEXT NOT NULL,
-  row_index INTEGER NOT NULL,
-  column_index INTEGER NOT NULL,
-  value TEXT NOT NULL,
-  PRIMARY KEY(entry_id, template_group_id, template_table_id, row_index, column_index),
-  FOREIGN KEY(entry_id, template_group_id)
-    REFERENCES entry_morphology_groups(entry_id, template_group_id) ON DELETE CASCADE
-)
+  row_id TEXT NOT NULL REFERENCES morphology_template_rows(id) ON DELETE CASCADE,
+  column_id TEXT NOT NULL REFERENCES morphology_template_columns(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK(kind IN ('form', 'absent')),
+  value TEXT,
+  PRIMARY KEY(entry_id, template_table_id, row_id, column_id),
+  FOREIGN KEY(entry_id, template_table_id)
+    REFERENCES entry_morphology_tables(entry_id, template_table_id) ON DELETE CASCADE,
+  CHECK ((kind = 'form' AND value IS NOT NULL AND value <> '') OR (kind = 'absent' AND value IS NULL))
+);
 ```
 
-字段边界说明：
-
-- `morphology_template_groups.notes` 保留，因为模板组级说明很快会成为前端 UI 需求。
-- `entry_morphology_groups.title` 保留，因为一个词条未来可手动配置多个形态模板组，词条级显示标题需要独立于模板组名称；`notes` 保留用于说明该词条采用此形态组时的特殊信息。模板组自身的 `notes` 不应自动显示在词条详情或词条编辑中。
-- 同一词条不能重复实例化同一个模板组，因此词条形态组不分配独立 UUID，而以 `entry_id + template_group_id` 作为组合主键；override 使用同一组合外键。
-- `entries.morphology_mode` 取值为 `auto` 或 `manual`；`template_group_id` 只保存真实模板组 ID，不使用 `auto` / `none` 伪值。手动模式按 `entry_morphology_groups.position` 排序，空列表即明确不使用形态；自动模式的排序来自自动分配规则，overlay position 没有业务语义。
-- `morphology_template_cells` 暂不设独立 `id`、`mode`、`ast_json`、`diagnostics_json` 或 cell 级时间戳；单元格由 `table_id + row_index + column_index` 定位，规则文本是主数据。
-- `entry_morphology_cell_overrides` 暂不设独立 `id`、`mode`、`notes` 或单条 override 时间戳；存在记录即表示手动覆盖，不存在则走模板规则自动生成。
-- `match_tags_json`、`row_labels_json`、`column_labels_json` 暂时保持 JSON 字段，因为它们当前不需要独立筛选、排序或局部引用。
-
-旧数据迁移语义：
-
-- 旧 JSON 字段迁移入口是 `lib/legacy-dictionary-migration.js`；核心 `dictionary-model` 与共享 `morphology-model` 只处理当前形状规范化。旧形态结构到新形态结构的迁移归迁移模块负责；SQLite repository 直接消费共享模型规范化后的模板组/词条形态组并写入 SQL projection。
-- 旧版单个 `morphology.tables[n]` 迁移为一个 `morphology_template_group`，其中包含一个 `morphology_template_table`。
-- 旧版 `table.cells` 迁移为 `morphology_template_cells.source_text`。
-- 旧版 `entry.morphology` 迁移为一个 `entry_morphology_group`。
-- 旧版 `overrides_json` 迁移为 `entry_morphology_cell_overrides`；在模板组和子表已经 SQL 化后，不再继续用复杂 JSON key 保存 override。
-- 旧版本 JSON 导入时必须迁移到新形态结构；但不要为了旧前端数据形状额外维护临时兼容层。形态前端应直接迁到新模板组/子表/词条形态组模型，前端因此暴露的问题应在前端修复。
-- SQLite repository 只重建当前 `templateGroups` / `morphologyGroups`，不回吐旧 `morphology.tables` 或 `entry.morphology`。前端 `normalizeMorphology()` 仍额外生成一份已无消费者的扁平 `tables` 投影（审计 C11）；清理时删除前端投影，不在 repository 中恢复旧输出。
+- 每张模板表外键指向一个槽位，表可以通过 `inherits_from` 指向任意槽位内的父表。只有链顶表持有行列，子表的格引用链顶表的行列。API 与导入边界检查同一条链的坐标和合形环。
+- 模板格与逐词覆写都以表和行列 ID 寻址。删除表或轴时，外键级联移除本表格或覆写记录。合形目标的外键保留引用完整性，草稿删除行列时先清除指向被删坐标的引用格。
+- `entry_morphology_tables` 用真实表 ID 和词条 ID 作主键。手动模式使用记录的 `position` 决定顺序。自动模式按槽位及表的分配结果显示，独立保存含备注或覆写的叠加层。
+- 解除继承的新链顶表使用新的行列 ID。一次事务处理表与后代的坐标、逐词覆写改址、确认删除和投影变化。SQLite 延迟外键检查到事务结束。
+- 旧 JSON 字段转换集中在 `lib/legacy-dictionary-migration.js`，SQLite 读写当前槽位与表结构。打开仍使用旧形态 SQL 表的数据库，在执行 DDL 前返回 `incompatible_sqlite_schema`。旧库经旧版导出 JSON 后导入新库。
 
 ## 6. 索引与派生表
 
@@ -330,17 +326,21 @@ idx_entry_sources_target_entry_id        entry_sources(target_entry_id)
 idx_entry_search_values_field            entry_search_values(field, entry_id)
 idx_definitions_entry_id                 definitions(entry_id)
 idx_definitions_id_entry                 definitions(id, entry_id) UNIQUE
-idx_morphology_template_tables_group_id  morphology_template_tables(group_id)
-idx_morphology_template_cells_table_id   morphology_template_cells(table_id)
-idx_entry_morphology_groups_entry_id     entry_morphology_groups(entry_id)
-idx_entry_morphology_overrides_group     entry_morphology_cell_overrides(entry_id, template_group_id)
+idx_morphology_template_tables_slot      morphology_template_tables(slot_id, position)
+idx_morphology_template_tables_parent    morphology_template_tables(inherits_from)
+idx_morphology_template_rows_table       morphology_template_rows(table_id, position)
+idx_morphology_template_columns_table    morphology_template_columns(table_id, position)
+idx_entry_morphology_tables_template     entry_morphology_tables(template_table_id, entry_id)
+idx_entry_morphology_overrides_table     entry_morphology_cell_overrides(template_table_id)
+idx_entry_morphology_overrides_row       entry_morphology_cell_overrides(row_id)
+idx_entry_morphology_overrides_column    entry_morphology_cell_overrides(column_id)
 ```
 
 当前的搜索派生表：
 
 ```text
 entry_search_values(entry_id, field, source_type, source_id, source_position, value_type, raw_value, normalized_value)
-entry_morphology_search_values(entry_id, position, template_group_id, template_table_id, row_index, column_index, raw_value, normalized_value)
+entry_morphology_search_values(entry_id, position, template_table_id, row_id, column_id, raw_value, normalized_value)
 ```
 
 `definition_tags` 的两条索引分别服务按标签找词条（筛选与 facet）和按词条读标签（标签数量、"恰好等于"与存在性等逐词条子查询）；`idx_definitions_id_entry` 是复合外键的父键。新增派生索引、关系表或结果缓存表，必须由真实查询需求和基准证明，并满足 `AGENTS.md` 的 SQL 化必要性判断。数据分析、功能结果和质量结果当前只使用进程内会话缓存（见第 7 节），不建 SQLite 派生结果表。冗余索引与默认排序复合索引的待定事项见[审计清单](AUDIT_OPEN_ISSUES.md) C14、R09。
@@ -415,7 +415,7 @@ cursor 由 `lib/result-window-cursor.js` 编码，绑定 process epoch、`cacheG
 
 | 范围 | 当前实现 | 是否组装完整词典 | 后续方向 |
 |---|---|---|---|
-| Schema 初始化 | `.sqlite` 文件、`dictionary_meta`、`module_blobs`、`entries`、`definitions`、`tag_registry`、`entry_tags`、`definition_tags`、`entry_sources`、两张搜索 projection、`morphology_template_groups/tables/cells`、`entry_morphology_groups/cell_overrides` 和第 6 节索引；`entries` 投影 `etymology_description`，不含 `entry_json` | 否 | 旧库兼容见审计 R04；冗余列与索引见 C13、C14 |
+| Schema 初始化 | `.sqlite` 文件、`dictionary_meta`、`module_blobs`、`entries`、`definitions`、`tag_registry`、`entry_tags`、`definition_tags`、`entry_sources`、两张搜索 projection、`morphology_slots、morphology_template_tables/rows/columns/cells`、`entry_morphology_tables/cell_overrides` 和第 6 节索引；`entries` 投影 `etymology_description`，不含 `entry_json` | 否 | 旧库兼容见审计 R04；冗余列与索引见 C13、C14 |
 | JSON 导入 / 导出 | 受支持当前字段的 JSON → SQLite projection/blob 写入，以及 SQLite → 当前 JSON profile 导出 | 是，这是预期的交换能力；未知字段不承诺 roundtrip | 保留为导入、导出和迁移边界 |
 | 词典生命周期 | 创建、导入、导出、激活、删除、偏好保存、`hasDictionary()`、`requireDictionary()` | 仅导入和导出 | 产品内迁移入口暂缓，见[导入导出规范](IMPORT_EXPORT_SPEC.md) |
 | `readState()` / `listDictionaries()` / `getDictionaryMeta()` | 只返回 `dictionary_meta` 与 summary；`entryCount` 和严格 `rootCount` 由轻量 SQL 计算，不写入 metadata | 否，也不建立词根拓扑 | — |
@@ -423,10 +423,10 @@ cursor 由 `lib/result-window-cursor.js` 编码，绑定 process epoch、`cacheG
 | `updateMetadata()` | 直接更新 `dictionary_meta` 并返回 metadata payload | 否 | — |
 | `updateSettings()` / `updateIpaSettings()` | 直接更新 `module_blobs.settings`，IPA 只替换 settings 内的 `ipa`；IPA 映射为无 ID 的顺序文本规则，返回 `{ id, updatedAt, settings }` | 否 | 如增加 IPA 搜索/质量索引，再同步刷新 |
 | `saveDocs()` | 直接更新 `module_blobs.docs` 并返回 `{ id, updatedAt, docs }` | 否 | — |
-| `saveMorphology()` | 保留形态语法校验；旧 `leftV/rightV` 函数对象设置写入 `module_blobs.morphology`，模板组/子表/单元格写入 SQL 表；同一事务内按受影响范围重建形态搜索 projection（第 10 节），并做提交内实体 ID 检查 | 否；只返回 `{ id, updatedAt, morphology }` | DSL v2 时移除旧函数对象设置 |
+| `saveMorphology()` | 保留形态语法校验；旧 `leftV/rightV` 函数对象设置写入 `module_blobs.morphology`，增量写入槽位、表、行列和格，检查提交内 ID 与引用，同一事务清理或换算词条覆写并更新搜索投影（第 10 节） | 否；只返回 `{ id, updatedAt, morphology }` | DSL v2 时移除旧函数对象设置 |
 | `queryCorpusItems()` / `getCorpusGroups()` / `getCorpusItem()` / `getCorpusItemLinks()` | 直接 SQL 读取语料窗口、分组概览、单条及组内位置、连接的释义 | 否 | — |
 | `createCorpusItem()` / `saveCorpusItem()` / `deleteCorpusItem()` | 单条写入 `corpus_items`；内容变化或解除连接时重写受影响词条的搜索投影；有连接时删除须 `unlink` | 否；只返回 `{ id, updatedAt, item }` 或 `{ id, updatedAt, entryIds }` | — |
-| `saveEntry()` / `deleteEntry()` / `patchEntries()` | 按词条写入目标 entry、definitions、释义标签、tags、sources、词条形态组/override 和两张搜索 projection，删除经外键级联；`patchEntries()` 只接受词条级字段，可附带 settings；整词典批处理经内部的 `writeEntryEdits()` 写入，可改写释义标签；返回 `{ id, updatedAt, entry }`、`{ id, updatedAt }` 或 `{ id, updatedAt, entries, settings? }` | 否 | 词条内部仍整条重建子记录与搜索投影（审计 A20） |
+| `saveEntry()` / `deleteEntry()` / `patchEntries()` | 按词条写入目标 entry、definitions、释义标签、tags、sources、词条形态表与覆写 和两张搜索 projection，删除经外键级联；`patchEntries()` 只接受词条级字段，可附带 settings；整词典批处理经内部的 `writeEntryEdits()` 写入，可改写释义标签；返回 `{ id, updatedAt, entry }`、`{ id, updatedAt }` 或 `{ id, updatedAt, entries, settings? }` | 否 | 词条内部仍整条重建子记录与搜索投影（审计 A20） |
 | `getEntry()` | 按 `entries.id` 读取 SQL 表并组装完整 entry | 否 | — |
 | `queryEntries()` | 始终返回摘要 DTO 分页对象。无搜索时完全下推到 SQL，标签条件都按有效标签：词性与标签 `any/all` 由两张标签表 `(tag, entry_id)` 索引驱动的候选集合实现，无词性反向查询复用标签候选集；词性只由词典显式配置的词性标签决定，不读取标签位置；活动日期使用 UTC 半开范围，来源数量上下界共享一次计数 | 否；完整词条只通过 `getEntry()` 按需读取 | 按真实基准继续优化查询形状；默认排序索引见审计 R09 |
 | `getEntryQueryOverview()` | 列表概览：与 `queryEntries()` 同一查询的全部结果按排序切段（API 契约“列表概览”）。无搜索时在 SQL 中只读排序键列，有搜索时复用查询会话的有序命中 ID | 否 | 不缓存；10 万条时无搜索路径同样受 R09 的排序成本影响 |
@@ -483,29 +483,22 @@ CREATE TABLE entry_search_values (
 CREATE TABLE entry_morphology_search_values (
   entry_id TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
   position INTEGER NOT NULL,
-  template_group_id TEXT NOT NULL,
   template_table_id TEXT NOT NULL,
-  row_index INTEGER NOT NULL,
-  column_index INTEGER NOT NULL,
+  row_id TEXT NOT NULL,
+  column_id TEXT NOT NULL,
   raw_value TEXT NOT NULL,
   normalized_value TEXT NOT NULL,
-  PRIMARY KEY (
-    entry_id,
-    template_group_id,
-    template_table_id,
-    row_index,
-    column_index
-  )
+  PRIMARY KEY(entry_id, template_table_id, row_id, column_id)
 );
 ```
 
-该表不分配独立 ID，不参与 JSON 导出，也不替代模板、词条形态组或 override 主数据。共享 `morphologySearchValueRecords()` 按真实自动/手动形态语义生成带模板组、子表、行列坐标和全局求值顺序的 records；空值不写入。
+行以词条、表、行和列的 ID 标识。共享 `morphologySearchValueRecords()` 解析生效表的格，给非空形式保存原值、搜索规范化值和源位置。位置沿显示顺序跨表计算，包含每个空白或不存在格的编号。JSON 导出取形态主数据。
 
-- 导入和整库覆盖在写入形态主数据后全量生成。
-- `saveEntry()` 和 `patchEntries()` 随目标词条局部重建；`deleteEntry()` 通过外键级联删除。
-- `saveMorphology()` 保持完整模块替换契约，但比较规范化前后状态：名称、说明和不参与生成的表格标签只增量更新模板行；规则、函数、表结构与自动匹配变化先定位受影响模板组，再只重建显式使用该组或自动分配发生变化的词条。自动分配定位只扫描轻量的词条 ID、模式和标签，不执行全词典形态求值；完全相同的 payload 不更新时间、模板行或 projection。
-- 删除模板组、删除或移动子表、缩小表格尺寸前先检查 `entry_morphology_groups` 与 override 坐标；可能留下悬空引用时返回 `morphology_references_in_use` 并拒绝保存，不静默删除词条配置。
-- NFC、case folding 或自定义等价规则变化时全量重建 `normalized_value`；标签显示名不影响形态值，不触发重建。
+- 导入、整库覆盖与搜索规范化设置变化时全量生成。
+- `saveEntry()` 与 `patchEntries()` 随词条重建，`deleteEntry()` 通过外键级联。
+- `saveMorphology()` 按稳定 ID 增量写入模板。格、父表、轴的增删和所用函数变化向后代传播生成失效。匹配规则、表的增删或槽位归属改变时，共享模型用轻量词条标签和逐释义标签比较前后分配，只重建实际受影响的词条。
+- 调整槽位、表或行列顺序时只重写所需的 `position`。标题、备注和行列标签变化只更新主数据。相同的规范化内容保留已有的词典版本。
+- 删除引用、解除继承或重定位覆写与模板保存、投影更新同事务提交。未确认的引用删除与仍被继承的父表删除返回 API 契约中的 409。
 
 查询形状（静态与形态 projection 相同）：没有结构筛选时直接扫描所选 projection；存在词性、标签或其他结构条件时，把 SQL 条件编译为物化 `candidates` 关系，以候选为外层连接两张 projection，不把候选 ID 传回 JavaScript 求交，也不使用经验分批阈值。严格字段执行 `instr()`，fuzzy 字段调用连接级 `conlexicon_fuzzy_match()`；首次查询保存最终有序命中 ID 与反向下标，repository 只为当前窗口回读命中 records。词根模式搜索复用同一匹配 SQL，但只读取去重命中 ID，再映射到稳定拓扑。两条路径都不导出完整 snapshot 或逐词条动态生成形态。
 

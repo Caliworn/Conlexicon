@@ -16,6 +16,8 @@ const {
 const { createSimpleIpaEngine } = require("../lib/phonology-engine");
 const {
   createTempSqliteRepository,
+  morphologyFormOverride,
+  morphologyTableFixture,
   requireSqliteRuntime,
 } = require("./sqlite-check-utils");
 
@@ -34,46 +36,16 @@ const MORPHOLOGY_SOURCE = {
   version: 1,
   options: {},
 };
-const MORPHOLOGY_TEMPLATE_GROUPS = [
-  {
-    id: "morph-noun",
-    name: "Noun",
-    matchTags: ["n"],
-    tables: [
-      {
-        id: "mtable-noun-main",
-        title: "Noun main",
-        rowCount: 1,
-        columnCount: 2,
-        cells: {},
-      },
-      {
-        id: "mtable-noun-extra",
-        title: "Noun extra",
-        rowCount: 1,
-        columnCount: 1,
-        cells: {},
-      },
-    ],
-  },
-  {
-    id: "morph-verb",
-    name: "Verb",
-    matchTags: ["v"],
-    tables: [{
-      id: "mtable-verb-main",
-      title: "Verb main",
-      rowCount: 1,
-      columnCount: 1,
-      cells: {},
-    }],
-  },
-  {
-    id: "morph-unused",
-    name: "Unused",
-    matchTags: ["unused"],
-    tables: [],
-  },
+const nounMain = morphologyTableFixture("mtable-noun-main", {
+  title: "Noun main", matchRules: [{ all: ["n"], none: [] }], columnLabels: ["", ""],
+});
+const nounExtra = morphologyTableFixture("mtable-noun-extra", { title: "Noun extra", matchRules: nounMain.matchRules });
+const verbMain = morphologyTableFixture("mtable-verb-main", { title: "Verb main", matchRules: [{ all: ["v"], none: [] }] });
+const unused = morphologyTableFixture("mtable-unused", { title: "Unused" });
+const MORPHOLOGY_SLOTS = [
+  { id: "mslot-noun", tables: [nounMain, nounExtra] },
+  { id: "mslot-verb", tables: [verbMain] },
+  { id: "mslot-unused", tables: [unused] },
 ];
 
 function morphologyFixtureEntries() {
@@ -83,80 +55,38 @@ function morphologyFixtureEntries() {
       lemma: "alpha",
       tags: ["n"],
       morphologyMode: "auto",
-      morphologyGroups: [
+      morphologyTables: [
         {
-          templateGroupId: "morph-noun",
-          overrides: {
-            "mtable-noun-main": {
-              "0,0": "alpha-one",
-              "0,1": "alpha-two",
-            },
-          },
+          tableId: nounMain.id,
+          overrides: [
+            morphologyFormOverride(nounMain, 0, 0, "alpha-one"),
+            { rowId: nounMain.rows[0].id, columnId: nounMain.columns[1].id, kind: "absent" },
+          ],
         },
-        {
-          templateGroupId: "morph-verb",
-          overrides: {
-            "mtable-verb-main": {
-              "0,0": "dormant-alpha",
-            },
-          },
-        },
+        { tableId: verbMain.id, overrides: [morphologyFormOverride(verbMain, 0, 0, "dormant-alpha")] },
       ],
     },
-    {
-      id: "entry-auto-plain",
-      lemma: "beta",
-      tags: ["n"],
-      morphologyMode: "auto",
-      morphologyGroups: [],
-    },
+    { id: "entry-auto-plain", lemma: "beta", tags: ["n"], morphologyMode: "auto", morphologyTables: [] },
     {
       id: "entry-manual-multi",
       lemma: "gamma",
       tags: ["v"],
       morphologyMode: "manual",
-      morphologyGroups: [
-        {
-          templateGroupId: "morph-verb",
-          overrides: {
-            "mtable-verb-main": {
-              "0,0": "manual-gamma",
-            },
-          },
-        },
-        {
-          templateGroupId: "morph-noun",
-          overrides: {},
-        },
+      morphologyTables: [
+        { tableId: verbMain.id, overrides: [morphologyFormOverride(verbMain, 0, 0, "manual-gamma")] },
+        { tableId: nounMain.id, overrides: [] },
+        { tableId: nounExtra.id, overrides: [] },
       ],
     },
+    { id: "entry-manual-empty", lemma: "delta", tags: [], morphologyMode: "manual", morphologyTables: [] },
     {
-      id: "entry-manual-empty",
-      lemma: "delta",
-      tags: [],
-      morphologyMode: "manual",
-      morphologyGroups: [],
+      id: "entry-auto-none", lemma: "epsilon", tags: ["x"], morphologyMode: "auto",
+      morphologyTables: [{ tableId: unused.id, notes: "Dormant notes only", overrides: [] }],
     },
-    {
-      id: "entry-auto-none",
-      lemma: "epsilon",
-      tags: ["x"],
-      morphologyMode: "auto",
-      morphologyGroups: [{
-        templateGroupId: "morph-unused",
-        title: "Dormant title only",
-        overrides: {},
-      }],
-    },
-    {
-      id: "entry-auto-noun-two",
-      lemma: "zeta",
-      tags: ["n"],
-      morphologyMode: "auto",
-      morphologyGroups: [],
-    },
+    { id: "entry-auto-noun-two", lemma: "zeta", tags: ["n"], morphologyMode: "auto", morphologyTables: [] },
   ];
 }
+
 
 function featureRequest(category, options = {}) {
   return {
@@ -254,18 +184,18 @@ async function checkQueryModel() {
     normalizeFeatureResultQuery({ source: MORPHOLOGY_SOURCE, responseMode: "summary" }),
     { source: MORPHOLOGY_SOURCE, responseMode: "summary" },
   );
-  const morphologyGroup = normalizeFeatureResultQuery(morphologyRequest("group", "morph-noun"));
-  assert.equal(morphologyGroup.view.category, "group");
-  assert.equal(morphologyGroup.view.value, "morph-noun");
-  const morphologyOverrideGroup = normalizeFeatureResultQuery(
-    morphologyRequest("overrideGroup", "morph-verb"),
+  const morphologyTable = normalizeFeatureResultQuery(morphologyRequest("table", nounMain.id));
+  assert.equal(morphologyTable.view.category, "table");
+  assert.equal(morphologyTable.view.value, nounMain.id);
+  const morphologyOverrideTable = normalizeFeatureResultQuery(
+    morphologyRequest("overrideTable", verbMain.id),
   );
-  assert.equal(morphologyOverrideGroup.view.scope, "any");
-  const inactiveOverrideGroup = normalizeFeatureResultQuery(
-    morphologyRequest("overrideGroup", "morph-verb", { scope: "inactive" }),
+  assert.equal(morphologyOverrideTable.view.scope, "any");
+  const inactiveOverrideTable = normalizeFeatureResultQuery(
+    morphologyRequest("overrideTable", verbMain.id, { scope: "inactive" }),
   );
-  assert.equal(inactiveOverrideGroup.view.scope, "inactive");
-  assert.equal(featureResultViewIdentity(inactiveOverrideGroup).scope, "inactive");
+  assert.equal(inactiveOverrideTable.view.scope, "inactive");
+  assert.equal(featureResultViewIdentity(inactiveOverrideTable).scope, "inactive");
   assert.throws(
     () => normalizeFeatureResultQuery({ source: SOURCE, responseMode: "summary", page: { limit: 1 } }),
     (error) => error instanceof FeatureResultQueryValidationError
@@ -358,9 +288,12 @@ async function checkMorphologyAnalysisModel() {
   const result = await buildMorphologyAnalysisResult({
     dictionary: {
       id: "dict-morphology-model",
-      morphology: { templateGroups: MORPHOLOGY_TEMPLATE_GROUPS },
+      morphology: { slots: MORPHOLOGY_SLOTS },
     },
-    entries: morphologyFixtureEntries(),
+    entries: morphologyFixtureEntries().map((entry) => ({
+      ...entry,
+      morphologyTables: entry.morphologyTables.map(({ tableId, overrides }) => ({ tableId, overrideCellCount: overrides.length })),
+    })),
   });
   assert.equal(result.summary.inputEntryCount, 6);
   assert.deepEqual(result.summary.assignment, {
@@ -371,14 +304,11 @@ async function checkMorphologyAnalysisModel() {
     { mode: "auto", entryCount: 4, assignedEntryCount: 3, unassignedEntryCount: 1 },
     { mode: "manual", entryCount: 2, assignedEntryCount: 1, unassignedEntryCount: 1 },
   ]);
-  assert.deepEqual(result.summary.groups.map((row) => ({
-    groupId: row.groupId,
-    assignedEntryCount: row.assignedEntryCount,
-    tableCount: row.tableCount,
-  })), [
-    { groupId: "morph-noun", assignedEntryCount: 4, tableCount: 2 },
-    { groupId: "morph-verb", assignedEntryCount: 1, tableCount: 1 },
-    { groupId: "morph-unused", assignedEntryCount: 0, tableCount: 0 },
+  assert.deepEqual(result.summary.tables, [
+    { tableId: nounMain.id, slotId: "mslot-noun", title: nounMain.title, assignedEntryCount: 4 },
+    { tableId: nounExtra.id, slotId: "mslot-noun", title: nounExtra.title, assignedEntryCount: 4 },
+    { tableId: verbMain.id, slotId: "mslot-verb", title: verbMain.title, assignedEntryCount: 1 },
+    { tableId: unused.id, slotId: "mslot-unused", title: unused.title, assignedEntryCount: 0 },
   ]);
   assert.deepEqual(result.summary.overrides, {
     entryCount: 2,
@@ -405,45 +335,8 @@ async function checkMorphologyAnalysisModel() {
     ],
   });
   assert.deepEqual(
-    result.summary.overrideGroups.map((row) => ({
-      groupId: row.groupId,
-      entryCount: row.entryCount,
-      activeEntryCount: row.activeEntryCount,
-      activeCellCount: row.activeCellCount,
-      inactiveEntryCount: row.inactiveEntryCount,
-      inactiveCellCount: row.inactiveCellCount,
-    })),
-    [
-      {
-        groupId: "morph-noun",
-        entryCount: 1,
-        activeEntryCount: 1,
-        activeCellCount: 2,
-        inactiveEntryCount: 0,
-        inactiveCellCount: 0,
-      },
-      {
-        groupId: "morph-verb",
-        entryCount: 2,
-        activeEntryCount: 1,
-        activeCellCount: 1,
-        inactiveEntryCount: 1,
-        inactiveCellCount: 1,
-      },
-      {
-        groupId: "morph-unused",
-        entryCount: 0,
-        activeEntryCount: 0,
-        activeCellCount: 0,
-        inactiveEntryCount: 0,
-        inactiveCellCount: 0,
-      },
-    ],
-  );
-  assert.deepEqual(
     result.summary.overrideTables.map((row) => ({
       tableId: row.tableId,
-      groupId: row.groupId,
       entryCount: row.entryCount,
       activeEntryCount: row.activeEntryCount,
       activeCellCount: row.activeCellCount,
@@ -453,7 +346,6 @@ async function checkMorphologyAnalysisModel() {
     [
       {
         tableId: "mtable-noun-main",
-        groupId: "morph-noun",
         entryCount: 1,
         activeEntryCount: 1,
         activeCellCount: 2,
@@ -462,7 +354,6 @@ async function checkMorphologyAnalysisModel() {
       },
       {
         tableId: "mtable-noun-extra",
-        groupId: "morph-noun",
         entryCount: 0,
         activeEntryCount: 0,
         activeCellCount: 0,
@@ -471,29 +362,36 @@ async function checkMorphologyAnalysisModel() {
       },
       {
         tableId: "mtable-verb-main",
-        groupId: "morph-verb",
         entryCount: 2,
         activeEntryCount: 1,
         activeCellCount: 1,
         inactiveEntryCount: 1,
         inactiveCellCount: 1,
       },
+      {
+        tableId: unused.id,
+        entryCount: 0,
+        activeEntryCount: 0,
+        activeCellCount: 0,
+        inactiveEntryCount: 0,
+        inactiveCellCount: 0,
+      },
     ],
   );
   const autoNoun = result.recordsById.get("entry-auto-noun");
   assert.equal(morphologyAnalysisRecordMatches(autoNoun, {
-    category: "overrideGroup",
-    value: "morph-verb",
+    category: "overrideTable",
+    value: verbMain.id,
     scope: "inactive",
   }), true);
   assert.equal(morphologyAnalysisRecordMatches(autoNoun, {
-    category: "overrideGroup",
-    value: "morph-verb",
+    category: "overrideTable",
+    value: verbMain.id,
     scope: "active",
   }), false);
   assert.deepEqual(morphologyAnalysisItemFeature(autoNoun), {
     mode: "auto",
-    assignedGroupIds: ["morph-noun"],
+    assignedTableIds: [nounMain.id, nounExtra.id],
     activeOverrideCellCount: 2,
     inactiveOverrideCellCount: 1,
   });
@@ -794,7 +692,7 @@ async function checkRepositoryIntegration() {
           },
         },
       },
-      morphology: { templateGroups: MORPHOLOGY_TEMPLATE_GROUPS },
+      morphology: { slots: MORPHOLOGY_SLOTS },
       entries: morphologyFixtureEntries(),
     });
     await repository.importDictionarySnapshot(morphologyDictionary);
@@ -831,52 +729,52 @@ async function checkRepositoryIntegration() {
     assert.equal(morphologySummary.summary.overrides.storedCellCount, 4);
     assert.equal(Object.hasOwn(morphologySummary, "items"), false);
 
-    const nounGroup = await service.query(
+    const nounTable = await service.query(
       morphologyDictionary.id,
-      morphologyRequest("group", "morph-noun"),
+      morphologyRequest("table", nounMain.id),
     );
-    assert.deepEqual(nounGroup.items.map((item) => item.entry.id), [
+    assert.deepEqual(nounTable.items.map((item) => item.entry.id), [
       "entry-auto-noun",
       "entry-auto-plain",
     ]);
-    assert.equal(nounGroup.pageInfo.total, 4);
-    assert.deepEqual(nounGroup.items[0].feature, {
+    assert.equal(nounTable.pageInfo.total, 4);
+    assert.deepEqual(nounTable.items[0].feature, {
       mode: "auto",
-      assignedGroupIds: ["morph-noun"],
+      assignedTableIds: [nounMain.id, nounExtra.id],
       activeOverrideCellCount: 2,
       inactiveOverrideCellCount: 1,
     });
-    assert.deepEqual(Object.keys(nounGroup.items[0].feature), [
+    assert.deepEqual(Object.keys(nounTable.items[0].feature), [
       "mode",
-      "assignedGroupIds",
+      "assignedTableIds",
       "activeOverrideCellCount",
       "inactiveOverrideCellCount",
     ]);
 
     const inactiveVerbOverride = await service.query(
       morphologyDictionary.id,
-      morphologyRequest("overrideGroup", "morph-verb", { scope: "inactive" }),
+      morphologyRequest("overrideTable", verbMain.id, { scope: "inactive" }),
     );
     assert.deepEqual(
       inactiveVerbOverride.items.map((item) => item.entry.id),
       ["entry-auto-noun"],
     );
-    const searchedVerbGroup = await service.query(
+    const searchedVerbTable = await service.query(
       morphologyDictionary.id,
-      morphologyRequest("group", "morph-verb", {
+      morphologyRequest("table", verbMain.id, {
         search: { text: "v", fields: ["tags"], fuzzyFields: [] },
       }),
     );
     assert.deepEqual(
-      searchedVerbGroup.items.map((item) => item.entry.id),
+      searchedVerbTable.items.map((item) => item.entry.id),
       ["entry-manual-multi"],
     );
-    assert.deepEqual(searchedVerbGroup.searchSummary, {
+    assert.deepEqual(searchedVerbTable.searchSummary, {
       matchedEntryCount: 1,
       fields: [{ field: "tags", matching: "strict", entryCount: 1 }],
     });
     const locatedMorphology = await service.location(morphologyDictionary.id, {
-      ...morphologyRequest("group", "morph-noun", { limit: 2 }),
+      ...morphologyRequest("table", nounMain.id, { limit: 2 }),
       entryId: "entry-auto-noun-two",
     });
     assert.equal(locatedMorphology.location.found, true);
@@ -887,7 +785,7 @@ async function checkRepositoryIntegration() {
     await assert.rejects(
       service.query(
         morphologyDictionary.id,
-        morphologyRequest("group", "morph-missing"),
+        morphologyRequest("table", "mtable-missing"),
       ),
       (error) => error.code === "invalid_feature_result_value",
     );

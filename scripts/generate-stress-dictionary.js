@@ -11,6 +11,7 @@ const {
   normalizeUiTheme,
 } = require("../lib/dictionary-model");
 const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
+const { importDictionaryFromJsonPayload } = require("../lib/dictionary-conversion-service");
 
 const ROOT = path.resolve(__dirname, "..");
 const REAL_DATA_DIR = path.join(ROOT, "data");
@@ -132,7 +133,7 @@ function makeExamples(content, group, index, corpusItems) {
     return [];
   }
   const id = deterministicId("corpus-item", group, index);
-  corpusItems.push({ id, name: "", group: "", content });
+  corpusItems.push({ id, name: "", group: "", content, createdAt: CREATED_AT, updatedAt: CREATED_AT });
   return [{ itemId: id }];
 }
 
@@ -246,7 +247,7 @@ function formatEntryCount(entryCount) {
   return entryCount.toLocaleString("en-US");
 }
 
-function buildDictionary(entryCount = DEFAULT_ENTRY_COUNT) {
+function buildLegacyStressDictionary(entryCount = DEFAULT_ENTRY_COUNT) {
   entryCount = parseEntryCount(entryCount);
   random = mulberry32(0xC0DEC0DE);
   const usedLemmas = new Set();
@@ -330,6 +331,10 @@ function buildDictionary(entryCount = DEFAULT_ENTRY_COUNT) {
     updatedAt: CREATED_AT,
     entries,
   };
+}
+
+function buildDictionary(entryCount = DEFAULT_ENTRY_COUNT) {
+  return importDictionaryFromJsonPayload(buildLegacyStressDictionary(entryCount)).dictionary;
 }
 
 function usage() {
@@ -482,6 +487,7 @@ module.exports = {
   DEFAULT_ENTRY_COUNT,
   DICTIONARY_ID,
   buildDictionary,
+  buildLegacyStressDictionary,
   generateStressDictionary,
   parseArgs,
 };

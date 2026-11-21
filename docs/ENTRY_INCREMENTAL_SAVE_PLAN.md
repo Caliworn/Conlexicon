@@ -5,7 +5,7 @@
 **2026-10-25 释义标签阶段 1 先于本计划实施**（[Definition Tag Specification](DEFINITION_TAG_SPEC.md)），下文第 1 节的事实和依赖清单尚未据此修订。实施前须吸收：
 
 - 释义有了标签，存于 `definition_tags`，随释义写入、经外键级联删除；释义子表的差异比较要包含释义标签。
-- 自动形态改按有效标签（词条标签 ∪ 释义标签）匹配，所以只改释义标签也可能改变形态结果；形态生成键里的"自动模式下的标签集合"应改为有效标签集合；形态分配重做定为按释义匹配后，改用合并后的生效表 ID 列表（见该计划第 4 节）。
+- 自动形态逐释义匹配。单改释义标签也可能改变生效表，生成键使用合并后的有序表 ID。[形态分配与保存](API_CONTRACT.md#形态分配与保存)
 - 搜索投影的 `tags` records 包含释义标签，`entry_search_values` 主键加入了 `source_id`。
 - `batchUpdateEntries()` 不再调用 `patchEntries()`，两者共用内部的 `writeEntryEdits()`；整理标签顺序也会改写释义标签。
 
@@ -16,7 +16,7 @@
 **写入路径**
 
 - 所有词条写入最终都调用 `writeEntryProjection(db, entry, position, dictionary)`（`lib/sqlite-dictionary-repository.js`）。它无条件执行以下步骤：
-  1. 删除当前词条的 definitions、tags、sources、形态组和 override，然后全部重新插入；
+  1. 删除当前词条的 definitions、tags、sources、形态表与覆写，然后全部重新插入；
   2. 用 `INSERT … ON CONFLICT(id) DO UPDATE` 重写主表的全部列，包括来自请求的 `created_at`；
   3. 重建该词条的静态搜索投影（`writeEntrySearchProjection()`）和形态搜索投影（`writeEntryMorphologySearchProjection()`）；
   4. lemma 变化时，执行 `UPDATE entry_sources SET source_text …`，并重建所有引用方的整份静态投影。
@@ -32,15 +32,10 @@
   - `lemma`、`pronunciation`：同名属性；
   - `tags`：标签原值，以及按 `tagDisplayMap` 得到的显示值；
   - `definitions`、`examples`：各条释义的释义文字和例句；
-  - `notes`：词条备注、释义备注、形态组备注三者合并；
+  - `notes`：词条备注、释义备注、形态表备注分别生成 records；
   - `etymology`：词源描述和来源文本。
-- 形态搜索投影由 `morphologySearchValueRecords(entry, dictionary)` 生成。它依赖的词条输入只有：
-  - `lemma`；
-  - `morphologyMode`；
-  - 形态组的 `templateGroupId` 与 `overrides`；
-  - 自动模式下的标签**集合**：`resolveAutomaticTemplateGroups()` 先把标签转成 Set，再按模板组顺序取第一个匹配项，因此与标签顺序无关。
-
-  它不依赖 `pronunciation`、释义、备注、形态组的 `title / notes`，也不依赖词源。
+- 形态搜索投影由 `morphologySearchValueRecords(entry, dictionary)` 生成。它使用词形、模式、有序生效表及对应坐标的覆写。
+  自动模式的生效表来自词条标签与各条释义标签，手动模式取显式列表。表备注单独参与静态搜索。
 
 **版本与冲突**
 
@@ -104,10 +99,10 @@ writeEntryChanges(db, previous, next, position, dictionary, options)
 - 例句连接 `definition_examples` 对释义是级联外键，目前随词条保存整体重写；改为按 ID 比较后，保留的释义行不会触发级联，连接仍须按 DTO 写回。
 - `definitions.updated_at` 在 C13 删除之前，只在插入和更新的行里写入词条的 `updatedAt`。
 
-**tags、sources、形态组与 override：整组比较**
+**tags、sources、形态表与覆写的比较**
 
 - 这几类每条词条通常只有几项。整组按顺序比较规范化后的值，相同就跳过，不同才整组删除后重新插入。按行比较带来的复杂度不值得。
-- 形态组比较的是 `normalizeEntryMorphologyState()` 的结果，排除 `createdAt / updatedAt`。形态组没变时整组不写，原有时间戳也就保留下来。
+- 按表 ID 比较 `normalizeEntryMorphologyState()` 的形态表记录，排除 `createdAt / updatedAt`。一张表上的覆写按行列 ID 比较。
 - sources 先按现在的规则，用目标词条的当前 lemma 重新计算来源文本，再做比较。
 
 ### 3.3 静态搜索投影：按字段比较
@@ -123,12 +118,8 @@ writeEntryChanges(db, previous, next, position, dictionary, options)
 
 ### 3.4 形态搜索投影：按生成键判断
 
-- 在 `lib/morphology-model.js` 中新增并导出 `entryMorphologyGenerationKey(entry)`，与 `resolveEntryMorphologyGroups()` 放在一起维护。生成键包含：
-  - `lemma`；
-  - `morphologyMode`；
-  - 有序的 `[templateGroupId, overrides]`；
-  - 仅自动模式下：与 `resolveAutomaticTemplateGroups()` 使用同一规范化方式得到的排序后标签集合。
-- 两边生成键相同时跳过形态生成。这样单改 `pronunciation`、释义、备注、词源或调整标签顺序时，都不会重新生成词形。
+- 在共享形态模型提供 `entryMorphologyGenerationKey(entry, morphology)`。生成键包含词形、模式和有序的生效表 ID，附该表每个坐标的覆写。自动模式从逐释义匹配的合并结果得出生效表。手动模式取显式列表。
+- 生成键相同就沿用投影。普通释义文字、备注、来源与标签顺序变化无需重新生成，释义标签只在改变生效表时影响生成键。
 - 风险：生成键漏掉某个依赖时，投影会**静默过期**。缓解措施见 §6 的一致性验收：每轮编辑后，把增量结果与全量重建结果逐行比较。
 
 ### 3.5 lemma 改名时的关联更新

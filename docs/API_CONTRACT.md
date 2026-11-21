@@ -93,7 +93,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `PUT` | `/api/dictionaries/:id/meta` | 保存词典名称、语言、描述 | 词典 metadata payload | 不做实体 ID 检查；响应包含 `id/name/language/description/createdAt/updatedAt`。 |
 | `PUT` | `/api/dictionaries/:id/settings` | 保存其他设置 | `{ id, updatedAt, settings }` | 不做实体 ID 检查；会保留既有 IPA 设置。`settings.search` 含字段级 `enabled/fuzzy`、`etymologyAutocomplete.fuzzy`，以及 `normalization: { unicodeNormalization: "none" | "nfc", caseFolding: boolean, customRules: { canonical, variants[] }[] }`。规范化默认严格关闭；自定义规则按最长变体优先且单次应用。前端据此生成读取 API 参数，并同步用于词根模式、搜索摘要/高亮、字段命中计数和词源自动补全。`settings.tagListSeparatorStyle` 支持 `commaSpace`、`fullwidthComma`、`ideographicComma`，只控制标签列表输入框重新显示时的分隔符。`settings.search.normalization.customRules` 必须是数组，每条规则须有非空的 `canonical` 和非空的 `variants`，同一变体不能对应不同的标准形式；任何一条不合规都整次拒绝，返回 400 `invalid_search_normalization_rule`（规则无效时运行期会忽略全部自定义规则，所以不接受部分保存）。`settings.toolNavOrder` 与 `settings.entrySectionOrder` 由服务端保留合法项顺序、去掉重复与未知项并补齐缺项；未知 settings 字段原样保留。 |
 | `PUT` | `/api/dictionaries/:id/docs` | 保存语言文档 | `{ id, updatedAt, docs }` | 不做实体 ID 检查。 |
-| `PUT` | `/api/dictionaries/:id/morphology` | 保存自动形态学模块 | `{ id, updatedAt, morphology }` | 请求仍表示完整替换形态模块；后端检查提交内组与表 ID 不重复（不查词条与语料）、规则语法和函数配置，并按稳定组/表 ID 增量写入模板。纯名称、说明、表格标题或行列标签变化不重建生成投影；规则、函数、表结构或自动分配变化只重建实际受影响词条的形态搜索 projection。完全相同的规范化 payload 作为 no-op 返回既有 `updatedAt`。删除组、删除/移动表格或缩小表格会使既有词条形态组或覆写悬空时返回 `morphology_references_in_use`。 |
+| `PUT` | `/api/dictionaries/:id/morphology` | 完整替换形态模块 | `{ id, updatedAt, morphology }` | 保存形态函数、槽位、表、行列及格。可带删除确认或解除继承的行列映射。请求、校验及投影更新见[形态分配与保存](#形态分配与保存)。 |
 | `PUT` | `/api/dictionaries/:id/settings/ipa` | 保存自动 IPA 设置 | `{ id, updatedAt, settings }` | 请求体是 `settings.ipa` 的字段，可另带 `ipaKeyboard`，两者在同一事务里写入 `settings`；不带时保留已有键盘。IPA 映射是按顺序保存的纯文本规则 `{ from, to, before, after }`，没有实体 ID，也不参与实体 ID 防撞。`syllable.vowels`、`onsetClusters`、`codaClusters`、`complexPhonemes` 都是字符串数组；写入字符串或含分隔符的数组项时，按空白、逗号、顿号拆开。 |
 | `POST` | `/api/dictionaries/:id/autosave` | 页面卸载时保存文档／已有语料 | `{ id, updatedAt, docs?, corpusItem? }` | `corpusItem` 为 `{ id, name, group, content }`，按 `PUT /corpus/items/:itemId` 保存。新草稿首次保存走 `POST /corpus/items`。请求至少须携带 `docs` 或带 `id` 的 `corpusItem`，否则返回 `invalid_autosave_payload`。 |
 
@@ -172,10 +172,10 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
   }
   ```
 
-  所有字段均可省略。所有标签条件（`part`、`partCount`、`partSet`、`tags`、`presence.tag`、`tagCount`）都按词条的**有效标签**判断，即词条标签与全部释义标签的并集，见[释义标签与有效标签](#释义标签与有效标签)；标签挂在哪一层不影响结果。`tags.mode` 为 `any`、`all` 或 `exact`；`exact` 要求词条包含全部指定标签且不含任何额外标签。`presence.field` 支持 `definition`、`example`、`entryNote`、`source`、`derivedEntries`、`ipa`、`tag`；`source` 表示词条有任何来源记录（已绑定或纯文本），`derivedEntries` 表示有其他词条以已绑定来源引用它（即它有衍生词）；`tag` 表示词条是否至少有一个有效标签。`sourceCount`、`tagCount` 与 `partCount` 都是包含边界的非负整数区间，`max` 可省略；`sourceCount` 统计来源记录，`tagCount` 统计不同有效标签的数量，`partCount` 统计词条的词性集合大小（有效标签中出现在 `settings.partOfSpeechTags` 里的不同标签）。`partSet` 是至少两个不同词性的数组，要求词条的词性集合恰好等于它，非词性标签不受限制；单个词性用 `part`。`partSet` 含未配置为词性的值时结果为空，与 `part` 处理未配置词性的方式相同；没有配置词性时 `partCount` 按 0 计算。`partCount` 区间非法返回 `invalid_entry_filter_part_count`，`partSet` 不是字符串数组或去重后只有一个值时返回 `invalid_entry_filter_part_set`。`activityDays.field` 支持 `created`、`updated`，日期按 UTC `YYYY-MM-DD` 的 `[dayStart, nextDayStart)` 半开范围比较。同一 presence 或日期字段不得给出冲突条件。`orthography` 是单一正写法结构条件，category 支持 `length`、`initial`、`character`、`bigram`；长度按整个 lemma 的 Unicode 码点数计算，首字符先 trim，字符忽略 Unicode 空白，双字符只统计空白分隔片段内部的相邻码点。该条件不执行 NFC、搜索规范化或字素簇合并。当前 `entryNote` 只表示词条级备注，不包含释义备注或形态组备注。
+  所有字段均可省略。所有标签条件（`part`、`partCount`、`partSet`、`tags`、`presence.tag`、`tagCount`）都按词条的**有效标签**判断，即词条标签与全部释义标签的并集，见[释义标签与有效标签](#释义标签与有效标签)；标签挂在哪一层不影响结果。`tags.mode` 为 `any`、`all` 或 `exact`；`exact` 要求词条包含全部指定标签且不含任何额外标签。`presence.field` 支持 `definition`、`example`、`entryNote`、`source`、`derivedEntries`、`ipa`、`tag`；`source` 表示词条有任何来源记录（已绑定或纯文本），`derivedEntries` 表示有其他词条以已绑定来源引用它（即它有衍生词）；`tag` 表示词条是否至少有一个有效标签。`sourceCount`、`tagCount` 与 `partCount` 都是包含边界的非负整数区间，`max` 可省略；`sourceCount` 统计来源记录，`tagCount` 统计不同有效标签的数量，`partCount` 统计词条的词性集合大小（有效标签中出现在 `settings.partOfSpeechTags` 里的不同标签）。`partSet` 是至少两个不同词性的数组，要求词条的词性集合恰好等于它，非词性标签不受限制；单个词性用 `part`。`partSet` 含未配置为词性的值时结果为空，与 `part` 处理未配置词性的方式相同；没有配置词性时 `partCount` 按 0 计算。`partCount` 区间非法返回 `invalid_entry_filter_part_count`，`partSet` 不是字符串数组或去重后只有一个值时返回 `invalid_entry_filter_part_set`。`activityDays.field` 支持 `created`、`updated`，日期按 UTC `YYYY-MM-DD` 的 `[dayStart, nextDayStart)` 半开范围比较。同一 presence 或日期字段不得给出冲突条件。`orthography` 是单一正写法结构条件，category 支持 `length`、`initial`、`character`、`bigram`；长度按整个 lemma 的 Unicode 码点数计算，首字符先 trim，字符忽略 Unicode 空白，双字符只统计空白分隔片段内部的相邻码点。该条件不执行 NFC、搜索规范化或字素簇合并。当前 `entryNote` 只表示词条级备注，不包含释义备注或形态表备注。
 - `fields`：逗号分隔的搜索字段白名单；当前支持 `lemma`、`pronunciation`、`tags`、`definitions`、`examples`、`notes`、`etymology`、`morphology`。为空或全部无效时搜索全部字段。
 - `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；仅对同时出现在 `fields` 中的字段生效。
-- 基础搜索逐个独立字段值匹配：一条释义、一个标签、一个来源或一段备注必须自行包含查询文本，查询不会跨多个值拼接命中；`notes` 中的词条备注、释义备注和每个词条形态组备注也分别作为独立值。多标签组合等条件应使用高级筛选。自由文本按当前词典的 `settings.search.normalization` 处理。SQLite 的严格及 fuzzy 查询均直接读取静态 `entry_search_values` 和按需读取形态 `entry_morphology_search_values`；fuzzy 通过连接级确定性函数复用共享搜索模型的评分语义。该路径支持 NFC、Unicode case folding 和自定义等价规则。结构键和词源关系键不套用该自由文本配置。
+- 基础搜索逐个独立字段值匹配：一条释义、一个标签、一个来源或一段备注必须自行包含查询文本，查询不会跨多个值拼接命中；`notes` 中的词条备注、释义备注和每个词条形态表备注也分别作为独立值。多标签组合等条件应使用高级筛选。自由文本按当前词典的 `settings.search.normalization` 处理。SQLite 的严格及 fuzzy 查询均直接读取静态 `entry_search_values` 和按需读取形态 `entry_morphology_search_values`；fuzzy 通过连接级确定性函数复用共享搜索模型的评分语义。该路径支持 NFC、Unicode case folding 和自定义等价规则。结构键和词源关系键不套用该自由文本配置。
 - 词源自动补全由独立的 `settings.search.etymologyAutocomplete.fuzzy` 控制，候选通过复用 `/entries` projection 的后端端点获取（见[输入、补全与唯一性](#输入补全与唯一性)），不再扫描前端词典快照。
 
 #### `POST /api/dictionaries/:id/entries/batch`：整词典批处理
@@ -254,7 +254,8 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `invalid_entry_updates_payload` | 批量词条更新请求格式无效。 |
 | `invalid_entry_batch_payload` | 整词典批处理的 operation、mode 或 dryRun 无效。 |
 | `entry_not_found` | 词条不存在或已被删除。 |
-| `invalid_entry_morphology` | 词条携带的当前形态组或覆盖项结构无效。 |
+| `invalid_entry_morphology` | 词条的形态模式或表列表无效，或引用的表不存在或重复。 |
+| `invalid_morphology_override` | 词条覆写坐标越界、重复，或字段与覆写类型不符。 |
 | `invalid_entry_location_target` | 词根窗口定位请求未提供目标词条 ID。 |
 | `invalid_overview_time_zone` | 列表概览的 `tz` 不是可识别的 IANA 时区名。 |
 | `invalid_root_context` | `preferredRootId` 不是目标词条的可用词根上下文。 |
@@ -286,8 +287,15 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `invalid_entry_filter_orthography` | 正写法筛选类别或值无效。 |
 | `query_cursor_required` | 非零窗口 offset 未附带版本化 cursor。 |
 | `query_cursor_stale` | cursor 已因服务进程、词典写入或查询条件变化而失效；`details.reason` 标明原因。 |
-| `invalid_morphology_payload` | 形态学请求体格式无效。 |
-| `morphology_references_in_use` | 形态模板结构变化会使既有词条形态组或单元格覆写失效；`details.referenceCount/references` 返回受影响引用摘要。 |
+| `invalid_morphology_payload` | 形态请求结构、确认标记、格的规则语法或函数配置无效。 |
+| `invalid_morphology_slot` | 槽位无效或槽位中没有表。 |
+| `invalid_morphology_match_rule` | 匹配规则不合法。行级错误返回 `details.tableId/row/reason`，行号从 1 开始。 |
+| `invalid_morphology_shape` | 链顶表缺少行或列，或形态模块内的行列 ID 无效、重复。 |
+| `invalid_morphology_inheritance` | 继承目标、继承环、子表形状、改换父表或解除继承映射无效。 |
+| `invalid_morphology_cell` | 模板格的坐标、状态字段或合形引用无效，包括叠好继承才出现的引用环。 |
+| `morphology_references_in_use` | 409。删除表或行列会清除词条数据，须确认后重试。 |
+| `morphology_table_has_children` | 409。被删表仍有子表继承，`details` 为 `{ tableId, childTableIds }`。 |
+| `incompatible_sqlite_schema` | 409。目标是旧形态结构的 SQLite，须用旧版导出 JSON，再导入新库。 |
 | `invalid_ipa_settings_payload` | IPA 设置请求体格式无效。 |
 | `unsupported_entry_patch_fields` | 批量词条 patch 包含不支持字段。 |
 | `entry_patch_tags_invalid` | 批量标签 patch 值不是数组。 |
@@ -337,7 +345,7 @@ GET /api/dictionaries/:id/entries?filter=&q=&fields=&fuzzyFields=&part=&tags=&ta
   - `tags`：词条标签和释义标签的原始值与显示替换值（词性也是标签）；
   - `definitions`：释义文本；
   - `examples`：释义连接的语料文本，经 `glossSearchText()` 去掉行内格式，包含各层、纯文本行与注释；
-  - `notes`：词条备注、释义备注和词条形态组备注；
+  - `notes`：词条备注、释义备注和词条形态表备注；
   - `etymology`：词源描述和来源文本；
   - `morphology`：按当前形态表设置动态生成的形态形式，以及词条级形态 override。
 - `fuzzyFields`：逗号分隔的字段级模糊匹配白名单；仅对 `fields` 中的字段生效。
@@ -447,14 +455,14 @@ GET /api/dictionaries/:id/entries/:entryId/location?filter=&q=&fields=&fuzzyFiel
 {
   field,           // lemma / pronunciation / tags / definitions / examples / notes / etymology / morphology
   value,           // 原始显示文本，不是规范化文本
-  sourceType,      // entry / tag / definitionTag / definition / morphologyGroup / etymologySource / morphology
+  sourceType,      // entry / tag / definitionTag / definition / morphologyTable / etymologySource / morphology
   sourceId,        // 有稳定 ID 时填写；词条标签为空字符串，释义标签为所属释义 ID
   sourcePosition,  // 该来源在所属词条中的零基位置；释义标签为它在所属释义内的位置
   valueType        // lemma / raw / display / meaning / example / note / description / source / generated 等
 }
 ```
 
-`lib/entry-search-model.js` 的 `entrySearchValueRecords()` 是该结构的共享定义；现有 matcher 也由这些 records 重新聚合字段值，避免后续 SQL projection 与 JavaScript 搜索形成两套逐值边界。`morphology` record 由共享形态模型的 `morphologySearchValueRecords()` 生成，`sourceId` 使用真实子表 ID，`sourcePosition` 保留跨形态组/子表的单元格求值顺序。
+`lib/entry-search-model.js` 的 `entrySearchValueRecords()` 定义每个检索值与它的来源，JavaScript 搜索和 SQLite 投影共用此定义。形态表备注用 `sourceType: "morphologyTable"`，表 ID 为 `sourceId`。
 
 SQLite projection 查询中，带 `q` 的分页结果会为每个命中词条附加：
 
@@ -480,9 +488,37 @@ SQLite projection 查询中，带 `q` 的分页结果会为每个命中词条附
 
 `examples` record 的 `sourceType` 为 `definitionExample`，`sourceId` 为释义 ID，`sourcePosition` 为例句在该释义内的位置，因此同一释义的多条例句各占一条 record。
 
-形态搜索不是简单读取持久化字段。词条使用 `morphologyMode: "auto" | "manual"`：`auto` 先按自动分配规则得出有序模板组，再按真实 `templateGroupId` 合并该词条的 overlay；`manual` 按词条形态组 position 使用显式模板组，空列表表示明确不使用形态。随后遍历组内全部子表，逐格读取以真实子表 ID 分层的 override；没有 override 时用词形、形态规则和形态函数动态生成默认形式。`templateGroupId` 不再接受 `"auto"` 或 `"none"` 伪值；旧 JSON 的转换只发生在导入迁移。
+形态搜索按词条生效表和每表的格逐一解析，只为非空形式生成记录。`entry_morphology_search_values` 保存模板表 ID、行列 ID、显示位置、原始值与搜索规范化值。命中返回 `sourceType: "morphology"`、`sourceId: <tableId>`、`valueType: "generated"`。零基的 `sourcePosition` 按生效表顺序、再按表内行列顺序编号，空白与不存在的格也占位置。严格及 fuzzy 查询直接从所需的 SQLite 投影匹配；带结构筛选时在同一 SQL 中用候选关系限定投影。每个 SQLite 连接注册 `conlexicon_fuzzy_match(normalized_value, normalized_query)`，复用共享 matcher。
 
-上述结果写入独立的 `entry_morphology_search_values` 派生 projection。它保存真实模板组、子表和单元格坐标以及原始/规范化值，不进入 JSON，也不替代形态主数据。词条 lemma、形态匹配标签、模式、显式组或 override 变化时局部重建；形态模板/函数变化或搜索规范化变化时全量重建。严格及 fuzzy 的形态单字段查询以及静态+形态混合查询均直接读取两张 projection，并把形态单元格映射为 `sourceType: "morphology"`、`sourceId: <templateTableId>`、`sourcePosition: <求值顺序>`、`valueType: "generated"`。每个 SQLite 连接注册确定性的 `conlexicon_fuzzy_match(normalized_value, normalized_query)`，使 fuzzy projection 查询复用共享 matcher。带结构筛选的词条搜索在同一 SQL 中将候选关系连接到两张 projection；无结构条件时直接扫描目标 projection。SQL 只返回最终命中 ID，不再读取完整 snapshot、动态生成形态、把所有候选 records 返回 Node.js，或在 JavaScript 中对候选集合与投射命中集合求交。
+### 形态分配与保存
+
+形态模块和词条形态字段使用如下形状。完整的 `PUT /morphology` 可传模块本身，或使用含 `morphology` 字段的对象来携带保存选项。
+
+```js
+morphology: {
+  functions: { leftV, rightV },
+  slots: [{
+    id, name, notes, createdAt, updatedAt,
+    tables: [{
+      id, title, notes, matchRules: [{ all, none }], inheritsFrom, createdAt, updatedAt,
+      rows: [{ id, label }], columns: [{ id, label }], cells: [Cell]
+    }]
+  }]
+}
+// 当前词条
+morphologyMode: "auto" | "manual",
+morphologyTables: [{ tableId, notes, overrides: [Override], createdAt, updatedAt }]
+```
+
+- 每个槽位至少一张表。槽位顺序在前，槽位内表顺序在后。新槽位或表可省略 ID，由服务端生成 `mslot-` 或 `mtable-` UUID。链顶表的行列各至少一项，使用稳定 ID。子表带父表 ID 并省略 `rows` 和 `columns`。父表可在任意槽位，继承不参与分配。
+- 自动模式对每条释义用「词条标签 ∪ 当前释义标签」匹配。没有释义时只匹配一次词条标签。每条规则要求全部 `all` 且没有任何 `none`，多行任选其一。`all` 不能为空，一行不能同时要求和排除同一标签。空规则列表不会自动匹配。结构化标签区分大小写。`matchRules` 里的标签只用于匹配。
+- 同一上下文和槽位内，满足的规则行中，条件集合被另一满足行真包含的行被覆盖。剩下的规则行各自所属的表同时生效。跨槽位与释义合并去重，按模板顺序返回。共享 `morphologyMatchContexts()`、`resolveAutomaticTables()` 和 `explainAutomaticTables()` 提供逐释义结果、合并结果和判定原因。
+- 手动模式按 `morphologyTables` 的顺序选择表，空列表表示无形态。自动模式的列表存放逐词备注和覆写，未匹配到的表保留为休眠叠加层。自动模式下，既无备注又无覆写的叠加层规范化时丢弃。
+- `Cell` 统一含 `rowId`、`columnId` 和 `kind`。规则格用 `{ kind: "rule", sourceText }`，不存在用 `{ kind: "absent" }`，合形引用用 `{ kind: "refer", targetRowId, targetColumnId }`。空白规则按没有记录处理。链顶表没有记录时为空白，子表没有记录时沿父表查找。生效的引用在当前表内解析目标坐标，沿用该表的覆写与继承。
+- `Override` 使用同样的行列 ID，允许 `{ kind: "form", value }` 和 `{ kind: "absent" }`。`value` 为去除首尾空白后非空的字面形式。每表每坐标只能有一条覆写，模板格亦同。没有覆写时从当前表沿链取第一条格记录。引用可以串联，叠好继承后的每张表里都不能形成环。
+- 同一词条的表和行列身份保持稳定。移动表或调整显示顺序会重排搜索投影位置，修改标题、说明和行列标签只改模板。规则、格状态、轴的增删、所用函数或继承内容变化只重建涉及生效表的词条。更改分配规则或移动表到不同槽位时，用前后生效表定位受影响的词条。完全等同的规范化请求返回原 `updatedAt`。
+- 删除表或行列导致手动选择、叠加层或覆写丢失时，返回 409 `morphology_references_in_use`，整次不保存。`details` 为 `{ referenceCount, targets: [{ tableId, rowId?, columnId?, label, entryCount }], references }`。`targets` 按被删表或链顶表上的行列聚合，`entryCount` 按词条去重。`references` 是按词条位置取的前 50 条，包含 `{ entryId, lemma, tableId, rowId?, columnId?, reason }`。其中 `tableId` 是实际持有该配置的表，`reason` 为 `manual_table`、`overlay` 或 `override`。用户确认后，在请求外层带 `confirmReferenceRemoval: true`，服务端在同一事务清理引用、保存模板并更新投影。仍被继承的表返回 `morphology_table_has_children`。
+- 解除继承时把目标变为带独立行列的新链顶表，草稿将模板格、合形引用及后代的坐标换成新 ID。请求外层带 `detachments: [{ tableId, rowIdMap, columnIdMap }]`，两个映射均为「原行列 ID → 新行列 ID」。映射只列仍保留的已保存坐标，每个新 ID 最多对应一个原 ID。服务端凭映射重定位该表及后代表的已有覆写，未保留的坐标走同一删除确认。已有子表改指不同链顶时，先单独保存解除继承，再设置新父表。
 
 ### 标签登记表
 
@@ -493,7 +529,7 @@ SQLite projection 查询中，带 `q` 的分页结果会为每个命中词条附
 - 词条标签和释义标签的每个值都已登记，由外键保证。运行期写入在写标签行之前把新值登记到普通区末尾，同一次写入里的多个新标签按输入顺序：词条标签在前，然后按释义顺序。新标签一律进普通区。
 - 除了 `delete` 操作，任何操作都不删除登记行；不再被使用的标签留在表中，`entryCount` 为 0。
 - 标签身份是去首尾空白后的原始字符串，逐字符比较，不做大小写折叠或 Unicode 规范化。
-- 形态模板组的 `matchTags` 不写入登记表，也不计入使用数。
+- 形态表 `matchRules` 里的标签独立于登记表和标签使用计数。
 
 #### 读取
 
@@ -544,7 +580,7 @@ tagRegistry: [{ tag, partOfSpeech, displayLabel, color, displayAmbiguous }]
 - **规范序**：标签在词条和释义中是集合，不存储顺序。响应里的标签数组（详情、摘要、保存响应、`PATCH` 响应）一律按标签值的二进制序，`effectiveTags` 是词条标签后接各释义新增的标签，保存响应与之后读取的结果相同。规范序没有业务含义，不用于显示。
 - **显示顺序**：标签的先后只由登记表决定：词性区在前，区内按登记顺序。比较函数是共享模型的 `tagRank`，前端在渲染时用 `arrangeTags` 排列所有标签，已保存词条和草稿共用；服务端只在需要最终顺序的地方用它，即 JSON 导出和分析页的组合。这样登记表移动后，前端已缓存的列表页不会显示过期的顺序。尚未登记的标签（只在未保存的草稿中出现）排在所有已登记标签之后，保持输入顺序。
 - **使用范围**：EntryFilter 的全部标签条件、`/tag-registry` 的使用数、分析页的词性与标签统计、`missing_tags` 质量规则、`allowEmptyTags` 保存校验和自动形态匹配都按有效标签。`near_duplicate_tags` 与 `tag_too_long` 同时检查两层标签；`duplicate_definition_tag`、`mixed_part_of_speech_levels` 与 `missing_definition_part_of_speech` 检查两层之间的关系。标签显示替换与红色强调对两层同样生效。
-- **自动形态**：模板组匹配把有效标签作为唯一输入，规则不变（任一标签与组的 `matchTags` 相同即匹配，只取最前的组）。这是形态分配重做（见 [Morphology Assignment Plan](MORPHOLOGY_ASSIGNMENT_PLAN.md)，已定为按释义匹配）实施前的行为；释义都没有标签时，结果与只用词条标签相同。
+- **自动形态**逐释义匹配，每次只使用词条标签和当前释义标签。结果在各释义间取并集，按槽位和表顺序排列。[形态分配与保存](#形态分配与保存)
 - **搜索**：`tags` 字段同时投影释义标签，命中的 `sourceType` 为 `definitionTag`，`sourceId` 为释义 ID，`sourcePosition` 为该标签在释义内的位置。
 
 ### 词源与词根关系
@@ -948,9 +984,9 @@ summary 模式同样只传 `source` 与 `responseMode: "summary"`。`summary.dis
   source: { type: "morphologyAnalysis", version: 1, options: {} },
   responseMode: "items",
   view: {
-    category: "assignment" | "mode" | "group" | "override" | "overrideGroup" | "overrideTable",
+    category: "assignment" | "mode" | "table" | "override" | "overrideTable",
     value: "assigned",
-    scope: "any" | "active" | "inactive", // 仅 overrideGroup/overrideTable；默认 any
+    scope: "any" | "active" | "inactive", // 仅 overrideTable，默认 any
     search: {
       text: "",
       fields: ["lemma", "morphology"],
@@ -962,7 +998,7 @@ summary 模式同样只传 `source` 与 `responseMode: "summary"`。`summary.dis
 }
 ```
 
-category/value 组合固定为：`assignment + assigned|unassigned`、`mode + auto|manual`、`group + templateGroupId`、`override + any|active|inactive`、`overrideGroup + templateGroupId + scope`、`overrideTable + templateTableId + scope`。`scope` 在后两类中省略时规范化为 `any`，其他 category 不接受 scope。不存在于当前 result source 的模板组或子表 ID、缺少 value、非法枚举和非法 scope 返回 `invalid_feature_result_value`。
+category/value 组合为 `assignment + assigned|unassigned`、`mode + auto|manual`、`table + tableId`、`override + any|active|inactive`、`overrideTable + tableId`。只有 `overrideTable` 接受 `scope`，缺省为 `any`。未知模板表 ID、缺少 value 或非法 value/scope 返回 `invalid_feature_result_value`。
 
 `morphologyAnalysis` summary 固定形状为：
 
@@ -974,8 +1010,8 @@ category/value 组合固定为：`assignment + assigned|unassigned`、`mode + au
     { mode: "auto", entryCount, assignedEntryCount, unassignedEntryCount },
     { mode: "manual", entryCount, assignedEntryCount, unassignedEntryCount }
   ],
-  groups: [
-    { groupId, name, assignedEntryCount, tableCount }
+  tables: [
+    { tableId, slotId, title, assignedEntryCount }
   ],
   overrides: {
     entryCount,
@@ -988,24 +1024,21 @@ category/value 组合固定为：`assignment + assigned|unassigned`、`mode + au
       { entryId, lemma, storedCellCount, activeCellCount, inactiveCellCount }
     ]
   },
-  overrideGroups: [
-    { groupId, name, entryCount, activeEntryCount, activeCellCount, inactiveEntryCount, inactiveCellCount }
-  ],
   overrideTables: [
-    { groupId, tableId, groupName, title, entryCount, activeEntryCount, activeCellCount, inactiveEntryCount, inactiveCellCount }
+    { tableId, title, entryCount, activeEntryCount, activeCellCount, inactiveEntryCount, inactiveCellCount }
   ]
 }
 ```
 
-assignment 的两个计数互斥且和为 `inputEntryCount`；每个 mode 行的 assigned/unassigned 之和等于该行 `entryCount`。手动词条可以属于多个模板组，所以 `groups[].assignedEntryCount` 不可相加推导总数。override 的 active/inactive 词条集合允许重叠，`entryCount` 表示至少保存一个非空 override 单元格的唯一词条数；单元格计数满足 `storedCellCount = activeCellCount + inactiveCellCount`。`topEntries` 最多 12 项，按 `storedCellCount` 降序并以现有稳定 `lemmaAsc + entryId` 顺序打破平局；模板组和子表数组按当前配置顺序返回，不携带成员 ID 集合。空 override 值以及只保存标题或备注的 dormant overlay 不增加这些单元格计数。
+assignment 的两个计数互斥且和为 `inputEntryCount`。每个 mode 行的 assigned/unassigned 之和等于该行 `entryCount`。一个词条可以使用多张表，每张表按词条去重。覆写的 active/inactive 词条集合允许重叠。`entryCount` 表示至少保存一个覆写格的唯一词条数，字面形式和显式不存在都计入，仅有备注的叠加层不计入。`storedCellCount = activeCellCount + inactiveCellCount`。`topEntries` 最多 12 项，按 `storedCellCount` 降序并依词形和词条 ID 排同分项。两张表统计数组都按槽位和表的顺序返回。
 
-`morphologyAnalysis` items 的 feature 固定为 `{ mode, assignedGroupIds, activeOverrideCellCount, inactiveOverrideCellCount }`。形态覆盖只表示至少解析到一个模板组；该 source 不执行单元格生成，不统计生成形式、空单元、失败或必需形式缺失，也不把未分配或 inactive override 解释为质量问题。
+`morphologyAnalysis` items 的 feature 为 `{ mode, assignedTableIds, activeOverrideCellCount, inactiveOverrideCellCount }`。分配统计衡量是否至少生效一张表，覆写统计按这些表划分活跃和休眠。这个 source 只读取模板分配与覆写事实。
 
 基础 outcome 为互斥的 `exactMatch`、`normalizedOnlyMatch`、`mismatch`、`unavailable`、`failed`。三个 UI category 分别映射为 `exactMatch`、`mismatch`、`normalizedOnlyMatch + mismatch`。响应中的 `summary.outcomes` 和 `summary.views` 一次返回全部计数，因此循环按钮不执行额外存在性探针。
 
 `ipaAutoCompare` items 形如 `{ entry: EntrySummary, feature: { outcome, generated, diagnostics } }`；`ipaDistribution` items 的 feature 形如 `{ category, value, occurrenceCount }`；`morphologyAnalysis` items 的 feature 形状见上。HTTP 响应和前端高级筛选 action 都不携带完整匹配 ID。`pageInfo` 返回 `total/limit/windowOffset/nextCursor/windowCursor/hasMore`。location 请求沿用同一 source/view/page，并增加 `entryId`；响应增加 `{ found, index, windowIndex, windowOffset }`。
 
-会话使用每词典最多 4 份、全局估算 32 MiB、空闲 2 分钟的有界进程缓存，并合并相同 descriptor 的并发构建。写入或 source 变化会产生新会话；`ipaAutoCompare` 另受完整 IPA 设置与引擎 ID/版本影响，`ipaDistribution` 只受多字符音位、多字符元音和音节分隔符影响，不调用音系引擎，也不因映射、重音或其他生成设置变化而产生不同 descriptor。`morphologyAnalysis` 只消费当前 generation 下的模板组元数据和词条形态分配/覆写事实，不依赖音系引擎、搜索 projection 或单元格生成配置摘要。淘汰或进程重启后由 descriptor 透明重建。cursor 绑定进程 epoch、generation、result key 和视图 identity，陈旧 cursor 返回 `query_cursor_stale`。当前简易 IPA 模型由 adapter 包装；自动生成值仍是可重建的运行时结果，不新增持久化列。
+会话使用每词典最多 4 份、全局估算 32 MiB、空闲 2 分钟的有界进程缓存，并合并相同 descriptor 的并发构建。写入或 source 变化会产生新会话；`ipaAutoCompare` 另受完整 IPA 设置与引擎 ID/版本影响，`ipaDistribution` 只受多字符音位、多字符元音和音节分隔符影响，不调用音系引擎，也不因映射、重音或其他生成设置变化而产生不同 descriptor。`morphologyAnalysis` 使用当前 generation 下的槽位、匹配规则、词条与逐释义标签、手动选择和各表覆写格数。淘汰或进程重启后由 descriptor 透明重建。cursor 绑定进程 epoch、generation、result key 和视图 identity，陈旧 cursor 返回 `query_cursor_stale`。当前简易 IPA 模型由 adapter 包装；自动生成值仍是可重建的运行时结果，不新增持久化列。
 
 音系引擎 adapter（`lib/phonology-engine.js`）是 `ipaAutoCompare` 与具体 IPA 生成器之间的唯一边界，feature service 只依赖它的契约，以后接入外部模块时只替换 adapter，同步或异步实现都不改变 source 的页面语义：
 
@@ -1194,7 +1227,7 @@ activityDistribution
 | 类别 | 入口 | 结果 |
 | --- | --- | --- |
 | EntryFilter | 词性与无词性、多词性与词性组合、标签与标签集合、释义/例句/词条备注/来源/IPA/标签的有无、来源数量与多来源、标签数量、新增/编辑日期、正写法（词长、首字符、字符、双字符）、词根与孤立词根 | 结构 descriptor 进入普通 `/entries` 窗口、会话、cursor、定位、排序与搜索 |
-| Feature result | IPA 自动比较、IPA 音素单元/首音/尾音/音节数、形态分配/模式/模板组/覆写 | `resultSource` 加 category/value 进入 feature query/location |
+| Feature result | IPA 自动比较、IPA 音素单元/首音/尾音/音节数、形态分配/模式/表/覆写 | `resultSource` 加 category/value 进入 feature query/location |
 | 质量结果 | 全部、按严重度、按模块 | `dictionaryQuality` source 加 selector 进入质量 entry 视图 |
 | 导航，不是筛选 | 词条总数与当前搜索命中、词根家族排行、override 排行 | 返回词条浏览页并保留普通查询状态，或定位单条词条 |
 

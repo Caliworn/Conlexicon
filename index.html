@@ -300,7 +300,7 @@
                   <div class="derived-list" id="displayDerived"></div>
                 </section>
 
-                <section class="display-section" id="displayMorphologySection" data-edit-section="morphology" hidden>
+                <section class="display-section" id="displayMorphologySection" hidden>
                   <div class="section-heading">
                     <span data-i18n="morphologyDisplay">形态学</span>
                   </div>
@@ -375,7 +375,7 @@
                   <div class="section-heading">
                     <span data-i18n="morphologyDisplay">形态学</span>
                   </div>
-                  <div class="entry-morphology-controls" id="entryMorphologyControls"></div>
+                  <p class="field-help" data-i18n="morphologyTablesPending">形态表格将在下一阶段恢复。</p>
                 </section>
 
                 <section class="display-section entry-editor-section" data-entry-form-section="notes">
@@ -885,16 +885,8 @@
             <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="morphologyTablesOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
           </section>
 
-          <section class="editor-panel tool-config-panel" id="morphologyTablesPanel">
-            <form id="morphologyTablesForm" autocomplete="off">
-              <div class="morphology-table-toolbar">
-                <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="addMorphologyTableGroupButton" type="button" data-i18n="addMorphologyTableGroup">新建表格组</button>
-              </div>
-              <div class="morphology-table-list" id="morphologyTableList"></div>
-              <div class="form-actions">
-                <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" type="submit" data-i18n="saveConfig">保存配置</button>
-              </div>
-            </form>
+          <section class="notice-panel" id="morphologyTablesPanel" hidden>
+            <p data-i18n="morphologyTablesPending">形态表格将在下一阶段恢复。</p>
           </section>
         </section>
 

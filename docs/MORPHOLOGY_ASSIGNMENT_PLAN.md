@@ -1,6 +1,6 @@
 # 形态分配重做计划：表格直接匹配、槽位与 elsewhere
 
-设计日期：2026-10-24，2026-11-21 定稿。状态：设计定稿，未实施。完成后把仍然有效的契约迁入 `docs/API_CONTRACT.md` 和 [SQLite 后端规范](SQLITE_BACKEND_SPEC.md)，本文删除。
+设计日期：2026-10-24，2026-11-21 定稿。状态：阶段 1 已实施并通过审查。阶段 2 和 3 待实施。形态数据和保存契约见 [API 契约](API_CONTRACT.md#形态分配与保存) 与 [SQLite 后端规范](SQLITE_BACKEND_SPEC.md#54-形态学结构化-schema)。全部完成后把仍有效的界面契约迁入现行规范并删除本文。
 
 与释义标签（[Definition Tag Specification](DEFINITION_TAG_SPEC.md)）的分工：释义标签规范定义词条标签、释义标签和有效标签；本计划决定形态匹配用哪些标签集合（2.4），以及这些集合会得到哪些形态表（2.3、2.5）。
 
@@ -16,7 +16,7 @@
 6. **合形只能抄规则**：几格系统性同形时，要把同一条规则写进每一格，改一处要改几处，逐词覆写也不会传递。
 7. **分不清"不存在"和"没填"**：空格同时表示这两种意思；逐词覆写也不能表示某个词缺某一格。
 
-### 1.2 现状
+### 1.2 改造前的基线
 
 以下内容对照基准提交 `6cf0a5c`；格的寻址、尺寸调整和搜索投影的字段对照 `ed01367`。
 
@@ -108,7 +108,7 @@ morphology: {
 - 行与行之间是"或"；
 - `matchRules` 为空的表不会自动匹配。
 
-比较时用结构化键（`normalizeStructuralKey`），与现行规则相同。
+比较时用结构化键（`normalizeStructuralKey`），去掉首尾空白，区分大小写。
 
 **校验**（只在外部边界做：形态模块的 `PUT` 和 JSON 导入）
 
@@ -252,6 +252,7 @@ explainAutomaticTables(contexts, morphology)  // → 每个上下文、每个槽
   - 复制链顶表当时的行列，生成新的行列 ID；
   - 原来沿用父表的格，复制沿链解析出的那条记录（同某格的目标换成新 ID）；
   - 这张表自己的格、这张表上的逐词覆写，以及它所有后代表的格和逐词覆写，都换到新的行列 ID 上。
+  - 草稿保存时在 `detachments` 提交保留行列的旧 ID 到新 ID 的映射，服务端凭映射重定位已有覆写。[API 契约](API_CONTRACT.md#形态分配与保存)
 - **删除被继承的父表**：返回 409 `morphology_table_has_children`，`details` 列出子表 ID；界面提示先解除这些子表的继承。
 
 **边界校验**
@@ -297,97 +298,16 @@ morphologyTables: [{ tableId, notes, overrides: [Override] }],   // Override 见
 
 ### 2.11 SQLite
 
-```sql
-CREATE TABLE IF NOT EXISTS morphology_slots (
-  id TEXT PRIMARY KEY,
-  position INTEGER NOT NULL,             -- 显示顺序
-  name TEXT NOT NULL DEFAULT '',
-  notes TEXT NOT NULL DEFAULT '',
-  created_at TEXT,
-  updated_at TEXT
-);
+槽位、模板表、行列、模板格和逐词覆写存入 SQLite 结构表。格与覆写的坐标为行列 ID，子表使用链顶表的行列。匹配规则存为 JSON，形态函数识别对象仍在形态模块 blob 中。[SQLite 后端规范](SQLITE_BACKEND_SPEC.md#54-形态学结构化-schema)
 
-CREATE TABLE IF NOT EXISTS morphology_template_tables (
-  id TEXT PRIMARY KEY,
-  slot_id TEXT NOT NULL REFERENCES morphology_slots(id),
-  position INTEGER NOT NULL,             -- 槽位内顺序
-  title TEXT NOT NULL DEFAULT '',
-  notes TEXT NOT NULL DEFAULT '',
-  match_rules_json TEXT NOT NULL,
-  inherits_from TEXT REFERENCES morphology_template_tables(id),
-  created_at TEXT,
-  updated_at TEXT
-);
-
--- 只有链顶表有行列
-CREATE TABLE IF NOT EXISTS morphology_template_rows (
-  id TEXT PRIMARY KEY,
-  table_id TEXT NOT NULL REFERENCES morphology_template_tables(id) ON DELETE CASCADE,
-  position INTEGER NOT NULL,
-  label TEXT NOT NULL DEFAULT ''
-);
-CREATE TABLE IF NOT EXISTS morphology_template_columns (
-  id TEXT PRIMARY KEY,
-  table_id TEXT NOT NULL REFERENCES morphology_template_tables(id) ON DELETE CASCADE,
-  position INTEGER NOT NULL,
-  label TEXT NOT NULL DEFAULT ''
-);
-
-CREATE TABLE IF NOT EXISTS morphology_template_cells (
-  table_id TEXT NOT NULL REFERENCES morphology_template_tables(id) ON DELETE CASCADE,
-  row_id TEXT NOT NULL REFERENCES morphology_template_rows(id) ON DELETE CASCADE,
-  column_id TEXT NOT NULL REFERENCES morphology_template_columns(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL CHECK (kind IN ('rule', 'absent', 'refer')),
-  source_text TEXT,
-  target_row_id TEXT REFERENCES morphology_template_rows(id),
-  target_column_id TEXT REFERENCES morphology_template_columns(id),
-  PRIMARY KEY (table_id, row_id, column_id),
-  CHECK (
-    (kind = 'rule'   AND source_text <> '' AND target_row_id IS NULL AND target_column_id IS NULL) OR
-    (kind = 'absent' AND source_text IS NULL AND target_row_id IS NULL AND target_column_id IS NULL) OR
-    (kind = 'refer'  AND source_text IS NULL AND target_row_id IS NOT NULL AND target_column_id IS NOT NULL)
-  )
-);
-
-CREATE TABLE IF NOT EXISTS entry_morphology_tables (
-  entry_id TEXT NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
-  template_table_id TEXT NOT NULL,
-  position INTEGER NOT NULL,             -- 只在手动模式下有意义
-  notes TEXT NOT NULL DEFAULT '',
-  created_at TEXT,
-  updated_at TEXT,
-  PRIMARY KEY (entry_id, template_table_id)
-);
-
-CREATE TABLE IF NOT EXISTS entry_morphology_cell_overrides (
-  entry_id TEXT NOT NULL,
-  template_table_id TEXT NOT NULL,
-  row_id TEXT NOT NULL REFERENCES morphology_template_rows(id) ON DELETE CASCADE,
-  column_id TEXT NOT NULL REFERENCES morphology_template_columns(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL CHECK (kind IN ('form', 'absent')),
-  value TEXT,
-  PRIMARY KEY (entry_id, template_table_id, row_id, column_id),
-  FOREIGN KEY (entry_id, template_table_id)
-    REFERENCES entry_morphology_tables(entry_id, template_table_id) ON DELETE CASCADE,
-  CHECK ((kind = 'form' AND value <> '') OR (kind = 'absent' AND value IS NULL))
-);
-
--- entry_morphology_search_values：删除 template_group_id 与行列下标，主键改为
---   (entry_id, template_table_id, row_id, column_id)。
--- 删除 morphology_template_groups 与 entry_morphology_groups。
-```
-
-- `match_rules_json` 是低频配置，按项目原则存 JSON，不拆表。
-- 删除行列时由外键级联删掉格和覆写；覆写的删除先经过 API 层的确认（2.12）。合形目标的外键不级联，残留的引用会让事务失败，写入前由草稿把这些格改回还没填。
-- 子表的格引用的是链顶表的行列，数据库无法约束"同一条链"，由边界校验保证。
-- 这是 schema 变更，旧数据库须经 JSON 重新导入。
+旧库先用旧版导出 JSON，再导入当前结构的新库。
 
 ### 2.12 派生与写入
 
 - **搜索投影**：按合并后的生效表 → 格生成，只为"形式"生成记录；`sourceType: "morphology"`、`sourceId: <tableId>` 不变，`sourcePosition` 按显示顺序编号。
 - **写入计划**（`morphology-write-plan.js`）：
   - **生成变化**按表判断（`generationTableIds`）：格的记录、行列的增删，或所用函数变化。一张表的格或行列变了，沿链向下的全部后代也算生成变化；改 `inheritsFrom` 或解除继承时，这张表及其后代都算生成变化。继承关系不算分配变化。
-  - **分配变化**：任一表的 `matchRules` 变化、表在槽位之间移动、表的增删。比较规则时用规范形式：每行的 `all`、`none` 各自转成排序后的结构化键集合，行与行之间再整体排序。只改行顺序、行内标签顺序或大小写，不算变化。
+  - **分配变化**：任一表的 `matchRules` 变化、表在槽位之间移动、表的增删。比较规则时将每行的 `all`、`none` 转成排序后的结构化键集合，再整体排序所有规则行。规则顺序、行内标签顺序和首尾空白不影响分配。修改标签大小写会触发重新分配。
   - **只改顺序**（槽位顺序、槽位内顺序、行列顺序）不影响哪些表生效，也不改变格的值，只重写搜索投影的 `sourcePosition`。
   - **行列标签**只影响显示和格名，不触发投影重建。
   - **删除会丢失词条数据时先确认**：删除表或行列时，如果有词条引用会随之消失，服务端在写入前返回 409 `morphology_references_in_use`，整次不保存。引用包括：手动模式选了这张表（`manual_table`）、自动模式在这张表上的叠加层（`overlay`，含休眠叠加层），以及落在被删表或行列上的逐词覆写（`override`，含后代子表上的覆写）。
@@ -597,8 +517,8 @@ elsewhere 的结果由规则自动计算，不看试算很难判断一张表为�
 
 ## 4. 与其他计划的关系
 
-- **[Definition Tag Specification](DEFINITION_TAG_SPEC.md)**：释义标签提供词条标签和释义标签，本计划按 2.4 生成上下文、按 2.5 解析。实施前，现行形态匹配仍以有效标签为唯一输入，一个词条只得到一个组。
-- **[Entry Incremental Save Plan](ENTRY_INCREMENTAL_SAVE_PLAN.md)**（草案，未实施）：形态生成键改为"合并后的生效表 ID 列表 + lemma + 模式 + 覆写"，形态子表的差异比较单位从组改为表。哪份计划先实施，另一份就要在实施时吸收这处变化。
+- **[Definition Tag Specification](DEFINITION_TAG_SPEC.md)** 提供词条标签和释义标签，自动形态按 2.4 生成上下文、按 2.5 解析。
+- **[Entry Incremental Save Plan](ENTRY_INCREMENTAL_SAVE_PLAN.md)** 的形态生成键使用合并后的生效表 ID 列表、lemma、模式与覆写。形态子记录比较使用表 ID。
 - **第 3 阶段规则引擎**（交接文档路线图）：本计划只管"哪些表生效"和格的状态，不碰单元格规则语言。分配预览端点与路线图中的"应用前展示对整本词典的影响对比"方向一致，规则引擎可以扩展它。规则引擎计划的输入约束：
   - 保留按上下文分配、槽位内 elsewhere、槽位间叠加这一层；
   - 以后给规则行加上非标签条件（如词形）时，要同时定义这些条件的具体程度如何比较，并让 `explainAutomaticTables()` 能说明原因；

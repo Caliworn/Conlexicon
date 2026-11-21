@@ -3,6 +3,7 @@ const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
 const { normalizeDictionary } = require("../lib/dictionary-model");
+const { importDictionaryFromJsonPayload } = require("../lib/dictionary-conversion-service");
 const { SqliteDictionaryRepository } = require("../lib/sqlite-dictionary-repository");
 const { requireSqliteRuntime, sqliteRepositoryOptions } = require("./sqlite-check-utils");
 const { buildDictionary, generateStressDictionary } = require("./generate-stress-dictionary");
@@ -36,7 +37,7 @@ async function main() {
   assert.deepEqual(buildDictionary(256), stress, "stress generation remains deterministic");
   const counts = checkSources(stress);
   assert.ok(counts.linked > 0 && counts.unbound > 0, "exercise linked and unrecorded sources");
-  assert.ok(checkSources(buildMorphologyTestDictionary()).linked > 0);
+  assert.ok(checkSources(importDictionaryFromJsonPayload(buildMorphologyTestDictionary()).dictionary).linked > 0);
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), "conlexicon-generated-"));
   let repository;
   try {
@@ -53,9 +54,10 @@ async function main() {
 
     const morphology = await writeMorphologyTestData(path.join(tempRoot, "morphology-json"));
     const json = JSON.parse(await fs.readFile(path.join(morphology.dataDir, "dictionaries", `${morphology.dictionary.id}.json`), "utf8"));
-    checkSources(json);
-    await repository.importDictionarySnapshot(json);
-    const sourceEntry = json.entries.find((entry) => entry.etymology.sources.length);
+    const converted = importDictionaryFromJsonPayload(json).dictionary;
+    checkSources(converted);
+    await repository.importDictionarySnapshot(converted);
+    const sourceEntry = converted.entries.find((entry) => entry.etymology.sources.length);
     assert.deepEqual((await repository.getEntry(json.id, sourceEntry.id)).etymology.sources, sourceEntry.etymology.sources);
     console.log("Generated dictionary current-source format, deterministic output and SQLite round-trip checks passed.");
   } finally {

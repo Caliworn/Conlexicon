@@ -1,101 +1,73 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const { normalizeEntryQuery } = require("../lib/entry-query-model");
+const { normalizeDictionary } = require("../lib/dictionary-model");
 const { planMorphologyWrite } = require("../lib/morphology-write-plan");
 
 const {
   createTempSqliteRepository,
+  morphologyFormOverride,
+  morphologyTableFixture,
   requireSqliteRuntime,
   sampleSqliteDictionary,
 } = require("./sqlite-check-utils");
 
 function checkMorphologyWritePlanning() {
-  const previous = {
-    functions: { leftV: ["a"], rightV: [] },
-    templateGroups: [
-      {
-        id: "morph-plan-function",
-        name: "Function group",
-        matchTags: ["n"],
-        tables: [{
-          id: "mtable-plan-function",
-          title: "Function table",
-          rowCount: 1,
-          columnCount: 1,
-          cells: { "0,0": { sourceText: "{}/leftV(a) = x; else = y/" } },
-        }],
-      },
-      {
-        id: "morph-plan-static",
-        name: "Static group",
-        matchTags: ["v"],
-        tables: [{
-          id: "mtable-plan-static",
-          title: "Static table",
-          rowCount: 1,
-          columnCount: 1,
-          cells: { "0,0": { sourceText: "{}-static" } },
-        }],
-      },
-    ],
-  };
+  const previous = normalizeDictionary({
+    morphology: {
+      functions: { leftV: ["a"] },
+      slots: [
+        { id: "mslot-plan-function", tables: [morphologyTableFixture("mtable-plan-function", {
+          matchRules: [{ all: ["n", "base"], none: ["x", "y"] }, { all: ["q"], none: [] }],
+          sources: [["{}/leftV(a) = x; else = y/"]],
+        })] },
+        { id: "mslot-plan-static", tables: [morphologyTableFixture("mtable-plan-static", {
+          matchRules: [{ all: ["v"], none: [] }], sources: [["{}-static"]],
+        })] },
+      ],
+    },
+  }).morphology;
   const displayOnly = structuredClone(previous);
-  displayOnly.templateGroups[0].tables[0].title = "Renamed table";
+  const renamed = displayOnly.slots[0].tables[0];
+  renamed.title = "Renamed table";
+  renamed.rows[0].label = "Renamed row";
+  renamed.matchRules = [{ all: [" q "], none: [] }, { all: ["base", "n"], none: ["y", "x"] }];
   const displayPlan = planMorphologyWrite(previous, displayOnly);
   assert.equal(displayPlan.rows.tables.upsert.length, 1);
-  assert.deepEqual([...displayPlan.projection.generationGroupIds], []);
+  assert.deepEqual([...displayPlan.projection.generationTableIds], []);
   assert.equal(displayPlan.projection.assignmentChanged, false);
+  renamed.matchRules[0].all = ["Q"];
+  assert.equal(planMorphologyWrite(previous, displayOnly).projection.assignmentChanged, true, "structural tags distinguish case");
 
   const functionsChanged = structuredClone(previous);
-  functionsChanged.functions.leftV = ["e"];
+  functionsChanged.functions.leftV.push("e");
   const functionPlan = planMorphologyWrite(previous, functionsChanged);
   assert.equal(functionPlan.blobChanged, true);
-  assert.deepEqual([...functionPlan.projection.generationGroupIds], ["morph-plan-function"]);
+  assert.deepEqual([...functionPlan.projection.generationTableIds], ["mtable-plan-function"]);
 }
 
 async function checkIncrementalMorphologyWrites(repository) {
   const dictionary = sampleSqliteDictionary();
   dictionary.id = "dict-morphology-incremental";
   dictionary.name = "Incremental Morphology";
-  dictionary.morphology.templateGroups = [
-    {
-      id: "morph-incremental-n",
-      name: "Nouns",
-      matchTags: ["n"],
-      tables: [{
-        id: "mtable-incremental-n",
-        title: "Noun forms",
-        rowCount: 1,
-        columnCount: 1,
-        cells: { "0,0": { sourceText: "{}-n" } },
-      }],
-    },
-    {
-      id: "morph-incremental-v",
-      name: "Verbs",
-      matchTags: ["v"],
-      tables: [{
-        id: "mtable-incremental-v",
-        title: "Verb forms",
-        rowCount: 1,
-        columnCount: 1,
-        cells: { "0,0": { sourceText: "{}-v" } },
-      }],
-    },
+  const noun = morphologyTableFixture("mtable-incremental-n", {
+    title: "Noun forms", matchRules: [{ all: ["n"], none: [] }], columnLabels: ["First", "Second"], sources: [["{}-n", "{}-second"]],
+  });
+  const verb = morphologyTableFixture("mtable-incremental-v", {
+    title: "Verb forms", matchRules: [{ all: ["v"], none: [] }], sources: [["{}-v"]],
+  });
+  dictionary.morphology.slots = [
+    { id: "mslot-incremental-n", tables: [noun] },
+    { id: "mslot-incremental-v", tables: [verb] },
   ];
   dictionary.entries = [
     {
-      id: "entry-incremental-manual",
-      lemma: "manual",
-      tags: ["n"],
-      morphologyMode: "manual",
-      morphologyGroups: [{
-        templateGroupId: "morph-incremental-n",
-        overrides: { "mtable-incremental-n": { "0,0": "manual-form" } },
-      }],
+      id: "entry-incremental-manual", lemma: "manual", tags: ["n"], morphologyMode: "manual",
+      morphologyTables: [{ tableId: noun.id, overrides: [morphologyFormOverride(noun, 0, 0, "manual-form")] }],
     },
     { id: "entry-incremental-auto-n", lemma: "auto-n", tags: ["n"] },
     { id: "entry-incremental-auto-v", lemma: "auto-v", tags: ["v"] },
+    { id: "entry-incremental-auto-multi", lemma: "auto-multi", tags: ["n", "v"] },
   ];
   await repository.importDictionarySnapshot(dictionary);
   const db = repository.openDictionaryDatabase(dictionary.id);
@@ -113,65 +85,60 @@ async function checkIncrementalMorphologyWrites(repository) {
     ORDER BY entry_id ASC
   `).all().map((row) => row.entryId);
   const clearAudit = () => db.prepare("DELETE FROM morphology_projection_delete_audit").run();
+  const forms = (entryId) => db.prepare(`
+    SELECT raw_value AS value FROM entry_morphology_search_values
+    WHERE entry_id = ? ORDER BY position
+  `).all(entryId).map(({ value }) => value);
 
-  const displayOnly = structuredClone(dictionary.morphology);
-  displayOnly.templateGroups[0].name = "Nouns renamed";
+  const displayOnly = structuredClone((await repository.getDictionarySnapshot(dictionary.id)).morphology);
+  displayOnly.slots[0].name = "Nouns renamed";
+  displayOnly.slots[0].tables[0].columns[0].label = "Renamed";
   const displaySaved = await repository.saveMorphology(dictionary.id, displayOnly);
-  assert.deepEqual(auditedEntryIds(), [], "display-only morphology save must not rebuild entry projections");
-  assert.equal(displaySaved.morphology.templateGroups[0].name, "Nouns renamed");
+  assert.deepEqual(auditedEntryIds(), [], "display-only changes do not write projections");
+  assert.equal(displaySaved.morphology.slots[0].name, "Nouns renamed");
 
-  clearAudit();
-  const changedRule = structuredClone(displaySaved.morphology);
-  changedRule.templateGroups[0].tables[0].cells["0,0"] = { sourceText: "{}-changed" };
+  const reordered = structuredClone(displaySaved.morphology);
+  reordered.slots[0].tables[0].columns.reverse();
+  reordered.slots.reverse();
+  const reorderedSaved = await repository.saveMorphology(dictionary.id, reordered);
+  assert.deepEqual(auditedEntryIds(), [], "reorder updates projection positions without regenerating forms");
+  assert.deepEqual(forms("entry-incremental-auto-multi"), ["auto-multi-v", "auto-multi-second", "auto-multi-n"]);
+  assert.deepEqual(forms("entry-incremental-manual"), ["manual-second", "manual-form"]);
+
+  const changedRule = structuredClone(reorderedSaved.morphology);
+  changedRule.slots[1].tables[0].cells.find((cell) => cell.columnId === noun.columns[0].id).sourceText = "{}-changed";
   const ruleSaved = await repository.saveMorphology(dictionary.id, changedRule);
   assert.deepEqual(auditedEntryIds(), [
-    "entry-incremental-auto-n",
-    "entry-incremental-manual",
+    "entry-incremental-auto-multi", "entry-incremental-auto-n", "entry-incremental-manual",
   ]);
-  assert.equal(db.prepare(`
-    SELECT raw_value AS rawValue
-    FROM entry_morphology_search_values
-    WHERE entry_id = 'entry-incremental-auto-n'
-  `).get().rawValue, "auto-n-changed");
-  assert.equal(db.prepare(`
-    SELECT raw_value AS rawValue
-    FROM entry_morphology_search_values
-    WHERE entry_id = 'entry-incremental-auto-v'
-  `).get().rawValue, "auto-v-v");
+  assert.deepEqual(forms("entry-incremental-auto-n"), ["auto-n-second", "auto-n-changed"]);
+  assert.deepEqual(forms("entry-incremental-auto-v"), ["auto-v-v"]);
 
   clearAudit();
   const changedAssignment = structuredClone(ruleSaved.morphology);
-  changedAssignment.templateGroups[0].matchTags = ["x"];
+  changedAssignment.slots[1].tables[0].matchRules = [{ all: ["x"], none: [] }];
   const assignmentSaved = await repository.saveMorphology(dictionary.id, changedAssignment);
-  assert.deepEqual(auditedEntryIds(), ["entry-incremental-auto-n"]);
-  assert.equal(db.prepare(`
-    SELECT COUNT(*) AS count
-    FROM entry_morphology_search_values
-    WHERE entry_id = 'entry-incremental-auto-n'
-  `).get().count, 0);
-  assert.equal(db.prepare(`
-    SELECT raw_value AS rawValue
-    FROM entry_morphology_search_values
-    WHERE entry_id = 'entry-incremental-manual'
-  `).get().rawValue, "manual-form");
+  assert.deepEqual(auditedEntryIds(), ["entry-incremental-auto-multi", "entry-incremental-auto-n"]);
+  assert.deepEqual(forms("entry-incremental-auto-n"), []);
+  assert.deepEqual(forms("entry-incremental-manual"), ["manual-second", "manual-form"]);
 
+  clearAudit();
   const unchanged = await repository.saveMorphology(dictionary.id, assignmentSaved.morphology);
   assert.equal(unchanged.updatedAt, assignmentSaved.updatedAt);
-  assert.deepEqual(auditedEntryIds(), ["entry-incremental-auto-n"], "no-op save must not touch projections");
+  assert.deepEqual(auditedEntryIds(), [], "no-op save does not touch projections");
 
-  const removedReferencedGroup = structuredClone(assignmentSaved.morphology);
-  removedReferencedGroup.templateGroups.shift();
-  await assert.rejects(
-    repository.saveMorphology(dictionary.id, removedReferencedGroup),
-    (error) => error.status === 409 && error.code === "morphology_references_in_use",
-  );
-  const removedReferencedTable = structuredClone(assignmentSaved.morphology);
-  removedReferencedTable.templateGroups[0].tables = [];
-  await assert.rejects(
-    repository.saveMorphology(dictionary.id, removedReferencedTable),
-    (error) => error.status === 409 && error.code === "morphology_references_in_use",
-  );
+  const competing = structuredClone(unchanged.morphology);
+  const [verbSlot, nounSlot] = competing.slots;
+  nounSlot.tables[0].matchRules = [{ all: ["v", "n"], none: [] }];
+  nounSlot.tables.push(...verbSlot.tables);
+  competing.slots = [nounSlot];
+  await repository.saveMorphology(dictionary.id, competing);
+  assert.deepEqual(auditedEntryIds(), ["entry-incremental-auto-multi"], "slot changes rebuild only entries with different assignment");
+  assert.deepEqual(forms("entry-incremental-auto-multi"), ["auto-multi-second", "auto-multi-changed"]);
+  assert.deepEqual(forms("entry-incremental-auto-v"), ["auto-v-v"]);
+  assert.deepEqual(forms("entry-incremental-manual"), ["manual-second", "manual-form"]);
 }
+
 
 async function runSqliteSchemaCheck() {
   requireSqliteRuntime("schema check");
@@ -202,10 +169,12 @@ async function runSqliteSchemaCheck() {
       "entry_sources",
       "entry_search_values",
       "entry_morphology_search_values",
-      "morphology_template_groups",
+      "morphology_slots",
+      "morphology_template_rows",
+      "morphology_template_columns",
       "morphology_template_tables",
       "morphology_template_cells",
-      "entry_morphology_groups",
+      "entry_morphology_tables",
       "entry_morphology_cell_overrides",
     ].forEach((table) => assert.equal(tables.has(table), true, `missing table: ${table}`));
     assert.equal(tables.has("schema_migrations"), false, "runtime schema must not introduce migration state");
@@ -232,15 +201,15 @@ async function runSqliteSchemaCheck() {
       .forEach((column) => assert.equal(entrySearchValueColumns.has(column), true, `missing entry_search_values column: ${column}`));
     assert.equal(entrySearchValueColumns.has("id"), false);
     const entryMorphologySearchValueColumns = new Set(db.prepare("PRAGMA table_info(entry_morphology_search_values)").all().map((row) => row.name));
-    ["entry_id", "position", "template_group_id", "template_table_id", "row_index", "column_index", "raw_value", "normalized_value"]
+    ["entry_id", "position", "template_table_id", "row_id", "column_id", "raw_value", "normalized_value"]
       .forEach((column) => assert.equal(entryMorphologySearchValueColumns.has(column), true, `missing entry_morphology_search_values column: ${column}`));
     assert.equal(entryMorphologySearchValueColumns.has("id"), false);
-    const entryMorphologyGroupColumns = new Set(db.prepare("PRAGMA table_info(entry_morphology_groups)").all().map((row) => row.name));
-    ["entry_id", "position", "template_group_id", "title", "notes", "created_at", "updated_at"]
-      .forEach((column) => assert.equal(entryMorphologyGroupColumns.has(column), true, `missing entry morphology group column: ${column}`));
-    assert.equal(entryMorphologyGroupColumns.has("id"), false);
+    const entryMorphologyTableColumns = new Set(db.prepare("PRAGMA table_info(entry_morphology_tables)").all().map((row) => row.name));
+    ["entry_id", "position", "template_table_id", "notes", "created_at", "updated_at"]
+      .forEach((column) => assert.equal(entryMorphologyTableColumns.has(column), true, `missing entry morphology table column: ${column}`));
+    assert.equal(entryMorphologyTableColumns.has("id"), false);
     const entryMorphologyOverrideColumns = new Set(db.prepare("PRAGMA table_info(entry_morphology_cell_overrides)").all().map((row) => row.name));
-    ["entry_id", "template_group_id", "template_table_id", "row_index", "column_index", "value"]
+    ["entry_id", "template_table_id", "row_id", "column_id", "kind", "value"]
       .forEach((column) => assert.equal(entryMorphologyOverrideColumns.has(column), true, `missing entry morphology override column: ${column}`));
 
     const sourceDictionary = sampleSqliteDictionary();
@@ -284,17 +253,15 @@ async function runSqliteSchemaCheck() {
       true,
     );
     assert.deepEqual({ ...projectionDb.prepare(`
-      SELECT position, template_group_id AS templateGroupId, template_table_id AS templateTableId,
-        row_index AS rowIndex, column_index AS columnIndex,
+      SELECT position, template_table_id AS templateTableId, row_id AS rowId, column_id AS columnId,
         raw_value AS rawValue, normalized_value AS normalizedValue
       FROM entry_morphology_search_values
       WHERE entry_id = 'entry-root'
     `).get() }, {
       position: 0,
-      templateGroupId: "morph-roundtrip",
       templateTableId: "mtable-roundtrip",
-      rowIndex: 0,
-      columnIndex: 0,
+      rowId: "mrow-mtable-roundtrip-1",
+      columnId: "mcol-mtable-roundtrip-1",
       rawValue: "root-form",
       normalizedValue: "root-form",
     });
@@ -344,7 +311,7 @@ async function runSqliteSchemaCheck() {
       SELECT normalized_value AS normalizedValue
       FROM entry_morphology_search_values
       WHERE entry_id = 'entry-root' AND template_table_id = 'mtable-roundtrip'
-        AND row_index = 0 AND column_index = 0
+        AND row_id = 'mrow-mtable-roundtrip-1' AND column_id = 'mcol-mtable-roundtrip-1'
     `).get().normalizedValue, "stem-form");
 
     const savedIpaSettings = await repository.updateIpaSettings(sourceDictionary.id, {
@@ -364,17 +331,18 @@ async function runSqliteSchemaCheck() {
     assert.equal(savedCorpusItem.item.content, "SQLite corpus");
 
     const morphologyWithGeneratedCell = structuredClone(sourceDictionary.morphology);
-    morphologyWithGeneratedCell.templateGroups[0].tables[0].cells["0,1"] = { sourceText: "{}-suffix" };
+    const table = morphologyWithGeneratedCell.slots[0].tables[0];
+    table.cells.push({ rowId: table.rows[0].id, columnId: table.columns[1].id, kind: "rule", sourceText: "{}-suffix" });
     const savedMorphology = await repository.saveMorphology(sourceDictionary.id, morphologyWithGeneratedCell);
     assert.deepEqual(Object.keys(savedMorphology).sort(), ["id", "morphology", "updatedAt"]);
     assert.equal(Object.hasOwn(savedMorphology, "entries"), false);
-    assert.equal(savedMorphology.morphology.templateGroups[0].id, "morph-roundtrip");
+    assert.equal(savedMorphology.morphology.slots[0].id, "mslot-roundtrip");
     assert.equal(projectionDb.prepare(`
       SELECT normalized_value AS normalizedValue
       FROM entry_morphology_search_values
       WHERE entry_id = 'entry-root' AND template_table_id = 'mtable-roundtrip'
-        AND row_index = 0 AND column_index = 1
-    `).get().normalizedValue, "stem-suffix");
+        AND row_id = ? AND column_id = ?
+    `).get(table.rows[0].id, table.columns[1].id).normalizedValue, "stem-suffix");
 
     const patchedEntries = await repository.patchEntries(sourceDictionary.id, [{
       id: "entry-root",
@@ -395,21 +363,20 @@ async function runSqliteSchemaCheck() {
     `).get().normalizedValue, "/patched/");
 
     const entryForSave = await repository.getEntry(sourceDictionary.id, "entry-root");
-    entryForSave.morphologyGroups[0].overrides["mtable-roundtrip"]["0,0"] = "saved-form";
+    entryForSave.morphologyTables[0].overrides[0].value = "saved-form";
     await repository.saveEntry(sourceDictionary.id, entryForSave);
     assert.equal(projectionDb.prepare(`
       SELECT raw_value AS rawValue
       FROM entry_morphology_search_values
       WHERE entry_id = 'entry-root' AND template_table_id = 'mtable-roundtrip'
-        AND row_index = 0 AND column_index = 0
-    `).get().rawValue, "saved-form");
+        AND row_id = ? AND column_id = ?
+    `).get(table.rows[0].id, table.columns[0].id).rawValue, "saved-form");
 
     const exported = repository.exportDictionarySnapshot(sourceDictionary.id);
     assert.equal(exported.id, sourceDictionary.id);
     assert.equal(exported.entries.length, sourceDictionary.entries.length);
-    assert.equal(exported.morphology.templateGroups[0].id, "morph-roundtrip");
-    assert.equal(exported.morphology.templateGroups[0].tables[0].title, "Nouns");
-    assert.equal(Object.hasOwn(exported.morphology, "tables"), false);
+    assert.equal(exported.morphology.slots[0].id, "mslot-roundtrip");
+    assert.equal(exported.morphology.slots[0].tables[0].title, "Nouns");
 
     const roundtripDb = repository.openDictionaryDatabase(sourceDictionary.id);
     assert.equal(roundtripDb.prepare("SELECT COUNT(*) AS count FROM entries").get().count, 2);
@@ -419,46 +386,44 @@ async function runSqliteSchemaCheck() {
       roundtripDb.prepare("SELECT etymology_description FROM entries WHERE id = 'entry-derived'").get().etymology_description,
       "derived from root",
     );
-    const projectedTemplateGroup = roundtripDb.prepare(`
-      SELECT id, name, match_tags_json AS matchTagsJson
-      FROM morphology_template_groups
-      WHERE id = 'morph-roundtrip'
+    const projectedSlot = roundtripDb.prepare(`
+      SELECT id, name FROM morphology_slots WHERE id = 'mslot-roundtrip'
     `).get();
-    assert.equal(projectedTemplateGroup.name, "Nouns");
-    assert.deepEqual(JSON.parse(projectedTemplateGroup.matchTagsJson), ["n"]);
+    assert.equal(projectedSlot.name, "Nouns");
     const projectedTemplateTable = roundtripDb.prepare(`
-      SELECT id, group_id AS groupId, title, row_count AS rowCount, column_count AS columnCount
+      SELECT id, title, match_rules_json AS matchRulesJson
       FROM morphology_template_tables
-      WHERE group_id = 'morph-roundtrip'
+      WHERE slot_id = 'mslot-roundtrip'
     `).get();
     assert.equal(projectedTemplateTable.title, "Nouns");
-    assert.equal(projectedTemplateTable.rowCount, 2);
-    assert.equal(projectedTemplateTable.columnCount, 2);
-    const projectedMorphologyGroup = roundtripDb.prepare(`
-      SELECT entry_id AS entryId, template_group_id AS templateGroupId, notes
-      FROM entry_morphology_groups
+    assert.deepEqual(JSON.parse(projectedTemplateTable.matchRulesJson), [{ all: ["n"], none: [] }]);
+    for (const axis of ["rows", "columns"]) {
+      const ids = roundtripDb.prepare(`
+        SELECT id FROM morphology_template_${axis} WHERE table_id = ? ORDER BY position
+      `).all(table.id);
+      assert.deepEqual(ids.map(({ id }) => id), table[axis].map(({ id }) => id));
+    }
+    const projectedMorphologyTable = roundtripDb.prepare(`
+      SELECT entry_id AS entryId, template_table_id AS tableId, notes
+      FROM entry_morphology_tables
       WHERE entry_id = 'entry-root'
       ORDER BY position ASC
     `).get();
-    assert.equal(projectedMorphologyGroup.templateGroupId, "morph-roundtrip");
-    assert.equal(projectedMorphologyGroup.notes, "Irregular plural retained for this entry.");
+    assert.equal(projectedMorphologyTable.tableId, table.id);
+    assert.equal(projectedMorphologyTable.notes, "Irregular plural retained for this entry.");
     const projectedOverride = roundtripDb.prepare(`
-      SELECT template_table_id AS templateTableId, row_index AS rowIndex, column_index AS columnIndex, value
+      SELECT row_id AS rowId, column_id AS columnId, kind, value
       FROM entry_morphology_cell_overrides
-      WHERE entry_id = ? AND template_group_id = ?
-    `).get(projectedMorphologyGroup.entryId, projectedMorphologyGroup.templateGroupId);
-    assert.equal(projectedOverride.rowIndex, 0);
-    assert.equal(projectedOverride.columnIndex, 0);
-    assert.equal(projectedOverride.value, "saved-form");
+      WHERE entry_id = ? AND template_table_id = ?
+    `).get(projectedMorphologyTable.entryId, projectedMorphologyTable.tableId);
+    assert.deepEqual({ ...projectedOverride }, morphologyFormOverride(table, 0, 0, "saved-form"));
 
     const rebuiltEntry = await repository.getEntry(sourceDictionary.id, "entry-root");
     assert.equal(rebuiltEntry.lemma, "root");
     assert.equal(rebuiltEntry.morphologyMode, "manual");
     assert.equal(rebuiltEntry.definitions[0].meaning, "root meaning");
-    assert.equal(rebuiltEntry.morphologyGroups[0].templateGroupId, "morph-roundtrip");
-    assert.equal(rebuiltEntry.morphologyGroups[0].notes, "Irregular plural retained for this entry.");
-    assert.equal(Object.hasOwn(rebuiltEntry.morphologyGroups[0], "id"), false);
-    assert.equal(Object.hasOwn(rebuiltEntry, "morphology"), false);
+    assert.equal(rebuiltEntry.morphologyTables[0].tableId, table.id);
+    assert.equal(rebuiltEntry.morphologyTables[0].notes, "Irregular plural retained for this entry.");
 
     await repository.deleteEntry(sourceDictionary.id, "entry-derived");
     assert.equal(projectionDb.prepare("SELECT COUNT(*) AS count FROM entry_search_values WHERE entry_id = 'entry-derived'").get().count, 0);

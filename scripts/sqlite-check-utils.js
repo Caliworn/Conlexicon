@@ -43,7 +43,29 @@ function requireSqliteRuntime(scope = "SQLite check") {
   }
 }
 
+function morphologyTableFixture(id, {
+  title = "",
+  matchRules = [],
+  rowLabels = [""],
+  columnLabels = [""],
+  sources = [],
+} = {}) {
+  const rows = rowLabels.map((label, index) => ({ id: `mrow-${id}-${index + 1}`, label }));
+  const columns = columnLabels.map((label, index) => ({ id: `mcol-${id}-${index + 1}`, label }));
+  const cells = sources.flatMap((row, rowIndex) => row.flatMap((sourceText, columnIndex) => (
+    sourceText ? [{ rowId: rows[rowIndex].id, columnId: columns[columnIndex].id, kind: "rule", sourceText }] : []
+  )));
+  return { id, title, matchRules, inheritsFrom: null, rows, columns, cells };
+}
+
+function morphologyFormOverride(table, row, column, value) {
+  return { rowId: table.rows[row].id, columnId: table.columns[column].id, kind: "form", value };
+}
+
 function sampleSqliteDictionary() {
+  const table = morphologyTableFixture("mtable-roundtrip", {
+    title: "Nouns", matchRules: [{ all: ["n"], none: [] }], rowLabels: ["", ""], columnLabels: ["", ""],
+  });
   return normalizeDictionary({
     id: "dict-sqlite-roundtrip",
     name: "SQLite Roundtrip",
@@ -56,17 +78,10 @@ function sampleSqliteDictionary() {
     docs: { markdown: "# Notes" },
     corpus: { items: [{ id: "corpus-item-roundtrip", content: "root example" }] },
     morphology: {
-      templateGroups: [{
-        id: "morph-roundtrip",
+      slots: [{
+        id: "mslot-roundtrip",
         name: "Nouns",
-        matchTags: ["n"],
-        tables: [{
-          id: "mtable-roundtrip",
-          title: "Nouns",
-          rowCount: 2,
-          columnCount: 2,
-          cells: {},
-        }],
+        tables: [table],
       }],
     },
     entries: [
@@ -78,10 +93,10 @@ function sampleSqliteDictionary() {
         definitions: [{ id: "def-root", meaning: "root meaning", examples: [{ itemId: "corpus-item-roundtrip" }], note: "root note" }],
         notes: "entry note",
         morphologyMode: "manual",
-        morphologyGroups: [{
-          templateGroupId: "morph-roundtrip",
+        morphologyTables: [{
+          tableId: table.id,
           notes: "Irregular plural retained for this entry.",
-          overrides: { "mtable-roundtrip": { "0,0": "root-form" } },
+          overrides: [morphologyFormOverride(table, 0, 0, "root-form")],
         }],
       },
       {
@@ -97,6 +112,8 @@ function sampleSqliteDictionary() {
 
 module.exports = {
   createTempSqliteRepository,
+  morphologyFormOverride,
+  morphologyTableFixture,
   requireSqliteRuntime,
   sampleSqliteDictionary,
   sqliteRepositoryOptions,

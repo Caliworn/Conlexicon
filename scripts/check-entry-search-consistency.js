@@ -9,6 +9,7 @@ const tagModel = require("../lib/tag-model");
 const { compareEntriesInListOrder } = require("./root-groups-reference");
 const {
   createTempSqliteRepository,
+  morphologyTableFixture,
   requireSqliteRuntime,
 } = require("./sqlite-check-utils");
 
@@ -130,20 +131,17 @@ function searchConsistencyDictionary() {
       { tag: "internal-tag", partOfSpeech: false, displayLabel: "DisplayTagToken" },
     ],
     morphology: {
-      templateGroups: [
+      slots: [
         {
-          id: "morph-upper-tag",
+          id: "mslot-upper-tag",
           name: "Upper tag",
-          matchTags: ["N"],
-          tables: [{
-            id: "mtable-upper-tag",
+          tables: [morphologyTableFixture("mtable-upper-tag", {
             title: "Upper forms",
-            rowCount: 1,
-            columnCount: 1,
-            cells: { "0,0": { sourceText: "{}-MorphToken" } },
-          }],
+            matchRules: [{ all: ["N"], none: [] }],
+            sources: [["{}-MorphToken"]],
+          })],
         },
-        { id: "morph-lower-tag", name: "Lower tag", matchTags: ["n"], tables: [] },
+        { id: "mslot-lower-tag", tables: [morphologyTableFixture("mtable-lower-tag", { matchRules: [{ all: ["n"], none: [] }] })] },
       ],
     },
     entries: [
@@ -164,9 +162,9 @@ function searchConsistencyDictionary() {
           description: "EtymologyDescriptionToken",
         },
         morphologyMode: "manual",
-        morphologyGroups: [{
-          templateGroupId: "morph-lower-tag",
-          notes: "MorphologyGroupNoteToken",
+        morphologyTables: [{
+          tableId: "mtable-lower-tag",
+          notes: "MorphologyTableNoteToken",
         }],
         createdAt: "2026-01-01T00:00:00.000Z",
         updatedAt: "2026-01-01T00:00:00.000Z",
@@ -279,16 +277,16 @@ async function main() {
       "the current matcher must consume the shared per-value record projection",
     );
     assert.deepEqual(
-      alphaSearchRecords.find((record) => record.value === "MorphologyGroupNoteToken"),
+      alphaSearchRecords.find((record) => record.value === "MorphologyTableNoteToken"),
       {
         field: "notes",
-        value: "MorphologyGroupNoteToken",
-        sourceType: "morphologyGroup",
-        sourceId: "morph-lower-tag",
+        value: "MorphologyTableNoteToken",
+        sourceType: "morphologyTable",
+        sourceId: "mtable-lower-tag",
         sourcePosition: 0,
         valueType: "note",
       },
-      "entry morphology-group notes must participate in the shared notes projection",
+      "entry morphology-table notes participate in the shared notes projection",
     );
 
     await assertDirectQuery(repository, dictionary, { fields: "lemma", fuzzyFields: "lemma", limit: 2 });
@@ -353,14 +351,14 @@ async function main() {
     const morphologyNoteResult = await assertDirectQuery(
       repository,
       dictionary,
-      { q: "MorphologyGroupNoteToken", fields: "notes" },
+      { q: "MorphologyTableNoteToken", fields: "notes" },
       ["entry-alpha-root"],
     );
     assert.deepEqual(morphologyNoteResult.items[0].searchHits, [{
       field: "notes",
-      value: "MorphologyGroupNoteToken",
-      sourceType: "morphologyGroup",
-      sourceId: "morph-lower-tag",
+      value: "MorphologyTableNoteToken",
+      sourceType: "morphologyTable",
+      sourceId: "mtable-lower-tag",
       sourcePosition: 0,
       valueType: "note",
     }]);
@@ -489,20 +487,15 @@ async function main() {
     await assertDirectQuery(repository, dictionary, { q: "StructuralToken", fields: "definitions", tags: "n" }, ["entry-lower-tag"]);
     await assertDirectQuery(repository, dictionary, { q: "StructuralToken", fields: "definitions", part: "n" }, ["entry-lower-tag"]);
     await assertDirectQuery(repository, dictionary, { q: "StructuralToken", fields: "definitions", part: "N" }, []);
+    const resolver = morphologyModel.createMorphologyResolver(dictionary.morphology);
     assert.deepEqual(
-      morphologyModel.resolveEntryMorphologyGroups(
-        dictionary.entries.find((entry) => entry.id === "entry-upper-tag"),
-        dictionary,
-      ).map(({ templateGroup }) => templateGroup.id),
-      ["morph-upper-tag"],
+      resolver.entryTableIds(dictionary.entries.find((entry) => entry.id === "entry-upper-tag")),
+      ["mtable-upper-tag"],
       "automatic morphology must match uppercase structural tags exactly",
     );
     assert.deepEqual(
-      morphologyModel.resolveEntryMorphologyGroups(
-        dictionary.entries.find((entry) => entry.id === "entry-lower-tag"),
-        dictionary,
-      ).map(({ templateGroup }) => templateGroup.id),
-      ["morph-lower-tag"],
+      resolver.entryTableIds(dictionary.entries.find((entry) => entry.id === "entry-lower-tag")),
+      ["mtable-lower-tag"],
       "automatic morphology must match lowercase structural tags exactly",
     );
     const summaryResult = await assertDirectQuery(repository, dictionary, {
