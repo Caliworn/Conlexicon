@@ -201,6 +201,12 @@ function checkSlotArrangement() {
   const created = draftModel.createTable(extracted, { afterSlotId: extracted.slots[0].id, ...options });
   assert.equal(created.morphology.slots[1].tables[0].id, created.tableId, "a new table follows the selected slot");
   assert.equal(draftModel.moveSlot(created.morphology, created.morphology.slots[2].id, 0).morphology.slots[0].tables[0].id, "child");
+
+  const appended = draftModel.createTable(saved, { slotId: "s2", ...options });
+  assert.deepEqual(appended.morphology.slots.map(({ id, tables }) => [id, tables.map((table) => table.id)]), [
+    ["s1", ["root", "child", "other"]],
+    ["s2", ["lonely", appended.tableId]],
+  ], "creating in a slot appends to it and leaves the other slots in place");
 }
 
 checkAxisRemovalUndo();

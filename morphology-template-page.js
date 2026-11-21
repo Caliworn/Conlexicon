@@ -897,6 +897,16 @@ function morphologyApply(result, { undoMessage = "", rerender = true, focus = ""
   return true;
 }
 
+function morphologyCreateTable(slotId = null) {
+  const page = morphologyPageState();
+  const draftModel = morphologyDraftModel();
+  const afterSlotId = !slotId && page.selectedTableId
+    ? draftModel.locateTable(page.draft, page.selectedTableId)?.slot.id
+    : null;
+  const result = draftModel.createTable(page.draft, { slotId, afterSlotId });
+  morphologyApply(result, { focus: "prop-title", select: result.tableId });
+}
+
 function morphologyReportOperationError(page, error) {
   if (error.kind === "cycle") {
     const shape = morphologyDraftModel().rootTable(page.draft, error.tableId);
@@ -1025,7 +1035,8 @@ function openMorphologySlotMenu(slot, event) {
   const handle = slot.querySelector('[data-mtp-action="slot-menu"]');
   const index = page.draft.slots.findIndex(({ id }) => id === slotId);
   showContextMenu(morphologyMenuPosition(event, handle), aText("槽位操作", "Slot actions"), [
-    { key: "up", label: `${aText("上移", "Move up")}  Alt+↑`, disabledReason: index === 0 ? aText("已在最上面", "Already first") : "", handler: () => morphologyMoveSlotBy(slotId, -1) },
+    { key: "new-table", label: aText("在此槽位新建表格", "New table in this slot"), handler: () => morphologyCreateTable(slotId) },
+    { key: "up", label: `${aText("上移", "Move up")}  Alt+↑`, separatorBefore: true, disabledReason: index === 0 ? aText("已在最上面", "Already first") : "", handler: () => morphologyMoveSlotBy(slotId, -1) },
     { key: "down", label: `${aText("下移", "Move down")}  Alt+↓`, disabledReason: index === page.draft.slots.length - 1 ? aText("已在最下面", "Already last") : "", handler: () => morphologyMoveSlotBy(slotId, 1) },
   ], { returnFocus: handle });
 }
@@ -1707,12 +1718,9 @@ function handleMorphologyPageClick(event) {
     case "undo":
       morphologyUndo();
       break;
-    case "new-table": {
-      const selectedSlot = page.selectedTableId ? draftModel.locateTable(page.draft, page.selectedTableId)?.slot.id : null;
-      const result = draftModel.createTable(page.draft, { afterSlotId: selectedSlot });
-      morphologyApply(result, { focus: "prop-title", select: result.tableId });
+    case "new-table":
+      morphologyCreateTable();
       break;
-    }
     case "card-menu":
       openMorphologyCardMenu(card, event);
       break;
