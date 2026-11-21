@@ -300,7 +300,7 @@
                   <div class="derived-list" id="displayDerived"></div>
                 </section>
 
-                <section class="display-section" id="displayMorphologySection" hidden>
+                <section class="display-section" id="displayMorphologySection" data-edit-section="morphology" hidden>
                   <div class="section-heading">
                     <span data-i18n="morphologyDisplay">形态学</span>
                   </div>
@@ -375,7 +375,7 @@
                   <div class="section-heading">
                     <span data-i18n="morphologyDisplay">形态学</span>
                   </div>
-                  <p class="field-help" data-i18n="morphologyTablesPending">形态表格将在下一阶段恢复。</p>
+                  <div class="entry-morphology-controls" id="entryMorphologyControls"></div>
                 </section>
 
                 <section class="display-section entry-editor-section" data-entry-form-section="notes">
@@ -885,9 +885,7 @@
             <button class="primary-button" data-control-tone="accent" data-control-emphasis="solid" id="morphologyTablesOpenDictionaryManagerButton" type="button" data-i18n="openDictionaryManager">打开词典管理</button>
           </section>
 
-          <section class="notice-panel" id="morphologyTablesPanel" hidden>
-            <p data-i18n="morphologyTablesPending">形态表格将在下一阶段恢复。</p>
-          </section>
+          <section class="morphology-template-page" id="morphologyTablesPanel" hidden></section>
         </section>
 
         <section class="view" id="tagsView" data-i18n-aria-label="tagManager" aria-label="标签">
@@ -1251,6 +1249,7 @@
     <script src="lib/tag-model.js"></script>
     <script src="lib/orthography-model.js"></script>
     <script src="lib/morphology-model.js"></script>
+    <script src="lib/morphology-draft-model.js"></script>
     <script src="lib/gloss-model.js"></script>
     <script src="lib/entry-search-model.js"></script>
     <script src="lib/entry-query-model.js"></script>
@@ -1265,6 +1264,8 @@
     <script src="lib/entry-sort-control.js"></script>
     <script src="lib/list-navigator.js"></script>
     <script src="lib/root-group-layout.js"></script>
+    <script src="morphology-view.js"></script>
+    <script src="morphology-template-page.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

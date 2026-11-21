@@ -23,6 +23,7 @@ const { migrateJsonDataDirectoryToSqlite } = require("./migrate-json-data-to-sql
 const { buildMorphologyTestDictionary, writeMorphologyTestData } = require("./generate-morphology-test-dictionary");
 const { buildLegacyStressDictionary } = require("./generate-stress-dictionary");
 const { callApi } = require("./repository-contract");
+const draftModel = require("../lib/morphology-draft-model");
 const {
   createTempSqliteRepository, morphologyFormOverride, morphologyTableFixture, requireSqliteRuntime, sqliteRepositoryOptions,
 } = require("./sqlite-check-utils");
@@ -383,10 +384,17 @@ async function checkStorageAndReferences(repository) {
   await assert.rejects(invalidEntry([{ ...absent(parent, 0, 0), rowId: "missing" }]), expectApiError("invalid_morphology_override"));
   await assert.rejects(invalidEntry([refer(parent, 0, 0, 0, 1)]), expectApiError("invalid_morphology_override"));
   await assert.rejects(save(starting.morphology, { confirmReferenceRemoval: "true" }), expectApiError("invalid_morphology_payload"));
+  const someSummary = { referenceCount: 1, targets: [{ tableId: parent.id, entryCount: 1 }] };
+  await assert.rejects(save(starting.morphology, { confirmReferenceRemoval: true }), expectApiError("invalid_morphology_payload"),
+    "a confirmation carries the summary the user saw");
+  await assert.rejects(save(starting.morphology, { confirmedReferences: someSummary }), expectApiError("invalid_morphology_payload"));
+  await assert.rejects(save(starting.morphology, {
+    confirmReferenceRemoval: true, confirmedReferences: { referenceCount: 1, targets: [{ tableId: parent.id, entryCount: 0 }] },
+  }), expectApiError("invalid_morphology_payload"));
 
   const brokenParent = structuredClone(starting.morphology);
   brokenParent.slots[0].tables.shift();
-  await assert.rejects(save(brokenParent, { confirmReferenceRemoval: true }), (error) => (
+  await assert.rejects(save(brokenParent, { confirmReferenceRemoval: true, confirmedReferences: someSummary }), (error) => (
     expectApiError("morphology_table_has_children", 409)(error)
       && error.details.tableId === parent.id && error.details.childTableIds.includes(child.id)
   ));
@@ -457,7 +465,13 @@ async function checkStorageAndReferences(repository) {
   });
   assert.deepEqual(await snapshot(), afterDetach, "an unconfirmed deletion preserves all main and derived data");
   assert.deepEqual(projected("active"), detachedSearchValues);
-  await save(removedRow, { confirmReferenceRemoval: true });
+  const rowSummary = { referenceCount: 3, targets: [{ tableId: child.id, rowId: removedRowId, entryCount: 3 }] };
+  await assert.rejects(save(removedRow, {
+    confirmReferenceRemoval: true, confirmedReferences: { ...rowSummary, referenceCount: 2 },
+  }), (error) => expectApiError("morphology_references_in_use", 409)(error) && error.details.referenceCount === 3,
+  "a stale summary returns the current one");
+  assert.deepEqual(await snapshot(), afterDetach, "a stale confirmation writes nothing");
+  await save(removedRow, { confirmReferenceRemoval: true, confirmedReferences: rowSummary });
   const afterRow = await snapshot();
   const afterRowResolver = createMorphologyResolver(afterRow.morphology);
   assert.equal(afterRowResolver.tableShape(grandchild.id).rows.length, detachedShape.rows.length - 1);
@@ -476,7 +490,12 @@ async function checkStorageAndReferences(repository) {
     return true;
   });
   assert.deepEqual(await snapshot(), afterRow);
-  await save(removedLeaf, { confirmReferenceRemoval: true });
+  const plain = await repository.getEntry(id, "plain");
+  await callApi(repository, "PUT", `/api/dictionaries/${id}/entries/plain`, { entry: { ...plain, notes: "changed meanwhile" } });
+  await save(removedLeaf, {
+    confirmReferenceRemoval: true,
+    confirmedReferences: { referenceCount: 56, targets: [{ tableId: grandchild.id, entryCount: 55 }] },
+  });
   const final = await snapshot();
   assert.deepEqual(final.entries.find(({ id: key }) => key === "manual").morphologyTables.map(({ tableId }) => tableId), [child.id]);
   assert.deepEqual(final.entries.find(({ id: key }) => key === "dormant").morphologyTables, []);
@@ -498,6 +517,48 @@ async function checkOldDatabaseIsOpenedWithoutWrites(repository) {
   assert.deepEqual(await fs.readFile(databasePath), before, "schema rejection occurs before writing to the old database");
 }
 
+// The template page detaches two saved levels, edits the new axes and saves once: the overrides
+// of both tables follow the coordinates they carried on.
+async function checkDraftDetachmentSave(repository) {
+  const { morphology, parent, child, grandchild } = inheritedMorphology();
+  const id = "dict-morphology-draft-detach";
+  const { dictionary } = importDictionaryFromJsonPayload({
+    id, name: "Draft detachments", morphology,
+    entries: [{
+      id: "chained", lemma: "chained", morphologyMode: "manual",
+      morphologyTables: [
+        { tableId: child.id, overrides: [morphologyFormOverride(parent, 0, 1, "child-a")] },
+        { tableId: grandchild.id, overrides: [morphologyFormOverride(parent, 2, 2, "grand-c")] },
+      ],
+    }],
+  });
+  await repository.importDictionarySnapshot(dictionary);
+  const saved = (await repository.getDictionarySnapshot(id)).morphology;
+  let lineage = draftModel.initialLineage(saved);
+  const first = draftModel.detachTable(saved, child.id, lineage);
+  const second = draftModel.detachTable(first.morphology, grandchild.id, first.lineage);
+  lineage = second.lineage;
+  let next = draftModel.insertAxisItem(second.morphology, grandchild.id, "rows", 0).morphology;
+  const grandchildTable = () => draftModel.findTable(next, grandchild.id);
+  next = draftModel.moveAxisItem(next, grandchild.id, "columns", grandchildTable().columns.at(-1).id, 0).morphology;
+  const carried = (axis, savedId) => grandchildTable()[axis].find(({ id: current }) => lineage[current] === savedId).id;
+  next = draftModel.removeAxisItem(next, grandchild.id, "rows", carried("rows", parent.rows[1].id)).morphology;
+  await callApi(repository, "PUT", `/api/dictionaries/${id}/morphology`, {
+    morphology: draftModel.morphologyForSave(next),
+    detachments: draftModel.detachmentsForSave(next, saved, lineage),
+  });
+  const entry = await repository.getEntry(id, "chained");
+  const childTable = draftModel.findTable(next, child.id);
+  const childCarried = (axis, savedId) => childTable[axis].find(({ id: current }) => lineage[current] === savedId).id;
+  assert.deepEqual(entry.morphologyTables.map(({ overrides }) => overrides.map(({ rowId, columnId, value }) => [rowId, columnId, value])), [
+    [[childCarried("rows", parent.rows[0].id), childCarried("columns", parent.columns[1].id), "child-a"]],
+    [[carried("rows", parent.rows[2].id), carried("columns", parent.columns[2].id), "grand-c"]],
+  ], "each detached table keeps its overrides on the coordinates it carried on");
+  const resolver = createMorphologyResolver((await repository.getDictionarySnapshot(id)).morphology);
+  assert.equal(resolver.tableShape(grandchild.id).id, grandchild.id);
+  assert.equal(resolver.tableShape(child.id).rows.length, parent.rows.length);
+}
+
 async function runMorphologyAcceptanceCheck() {
   requireSqliteRuntime("morphology acceptance check");
   checkAssignment();
@@ -508,6 +569,7 @@ async function runMorphologyAcceptanceCheck() {
   try {
     await checkLegacyConversion(repository, dataDir);
     await checkStorageAndReferences(repository);
+    await checkDraftDetachmentSave(repository);
     await checkOldDatabaseIsOpenedWithoutWrites(repository);
   } finally {
     await cleanup();

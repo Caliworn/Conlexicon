@@ -1,6 +1,6 @@
 # 形态分配重做计划：表格直接匹配、槽位与 elsewhere
 
-设计日期：2026-10-24，2026-11-21 定稿。状态：阶段 1 已实施并通过审查。阶段 2 和阶段 3 待实施。形态数据和当前保存契约见 [API 契约](API_CONTRACT.md#形态分配与保存) 与 [SQLite 后端规范](SQLITE_BACKEND_SPEC.md#54-形态学结构化-schema)。全部完成后把仍有效的界面契约迁入现行规范并删除本文。
+设计日期：2026-10-24，2026-11-21 定稿。状态：阶段 1 已实施并通过审查，阶段 2 已实施、待审查，阶段 3 待实施。形态数据和当前保存契约见 [API 契约](API_CONTRACT.md#形态分配与保存) 与 [SQLite 后端规范](SQLITE_BACKEND_SPEC.md#54-形态学结构化-schema)。全部完成后把仍有效的界面契约迁入现行规范并删除本文。
 
 与释义标签（[Definition Tag Specification](DEFINITION_TAG_SPEC.md)）的分工：释义标签规范定义词条标签、释义标签和有效标签；本计划决定形态匹配用哪些标签集合（2.4），以及这些集合会得到哪些形态表（2.3、2.5）。
 
@@ -333,7 +333,7 @@ morphologyTables: [{ tableId, notes, overrides: [Override] }],   // Override 见
   - **行列标签**只影响显示和格名，不触发投影重建。
   - **删除会丢失词条数据时先确认**：删除表或行列时，如果有词条引用会随之消失，服务端在写入前返回 409 `morphology_references_in_use`，整次不保存。引用包括：手动模式选了这张表（`manual_table`）、自动模式在这张表上的叠加层（`overlay`，含休眠叠加层），以及落在被删表或行列上的逐词覆写（`override`，含后代子表上的覆写）。
     - `details` 提供 `{ referenceCount, targets: [{ tableId, rowId?, columnId?, label, entryCount }], references }`。`references` 是至多 50 条 `{ entryId, lemma, tableId, rowId?, columnId?, reason }`。弹窗按删除目标显示 `entryCount`，示例按词条 ID 去重。总 `referenceCount` 按记录计，同一词条也可出现在多个目标里。被清除的模板 syncretism 引用由草稿另行统计。
-    - 确认后用原请求快照重发，附 `confirmReferenceRemoval: true` 和用户在弹窗里看到的摘要 `confirmedReferences: { referenceCount, targets: [{ tableId, rowId?, columnId?, entryCount }] }`（阶段 2 加入）。服务端在保存事务里重算引用；摘要一致时清除引用并保存模板，不一致时整次不执行，返回新的 409 摘要重新确认。
+    - 确认后用原请求快照重发，附 `confirmReferenceRemoval: true` 和用户在弹窗里看到的摘要 `confirmedReferences: { referenceCount, targets: [{ tableId, rowId?, columnId?, entryCount }] }`。服务端在保存事务里重算引用；摘要一致时清除引用并保存模板，不一致时整次不执行，返回新的 409 摘要重新确认。
     - 确认弹窗独立于离开确认，打开时只允许操作最上层弹窗。取消后返还焦点，保留整份草稿和最近删除的撤销。点示例词条先关闭删除确认并结束本次保存尝试，再走统一的未保存检查跳转。若此时选择保存，可以重新进入删除确认。
     - 仍被继承的父表不走这个流程，返回 409 `morphology_table_has_children`（2.8），因为要先处理的是其他表，不是词条数据。
   - 表在槽位之间移动不改变覆写的归属，不需要引用检查。

@@ -2843,184 +2843,18 @@ span.pending-source {
   margin-top: 4px;
 }
 
-.morphology-table-list,
-.morphology-override-grid,
-.morphology-override-list,
-.entry-morphology-controls,
-.partial-morphology-controls,
-.entry-morphology-group-list,
-.morphology-display-groups {
-  display: grid;
-  gap: 12px;
-}
-
-.entry-morphology-mode-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.entry-morphology-add-row,
-.entry-morphology-group-heading,
-.entry-morphology-group-fields {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.entry-morphology-add-row select {
-  min-width: min(100%, 240px);
-}
-
-.entry-morphology-group-card {
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-}
-
-.entry-morphology-group-list {
-  gap: var(--material-entry-editor-item-gap);
-}
-
-.entry-morphology-group-heading {
-  justify-content: space-between;
-}
-
-.entry-morphology-group-heading > div {
-  display: grid;
-  gap: 2px;
-}
-
-.entry-morphology-group-fields > label {
-  flex: 1 1 240px;
-}
-
-.entry-morphology-override-table {
-  display: grid;
-  gap: 8px;
-}
-
-.entry-morphology-override-table h5 {
-  margin: 0;
-}
-
-.entry-morphology-override-table .morphology-table input {
-  min-width: 9rem;
-  width: 100%;
-}
-
-.morphology-display-group,
-.morphology-display-table {
-  display: grid;
-  gap: 10px;
-  min-width: 0;
-}
-
-.morphology-display-group + .morphology-display-group {
-  padding-top: 14px;
-  border-top: 1px solid var(--ui-border);
-}
-
-.morphology-display-group-heading {
-  display: grid;
-  gap: 2px;
-}
-
-.morphology-display-group-heading h4,
-.morphology-display-table h5 {
-  margin: 0;
-}
-
-.morphology-display-group-note {
-  margin: 2px 0 0;
-  color: var(--ui-text-muted);
-  white-space: pre-wrap;
-}
-
-.morphology-display-table h5 {
-  color: var(--ui-text-muted);
-  font-size: 0.92rem;
-}
-
-/* Each subtable keeps its intrinsic width where possible. Flex wrapping lets a
-   group fill a wide detail panel with as many tables as actually fit, while a
-   narrow panel naturally falls back to one horizontally scrollable table. */
-.morphology-display-table-grid {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: clamp(12px, 1.6vw, 18px);
-  min-width: 0;
-}
-
-.morphology-display-table-grid > .morphology-display-table {
-  flex: 0 1 auto;
-  width: fit-content;
-  max-width: 100%;
-}
-
-.morphology-display-table-grid .morphology-table-scroll {
-  max-width: 100%;
-}
-
-#morphologyFunctionsForm,
-#morphologyTablesForm {
+#morphologyFunctionsForm {
   display: grid;
   gap: 18px;
 }
 
-#morphologyFunctionsForm .form-actions,
-#morphologyTablesForm .form-actions {
+#morphologyFunctionsForm .form-actions {
   margin-top: 10px;
 }
 
 .morphology-page-title,
 .page-title-with-info {
   align-items: center;
-}
-
-.morphology-table-toolbar {
-  display: flex;
-  justify-content: flex-start;
-}
-
-.morphology-group-card {
-  display: grid;
-  gap: 16px;
-  min-width: 0;
-  padding: 18px;
-  border: 1px solid var(--ui-border);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--material-inset-background) 76%, var(--material-panel-background));
-  transition: opacity 140ms ease;
-  container-type: inline-size;
-}
-
-.morphology-group-header,
-.morphology-group-title-row,
-.morphology-table-title-row,
-.morphology-group-table-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.morphology-group-table-toolbar {
-  justify-content: space-between;
-  flex-wrap: wrap;
-}
-
-.morphology-group-title-row > div,
-.morphology-table-title-row > div {
-  min-width: 0;
-}
-
-.morphology-group-title-row input,
-.morphology-card-title-row input {
-  max-width: 320px;
 }
 
 .content-disclosure-button {
@@ -3061,70 +2895,6 @@ span.pending-source {
   transform: rotate(0deg);
 }
 
-.morphology-group-config-grid {
-  display: grid;
-  grid-template-columns: minmax(300px, 480px) minmax(260px, 1fr) auto;
-  grid-template-areas: "primary notes delete";
-  gap: 16px;
-  align-items: start;
-}
-
-.morphology-group-primary-fields {
-  grid-area: primary;
-  display: grid;
-  gap: 16px;
-  min-width: 0;
-}
-
-.morphology-group-fields {
-  max-width: 440px;
-}
-
-.morphology-group-notes-field textarea {
-  min-height: 96px;
-  height: 96px;
-  resize: vertical;
-}
-
-.morphology-group-notes-field {
-  grid-area: notes;
-}
-
-.morphology-group-delete-action {
-  grid-area: delete;
-  justify-self: end;
-}
-
-@container (max-width: 760px) {
-  .morphology-group-config-grid {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      "primary delete"
-      "notes notes";
-  }
-}
-
-@container (max-width: 460px) {
-  .morphology-group-config-grid {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "primary"
-      "delete"
-      "notes";
-  }
-}
-
-.morphology-group-table-toolbar > span {
-  color: var(--ui-text-muted);
-  font-size: 0.88rem;
-  font-weight: 900;
-}
-
-.morphology-group-table-list {
-  display: grid;
-  gap: 12px;
-}
-
 /* Drag grips are not commands: no recipe, no optical surface, only a hover cue. */
 :is(.morphology-drag-handle, .ipa-rule-drag-handle) {
   display: inline-grid;
@@ -3155,65 +2925,82 @@ span.pending-source {
   min-height: 38px;
 }
 
-.morphology-config-card {
-  display: grid;
-  gap: 14px;
-  min-width: 0;
-  max-width: 100%;
-  padding: 16px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--radius-panel);
-  background: var(--material-panel-background);
-  transition: opacity 140ms ease;
-}
+/* ---- Morphology: shared read-only tables (entry detail, word-form trial) ---- */
 
-.morphology-config-card.is-collapsed {
-  gap: 0;
-}
-
-.morphology-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.morphology-card-header > div:first-child {
-  min-width: 0;
-}
-
-.morphology-card-title-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.morphology-card-title-row input {
-  max-width: 320px;
-}
-
-.morphology-card-body {
+.morphology-display-slots,
+.entry-morphology-controls,
+.entry-morphology-table-list {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
-.morphology-card-body[hidden] {
-  display: none;
+.morphology-display-slot {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
 }
 
-.morphology-override-list {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+.morphology-display-slot.has-columns {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), max-content));
+  align-items: start;
+  column-gap: clamp(14px, 2vw, 24px);
 }
 
-.morphology-override-input::placeholder {
+.morphology-display-column {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.morphology-display-column-label {
+  margin: 0;
   color: var(--ui-text-muted);
-  opacity: 0.72;
+  font-size: 0.86rem;
+  font-weight: 900;
+}
+
+.morphology-display-table {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.morphology-display-table h5 {
+  margin: 0;
+  color: var(--ui-text-muted);
+  font-size: 0.92rem;
+}
+
+.morphology-display-note {
+  margin: 0;
+  color: var(--ui-text-muted);
+  white-space: pre-wrap;
+}
+
+/* Each table keeps its intrinsic width; a narrow panel falls back to one scrollable table. */
+.morphology-display-table-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: clamp(12px, 1.6vw, 18px);
+  min-width: 0;
+}
+
+.morphology-display-table-grid > .morphology-display-table {
+  flex: 0 1 auto;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.morphology-untitled {
+  color: var(--ui-text-muted);
+  font-weight: 700;
 }
 
 .morphology-table-scroll,
-.morphology-edit-scroll {
+.morphology-edit-scroll,
+.morphology-grid-scroll {
   min-width: 0;
   max-width: 100%;
   overflow-x: auto;
@@ -3222,47 +3009,1000 @@ span.pending-source {
 
 .morphology-table-scroll {
   width: fit-content;
-  max-width: 100%;
+}
+
+.morphology-table-scroll:focus-visible,
+.morphology-grid-scroll:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
 }
 
 .morphology-table,
-.morphology-edit-table {
+.morphology-edit-table,
+.morphology-grid {
   width: max-content;
   border-collapse: collapse;
 }
 
-.morphology-table th,
-.morphology-table td,
-.morphology-edit-table th,
-.morphology-edit-table td {
+.morphology-table :is(th, td),
+.morphology-edit-table :is(th, td),
+.morphology-grid :is(th, td) {
   border: 1px solid var(--ui-border);
-  padding: 10px;
+  padding: 8px 10px;
   text-align: center;
   white-space: nowrap;
 }
 
-.morphology-table th:first-child {
-  min-width: 72px;
-}
-
-.morphology-table th:not(:first-child),
-.morphology-table td {
-  min-width: 112px;
-}
-
 .morphology-table th,
-.morphology-edit-table th {
+.morphology-edit-table th,
+.morphology-grid th {
   background: color-mix(in srgb, var(--material-inset-background) 72%, var(--material-panel-background));
   font-weight: 900;
 }
 
-.morphology-edit-table input,
-.morphology-edit-table textarea {
-  min-width: 140px;
+.morphology-table td {
+  min-width: 96px;
 }
 
-.morphology-edit-table textarea {
+.morphology-table .morphology-corner,
+.morphology-edit-table .morphology-corner,
+.morphology-grid .morphology-corner {
+  /* Only the outer edges go: a collapsed border of style none loses to its neighbour, so the
+     first column header keeps its left edge and the first row header its top edge. */
+  border-top-style: none;
+  border-left-style: none;
+  background: transparent;
+}
+
+.morphology-table td.is-absent {
+  color: var(--ui-text-muted);
+}
+
+/* A syncretism region reads as one cell: a faint tint, and no edges inside it. */
+.morphology-table td.is-merged {
+  background: color-mix(in srgb, var(--ui-accent) 7%, transparent);
+}
+
+.morphology-table td.open-top { border-top-style: hidden; }
+.morphology-table td.open-bottom { border-bottom-style: hidden; }
+.morphology-table td.open-left { border-left-style: hidden; }
+.morphology-table td.open-right { border-right-style: hidden; }
+
+/* ---- Entry editor ---- */
+
+.entry-morphology-mode-row,
+.entry-morphology-add-row,
+.entry-morphology-dormant-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.entry-morphology-add-row select {
+  min-width: min(100%, 240px);
+}
+
+.entry-morphology-table-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.entry-morphology-table-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.entry-morphology-table-title {
+  min-width: 0;
+}
+
+.entry-morphology-context,
+.entry-morphology-content-badge {
+  color: var(--ui-text-muted);
+  font-size: 0.86rem;
+}
+
+.entry-morphology-table-actions {
+  display: flex;
+  gap: 8px;
+  margin-inline-start: auto;
+  flex-wrap: wrap;
+}
+
+.entry-morphology-table-body {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.entry-morphology-table-body[hidden] {
+  display: none;
+}
+
+.entry-morphology-notes {
+  max-width: 560px;
+}
+
+.entry-morphology-override-table td {
+  vertical-align: top;
+  padding: 6px;
+}
+
+.morphology-cell-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.morphology-override-input,
+.morphology-rule-input {
+  width: 100%;
+  min-width: 8.5rem;
+  padding-inline-end: 28px;
+}
+
+.morphology-override-input::placeholder,
+.morphology-rule-input::placeholder {
+  color: var(--ui-text-muted);
+  opacity: 0.78;
+}
+
+.entry-morphology-cell.is-overridden .morphology-override-input {
+  border-color: color-mix(in srgb, var(--ui-accent) 55%, var(--ui-border));
+}
+
+.entry-morphology-cell.is-override-absent .morphology-override-input::placeholder {
+  font-style: italic;
+}
+
+.entry-morphology-cell-note,
+.morphology-cell-note {
+  display: block;
+  max-width: 14rem;
+  margin-top: 3px;
+  color: var(--ui-text-muted);
+  font-size: 0.78rem;
+  white-space: normal;
+  text-align: start;
+}
+
+.morphology-cell-note:empty,
+.entry-morphology-cell-note:empty {
+  display: none;
+}
+
+/* The ⋯ button appears with hover or focus; touch can tap the cell first, then the button. */
+.morphology-cell-menu-button {
+  position: absolute;
+  inset-inline-end: 3px;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ui-text-muted);
+  font-weight: 900;
+  opacity: 0;
+}
+
+.morphology-table-card-head .morphology-cell-menu-button,
+.morphology-axis-head .morphology-cell-menu-button {
+  position: static;
+}
+
+:is(td, th, .morphology-table-card):is(:hover, :focus-within) .morphology-cell-menu-button,
+.morphology-cell-menu-button.is-focusable,
+.morphology-cell-menu-button:focus-visible {
+  opacity: 1;
+}
+
+.morphology-cell-menu-button:hover {
+  background: var(--material-inset-background);
+  color: var(--ui-text);
+}
+
+@media (hover: none) {
+  .morphology-cell-menu-button {
+    opacity: 1;
+  }
+}
+
+.entry-morphology-dormant {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.entry-morphology-dormant p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0;
+}
+
+.entry-morphology-dormant-list {
+  display: grid;
+  gap: 8px;
+}
+
+.entry-morphology-dormant-table ul {
+  margin: 4px 0 0;
+  padding-inline-start: 1.2em;
+}
+
+/* ---- Template page ---- */
+
+.morphology-template-page {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.morphology-page-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  flex-wrap: wrap;
+}
+
+.morphology-page-savebar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.morphology-undo-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 34rem;
+  padding: 4px 4px 4px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-control);
+  background: var(--material-inset-background);
+}
+
+.morphology-dirty-status {
+  color: var(--ui-text-muted);
+  font-size: 0.88rem;
+}
+
+.text-link-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ui-accent);
+  font: inherit;
+  font-weight: 800;
+  text-align: start;
+  cursor: pointer;
+}
+
+.text-link-button:hover {
+  color: var(--ui-accent-hover);
+  text-decoration: underline;
+}
+
+.morphology-template-page .is-error {
+  color: var(--ui-danger);
+}
+
+.morphology-structure {
+  display: grid;
+  grid-template-areas: "trial" "slots";
+  gap: 18px;
+  min-width: 0;
+}
+
+@container (min-width: 760px) {
+  .morphology-structure {
+    grid-template-columns: minmax(0, 1fr) clamp(320px, 30cqi, 360px);
+    grid-template-areas: "slots trial" "slots properties";
+    grid-template-rows: auto 1fr;
+    align-items: start;
+  }
+}
+
+.morphology-structure-trial { grid-area: trial; }
+.morphology-structure-slots { grid-area: slots; }
+.morphology-structure-properties { grid-area: properties; }
+
+.morphology-structure-trial,
+.morphology-structure-properties {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-panel);
+  background: var(--material-panel-background);
+}
+
+.morphology-structure-trial h3,
+.morphology-structure-properties h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.morphology-drawer-close {
+  display: none;
+}
+
+/* Narrow workspaces edit properties in a drawer over the page. The trial sits above the slots
+   and keeps only its input and context: the cards already show each verdict. */
+@container (max-width: 759px) {
+  .morphology-structure-properties {
+    display: none;
+  }
+
+  .morphology-structure-trial .morphology-trial-list {
+    display: none;
+  }
+
+  .morphology-structure.drawer-open .morphology-structure-properties {
+    position: fixed;
+    inset: 0 0 0 auto;
+    z-index: 60;
+    display: grid;
+    align-content: start;
+    width: min(380px, 100vw);
+    overflow-y: auto;
+    border-radius: 0;
+    box-shadow: var(--material-card-shadow);
+  }
+
+  .morphology-drawer-close {
+    display: inline-flex;
+  }
+}
+
+.morphology-properties-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.morphology-structure-slots {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-width: 0;
+}
+
+.morphology-structure-slots > .additive-button {
+  justify-self: start;
+}
+
+.morphology-structure-help,
+.morphology-count-note {
+  margin: 0;
+}
+
+.morphology-count-note:empty {
+  display: none;
+}
+
+.morphology-slot-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.morphology-slot {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 6px;
+  align-items: start;
+  padding: 8px;
+  border: 1px dashed var(--ui-border);
+  border-radius: var(--radius-panel);
+}
+
+.morphology-slot.is-competing {
+  border-style: solid;
+  background: color-mix(in srgb, var(--material-inset-background) 55%, transparent);
+}
+
+.morphology-slot-head {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.morphology-slot-name {
+  max-width: 320px;
+  font-weight: 800;
+}
+
+.morphology-slot-notes {
+  max-width: 560px;
+  min-height: 0;
   resize: vertical;
+}
+
+.morphology-slot-rule {
+  margin: 0;
+  color: var(--ui-text-muted);
+  font-size: 0.84rem;
+}
+
+.morphology-slot.is-competing .morphology-card-row {
+  grid-column: 2;
+}
+
+.morphology-card-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-width: 0;
+  min-height: 40px;
+}
+
+.morphology-table-card {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  flex: 1 1 220px;
+  min-width: min(100%, 220px);
+  max-width: 320px;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-panel);
+  background: var(--material-panel-background);
+  cursor: pointer;
+}
+
+.morphology-table-card.is-selected {
+  border-color: var(--ui-accent);
+  box-shadow: inset 0 0 0 1px var(--ui-accent);
+}
+
+.morphology-table-card:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+.morphology-table-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.morphology-table-card-head strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.morphology-table-card-info {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.morphology-rule-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+}
+
+.morphology-rule-chip {
+  padding: 1px 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--material-inset-background);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.morphology-rule-chip.is-invalid {
+  border-color: var(--ui-danger);
+  color: var(--ui-danger);
+}
+
+.morphology-rule-or {
+  color: var(--ui-text-muted);
+  font-size: 0.8rem;
+}
+
+.morphology-card-line {
+  margin: 0;
+  color: var(--ui-text-muted);
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.morphology-partial-cover summary {
+  cursor: pointer;
+}
+
+.morphology-trial-verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin: 2px 0 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--ui-border);
+  color: var(--ui-text-muted);
+  font-size: 0.84rem;
+}
+
+.morphology-trial-badge {
+  flex: 0 0 auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--material-inset-background);
+  color: var(--ui-text-muted);
+  font-weight: 900;
+}
+
+/* Trial results: applying tables stand out, the others step back until pointed at. */
+.morphology-table-card[data-trial-state="effective"] {
+  background: color-mix(in srgb, var(--ui-accent) 12%, var(--material-panel-background));
+  box-shadow: inset 4px 0 0 var(--ui-accent);
+}
+
+.morphology-table-card.is-selected[data-trial-state="effective"] {
+  box-shadow: inset 4px 0 0 var(--ui-accent), inset 0 0 0 1px var(--ui-accent);
+}
+
+.morphology-table-card[data-trial-state="effective"] .morphology-trial-badge {
+  background: var(--ui-accent);
+  color: var(--ui-text-on-solid);
+}
+
+.morphology-table-card[data-trial-state="effective"] .morphology-trial-verdict {
+  border-top-color: color-mix(in srgb, var(--ui-accent) 35%, var(--ui-border));
+  color: var(--ui-text);
+}
+
+.morphology-table-card[data-trial-state="inactive"]:not(.is-selected, :hover, :focus-within) {
+  opacity: 0.55;
+}
+
+.drop-before { box-shadow: inset 3px 0 0 var(--ui-accent); }
+.drop-after { box-shadow: inset -3px 0 0 var(--ui-accent); }
+.morphology-slot.drop-before { box-shadow: inset 0 3px 0 var(--ui-accent); }
+.morphology-slot.drop-after { box-shadow: inset 0 -3px 0 var(--ui-accent); }
+.morphology-axis-header[data-axis="rows"].drop-before { box-shadow: inset 0 3px 0 var(--ui-accent); }
+.morphology-axis-header[data-axis="rows"].drop-after { box-shadow: inset 0 -3px 0 var(--ui-accent); }
+.drop-into { outline: 2px dashed var(--ui-accent); outline-offset: 2px; }
+
+.morphology-properties-parent {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 0.9rem;
+}
+
+.morphology-rule-editor {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.morphology-rule-editor legend {
+  padding: 0;
+  font-weight: 900;
+}
+
+.morphology-rule-editor .field-help {
+  margin: 0;
+}
+
+.morphology-rule-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 6px 8px;
+  align-items: end;
+}
+
+.morphology-rule-row.is-invalid input {
+  border-color: var(--ui-danger);
+}
+
+.morphology-rule-remove {
+  min-width: 34px;
+  padding-inline: 0;
+}
+
+.morphology-rule-feedback {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--ui-text-muted);
+  font-size: 0.82rem;
+}
+
+.morphology-rule-feedback:empty {
+  display: none;
+}
+
+.morphology-rule-or-line {
+  margin: 0;
+  color: var(--ui-text-muted);
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-align: center;
+}
+
+.morphology-trial-mode {
+  justify-self: start;
+}
+
+.morphology-trial-input input,
+.morphology-trial-entry input {
+  width: 100%;
+}
+
+.morphology-trial-entry {
+  position: relative;
+}
+
+.morphology-trial-output {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.morphology-trial-output:empty {
+  display: none;
+}
+
+.morphology-trial-output p {
+  margin: 0;
+}
+
+.morphology-context-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.morphology-context-switch .chip-button {
+  padding: 2px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--material-inset-background);
+  color: var(--ui-text);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.morphology-context-switch .chip-button.active {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+  color: var(--ui-text-on-solid);
+}
+
+.morphology-trial-tags {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  font-size: 0.86rem;
+}
+
+.morphology-trial-tags > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+}
+
+.morphology-trial-tags dt {
+  color: var(--ui-text-muted);
+  font-weight: 800;
+}
+
+.morphology-trial-tags dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.morphology-trial-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.morphology-trial-list li {
+  display: grid;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: var(--radius-control);
+  font-size: 0.88rem;
+}
+
+.morphology-trial-list li span {
+  color: var(--ui-text-muted);
+}
+
+.morphology-trial-list li.is-effective {
+  background: color-mix(in srgb, var(--ui-accent) 12%, transparent);
+  box-shadow: inset 4px 0 0 var(--ui-accent);
+}
+
+.morphology-trial-list li.is-effective span {
+  color: var(--ui-text);
+  font-weight: 800;
+}
+
+/* Tables view */
+
+.morphology-tables {
+  display: grid;
+  grid-template-areas: "select" "editor";
+  gap: 16px;
+  min-width: 0;
+}
+
+@container (min-width: 760px) {
+  .morphology-tables {
+    grid-template-columns: 200px minmax(0, 1fr);
+    grid-template-areas: "list editor";
+    align-items: start;
+  }
+}
+
+.morphology-table-list {
+  grid-area: list;
+  display: none;
+}
+
+.morphology-table-select {
+  grid-area: select;
+  max-width: 360px;
+}
+
+@container (min-width: 760px) {
+  .morphology-table-list { display: block; }
+  .morphology-table-select { display: none; }
+}
+
+.morphology-table-list ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.morphology-table-list-group > span {
+  display: block;
+  margin: 8px 0 2px;
+  color: var(--ui-text-muted);
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.morphology-table-list-group ul {
+  padding-inline-start: 8px;
+}
+
+.morphology-table-list-item {
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ui-text);
+  font-weight: 700;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.morphology-table-list-item:hover {
+  background: var(--material-inset-background);
+}
+
+/* Selection never changes the weight, so a selected title wraps exactly like before. */
+.morphology-table-list-item.active {
+  background: color-mix(in srgb, var(--ui-accent) 14%, transparent);
+  box-shadow: inset 3px 0 0 var(--ui-accent);
+  color: var(--ui-accent-hover);
+}
+
+.morphology-table-editor {
+  grid-area: editor;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.morphology-table-title-input {
+  max-width: 420px;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.morphology-table-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-width: 0;
+  font-size: 0.9rem;
+}
+
+.morphology-shape-note {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.morphology-pick-banner {
+  padding: 6px 10px;
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--ui-accent) 12%, transparent);
+  font-size: 0.88rem;
+}
+
+.morphology-pick-banner[hidden],
+.morphology-pick-banner:empty {
+  display: none;
+}
+
+.morphology-grid-scroll {
+  justify-self: start;
+}
+
+.morphology-grid td.morphology-grid-cell {
+  min-width: 9rem;
+  padding: 4px;
+  vertical-align: top;
+}
+
+.morphology-grid tbody th,
+.morphology-grid .morphology-corner {
+  position: sticky;
+  inset-inline-start: 0;
+  z-index: 1;
+}
+
+.morphology-grid .morphology-corner {
+  background: var(--material-panel-background);
+}
+
+.morphology-axis-header {
+  padding: 4px;
+}
+
+.morphology-axis-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.morphology-axis-input {
+  width: 7.5rem;
+  min-width: 4rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.morphology-axis-text {
+  flex: 1 1 auto;
+  padding: 0 6px;
+}
+
+.morphology-axis-handle {
+  width: 18px;
+  min-height: 30px;
+  opacity: 0;
+}
+
+.morphology-axis-header:is(:hover, :focus-within) .morphology-axis-handle {
+  opacity: 1;
+}
+
+.morphology-add-column-cell {
+  border-color: transparent !important;
+  background: transparent !important;
+}
+
+.morphology-add-row {
+  justify-self: start;
+}
+
+.morphology-cell-state {
+  width: 100%;
+  min-width: 8.5rem;
+  min-height: 34px;
+  padding: 4px 28px 4px 8px;
+  border: 1px dashed var(--ui-border);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ui-text-muted);
+  font: inherit;
+  text-align: start;
+}
+
+.morphology-grid-cell[data-cell-state="absent"] .morphology-cell-state {
+  border-style: solid;
+  background: repeating-linear-gradient(-45deg, transparent 0 6px, color-mix(in srgb, var(--ui-border) 45%, transparent) 6px 7px);
+  font-style: italic;
+}
+
+.morphology-grid-cell[data-cell-state="inherited"] .morphology-rule-input::placeholder {
+  font-style: italic;
+}
+
+.morphology-grid-cell.is-invalid :is(input, .morphology-cell-state) {
+  border-color: var(--ui-danger);
+}
+
+.morphology-grid-cell.is-invalid .morphology-cell-note {
+  color: var(--ui-danger);
+}
+
+.morphology-grid-scroll.is-picking .morphology-grid-cell,
+.morphology-grid-scroll.is-picking .morphology-axis-header {
+  cursor: crosshair;
+}
+
+.morphology-grid-cell.is-pick-target {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: -2px;
+}
+
+.morphology-grid-cell.is-pick-source {
+  background: color-mix(in srgb, var(--ui-accent) 10%, transparent);
+}
+
+.morphology-form-trial {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.morphology-form-trial label {
+  max-width: 320px;
+}
+
+.morphology-tables-empty {
+  padding: 12px 0;
+}
+
+.morphology-delete-targets {
+  margin: 0;
+  padding-inline-start: 1.2em;
+}
+
+.morphology-delete-samples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  max-height: 8rem;
+  overflow-y: auto;
+}
+
+.analysis-template-link {
+  font-size: 0.84rem;
 }
 
 .entry-card small {
@@ -4307,7 +5047,7 @@ span.pending-source {
 }
 
 .definition-form-card + .definition-form-card,
-.entry-morphology-group-card + .entry-morphology-group-card {
+.entry-morphology-table-card + .entry-morphology-table-card {
   border-top: 1px solid var(--material-entry-editor-item-divider);
   padding-top: var(--material-entry-editor-item-gap);
 }
@@ -4518,11 +5258,11 @@ span.pending-source {
 }
 
 /* Drag sorting: the card dims in place and a line shows where it will land. */
-:is(.tool-order-card, .ipa-rule-card, .morphology-group-card, .morphology-config-card, .tag-row, .tag-tile, .source-reference-card).dragging {
+:is(.tool-order-card, .ipa-rule-card, .tag-row, .tag-tile, .source-reference-card).dragging {
   opacity: 0.5;
 }
 
-:is(.tool-order-list, .ipa-rule-list, .morphology-table-list, .morphology-group-table-list) {
+:is(.tool-order-list, .ipa-rule-list) {
   position: relative;
 }
 
@@ -6343,15 +7083,15 @@ body[data-density="compact"] #entryForm #notesInput {
   height: calc(3lh + 22px);
 }
 
-body[data-density="compact"] #entryForm :is(.definition-form-list, .entry-morphology-group-list) {
+body[data-density="compact"] #entryForm :is(.definition-form-list, .entry-morphology-table-list) {
   gap: min(var(--material-entry-editor-item-gap), 10px);
 }
 
-body[data-density="compact"] #entryForm :is(.definition-form-card, .entry-morphology-group-card) + :is(.definition-form-card, .entry-morphology-group-card) {
+body[data-density="compact"] #entryForm :is(.definition-form-card, .entry-morphology-table-card) + :is(.definition-form-card, .entry-morphology-table-card) {
   padding-top: min(var(--material-entry-editor-item-gap), 10px);
 }
 
-body[data-density="compact"] #entryForm :is(.definition-form-fields, .definition-optional-fields, .entry-morphology-controls, .entry-morphology-group-card) {
+body[data-density="compact"] #entryForm :is(.definition-form-fields, .definition-optional-fields, .entry-morphology-controls, .entry-morphology-table-card) {
   gap: 8px;
 }
 

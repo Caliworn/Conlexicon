@@ -160,6 +160,7 @@ function corpusHarness(corpusAutoSave = false) {
     observeAutoHeightTextareas() {},
     docsFormIsDirty: () => false,
     quickEntryHasDraft: () => false,
+    morphologyTemplatesAreDirty: () => false,
     confirmUnsavedChanges: (_, { discard }) => { discard(); return true; },
     showToast() {},
     showApiErrorToast: (error) => errors.push(error),

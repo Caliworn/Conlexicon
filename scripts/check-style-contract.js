@@ -455,10 +455,7 @@ const ordinaryCommandIds = new Set([
   "entryFilterResetButton", "entryFilterCancelButton",
 ]);
 const ordinaryActions = new Set([
-  "toggle-morphology-table",
-  "toggle-entry-morphology-mode",
-  "config", "export", "activate", "move-entry-morphology-group-up",
-  "move-entry-morphology-group-down", "resize-morphology-table", "cancel-partial-edit", "partial-auto-ipa",
+  "config", "export", "activate", "cancel-partial-edit", "partial-auto-ipa",
 ]);
 for (const [tag] of `${index}\n${app}`.matchAll(/<(?:button|label)\b[^>]*>/g)) {
   const id = tag.match(/\bid="([^"]+)"/)?.[1] || "";

@@ -407,7 +407,6 @@ const i18n = {
     morphologyRightVObjects: "rightV 识别对象",
     invalidMorphologyFunctionObjects: "形态配置中存在未配置的函数对象",
     morphologyTableNote: "形态表备注",
-    morphologyTablesPending: "形态表格将在下一阶段恢复。",
     morphologySyntaxTitle: "形态语法",
     morphologySyntaxInfo: "查看形态语法",
     corpusSyntaxTitle: "语料格式说明",
@@ -664,6 +663,7 @@ const i18n = {
     unsavedIpaConfirm: "IPA 设置中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
     unsavedDictionaryConfirm: "词典设置中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
     unsavedMorphologyConfirm: "自动形态学中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
+    unsavedMorphologyTablesConfirm: "形态表格中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
     unsavedCorpusConfirm: "语料库中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
     unsavedDocsConfirm: "语言文档中有未保存的更改。请选择保存、放弃更改，或取消当前操作。",
     tags: "标签",
@@ -1034,7 +1034,6 @@ const i18n = {
     morphologyRightVObjects: "rightV Objects",
     invalidMorphologyFunctionObjects: "Morphology config contains unconfigured function objects",
     morphologyTableNote: "Morphology Table Note",
-    morphologyTablesPending: "Morphology tables will return in the next stage.",
     morphologySyntaxTitle: "Morphology Syntax",
     morphologySyntaxInfo: "Show morphology syntax",
     corpusSyntaxTitle: "Corpus Syntax",
@@ -1291,6 +1290,7 @@ const i18n = {
     unsavedIpaConfirm: "IPA settings have unsaved changes. Save them, discard them, or cancel the current action.",
     unsavedDictionaryConfirm: "Dictionary settings has unsaved changes. Save them, discard them, or cancel the current action.",
     unsavedMorphologyConfirm: "Auto Morphology has unsaved changes. Save them, discard them, or cancel the current action.",
+    unsavedMorphologyTablesConfirm: "Morphology Tables has unsaved changes. Save them, discard them, or cancel the current action.",
     unsavedCorpusConfirm: "Corpus has unsaved changes. Save them, discard them, or cancel the current action.",
     unsavedDocsConfirm: "Language Docs has unsaved changes. Save them, discard them, or cancel the current action.",
     tags: "Tags",
@@ -1780,6 +1780,7 @@ const elements = {
   displayDerivedSection: document.querySelector("#displayDerivedSection"),
   displayDerived: document.querySelector("#displayDerived"),
   displayMorphologySection: document.querySelector("#displayMorphologySection"),
+  displayMorphology: document.querySelector("#displayMorphology"),
   displayEntryNotesSection: document.querySelector("#displayEntryNotesSection"),
   displayEntryNotes: document.querySelector("#displayEntryNotes"),
   editEntryButton: document.querySelector("#editEntryButton"),
@@ -1797,6 +1798,7 @@ const elements = {
   fullEditDerivedSection: document.querySelector("#fullEditDerivedSection"),
   fullEditDerived: document.querySelector("#fullEditDerived"),
   definitionFormList: document.querySelector("#definitionFormList"),
+  entryMorphologyControls: document.querySelector("#entryMorphologyControls"),
   addDefinitionButton: document.querySelector("#addDefinitionButton"),
   sourceEntryInput: document.querySelector("#sourceEntryInput"),
   sourceSuggestionBox: document.querySelector("#sourceSuggestionBox"),
@@ -3167,6 +3169,10 @@ function renderActiveView(options = {}) {
     fillMorphologyFunctionsForm(dictionary);
     return;
   }
+  if (state.activeView === "morphology-tables") {
+    renderMorphologyTemplatePage(dictionary);
+    return;
+  }
   if (state.activeView === "ipa") {
     fillIpaForm(dictionary);
     renderIpaSandbox();
@@ -3212,6 +3218,10 @@ function renderLocaleActiveView() {
   }
   if (state.activeView === "ipa") {
     renderIpaSandbox();
+    return;
+  }
+  if (state.activeView === "morphology-tables") {
+    renderMorphologyTemplatePage(dictionary);
     return;
   }
   if (state.activeView === "tags") {
@@ -7085,6 +7095,9 @@ function tagUsagePartsForRender(dictionary) {
 
 function renderAfterTagUsageLoad() {
   renderPartFilter();
+  if (state.activeView === "morphology-tables") {
+    renderMorphologyTemplateDerived();
+  }
   if (state.activeView === "tags") {
     renderTagManagerZones();
   }
@@ -7448,8 +7461,8 @@ function showContextMenu(event, label, actions, { returnFocus = null } = {}) {
   menu.className = "entry-context-menu";
   menu.setAttribute("role", "menu");
   menu.setAttribute("aria-label", label);
-  actions.forEach((action) => {
-    if (action.danger) {
+  actions.forEach((action, index) => {
+    if ((action.danger || action.separatorBefore) && index > 0) {
       const separator = document.createElement("div");
       separator.className = "entry-context-menu-separator";
       separator.setAttribute("role", "separator");
@@ -7487,6 +7500,14 @@ function showContextMenu(event, label, actions, { returnFocus = null } = {}) {
     if (keyEvent.key === "Escape") {
       closeEntryContextMenu();
       returnFocus?.focus();
+      return;
+    }
+    const items = [...menu.querySelectorAll('[role="menuitem"]')];
+    const current = items.indexOf(document.activeElement);
+    const next = { ArrowDown: current + 1, ArrowUp: current - 1, Home: 0, End: items.length - 1 }[keyEvent.key];
+    if (next !== undefined && menu.contains(document.activeElement)) {
+      keyEvent.preventDefault();
+      items[(next + items.length) % items.length].focus();
     }
   };
   const closeOnScroll = () => closeEntryContextMenu();
@@ -8938,6 +8959,7 @@ function renderEntryDisplay(entry) {
   });
 
   renderEntryRelationSections(entry, showEmptySections);
+  renderMorphologyDisplay(entry, showEmptySections);
   elements.displayEntryNotesSection.hidden = !entry.notes && !showEmptySections;
   elements.displayEntryNotes.textContent = entry.notes || "";
   applyEntryDisplaySectionOrder();
@@ -9983,6 +10005,9 @@ async function loadAnalysisQuery(name, dictionary, { force = false } = {}) {
     }
     analysisQueryStates.set(name, { key, status: "error", response: null, error, requestId });
     console.error(error);
+  }
+  if (name === "morphology" && state.activeView === "morphology-tables" && activeDictionary()?.id === dictionary.id) {
+    renderMorphologyTemplateDerived(activeDictionary());
   }
   const page = activeAnalysisPage();
   if (
@@ -11102,12 +11127,12 @@ function renderAnalysisMorphologyQuery(response, subpage) {
       activeFilterValueTitleDescriptor("activeFilterMorphologyTable", label),
       row.assignedEntryCount,
     );
-    return [
+    return {
       label,
-      row.assignedEntryCount,
-      featureResultActiveFilterAction(response.source, [variant], "table", row.tableId)
-        || viewAction("morphology-tables"),
-    ];
+      value: row.assignedEntryCount,
+      action: featureResultActiveFilterAction(response.source, [variant], "table", row.tableId),
+      templateTableId: row.tableId,
+    };
   });
   return `<section class="analysis-detail-grid">
     ${analysisCard(aText("模板分配", "Template Assignment"), analysisCoverageList([
@@ -11555,7 +11580,7 @@ function analysisBarList(items, options = {}) {
     ? { label: item[0], value: item[1], action: item[2], valueText: "", secondaryLabel: "" }
     : item));
   const max = Math.max(...rows.map((item) => item.value), 1);
-  return `<div class="analysis-bars">${rows.map(({ label, value, action, valueText = "", secondaryLabel = "", tag = "" }) => {
+  return `<div class="analysis-bars">${rows.map(({ label, value, action, valueText = "", secondaryLabel = "", tag = "", templateTableId = "" }) => {
     const attrs = analysisActionAttributes(action);
     const labelTag = attrs ? "button" : "span";
     const labelAttrs = attrs ? ` type="button"` : "";
@@ -11568,6 +11593,7 @@ function analysisBarList(items, options = {}) {
       <div class="analysis-bar-track"><span style="width: ${Math.max(4, (value / max) * 100).toFixed(2)}%"></span></div>
       <strong>${escapeHtml(valueText || value)}</strong>
       ${tag ? tagManagerLinkHtml([tag], "analysis-tag-link") : ""}
+      ${templateTableId ? `<button type="button" class="text-link-button analysis-template-link" data-morphology-template-table="${escapeHtml(templateTableId)}">${escapeHtml(aText("编辑模板", "Edit template"))}</button>` : ""}
     </div>
   `;
   }).join("")}</div>`;
@@ -11824,6 +11850,7 @@ function fillEntryForm(entry) {
   setSourceInputReferences(elements.sourceEntryInput, formEntry.etymology?.sources || []);
   elements.etymologyDescriptionInput.value = formEntry.etymology?.description || "";
   renderDefinitionFormList(formEntry.definitions);
+  createEntryMorphologyEditor(elements.entryMorphologyControls, formEntry, fullEntryFormMorphologyPreview);
   renderFullEditDerivedEntries(formEntry);
   applyFullEntrySectionOrder();
   renderIpaKeyboard(activeDictionary());
@@ -12218,7 +12245,10 @@ function entrySemanticSnapshot(entry = {}) {
     morphologyTables: morphologyState.morphologyTables.map((table) => ({
       tableId: table.tableId,
       notes: table.notes.trim(),
-      overrides: table.overrides,
+      // Overrides are keyed by cell, so their order is not an edit.
+      overrides: [...table.overrides].sort((left, right) => (
+        left.rowId.localeCompare(right.rowId) || left.columnId.localeCompare(right.columnId)
+      )),
     })),
     notes: String(entry.notes || "").trim(),
   };
@@ -12231,7 +12261,7 @@ function entriesHaveSameSemantics(left, right) {
 function fullEntryFormCandidate(existing = selectedEntry()) {
   const lemma = elements.lemmaInput.value.trim();
   const tags = parseTagListText(elements.tagsInput.value);
-  const morphologyState = morphologyModel.normalizeEntryMorphologyState(existing || {});
+  const morphologyState = entryMorphologyEditorFor(elements.entryMorphologyControls).collect();
   return {
     ...(existing || {}),
     id: existing?.id || "",
@@ -12246,6 +12276,28 @@ function fullEntryFormCandidate(existing = selectedEntry()) {
     ...morphologyState,
     notes: elements.notesInput.value.trim(),
   };
+}
+
+// What the morphology editor matches and generates from while the full edit is open.
+function fullEntryFormMorphologyPreview() {
+  return {
+    lemma: elements.lemmaInput.value.trim(),
+    tags: parseTagListText(elements.tagsInput.value),
+    definitions: collectDefinitions(),
+  };
+}
+
+let fullEntryMorphologyRefreshTimer = 0;
+
+// Lemma, tags and definitions change which tables apply and what they generate.
+function scheduleFullEntryMorphologyRefresh(event) {
+  if (elements.entryMorphologyControls.contains(event.target)) {
+    return;
+  }
+  clearTimeout(fullEntryMorphologyRefreshTimer);
+  fullEntryMorphologyRefreshTimer = setTimeout(() => {
+    entryMorphologyEditorFor(elements.entryMorphologyControls)?.refresh();
+  }, 200);
 }
 
 function fullEntryEditIsOpen() {
@@ -12318,8 +12370,15 @@ function sourceCompletionController(input) {
   return controller;
 }
 
+// Inputs that pick one entry by lemma instead of editing a list of sources.
+const sourceCompletionPickers = new WeakMap();
+
 function sourceCompletionRequest(input) {
   const dictionaryId = activeDictionary()?.id || "";
+  if (sourceCompletionPickers.has(input)) {
+    const body = { q: input.value.trim(), ownerEntryId: "", excludeEntryIds: [] };
+    return { dictionaryId, body, key: JSON.stringify([dictionaryId, "picker", body.q]) };
+  }
   const segment = sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length);
   const excludeEntryIds = (sourceInputReferences.get(input)?.sources || [])
     .map((source) => source.entryId)
@@ -12451,7 +12510,9 @@ function renderSourceCompletion(input) {
   const controller = sourceCompletionController(input);
   const field = input.closest(".source-reference-field");
   const focused = Boolean(field?.contains(document.activeElement));
-  const hasQuery = Boolean(sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length).prefix);
+  const hasQuery = sourceCompletionPickers.has(input)
+    ? Boolean(input.value.trim())
+    : Boolean(sourceSegmentAtCursor(input.value, input.selectionStart ?? input.value.length).prefix);
   const open = focused && hasQuery && controller.requestKey !== controller.dismissedKey
     && Boolean(controller.candidates.length || controller.error || controller.loading);
   const listId = `${input.id}Suggestions`;
@@ -12464,7 +12525,7 @@ function renderSourceCompletion(input) {
   list.id = listId;
   list.className = "source-suggestion-list";
   list.setAttribute("role", "listbox");
-  list.setAttribute("aria-label", t("sourceEntry"));
+  list.setAttribute("aria-label", sourceCompletionPickers.get(input)?.label || t("sourceEntry"));
   controller.candidates.forEach((summary, index) => {
     const option = document.createElement("div");
     option.id = `${listId}-${index}`;
@@ -12534,6 +12595,13 @@ function confirmSourceCompletion(input, index) {
   const controller = sourceCompletionController(input);
   const summary = controller.candidates[index];
   if (controller.stale || !summary || sourceCompletionRequest(input).key !== controller.requestKey) {
+    return;
+  }
+  const picker = sourceCompletionPickers.get(input);
+  if (picker) {
+    controller.dismissedKey = controller.requestKey;
+    renderSourceCompletion(input);
+    picker.onPick(summary);
     return;
   }
   fillSourceSegment(summary, input);
@@ -12822,9 +12890,13 @@ function handleSourceAutocompleteKeydown(event) {
   }
 }
 
-function bindSourceAutocompleteInput(input) {
+// `picker` ({ label, onPick(summary) }) makes the input choose a single entry.
+function bindSourceAutocompleteInput(input, picker = null) {
   if (!input) {
     return;
+  }
+  if (picker) {
+    sourceCompletionPickers.set(input, picker);
   }
   const field = input.closest(".source-reference-field");
   // The composite field is not a label: its buttons must never become a
@@ -15664,6 +15736,9 @@ async function openPartialEdit(section) {
     `;
     setSourceInputReferences(body.querySelector('[data-field="sources"]'), entry.etymology?.sources || []);
     bindSourceAutocompleteInput(body.querySelector('[data-field="sources"]'));
+  } else if (section === "morphology") {
+    body.innerHTML = `<div class="entry-morphology-controls partial-morphology-controls"></div>`;
+    createEntryMorphologyEditor(body.firstElementChild, entry, () => entry);
   } else if (section === "notes") {
     body.innerHTML = `
       <textarea data-field="notes" rows="6" aria-labelledby="${escapeHtml(headingLabel?.id || "")}">${escapeHtml(entry.notes || "")}</textarea>
@@ -15785,6 +15860,9 @@ function partialEntryFormCandidate(entry = selectedEntry(), body = partialEditBo
   }
   if (partialEditSection === "notes") {
     return { ...entry, notes: body.querySelector('[data-field="notes"]').value.trim() };
+  }
+  if (partialEditSection === "morphology") {
+    return { ...entry, ...entryMorphologyEditorFor(body.querySelector(".partial-morphology-controls")).collect() };
   }
   return { ...entry };
 }
@@ -17324,6 +17402,9 @@ async function confirmLeaveUnsavedConfigView() {
       save: () => saveMorphologyFunctions({ preventDefault() {} }),
     });
   }
+  if (state.activeView === "morphology-tables") {
+    return confirmLeaveMorphologyTemplates();
+  }
   const settings = dictionarySettings();
   if (state.activeView === "docs" && docsFormIsDirty()) {
     if (settings.docsAutoSave) {
@@ -17368,6 +17449,7 @@ function hasUnsavedChangesOnExit() {
     // A first save needs its response before any newer edits can be sent by ID.
     || Boolean(creation && (!creation.keepalive || !corpusTextsEqual(creation.snapshot, corpusDraftState.draft)))
     || quickEntryHasDraft()
+    || morphologyTemplatesAreDirty(dictionary)
   );
 }
 
@@ -18069,6 +18151,11 @@ elements.analysisPanel.addEventListener("click", (event) => {
     restoreProcessScroll();
     return;
   }
+  const templateLink = event.target.closest("[data-morphology-template-table]");
+  if (templateLink) {
+    void openMorphologyTemplateTable(templateLink.dataset.morphologyTemplateTable);
+    return;
+  }
   const viewTarget = event.target.closest("[data-view-target]");
   if (viewTarget) {
     activeFilter = null;
@@ -18170,6 +18257,11 @@ elements.autoIpaButton.addEventListener("click", () => applyAutoIpa());
 elements.cancelEditButton.addEventListener("click", cancelEntryEdit);
 elements.deleteEntryButton.addEventListener("click", deleteSelectedEntry);
 elements.entryForm.addEventListener("submit", saveEntry);
+elements.entryForm.addEventListener("input", scheduleFullEntryMorphologyRefresh);
+elements.entryForm.addEventListener("click", (event) => {
+  // Adding or removing a definition changes the contexts without an input event.
+  if (event.target.closest('[data-action$="definition"]')) scheduleFullEntryMorphologyRefresh(event);
+});
 elements.dictionaryForm.addEventListener("submit", saveDictionary);
 elements.settingsForm.addEventListener("submit", saveSettings);
 elements.searchFieldEnabledInputs.forEach((input) => {
@@ -18257,6 +18349,7 @@ elements.docsMarkdownInput.addEventListener("scroll", rememberDocsPaneScroll, { 
 elements.docsPreview.addEventListener("scroll", rememberDocsPaneScroll, { passive: true });
 elements.saveDocsButton.addEventListener("click", () => saveLanguageDocs(true));
 elements.morphologyFunctionsForm.addEventListener("submit", saveMorphologyFunctions);
+bindMorphologyTemplatePage();
 elements.morphologySyntaxButton.addEventListener("click", () => {
   appInfoDialog(t("morphologySyntaxTitle"), {
     html: morphologySyntaxInfoHtml(),
@@ -18538,7 +18631,7 @@ function handleNewEntryShortcut(event) {
   }
   event.preventDefault();
   event.stopPropagation();
-  if (confirmDialogResolver || !elements.infoDialog.hidden) {
+  if (confirmDialogResolver || !elements.infoDialog.hidden || morphologyModalIsOpen()) {
     return true;
   }
   // Inside an open edit the same key saves, as it submits in quick entry.
@@ -18581,7 +18674,7 @@ function showShortcutHelp() {
 // Ctrl/Cmd+K works while typing, because it only moves focus. Ctrl/Cmd+E and ?
 // wait until focus has left editable fields, like the new-entry shortcuts.
 function handleAppShortcut(event) {
-  const overlayOpen = confirmDialogResolver || !elements.infoDialog.hidden || quickEntryIsOpen() || networkOpen;
+  const overlayOpen = confirmDialogResolver || !elements.infoDialog.hidden || quickEntryIsOpen() || networkOpen || morphologyModalIsOpen();
   if (overlayOpen || event.isComposing || event.keyCode === 229) {
     return false;
   }
@@ -18718,6 +18811,14 @@ document.addEventListener("keydown", (event) => {
   if (state.activeView === "morphology-functions" && !elements.morphologyFunctionsForm.hidden) {
     event.preventDefault();
     elements.morphologyFunctionsForm.requestSubmit();
+    return;
+  }
+
+  if (state.activeView === "morphology-tables" && !elements.morphologyTablesPanel.hidden) {
+    event.preventDefault();
+    if (!event.repeat && !elements.morphologyTablesPanel.inert) {
+      saveMorphologyTemplates().catch((error) => console.error(error));
+    }
   }
 });
 
