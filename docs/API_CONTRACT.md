@@ -579,7 +579,7 @@ tagRegistry: [{ tag, partOfSpeech, displayLabel, color, displayAmbiguous }]
 - **DTO**：详情 DTO 与摘要 DTO 的 `tags` 都只表示词条标签。摘要 DTO 另带 `effectiveTags`，`parts` 从它计算；摘要的 `definitionPreviews[]` 只多带 `parts`（该释义自己的标签中的词性），供列表与悬浮卡片在每条释义前显示它自己的词性，不带其他标签。
 - **规范序**：标签在词条和释义中是集合，不存储顺序。响应里的标签数组（详情、摘要、保存响应、`PATCH` 响应）一律按标签值的二进制序，`effectiveTags` 是词条标签后接各释义新增的标签，保存响应与之后读取的结果相同。规范序没有业务含义，不用于显示。
 - **显示顺序**：标签的先后只由登记表决定：词性区在前，区内按登记顺序。比较函数是共享模型的 `tagRank`，前端在渲染时用 `arrangeTags` 排列所有标签，已保存词条和草稿共用；服务端只在需要最终顺序的地方用它，即 JSON 导出和分析页的组合。这样登记表移动后，前端已缓存的列表页不会显示过期的顺序。尚未登记的标签（只在未保存的草稿中出现）排在所有已登记标签之后，保持输入顺序。
-- **使用范围**：EntryFilter 的全部标签条件、`/tag-registry` 的使用数、分析页的词性与标签统计、`missing_tags` 质量规则、`allowEmptyTags` 保存校验和自动形态匹配都按有效标签。`near_duplicate_tags` 与 `tag_too_long` 同时检查两层标签；`duplicate_definition_tag`、`mixed_part_of_speech_levels` 与 `missing_definition_part_of_speech` 检查两层之间的关系。标签显示替换与红色强调对两层同样生效。
+- **使用范围**：EntryFilter 的全部标签条件、`/tag-registry` 的使用数、分析页的词性与标签统计、`missing_tags` 质量规则和 `allowEmptyTags` 保存校验都按有效标签。`near_duplicate_tags` 与 `tag_too_long` 同时检查两层标签；`duplicate_definition_tag`、`mixed_part_of_speech_levels` 与 `missing_definition_part_of_speech` 检查两层之间的关系。标签显示替换与红色强调对两层同样生效。
 - **自动形态**逐释义匹配，每次只使用词条标签和当前释义标签。结果在各释义间取并集，按槽位和表顺序排列。[形态分配与保存](#形态分配与保存)
 - **搜索**：`tags` 字段同时投影释义标签，命中的 `sourceType` 为 `definitionTag`，`sourceId` 为释义 ID，`sourcePosition` 为该标签在释义内的位置。
 
