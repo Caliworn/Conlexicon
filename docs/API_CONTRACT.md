@@ -292,7 +292,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `invalid_morphology_match_rule` | 匹配规则不合法。行级错误返回 `details.tableId/row/reason`，行号从 1 开始。 |
 | `invalid_morphology_shape` | 链顶表缺少行或列，或形态模块内的行列 ID 无效、重复。 |
 | `invalid_morphology_inheritance` | 继承目标、继承环、子表形状、改换父表或解除继承映射无效。 |
-| `invalid_morphology_cell` | 模板格的坐标、状态字段或合形引用无效，包括叠好继承才出现的引用环。 |
+| `invalid_morphology_cell` | 模板格的坐标、状态字段或 syncretism 引用无效，包括叠好继承才出现的引用环。 |
 | `morphology_references_in_use` | 409。删除表或行列会清除词条数据，须确认后重试。 |
 | `morphology_table_has_children` | 409。被删表仍有子表继承，`details` 为 `{ tableId, childTableIds }`。 |
 | `incompatible_sqlite_schema` | 409。目标是旧形态结构的 SQLite，须用旧版导出 JSON，再导入新库。 |
@@ -514,11 +514,11 @@ morphologyTables: [{ tableId, notes, overrides: [Override], createdAt, updatedAt
 - 自动模式对每条释义用「词条标签 ∪ 当前释义标签」匹配。没有释义时只匹配一次词条标签。每条规则要求全部 `all` 且没有任何 `none`，多行任选其一。`all` 不能为空，一行不能同时要求和排除同一标签。空规则列表不会自动匹配。结构化标签区分大小写。`matchRules` 里的标签只用于匹配。
 - 同一上下文和槽位内，满足的规则行中，条件集合被另一满足行真包含的行被覆盖。剩下的规则行各自所属的表同时生效。跨槽位与释义合并去重，按模板顺序返回。共享 `morphologyMatchContexts()`、`resolveAutomaticTables()` 和 `explainAutomaticTables()` 提供逐释义结果、合并结果和判定原因。
 - 手动模式按 `morphologyTables` 的顺序选择表，空列表表示无形态。自动模式的列表存放逐词备注和覆写，未匹配到的表保留为休眠叠加层。自动模式下，既无备注又无覆写的叠加层规范化时丢弃。
-- `Cell` 统一含 `rowId`、`columnId` 和 `kind`。规则格用 `{ kind: "rule", sourceText }`，不存在用 `{ kind: "absent" }`，合形引用用 `{ kind: "refer", targetRowId, targetColumnId }`。空白规则按没有记录处理。链顶表没有记录时为空白，子表没有记录时沿父表查找。生效的引用在当前表内解析目标坐标，沿用该表的覆写与继承。
+- `Cell` 统一含 `rowId`、`columnId` 和 `kind`。规则格用 `{ kind: "rule", sourceText }`，不存在用 `{ kind: "absent" }`，syncretism 引用用 `{ kind: "refer", targetRowId, targetColumnId }`。空白规则按没有记录处理。链顶表没有记录时为空白，子表没有记录时沿父表查找。生效的引用在当前表内解析目标坐标，沿用该表的覆写与继承。
 - `Override` 使用同样的行列 ID，允许 `{ kind: "form", value }` 和 `{ kind: "absent" }`。`value` 为去除首尾空白后非空的字面形式。每表每坐标只能有一条覆写，模板格亦同。没有覆写时从当前表沿链取第一条格记录。引用可以串联，叠好继承后的每张表里都不能形成环。
 - 同一词条的表和行列身份保持稳定。移动表或调整显示顺序会重排搜索投影位置，修改标题、说明和行列标签只改模板。规则、格状态、轴的增删、所用函数或继承内容变化只重建涉及生效表的词条。更改分配规则或移动表到不同槽位时，用前后生效表定位受影响的词条。完全等同的规范化请求返回原 `updatedAt`。
 - 删除表或行列导致手动选择、叠加层或覆写丢失时，返回 409 `morphology_references_in_use`，整次不保存。`details` 为 `{ referenceCount, targets: [{ tableId, rowId?, columnId?, label, entryCount }], references }`。`targets` 按被删表或链顶表上的行列聚合，`entryCount` 按词条去重。`references` 是按词条位置取的前 50 条，包含 `{ entryId, lemma, tableId, rowId?, columnId?, reason }`。其中 `tableId` 是实际持有该配置的表，`reason` 为 `manual_table`、`overlay` 或 `override`。用户确认后，在请求外层带 `confirmReferenceRemoval: true`，服务端在同一事务清理引用、保存模板并更新投影。仍被继承的表返回 `morphology_table_has_children`。
-- 解除继承时把目标变为带独立行列的新链顶表，草稿将模板格、合形引用及后代的坐标换成新 ID。请求外层带 `detachments: [{ tableId, rowIdMap, columnIdMap }]`，两个映射均为「原行列 ID → 新行列 ID」。映射只列仍保留的已保存坐标，每个新 ID 最多对应一个原 ID。服务端凭映射重定位该表及后代表的已有覆写，未保留的坐标走同一删除确认。已有子表改指不同链顶时，先单独保存解除继承，再设置新父表。
+- 解除继承时把目标变为带独立行列的新链顶表，草稿将模板格、syncretism 引用及后代的坐标换成新 ID。请求外层带 `detachments: [{ tableId, rowIdMap, columnIdMap }]`，两个映射均为「原行列 ID → 新行列 ID」。映射只列仍保留的已保存坐标，每个新 ID 最多对应一个原 ID。服务端凭映射重定位该表及后代表的已有覆写，未保留的坐标走同一删除确认。已有子表改指不同链顶时须先单独保存解除继承。独立表改设父表时，它原有行列上的覆写按删除处理，走同一删除确认；界面不提供这个操作，见[形态分配计划](MORPHOLOGY_ASSIGNMENT_PLAN.md) 2.8。
 
 ### 标签登记表
 

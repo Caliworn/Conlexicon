@@ -16,7 +16,7 @@
 | [Entry Incremental Save Plan](ENTRY_INCREMENTAL_SAVE_PLAN.md) | 设计草案 | 审计 A20＋A05：词条写入只改动变化的主表列、子表和投影字段；`PUT` 基于 `updatedAt` 的条件保存与冲突确认。 |
 | [Definition Tag Specification](DEFINITION_TAG_SPEC.md) | 现行规范 | 释义标签与多词性词条的数据原则、编辑、显示、质量规则、词性统计及逐释义的自动形态输入。 |
 | [Tag Manager Specification](TAG_MANAGER_SPEC.md) | 现行规范 | 标签管理页的布局、行内控件、搜索与添加、显示面板、压缩视图、键盘、窄屏、跳转和验收。数据语义见 API Contract 的标签登记表一节。 |
-| [Morphology Assignment Plan](MORPHOLOGY_ASSIGNMENT_PLAN.md) | 分阶段实施计划 | 形态槽位与逐释义分配、表继承、合形和稳定行列 ID，以及模板与词条侧界面、试算和保存前影响预览。 |
+| [Morphology Assignment Plan](MORPHOLOGY_ASSIGNMENT_PLAN.md) | 分阶段实施计划 | 形态槽位与逐释义分配、表继承、syncretism 和稳定行列 ID，以及模板与词条侧界面、试算和保存前影响预览。 |
 | [List Navigator Specification](LIST_NAVIGATOR_SPEC.md) | 现行规范 | 词条列表普通模式与词根模式的自定义导航条：外观与交互、按结果下标与估算高度定位、窗口加载与缩放、拖动时的加载与立即测高、分段与排序单位、隐藏原生滚动条与滚轮转发、模块接口与设计取舍；概览接口见 API 契约“列表概览”。 |
 | [App Shell Specification](APP_SHELL_SPEC.md) | 现行规范 | 响应式应用外壳：布局、外壳状态模型、DOM/CSS 边界、断点、词条列表与工具栏、交互与可访问性。 |
 | [Touch, Focus and Accessibility Plan](TOUCH_FOCUS_A11Y_PLAN.md) | 计划，未开始 | 触摸替代交互、输入能力判定、命中区域、焦点管理与无障碍验收。 |
