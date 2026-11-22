@@ -3584,6 +3584,7 @@ span.pending-source {
 }
 
 .morphology-slot {
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 8px 6px;
@@ -3744,12 +3745,49 @@ span.pending-source {
 }
 
 .drop-before { box-shadow: inset 3px 0 0 var(--ui-accent); }
-.drop-after { box-shadow: inset -3px 0 0 var(--ui-accent); }
-.morphology-slot.drop-before { box-shadow: inset 0 3px 0 var(--ui-accent); }
-.morphology-slot.drop-after { box-shadow: inset 0 -3px 0 var(--ui-accent); }
-.morphology-axis-header[data-axis="rows"].drop-before { box-shadow: inset 0 3px 0 var(--ui-accent); }
-.morphology-axis-header[data-axis="rows"].drop-after { box-shadow: inset 0 -3px 0 var(--ui-accent); }
-.drop-into { outline: 2px dashed var(--ui-accent); outline-offset: 2px; }
+
+.morphology-template-page :is(.morphology-table-card, .morphology-slot, .morphology-axis-header)[data-mtp-dragging] {
+  opacity: 0.5;
+}
+
+:is([data-mtp-drop="before"], [data-mtp-drop="after"])::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  background: var(--ui-accent);
+  pointer-events: none;
+}
+
+:is(.morphology-table-card, .morphology-axis-header[data-axis="columns"])[data-mtp-drop]::after {
+  inset-block: 0;
+  inline-size: 2px;
+}
+
+:is(.morphology-table-card, .morphology-axis-header[data-axis="columns"])[data-mtp-drop="before"]::after {
+  inset-inline-start: -2px;
+}
+
+:is(.morphology-table-card, .morphology-axis-header[data-axis="columns"])[data-mtp-drop="after"]::after {
+  inset-inline-end: -2px;
+}
+
+:is(.morphology-slot, .morphology-axis-header[data-axis="rows"])[data-mtp-drop]::after {
+  inset-inline: 0;
+  block-size: 2px;
+}
+
+:is(.morphology-slot, .morphology-axis-header[data-axis="rows"])[data-mtp-drop="before"]::after {
+  inset-block-start: -2px;
+}
+
+:is(.morphology-slot, .morphology-axis-header[data-axis="rows"])[data-mtp-drop="after"]::after {
+  inset-block-end: -2px;
+}
+
+[data-mtp-drop="into"] {
+  outline: 2px dashed var(--ui-accent);
+  outline-offset: 2px;
+}
 
 .morphology-properties-parent {
   display: flex;
@@ -4079,6 +4117,10 @@ span.pending-source {
 
 .morphology-axis-header {
   padding: 4px;
+}
+
+.morphology-axis-header[data-axis="columns"] {
+  position: relative;
 }
 
 .morphology-axis-head {

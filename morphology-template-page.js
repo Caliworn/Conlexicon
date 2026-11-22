@@ -86,6 +86,7 @@ async function confirmLeaveMorphologyTemplates() {
     });
     if (!left) return false;
   }
+  morphologyFinishDrag();
   page.undo = null;
   page.pick = null;
   page.drawer = null;
@@ -293,6 +294,7 @@ function renderMorphologyTemplatePage(dictionary = activeDictionary()) {
   const scroll = [...panel.querySelectorAll("[data-mtp-scroll]")].map((node) => [node.dataset.mtpScroll, node.scrollTop]);
   const drawer = panel.querySelector(".morphology-drawer[open]");
   if (drawer) hideMorphologyDrawer(drawer);
+  morphologyFinishDrag();
   panel.innerHTML = `
     ${morphologyToolbarHtml(page)}
     <div class="morphology-page-body" data-view="${page.view}">
@@ -333,6 +335,7 @@ function renderMorphologyTemplateDerived(dictionary = activeDictionary()) {
   } else {
     renderMorphologyTablesDerived(page, dictionary, problems);
   }
+  if (morphologyDragState) morphologyDragState.positions = null;
 }
 
 function renderMorphologyToolbarState(page) {
@@ -475,7 +478,7 @@ function morphologySlotListHtml(page) {
     return `<li class="morphology-slot${multi ? " is-competing" : ""}" data-slot-id="${escapeHtml(slot.id)}">
       ${handle}
       ${multi ? `<input class="morphology-slot-name" data-mtp-slot-name data-mtp-focus="slot-name:${escapeHtml(slot.id)}" value="${escapeHtml(slot.name)}" placeholder="${escapeHtml(aText("未命名槽位", "Untitled slot"))}" aria-label="${escapeHtml(aText("槽位名称", "Slot name"))}">` : ""}
-      <div class="morphology-card-row" data-mtp-drop="slot">${slot.tables.map((table) => morphologyCardHtml(page, table)).join("")}</div>
+      <div class="morphology-card-row">${slot.tables.map((table) => morphologyCardHtml(page, table)).join("")}</div>
     </li>`;
   }).join("");
 }
@@ -1309,64 +1312,95 @@ function handleMorphologyPickKeydown(event) {
 
 // ---- Drag and drop -----------------------------------------------------------------------------
 
-function morphologyClearDropMarkers() {
-  elements.morphologyTablesPanel.querySelectorAll(".drop-before, .drop-after, .drop-into").forEach((node) => {
-    node.classList.remove("drop-before", "drop-after", "drop-into");
+function morphologyMeasureDragPositions(drag, origin) {
+  drag.width = origin.width;
+  drag.height = origin.height;
+  drag.positions = drag.items.map((item) => {
+    const rect = item.getBoundingClientRect();
+    return {
+      top: rect.top - origin.top,
+      bottom: rect.bottom - origin.top,
+      middleX: rect.left + rect.width / 2 - origin.left,
+      middleY: rect.top + rect.height / 2 - origin.top,
+    };
   });
 }
 
-// Where a dragged item would land among `items`, by the pointer position along one axis.
-function morphologyDropIndex(items, event, horizontal) {
-  for (let index = 0; index < items.length; index += 1) {
-    const rect = items[index].getBoundingClientRect();
-    const middle = horizontal ? rect.left + rect.width / 2 : rect.top + rect.height / 2;
-    if ((horizontal ? event.clientX : event.clientY) < middle) return index;
-  }
-  return items.length;
+function morphologyStartDrag(source) {
+  const type = source.dataset.mtpDrag;
+  const item = source.closest(".morphology-table-card, .morphology-slot, .morphology-axis-header");
+  const axis = item.dataset.axis;
+  const container = axis ? item.closest(".morphology-grid") : item.parentElement;
+  const selector = axis
+    ? `.morphology-axis-header[data-axis="${axis}"]`
+    : type === "table" ? ".morphology-table-card" : ".morphology-slot";
+  const items = [...container.querySelectorAll(selector)];
+  const drag = {
+    type, axis, item, container, selector,
+    startIndex: items.indexOf(item),
+    items: items.filter((node) => node !== item),
+  };
+  morphologyMeasureDragPositions(drag, container.getBoundingClientRect());
+  item.dataset.mtpDragging = "";
+  return drag;
 }
 
-function morphologyMarkDrop(items, index) {
-  if (!items.length) return;
-  if (index < items.length) items[index].classList.add("drop-before");
-  else items.at(-1).classList.add("drop-after");
-}
-
-function morphologyDragTarget(event) {
-  const page = morphologyPageState();
-  const drag = morphologyDragState;
-  const panel = elements.morphologyTablesPanel;
-  if (drag.type === "table") {
+function morphologyDragTarget(drag, event) {
+  const { container, type, axis, items } = drag;
+  if (type === "table") {
     const row = event.target.closest(".morphology-card-row");
     if (!row) return null;
-    const slotId = row.closest("[data-slot-id]").dataset.slotId;
-    const { slot } = morphologyDraftModel().locateTable(page.draft, drag.tableId);
-    if (slotId !== slot.id) return { kind: "slot", slotId, element: row };
-    const cards = [...row.querySelectorAll(".morphology-table-card")].filter((card) => card.dataset.tableId !== drag.tableId);
-    return { kind: "within", slotId, index: morphologyDropIndex(cards, event, true), items: cards };
+    if (row !== container) return { slotId: row.closest("[data-slot-id]").dataset.slotId, element: row, side: "into" };
+  } else if (!container.contains(event.target) || (axis && !event.target.closest(drag.selector))) {
+    return null;
   }
-  if (drag.type === "slot") {
-    if (!event.target.closest(".morphology-slot-list")) return null;
-    const slots = [...panel.querySelectorAll(".morphology-slot")].filter((slot) => slot.dataset.slotId !== drag.slotId);
-    return { kind: "slot-order", index: morphologyDropIndex(slots, event, false), items: slots };
+
+  // The container moves with its content when the workspace or grid scrolls.
+  const origin = container.getBoundingClientRect();
+  if (!drag.positions || origin.width !== drag.width || origin.height !== drag.height) {
+    morphologyMeasureDragPositions(drag, origin);
   }
-  const header = event.target.closest(`.morphology-axis-header[data-axis="${drag.axis}"]`);
-  if (!header) return null;
-  const headers = [...panel.querySelectorAll(`.morphology-axis-header[data-axis="${drag.axis}"]`)].filter((node) => node.dataset.itemId !== drag.itemId);
-  return { kind: "axis", index: morphologyDropIndex(headers, event, drag.axis === "columns"), items: headers };
+  const x = event.clientX - origin.left;
+  const y = event.clientY - origin.top;
+  const index = firstSlotPast(drag.positions, (position) => {
+    // Flex cards stretch to their line's height. A line's end is the next line's start.
+    if (type === "table") return y < position.top || (y < position.bottom && x < position.middleX);
+    return axis === "columns" ? x < position.middleX : y < position.middleY;
+  });
+  return { index, element: items[index] || items.at(-1), side: index < items.length ? "before" : "after" };
 }
 
-function morphologyCommitDrop(target) {
+function morphologySetDropMarker(drag, target) {
+  const element = target?.element;
+  if (drag.marker === element && element?.dataset.mtpDrop === target?.side) return;
+  drag.marker?.removeAttribute("data-mtp-drop");
+  if (element) element.dataset.mtpDrop = target.side;
+  drag.marker = element;
+}
+
+function morphologyFinishDrag() {
+  const drag = morphologyDragState;
+  if (!drag) return;
+  morphologySetDropMarker(drag, null);
+  drag.item.removeAttribute("data-mtp-dragging");
+  morphologyDragState = null;
+}
+
+function morphologyCommitDrop(drag, target) {
   const page = morphologyPageState();
   const draftModel = morphologyDraftModel();
-  const drag = morphologyDragState;
-  if (target.kind === "slot") {
-    morphologyApply(draftModel.moveTableToSlot(page.draft, drag.tableId, target.slotId), { focus: `card:${drag.tableId}` });
-  } else if (target.kind === "within") {
-    morphologyApply(draftModel.moveTableInSlot(page.draft, drag.tableId, target.index), { focus: `card:${drag.tableId}` });
-  } else if (target.kind === "slot-order") {
-    morphologyApply(draftModel.moveSlot(page.draft, drag.slotId, target.index), { focus: `slot-handle:${drag.slotId}` });
+  if (drag.type === "table") {
+    const { tableId } = drag.item.dataset;
+    const result = target.slotId
+      ? draftModel.moveTableToSlot(page.draft, tableId, target.slotId)
+      : draftModel.moveTableInSlot(page.draft, tableId, target.index);
+    morphologyApply(result, { focus: `card:${tableId}` });
+  } else if (drag.type === "slot") {
+    const { slotId } = drag.item.dataset;
+    morphologyApply(draftModel.moveSlot(page.draft, slotId, target.index), { focus: `slot-handle:${slotId}` });
   } else {
-    morphologyApply(draftModel.moveAxisItem(page.draft, page.selectedTableId, drag.axis, drag.itemId, target.index), { focus: `axis:${drag.axis}:${drag.itemId}` });
+    const { itemId } = drag.item.dataset;
+    morphologyApply(draftModel.moveAxisItem(page.draft, page.selectedTableId, drag.axis, itemId, target.index), { focus: `axis:${drag.axis}:${itemId}` });
   }
 }
 
@@ -1896,37 +1930,31 @@ function bindMorphologyTemplatePage() {
   panel.addEventListener("dragstart", (event) => {
     const source = event.target.closest?.("[data-mtp-drag]");
     if (!source) return;
-    const kind = source.dataset.mtpDrag;
-    if (kind === "table") morphologyDragState = { type: "table", tableId: source.dataset.tableId };
-    else if (kind === "slot") morphologyDragState = { type: "slot", slotId: source.closest("[data-slot-id]").dataset.slotId };
-    else {
-      const header = source.closest(".morphology-axis-header");
-      morphologyDragState = { type: "axis", axis: header.dataset.axis, itemId: header.dataset.itemId };
-    }
+    morphologyFinishDrag();
+    morphologyDragState = morphologyStartDrag(source);
     event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("application/x-conlexicon-morphology", kind);
+    event.dataTransfer.setData("application/x-conlexicon-morphology", morphologyDragState.type);
   });
   panel.addEventListener("dragover", (event) => {
-    if (!morphologyDragState) return;
-    const target = morphologyDragTarget(event);
-    morphologyClearDropMarkers();
+    const drag = morphologyDragState;
+    if (!drag) return;
+    const target = morphologyDragTarget(drag, event);
+    morphologySetDropMarker(drag, target);
     if (!target) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
-    if (target.kind === "slot") target.element.classList.add("drop-into");
-    else morphologyMarkDrop(target.items, target.index);
+  });
+  panel.addEventListener("dragleave", (event) => {
+    if (morphologyDragState && !panel.contains(event.relatedTarget)) morphologySetDropMarker(morphologyDragState, null);
   });
   panel.addEventListener("drop", (event) => {
-    if (!morphologyDragState) return;
-    const target = morphologyDragTarget(event);
-    morphologyClearDropMarkers();
+    const drag = morphologyDragState;
+    if (!drag) return;
+    const target = morphologyDragTarget(drag, event);
+    morphologyFinishDrag();
     if (!target) return;
     event.preventDefault();
-    morphologyCommitDrop(target);
-    morphologyDragState = null;
+    if (target.index !== drag.startIndex) morphologyCommitDrop(drag, target);
   });
-  panel.addEventListener("dragend", () => {
-    morphologyDragState = null;
-    morphologyClearDropMarkers();
-  });
+  panel.addEventListener("dragend", morphologyFinishDrag);
 }
