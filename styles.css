@@ -125,12 +125,17 @@ body {
   overscroll-behavior: none;
 }
 
-/* Pages whose header switches content in place keep the scrollbar's space, so switching between
-   a short and a long view does not shift the header controls. Narrow layouts scroll the
-   workspace instead of the page. */
+/* Pages whose header switches content in place keep their layout whether or not the page
+   scrollbar shows, so switching between a short and a long view does not shift the header
+   controls. Without a scrollbar the body pads its end by the scrollbar's width
+   (--scrollbar-width, measured in app.js); with one, 100vw - 100% equals that width and the
+   padding drops to zero. The padding is part of the body, so the page background stays
+   continuous. Reserving the gutter with scrollbar-gutter would leave a strip that only takes a
+   flat color and breaks Liquid Glass's gradient. Narrow layouts scroll the workspace, not the
+   page. */
 @media (min-width: 800px) {
-  html:has(.view.active > .top-bar .segmented-control) {
-    scrollbar-gutter: stable;
+  html:has(.view.active > .top-bar .segmented-control) > body {
+    padding-inline-end: calc(var(--scrollbar-width, 0px) - (100vw - 100%));
   }
 }
 

@@ -4075,6 +4075,18 @@ function measureStickyViewHeader(header) {
   header.parentElement.style.setProperty("--sticky-header-height", `${header.offsetHeight - hidden}px`);
 }
 
+// Classic scrollbars take this much width; overlay scrollbars take none (styles.css keeps some
+// pages' layout steady with it). Browser zoom changes it, and zooming fires resize.
+function measureScrollbarWidth() {
+  const probe = document.createElement("div");
+  probe.style.cssText = "position: absolute; visibility: hidden; overflow: scroll; width: 100px; height: 100px;";
+  document.body.append(probe);
+  document.documentElement.style.setProperty("--scrollbar-width", `${probe.offsetWidth - probe.clientWidth}px`);
+  probe.remove();
+}
+measureScrollbarWidth();
+window.addEventListener("resize", measureScrollbarWidth);
+
 const stickyViewHeaderObserver = new ResizeObserver((entries) => {
   for (const { target } of entries) measureStickyViewHeader(target);
 });

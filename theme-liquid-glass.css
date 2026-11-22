@@ -22,13 +22,11 @@ body[data-ui-skin="liquid-glass"] {
   --skin-nav-item-padding-inline: 12px;
 
   --ui-canvas-bg: #eaf0f2;
-  /* The closing color fills the scrollbar gutter a page reserves, which gradients do not reach;
-     it is the gradient's middle stop, near its right edge. */
   --ui-page-background:
     radial-gradient(circle at 8% 4%, rgba(58, 202, 190, 0.32) 0%, rgba(58, 202, 190, 0.08) 22%, transparent 42%),
     radial-gradient(circle at 96% 9%, rgba(154, 112, 224, 0.25) 0%, rgba(154, 112, 224, 0.055) 23%, transparent 43%),
     radial-gradient(circle at 74% 96%, rgba(232, 174, 58, 0.22) 0%, rgba(232, 174, 58, 0.04) 24%, transparent 45%),
-    linear-gradient(135deg, #edf5f4 0%, #edf1f5 52%, #f5f0e7 100%) #edf1f5;
+    linear-gradient(135deg, #edf5f4 0%, #edf1f5 52%, #f5f0e7 100%);
   --ui-text: #122026;
   --ui-text-muted: #596a72;
   --ui-text-on-solid: #ffffff;
@@ -186,7 +184,7 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
     radial-gradient(circle at 7% 3%, rgba(34, 174, 163, 0.26) 0%, rgba(34, 174, 163, 0.055) 24%, transparent 45%),
     radial-gradient(circle at 96% 8%, rgba(135, 86, 206, 0.23) 0%, rgba(135, 86, 206, 0.045) 24%, transparent 45%),
     radial-gradient(circle at 76% 97%, rgba(203, 139, 32, 0.17) 0%, rgba(203, 139, 32, 0.035) 25%, transparent 47%),
-    linear-gradient(135deg, #0b1619 0%, #10141c 54%, #19150f 100%) #10141c;
+    linear-gradient(135deg, #0b1619 0%, #10141c 54%, #19150f 100%);
   --ui-text: #edf7f5;
   --ui-text-muted: #a9bcbe;
   --ui-border: rgba(221, 248, 244, 0.16);
