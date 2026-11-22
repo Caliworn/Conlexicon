@@ -12046,9 +12046,7 @@ function renderDefinitionFormCardInPlace(card, fieldToShow) {
   card.querySelector(fieldToShow === "example" ? "[data-example-search]" : `[data-field="${fieldToShow}"]`)?.focus();
 }
 
-function definitionHasContent(definition) {
-  return Boolean(definition.meaning || definition.note || definition.tags.length || definition.examples.length);
-}
+const { definitionHasContent } = dictionaryDataModel;
 
 function definitionExamplesFromCard(card) {
   return [...card.querySelectorAll("[data-definition-example]")].map((row) => (
@@ -18762,6 +18760,11 @@ document.addEventListener("keydown", (event) => {
 
   if (event.key === "Escape" && confirmDialogResolver) {
     closeConfirmDialog(confirmDialogResults.cancel);
+    return;
+  }
+
+  // The confirmation is modal: Tab cycles through its buttons and never reaches the page.
+  if (confirmDialogResolver && trapFocusWithin(elements.confirmDialog, event)) {
     return;
   }
 

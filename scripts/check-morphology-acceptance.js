@@ -8,7 +8,6 @@ const { normalizeMorphologyInput } = require("../lib/morphology-validation");
 const {
   applyMorphologyRuleSyntax,
   createMorphologyResolver,
-  detachMorphologyTable,
   explainAutomaticTables,
   morphologyMatchContexts,
   morphologyMergeRegions,
@@ -452,9 +451,13 @@ async function checkStorageAndReferences(repository) {
     assert.equal(value, beforeByCell.get(JSON.stringify([rowId, columnId])));
   }
 
-  const { morphology: detached, detachment } = detachMorphologyTable(afterInsert.morphology, child.id);
+  const detachedDraft = draftModel.detachTable(afterInsert.morphology, child.id, new Map());
+  const detached = detachedDraft.morphology;
+  const coordinateMappings = draftModel.coordinateMappingsForSave(detached, afterInsert.morphology, detachedDraft.lineage);
+  assert.deepEqual(coordinateMappings.map(({ tableId }) => tableId).sort(), [child.id, grandchild.id].sort());
+  const detachment = coordinateMappings.find(({ tableId }) => tableId === child.id);
   await assert.rejects(save(detached), expectApiError("invalid_morphology_inheritance"));
-  assert.equal((await save(detached, { detachments: [detachment] })).statusCode, 200);
+  assert.equal((await save(detached, { coordinateMappings })).statusCode, 200);
   const afterDetach = await snapshot();
   assert.equal(findTable(afterDetach.morphology, child.id).inheritsFrom, null);
   const detachedSearchValues = checkProjection(afterDetach, "active");

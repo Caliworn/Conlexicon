@@ -520,8 +520,7 @@ morphologyTables: [{ tableId, notes, overrides: [Override], createdAt, updatedAt
 - 同一词条的表和行列身份保持稳定。移动表或调整显示顺序会重排搜索投影位置，修改标题、说明和行列标签只改模板。规则、格状态、轴的增删、所用函数或继承内容变化只重建涉及生效表的词条。更改分配规则或移动表到不同槽位时，用前后生效表定位受影响的词条。完全等同的规范化请求返回原 `updatedAt`。
 - 删除表或行列导致手动选择、叠加层或覆写丢失时，返回 409 `morphology_references_in_use`，整次不保存。`details` 为 `{ referenceCount, targets: [{ tableId, rowId?, columnId?, label, entryCount }], references }`。`targets` 按被删表或链顶表上的行列聚合，`entryCount` 按词条去重。`references` 是按词条位置取的前 50 条，包含 `{ entryId, lemma, tableId, rowId?, columnId?, reason }`。其中 `tableId` 是实际持有该配置的表，`reason` 为 `manual_table`、`overlay` 或 `override`。用户确认后，在请求外层带 `confirmReferenceRemoval: true` 和弹窗里显示的摘要 `confirmedReferences: { referenceCount, targets: [{ tableId, rowId?, columnId?, entryCount }] }`。服务端在保存事务里重算引用：与摘要一致时清理引用、保存模板并更新投影；不一致时整次不执行，返回新的 409 摘要；此时已没有要清除的引用则照常保存。缺少摘要、摘要格式不对，或未确认却带了摘要，返回 400 `invalid_morphology_payload`。仍被继承的表返回 `morphology_table_has_children`。
 - 为现有链顶新建父表时，在同一次提交中把原行列及其 ID 移交给新链顶。服务端用这些 ID 确认新链顶承接了原坐标，已有覆写继续使用相同的表和行列 ID。草稿同时增删行列时，被删除的坐标仍走删除确认。
-- 跨链设置父表和解除继承都用 `coordinateMappings: [{ tableId, expectedUpdatedAt, rowIdMap, columnIdMap }]`。草稿用当前行列顺序配对旧链和新链的轴，并为每张受影响的已保存表合成「已保存 ID → 本次提交后的 ID」。两端都要属于该表在相应版本的链顶，目标 ID 各自唯一。实际删除的轴省略对应，相关覆写走删除确认。服务端在同一事务里核对表的 `updatedAt`、重定位覆写、更新搜索投影并推进表版本。仅覆写坐标变化时也推进版本。版本不一致返回 409 `morphology_coordinates_changed`，整次不保存。模板格及 syncretism 引用的最终坐标随 `morphology` 提交。
-- `detachments: [{ tableId, rowIdMap, columnIdMap }]` 仍可用于解除继承。通过保存前后均存在的 `tableId` 确定两端链顶，对来自同一原链且落到该新链顶的表应用映射。新链顶须使用新轴。提交给同一张表的映射只使用一种字段。
+- 跨链设置父表和解除继承都用 `coordinateMappings: [{ tableId, expectedUpdatedAt, rowIdMap, columnIdMap }]`。草稿用当前行列顺序配对旧链和新链的轴，并为每张受影响的已保存表合成「已保存 ID → 本次提交后的 ID」。两端都要属于该表在相应版本的链顶，目标 ID 各自唯一。实际删除的轴省略对应，相关覆写走删除确认。服务端在同一事务里核对表的 `updatedAt`、重定位覆写、更新搜索投影并推进表版本。仅覆写坐标变化时也推进版本。版本不一致返回 409 `morphology_coordinates_changed`，整次不保存。模板格及 syncretism 引用的最终坐标随 `morphology` 提交。已保存的表换了链顶，却既没有映射、也不是新链顶承接原行列时，返回 400 `invalid_morphology_inheritance`。
 
 ### 标签登记表
 
@@ -578,7 +577,7 @@ tagRegistry: [{ tag, partOfSpeech, displayLabel, color, displayAmbiguous }]
 
 释义可以带标签。词条标签描述这个词，释义标签描述那条释义；释义不继承词条标签。需要"整个词"的答案时，取词条的**有效标签**：词条标签与全部释义标签的并集。词性放在哪一层是使用约定：要么只挂在词条上，要么挂在每条释义上（多词性词条原则上放在各条释义上）。程序不强制、不迁移，但质量检查报告不符合约定的释义（见质量规则的"标签层级"）。
 
-- **存储与写入**：详情 DTO 的 `definitions[]` 带 `tags: string[]`；`POST` / `PUT /entries` 与 JSON 导入在边界把它按标签列表规范化（去首尾空白、去空、去重并保持顺序，非数组按空列表），缺省为 `[]`。一条释义可以只有标签，释义文字（`meaning`）、例句和备注都为空也合法，导入时不会被当作空释义丢弃。`PATCH /entries` 不接受释义标签。
+- **存储与写入**：详情 DTO 的 `definitions[]` 带 `tags: string[]`；`POST` / `PUT /entries` 与 JSON 导入在边界把它按标签列表规范化（去首尾空白、去空、去重并保持顺序，非数组按空列表），缺省为 `[]`。一条释义可以只有标签，释义文字（`meaning`）、例句和备注都为空也合法，导入时不会被当作空释义丢弃。释义文字、备注、标签和例句全为空的释义在保存和导入时去掉，不写入数据库。`PATCH /entries` 不接受释义标签。
 - **DTO**：详情 DTO 与摘要 DTO 的 `tags` 都只表示词条标签。摘要 DTO 另带 `effectiveTags`，`parts` 从它计算；摘要的 `definitionPreviews[]` 只多带 `parts`（该释义自己的标签中的词性），供列表与悬浮卡片在每条释义前显示它自己的词性，不带其他标签。
 - **规范序**：标签在词条和释义中是集合，不存储顺序。响应里的标签数组（详情、摘要、保存响应、`PATCH` 响应）一律按标签值的二进制序，`effectiveTags` 是词条标签后接各释义新增的标签，保存响应与之后读取的结果相同。规范序没有业务含义，不用于显示。
 - **显示顺序**：标签的先后只由登记表决定：词性区在前，区内按登记顺序。比较函数是共享模型的 `tagRank`，前端在渲染时用 `arrangeTags` 排列所有标签，已保存词条和草稿共用；服务端只在需要最终顺序的地方用它，即 JSON 导出和分析页的组合。这样登记表移动后，前端已缓存的列表页不会显示过期的顺序。尚未登记的标签（只在未保存的草稿中出现）排在所有已登记标签之后，保持输入顺序。

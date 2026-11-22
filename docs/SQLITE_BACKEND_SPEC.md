@@ -83,11 +83,11 @@ data/dictionaries/<dictionary-id>.sqlite
 
 ### 共享数据规则
 
-- 前后端相同的纯数据规范化只有一份实现：`lib/dictionary-data-model.js`（UMD，浏览器全局 `ConlexiconDictionaryData`）。它覆盖 settings（含 gloss 样式、工具导航顺序、词条区域顺序）、docs、corpus 与各级语料实体、definition、词条字段整形、全局界面偏好，以及缺失实体 ID 的补齐（`ensureEntityId`，用 `globalThis.crypto.randomUUID`，不扫描已有 ID）；依赖已有的 tag、IPA、entry-search、morphology 共享模型，不复制它们。
+- 前后端相同的纯数据规范化只有一份实现：`lib/dictionary-data-model.js`（UMD，浏览器全局 `ConlexiconDictionaryData`）。它覆盖 settings（含 gloss 样式、工具导航顺序、词条区域顺序）、docs、corpus 与各级语料实体、definition、词条字段整形、全局界面偏好，以及缺失实体 ID 的补齐（`ensureEntityId`，不扫描已有 ID）；依赖已有的 tag、IPA、entry-search、morphology 共享模型，不复制它们。浏览器端的实体 ID 由 `lib/entity-id.js`（浏览器全局 `ConlexiconEntityId`）用 `crypto.getRandomValues()` 生成 UUID v4，词典数据模型和形态草稿共用。`crypto.randomUUID()` 只在安全来源可用，局域网调试的普通 HTTP 来源没有它。
 - 词条字段整形接收调用方处理好的来源：`dictionary-model.js` 严格校验，重复目标与自引用以 `apiError` 拒绝；`app.js` 以 `allowDuplicateTargets` 宽松读取，使早期数据库中的重复引用仍可见、可删除后保存。共享模块不带“严格／宽松”参数。
 - `dictionary-model.js` 只保留 Node 侧内容：错误包装、完整词典入口、实体 ID 唯一性检查与导入；`app.js` 保留本地化默认名称、summary、显示视图（如形态的临时扁平表格视图）和前端状态入口。
 - settings 保留未知字段，显式 `false`、空字符串与空集合不被默认值替换；`toolNavOrder` 与 `entrySectionOrder` 保留合法项的顺序，去掉重复与未知项并补齐缺项。导出的默认数组冻结，规范化结果总是新对象。
-- 契约检查为 `scripts/check-dictionary-data-model.js`，其中按 `index.html` 的脚本顺序在 VM 中加载到 `app.js` 之前，确认浏览器全局和依赖可用。
+- 契约检查为 `scripts/check-dictionary-data-model.js`，其中按 `index.html` 的脚本顺序在 VM 中加载到 `app.js` 之前，确认浏览器全局和依赖可用；VM 里的 `crypto` 只提供 `getRandomValues()`，模拟普通 HTTP 来源。
 - 前端只在词典进入状态时规范化一次：首次加载与切换词典的完整快照、模块保存响应、词条保存与删除响应、批量 patch 都经 `normalizeDictionary`（`replaceDictionaryInState`／`replaceLoadedDictionarySource`）。读取已加载词典的配置一律用 `dictionarySettings(dictionary = activeDictionary())`，不再对状态中的 settings 或其中单个字段重复规范化；新增的状态入口必须同样经过规范化，不在读取处兜底。
 - 没有活动词典、或词典只是 metadata 占位（未加载，没有 `settings`）时，`dictionarySettings` 返回一份深度冻结的默认设置，只供读取；表单收集和排序逻辑需要修改时先复制。表单从 DOM 收集的原始输入（如 `ipaSettingsFromForm`）仍在边界规范化。
 

@@ -95,6 +95,21 @@ function checkGlossPreambleSettings() {
   assert.deepEqual(changed.preamble, partial.preamble, "a saved preamble style stays independent of later gla edits");
 }
 
+// An empty definition is not stored, so it cannot add a morphology context that the editor,
+// which never shows empty definitions, would leave out.
+function checkEmptyDefinitionsDropped() {
+  const entry = dataModel.normalizeEntryFields({
+    lemma: "walk",
+    definitions: [
+      { id: "empty", meaning: "  ", note: "", tags: [], examples: [] },
+      { id: "tagged", meaning: "", tags: ["v"] },
+      { id: "example", examples: [{ itemId: "corpus-item-1" }] },
+      { id: "meaning", meaning: "to go on foot" },
+    ],
+  }, []);
+  assert.deepEqual(entry.definitions.map(({ id }) => id), ["tagged", "example", "meaning"]);
+}
+
 function checkIdGeneration() {
   assert.equal(dataModel.ensureEntityId(" kept ", "def"), "kept");
   assert.match(dataModel.ensureEntityId("", "def"), /^def-[0-9a-f-]{36}$/);
@@ -110,7 +125,11 @@ function checkBrowserLoadOrder() {
   assert.ok(appIndex > 0, "index.html loads app.js");
   assert.ok(scripts.indexOf("lib/dictionary-data-model.js") >= 0 && scripts.indexOf("lib/dictionary-data-model.js") < appIndex);
 
-  const context = vm.createContext({ crypto: globalThis.crypto });
+  // Plain-HTTP LAN origins offer getRandomValues() but not randomUUID().
+  const context = vm.createContext({
+    crypto: { getRandomValues: (array) => globalThis.crypto.getRandomValues(array) },
+    structuredClone,
+  });
   context.window = context;
   scripts.slice(0, appIndex).forEach((script) => {
     vm.runInContext(fs.readFileSync(path.join(root, script), "utf8"), context, { filename: script });
@@ -121,12 +140,15 @@ function checkBrowserLoadOrder() {
   assert.equal(settings.toolNavOrder[0], "docs");
   assert.ok(settings.search.fields.lemma, "dependencies resolve in the browser load order");
   assert.match(browserModel.uid("entry"), /^entry-[0-9a-f-]{36}$/);
+  const { tableId } = context.ConlexiconMorphologyDraft.createTable({ functions: {}, slots: [] });
+  assert.match(tableId, /^mtable-[0-9a-f-]{36}$/, "morphology drafts create IDs without randomUUID()");
 }
 
 checkToolNavOrder();
 checkSettingsPreservation();
 checkStability();
 checkGlossPreambleSettings();
+checkEmptyDefinitionsDropped();
 checkIdGeneration();
 checkBrowserLoadOrder();
 console.log("Dictionary data model checks passed.");

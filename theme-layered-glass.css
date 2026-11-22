@@ -22,8 +22,6 @@ body[data-ui-skin="layered-glass"] {
   --ui-warning-tag-background: #fff0d1;
   --ui-warning-badge-background: #fff4d7;
   --ui-warning-badge-text: #805300;
-  --ui-success-badge-background: #e6f4ea;
-  --ui-success-badge-text: #225b3d;
   --ui-danger: #a3313c;
   --ui-danger-soft: #fae5e6;
   --ui-focus: var(--ui-field-focus);
@@ -166,8 +164,6 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   --ui-warning-tag-background: #3f3218;
   --ui-warning-badge-background: #3f3218;
   --ui-warning-badge-text: #ffd36f;
-  --ui-success-badge-background: #223c2f;
-  --ui-success-badge-text: #bce5c8;
   --ui-danger: #f28791;
   --ui-danger-soft: #3e2226;
   --ui-focus: var(--ui-field-focus);

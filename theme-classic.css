@@ -38,8 +38,6 @@ body:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-glass"])) {
   --ui-warning-tag-background: #fff0d1;
   --ui-warning-badge-background: #fff4d7;
   --ui-warning-badge-text: #8a5a00;
-  --ui-success-badge-background: #e4f4e9;
-  --ui-success-badge-text: #24583e;
   --ui-danger: #b43f46;
   --ui-danger-soft: #fae5e6;
   --ui-focus: var(--ui-field-focus);
@@ -159,8 +157,6 @@ body.dark-theme:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-gl
   --ui-warning-tag-background: #3f3218;
   --ui-warning-badge-background: #3f3218;
   --ui-warning-badge-text: #ffd36f;
-  --ui-success-badge-background: #213b2e;
-  --ui-success-badge-text: #b3e4c7;
   --ui-danger: #ee7c84;
   --ui-danger-soft: #3e2226;
   --ui-focus: var(--ui-field-focus);

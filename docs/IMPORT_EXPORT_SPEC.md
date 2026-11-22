@@ -80,7 +80,7 @@ Legacy JSON 导入应分为几个明确阶段：
    - 文件没有 `tagRegistry` 时，由 `partOfSpeechTags`、`tagSortOrder`、`tagDisplayMap`、`redHighlightTags` 和词典中实际在用的标签生成登记表，并从 settings 移除这四项（见 5.1）。
 3. 规范化。
    - 补齐缺失 ID。
-   - 规范化当前形状的 settings、docs、corpus（`{ items: [{ id, name, group, content, createdAt, updatedAt }] }`）、morphology、IPA、entries、definitions（含可选的释义标签 `tags`，缺省为 `[]`；例句 `examples: [{ itemId }]`）、sources、tags。
+   - 规范化当前形状的 settings、docs、corpus（`{ items: [{ id, name, group, content, createdAt, updatedAt }] }`）、morphology、IPA、entries、definitions（含可选的释义标签 `tags`，缺省为 `[]`；例句 `examples: [{ itemId }]`；释义文字、备注、标签和例句全为空的释义去掉）、sources、tags。
    - 规范化标签登记表：同一标签保留首行，词性区排在普通区之前，与自身相同的显示名按空保存；文件中在用但未登记的标签按首次出现追加到普通区末尾。
    - 对错误词典 ID 提供“作为新词典导入并重新生成 ID”的路径。
 4. 校验。

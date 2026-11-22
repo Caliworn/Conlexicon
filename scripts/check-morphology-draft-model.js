@@ -97,6 +97,38 @@ function checkUndoCycleConflict() {
   assert.equal(result.error?.kind, "cycle", "an undo that closes a loop reports the conflict and changes nothing");
 }
 
+// Parent B → A; child A → B and B → C, plus a loop D ↔ E the child already had.
+function axisRemovalCycleMorphology({ existingLoop }) {
+  const refer = (rowId, targetRowId) => ({ rowId, columnId: "c1", kind: "refer", targetRowId, targetColumnId: "c1" });
+  return normalizeMorphology({
+    functions: {},
+    slots: [{ id: "s1", name: "", tables: [
+      {
+        id: "root", title: "", notes: "", inheritsFrom: null, matchRules: [],
+        rows: ["A", "B", "C", "D", "E"].map((id) => ({ id, label: id })), columns: [{ id: "c1", label: "" }],
+        cells: [refer("B", "A")],
+      },
+      {
+        id: "child", title: "", notes: "", inheritsFrom: "root", matchRules: [],
+        cells: [refer("A", "B"), refer("B", "C"), ...(existingLoop ? [refer("D", "E"), refer("E", "D")] : [])],
+      },
+    ] }],
+  });
+}
+
+function checkAxisRemovalCycles() {
+  for (const existingLoop of [false, true]) {
+    const draft = axisRemovalCycleMorphology({ existingLoop });
+    const removal = draftModel.removeAxisItem(draft, "root", "rows", "C");
+    assert.equal(removal.error?.kind, "cycle", `removing C exposes B → A and closes A ↔ B (existing loop: ${existingLoop})`);
+    assert.equal(removal.error.tableId, "child");
+    assert.ok(["A", "B"].includes(removal.error.rowId));
+  }
+  const loopRemoval = draftModel.removeAxisItem(axisRemovalCycleMorphology({ existingLoop: true }), "root", "rows", "E");
+  assert.ok(!loopRemoval.error, "a removal that breaks an existing loop is allowed");
+  assert.deepEqual(draftModel.referenceCycles(loopRemoval.morphology), []);
+}
+
 function checkTableDeletionUndo() {
   const saved = baseMorphology();
   assert.equal(draftModel.deleteTable(saved, "root").error.kind, "has_children");
@@ -255,6 +287,7 @@ function checkSlotArrangement() {
 
 checkAxisRemovalUndo();
 checkUndoCycleConflict();
+checkAxisRemovalCycles();
 checkTableDeletionUndo();
 checkFillAndCells();
 checkInheritanceAndDetachment();

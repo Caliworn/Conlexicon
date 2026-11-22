@@ -3703,8 +3703,8 @@ span.pending-source {
 }
 
 [data-parent-choice="same-chain"] > .morphology-parent-choice-label {
-  background: var(--ui-success-badge-background);
-  color: var(--ui-success-badge-text);
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent-hover);
 }
 
 [data-parent-choice="cross-chain"] > .morphology-parent-choice-label {

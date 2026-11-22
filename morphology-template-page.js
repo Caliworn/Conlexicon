@@ -81,6 +81,9 @@ async function confirmLeaveMorphologyTemplates() {
   const dictionary = activeDictionary();
   const page = morphologyPageStates.get(dictionary.id);
   if (!page) return true;
+  // Leaving during a save follows its outcome: a successful save leaves, a failed or cancelled
+  // one stays with the draft and its undo record.
+  if (page.savePromise && !(await page.savePromise)) return false;
   if (morphologyPageIsDirty(page)) {
     const left = await confirmUnsavedChanges(t("unsavedMorphologyTablesConfirm"), {
       save: () => saveMorphologyTemplates(),
@@ -1212,15 +1215,10 @@ async function morphologyChooseParent(parentId, choice) {
     const draft = page.draft;
     const source = morphologyTableLabel(draft, tableId);
     const target = morphologyTableLabel(draft, parentId);
-    const confirmed = appConfirm(aText(
+    const accepted = await appConfirm(aText(
       `“${source}”及其后代将采用“${target}”所在继承链的表头。行列按当前顺序对应，模板格和逐词覆写随坐标迁移。沿用父表的格会改用新父表的内容。`,
       `“${source}” and its descendants will use the headers from “${target}”’s chain. Cells and entry overrides move by the current row and column positions. Inherited cells will use the new parent’s contents.`,
     ), { title: aText("跨链设置父表", "Set a parent from another chain"), confirmText: aText("设置父表", "Set parent") });
-    const trap = (event) => trapFocusWithin(elements.confirmDialog, event);
-    elements.confirmDialog.addEventListener("keydown", trap);
-    elements.confirmCancelButton.focus();
-    const accepted = await confirmed;
-    elements.confirmDialog.removeEventListener("keydown", trap);
     if (!accepted || page.draft !== draft || page.parentPickerTableId !== tableId) {
       restoreChoiceFocus();
       return;
@@ -1528,10 +1526,20 @@ function morphologyLocateProblem(problems) {
 }
 
 // Saves the draft snapshot taken now. Deletions that drop entry data ask first and resend the same
-// snapshot with the confirmed summary; the draft stays locked until the attempt ends.
-async function saveMorphologyTemplates() {
+// snapshot with the confirmed summary; the draft stays locked until the attempt ends. A call while
+// a save is running returns that save, so the leave check can wait for it and nothing is sent twice.
+function saveMorphologyTemplates() {
   const dictionary = activeDictionary();
   const page = morphologyPageState(dictionary);
+  if (!page.savePromise) {
+    page.savePromise = runMorphologySave(dictionary, page).finally(() => {
+      page.savePromise = null;
+    });
+  }
+  return page.savePromise;
+}
+
+async function runMorphologySave(dictionary, page) {
   const panel = elements.morphologyTablesPanel;
   const draftModel = morphologyDraftModel();
   if (page.parentPickerTableId) closeMorphologyParentPicker();
@@ -1559,10 +1567,10 @@ async function saveMorphologyTemplates() {
           method: "PUT",
           body: JSON.stringify({ ...snapshot, ...confirmation }),
         });
-        applyDictionaryModulePayload(saved);
+        const savedDictionary = applyDictionaryModulePayload(saved);
         resetEntryReadStateAfterSave();
         const keep = { view: page.view, selectedTableId: page.selectedTableId, trial: page.trial, formTrial: page.formTrial };
-        Object.assign(page, morphologyPageBase(activeDictionary()), keep);
+        Object.assign(page, morphologyPageBase(savedDictionary), keep);
         showToast(t("dictionarySaved"));
         return true;
       } catch (error) {
