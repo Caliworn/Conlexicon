@@ -26,6 +26,7 @@ function newMorphologyPageState(dictionary) {
     selectedTableId: "",
     trial: { mode: "tags", tagsText: "", entryQuery: "", entry: null, entryStatus: "idle", contextKey: "merged" },
     formTrial: { lemma: "", autoFilled: false },
+    slotCoverageCache: new Map(),
     drawer: null,
     pick: null,
     ...morphologyPageBase(dictionary),
@@ -87,6 +88,7 @@ async function confirmLeaveMorphologyTemplates() {
     if (!left) return false;
   }
   morphologyFinishDrag();
+  if (page.trial.entryStatus === "loading") resetMorphologyTrialEntry(page);
   page.undo = null;
   page.pick = null;
   page.drawer = null;
@@ -629,18 +631,24 @@ function morphologyTrialExplanationsHtml(page, trialState) {
 
 function renderMorphologyStructureDerived(page, dictionary, problems) {
   const panel = elements.morphologyTablesPanel;
+  const draftModel = morphologyDraftModel();
   const counts = morphologySummaryCounts(dictionary);
   const trialState = morphologyTrialState(page, problems);
   const verdicts = morphologyTrialVerdicts(page, trialState);
-  const savedIds = new Set(morphologyDraftModel().allTables(page.saved).map(({ id }) => id));
+  const savedIds = new Set(draftModel.allTables(page.saved).map(({ id }) => id));
   const errorTables = new Set(problems.ruleErrors.map(({ tableId }) => tableId));
+  const slotCoverageCache = new Map();
   page.draft.slots.forEach((slot) => {
-    const coverage = morphologyDraftModel().slotCoverage(slot);
+    // Draft operations clone slots. Compare the inputs to coverage so unrelated edits reuse it.
+    const key = JSON.stringify(slot.tables.map(({ id, matchRules }) => [id, matchRules]));
+    const cached = page.slotCoverageCache.get(slot.id);
+    const entry = cached?.key === key ? cached : { key, coverage: draftModel.slotCoverage(slot) };
+    slotCoverageCache.set(slot.id, entry);
     slot.tables.forEach((table) => {
       const info = panel.querySelector(`[data-table-id="${CSS.escape(table.id)}"] [data-mtp-region="card-info"]`);
       if (!info) return;
       info.innerHTML = morphologyCardInfoHtml(page, table, {
-        coverage: coverage.get(table.id),
+        coverage: entry.coverage.get(table.id),
         counts,
         verdict: verdicts.get(table.id),
         ruleErrors: errorTables.has(table.id),
@@ -653,6 +661,7 @@ function renderMorphologyStructureDerived(page, dictionary, problems) {
       else delete card.dataset.trialState;
     });
   });
+  page.slotCoverageCache = slotCoverageCache;
   const output = panel.querySelector('[data-mtp-region="trial-output"]');
   if (output) output.innerHTML = morphologyTrialOutputHtml(page, trialState, problems);
   const details = panel.querySelector(".morphology-trial-details");
@@ -889,7 +898,11 @@ function morphologyApply(result, { undoMessage = "", rerender = true, focus = ""
       page.drawer = { pane: "properties", returnFocus: `card:${select}` };
     }
   }
-  if (result.undo) page.undo = { record: result.undo, message: undoMessage };
+  if (result.undo) {
+    page.undo = { record: result.undo, message: undoMessage };
+  } else if (page.undo && result.cellEdits) {
+    page.undo.record = morphologyDraftModel().undoAfterCellEdits(page.undo.record, result.cellEdits);
+  }
   if (focus) morphologyFocusAfterRender(focus);
   if (rerender) renderMorphologyTemplatePage();
   else renderMorphologyTemplateDerived();
@@ -1620,33 +1633,39 @@ async function openMorphologyTemplateTable(tableId) {
 
 // ---- Assignment trial entry picker -------------------------------------------------------------
 
+function resetMorphologyTrialEntry(page) {
+  morphologyTrialRequestId += 1;
+  page.trial.entry = null;
+  page.trial.entryStatus = "idle";
+  page.trial.contextKey = "merged";
+}
+
 async function morphologyPickTrialEntry(summary) {
   const dictionary = activeDictionary();
   const page = morphologyPageState(dictionary);
-  const requestId = ++morphologyTrialRequestId;
+  resetMorphologyTrialEntry(page);
+  const requestId = morphologyTrialRequestId;
+  const isCurrent = () => requestId === morphologyTrialRequestId
+    && state.activeView === "morphology-tables" && activeDictionary()?.id === dictionary.id;
   page.trial.entryQuery = summary.lemma || "";
-  page.trial.entry = null;
   page.trial.entryStatus = "loading";
-  page.trial.contextKey = "merged";
   const input = elements.morphologyTablesPanel.querySelector('[data-mtp-trial="entry"]');
   if (input) input.value = page.trial.entryQuery;
   renderMorphologyTemplateDerived(dictionary);
   try {
     const entry = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/entries/${encodeURIComponent(summary.id)}`);
-    if (requestId !== morphologyTrialRequestId || activeDictionary()?.id !== dictionary.id) return;
+    if (!isCurrent()) return;
     page.trial.entry = entry;
     page.trial.entryStatus = "ready";
     if (!page.formTrial.lemma.trim() || page.formTrial.autoFilled) {
       page.formTrial = { lemma: entry.lemma, autoFilled: true };
     }
   } catch (error) {
-    if (requestId !== morphologyTrialRequestId) return;
+    if (!isCurrent()) return;
     page.trial.entryStatus = "error";
     console.error(error);
   }
-  if (state.activeView === "morphology-tables" && activeDictionary()?.id === dictionary.id) {
-    renderMorphologyTemplateDerived(activeDictionary());
-  }
+  renderMorphologyTemplateDerived();
 }
 
 // ---- Events ------------------------------------------------------------------------------------
@@ -1693,7 +1712,12 @@ function handleMorphologyPageInput(event) {
     return;
   }
   if (target.dataset.mtpTrial === "entry") {
+    if (page.trial.entryQuery === target.value) return;
     page.trial.entryQuery = target.value;
+    if (page.trial.entryStatus !== "idle") {
+      resetMorphologyTrialEntry(page);
+      renderMorphologyTemplateDerived();
+    }
     return;
   }
   if (target.dataset.mtpField === "form-trial") {

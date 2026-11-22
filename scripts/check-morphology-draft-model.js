@@ -44,22 +44,32 @@ function baseMorphology() {
 
 function checkAxisRemovalUndo() {
   const saved = baseMorphology();
+  draftModel.findTable(saved, "child").cells.push({ ...own(saved, "root", "r2", "c1") });
   const removal = draftModel.removeAxisItem(saved, "root", "rows", "r3");
   assert.equal(removal.clearedRootReferenceCount, 1, "acc→gen reference is cleared with the gen row");
   assert.equal(own(removal.morphology, "root", "r2", "c1"), null, "a cleared root reference becomes unfilled");
   assert.deepEqual(cellsOf(removal.morphology, "child"), [], "child cells on the removed row go too");
 
   // Unrelated edits after the removal survive the undo; a re-edited reference cell keeps the edit.
-  let edited = draftModel.setRuleText(removal.morphology, "root", "r1", "c2", "{}-i").morphology;
-  edited = draftModel.setRuleText(edited, "root", "r2", "c1", "{}-m").morphology;
+  const elsewhere = draftModel.setRuleText(removal.morphology, "root", "r1", "c2", "{}-i");
+  const edited = draftModel.setRuleText(elsewhere.morphology, "root", "r2", "c1", "{}-m");
   assert.ok(!draftModel.draftIsDirty(draftModel.applyUndo(removal.morphology, removal.undo).morphology, saved),
     "undoing the only change leaves nothing to save, whatever order the cells come back in");
-  const undone = draftModel.applyUndo(edited, removal.undo);
+  const afterElsewhere = draftModel.undoAfterCellEdits(removal.undo, elsewhere.cellEdits);
+  const afterEdit = draftModel.undoAfterCellEdits(afterElsewhere, edited.cellEdits);
+  const undone = draftModel.applyUndo(edited.morphology, afterEdit);
   assert.deepEqual(undone.morphology.slots[0].tables[0].rows.map(({ id }) => id), ["r1", "r2", "r3"]);
   assert.equal(own(undone.morphology, "root", "r1", "c2").sourceText, "{}-i", "edits elsewhere are kept");
   assert.equal(own(undone.morphology, "root", "r2", "c1").sourceText, "{}-m", "a re-edited reference cell is not overwritten");
   assert.equal(own(undone.morphology, "root", "r3", "c1").sourceText, "{}-s");
   assert.equal(own(undone.morphology, "child", "r3", "c2").kind, "absent");
+
+  const cleared = draftModel.setCellRecord(edited.morphology, "root", "r2", "c1", null);
+  const afterClear = draftModel.undoAfterCellEdits(afterEdit, cleared.cellEdits);
+  const undoneAfterClear = draftModel.applyUndo(cleared.morphology, afterClear).morphology;
+  assert.equal(own(undoneAfterClear, "root", "r2", "c1"), null, "a cell deliberately emptied after removal stays empty");
+  assert.deepEqual(own(undoneAfterClear, "child", "r2", "c1"), own(saved, "child", "r2", "c1"),
+    "an untouched reference at the same coordinate in a different table is restored");
 
   // An empty saved row is still removable and restorable.
   const emptyRow = draftModel.removeAxisItem(saved, "root", "columns", "c2");
