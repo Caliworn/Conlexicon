@@ -265,35 +265,41 @@ function morphologyTrialVerdicts(page, trialState) {
 
 // ---- Rendering: page frame ---------------------------------------------------------------------
 
-function morphologyToolbarHtml(page) {
-  return `<div class="morphology-page-toolbar">
-    <div class="morphology-toolbar-main">
-      <div class="morphology-view-switch" role="tablist" aria-label="${escapeHtml(aText("视图", "View"))}">
-        ${[["structure", aText("结构", "Structure")], ["tables", aText("表格", "Tables")]].map(([view, label]) => `
-          <button class="morphology-toolbar-button" type="button" role="tab" data-mtp-action="view" data-view-name="${view}" data-mtp-focus="view:${view}" aria-selected="${page.view === view}">${escapeHtml(label)}</button>
-        `).join("")}
+// The page's controls live in the view's top bar, as on the other tool pages: the view switch and
+// the save area beside the title, then rows that only some states show.
+function morphologyHeaderToolsHtml(page) {
+  const views = [["structure", aText("结构", "Structure")], ["tables", aText("表格", "Tables")]];
+  return `<div class="top-actions morphology-page-actions">
+      <div class="segmented-control morphology-view-switch" role="radiogroup" aria-label="${escapeHtml(aText("视图", "View"))}">
+        ${views.map(([view, label]) => {
+          const current = page.view === view;
+          return `<button class="${current ? "active" : ""}" type="button" role="radio" data-control-tone="neutral" data-control-selection data-mtp-action="view" data-view-name="${view}" data-mtp-focus="view:${view}" aria-checked="${current}" tabindex="${current ? 0 : -1}">${escapeHtml(label)}</button>`;
+        }).join("")}
       </div>
-      ${page.view === "structure" ? `<div class="morphology-toolbar-drawers">
-        <button class="morphology-toolbar-button" type="button" data-mtp-action="open-drawer" data-pane="trial" data-mtp-focus="drawer:trial" aria-haspopup="dialog" aria-controls="morphologyDrawer" aria-expanded="false"${page.parentPickerTableId ? " disabled" : ""}>
-          <span>${escapeHtml(aText("试算", "Trial"))}</span><span class="morphology-toolbar-trial-summary" data-mtp-region="trial-summary" hidden></span>
-        </button>
-        <button class="morphology-toolbar-button" type="button" data-mtp-action="open-drawer" data-pane="properties" data-mtp-focus="drawer:properties" aria-haspopup="dialog" aria-controls="morphologyDrawer" aria-expanded="false"${page.selectedTableId && !page.parentPickerTableId ? "" : " disabled"}>${escapeHtml(aText("属性", "Properties"))}</button>
-      </div>` : morphologyTableSelectHtml(page)}
-    </div>
-    <div class="morphology-toolbar-actions">
       <span class="morphology-dirty-status" role="status" data-mtp-region="save-status"></span>
-      <button class="morphology-toolbar-button" type="button" data-mtp-action="discard" data-mtp-focus="discard">${escapeHtml(t("editSwitchDiscard"))}</button>
-      <button class="morphology-toolbar-button morphology-toolbar-save" type="button" data-mtp-action="save" data-mtp-focus="save">${escapeHtml(t("save"))}</button>
+      <button class="secondary-button" type="button" data-control-tone="neutral" data-mtp-action="discard" data-mtp-focus="discard">${escapeHtml(t("editSwitchDiscard"))}</button>
+      <button class="primary-button" type="button" data-control-tone="accent" data-control-emphasis="solid" data-mtp-action="save" data-mtp-focus="save">${escapeHtml(t("save"))}</button>
     </div>
-    <div class="morphology-undo-notice" hidden>
+    ${page.view === "structure" ? `<div class="morphology-header-row morphology-header-drawers">
+      <button class="secondary-button" type="button" data-control-tone="neutral" data-mtp-action="open-drawer" data-pane="trial" data-mtp-focus="drawer:trial" aria-haspopup="dialog" aria-controls="morphologyDrawer" aria-expanded="false"${page.parentPickerTableId ? " disabled" : ""}>
+        <span>${escapeHtml(aText("试算", "Trial"))}</span><span class="morphology-header-trial-summary" data-mtp-region="trial-summary" hidden></span>
+      </button>
+      <button class="secondary-button" type="button" data-control-tone="neutral" data-mtp-action="open-drawer" data-pane="properties" data-mtp-focus="drawer:properties" aria-haspopup="dialog" aria-controls="morphologyDrawer" aria-expanded="false"${page.selectedTableId && !page.parentPickerTableId ? "" : " disabled"}>${escapeHtml(aText("属性", "Properties"))}</button>
+    </div>` : `<div class="morphology-header-row morphology-header-table-select">${morphologyTableSelectHtml(page)}</div>`}
+    <div class="morphology-header-row morphology-undo-notice" hidden>
       <span class="morphology-undo-message" role="status" data-mtp-region="undo-message"></span>
-      <button class="morphology-toolbar-button" type="button" data-mtp-action="undo" data-mtp-focus="undo">${escapeHtml(aText("撤销", "Undo"))}</button>
+      <button class="secondary-button" type="button" data-control-tone="neutral" data-mtp-action="undo" data-mtp-focus="undo">${escapeHtml(aText("撤销", "Undo"))}</button>
     </div>
-    ${page.parentPickerTableId ? `<div class="morphology-parent-picker-notice">
+    ${page.parentPickerTableId ? `<div class="morphology-header-row morphology-parent-picker-notice">
       <span role="status">${escapeHtml(aText(`为“${morphologyTableLabel(page.draft, page.parentPickerTableId)}”选择父表`, `Choose a parent for “${morphologyTableLabel(page.draft, page.parentPickerTableId)}”`))}</span>
-      <button class="morphology-toolbar-button" type="button" data-mtp-action="cancel-parent-picker" data-mtp-focus="parent-picker-cancel">${escapeHtml(t("cancel"))}</button>
-    </div>` : ""}
-  </div>`;
+      <button class="secondary-button" type="button" data-control-tone="neutral" data-mtp-action="cancel-parent-picker" data-mtp-focus="parent-picker-cancel">${escapeHtml(t("cancel"))}</button>
+    </div>` : ""}`;
+}
+
+// The header tools and the panel are locked together while a save runs.
+function setMorphologyPageInert(inert) {
+  elements.morphologyTablesPanel.inert = inert;
+  elements.morphologyTablesHeaderTools.inert = inert;
 }
 
 function renderMorphologyTemplatePage(dictionary = activeDictionary()) {
@@ -306,13 +312,13 @@ function renderMorphologyTemplatePage(dictionary = activeDictionary()) {
   const drawer = panel.querySelector(".morphology-drawer[open]");
   if (drawer) hideMorphologyDrawer(drawer);
   morphologyFinishDrag();
+  elements.morphologyTablesHeaderTools.innerHTML = morphologyHeaderToolsHtml(page);
   panel.innerHTML = `
-    ${morphologyToolbarHtml(page)}
     <div class="morphology-page-body" data-view="${page.view}">
       ${page.view === "structure" ? morphologyStructureViewHtml(page) : morphologyTablesViewHtml(page)}
     </div>
   `;
-  panel.inert = page.saving;
+  setMorphologyPageInert(page.saving);
   const entryPicker = panel.querySelector('[data-mtp-trial="entry"]');
   if (entryPicker) {
     bindSourceAutocompleteInput(entryPicker, {
@@ -350,15 +356,15 @@ function renderMorphologyTemplateDerived(dictionary = activeDictionary()) {
 }
 
 function renderMorphologyToolbarState(page) {
-  const panel = elements.morphologyTablesPanel;
+  const tools = elements.morphologyTablesHeaderTools;
   const dirty = morphologyPageIsDirty(page);
-  const status = panel.querySelector('[data-mtp-region="save-status"]');
+  const status = tools.querySelector('[data-mtp-region="save-status"]');
   const text = page.saving ? aText("正在保存", "Saving")
     : dirty ? aText("未保存", "Unsaved") : aText("已保存", "Saved");
   if (status.textContent !== text) status.textContent = text;
-  panel.querySelector('[data-mtp-action="discard"]').disabled = !dirty || page.saving;
-  panel.querySelector('[data-mtp-action="save"]').disabled = !dirty || page.saving;
-  const notice = panel.querySelector(".morphology-undo-notice");
+  tools.querySelector('[data-mtp-action="discard"]').disabled = !dirty || page.saving;
+  tools.querySelector('[data-mtp-action="save"]').disabled = !dirty || page.saving;
+  const notice = tools.querySelector(".morphology-undo-notice");
   const message = notice.querySelector('[data-mtp-region="undo-message"]');
   notice.hidden = !page.undo;
   if (message.textContent !== (page.undo?.message || "")) message.textContent = page.undo?.message || "";
@@ -366,11 +372,17 @@ function renderMorphologyToolbarState(page) {
 
 function observeMorphologyLayout() {
   const panel = elements.morphologyTablesPanel;
-  const toolbar = panel.querySelector(".morphology-page-toolbar");
+  const header = elements.morphologyTablesHeader;
   const workspace = panel.closest(".workspace");
   const update = () => {
     if (state.activeView !== "morphology-tables" || panel.hidden) return;
-    panel.style.setProperty("--morphology-toolbar-height", `${toolbar.offsetHeight}px`);
+    // When the controls wrap below the title, the title scrolls away and only the controls stick.
+    const top = header.getBoundingClientRect().top;
+    const title = header.firstElementChild.getBoundingClientRect();
+    const actions = header.querySelector(".morphology-page-actions").getBoundingClientRect();
+    const hidden = actions.top >= title.bottom ? title.bottom - top : 0;
+    header.style.setProperty("--morphology-header-offset", `${-hidden}px`);
+    panel.style.setProperty("--morphology-header-height", `${header.offsetHeight - hidden}px`);
     panel.style.setProperty("--morphology-workspace-height", mobileShellMode() ? `${workspace.clientHeight}px` : "100dvh");
     updateMorphologyTableListHeight();
     if (panel.querySelector(".morphology-drawer[open]") && !morphologyStructureIsNarrow()) {
@@ -379,7 +391,7 @@ function observeMorphologyLayout() {
   };
   morphologyLayoutObserver?.disconnect();
   morphologyLayoutObserver = new ResizeObserver(update);
-  morphologyLayoutObserver.observe(toolbar);
+  morphologyLayoutObserver.observe(header);
   morphologyLayoutObserver.observe(workspace);
   update();
 }
@@ -396,7 +408,7 @@ function updateMorphologyTableListHeight() {
 
 function morphologyFocusSnapshot(panel) {
   const active = document.activeElement;
-  if (!panel.contains(active) || !active.dataset.mtpFocus) return null;
+  if (!(panel.contains(active) || elements.morphologyTablesHeaderTools.contains(active)) || !active.dataset.mtpFocus) return null;
   return { key: active.dataset.mtpFocus, start: active.selectionStart, end: active.selectionEnd };
 }
 
@@ -455,7 +467,7 @@ function showMorphologyDrawer(page) {
   const section = panel.querySelector(`[data-mtp-pane="${pane}"]`);
   drawer.setAttribute("aria-labelledby", section.getAttribute("aria-labelledby"));
   drawer.append(section);
-  panel.querySelector(`[data-mtp-action="open-drawer"][data-pane="${pane}"]`).setAttribute("aria-expanded", "true");
+  elements.morphologyTablesHeaderTools.querySelector(`[data-mtp-action="open-drawer"][data-pane="${pane}"]`).setAttribute("aria-expanded", "true");
   hideAppTooltip();
   // Put tooltips on the same top layer as their controls.
   drawer.append(elements.appTooltip);
@@ -481,7 +493,7 @@ function closeMorphologyDrawer({ docked = false } = {}) {
   hideMorphologyDrawer(drawer);
   if (pane === "trial") rail.prepend(section);
   else rail.append(section);
-  panel.querySelector(`[data-mtp-action="open-drawer"][data-pane="${pane}"]`).setAttribute("aria-expanded", "false");
+  elements.morphologyTablesHeaderTools.querySelector(`[data-mtp-action="open-drawer"][data-pane="${pane}"]`).setAttribute("aria-expanded", "false");
   syncMorphologyTrialDetails(page);
 
   if (docked) {
@@ -719,7 +731,7 @@ function renderMorphologyStructureDerived(page, dictionary, problems) {
     details.querySelector('[data-mtp-region="trial-explanations"]').innerHTML = morphologyTrialExplanationsHtml(page, trialState);
   }
   syncMorphologyTrialDetails(page);
-  const toolbarSummary = panel.querySelector('[data-mtp-region="trial-summary"]');
+  const toolbarSummary = elements.morphologyTablesHeaderTools.querySelector('[data-mtp-region="trial-summary"]');
   const trialInput = page.trial.mode === "entry" ? page.trial.entry?.lemma : page.trial.tagsText.trim();
   toolbarSummary.hidden = !trialInput;
   if (toolbarSummary.textContent !== (trialInput || "")) toolbarSummary.textContent = trialInput || "";
@@ -1556,7 +1568,7 @@ async function runMorphologySave(dictionary, page) {
   const clearedTemplateReferences = draftModel.clearedTemplateReferenceCount(page.saved, page.draft, page.lineage);
   const focus = morphologyFocusSnapshot(panel);
   page.saving = true;
-  panel.inert = true;
+  setMorphologyPageInert(true);
   renderMorphologyToolbarState(page);
   let confirmation = {};
   let navigateTo = "";
@@ -1597,7 +1609,7 @@ async function runMorphologySave(dictionary, page) {
     return false;
   } finally {
     page.saving = false;
-    panel.inert = false;
+    setMorphologyPageInert(false);
     // A successful save replaced the dictionary object; rendering the one captured before the
     // request would read the old module as "saved" and reset the page to it.
     if (state.activeView === "morphology-tables" && activeDictionary()?.id === dictionary.id) {
@@ -1776,7 +1788,7 @@ function handleMorphologyPageInput(event) {
   if (target.dataset.mtpProp) {
     morphologyApply(draftModel.updateTable(page.draft, page.selectedTableId, { [target.dataset.mtpProp]: target.value }), { rerender: false });
     if (page.view === "tables" && target.dataset.mtpProp === "title") {
-      const select = elements.morphologyTablesPanel.querySelector('[data-mtp-field="table-select"]');
+      const select = elements.morphologyTablesHeaderTools.querySelector('[data-mtp-field="table-select"]');
       const choices = morphologyTableChoices(page.draft);
       choices.forEach(({ label }, index) => { select.options[index].textContent = label; });
     }
@@ -2028,9 +2040,12 @@ function handleMorphologyPageKeydown(event) {
 
 function bindMorphologyTemplatePage() {
   const panel = elements.morphologyTablesPanel;
+  const tools = elements.morphologyTablesHeaderTools;
   panel.addEventListener("input", handleMorphologyPageInput);
-  panel.addEventListener("click", handleMorphologyPageClick);
-  panel.addEventListener("keydown", handleMorphologyPageKeydown);
+  for (const root of [panel, tools]) {
+    root.addEventListener("click", handleMorphologyPageClick);
+    root.addEventListener("keydown", handleMorphologyPageKeydown);
+  }
   panel.addEventListener("cancel", (event) => {
     if (event.target.matches(".morphology-drawer")) {
       event.preventDefault();
@@ -2043,7 +2058,7 @@ function bindMorphologyTemplatePage() {
       syncMorphologyTrialDetails(morphologyPageState());
     }
   });
-  panel.addEventListener("change", (event) => {
+  tools.addEventListener("change", (event) => {
     if (event.target.dataset.mtpField === "table-select") {
       morphologySelectTable(event.target.value, { focus: "table-select" });
     }

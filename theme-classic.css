@@ -25,6 +25,8 @@ body:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-glass"])) {
 
   /* Semantic colors describe meaning, independent of component shape. */
   --ui-canvas-bg: #f4f6f2;
+  /* The page's own paint; sticky page headers reuse it to cover content scrolling beneath. */
+  --ui-page-background: var(--ui-canvas-bg);
   --ui-text: #17202a;
   --ui-text-muted: #687380;
   --ui-text-on-solid: #ffffff;
@@ -146,6 +148,7 @@ body.dark-theme .skin-picker-preview-classic,
 body.dark-theme:not(:is([data-ui-skin="layered-glass"], [data-ui-skin="liquid-glass"])) {
   color-scheme: dark;
   --ui-canvas-bg: #151a1d;
+  --ui-page-background: var(--ui-canvas-bg);
   --ui-text: #edf2f1;
   --ui-text-muted: #aab7bc;
   --ui-border: #405057;

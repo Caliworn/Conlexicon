@@ -22,6 +22,11 @@ body[data-ui-skin="liquid-glass"] {
   --skin-nav-item-padding-inline: 12px;
 
   --ui-canvas-bg: #eaf0f2;
+  --ui-page-background:
+    radial-gradient(circle at 8% 4%, rgba(58, 202, 190, 0.32) 0%, rgba(58, 202, 190, 0.08) 22%, transparent 42%),
+    radial-gradient(circle at 96% 9%, rgba(154, 112, 224, 0.25) 0%, rgba(154, 112, 224, 0.055) 23%, transparent 43%),
+    radial-gradient(circle at 74% 96%, rgba(232, 174, 58, 0.22) 0%, rgba(232, 174, 58, 0.04) 24%, transparent 45%),
+    linear-gradient(135deg, #edf5f4 0%, #edf1f5 52%, #f5f0e7 100%);
   --ui-text: #122026;
   --ui-text-muted: #596a72;
   --ui-text-on-solid: #ffffff;
@@ -175,6 +180,11 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   color-scheme: dark;
 
   --ui-canvas-bg: #0d1419;
+  --ui-page-background:
+    radial-gradient(circle at 7% 3%, rgba(34, 174, 163, 0.26) 0%, rgba(34, 174, 163, 0.055) 24%, transparent 45%),
+    radial-gradient(circle at 96% 8%, rgba(135, 86, 206, 0.23) 0%, rgba(135, 86, 206, 0.045) 24%, transparent 45%),
+    radial-gradient(circle at 76% 97%, rgba(203, 139, 32, 0.17) 0%, rgba(203, 139, 32, 0.035) 25%, transparent 47%),
+    linear-gradient(135deg, #0b1619 0%, #10141c 54%, #19150f 100%);
   --ui-text: #edf7f5;
   --ui-text-muted: #a9bcbe;
   --ui-border: rgba(221, 248, 244, 0.16);
@@ -287,20 +297,7 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
 }
 
 body[data-ui-skin="liquid-glass"] {
-  background:
-    radial-gradient(circle at 8% 4%, rgba(58, 202, 190, 0.32) 0%, rgba(58, 202, 190, 0.08) 22%, transparent 42%),
-    radial-gradient(circle at 96% 9%, rgba(154, 112, 224, 0.25) 0%, rgba(154, 112, 224, 0.055) 23%, transparent 43%),
-    radial-gradient(circle at 74% 96%, rgba(232, 174, 58, 0.22) 0%, rgba(232, 174, 58, 0.04) 24%, transparent 45%),
-    linear-gradient(135deg, #edf5f4 0%, #edf1f5 52%, #f5f0e7 100%);
   background-attachment: fixed;
-}
-
-body.dark-theme[data-ui-skin="liquid-glass"] {
-  background:
-    radial-gradient(circle at 7% 3%, rgba(34, 174, 163, 0.26) 0%, rgba(34, 174, 163, 0.055) 24%, transparent 45%),
-    radial-gradient(circle at 96% 8%, rgba(135, 86, 206, 0.23) 0%, rgba(135, 86, 206, 0.045) 24%, transparent 45%),
-    radial-gradient(circle at 76% 97%, rgba(203, 139, 32, 0.17) 0%, rgba(203, 139, 32, 0.035) 25%, transparent 47%),
-    linear-gradient(135deg, #0b1619 0%, #10141c 54%, #19150f 100%);
 }
 
 @media (min-width: 800px) {
@@ -665,7 +662,7 @@ body[data-ui-skin="liquid-glass"] :is([data-control-tone="neutral"]:not([data-co
   --control-pressed-shadow: var(--liquid-glass-compact-control-shadow);
 }
 
-body[data-ui-skin="liquid-glass"] :is(.dictionary-panel, .entry-search-control, .entry-mail-tools, .tag-manager-search, .corpus-search, #docsModeControl, #tagManagerViewControl) {
+body[data-ui-skin="liquid-glass"] :is(.dictionary-panel, .entry-search-control, .entry-mail-tools, .tag-manager-search, .corpus-search, #docsModeControl, #tagManagerViewControl, .morphology-view-switch) {
   --liquid-glass-compact-control-shadow: none;
 }
 
@@ -943,7 +940,7 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   body[data-ui-skin="liquid-glass"] {
-    background: var(--ui-canvas-bg);
+    --ui-page-background: var(--ui-canvas-bg);
     --material-panel-background: #f8fbfb;
     --material-content-shell-background: #f8fbfb;
     --material-entry-detail-mobile-background: #f8fbfb;
@@ -988,7 +985,7 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
 
 @media (prefers-reduced-transparency: reduce) {
   body[data-ui-skin="liquid-glass"] {
-    background: var(--ui-canvas-bg);
+    --ui-page-background: var(--ui-canvas-bg);
     --material-panel-background: #f8fbfb;
     --material-content-shell-background: #f8fbfb;
     --material-entry-detail-mobile-background: #f8fbfb;
@@ -1083,7 +1080,7 @@ body[data-ui-skin="liquid-glass"] .entry-card.active {
 @media (forced-colors: active) {
   body[data-ui-skin="liquid-glass"],
   body.dark-theme[data-ui-skin="liquid-glass"] {
-    background: Canvas;
+    --ui-page-background: Canvas;
     --ui-canvas-bg: Canvas;
     --ui-text: CanvasText;
     --ui-text-muted: CanvasText;

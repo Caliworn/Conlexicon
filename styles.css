@@ -129,7 +129,7 @@ body {
   margin: 0;
   min-width: 0;
   min-height: 100vh;
-  background: var(--ui-canvas-bg);
+  background: var(--ui-page-background);
   color: var(--ui-text);
 }
 
@@ -3258,7 +3258,7 @@ span.pending-source {
 /* ---- Template page ---- */
 
 .morphology-template-page {
-  --morphology-rail-top: calc(var(--morphology-toolbar-height, 0px) + 12px);
+  --morphology-rail-top: calc(var(--morphology-header-height, 0px) + 12px);
   --morphology-rail-height: calc(var(--morphology-workspace-height, 100dvh) - var(--morphology-rail-top) - 12px);
   display: grid;
   gap: 16px;
@@ -3266,148 +3266,108 @@ span.pending-source {
   container-type: inline-size;
 }
 
-.morphology-page-toolbar {
+/* The view's top bar holds the page controls and sticks on the page's own background, so it
+   reads as part of the page. When the controls wrap below the title, a negative offset lets the
+   title scroll away and only the controls stick. The padding moves the workspace gutter inside
+   the bar, so the resting layout is unchanged and a stuck bar keeps the gutter above it. */
+#morphologyTablesView {
+  container: morphology-view / inline-size;
+}
+
+.top-bar.morphology-top-bar {
+  --morphology-header-fade: 12px;
   position: sticky;
-  inset-block-start: 0;
+  inset-block-start: var(--morphology-header-offset, 0px);
   z-index: 6;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: "main actions" "undo undo";
-  align-items: center;
-  column-gap: 12px;
-  margin-inline: calc(-1 * var(--workspace-gutter));
-  padding: 3px var(--workspace-gutter);
-  border-block-end: 1px solid var(--ui-border);
-  background: var(--ui-canvas-bg);
+  row-gap: 8px;
+  min-height: calc(var(--view-header-min-height) + var(--workspace-gutter) + 8px);
+  margin: calc(-1 * var(--workspace-gutter)) calc(-1 * var(--workspace-gutter)) max(var(--morphology-header-fade), calc(var(--view-header-gap) - 8px));
+  padding: var(--workspace-gutter) var(--workspace-gutter) 8px;
+  background: var(--ui-page-background);
+  background-attachment: fixed;
 }
 
-.morphology-toolbar-main,
-.morphology-toolbar-actions {
+/* Content scrolling under the bar fades out like the entry list's edges. The fade repaints the
+   page background, so it is invisible while nothing is beneath it; the gap below the bar is at
+   least as tall, which keeps it off the content at rest. */
+.top-bar.morphology-top-bar::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 100%;
+  block-size: var(--morphology-header-fade);
+  background: var(--ui-page-background);
+  background-attachment: fixed;
+  -webkit-mask-image: linear-gradient(to bottom, black, transparent);
+  mask-image: linear-gradient(to bottom, black, transparent);
+  pointer-events: none;
+}
+
+.morphology-header-tools:not([hidden]) {
+  display: contents;
+}
+
+.top-bar .morphology-page-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.morphology-header-row:not([hidden]) {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  width: 100%;
   min-width: 0;
 }
 
-.morphology-toolbar-main {
-  grid-area: main;
-  justify-content: space-between;
+.morphology-header-row:empty {
+  display: none;
 }
 
-.morphology-toolbar-actions {
-  grid-area: actions;
-}
-
-.morphology-view-switch {
+.morphology-header-drawers [data-pane="trial"] {
   display: flex;
-  flex: none;
-}
-
-.morphology-toolbar-button {
-  min-height: 38px;
-  padding: 0 7px;
-  border: 0;
-  background: transparent;
-  color: var(--ui-text);
-  font: inherit;
-  font-size: 0.88rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.morphology-toolbar-button:hover:not(:disabled) {
-  color: var(--ui-accent-hover);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.morphology-toolbar-button:focus-visible {
-  outline-offset: -2px;
-}
-
-.morphology-toolbar-button:disabled {
-  color: var(--ui-text-muted);
-  opacity: 0.65;
-  cursor: not-allowed;
-}
-
-.morphology-view-switch > [role="tab"] {
-  border-block-end: 2px solid transparent;
-  color: var(--ui-text-muted);
-}
-
-.morphology-view-switch > [aria-selected="true"] {
-  border-block-end-color: var(--ui-accent);
-  color: var(--ui-accent-hover);
-}
-
-.morphology-toolbar-save:not(:disabled) {
-  color: var(--ui-accent-hover);
-}
-
-.morphology-toolbar-main > :is(.morphology-toolbar-drawers, .morphology-table-select) {
+  align-items: center;
+  gap: 4px;
   min-width: 0;
-  border-inline-start: 1px solid var(--ui-border);
-  padding-inline-start: 4px;
 }
 
-.morphology-toolbar-drawers {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.morphology-toolbar-drawers [data-pane="trial"] {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 44px;
-}
-
-.morphology-toolbar-drawers [data-pane="properties"] {
+.morphology-header-drawers [data-pane="properties"] {
   flex: none;
 }
 
-.morphology-toolbar-trial-summary {
+.morphology-header-trial-summary {
   overflow: hidden;
   color: var(--ui-text-muted);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.morphology-toolbar-trial-summary:not([hidden])::before {
+.morphology-header-trial-summary:not([hidden])::before {
   content: "· ";
 }
 
-.morphology-undo-notice:not([hidden]) {
-  grid-area: undo;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  padding-inline-start: 7px;
-  border-block-start: 1px solid var(--ui-border);
+.morphology-header-table-select .morphology-table-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.morphology-header-table-select select {
+  width: 100%;
+}
+
+.morphology-undo-message,
+.morphology-parent-picker-notice > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .morphology-undo-message {
   max-block-size: 4.5em;
   overflow-y: auto;
-  overflow-wrap: anywhere;
 }
 
-.morphology-parent-picker-notice {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding-inline-start: 7px;
-  border-block-start: 1px solid var(--ui-border);
-}
-
-.morphology-parent-picker-notice > span {
-  min-width: 0;
-  overflow-wrap: anywhere;
+.morphology-header-row > button {
+  flex: none;
 }
 
 .morphology-dirty-status {
@@ -3415,17 +3375,10 @@ span.pending-source {
   font-size: 0.88rem;
 }
 
-@container (width < 760px) {
-  .morphology-page-toolbar {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas: "main" "actions" "undo";
+@container morphology-view (width >= 760px) {
+  .morphology-header-row:is(.morphology-header-drawers, .morphology-header-table-select) {
+    display: none;
   }
-
-  .morphology-dirty-status { margin-inline-end: auto; }
-}
-
-@container (width < 350px) {
-  .morphology-toolbar-main .morphology-toolbar-button { padding-inline: 5px; }
 }
 
 .morphology-page-body [data-mtp-focus] {
@@ -3468,8 +3421,6 @@ span.pending-source {
     grid-template-areas: "slots rail";
     align-items: start;
   }
-
-  .morphology-toolbar-drawers { display: none; }
 
   .morphology-structure-rail {
     grid-area: rail;
@@ -4057,18 +4008,6 @@ span.pending-source {
   max-width: 360px;
 }
 
-.morphology-toolbar-main .morphology-table-select > select {
-  width: 100%;
-  min-height: 38px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-  backdrop-filter: none;
-  font-size: 0.88rem;
-}
-
 @container (width >= 760px) {
   .morphology-table-list-slot {
     display: block;
@@ -4085,7 +4024,6 @@ span.pending-source {
     overflow: auto;
     overscroll-behavior: contain;
   }
-  .morphology-table-select { display: none; }
 }
 
 .morphology-table-list ul {
@@ -8811,9 +8749,14 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
     padding: var(--workspace-gutter) var(--workspace-gutter) 24px;
   }
 
-  /* Place the top inset with the scrolling title so the toolbar sticks flush to the app bar. */
+  /* Sticky offsets start inside the scroller's padding, so the top bar carries the top gutter
+     itself and sticks flush to the app bar. */
   .workspace:has(> #morphologyTablesView.active) { padding-block-start: 0; }
-  #morphologyTablesView { padding-block-start: var(--workspace-gutter); }
+
+  .top-bar.morphology-top-bar {
+    min-height: 0;
+    margin-block: 0 var(--morphology-header-fade);
+  }
 
   .entry-display {
     background: var(--material-entry-detail-mobile-background);

@@ -935,18 +935,13 @@ for (const materialToken of [
     `${materialToken} must remain a pure tint instead of painted component lighting`,
   );
 }
-const liquidGlassLightProductBackground = liquidGlass.match(
-  /body\[data-ui-skin="liquid-glass"\] \{\n  background:\n([\s\S]*?)\n  background-attachment:/,
-);
-const liquidGlassDarkProductBackground = liquidGlass.match(
-  /body\.dark-theme\[data-ui-skin="liquid-glass"\] \{\n  background:\n([\s\S]*?)\n\}/,
-);
+const liquidGlassProductBackgrounds = [...liquidGlass.matchAll(/--ui-page-background:\s*([^;]+);/g)]
+  .map((match) => match[1])
+  .filter((value) => /gradient\(/.test(value));
 assert(
-  liquidGlassLightProductBackground
-    && liquidGlassDarkProductBackground
-    && !/repeating-linear-gradient\(/.test(liquidGlassLightProductBackground[1])
-    && !/repeating-linear-gradient\(/.test(liquidGlassDarkProductBackground[1]),
-  "Liquid Glass product backgrounds must not paint diagnostic grid textures",
+  liquidGlassProductBackgrounds.length === 2
+    && liquidGlassProductBackgrounds.every((value) => !/repeating-linear-gradient\(/.test(value)),
+  "Liquid Glass light and dark product backgrounds must not paint diagnostic grid textures",
 );
 for (const definition of liquidGlassSurfaceDefinitions) {
   for (const selector of (definition.role === "relationship" ? [] : definition.selector.split(",").map((value) => value.trim()))) {

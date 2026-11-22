@@ -1883,6 +1883,8 @@ const elements = {
   morphologyTablesNoDictionaryNotice: document.querySelector("#morphologyTablesNoDictionaryNotice"),
   morphologyTablesOpenDictionaryManagerButton: document.querySelector("#morphologyTablesOpenDictionaryManagerButton"),
   morphologyTablesPanel: document.querySelector("#morphologyTablesPanel"),
+  morphologyTablesHeader: document.querySelector("#morphologyTablesHeader"),
+  morphologyTablesHeaderTools: document.querySelector("#morphologyTablesHeaderTools"),
   morphologyLeftVObjectsInput: document.querySelector("#morphologyLeftVObjectsInput"),
   morphologyRightVObjectsInput: document.querySelector("#morphologyRightVObjectsInput"),
   morphologyTablesInfoButton: document.querySelector("#morphologyTablesInfoButton"),
@@ -4211,6 +4213,7 @@ function renderAvailability() {
   elements.morphologyFunctionsPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "morphology-functions";
   elements.morphologyTablesNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "morphology-tables";
   elements.morphologyTablesPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "morphology-tables";
+  elements.morphologyTablesHeaderTools.hidden = elements.morphologyTablesPanel.hidden;
   elements.ipaNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "ipa";
   elements.ipaPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "ipa";
   elements.tagsNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "tags";

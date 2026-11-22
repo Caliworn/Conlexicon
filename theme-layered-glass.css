@@ -9,6 +9,7 @@ body[data-ui-skin="layered-glass"] {
   --radius-pill: 999px;
 
   --ui-canvas-bg: #e2e8ee;
+  --ui-page-background: var(--ui-canvas-bg);
   --ui-text: #172126;
   --ui-text-muted: #4d5a61;
   --ui-text-on-solid: #ffffff;
@@ -151,6 +152,7 @@ body.dark-theme[data-ui-skin="layered-glass"] {
   color-scheme: dark;
 
   --ui-canvas-bg: #191d22;
+  --ui-page-background: var(--ui-canvas-bg);
   --ui-text: #edf2f4;
   --ui-text-muted: #b5bfc4;
   --ui-text-on-solid: #131b1d;
