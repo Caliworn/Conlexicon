@@ -159,37 +159,38 @@ function morphologyDisplayTableHtml(entry, table, resolver) {
 }
 
 function morphologyDisplayHtml(entry, morphology) {
+  const model = window.ConlexiconMorphology;
   const resolver = morphologyResolverFor(morphology);
+  const tableGridHtml = (tables) => `<div class="morphology-display-table-grid">${tables.map((table) => morphologyDisplayTableHtml(entry, table, resolver)).join("")}</div>`;
   if (entry.morphologyMode === "manual") {
     const tables = (entry.morphologyTables || [])
       .map(({ tableId }) => morphologyTableById(morphology, tableId))
       .filter(Boolean);
-    return tables.length
-      ? `<div class="morphology-display-slot"><div class="morphology-display-table-grid">${tables.map((table) => morphologyDisplayTableHtml(entry, table, resolver)).join("")}</div></div>`
-      : "";
+    return tables.length ? tableGridHtml(tables) : "";
   }
-  const { contexts } = resolver.resolveAutomaticTables(window.ConlexiconMorphology.morphologyMatchContexts(entry));
+
+  const assignment = resolver.resolveAutomaticTables(model.morphologyMatchContexts(entry));
+  const groups = model.morphologyDisplayGroups(assignment);
+  if (!groups.length) return "";
   const label = morphologyContextLabeler(entry.definitions);
-  return morphology.slots.map((slot) => {
-    const groups = window.ConlexiconMorphology.morphologySlotDisplayGroups(slot, contexts);
-    if (!groups.length) return "";
-    const columns = groups.map((group) => {
-      const tables = group.tableIds.map((id) => morphologyTableById(morphology, id));
-      return `<div class="morphology-display-column">
-        ${group.fullWidth ? "" : `<p class="morphology-display-column-label">${escapeHtml(label(group.definitionIds))}</p>`}
-        <div class="morphology-display-table-grid">${tables.map((table) => morphologyDisplayTableHtml(entry, table, resolver)).join("")}</div>
-      </div>`;
-    }).join("");
-    return `<div class="morphology-display-slot${groups[0].fullWidth ? "" : " has-columns"}">${columns}</div>`;
+  const groupHtml = groups.map(({ definitionIds, tableIds, shared }) => {
+    const tables = tableIds.map((id) => morphologyTableById(morphology, id));
+    const heading = shared
+      ? (groups.length > 1 ? aText("共用", "Shared") : "")
+      : label(definitionIds);
+    return `<div class="morphology-display-group${shared ? " is-shared" : ""}">
+      ${heading ? `<h4 class="morphology-display-group-label">${escapeHtml(heading)}</h4>` : ""}
+      ${tableGridHtml(tables)}
+    </div>`;
   }).join("");
+  return `<div class="morphology-display-groups">${groupHtml}</div>`;
 }
 
 function renderMorphologyDisplay(entry, showEmptySections) {
   const html = morphologyDisplayHtml(entry, activeDictionary().morphology);
   elements.displayMorphologySection.hidden = !html && !showEmptySections;
   elements.displayMorphology.innerHTML = html
-    ? `<div class="morphology-display-slots">${html}</div>`
-    : (showEmptySections ? `<p class="muted-text">${escapeHtml(aText("没有生效的形态表", "No morphology tables apply"))}</p>` : "");
+    || (showEmptySections ? `<p class="muted-text">${escapeHtml(aText("没有生效的形态表", "No morphology tables apply"))}</p>` : "");
 }
 
 // ---- Cell menus (shared with the template page) -------------------------------------------

@@ -13,7 +13,7 @@ const {
   morphologyMatchContexts,
   morphologyMergeRegions,
   morphologySearchValueRecords,
-  morphologySlotDisplayGroups,
+  morphologyDisplayGroups,
   normalizeMorphologyFunctions,
   removeMorphologyAxisItem,
   resolveAutomaticTables,
@@ -186,16 +186,34 @@ function checkBoundaryValidation() {
 }
 
 function checkDisplayAlgorithms() {
-  const primary = slot("slot", table("a"), table("b"));
   const ctx = (definitionId, ...tableIds) => ({ definitionId, tableIds });
-  assert.deepEqual(morphologySlotDisplayGroups(primary, [ctx("d1", "a", "c"), ctx("d2", "a")]), [
-    { definitionIds: ["d1", "d2"], tableIds: ["a"], fullWidth: true },
+  assert.deepEqual(morphologyDisplayGroups({
+    tableIds: ["tense", "case", "tone", "plural", "register", "agreement"],
+    contexts: [
+      ctx("d1", "case", "tone", "plural", "register"),
+      ctx("d2", "tense", "tone", "agreement"),
+      ctx("d3", "tone", "register"),
+      ctx("d4", "tone"),
+    ],
+  }), [
+    { definitionIds: ["d1", "d2", "d3", "d4"], tableIds: ["tone"], shared: true },
+    { definitionIds: ["d1"], tableIds: ["case", "plural"], shared: false },
+    { definitionIds: ["d1", "d3"], tableIds: ["register"], shared: false },
+    { definitionIds: ["d2"], tableIds: ["tense", "agreement"], shared: false },
   ]);
-  assert.deepEqual(morphologySlotDisplayGroups(primary, [ctx("d1", "a", "b"), ctx("d2"), ctx("d3", "a", "b"), ctx("d4", "b")]), [
-    { definitionIds: ["d1", "d3"], tableIds: ["a", "b"], fullWidth: false },
-    { definitionIds: ["d4"], tableIds: ["b"], fullWidth: false },
+  assert.deepEqual(morphologyDisplayGroups({
+    tableIds: ["case"],
+    contexts: [ctx("d1"), ctx("d2", "case")],
+  }), [
+    { definitionIds: ["d2"], tableIds: ["case"], shared: false },
   ]);
-  assert.deepEqual(morphologySlotDisplayGroups(primary, [ctx("d1"), ctx("d2", "c")]), []);
+  assert.deepEqual(morphologyDisplayGroups({
+    tableIds: ["tone"],
+    contexts: [ctx(null, "tone")],
+  }), [
+    { definitionIds: [null], tableIds: ["tone"], shared: true },
+  ]);
+  assert.deepEqual(morphologyDisplayGroups({ tableIds: [], contexts: [ctx("d1"), ctx("d2")] }), []);
   const rectangles = (pattern) => {
     const grid = pattern.map((markers, row) => Array.from(markers, (marker, column) => {
       if (marker === ".") return { kind: "blank" };

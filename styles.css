@@ -2928,7 +2928,6 @@ span.pending-source {
 
 /* ---- Morphology: shared read-only tables (entry detail, word-form trial) ---- */
 
-.morphology-display-slots,
 .entry-morphology-controls,
 .entry-morphology-table-list {
   display: grid;
@@ -2936,35 +2935,40 @@ span.pending-source {
   min-width: 0;
 }
 
-.morphology-display-slot {
-  display: grid;
-  gap: 10px;
+.morphology-display-groups {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 14px clamp(14px, 2vw, 24px);
   min-width: 0;
 }
 
-.morphology-display-slot.has-columns {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), max-content));
-  align-items: start;
-  column-gap: clamp(14px, 2vw, 24px);
-}
-
-.morphology-display-column {
+.morphology-display-group {
   display: grid;
   gap: 8px;
+  flex: 0 1 auto;
+  width: max-content;
   min-width: 0;
+  max-width: 100%;
 }
 
-.morphology-display-column-label {
+.morphology-display-group.is-shared {
+  flex-basis: 100%;
+}
+
+.morphology-display-group-label {
   margin: 0;
   color: var(--ui-text-muted);
   font-size: 0.86rem;
   font-weight: 900;
+  overflow-wrap: anywhere;
 }
 
 .morphology-display-table {
   display: grid;
   gap: 6px;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .morphology-display-table h5 {
@@ -3055,6 +3059,10 @@ span.pending-source {
   border-top-style: none;
   border-left-style: none;
   background: transparent;
+}
+
+.morphology-display-table .morphology-corner {
+  min-width: 0;
 }
 
 .morphology-table td.is-absent {
@@ -7250,7 +7258,7 @@ body[data-density="compact"] .entry-display .morphology-table :is(th, td) {
 }
 
 body[data-density="compact"] .entry-display .morphology-table th:not(:first-child),
-body[data-density="compact"] .entry-display .morphology-table td {
+body[data-density="compact"] .entry-display .morphology-table td:not(.morphology-corner) {
   min-width: 88px;
 }
 
