@@ -309,6 +309,7 @@ CREATE TABLE entry_morphology_cell_overrides (
 - `entry_morphology_tables` 用真实表 ID 和词条 ID 作主键。手动模式使用记录的 `position` 决定顺序。自动模式按槽位及表的分配结果显示，独立保存含备注或覆写的叠加层。
 - 为链顶新建父表时，原有行列以相同主键更新归属，逐词覆写继续引用原表和原坐标。
 - 解除继承的新链顶表使用新的行列 ID。一次事务处理表与后代的坐标、逐词覆写改址、确认删除和投影变化。SQLite 延迟外键检查到事务结束。
+- 跨链设置父表时，迁移的表和后代使用目标链的行列 ID。逐词覆写按各表的行列映射在同一事务内换址，保留原表归属。表版本随覆写迁移推进，防止同一映射重复应用。
 - 旧 JSON 字段转换集中在 `lib/legacy-dictionary-migration.js`，SQLite 读写当前槽位与表结构。打开仍使用旧形态 SQL 表的数据库，在执行 DDL 前返回 `incompatible_sqlite_schema`。旧库经旧版导出 JSON 后导入新库。
 
 ## 6. 索引与派生表

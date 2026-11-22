@@ -93,7 +93,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `PUT` | `/api/dictionaries/:id/meta` | 保存词典名称、语言、描述 | 词典 metadata payload | 不做实体 ID 检查；响应包含 `id/name/language/description/createdAt/updatedAt`。 |
 | `PUT` | `/api/dictionaries/:id/settings` | 保存其他设置 | `{ id, updatedAt, settings }` | 不做实体 ID 检查；会保留既有 IPA 设置。`settings.search` 含字段级 `enabled/fuzzy`、`etymologyAutocomplete.fuzzy`，以及 `normalization: { unicodeNormalization: "none" | "nfc", caseFolding: boolean, customRules: { canonical, variants[] }[] }`。规范化默认严格关闭；自定义规则按最长变体优先且单次应用。前端据此生成读取 API 参数，并同步用于词根模式、搜索摘要/高亮、字段命中计数和词源自动补全。`settings.tagListSeparatorStyle` 支持 `commaSpace`、`fullwidthComma`、`ideographicComma`，只控制标签列表输入框重新显示时的分隔符。`settings.search.normalization.customRules` 必须是数组，每条规则须有非空的 `canonical` 和非空的 `variants`，同一变体不能对应不同的标准形式；任何一条不合规都整次拒绝，返回 400 `invalid_search_normalization_rule`（规则无效时运行期会忽略全部自定义规则，所以不接受部分保存）。`settings.toolNavOrder` 与 `settings.entrySectionOrder` 由服务端保留合法项顺序、去掉重复与未知项并补齐缺项；未知 settings 字段原样保留。 |
 | `PUT` | `/api/dictionaries/:id/docs` | 保存语言文档 | `{ id, updatedAt, docs }` | 不做实体 ID 检查。 |
-| `PUT` | `/api/dictionaries/:id/morphology` | 完整替换形态模块 | `{ id, updatedAt, morphology }` | 保存形态函数、槽位、表、行列及格。可带删除确认或解除继承的行列映射。请求、校验及投影更新见[形态分配与保存](#形态分配与保存)。 |
+| `PUT` | `/api/dictionaries/:id/morphology` | 完整替换形态模块 | `{ id, updatedAt, morphology }` | 保存形态函数、槽位、表、行列及格。可带删除确认和按表的行列映射。请求、校验及投影更新见[形态分配与保存](#形态分配与保存)。 |
 | `PUT` | `/api/dictionaries/:id/settings/ipa` | 保存自动 IPA 设置 | `{ id, updatedAt, settings }` | 请求体是 `settings.ipa` 的字段，可另带 `ipaKeyboard`，两者在同一事务里写入 `settings`；不带时保留已有键盘。IPA 映射是按顺序保存的纯文本规则 `{ from, to, before, after }`，没有实体 ID，也不参与实体 ID 防撞。`syllable.vowels`、`onsetClusters`、`codaClusters`、`complexPhonemes` 都是字符串数组；写入字符串或含分隔符的数组项时，按空白、逗号、顿号拆开。 |
 | `POST` | `/api/dictionaries/:id/autosave` | 页面卸载时保存文档／已有语料 | `{ id, updatedAt, docs?, corpusItem? }` | `corpusItem` 为 `{ id, name, group, content }`，按 `PUT /corpus/items/:itemId` 保存。新草稿首次保存走 `POST /corpus/items`。请求至少须携带 `docs` 或带 `id` 的 `corpusItem`，否则返回 `invalid_autosave_payload`。 |
 
@@ -291,7 +291,8 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `invalid_morphology_slot` | 槽位无效或槽位中没有表。 |
 | `invalid_morphology_match_rule` | 匹配规则不合法。行级错误返回 `details.tableId/row/reason`，行号从 1 开始。 |
 | `invalid_morphology_shape` | 链顶表缺少行或列，或形态模块内的行列 ID 无效、重复。 |
-| `invalid_morphology_inheritance` | 继承目标、继承环、子表形状、改换父表或解除继承映射无效。 |
+| `invalid_morphology_inheritance` | 继承目标、继承环、子表形状或行列映射无效。 |
+| `morphology_coordinates_changed` | 409。行列映射对应的表版本已变化，`details.tableId` 指明受影响的表。 |
 | `invalid_morphology_cell` | 模板格的坐标、状态字段或 syncretism 引用无效，包括叠好继承才出现的引用环。 |
 | `morphology_references_in_use` | 409。删除表或行列会清除词条数据，须确认后重试。 |
 | `morphology_table_has_children` | 409。被删表仍有子表继承，`details` 为 `{ tableId, childTableIds }`。 |
@@ -519,7 +520,8 @@ morphologyTables: [{ tableId, notes, overrides: [Override], createdAt, updatedAt
 - 同一词条的表和行列身份保持稳定。移动表或调整显示顺序会重排搜索投影位置，修改标题、说明和行列标签只改模板。规则、格状态、轴的增删、所用函数或继承内容变化只重建涉及生效表的词条。更改分配规则或移动表到不同槽位时，用前后生效表定位受影响的词条。完全等同的规范化请求返回原 `updatedAt`。
 - 删除表或行列导致手动选择、叠加层或覆写丢失时，返回 409 `morphology_references_in_use`，整次不保存。`details` 为 `{ referenceCount, targets: [{ tableId, rowId?, columnId?, label, entryCount }], references }`。`targets` 按被删表或链顶表上的行列聚合，`entryCount` 按词条去重。`references` 是按词条位置取的前 50 条，包含 `{ entryId, lemma, tableId, rowId?, columnId?, reason }`。其中 `tableId` 是实际持有该配置的表，`reason` 为 `manual_table`、`overlay` 或 `override`。用户确认后，在请求外层带 `confirmReferenceRemoval: true` 和弹窗里显示的摘要 `confirmedReferences: { referenceCount, targets: [{ tableId, rowId?, columnId?, entryCount }] }`。服务端在保存事务里重算引用：与摘要一致时清理引用、保存模板并更新投影；不一致时整次不执行，返回新的 409 摘要；此时已没有要清除的引用则照常保存。缺少摘要、摘要格式不对，或未确认却带了摘要，返回 400 `invalid_morphology_payload`。仍被继承的表返回 `morphology_table_has_children`。
 - 为现有链顶新建父表时，在同一次提交中把原行列及其 ID 移交给新链顶。服务端用这些 ID 确认新链顶承接了原坐标，已有覆写继续使用相同的表和行列 ID。草稿同时增删行列时，被删除的坐标仍走删除确认。
-- 解除继承时，草稿将新链顶及后代的模板格和 syncretism 引用换到新行列 ID。请求外层带 `detachments: [{ tableId, rowIdMap, columnIdMap }]`，两个映射均为「原行列 ID → 新行列 ID」。`tableId` 在保存前后都须存在。通常它就是新的链顶。若同一草稿又在上方新建了父表，可以用链内保存前已存在的表作为 `tableId`。服务端用它找出保存前和提交后的链顶。每个新链顶只接收一份映射，每个新 ID 最多对应一个原 ID。来自同一原链的已有覆写据此重定位，未保留的坐标走删除确认。已有子表改指使用另一套已保存行列的链顶时须先单独保存解除继承。通过 API 给独立表改设已有父表时，原坐标的覆写按删除处理。见[形态分配计划](MORPHOLOGY_ASSIGNMENT_PLAN.md) 2.8。
+- 跨链设置父表和解除继承都用 `coordinateMappings: [{ tableId, expectedUpdatedAt, rowIdMap, columnIdMap }]`。草稿用当前行列顺序配对旧链和新链的轴，并为每张受影响的已保存表合成「已保存 ID → 本次提交后的 ID」。两端都要属于该表在相应版本的链顶，目标 ID 各自唯一。实际删除的轴省略对应，相关覆写走删除确认。服务端在同一事务里核对表的 `updatedAt`、重定位覆写、更新搜索投影并推进表版本。仅覆写坐标变化时也推进版本。版本不一致返回 409 `morphology_coordinates_changed`，整次不保存。模板格及 syncretism 引用的最终坐标随 `morphology` 提交。
+- `detachments: [{ tableId, rowIdMap, columnIdMap }]` 仍可用于解除继承。通过保存前后均存在的 `tableId` 确定两端链顶，对来自同一原链且落到该新链顶的表应用映射。新链顶须使用新轴。提交给同一张表的映射只使用一种字段。
 
 ### 标签登记表
 

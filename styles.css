@@ -3395,6 +3395,21 @@ span.pending-source {
   overflow-wrap: anywhere;
 }
 
+.morphology-parent-picker-notice {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-inline-start: 7px;
+  border-block-start: 1px solid var(--ui-border);
+}
+
+.morphology-parent-picker-notice > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .morphology-dirty-status {
   color: var(--ui-text-muted);
   font-size: 0.88rem;
@@ -3648,6 +3663,53 @@ span.pending-source {
 .morphology-table-card:focus-visible {
   outline: 2px solid var(--ui-focus);
   outline-offset: 2px;
+}
+
+.morphology-slot.morphology-parent-picker-slot {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.morphology-parent-picker-slot .morphology-slot-name {
+  overflow-wrap: anywhere;
+}
+
+.morphology-slot.morphology-parent-picker-slot .morphology-card-row {
+  grid-column: 1;
+}
+
+.morphology-parent-choice {
+  align-content: start;
+  color: var(--ui-text);
+  font: inherit;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.morphology-parent-choice:hover:not(:disabled) {
+  border-color: var(--ui-accent-hover);
+}
+
+.morphology-parent-choice:disabled {
+  background: var(--material-inset-background);
+  color: var(--ui-text-muted);
+  cursor: not-allowed;
+}
+
+.morphology-parent-choice-label {
+  justify-self: start;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  font-size: 0.84em;
+}
+
+[data-parent-choice="same-chain"] > .morphology-parent-choice-label {
+  background: var(--ui-success-badge-background);
+  color: var(--ui-success-badge-text);
+}
+
+[data-parent-choice="cross-chain"] > .morphology-parent-choice-label {
+  background: var(--ui-warning-badge-background);
+  color: var(--ui-warning-badge-text);
 }
 
 .morphology-table-card-head {

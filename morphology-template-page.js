@@ -39,7 +39,8 @@ function morphologyPageBase(dictionary) {
     saved,
     savedJson: stableJson(saved),
     draft: structuredClone(saved),
-    lineage: morphologyDraftModel().initialLineage(saved),
+    lineage: new Map(),
+    parentPickerTableId: "",
     undo: null,
     saving: false,
   };
@@ -61,7 +62,7 @@ function morphologyPageState(dictionary = activeDictionary()) {
 }
 
 function morphologyPageIsDirty(page) {
-  return morphologyDraftModel().draftIsDirty(page.draft, page.saved);
+  return morphologyDraftModel().draftIsDirty(page.draft, page.saved, page.lineage);
 }
 
 function morphologyTemplatesAreDirty(dictionary = activeDictionary()) {
@@ -91,6 +92,7 @@ async function confirmLeaveMorphologyTemplates() {
   if (page.trial.entryStatus === "loading") resetMorphologyTrialEntry(page);
   page.undo = null;
   page.pick = null;
+  page.parentPickerTableId = "";
   page.drawer = null;
   return true;
 }
@@ -269,10 +271,10 @@ function morphologyToolbarHtml(page) {
         `).join("")}
       </div>
       ${page.view === "structure" ? `<div class="morphology-toolbar-drawers">
-        <button class="morphology-toolbar-button" type="button" data-mtp-action="open-drawer" data-pane="trial" data-mtp-focus="drawer:trial" aria-haspopup="dialog" aria-controls="morphologyDrawer" aria-expanded="false">
+        <button class="morphology-toolbar-button" type="button" data-mtp-action="open-drawer" data-pane="trial" data-mtp-focus="drawer:trial" aria-haspopup="dialog" aria-controls="morphologyDrawer" aria-expanded="false"${page.parentPickerTableId ? " disabled" : ""}>
           <span>${escapeHtml(aText("试算", "Trial"))}</span><span class="morphology-toolbar-trial-summary" data-mtp-region="trial-summary" hidden></span>
         </button>
-        <button class="morphology-toolbar-button" type="button" data-mtp-action="open-drawer" data-pane="properties" data-mtp-focus="drawer:properties" aria-haspopup="dialog" aria-controls="morphologyDrawer" aria-expanded="false"${page.selectedTableId ? "" : " disabled"}>${escapeHtml(aText("属性", "Properties"))}</button>
+        <button class="morphology-toolbar-button" type="button" data-mtp-action="open-drawer" data-pane="properties" data-mtp-focus="drawer:properties" aria-haspopup="dialog" aria-controls="morphologyDrawer" aria-expanded="false"${page.selectedTableId && !page.parentPickerTableId ? "" : " disabled"}>${escapeHtml(aText("属性", "Properties"))}</button>
       </div>` : morphologyTableSelectHtml(page)}
     </div>
     <div class="morphology-toolbar-actions">
@@ -284,6 +286,10 @@ function morphologyToolbarHtml(page) {
       <span class="morphology-undo-message" role="status" data-mtp-region="undo-message"></span>
       <button class="morphology-toolbar-button" type="button" data-mtp-action="undo" data-mtp-focus="undo">${escapeHtml(aText("撤销", "Undo"))}</button>
     </div>
+    ${page.parentPickerTableId ? `<div class="morphology-parent-picker-notice">
+      <span role="status">${escapeHtml(aText(`为“${morphologyTableLabel(page.draft, page.parentPickerTableId)}”选择父表`, `Choose a parent for “${morphologyTableLabel(page.draft, page.parentPickerTableId)}”`))}</span>
+      <button class="morphology-toolbar-button" type="button" data-mtp-action="cancel-parent-picker" data-mtp-focus="parent-picker-cancel">${escapeHtml(t("cancel"))}</button>
+    </div>` : ""}
   </div>`;
 }
 
@@ -401,9 +407,11 @@ function morphologyFocusAfterRender(key) {
 // ---- Structure view ----------------------------------------------------------------------------
 
 function morphologyStructureViewHtml(page) {
-  const selected = page.selectedTableId ? morphologyDraftModel().findTable(page.draft, page.selectedTableId) : null;
+  const draftModel = morphologyDraftModel();
+  const selected = page.selectedTableId ? draftModel.findTable(page.draft, page.selectedTableId) : null;
+  const choices = page.parentPickerTableId ? draftModel.parentChoices(page.draft, page.parentPickerTableId) : null;
   return `<div class="morphology-structure">
-    <aside class="morphology-structure-rail">
+    <aside class="morphology-structure-rail"${choices ? " inert" : ""}>
       <section class="morphology-structure-trial" data-mtp-pane="trial" data-mtp-scroll="trial" aria-labelledby="morphologyTrialHeading">${morphologyTrialHtml(page)}</section>
       <section class="morphology-structure-properties" data-mtp-pane="properties" data-mtp-scroll="properties:${escapeHtml(page.selectedTableId)}" aria-labelledby="morphologyPropertiesHeading">
         ${morphologyPaneHeadingHtml("morphologyPropertiesHeading", aText("表格属性", "Table properties"))}
@@ -411,8 +419,8 @@ function morphologyStructureViewHtml(page) {
       </section>
     </aside>
     <section class="morphology-structure-slots" aria-label="${escapeHtml(aText("槽位", "Slots"))}">
-      <ol class="morphology-slot-list" data-mtp-region="slots">${morphologySlotListHtml(page)}</ol>
-      <button class="secondary-button additive-button" type="button" data-control-tone="accent" data-control-emphasis="outline" data-mtp-action="new-table" data-mtp-focus="new-table">${escapeHtml(aText("新建表格", "New table"))}</button>
+      <ol class="morphology-slot-list" data-mtp-region="slots">${morphologySlotListHtml(page, choices)}</ol>
+      ${choices ? "" : `<button class="secondary-button additive-button" type="button" data-control-tone="accent" data-control-emphasis="outline" data-mtp-action="new-table" data-mtp-focus="new-table">${escapeHtml(aText("新建表格", "New table"))}</button>`}
     </section>
     <dialog class="morphology-drawer" id="morphologyDrawer"></dialog>
   </div>`;
@@ -470,12 +478,18 @@ function closeMorphologyDrawer({ docked = false } = {}) {
   }
 }
 
-function morphologySlotListHtml(page) {
+function morphologySlotListHtml(page, choices) {
   if (!page.draft.slots.length) {
     return `<li class="morphology-slot-empty muted-text">${escapeHtml(aText("还没有形态表。", "No morphology tables yet."))}</li>`;
   }
   return page.draft.slots.map((slot, slotIndex) => {
     const multi = slot.tables.length > 1;
+    if (choices) {
+      return `<li class="morphology-slot morphology-parent-picker-slot${multi ? " is-competing" : ""}">
+        <span class="morphology-slot-name">${escapeHtml(slot.name || aText(`槽位 ${slotIndex + 1}`, `Slot ${slotIndex + 1}`))}</span>
+        <div class="morphology-card-row">${slot.tables.map((table) => morphologyParentChoiceHtml(table, choices.get(table.id))).join("")}</div>
+      </li>`;
+    }
     const handle = `<button class="morphology-drag-handle" type="button" draggable="true" data-mtp-drag="slot" data-mtp-action="slot-menu" data-mtp-focus="slot-handle:${escapeHtml(slot.id)}" aria-haspopup="menu" aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown" aria-label="${escapeHtml(aText(`槽位 ${slotIndex + 1}：拖动或按 Alt+方向键调整顺序`, `Slot ${slotIndex + 1}: drag or press Alt+arrow keys to reorder`))}" data-app-tooltip="always">⋮⋮</button>`;
     return `<li class="morphology-slot${multi ? " is-competing" : ""}" data-slot-id="${escapeHtml(slot.id)}">
       ${handle}
@@ -483,6 +497,22 @@ function morphologySlotListHtml(page) {
       <div class="morphology-card-row">${slot.tables.map((table) => morphologyCardHtml(page, table)).join("")}</div>
     </li>`;
   }).join("");
+}
+
+function morphologyParentChoiceHtml(table, choice) {
+  const labels = {
+    self: aText("正在设置的表", "Table being edited"),
+    descendant: aText("当前表的后代", "Descendant of this table"),
+    current: aText("当前父表", "Current parent"),
+    "different-size": aText("行列数不同", "Different number of rows or columns"),
+    "same-chain": aText("共用行列", "Shares rows and columns"),
+    "cross-chain": aText("跨链 · 按位置对应", "Different chain · Match by position"),
+  };
+  const selectable = choice === "same-chain" || choice === "cross-chain";
+  return `<button class="morphology-table-card morphology-parent-choice${choice === "self" ? " is-selected" : ""}" type="button" data-mtp-action="choose-parent" data-parent-choice="${choice}" data-target-table-id="${escapeHtml(table.id)}" data-mtp-focus="parent-choice:${escapeHtml(table.id)}"${selectable ? "" : " disabled"}>
+    <strong>${morphologyTableTitleHtml(table)}</strong>
+    <span class="morphology-parent-choice-label">${escapeHtml(labels[choice])}</span>
+  </button>`;
 }
 
 function morphologyCardHtml(page, table) {
@@ -892,6 +922,10 @@ function morphologyApply(result, { undoMessage = "", rerender = true, focus = ""
     return false;
   }
   page.draft = result.morphology;
+  if (result.lineage) {
+    page.lineage = result.lineage;
+    if (page.undo && !morphologyDraftModel().undoSurvivesCoordinateChange(page.undo.record, result.family)) page.undo = null;
+  }
   if (select) {
     page.selectedTableId = select;
     if (page.view === "structure" && morphologyStructureIsNarrow()) {
@@ -925,7 +959,7 @@ function morphologyCreateTable(slotId = null) {
 
 function morphologyReportOperationError(page, error) {
   if (error.kind === "cycle") {
-    const shape = morphologyDraftModel().rootTable(page.draft, error.tableId);
+    const shape = error.shape || morphologyDraftModel().rootTable(page.draft, error.tableId);
     showToast(aText(
       `会在“${morphologyTableLabel(page.draft, error.tableId)}”的 ${window.ConlexiconMorphology.morphologyCellLabel(shape, error.rowId, error.columnId)} 形成引用循环，未修改。`,
       `This would create a reference loop at ${window.ConlexiconMorphology.morphologyCellLabel(shape, error.rowId, error.columnId)} in “${morphologyTableLabel(page.draft, error.tableId)}”; nothing changed.`,
@@ -939,6 +973,7 @@ function morphologySelectTable(tableId, { view, focus, openDrawer = false } = {}
   const page = morphologyPageState();
   page.selectedTableId = tableId;
   page.pick = null;
+  page.parentPickerTableId = "";
   if (view) page.view = view;
   if (page.view === "structure" && openDrawer && morphologyStructureIsNarrow()) {
     page.drawer = { pane: "properties", returnFocus: `card:${tableId}` };
@@ -1020,12 +1055,6 @@ function morphologyUndo() {
 function morphologyDetach(tableId) {
   const page = morphologyPageState();
   const result = morphologyDraftModel().detachTable(page.draft, tableId, page.lineage);
-  if (result.error) {
-    morphologyReportOperationError(page, result.error);
-    return;
-  }
-  page.lineage = result.lineage;
-  if (page.undo && !morphologyDraftModel().undoSurvivesDetach(page.undo.record, result.family)) page.undo = null;
   morphologyApply(result, { focus: page.view === "structure" ? `card:${tableId}` : "table-title" });
 }
 
@@ -1101,19 +1130,15 @@ function openMorphologyCardMenu(card, event) {
       morphologyApply(result, { focus: "prop-title", select: result.tableId });
     },
   });
+  actions.push({
+    key: "parent",
+    label: aText("设置父表…", "Set parent…"),
+    handler: () => openMorphologyParentPicker(tableId),
+  });
   if (table.inheritsFrom) {
-    const candidates = draftModel.parentCandidates(page.draft, tableId).filter(({ id }) => id !== table.inheritsFrom);
-    actions.push({
-      key: "parent",
-      label: aText("改换父表…", "Change parent…"),
-      disabledReason: candidates.length ? "" : aText("同一继承链里没有其他可选的父表", "No other parent in this inheritance chain"),
-      handler: () => openMorphologyParentPicker(card, tableId, candidates),
-    });
-    const blocked = draftModel.detachBlockedReason(page.draft, page.saved, tableId);
     actions.push({
       key: "detach",
       label: aText("解除继承", "Detach from parent"),
-      disabledReason: blocked ? aText("先保存这层继承关系，再解除", "Save this inheritance first, then detach") : "",
       handler: () => morphologyDetach(tableId),
     });
   }
@@ -1145,14 +1170,57 @@ function openMorphologySlotPicker(card, tableId, slots) {
   }), { returnFocus: card });
 }
 
-function openMorphologyParentPicker(card, tableId, candidates) {
+function openMorphologyParentPicker(tableId) {
   const page = morphologyPageState();
-  const labels = new Map(morphologyTableChoices(page.draft).map(({ id, label }) => [id, label]));
-  showContextMenu(morphologyMenuPosition(null, card), aText("改换父表", "Change parent"), candidates.map((candidate) => ({
-    key: candidate.id,
-    label: labels.get(candidate.id),
-    handler: () => morphologyApply(morphologyDraftModel().changeParent(page.draft, tableId, candidate.id), { focus: page.view === "structure" ? `card:${tableId}` : "table-title" }),
-  })), { returnFocus: card });
+  page.selectedTableId = tableId;
+  page.parentPickerTableId = tableId;
+  page.drawer = null;
+  morphologyFocusAfterRender("parent-picker-cancel");
+  renderMorphologyTemplatePage();
+}
+
+function closeMorphologyParentPicker() {
+  const page = morphologyPageState();
+  const tableId = page.parentPickerTableId;
+  page.parentPickerTableId = "";
+  morphologyFocusAfterRender(`card:${tableId}`);
+  renderMorphologyTemplatePage();
+}
+
+async function morphologyChooseParent(parentId, choice) {
+  const page = morphologyPageState();
+  const tableId = page.parentPickerTableId;
+  const restoreChoiceFocus = () => {
+    if (page.parentPickerTableId === tableId) {
+      morphologyRestoreFocus(elements.morphologyTablesPanel, { key: `parent-choice:${parentId}` }, { preventScroll: true });
+    }
+  };
+  if (choice === "cross-chain") {
+    const draft = page.draft;
+    const source = morphologyTableLabel(draft, tableId);
+    const target = morphologyTableLabel(draft, parentId);
+    const confirmed = appConfirm(aText(
+      `“${source}”及其后代将采用“${target}”所在继承链的表头。行列按当前顺序对应，模板格和逐词覆写随坐标迁移。沿用父表的格会改用新父表的内容。`,
+      `“${source}” and its descendants will use the headers from “${target}”’s chain. Cells and entry overrides move by the current row and column positions. Inherited cells will use the new parent’s contents.`,
+    ), { title: aText("跨链设置父表", "Set a parent from another chain"), confirmText: aText("设置父表", "Set parent") });
+    const trap = (event) => trapFocusWithin(elements.confirmDialog, event);
+    elements.confirmDialog.addEventListener("keydown", trap);
+    elements.confirmCancelButton.focus();
+    const accepted = await confirmed;
+    elements.confirmDialog.removeEventListener("keydown", trap);
+    if (!accepted || page.draft !== draft || page.parentPickerTableId !== tableId) {
+      restoreChoiceFocus();
+      return;
+    }
+  }
+  const result = morphologyDraftModel().changeParent(page.draft, tableId, parentId, page.lineage);
+  if (result.error) {
+    morphologyReportOperationError(page, result.error);
+    restoreChoiceFocus();
+    return;
+  }
+  page.parentPickerTableId = "";
+  morphologyApply(result, { focus: `card:${tableId}` });
 }
 
 function openMorphologyAxisMenu(header, event) {
@@ -1453,6 +1521,7 @@ async function saveMorphologyTemplates() {
   const page = morphologyPageState(dictionary);
   const panel = elements.morphologyTablesPanel;
   const draftModel = morphologyDraftModel();
+  if (page.parentPickerTableId) closeMorphologyParentPicker();
   const problems = morphologyDraftProblems(page);
   if (problems.ruleErrors.length || problems.cycles.length || problems.cellErrors.length) {
     morphologyLocateProblem(problems);
@@ -1461,9 +1530,9 @@ async function saveMorphologyTemplates() {
   if (!morphologyPageIsDirty(page)) return true;
   const snapshot = {
     morphology: draftModel.morphologyForSave(page.draft),
-    detachments: draftModel.detachmentsForSave(page.draft, page.saved, page.lineage),
+    coordinateMappings: draftModel.coordinateMappingsForSave(page.draft, page.saved, page.lineage),
   };
-  const clearedTemplateReferences = draftModel.clearedTemplateReferenceCount(page.saved, page.draft);
+  const clearedTemplateReferences = draftModel.clearedTemplateReferenceCount(page.saved, page.draft, page.lineage);
   const focus = morphologyFocusSnapshot(panel);
   page.saving = true;
   panel.inert = true;
@@ -1771,6 +1840,7 @@ function handleMorphologyPageClick(event) {
     case "view":
       page.view = actionNode.dataset.viewName;
       page.pick = null;
+      page.parentPickerTableId = "";
       page.drawer = null;
       morphologyFocusAfterRender(`view:${page.view}`);
       renderMorphologyTemplatePage();
@@ -1790,6 +1860,12 @@ function handleMorphologyPageClick(event) {
       break;
     case "card-menu":
       openMorphologyCardMenu(card, event);
+      break;
+    case "choose-parent":
+      if (!actionNode.disabled) void morphologyChooseParent(tableId, actionNode.dataset.parentChoice);
+      break;
+    case "cancel-parent-picker":
+      closeMorphologyParentPicker();
       break;
     case "slot-menu":
       openMorphologySlotMenu(actionNode.closest("[data-slot-id]"), event);
@@ -1874,6 +1950,14 @@ function handleMorphologyPageKeydown(event) {
   const page = morphologyPageState();
   if (page.pick && handleMorphologyPickKeydown(event)) return;
   if (event.isComposing || event.keyCode === 229) return;
+  if (page.parentPickerTableId) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      closeMorphologyParentPicker();
+    }
+    return;
+  }
   const target = event.target;
   const drawer = target.closest(".morphology-drawer[open]");
   if (drawer && trapFocusWithin(drawer, event)) return;
@@ -1944,7 +2028,8 @@ function bindMorphologyTemplatePage() {
     }
   });
   panel.addEventListener("contextmenu", (event) => {
-    if (morphologyPageState().pick) {
+    const page = morphologyPageState();
+    if (page.pick || page.parentPickerTableId) {
       event.preventDefault();
       return;
     }

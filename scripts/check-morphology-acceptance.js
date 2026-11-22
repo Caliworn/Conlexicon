@@ -561,7 +561,7 @@ async function checkParentCreation(repository) {
   const snapshot = () => repository.getDictionarySnapshot(id);
   const save = (draft, saved, lineage) => callApi(repository, "PUT", `/api/dictionaries/${id}/morphology`, {
     morphology: draftModel.morphologyForSave(draft),
-    detachments: draftModel.detachmentsForSave(draft, saved, lineage),
+    coordinateMappings: draftModel.coordinateMappingsForSave(draft, saved, lineage),
   });
   const before = await snapshot();
   const db = repository.openDictionaryDatabase(id);
@@ -572,7 +572,7 @@ async function checkParentCreation(repository) {
   const beforeValues = projection.all();
   const aboveRoot = draftModel.createParentTable(before.morphology, parent.id);
   const aboveChild = draftModel.createParentTable(aboveRoot.morphology, child.id);
-  await save(aboveChild.morphology, before.morphology, draftModel.initialLineage(before.morphology));
+  await save(aboveChild.morphology, before.morphology, new Map());
 
   const after = await snapshot();
   const newRoot = findTable(after.morphology, aboveRoot.tableId);
@@ -594,7 +594,7 @@ async function checkParentCreation(repository) {
   // A second draft creates parents on either side of detachments. The saved overrides follow
   // the axes of their own family even when the table holding those axes was just created.
   const top = draftModel.createParentTable(after.morphology, newRoot.id);
-  const detachedRoot = draftModel.detachTable(top.morphology, newRoot.id, draftModel.initialLineage(after.morphology));
+  const detachedRoot = draftModel.detachTable(top.morphology, newRoot.id, new Map());
   const detachedChild = draftModel.detachTable(detachedRoot.morphology, child.id, detachedRoot.lineage);
   const detachedParent = draftModel.createParentTable(detachedChild.morphology, child.id);
   await save(detachedParent.morphology, after.morphology, detachedChild.lineage);
@@ -604,7 +604,7 @@ async function checkParentCreation(repository) {
     const finalEntry = composed.entries.find(({ id: entryId }) => entryId === entry.id);
     const expected = entry.morphologyTables.map((table) => {
       const shape = resolver.tableShape(table.tableId);
-      const carry = (axis, original) => shape[axis].find(({ id: current }) => detachedChild.lineage[current] === original).id;
+      const carry = (axis, original) => shape[axis].find(({ id: current }) => detachedChild.lineage.get(table.tableId).get(current) === original).id;
       return {
         ...table,
         overrides: table.overrides.map((cell) => ({
@@ -614,6 +614,88 @@ async function checkParentCreation(repository) {
     });
     assert.deepEqual(finalEntry.morphologyTables, expected);
   }
+  assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
+}
+
+async function checkCrossChainParentSave(repository) {
+  const { morphology, parent, child, grandchild } = inheritedMorphology();
+  const target = morphologyTableFixture("other-chain", {
+    rowLabels: ["X", "Y", "Z"], columnLabels: ["I", "II", "III"], sources: [["{}-other"]],
+  });
+  const emptyChild = { id: "empty-child", inheritsFrom: target.id, cells: [] };
+  morphology.slots.push(slot("other-slot", target, emptyChild));
+  child.cells.push(refer(parent, 1, 2, 0, 0));
+  const id = "dict-morphology-cross-chain";
+  const { dictionary } = importDictionaryFromJsonPayload({
+    id, name: "Cross-chain parent change", morphology,
+    entries: [
+      { id: "active", lemma: "sample", morphologyMode: "manual", morphologyTables: [
+        { tableId: parent.id, overrides: [morphologyFormOverride(parent, 1, 2, "source")] },
+        { tableId: child.id, overrides: [morphologyFormOverride(parent, 1, 2, "child")] },
+        { tableId: target.id, overrides: [morphologyFormOverride(target, 0, 0, "target")] },
+        { tableId: emptyChild.id, overrides: [morphologyFormOverride(target, 0, 0, "round-trip")] },
+      ] },
+      { id: "dormant", lemma: "dormant", morphologyTables: [
+        { tableId: grandchild.id, notes: "Dormant override", overrides: [absent(parent, 1, 2)] },
+      ] },
+    ],
+  });
+  await repository.importDictionarySnapshot(dictionary);
+  const snapshot = () => repository.getDictionarySnapshot(id);
+  const put = (body) => callApi(repository, "PUT", `/api/dictionaries/${id}/morphology`, body);
+  const body = (draft, saved, lineage) => ({
+    morphology: draftModel.morphologyForSave(draft),
+    coordinateMappings: draftModel.coordinateMappingsForSave(draft, saved, lineage),
+  });
+  const override = (current, entryId, tableId) => current.entries.find((entry) => entry.id === entryId)
+    .morphologyTables.find((table) => table.tableId === tableId).overrides[0];
+  const before = await snapshot();
+  const draftedRows = draftModel.moveAxisItem(before.morphology, parent.id, "rows", parent.rows[1].id, 0).morphology;
+  const draftedAxes = draftModel.moveAxisItem(draftedRows, parent.id, "columns", parent.columns[2].id, 0).morphology;
+  const moved = draftModel.changeParent(draftedAxes, child.id, target.id, new Map());
+  const next = draftModel.moveAxisItem(moved.morphology, target.id, "rows", target.rows[0].id, 2).morphology;
+  const request = body(next, before.morphology, moved.lineage);
+  assert.deepEqual(request.coordinateMappings.map(({ tableId }) => tableId), [child.id, grandchild.id]);
+  await assert.rejects(put({ morphology: request.morphology }), expectApiError("invalid_morphology_inheritance"));
+  const invalid = structuredClone(request);
+  invalid.coordinateMappings[0].rowIdMap[parent.rows[0].id] = target.rows[0].id;
+  await assert.rejects(put(invalid), expectApiError("invalid_morphology_inheritance"));
+  assert.deepEqual((await snapshot()).entries, before.entries, "invalid mappings do not move overrides");
+  await put(request);
+  const after = await snapshot();
+  const movedCell = at(target, 0, 0);
+  assert.deepEqual(override(after, "active", child.id), { ...movedCell, kind: "form", value: "child" });
+  assert.deepEqual(override(after, "dormant", grandchild.id), { ...movedCell, kind: "absent" });
+  assert.deepEqual(override(after, "active", parent.id), override(before, "active", parent.id));
+  assert.deepEqual(override(after, "active", target.id), override(before, "active", target.id));
+  assert.deepEqual(findTable(after.morphology, child.id).cells.find(({ kind }) => kind === "refer"), refer(target, 0, 0, 1, 1));
+  const db = repository.openDictionaryDatabase(id);
+  const projected = db.prepare(`
+    SELECT raw_value AS value, template_table_id AS tableId, row_id AS rowId, column_id AS columnId, position AS sourcePosition
+    FROM entry_morphology_search_values WHERE entry_id = ? ORDER BY position
+  `);
+  assert.deepEqual(projected.all("active").map((row) => ({ ...row })), morphologySearchValueRecords(after.entries[0], after));
+
+  // A round trip with a reorder in between can move overrides even when the final template is identical.
+  const across = draftModel.changeParent(after.morphology, emptyChild.id, parent.id, new Map());
+  const reordered = draftModel.moveAxisItem(across.morphology, parent.id, "rows", parent.rows[1].id, 2).morphology;
+  const returned = draftModel.changeParent(reordered, emptyChild.id, target.id, across.lineage);
+  const restored = draftModel.moveAxisItem(returned.morphology, parent.id, "rows", parent.rows[1].id, 0).morphology;
+  const savedModule = draftModel.normalizedDraft(after.morphology);
+  assert.equal(draftModel.draftIsDirty(restored, savedModule), false);
+  assert.equal(draftModel.draftIsDirty(restored, savedModule, returned.lineage), true);
+  const roundTrip = body(restored, after.morphology, returned.lineage);
+  await put(roundTrip);
+  const saved = await snapshot();
+  assert.equal(override(saved, "active", emptyChild.id).rowId, target.rows[2].id);
+  await assert.rejects(put(roundTrip), expectApiError("morphology_coordinates_changed", 409));
+  assert.deepEqual((await snapshot()).entries, saved.entries, "retry leaves the saved coordinate move applied once");
+
+  const adoptedRoot = draftModel.changeParent(saved.morphology, parent.id, target.id, new Map());
+  await put(body(adoptedRoot.morphology, saved.morphology, adoptedRoot.lineage));
+  const final = await snapshot();
+  assert.deepEqual(override(final, "active", parent.id), { ...at(target, 1, 0), kind: "form", value: "source" });
+  assert.deepEqual(override(final, "active", child.id), override(after, "active", child.id));
   assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
 }
 
@@ -634,22 +716,21 @@ async function checkDraftDetachmentSave(repository) {
   });
   await repository.importDictionarySnapshot(dictionary);
   const saved = (await repository.getDictionarySnapshot(id)).morphology;
-  let lineage = draftModel.initialLineage(saved);
-  const first = draftModel.detachTable(saved, child.id, lineage);
+  const first = draftModel.detachTable(saved, child.id, new Map());
   const second = draftModel.detachTable(first.morphology, grandchild.id, first.lineage);
-  lineage = second.lineage;
+  const lineage = second.lineage;
   let next = draftModel.insertAxisItem(second.morphology, grandchild.id, "rows", 0).morphology;
   const grandchildTable = () => draftModel.findTable(next, grandchild.id);
   next = draftModel.moveAxisItem(next, grandchild.id, "columns", grandchildTable().columns.at(-1).id, 0).morphology;
-  const carried = (axis, savedId) => grandchildTable()[axis].find(({ id: current }) => lineage[current] === savedId).id;
+  const carried = (axis, savedId) => grandchildTable()[axis].find(({ id: current }) => lineage.get(grandchild.id).get(current) === savedId).id;
   next = draftModel.removeAxisItem(next, grandchild.id, "rows", carried("rows", parent.rows[1].id)).morphology;
   await callApi(repository, "PUT", `/api/dictionaries/${id}/morphology`, {
     morphology: draftModel.morphologyForSave(next),
-    detachments: draftModel.detachmentsForSave(next, saved, lineage),
+    coordinateMappings: draftModel.coordinateMappingsForSave(next, saved, lineage),
   });
   const entry = await repository.getEntry(id, "chained");
   const childTable = draftModel.findTable(next, child.id);
-  const childCarried = (axis, savedId) => childTable[axis].find(({ id: current }) => lineage[current] === savedId).id;
+  const childCarried = (axis, savedId) => childTable[axis].find(({ id: current }) => lineage.get(child.id).get(current) === savedId).id;
   assert.deepEqual(entry.morphologyTables.map(({ overrides }) => overrides.map(({ rowId, columnId, value }) => [rowId, columnId, value])), [
     [[childCarried("rows", parent.rows[0].id), childCarried("columns", parent.columns[1].id), "child-a"]],
     [[carried("rows", parent.rows[2].id), carried("columns", parent.columns[2].id), "grand-c"]],
@@ -670,6 +751,7 @@ async function runMorphologyAcceptanceCheck() {
     await checkLegacyConversion(repository, dataDir);
     await checkStorageAndReferences(repository);
     await checkParentCreation(repository);
+    await checkCrossChainParentSave(repository);
     await checkDraftDetachmentSave(repository);
     await checkOldDatabaseIsOpenedWithoutWrites(repository);
   } finally {

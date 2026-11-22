@@ -35,6 +35,8 @@ body[data-ui-skin="liquid-glass"] {
   --ui-warning-tag-background: rgba(255, 239, 204, 0.88);
   --ui-warning-badge-background: rgba(255, 244, 215, 0.92);
   --ui-warning-badge-text: #805300;
+  --ui-success-badge-background: rgba(220, 246, 230, 0.9);
+  --ui-success-badge-text: #235c40;
   --ui-danger: #b43f46;
   --ui-danger-soft: rgba(250, 226, 229, 0.88);
   --ui-focus: var(--ui-field-focus);
@@ -187,6 +189,8 @@ body.dark-theme[data-ui-skin="liquid-glass"] {
   --ui-warning-tag-background: rgba(63, 50, 24, 0.88);
   --ui-warning-badge-background: rgba(63, 50, 24, 0.94);
   --ui-warning-badge-text: #ffd36f;
+  --ui-success-badge-background: rgba(31, 61, 47, 0.92);
+  --ui-success-badge-text: #bce8cc;
   --ui-danger: #ee7c84;
   --ui-danger-soft: rgba(62, 34, 38, 0.9);
   --ui-focus: var(--ui-field-focus);

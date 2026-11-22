@@ -145,26 +145,47 @@ function checkInheritanceAndDetachment() {
   const saved = baseMorphology();
   const withGrandchild = draftModel.createChildTable(saved, "child", options);
   const grandchildId = withGrandchild.tableId;
-  assert.deepEqual(draftModel.parentCandidates(withGrandchild.morphology, "child").map(({ id }) => id), ["root"]);
-  assert.deepEqual(draftModel.parentCandidates(withGrandchild.morphology, grandchildId).map(({ id }) => id), ["root", "child"]);
-  assert.equal(draftModel.detachBlockedReason(withGrandchild.morphology, saved, grandchildId), "");
+  const childChoices = draftModel.parentChoices(withGrandchild.morphology, "child");
+  assert.equal(childChoices.get("root"), "current");
+  assert.equal(childChoices.get("child"), "self");
+  assert.equal(childChoices.get(grandchildId), "descendant");
+  assert.equal(childChoices.get("other"), "different-size");
+  assert.equal(draftModel.parentChoices(withGrandchild.morphology, grandchildId).get("root"), "same-chain");
 
-  let lineage = draftModel.initialLineage(saved);
-  const first = draftModel.detachTable(saved, "child", lineage, options);
-  lineage = first.lineage;
+  const first = draftModel.detachTable(saved, "child", new Map(), options);
   const childShape = draftModel.findTable(first.morphology, "child");
   assert.equal(childShape.inheritsFrom, null);
   assert.equal(childShape.cells.length, 4, "the detached table copies what it inherited");
-  const detachments = draftModel.detachmentsForSave(first.morphology, saved, lineage);
-  assert.deepEqual(Object.keys(detachments[0].rowIdMap), ["r1", "r2", "r3"]);
+  const mappings = draftModel.coordinateMappingsForSave(first.morphology, saved, first.lineage);
+  assert.deepEqual(Object.keys(mappings[0].rowIdMap), ["r1", "r2", "r3"]);
 
-  // A saved child moved under a new child blocks detaching that new child until saved.
+  // A new parent can detach in the same draft because mappings follow its saved children.
   const newParent = draftModel.createChildTable(saved, "root", options);
   const moved = draftModel.changeParent(newParent.morphology, "child", newParent.tableId).morphology;
-  assert.equal(draftModel.detachBlockedReason(moved, saved, newParent.tableId), "save_first");
+  const detachedNewParent = draftModel.detachTable(moved, newParent.tableId, new Map(), options);
+  const childMapping = draftModel.coordinateMappingsForSave(detachedNewParent.morphology, saved, detachedNewParent.lineage);
+  assert.deepEqual(childMapping.map(({ tableId }) => tableId), ["child"]);
+  assert.equal(childMapping[0].rowIdMap.r1, draftModel.rootTable(detachedNewParent.morphology, "child").rows[0].id);
 
-  assert.ok(draftModel.undoSurvivesDetach({ type: "fillAxis", tableId: "other" }, first.family));
-  assert.ok(!draftModel.undoSurvivesDetach({ type: "fillAxis", tableId: "child" }, first.family));
+  assert.ok(draftModel.undoSurvivesCoordinateChange({ type: "fillAxis", tableId: "other" }, first.family));
+  assert.ok(!draftModel.undoSurvivesCoordinateChange({ type: "fillAxis", tableId: "child" }, first.family));
+}
+
+function checkCrossChainReferenceCycle() {
+  const saved = baseMorphology();
+  const other = draftModel.findTable(saved, "other");
+  other.rows = ["a", "b", "c"].map((id) => ({ id, label: "" }));
+  other.columns = ["left", "right"].map((id) => ({ id, label: "" }));
+  other.cells = [{ rowId: "a", columnId: "left", kind: "refer", targetRowId: "b", targetColumnId: "left" }];
+  const child = draftModel.findTable(saved, "child");
+  child.cells.push({ rowId: "r2", columnId: "c1", kind: "refer", targetRowId: "r1", targetColumnId: "c1" });
+  const choices = draftModel.parentChoices(saved, child.id);
+  assert.equal(choices.get(other.id), "cross-chain");
+  const moved = draftModel.changeParent(saved, child.id, other.id, new Map());
+  assert.equal(moved.error.kind, "cycle");
+  assert.equal(moved.error.tableId, child.id);
+  assert.equal(moved.error.shape.id, other.id, "the cycle error names coordinates in the proposed parent shape");
+  assert.equal(child.inheritsFrom, "root", "a cycle leaves the branch and its coordinates in the original chain");
 }
 
 function checkParentCreationKeepsAxisUndo() {
@@ -237,6 +258,7 @@ checkUndoCycleConflict();
 checkTableDeletionUndo();
 checkFillAndCells();
 checkInheritanceAndDetachment();
+checkCrossChainReferenceCycle();
 checkParentCreationKeepsAxisUndo();
 checkRulesAndPayload();
 checkSlotArrangement();
