@@ -125,6 +125,15 @@ body {
   overscroll-behavior: none;
 }
 
+/* Pages whose header switches content in place keep the scrollbar's space, so switching between
+   a short and a long view does not shift the header controls. Narrow layouts scroll the
+   workspace instead of the page. */
+@media (min-width: 800px) {
+  html:has(.view.active > .top-bar .segmented-control) {
+    scrollbar-gutter: stable;
+  }
+}
+
 body {
   margin: 0;
   min-width: 0;
@@ -458,6 +467,152 @@ body.english-locale .brand-row h1 {
 .top-bar {
   min-height: var(--view-header-min-height);
   margin-bottom: var(--view-header-gap);
+}
+
+/* ---- Sticky view headers ----
+   A view whose top bar holds controls needed while scrolling marks it data-sticky-header. The
+   bar sticks on the page's own background, so it reads as part of the page, and content
+   scrolling under it fades out like the entry list's edges. When the controls wrap below the
+   title, measureStickyViewHeader() gives the bar a negative offset so the title scrolls away
+   and only the controls stick, and publishes the stuck height as --sticky-header-height on the
+   view for sidebars that stick below it. The padding moves the workspace gutter inside the
+   bar, so the resting layout is unchanged and a stuck bar keeps the gutter above it. */
+.view:has(> .top-bar[data-sticky-header]) {
+  container: page-view / inline-size;
+}
+
+.top-bar[data-sticky-header] {
+  --sticky-header-fade: 12px;
+  position: sticky;
+  inset-block-start: var(--sticky-header-offset, 0px);
+  z-index: 6;
+  row-gap: 8px;
+  min-height: calc(var(--view-header-min-height) + var(--workspace-gutter) + 8px);
+  margin: calc(-1 * var(--workspace-gutter)) calc(-1 * var(--workspace-gutter)) max(var(--sticky-header-fade), calc(var(--view-header-gap) - 8px));
+  padding: var(--workspace-gutter) var(--workspace-gutter) 8px;
+  background: var(--ui-page-background);
+  background-attachment: fixed;
+}
+
+/* The fade repaints the page background, so it is invisible while nothing is beneath it; the
+   gap below the bar is at least as tall, which keeps it off the content at rest. */
+.top-bar[data-sticky-header]::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 100%;
+  block-size: var(--sticky-header-fade);
+  background: var(--ui-page-background);
+  background-attachment: fixed;
+  -webkit-mask-image: linear-gradient(to bottom, black, transparent);
+  mask-image: linear-gradient(to bottom, black, transparent);
+  pointer-events: none;
+}
+
+/* Controls a view renders into its top bar. They are the page's own controls, so narrow
+   layouts keep them (plain .top-actions hide below 800px); rows that only some states show
+   take a full line below the title and actions. */
+.view-header-tools:not([hidden]) {
+  display: contents;
+}
+
+.view-header-tools .top-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.view-header-row:not([hidden]) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.view-header-row:empty {
+  display: none;
+}
+
+.view-header-row > button {
+  flex: none;
+}
+
+.view-header-switch > button {
+  white-space: nowrap;
+}
+
+.view-header-switch-count {
+  margin-inline-start: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Narrow layouts stretch .top-actions buttons; an info button keeps its round size. */
+.view-header-tools .top-actions .info-button {
+  flex: none;
+}
+
+/* ---- Side lists ----
+   A column of choices beside a page's main content, such as the morphology table list and the
+   quality categories. The selected row keeps its weight, so it wraps exactly like before. */
+.page-side-list,
+.page-side-list ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.page-side-list-group > span {
+  display: block;
+  margin: 8px 0 2px;
+  color: var(--ui-text-muted);
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.page-side-list-group ul {
+  padding-inline-start: 8px;
+}
+
+.page-side-list-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ui-text);
+  font-weight: 700;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.page-side-list-item:hover:not(:disabled) {
+  background: var(--material-inset-background);
+}
+
+.page-side-list-item.active {
+  background: color-mix(in srgb, var(--ui-accent) 14%, transparent);
+  box-shadow: inset 3px 0 0 var(--ui-accent);
+  color: var(--ui-accent-hover);
+}
+
+.page-side-list-item:disabled {
+  color: var(--ui-text-muted);
+  cursor: not-allowed;
+}
+
+.page-side-list-count {
+  flex: none;
+  color: var(--ui-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.page-side-list-item.active .page-side-list-count {
+  color: inherit;
 }
 
 .content-grid {
@@ -3258,70 +3413,12 @@ span.pending-source {
 /* ---- Template page ---- */
 
 .morphology-template-page {
-  --morphology-rail-top: calc(var(--morphology-header-height, 0px) + 12px);
+  --morphology-rail-top: calc(var(--sticky-header-height, 0px) + 12px);
   --morphology-rail-height: calc(var(--morphology-workspace-height, 100dvh) - var(--morphology-rail-top) - 12px);
   display: grid;
   gap: 16px;
   min-width: 0;
   container-type: inline-size;
-}
-
-/* The view's top bar holds the page controls and sticks on the page's own background, so it
-   reads as part of the page. When the controls wrap below the title, a negative offset lets the
-   title scroll away and only the controls stick. The padding moves the workspace gutter inside
-   the bar, so the resting layout is unchanged and a stuck bar keeps the gutter above it. */
-#morphologyTablesView {
-  container: morphology-view / inline-size;
-}
-
-.top-bar.morphology-top-bar {
-  --morphology-header-fade: 12px;
-  position: sticky;
-  inset-block-start: var(--morphology-header-offset, 0px);
-  z-index: 6;
-  row-gap: 8px;
-  min-height: calc(var(--view-header-min-height) + var(--workspace-gutter) + 8px);
-  margin: calc(-1 * var(--workspace-gutter)) calc(-1 * var(--workspace-gutter)) max(var(--morphology-header-fade), calc(var(--view-header-gap) - 8px));
-  padding: var(--workspace-gutter) var(--workspace-gutter) 8px;
-  background: var(--ui-page-background);
-  background-attachment: fixed;
-}
-
-/* Content scrolling under the bar fades out like the entry list's edges. The fade repaints the
-   page background, so it is invisible while nothing is beneath it; the gap below the bar is at
-   least as tall, which keeps it off the content at rest. */
-.top-bar.morphology-top-bar::after {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  inset-block-start: 100%;
-  block-size: var(--morphology-header-fade);
-  background: var(--ui-page-background);
-  background-attachment: fixed;
-  -webkit-mask-image: linear-gradient(to bottom, black, transparent);
-  mask-image: linear-gradient(to bottom, black, transparent);
-  pointer-events: none;
-}
-
-.morphology-header-tools:not([hidden]) {
-  display: contents;
-}
-
-.top-bar .morphology-page-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.morphology-header-row:not([hidden]) {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-width: 0;
-}
-
-.morphology-header-row:empty {
-  display: none;
 }
 
 .morphology-header-drawers [data-pane="trial"] {
@@ -3366,17 +3463,13 @@ span.pending-source {
   overflow-y: auto;
 }
 
-.morphology-header-row > button {
-  flex: none;
-}
-
 .morphology-dirty-status {
   color: var(--ui-text-muted);
   font-size: 0.88rem;
 }
 
-@container morphology-view (width >= 760px) {
-  .morphology-header-row:is(.morphology-header-drawers, .morphology-header-table-select) {
+@container page-view (width >= 760px) {
+  .view-header-row:is(.morphology-header-drawers, .morphology-header-table-select) {
     display: none;
   }
 }
@@ -4024,49 +4117,6 @@ span.pending-source {
     overflow: auto;
     overscroll-behavior: contain;
   }
-}
-
-.morphology-table-list ul {
-  display: grid;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.morphology-table-list-group > span {
-  display: block;
-  margin: 8px 0 2px;
-  color: var(--ui-text-muted);
-  font-size: 0.8rem;
-  font-weight: 900;
-}
-
-.morphology-table-list-group ul {
-  padding-inline-start: 8px;
-}
-
-.morphology-table-list-item {
-  width: 100%;
-  padding: 6px 10px;
-  border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--ui-text);
-  font-weight: 700;
-  text-align: start;
-  overflow-wrap: anywhere;
-}
-
-.morphology-table-list-item:hover {
-  background: var(--material-inset-background);
-}
-
-/* Selection never changes the weight, so a selected title wraps exactly like before. */
-.morphology-table-list-item.active {
-  background: color-mix(in srgb, var(--ui-accent) 14%, transparent);
-  box-shadow: inset 3px 0 0 var(--ui-accent);
-  color: var(--ui-accent-hover);
 }
 
 .morphology-table-editor {
@@ -5186,7 +5236,7 @@ span.pending-source {
 
 .tag-display-panel {
   position: sticky;
-  top: 24px;
+  top: calc(var(--sticky-header-height, 0px) + 12px);
   align-self: start;
 }
 
@@ -5954,32 +6004,19 @@ span.pending-source {
   justify-self: start;
 }
 
-.analysis-panel,
-.analysis-tab-panel {
+.analysis-panel {
   display: grid;
   gap: 18px;
   min-width: 0;
   max-width: 100%;
 }
 
-.analysis-page-tabs,
 .analysis-subpage-tabs {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.analysis-subpage-tab-groups {
-  display: grid;
-  gap: 10px;
-}
-
-.analysis-subpage-tab-group {
-  display: grid;
-  gap: 6px;
-}
-
-.analysis-subpage-tab-group > span,
 .analysis-filter-group > span {
   color: var(--ui-text-muted);
   font-size: 0.76rem;
@@ -5987,48 +6024,96 @@ span.pending-source {
   letter-spacing: 0.02em;
 }
 
-.analysis-page-tabs button,
 .analysis-subpage-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   border: 1px solid var(--material-control-border);
   border-radius: var(--radius-control);
   background: var(--material-control-background);
   color: var(--ui-text-muted);
   font: inherit;
-  font-size: 0.84rem;
-  font-weight: 900;
-  padding: 9px 12px;
-}
-
-.analysis-subpage-tabs button {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 7px 10px;
   font-size: 0.78rem;
+  font-weight: 900;
+  padding: 7px 10px;
 }
 
-.analysis-subpage-tabs button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
+/* Analysis pages: five segments in the header, a dropdown where they may not fit. */
+#analysisView {
+  container: page-view / inline-size;
 }
 
-.analysis-tab-count {
-  display: inline-grid;
-  place-items: center;
-  min-width: 22px;
-  min-height: 22px;
-  border-radius: var(--radius-pill);
-  padding: 0 6px;
-  background: var(--material-inset-background);
-  color: var(--ui-text-muted);
-  font-size: 0.72rem;
-  font-weight: 950;
-  line-height: 1;
+.analysis-page-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 360px;
 }
 
-.analysis-subpage-tabs button.active .analysis-tab-count {
-  background: var(--material-panel-background);
-  color: var(--ui-accent-hover);
+.analysis-page-select select {
+  width: 100%;
+}
+
+@container page-view (width < 480px) {
+  .top-actions.analysis-page-actions {
+    display: none;
+  }
+}
+
+@container page-view (width >= 480px) {
+  .view-header-row.analysis-page-select-row {
+    display: none;
+  }
+}
+
+/* Quality check: categories of the current source in a side list that sticks below the header,
+   or a dropdown in the header on narrow pages. */
+.quality-layout {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.quality-category-rail {
+  display: none;
+}
+
+/* The entry-list action and its explanation sit at the end of the issue card's header. */
+.quality-entry-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+.quality-category-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 360px;
+}
+
+.quality-category-select select {
+  width: 100%;
+}
+
+@container page-view (width >= 760px) {
+  .quality-layout {
+    grid-template-columns: 200px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .quality-category-rail {
+    position: sticky;
+    inset-block-start: calc(var(--sticky-header-height, 0px) + 12px);
+    display: block;
+    max-block-size: calc(100dvh - var(--sticky-header-height, 0px) - 24px);
+    padding: 3px;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  .view-header-row.quality-category-select-row {
+    display: none;
+  }
 }
 
 .analysis-page-body {
@@ -6053,38 +6138,6 @@ span.pending-source {
 .analysis-filter-group > span {
   min-width: 84px;
   padding-top: 9px;
-}
-
-.analysis-quality-current {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-  min-width: 0;
-  margin-top: -2px;
-}
-
-.analysis-quality-current strong {
-  font-size: 0.86rem;
-}
-
-.analysis-quality-current > span {
-  color: var(--ui-text-muted);
-  font-size: 0.78rem;
-  font-weight: 800;
-}
-
-.analysis-quality-view-button {
-  min-height: 34px;
-  padding: 7px 11px;
-  font-size: 0.82rem;
-  margin-left: 2px;
-}
-
-.analysis-quality-view-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.52;
 }
 
 .analysis-grid {
@@ -8749,13 +8802,13 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
     padding: var(--workspace-gutter) var(--workspace-gutter) 24px;
   }
 
-  /* Sticky offsets start inside the scroller's padding, so the top bar carries the top gutter
-     itself and sticks flush to the app bar. */
-  .workspace:has(> #morphologyTablesView.active) { padding-block-start: 0; }
+  /* Sticky offsets start inside the scroller's padding, so a sticky view header carries the
+     top gutter itself and sticks flush to the app bar. */
+  .workspace:has(> .view.active > .top-bar[data-sticky-header]) { padding-block-start: 0; }
 
-  .top-bar.morphology-top-bar {
+  .top-bar[data-sticky-header] {
     min-height: 0;
-    margin-block: 0 var(--morphology-header-fade);
+    margin-block: 0 var(--sticky-header-fade);
   }
 
   .entry-display {

@@ -205,7 +205,7 @@ body[data-ui-skin="layered-glass"] {
 
 body[data-ui-skin="layered-glass"] :is(.primary-button, .secondary-button, .danger-button, .danger-ghost, .icon-button),
 body[data-ui-skin="layered-glass"] .tool-button .tool-label,
-body[data-ui-skin="layered-glass"] :is(.analysis-page-tabs, .analysis-subpage-tabs) button,
+body[data-ui-skin="layered-glass"] .analysis-subpage-tabs button,
 body[data-ui-skin="layered-glass"] .entry-card-header > small,
 body[data-ui-skin="layered-glass"] .entry-filter-part-chip {
   font-weight: 400;

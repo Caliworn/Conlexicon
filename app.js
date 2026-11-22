@@ -174,6 +174,7 @@ const defaultAnalysisViewState = {
 };
 const defaultQualityViewState = {
   subpage: "issues",
+  subpageBySource: {},
   scrollBySubpage: {},
 };
 const analysisViewStates = new Map();
@@ -532,10 +533,8 @@ const i18n = {
     cycleActiveFilter: "切换筛选条件",
     qualityFilterInfo: "查看质量筛选说明",
     qualityFilterInfoTitle: "质量筛选说明",
-    qualityFilterInfoBody: "点击质量类别按钮只会切换本页显示的问题列表；点击“在词条列表查看”才会将当前质量类别用作词条筛选，并在词条列表中查看全部相关词条。词条卡片下方会显示对应的问题类型，悬浮可查看具体问题。按优先度筛选会在全部、高、中、低之间循环；按检查模块筛选会在词形、标签、IPA、词源网络、Glossed 例句和其他问题之间循环。",
-    qualityCurrentCategory: "当前类别",
+    qualityFilterInfoBody: "左侧的分类（窄屏时为页头的下拉框）只切换本页显示的问题。点“在词条列表查看”会按当前分类筛选词条，在词条列表里列出所有相关词条；词条卡片下方显示问题类型，悬浮可查看具体问题。在词条列表里，筛选栏的“切换筛选条件”按钮在当前分类所在的组内依次切换：按优先度为全部问题、高、中、低优先级，按检查模块为词形问题、标签问题、IPA、词源网络和其他问题，没有问题的分类会跳过。",
     viewQualityEntries: "在词条列表查看",
-    qualityEntryCount: "个词条",
     sortLemmaAsc: "首字母正序",
     sortLemmaDesc: "首字母倒序",
     sortUpdatedAsc: "编辑时间正序",
@@ -1164,10 +1163,8 @@ const i18n = {
     cycleActiveFilter: "Cycle Filter Condition",
     qualityFilterInfo: "Show quality filter help",
     qualityFilterInfoTitle: "Quality filter help",
-    qualityFilterInfoBody: "Click a quality category button to switch the issue list shown on this page. Click “View in Entry List” to use the current quality category as the entry filter and review all related entries in the list. Entry cards show the matching issue types below the card; hover them to see the concrete issue. Priority filters cycle between all, high, medium, and low priority. Module filters cycle between word-form, tag, IPA, etymology network, Glossed example, and other issues.",
-    qualityCurrentCategory: "Current Category",
+    qualityFilterInfoBody: "The categories on the left (a dropdown in the header on narrow screens) only switch the issues shown on this page. “View in Entry List” filters the entry list by the current category and lists every affected entry; entry cards show the issue types below the card, and hovering one shows the exact issue. In the entry list, the filter bar’s Cycle Filter Condition button steps through the current category’s group: All Issues, High, Medium, and Low for priority; Word Forms, Tags, IPA, Etymology, and Other for check modules. Categories without issues are skipped.",
     viewQualityEntries: "View in Entry List",
-    qualityEntryCount: "entries",
     sortLemmaAsc: "Lemma A-Z",
     sortLemmaDesc: "Lemma Z-A",
     sortUpdatedAsc: "Updated Oldest",
@@ -1837,9 +1834,11 @@ const elements = {
   analysisNoDictionaryNotice: document.querySelector("#analysisNoDictionaryNotice"),
   analysisOpenDictionaryManagerButton: document.querySelector("#analysisOpenDictionaryManagerButton"),
   analysisPanel: document.querySelector("#analysisPanel"),
+  analysisHeaderTools: document.querySelector("#analysisHeaderTools"),
   qualityNoDictionaryNotice: document.querySelector("#qualityNoDictionaryNotice"),
   qualityOpenDictionaryManagerButton: document.querySelector("#qualityOpenDictionaryManagerButton"),
   qualityPanel: document.querySelector("#qualityPanel"),
+  qualityHeaderTools: document.querySelector("#qualityHeaderTools"),
   settingsForm: document.querySelector("#settingsForm"),
   glossStyleRows: [...document.querySelectorAll("[data-gloss-style]")],
   showEmptyEntrySectionsInput: document.querySelector("#showEmptyEntrySectionsInput"),
@@ -3317,6 +3316,7 @@ function forgetAnalysisViewState(dictionaryId) {
 function createQualityViewState() {
   return {
     subpage: defaultQualityViewState.subpage,
+    subpageBySource: {},
     scrollBySubpage: {},
   };
 }
@@ -4062,6 +4062,24 @@ function measureStickySidebarHeights(anchor, stickyOffset, { minHeight = 0, minB
   return { height: heightAt(top), restingHeight: heightAt(top + scrollTop) };
 }
 
+// Sticky view headers (styles.css): when the controls wrap below the title, the title scrolls
+// away and only the controls stick. Publishes the stuck height for sidebars below the header.
+function measureStickyViewHeader(header) {
+  if (!header.getClientRects().length) return;
+  const top = header.getBoundingClientRect().top;
+  const title = header.firstElementChild.getBoundingClientRect();
+  // A view that renders its tools may not have rendered them yet.
+  const actions = header.querySelector(".top-actions");
+  const hidden = actions && actions.getBoundingClientRect().top >= title.bottom ? title.bottom - top : 0;
+  header.style.setProperty("--sticky-header-offset", `${-hidden}px`);
+  header.parentElement.style.setProperty("--sticky-header-height", `${header.offsetHeight - hidden}px`);
+}
+
+const stickyViewHeaderObserver = new ResizeObserver((entries) => {
+  for (const { target } of entries) measureStickyViewHeader(target);
+});
+document.querySelectorAll(".top-bar[data-sticky-header]").forEach((header) => stickyViewHeaderObserver.observe(header));
+
 function updateEntryBrowserHeight() {
   const browser = elements.entryBrowser;
   const slot = elements.entryBrowserSlot;
@@ -4201,8 +4219,10 @@ function renderAvailability() {
   elements.settingsPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "settings";
   elements.analysisNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "analysis";
   elements.analysisPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "analysis";
+  elements.analysisHeaderTools.hidden = elements.analysisPanel.hidden;
   elements.qualityNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "quality";
   elements.qualityPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "quality";
+  elements.qualityHeaderTools.hidden = elements.qualityPanel.hidden;
   elements.docsNoDictionaryNotice.hidden = !backendAvailable || hasDictionary || state.activeView !== "docs";
   elements.docsPanel.hidden = !backendAvailable || !hasDictionary || state.activeView !== "docs";
   elements.saveDocsButton.hidden = !backendAvailable || !hasDictionary || state.activeView !== "docs" || settings.docsAutoSave;
@@ -9887,25 +9907,38 @@ function morphologyFunctionConfig(dictionary = activeDictionary()) {
 
 function renderAnalysis(dictionary = activeDictionary()) {
   const focusedTab = elements.analysisPanel.contains(document.activeElement) ? document.activeElement.id : "";
+  const headerFocus = captureFocusKey(elements.analysisHeaderTools);
   try {
     renderAnalysisContent(dictionary);
   } finally {
     // Async query completion and tab switches both replace the navigation DOM.
     synchronizePageTabs(elements.analysisPanel, focusedTab);
+    restoreFocusKey(elements.analysisHeaderTools, headerFocus);
     liquidGlassOpticalEngine?.syncMappedSurfaces();
   }
+}
+
+// Views that replace their controls on render keep focus on the control with the same key.
+function captureFocusKey(root) {
+  return root.contains(document.activeElement) ? document.activeElement.dataset.focusKey || "" : "";
+}
+
+function restoreFocusKey(root, key) {
+  if (key) root.querySelector(`[data-focus-key="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
 }
 
 function renderAnalysisContent(dictionary) {
   disconnectMasonryLayoutsWithin(elements.analysisPanel);
   if (!dictionary) {
     elements.analysisPanel.innerHTML = "";
+    elements.analysisHeaderTools.innerHTML = "";
     return;
   }
 
   analysisFilterRegistry.clear();
   analysisFilterCounter = 0;
   const page = activeAnalysisPage();
+  elements.analysisHeaderTools.innerHTML = analysisHeaderToolsHtml(page);
   const subpage = activeAnalysisSubpage(page);
   const view = analysisQueryView(page, subpage);
   const queryState = analysisQueryStateFor(view.query, dictionary);
@@ -10086,7 +10119,6 @@ function renderAnalysisIpaCompareQueryPage(queryState) {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在检查 IPA 自动生成结果", "Checking generated IPA"))}</strong></div>`;
   }
   return `
-    ${analysisPageNav("ipa")}
     ${analysisSubpageNav("ipa", "mismatches")}
     <section class="analysis-page-body">${body}</section>
   `;
@@ -10106,7 +10138,6 @@ function renderAnalysisIpaDistributionQueryPage(queryState, subpage) {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载 IPA 分布", "Loading IPA distribution"))}</strong></div>`;
   }
   return `
-    ${analysisPageNav("ipa")}
     ${analysisSubpageNav("ipa", subpage)}
     <section class="analysis-page-body">${body}</section>
   `;
@@ -10126,7 +10157,6 @@ function renderAnalysisMorphologyQueryPage(queryState, subpage) {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载形态分析", "Loading morphology analysis"))}</strong></div>`;
   }
   return `
-    ${analysisPageNav("morphology")}
     ${analysisSubpageNav("morphology", subpage)}
     <section class="analysis-page-body">${body}</section>
   `;
@@ -10146,7 +10176,6 @@ function renderAnalysisActivityQueryPage(queryState, subpage) {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载编辑日期", "Loading editing dates"))}</strong></div>`;
   }
   return `
-    ${analysisPageNav("activity")}
     ${analysisSubpageNav("activity", subpage)}
     <section class="analysis-page-body">${body}</section>
   `;
@@ -10175,7 +10204,6 @@ function renderAnalysisRootFamiliesQueryPage(queryState) {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载词根家族", "Loading root families"))}</strong></div>`;
   }
   return `
-    ${analysisPageNav("entries")}
     ${analysisSubpageNav("entries", "roots")}
     <section class="analysis-page-body">${body}</section>
   `;
@@ -10195,7 +10223,6 @@ function renderAnalysisOverviewQueryPage(queryState) {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载数据分析", "Loading analysis"))}</strong></div>`;
   }
   return `
-    ${analysisPageNav("overview")}
     <section class="analysis-page-body">${body}</section>
   `;
 }
@@ -10210,10 +10237,11 @@ function activeAnalysisPage() {
 }
 
 function renderQuality(dictionary = activeDictionary()) {
-  const focusedTab = elements.qualityPanel.contains(document.activeElement) ? document.activeElement.id : "";
+  const focusKey = captureFocusKey(elements.qualityView);
   disconnectMasonryLayoutsWithin(elements.qualityPanel);
   if (!dictionary) {
     elements.qualityPanel.innerHTML = "";
+    elements.qualityHeaderTools.innerHTML = "";
     liquidGlassOpticalEngine?.syncMappedSurfaces();
     return;
   }
@@ -10228,8 +10256,10 @@ function renderQuality(dictionary = activeDictionary()) {
   } else {
     void loadQualityIssueWindow(dictionary, subpage);
   }
-  elements.qualityPanel.innerHTML = renderQualityPage(subpage);
-  synchronizePageTabs(elements.qualityPanel, focusedTab);
+  const summary = qualitySummaryState.status === "ready" ? qualitySummaryState.response.summary : null;
+  elements.qualityHeaderTools.innerHTML = qualityHeaderToolsHtml(subpage, summary);
+  elements.qualityPanel.innerHTML = renderQualityPage(subpage, summary);
+  restoreFocusKey(elements.qualityView, focusKey);
   setupQualityMasonryLayouts();
   liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
@@ -10377,43 +10407,28 @@ function retryQuality(dictionary) {
 // Tabs activate manually: arrows move focus, Enter/Space retain native click.
 // Re-rendered selected content is associated with its primary and nested tabs.
 function synchronizePageTabs(host, focusedId = "") {
-  if (!host) return;
-  const primary = host.querySelector(".analysis-page-tabs");
-  const qualityGroups = host.querySelector(".quality-subpage-tab-groups");
-  const secondary = qualityGroups || host.querySelector(".analysis-subpage-tabs");
-  const body = host.querySelector(".analysis-page-body");
-  if (!body) return;
-  let primaryPanel = body;
-  if (primary && secondary) {
-    primaryPanel = document.createElement("div");
-    primaryPanel.className = "analysis-tab-panel";
-    secondary.before(primaryPanel);
-    primaryPanel.append(secondary, body);
-  }
-  for (const [nav, panel, kind] of [[primary, primaryPanel, "main"], [secondary, body, "sub"]]) {
-    if (!nav) continue;
-    nav.setAttribute("role", "tablist");
-    nav.setAttribute("aria-label", aText(kind === "main" ? "分析页面" : "分类", kind === "main" ? "Analysis pages" : "Categories"));
-    if (nav === qualityGroups) nav.querySelectorAll("nav").forEach((node) => node.setAttribute("role", "presentation"));
-    panel.id = `${host.id}-${kind}-panel`;
-    panel.setAttribute("role", "tabpanel");
-    panel.tabIndex = 0;
-    nav.querySelectorAll("button").forEach((button) => {
-      const key = button.dataset.analysisPage || button.dataset.analysisSubpage || button.dataset.qualitySubpage;
-      button.id = `${host.id}-${kind}-${key}`;
-      button.dataset.controlTone = "neutral";
-      button.dataset.controlSelection = "";
-      button.setAttribute("role", "tab");
-      button.setAttribute("aria-selected", String(button.classList.contains("active")));
-      button.setAttribute("aria-controls", panel.id);
-      button.tabIndex = button.classList.contains("active") ? 0 : -1;
-      if (button.classList.contains("active")) panel.setAttribute("aria-labelledby", button.id);
-    });
-  }
+  const nav = host.querySelector(".analysis-subpage-tabs");
+  const panel = host.querySelector(".analysis-page-body");
+  if (!nav || !panel) return;
+  nav.setAttribute("role", "tablist");
+  nav.setAttribute("aria-label", aText("分类", "Categories"));
+  panel.id = `${host.id}-sub-panel`;
+  panel.setAttribute("role", "tabpanel");
+  panel.tabIndex = 0;
+  nav.querySelectorAll("button").forEach((button) => {
+    button.id = `${host.id}-sub-${button.dataset.analysisSubpage}`;
+    button.dataset.controlTone = "neutral";
+    button.dataset.controlSelection = "";
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-selected", String(button.classList.contains("active")));
+    button.setAttribute("aria-controls", panel.id);
+    button.tabIndex = button.classList.contains("active") ? 0 : -1;
+    if (button.classList.contains("active")) panel.setAttribute("aria-labelledby", button.id);
+  });
   if (focusedId) {
     const target = document.getElementById(focusedId);
-    if (target && host.contains(target) && target.matches('[role="tab"]:not(:disabled)')) {
-      target.closest('[role="tablist"]').querySelectorAll('[role="tab"]').forEach((tab) => { tab.tabIndex = tab === target ? 0 : -1; });
+    if (target && nav.contains(target) && !target.disabled) {
+      nav.querySelectorAll('[role="tab"]').forEach((tab) => { tab.tabIndex = tab === target ? 0 : -1; });
       target.focus({ preventScroll: true });
     }
   }
@@ -10439,7 +10454,9 @@ function handleSelectionKeydown(event) {
 }
 document.addEventListener("keydown", handleSelectionKeydown);
 
-function analysisPageNav(activePage) {
+// The analysis pages switch in the view header, like the other tool pages' views; narrow
+// pages, where five segments may not fit, use a dropdown instead.
+function analysisHeaderToolsHtml(activePage) {
   const pages = [
     ["overview", aText("总览", "Overview")],
     ["entries", aText("词汇", "Lexicon")],
@@ -10447,9 +10464,17 @@ function analysisPageNav(activePage) {
     ["morphology", aText("形态学", "Morphology")],
     ["activity", aText("编辑进度", "Activity")],
   ];
-  return `<nav class="analysis-page-tabs">${pages.map(([page, label]) => `
-    <button type="button" class="${page === activePage ? "active" : ""}" data-analysis-page="${escapeHtml(page)}">${escapeHtml(label)}</button>
-  `).join("")}</nav>`;
+  return `<div class="top-actions analysis-page-actions">
+    <div class="segmented-control view-header-switch analysis-page-switch" role="radiogroup" aria-label="${escapeHtml(aText("分析页面", "Analysis pages"))}">
+      ${pages.map(([page, label]) => {
+        const current = page === activePage;
+        return `<button type="button" role="radio" class="${current ? "active" : ""}" data-control-tone="neutral" data-control-selection data-analysis-page="${escapeHtml(page)}" data-focus-key="page:${escapeHtml(page)}" aria-checked="${current}" tabindex="${current ? 0 : -1}">${escapeHtml(label)}</button>`;
+      }).join("")}
+    </div>
+  </div>
+  <div class="view-header-row analysis-page-select-row">
+    <label class="analysis-page-select"><span class="visually-hidden">${escapeHtml(aText("分析页面", "Analysis pages"))}</span><select data-analysis-page-select data-focus-key="page-select">${pages.map(([page, label]) => `<option value="${escapeHtml(page)}"${page === activePage ? " selected" : ""}>${escapeHtml(label)}</option>`).join("")}</select></label>
+  </div>`;
 }
 
 function analysisSubpageNav(page, activeSubpage, report = null) {
@@ -10486,35 +10511,74 @@ function analysisSubpages(page) {
   return subpages[page] || [];
 }
 
-function renderQualityPage(subpage) {
-  const summary = qualitySummaryState.status === "ready" ? qualitySummaryState.response.summary : null;
-  return `
-    ${qualitySubpageNav(subpage, summary)}
+// The header switches between the dictionary and corpus checks; a side list (a dropdown in the
+// header on narrow pages) picks the category within the current source.
+function qualitySource(subpage) {
+  return isCorpusQualitySubpage(subpage) ? "corpus" : "dictionary";
+}
+
+function qualitySourceGroups(source) {
+  const groups = qualitySubpageGroups().filter((group) => group.source === source);
+  return groups.length > 1 ? groups : groups.map((group) => ({ ...group, label: "" }));
+}
+
+function qualityCategoryCount(subpage, summary) {
+  if (isCorpusQualitySubpage(subpage)) return corpusQualitySubpageCount(subpage);
+  return summary ? qualitySubpageEntryCount(summary, subpage) : null;
+}
+
+function qualityHeaderToolsHtml(subpage, summary) {
+  const source = qualitySource(subpage);
+  const sources = [
+    ["dictionary", aText("词典", "Dictionary"), summary ? summary.affectedEntryCount : null],
+    ["corpus", aText("语料库", "Corpus"), corpusQualitySubpageCount("corpus")],
+  ];
+  const options = qualitySourceGroups(source).map((group) => {
+    const items = group.subpages.map(([key, label]) => {
+      const count = qualityCategoryCount(key, summary);
+      const text = count === null ? label : aText(`${label}（${count}）`, `${label} (${count})`);
+      return `<option value="${escapeHtml(key)}"${key === subpage ? " selected" : ""}${count === 0 && key !== subpage ? " disabled" : ""}>${escapeHtml(text)}</option>`;
+    }).join("");
+    return group.label ? `<optgroup label="${escapeHtml(group.label)}">${items}</optgroup>` : items;
+  }).join("");
+  return `<div class="top-actions quality-page-actions">
+      <div class="segmented-control view-header-switch" role="radiogroup" aria-label="${escapeHtml(aText("检查对象", "Checked content"))}">
+        ${sources.map(([key, label, count]) => {
+          const current = key === source;
+          return `<button type="button" role="radio" class="${current ? "active" : ""}" data-control-tone="neutral" data-control-selection data-quality-source="${key}" data-focus-key="source:${key}" aria-checked="${current}" tabindex="${current ? 0 : -1}">${escapeHtml(label)}${count === null ? "" : `<span class="view-header-switch-count">${escapeHtml(count)}</span>`}</button>`;
+        }).join("")}
+      </div>
+    </div>
+    <div class="view-header-row quality-category-select-row">
+      <label class="quality-category-select"><span class="visually-hidden">${escapeHtml(aText("分类", "Category"))}</span><select data-quality-category data-focus-key="category-select">${options}</select></label>
+    </div>`;
+}
+
+function renderQualityPage(subpage, summary) {
+  const items = (group) => group.subpages.map(([key, label]) => {
+    const count = qualityCategoryCount(key, summary);
+    const active = key === subpage;
+    return `<li><button type="button" class="page-side-list-item${active ? " active" : ""}" data-quality-subpage="${escapeHtml(key)}" data-focus-key="category:${escapeHtml(key)}" aria-current="${active}"${count === 0 && !active ? " disabled" : ""}><span>${escapeHtml(label)}</span>${count === null ? "" : `<span class="page-side-list-count">${escapeHtml(count)}</span>`}</button></li>`;
+  }).join("");
+  return `<div class="quality-layout">
+    <nav class="quality-category-rail" aria-label="${escapeHtml(aText("分类", "Categories"))}">
+      <ul class="page-side-list">${qualitySourceGroups(qualitySource(subpage)).map((group) => (
+        group.label ? `<li class="page-side-list-group"><span>${escapeHtml(group.label)}</span><ul>${items(group)}</ul></li>` : items(group)
+      )).join("")}</ul>
+    </nav>
     <section class="analysis-page-body">
       ${qualityPageBody(subpage, summary)}
     </section>
-  `;
+  </div>`;
 }
 
-function qualitySubpageNav(activeSubpage, summary) {
-  return `<div class="analysis-subpage-tab-groups quality-subpage-tab-groups">${qualitySubpageGroups().map((group) => `
-    <div class="analysis-subpage-tab-group">
-      <span>${escapeHtml(group.label)}</span>
-      <nav class="analysis-subpage-tabs">${group.subpages.map(([subpage, label]) => `
-        ${renderQualitySubpageButton(subpage, label, activeSubpage, summary)}
-      `).join("")}</nav>
-    </div>
-  `).join("")}</div>`;
-}
-
-function renderQualitySubpageButton(subpage, label, activeSubpage, summary) {
-  const count = isCorpusQualitySubpage(subpage)
-    ? corpusQualitySubpageCount(subpage)
-    : summary ? qualitySubpageEntryCount(summary, subpage) : null;
-  const isActive = subpage === activeSubpage;
-  const disabled = count === 0 && !isActive;
-  const countBadge = count === null ? "" : `<span class="analysis-tab-count">${escapeHtml(count)}</span>`;
-  return `<button type="button" class="${isActive ? "active" : ""}" data-quality-subpage="${escapeHtml(subpage)}" ${disabled ? "disabled" : ""}>${escapeHtml(label)}${countBadge}</button>`;
+function selectQualitySubpage(subpage) {
+  rememberProcessScroll();
+  const qualityViewState = activeQualityViewState();
+  qualityViewState.subpage = subpage;
+  qualityViewState.subpageBySource[qualitySource(subpage)] = subpage;
+  renderQuality(activeDictionary());
+  restoreProcessScroll();
 }
 
 function activeQualitySubpage() {
@@ -10528,6 +10592,7 @@ function activeQualitySubpage() {
 function qualitySubpageGroups() {
   return [
     {
+      source: "dictionary",
       label: aText("按优先度", "By priority"),
       subpages: [
         ["issues", aText("全部问题", "All Issues")],
@@ -10537,6 +10602,7 @@ function qualitySubpageGroups() {
       ],
     },
     {
+      source: "dictionary",
       label: aText("按检查模块", "By check module"),
       subpages: [
         ["lemma", aText("词形问题", "Word Forms")],
@@ -10547,6 +10613,7 @@ function qualitySubpageGroups() {
       ],
     },
     {
+      source: "corpus",
       label: aText("语料库", "Corpus"),
       subpages: [
         ["corpus", aText("全部语料问题", "All Corpus Issues")],
@@ -10949,7 +11016,6 @@ function renderAnalysisTagsQueryPage(queryState) {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载标签统计", "Loading tag statistics"))}</strong></div>`;
   }
   return `
-    ${analysisPageNav("entries")}
     ${analysisSubpageNav("entries", "tags")}
     <section class="analysis-page-body">${body}</section>
   `;
@@ -11013,7 +11079,6 @@ function renderAnalysisOrthographyQueryPage(queryState) {
     body = `<div class="empty-state"><strong>${escapeHtml(aText("正在加载正写法统计", "Loading orthography statistics"))}</strong></div>`;
   }
   return `
-    ${analysisPageNav("entries")}
     ${analysisSubpageNav("entries", "forms")}
     <section class="analysis-page-body">${body}</section>
   `;
@@ -11353,10 +11418,11 @@ function qualityPageBody(subpage, summary) {
   if (qualitySummaryState.status === "error") {
     return qualityErrorState(aText("无法加载质量检查", "Could not load quality checks"));
   }
-  const cardTitle = QUALITY_MODULE_SUBPAGES.includes(subpage)
-    ? qualityIssueModuleLabel(subpage)
-    : aText("质量检查", "Quality Checks");
-  return `${renderQualityFilterBar(subpage, summary)}<section class="analysis-detail-grid">${analysisCard(cardTitle, renderQualityIssueWindow())}</section>`;
+  // The entry-list action belongs to the list it filters, so it sits in the card header and the
+  // header switch stays put when the corpus part, which has no such action, is shown.
+  const attrs = analysisActionAttributes(summary ? qualityFilterAction(summary, subpage) : null);
+  const actions = `<span class="quality-entry-actions"><button class="secondary-button" data-control-tone="neutral" type="button" data-focus-key="view-entries"${attrs} ${attrs ? "" : "disabled"}>${escapeHtml(t("viewQualityEntries"))}</button><button class="info-button" type="button" data-control-tone="neutral" data-action="quality-filter-info" data-focus-key="filter-info" data-app-tooltip="always" aria-label="${escapeHtml(t("qualityFilterInfo"))}">i</button></span>`;
+  return `<section class="analysis-detail-grid">${analysisCard(qualitySubpageLabel(subpage), renderQualityIssueWindow(), { actions })}</section>`;
 }
 
 function qualityErrorState(title) {
@@ -11450,21 +11516,6 @@ function qualityIssueText(issue) {
     title: aText(...titles[issue.code]),
     detail: details[issue.code]?.() || "",
   };
-}
-
-function renderQualityFilterBar(subpage, summary) {
-  const label = qualitySubpageLabel(subpage);
-  const count = summary ? qualitySubpageEntryCount(summary, subpage) : null;
-  const action = summary ? qualityFilterAction(summary, subpage) : null;
-  const attrs = analysisActionAttributes(action);
-  return `
-    <section class="analysis-quality-current" aria-label="${escapeHtml(aText("质量检查筛选", "Quality filters"))}">
-      <strong>${escapeHtml(t("qualityCurrentCategory"))}: ${escapeHtml(label)}</strong>
-      <span>${count === null ? "" : `${escapeHtml(count)} ${escapeHtml(t("qualityEntryCount"))}`}</span>
-      <button class="secondary-button analysis-quality-view-button" data-control-tone="neutral" type="button"${attrs} ${attrs ? "" : "disabled"}>${escapeHtml(t("viewQualityEntries"))}</button>
-      <button class="info-button" type="button" data-control-tone="neutral" data-action="quality-filter-info" data-app-tooltip="always" aria-label="${escapeHtml(t("qualityFilterInfo"))}">i</button>
-    </section>
-  `;
 }
 
 function qualitySubpageSelector(subpage) {
@@ -11590,7 +11641,7 @@ function analysisCard(title, body, options = {}) {
     ? `<button type="button" class="analysis-card-navigation" data-control-tone="neutral" data-analysis-destination-page="${escapeHtml(options.destinationPage)}"${options.destinationSubpage ? ` data-analysis-destination-subpage="${escapeHtml(options.destinationSubpage)}"` : ""}><span>${escapeHtml(aText("详情", "Details"))}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button>`
     : "";
   const className = ["analysis-card", options.className].filter(Boolean).join(" ");
-  return `<article class="${escapeHtml(className)}" data-surface="content-shell"><header class="analysis-card-header"><h3>${escapeHtml(title)}</h3>${destination}</header>${body}</article>`;
+  return `<article class="${escapeHtml(className)}" data-surface="content-shell"><header class="analysis-card-header"><h3>${escapeHtml(title)}</h3>${destination}${options.actions || ""}</header>${body}</article>`;
 }
 
 function analysisOverviewPrimaryStat(value, unit) {
@@ -18138,7 +18189,19 @@ elements.closeQuickEntryButton.addEventListener("click", () => requestCloseQuick
 elements.quickEntryFullEditButton.addEventListener("click", () => transferQuickEntryToFullEditor());
 elements.quickEntrySubmitButton.addEventListener("click", () => submitQuickEntry());
 elements.editEntryButton.addEventListener("click", beginEditEntry);
-elements.analysisPanel.addEventListener("click", (event) => {
+function selectAnalysisPage(page) {
+  rememberProcessScroll();
+  const analysisViewState = activeAnalysisViewState();
+  analysisViewState.page = page;
+  const firstSubpage = analysisSubpages(page)[0]?.[0] || "";
+  if (firstSubpage && !analysisViewState.subpageByPage[page]) {
+    analysisViewState.subpageByPage[page] = firstSubpage;
+  }
+  renderAnalysis(activeDictionary());
+  restoreProcessScroll();
+}
+
+function handleAnalysisClick(event) {
   const tagManagerLink = event.target.closest("[data-tag-manager-tags]");
   if (tagManagerLink) {
     event.preventDefault();
@@ -18179,15 +18242,7 @@ elements.analysisPanel.addEventListener("click", (event) => {
   }
   const pageButton = event.target.closest("[data-analysis-page]");
   if (pageButton) {
-    rememberProcessScroll();
-    const analysisViewState = activeAnalysisViewState();
-    analysisViewState.page = pageButton.dataset.analysisPage || "overview";
-    const firstSubpage = analysisSubpages(analysisViewState.page)[0]?.[0] || "";
-    if (firstSubpage && !analysisViewState.subpageByPage[analysisViewState.page]) {
-      analysisViewState.subpageByPage[analysisViewState.page] = firstSubpage;
-    }
-    renderAnalysis(activeDictionary());
-    restoreProcessScroll();
+    selectAnalysisPage(pageButton.dataset.analysisPage);
     return;
   }
   const subpageButton = event.target.closest("[data-analysis-subpage]");
@@ -18225,8 +18280,14 @@ elements.analysisPanel.addEventListener("click", (event) => {
     return;
   }
   void navigateToEntryFromReport(target.dataset.entryId);
+}
+elements.analysisPanel.addEventListener("click", handleAnalysisClick);
+elements.analysisHeaderTools.addEventListener("click", handleAnalysisClick);
+elements.analysisHeaderTools.addEventListener("change", (event) => {
+  if (event.target.matches("[data-analysis-page-select]")) selectAnalysisPage(event.target.value);
 });
-elements.qualityPanel.addEventListener("click", (event) => {
+
+function handleQualityClick(event) {
   const tagManagerLink = event.target.closest("[data-tag-manager-tags]");
   if (tagManagerLink) {
     event.preventDefault();
@@ -18259,13 +18320,15 @@ elements.qualityPanel.addEventListener("click", (event) => {
     openCorpusItem(corpusItemButton.dataset.corpusQualityItem).catch((error) => console.error(error));
     return;
   }
+  const sourceButton = event.target.closest("[data-quality-source]");
+  if (sourceButton) {
+    const source = sourceButton.dataset.qualitySource;
+    selectQualitySubpage(activeQualityViewState().subpageBySource[source] || (source === "corpus" ? "corpus" : "issues"));
+    return;
+  }
   const subpageButton = event.target.closest("[data-quality-subpage]");
   if (subpageButton) {
-    rememberProcessScroll();
-    const qualityViewState = activeQualityViewState();
-    qualityViewState.subpage = subpageButton.dataset.qualitySubpage || "issues";
-    renderQuality(activeDictionary());
-    restoreProcessScroll();
+    selectQualitySubpage(subpageButton.dataset.qualitySubpage);
     return;
   }
   const viewTarget = event.target.closest("[data-view-target]");
@@ -18289,6 +18352,11 @@ elements.qualityPanel.addEventListener("click", (event) => {
     return;
   }
   void navigateToEntryFromReport(target.dataset.entryId);
+}
+elements.qualityPanel.addEventListener("click", handleQualityClick);
+elements.qualityHeaderTools.addEventListener("click", handleQualityClick);
+elements.qualityHeaderTools.addEventListener("change", (event) => {
+  if (event.target.matches("[data-quality-category]")) selectQualitySubpage(event.target.value);
 });
 elements.activeFilterRefreshButton.addEventListener("click", refreshActiveFilter);
 elements.activeFilterCycleButton.addEventListener("click", cycleActiveFilterVariant);

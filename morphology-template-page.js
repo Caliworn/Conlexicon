@@ -270,7 +270,7 @@ function morphologyTrialVerdicts(page, trialState) {
 function morphologyHeaderToolsHtml(page) {
   const views = [["structure", aText("结构", "Structure")], ["tables", aText("表格", "Tables")]];
   return `<div class="top-actions morphology-page-actions">
-      <div class="segmented-control morphology-view-switch" role="radiogroup" aria-label="${escapeHtml(aText("视图", "View"))}">
+      <div class="segmented-control view-header-switch" role="radiogroup" aria-label="${escapeHtml(aText("视图", "View"))}">
         ${views.map(([view, label]) => {
           const current = page.view === view;
           return `<button class="${current ? "active" : ""}" type="button" role="radio" data-control-tone="neutral" data-control-selection data-mtp-action="view" data-view-name="${view}" data-mtp-focus="view:${view}" aria-checked="${current}" tabindex="${current ? 0 : -1}">${escapeHtml(label)}</button>`;
@@ -280,17 +280,17 @@ function morphologyHeaderToolsHtml(page) {
       <button class="secondary-button" type="button" data-control-tone="neutral" data-mtp-action="discard" data-mtp-focus="discard">${escapeHtml(t("editSwitchDiscard"))}</button>
       <button class="primary-button" type="button" data-control-tone="accent" data-control-emphasis="solid" data-mtp-action="save" data-mtp-focus="save">${escapeHtml(t("save"))}</button>
     </div>
-    ${page.view === "structure" ? `<div class="morphology-header-row morphology-header-drawers">
+    ${page.view === "structure" ? `<div class="view-header-row morphology-header-drawers">
       <button class="secondary-button" type="button" data-control-tone="neutral" data-mtp-action="open-drawer" data-pane="trial" data-mtp-focus="drawer:trial" aria-haspopup="dialog" aria-controls="morphologyDrawer" aria-expanded="false"${page.parentPickerTableId ? " disabled" : ""}>
         <span>${escapeHtml(aText("试算", "Trial"))}</span><span class="morphology-header-trial-summary" data-mtp-region="trial-summary" hidden></span>
       </button>
       <button class="secondary-button" type="button" data-control-tone="neutral" data-mtp-action="open-drawer" data-pane="properties" data-mtp-focus="drawer:properties" aria-haspopup="dialog" aria-controls="morphologyDrawer" aria-expanded="false"${page.selectedTableId && !page.parentPickerTableId ? "" : " disabled"}>${escapeHtml(aText("属性", "Properties"))}</button>
-    </div>` : `<div class="morphology-header-row morphology-header-table-select">${morphologyTableSelectHtml(page)}</div>`}
-    <div class="morphology-header-row morphology-undo-notice" hidden>
+    </div>` : `<div class="view-header-row morphology-header-table-select">${morphologyTableSelectHtml(page)}</div>`}
+    <div class="view-header-row morphology-undo-notice" hidden>
       <span class="morphology-undo-message" role="status" data-mtp-region="undo-message"></span>
       <button class="secondary-button" type="button" data-control-tone="neutral" data-mtp-action="undo" data-mtp-focus="undo">${escapeHtml(aText("撤销", "Undo"))}</button>
     </div>
-    ${page.parentPickerTableId ? `<div class="morphology-header-row morphology-parent-picker-notice">
+    ${page.parentPickerTableId ? `<div class="view-header-row morphology-parent-picker-notice">
       <span role="status">${escapeHtml(aText(`为“${morphologyTableLabel(page.draft, page.parentPickerTableId)}”选择父表`, `Choose a parent for “${morphologyTableLabel(page.draft, page.parentPickerTableId)}”`))}</span>
       <button class="secondary-button" type="button" data-control-tone="neutral" data-mtp-action="cancel-parent-picker" data-mtp-focus="parent-picker-cancel">${escapeHtml(t("cancel"))}</button>
     </div>` : ""}`;
@@ -376,13 +376,8 @@ function observeMorphologyLayout() {
   const workspace = panel.closest(".workspace");
   const update = () => {
     if (state.activeView !== "morphology-tables" || panel.hidden) return;
-    // When the controls wrap below the title, the title scrolls away and only the controls stick.
-    const top = header.getBoundingClientRect().top;
-    const title = header.firstElementChild.getBoundingClientRect();
-    const actions = header.querySelector(".morphology-page-actions").getBoundingClientRect();
-    const hidden = actions.top >= title.bottom ? title.bottom - top : 0;
-    header.style.setProperty("--morphology-header-offset", `${-hidden}px`);
-    panel.style.setProperty("--morphology-header-height", `${header.offsetHeight - hidden}px`);
+    // The rail and table list stick below the header, so measure it before sizing them.
+    measureStickyViewHeader(header);
     panel.style.setProperty("--morphology-workspace-height", mobileShellMode() ? `${workspace.clientHeight}px` : "100dvh");
     updateMorphologyTableListHeight();
     if (panel.querySelector(".morphology-drawer[open]") && !morphologyStructureIsNarrow()) {
@@ -774,14 +769,14 @@ function morphologyTablesViewHtml(page) {
   }
   const table = draftModel.findTable(page.draft, page.selectedTableId);
   const list = page.draft.slots.map((slot) => {
-    const items = slot.tables.map((item) => `<li><button type="button" class="morphology-table-list-item${item.id === table.id ? " active" : ""}" data-mtp-action="select-table" data-target-table-id="${escapeHtml(item.id)}" aria-current="${item.id === table.id}">${morphologyTableTitleHtml(item)}</button></li>`).join("");
+    const items = slot.tables.map((item) => `<li><button type="button" class="page-side-list-item${item.id === table.id ? " active" : ""}" data-mtp-action="select-table" data-target-table-id="${escapeHtml(item.id)}" aria-current="${item.id === table.id}">${morphologyTableTitleHtml(item)}</button></li>`).join("");
     return slot.tables.length > 1
-      ? `<li class="morphology-table-list-group"><span>${escapeHtml(slot.name || aText("未命名槽位", "Untitled slot"))}</span><ul>${items}</ul></li>`
+      ? `<li class="page-side-list-group"><span>${escapeHtml(slot.name || aText("未命名槽位", "Untitled slot"))}</span><ul>${items}</ul></li>`
       : items;
   }).join("");
   return `<div class="morphology-tables">
     <div class="morphology-table-list-slot">
-      <nav class="morphology-table-list" data-mtp-scroll="table-list" aria-label="${escapeHtml(aText("表格列表", "Tables"))}"><ul>${list}</ul></nav>
+      <nav class="morphology-table-list" data-mtp-scroll="table-list" aria-label="${escapeHtml(aText("表格列表", "Tables"))}"><ul class="page-side-list">${list}</ul></nav>
     </div>
     <section class="morphology-table-editor" data-table-id="${escapeHtml(table.id)}">
       <input class="morphology-table-title-input" data-mtp-prop="title" data-mtp-focus="table-title" value="${escapeHtml(table.title)}" placeholder="${escapeHtml(aText("未命名表格", "Untitled table"))}" aria-label="${escapeHtml(aText("标题", "Title"))}">
@@ -871,7 +866,7 @@ function renderMorphologyTablesDerived(page, dictionary, problems) {
     ${table.inheritsFrom ? `<span class="muted-text">${escapeHtml(aText("继承自", "Inherits from"))} “${escapeHtml(morphologyTableLabel(page.draft, table.inheritsFrom))}”</span>` : ""}
     <button class="text-link-button" type="button" data-mtp-action="edit-structure">${escapeHtml(aText("在结构中编辑", "Edit in structure"))}</button>
     ${table.inheritsFrom ? `<p class="field-help morphology-shape-note">${escapeHtml(aText(`行列由“${morphologyTableTitleText(shape)}”决定。`, `Rows and columns come from “${morphologyTableTitleText(shape)}”.`))} <button class="text-link-button" type="button" data-mtp-action="select-table" data-target-table-id="${escapeHtml(shape.id)}">${escapeHtml(aText("编辑行列", "Edit rows and columns"))}</button></p>` : ""}`;
-  panel.querySelectorAll(".morphology-table-list-item").forEach((button) => {
+  panel.querySelectorAll(".morphology-table-list .page-side-list-item").forEach((button) => {
     button.innerHTML = morphologyTableTitleHtml(draftModel.findTable(page.draft, button.dataset.targetTableId));
   });
   const cycleKeys = new Set(problems.cycles.filter(({ tableId }) => tableId === table.id).map(({ rowId, columnId }) => `${rowId}|${columnId}`));

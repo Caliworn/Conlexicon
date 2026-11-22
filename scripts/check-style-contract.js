@@ -545,7 +545,7 @@ assert(!/--(?:material-)?control-(?:hover-|pressed-)?shadow/.test(
   const cssOwners = new Set(ownerBlock[1].split(",").map((value) => value.trim()));
   const leafSurfaces = new Set([
     liquidGlassEngineApi.COMPACT_CONTROL_SELECTOR,
-    ".analysis-page-tabs button, .analysis-subpage-tabs button",
+    ".analysis-subpage-tabs button",
     "#displayDerived .derived-link, #fullEditDerived .derived-link",
     // A source card only holds its remove button, which is part of the card
     // and carries no semantic recipe.
@@ -790,9 +790,9 @@ assert(
 );
 assert(
   liquidGlassSurfaceDefinitions.some(({ role, selector }) => (
-    role === "relationship" && selector === ".analysis-page-tabs button, .analysis-subpage-tabs button"
+    role === "relationship" && selector === ".analysis-subpage-tabs button"
   )),
-  "Compact Q3 tab experiment must cover analysis and the shared quality-category navigation",
+  "Compact Q3 tab experiment must cover the analysis subpage tabs",
 );
 assert(
   liquidGlassSurfaceDefinitions.some(({ role, selector }) => (
