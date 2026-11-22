@@ -542,6 +542,75 @@ async function checkOldDatabaseIsOpenedWithoutWrites(repository) {
   assert.deepEqual(await fs.readFile(databasePath), before, "schema rejection occurs before writing to the old database");
 }
 
+async function checkParentCreation(repository) {
+  const { morphology, parent, child, grandchild } = inheritedMorphology();
+  const id = "dict-morphology-create-parent";
+  const { dictionary } = importDictionaryFromJsonPayload({
+    id, name: "Create morphology parent", morphology,
+    entries: [
+      { id: "auto", lemma: "auto", tags: ["n"], morphologyTables: [
+        { tableId: grandchild.id, notes: "Dormant", overrides: [absent(parent, 0, 0)] },
+      ] },
+      { id: "manual", lemma: "manual", morphologyMode: "manual", morphologyTables: [
+        { tableId: parent.id, overrides: [morphologyFormOverride(parent, 0, 0, "root override")] },
+        { tableId: grandchild.id, overrides: [morphologyFormOverride(parent, 0, 1, "leaf override")] },
+      ] },
+    ],
+  });
+  await repository.importDictionarySnapshot(dictionary);
+  const snapshot = () => repository.getDictionarySnapshot(id);
+  const save = (draft, saved, lineage) => callApi(repository, "PUT", `/api/dictionaries/${id}/morphology`, {
+    morphology: draftModel.morphologyForSave(draft),
+    detachments: draftModel.detachmentsForSave(draft, saved, lineage),
+  });
+  const before = await snapshot();
+  const db = repository.openDictionaryDatabase(id);
+  const projection = db.prepare(`
+    SELECT entry_id, template_table_id, row_id, column_id, position, raw_value
+    FROM entry_morphology_search_values ORDER BY entry_id, position
+  `);
+  const beforeValues = projection.all();
+  const aboveRoot = draftModel.createParentTable(before.morphology, parent.id);
+  const aboveChild = draftModel.createParentTable(aboveRoot.morphology, child.id);
+  await save(aboveChild.morphology, before.morphology, draftModel.initialLineage(before.morphology));
+
+  const after = await snapshot();
+  const newRoot = findTable(after.morphology, aboveRoot.tableId);
+  const inserted = findTable(after.morphology, aboveChild.tableId);
+  assert.deepEqual(newRoot.rows, parent.rows);
+  assert.deepEqual(newRoot.columns, parent.columns);
+  assert.equal(findTable(after.morphology, parent.id).inheritsFrom, newRoot.id);
+  assert.equal(findTable(after.morphology, child.id).inheritsFrom, inserted.id);
+  assert.equal(inserted.inheritsFrom, parent.id);
+  assert.deepEqual(after.entries.map(({ morphologyTables }) => morphologyTables), before.entries.map(({ morphologyTables }) => morphologyTables));
+  assert.deepEqual(projection.all(), beforeValues, "new parents preserve the assigned tables, forms and search coordinates");
+
+  // A second draft creates parents on either side of detachments. The saved overrides follow
+  // the axes of their own family even when the table holding those axes was just created.
+  const top = draftModel.createParentTable(after.morphology, newRoot.id);
+  const detachedRoot = draftModel.detachTable(top.morphology, newRoot.id, draftModel.initialLineage(after.morphology));
+  const detachedChild = draftModel.detachTable(detachedRoot.morphology, child.id, detachedRoot.lineage);
+  const detachedParent = draftModel.createParentTable(detachedChild.morphology, child.id);
+  await save(detachedParent.morphology, after.morphology, detachedChild.lineage);
+  const composed = await snapshot();
+  const resolver = createMorphologyResolver(composed.morphology);
+  for (const entry of before.entries) {
+    const finalEntry = composed.entries.find(({ id: entryId }) => entryId === entry.id);
+    const expected = entry.morphologyTables.map((table) => {
+      const shape = resolver.tableShape(table.tableId);
+      const carry = (axis, original) => shape[axis].find(({ id: current }) => detachedChild.lineage[current] === original).id;
+      return {
+        ...table,
+        overrides: table.overrides.map((cell) => ({
+          ...cell, rowId: carry("rows", cell.rowId), columnId: carry("columns", cell.columnId),
+        })),
+      };
+    });
+    assert.deepEqual(finalEntry.morphologyTables, expected);
+  }
+  assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
+}
+
 // The template page detaches two saved levels, edits the new axes and saves once: the overrides
 // of both tables follow the coordinates they carried on.
 async function checkDraftDetachmentSave(repository) {
@@ -594,6 +663,7 @@ async function runMorphologyAcceptanceCheck() {
   try {
     await checkLegacyConversion(repository, dataDir);
     await checkStorageAndReferences(repository);
+    await checkParentCreation(repository);
     await checkDraftDetachmentSave(repository);
     await checkOldDatabaseIsOpenedWithoutWrites(repository);
   } finally {

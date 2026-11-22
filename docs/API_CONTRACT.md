@@ -518,7 +518,8 @@ morphologyTables: [{ tableId, notes, overrides: [Override], createdAt, updatedAt
 - `Override` 使用同样的行列 ID，允许 `{ kind: "form", value }` 和 `{ kind: "absent" }`。`value` 为去除首尾空白后非空的字面形式。每表每坐标只能有一条覆写，模板格亦同。没有覆写时从当前表沿链取第一条格记录。引用可以串联，叠好继承后的每张表里都不能形成环。
 - 同一词条的表和行列身份保持稳定。移动表或调整显示顺序会重排搜索投影位置，修改标题、说明和行列标签只改模板。规则、格状态、轴的增删、所用函数或继承内容变化只重建涉及生效表的词条。更改分配规则或移动表到不同槽位时，用前后生效表定位受影响的词条。完全等同的规范化请求返回原 `updatedAt`。
 - 删除表或行列导致手动选择、叠加层或覆写丢失时，返回 409 `morphology_references_in_use`，整次不保存。`details` 为 `{ referenceCount, targets: [{ tableId, rowId?, columnId?, label, entryCount }], references }`。`targets` 按被删表或链顶表上的行列聚合，`entryCount` 按词条去重。`references` 是按词条位置取的前 50 条，包含 `{ entryId, lemma, tableId, rowId?, columnId?, reason }`。其中 `tableId` 是实际持有该配置的表，`reason` 为 `manual_table`、`overlay` 或 `override`。用户确认后，在请求外层带 `confirmReferenceRemoval: true` 和弹窗里显示的摘要 `confirmedReferences: { referenceCount, targets: [{ tableId, rowId?, columnId?, entryCount }] }`。服务端在保存事务里重算引用：与摘要一致时清理引用、保存模板并更新投影；不一致时整次不执行，返回新的 409 摘要；此时已没有要清除的引用则照常保存。缺少摘要、摘要格式不对，或未确认却带了摘要，返回 400 `invalid_morphology_payload`。仍被继承的表返回 `morphology_table_has_children`。
-- 解除继承时把目标变为带独立行列的新链顶表，草稿将模板格、syncretism 引用及后代的坐标换成新 ID。请求外层带 `detachments: [{ tableId, rowIdMap, columnIdMap }]`，两个映射均为「原行列 ID → 新行列 ID」。映射只列仍保留的已保存坐标，每个新 ID 最多对应一个原 ID。服务端凭映射重定位该表及后代表的已有覆写，未保留的坐标走同一删除确认。已有子表改指不同链顶时须先单独保存解除继承。独立表改设父表时，它原有行列上的覆写按删除处理，走同一删除确认；界面不提供这个操作，见[形态分配计划](MORPHOLOGY_ASSIGNMENT_PLAN.md) 2.8。
+- 为现有链顶新建父表时，在同一次提交中把原行列及其 ID 移交给新链顶。服务端用这些 ID 确认新链顶承接了原坐标，已有覆写继续使用相同的表和行列 ID。草稿同时增删行列时，被删除的坐标仍走删除确认。
+- 解除继承时，草稿将新链顶及后代的模板格和 syncretism 引用换到新行列 ID。请求外层带 `detachments: [{ tableId, rowIdMap, columnIdMap }]`，两个映射均为「原行列 ID → 新行列 ID」。`tableId` 在保存前后都须存在。通常它就是新的链顶。若同一草稿又在上方新建了父表，可以用链内保存前已存在的表作为 `tableId`。服务端用它找出保存前和提交后的链顶。每个新链顶只接收一份映射，每个新 ID 最多对应一个原 ID。来自同一原链的已有覆写据此重定位，未保留的坐标走删除确认。已有子表改指使用另一套已保存行列的链顶时须先单独保存解除继承。通过 API 给独立表改设已有父表时，原坐标的覆写按删除处理。见[形态分配计划](MORPHOLOGY_ASSIGNMENT_PLAN.md) 2.8。
 
 ### 标签登记表
 

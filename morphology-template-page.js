@@ -1092,6 +1092,15 @@ function openMorphologyCardMenu(card, event) {
       morphologyApply(result, { focus: "prop-title", select: result.tableId });
     },
   });
+  actions.push({
+    key: "create-parent",
+    label: aText("新建父表", "New parent table"),
+    handler: () => {
+      const result = draftModel.createParentTable(page.draft, tableId);
+      if (page.undo) page.undo.record = draftModel.undoAfterCreateParent(page.undo.record, tableId, result.tableId);
+      morphologyApply(result, { focus: "prop-title", select: result.tableId });
+    },
+  });
   if (table.inheritsFrom) {
     const candidates = draftModel.parentCandidates(page.draft, tableId).filter(({ id }) => id !== table.inheritsFrom);
     actions.push({

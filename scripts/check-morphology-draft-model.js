@@ -167,6 +167,18 @@ function checkInheritanceAndDetachment() {
   assert.ok(!draftModel.undoSurvivesDetach({ type: "fillAxis", tableId: "child" }, first.family));
 }
 
+function checkParentCreationKeepsAxisUndo() {
+  const saved = baseMorphology();
+  const removal = draftModel.removeAxisItem(saved, "root", "rows", "r3");
+  const created = draftModel.createParentTable(removal.morphology, "root", options);
+  const undo = draftModel.undoAfterCreateParent(removal.undo, "root", created.tableId);
+  const restored = draftModel.applyUndo(created.morphology, undo).morphology;
+  assert.deepEqual(draftModel.rootTable(restored, "child").rows, draftModel.rootTable(saved, "child").rows);
+  assert.deepEqual(own(restored, created.tableId, "r2", "c1"), own(saved, "root", "r2", "c1"));
+  assert.deepEqual(own(restored, created.tableId, "r3", "c1"), own(saved, "root", "r3", "c1"));
+  assert.deepEqual(own(restored, "child", "r3", "c2"), own(saved, "child", "r3", "c2"));
+}
+
 function checkRulesAndPayload() {
   const saved = baseMorphology();
   // Imported tags may contain separators; untouched inputs keep them whole.
@@ -224,6 +236,7 @@ checkUndoCycleConflict();
 checkTableDeletionUndo();
 checkFillAndCells();
 checkInheritanceAndDetachment();
+checkParentCreationKeepsAxisUndo();
 checkRulesAndPayload();
 checkSlotArrangement();
 console.log("Morphology draft model checks passed.");
