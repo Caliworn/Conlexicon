@@ -579,9 +579,15 @@ async function checkParentCreation(repository) {
   const inserted = findTable(after.morphology, aboveChild.tableId);
   assert.deepEqual(newRoot.rows, parent.rows);
   assert.deepEqual(newRoot.columns, parent.columns);
-  assert.equal(findTable(after.morphology, parent.id).inheritsFrom, newRoot.id);
-  assert.equal(findTable(after.morphology, child.id).inheritsFrom, inserted.id);
+  assert.deepEqual(newRoot.cells, [], "a new root parent starts with empty template cells");
+  assert.deepEqual(inserted.cells, [], "an inserted parent starts with no local template cells");
+  const savedRoot = findTable(after.morphology, parent.id);
+  const savedChild = findTable(after.morphology, child.id);
+  assert.equal(savedRoot.inheritsFrom, newRoot.id);
+  assert.equal(savedChild.inheritsFrom, inserted.id);
   assert.equal(inserted.inheritsFrom, parent.id);
+  assert.deepEqual(savedRoot.cells, findTable(before.morphology, parent.id).cells);
+  assert.deepEqual(savedChild.cells, findTable(before.morphology, child.id).cells);
   assert.deepEqual(after.entries.map(({ morphologyTables }) => morphologyTables), before.entries.map(({ morphologyTables }) => morphologyTables));
   assert.deepEqual(projection.all(), beforeValues, "new parents preserve the assigned tables, forms and search coordinates");
 

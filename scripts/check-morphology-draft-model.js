@@ -174,8 +174,9 @@ function checkParentCreationKeepsAxisUndo() {
   const undo = draftModel.undoAfterCreateParent(removal.undo, "root", created.tableId);
   const restored = draftModel.applyUndo(created.morphology, undo).morphology;
   assert.deepEqual(draftModel.rootTable(restored, "child").rows, draftModel.rootTable(saved, "child").rows);
-  assert.deepEqual(own(restored, created.tableId, "r2", "c1"), own(saved, "root", "r2", "c1"));
-  assert.deepEqual(own(restored, created.tableId, "r3", "c1"), own(saved, "root", "r3", "c1"));
+  assert.deepEqual(cellsOf(restored, created.tableId), [], "undo restores the axis to the new parent and leaves its cells empty");
+  assert.deepEqual(own(restored, "root", "r2", "c1"), own(saved, "root", "r2", "c1"));
+  assert.deepEqual(own(restored, "root", "r3", "c1"), own(saved, "root", "r3", "c1"));
   assert.deepEqual(own(restored, "child", "r3", "c2"), own(saved, "child", "r3", "c2"));
 }
 
