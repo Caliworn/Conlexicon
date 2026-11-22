@@ -40,6 +40,7 @@ const shellState = {
 };
 let activeAppTooltipTarget = null;
 const desktopNavMediaQuery = window.matchMedia("(min-width: 800px)");
+const stackedCorpusMediaQuery = window.matchMedia("(max-width: 980px)");
 const wideNavMediaQuery = window.matchMedia("(min-width: 1280px)");
 // The "auto" density is compact in desktop windows up to 920px tall.
 const compactDensityMediaQuery = window.matchMedia("(min-width: 800px) and (max-height: 920px)");
@@ -284,9 +285,9 @@ let analysisFilterCounter = 0;
 const analysisFilterRegistry = new Map();
 let entryCardScrollRequestId = 0;
 let pendingEntryCardScroll = null;
-let entryBrowserHeightFrame = 0;
-let entryBrowserLayoutRefreshFrame = 0;
-let entryBrowserLayoutRefreshUntil = 0;
+let listSidebarHeightFrame = 0;
+let listSidebarLayoutRefreshFrame = 0;
+let listSidebarLayoutRefreshUntil = 0;
 let activeEntryContextMenu = null;
 // Estimated entry card heights per density; measured cards replace them.
 // The compact card is about 91px with a one-line definition (styles.css
@@ -319,7 +320,7 @@ function syncUiDensity() {
     return;
   }
   renderEntryListContent({ allowQueryStart: false });
-  scheduleEntryBrowserLayoutRefresh();
+  scheduleListSidebarLayoutRefresh();
 }
 const entryVirtualList = createVirtualListState(entryCardEstimatedHeight());
 // The entry list's navigator replaces its native scrollbar. Root mode has the
@@ -1870,6 +1871,7 @@ const elements = {
   corpusNoDictionaryNotice: document.querySelector("#corpusNoDictionaryNotice"),
   corpusOpenDictionaryManagerButton: document.querySelector("#corpusOpenDictionaryManagerButton"),
   corpusPanel: document.querySelector("#corpusPanel"),
+  corpusBrowserSlot: document.querySelector("#corpusBrowserSlot"),
   newCorpusItemButton: document.querySelector("#newCorpusItemButton"),
   corpusSearchInput: document.querySelector("#corpusSearchInput"),
   corpusItemList: document.querySelector("#corpusItemList"),
@@ -2081,7 +2083,7 @@ function hydrateInitialUiPreferences() {
 
 function finishAppBoot() {
   requestAnimationFrame(() => {
-    updateEntryBrowserHeight();
+    updateListSidebarHeight();
     document.body.classList.remove("app-booting");
     document.body.classList.add("app-boot-settling");
     requestAnimationFrame(() => {
@@ -3091,7 +3093,7 @@ function render(options = {}) {
   renderToolNav();
   renderActiveView(options);
   restoreProcessScroll();
-  scheduleEntryBrowserHeightUpdate();
+  scheduleListSidebarHeightUpdate();
   liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
 
@@ -3108,7 +3110,7 @@ function renderLocaleChange() {
   renderToolNav();
   renderLocaleActiveView();
   restoreProcessScroll();
-  scheduleEntryBrowserHeightUpdate();
+  scheduleListSidebarHeightUpdate();
   liquidGlassOpticalEngine?.syncMappedSurfaces();
 }
 
@@ -3814,7 +3816,7 @@ function focusCurrentEntryInBrowser() {
   }
   revealEntryBrowserForResults();
   renderShellEntryBrowser();
-  scheduleEntryBrowserLayoutRefresh();
+  scheduleListSidebarLayoutRefresh();
   requestAnimationFrame(() => {
     remeasureEntryVirtualList();
     flushPendingEntryCardScroll();
@@ -4040,28 +4042,34 @@ function renderShellEntryBrowser() {
   elements.entryBrowser.hidden = false;
   entryToolbarMenus?.syncVisibility();
   syncMobileDrawerBodyState();
-  scheduleEntryBrowserHeightUpdate();
+  scheduleListSidebarHeightUpdate();
+}
+
+// The slot's resting height keeps the sticky sidebar from lengthening its own scroll container.
+function measureStickySidebarHeights(anchor, stickyOffset, { minHeight = 0, minBottomGap = 20 } = {}) {
+  const workspace = elements.workspace;
+  const scrollsInWorkspace = mobileShellMode();
+  const viewportTop = scrollsInWorkspace ? workspace.getBoundingClientRect().top + workspace.clientTop : 0;
+  const viewportHeight = scrollsInWorkspace ? workspace.clientHeight : window.innerHeight;
+  const scrollTop = scrollsInWorkspace ? workspace.scrollTop : window.scrollY;
+  const top = anchor.getBoundingClientRect().top;
+  const bottomPadding = Number.parseFloat(getComputedStyle(workspace).paddingBottom) || 0;
+  const bottom = viewportTop + viewportHeight - Math.max(minBottomGap, bottomPadding);
+  const stickyTop = viewportTop + stickyOffset;
+  const heightAt = (anchorTop) => Math.round(Math.max(minHeight, bottom - Math.max(stickyTop, anchorTop)));
+  return { height: heightAt(top), restingHeight: heightAt(top + scrollTop) };
 }
 
 function updateEntryBrowserHeight() {
-  entryBrowserHeightFrame = 0;
   const browser = elements.entryBrowser;
   const slot = elements.entryBrowserSlot;
   if (!browser || !slot || browser.hidden || state.activeView !== "editor" || !desktopNavMediaQuery.matches) {
     clearEntryBrowserLayoutVariables();
     return;
   }
-  const gridRect = elements.contentGrid.getBoundingClientRect();
-  const workspaceBottomPadding = Number.parseFloat(getComputedStyle(elements.workspace).paddingBottom) || 0;
-  const bottomGap = Math.max(20, workspaceBottomPadding);
-  const stickyTop = 20;
-  const top = Math.max(stickyTop, gridRect.top);
-  const availableHeight = Math.max(220, window.innerHeight - top - bottomGap);
-  const gridDocumentTop = gridRect.top + window.scrollY;
-  const restingTop = Math.max(stickyTop, gridDocumentTop);
-  const restingHeight = Math.max(220, window.innerHeight - restingTop - bottomGap);
-  const nextHeight = `${Math.round(availableHeight)}px`;
-  const nextSlotMinHeight = `${Math.round(restingHeight)}px`;
+  const { height, restingHeight } = measureStickySidebarHeights(elements.contentGrid, 20, { minHeight: 220 });
+  const nextHeight = `${height}px`;
+  const nextSlotMinHeight = `${restingHeight}px`;
   if (
     browser.style.getPropertyValue("--entry-browser-height") === nextHeight
     && slot.style.getPropertyValue("--entry-browser-slot-min-height") === nextSlotMinHeight
@@ -4074,6 +4082,27 @@ function updateEntryBrowserHeight() {
   syncEntryVirtualListAfterBrowserLayoutChange({ scrollPin });
 }
 
+function updateCorpusBrowserHeight() {
+  if (elements.corpusPanel.hidden) return;
+  if (stackedCorpusMediaQuery.matches) {
+    const list = elements.corpusItemList;
+    const { restingHeight } = measureStickySidebarHeights(list, 0);
+    // In one column, leave a third of the available space for the editor below the list.
+    list.style.setProperty("--corpus-item-list-height", `${Math.floor(restingHeight * 2 / 3)}px`);
+    return;
+  }
+  const slot = elements.corpusBrowserSlot;
+  const { height, restingHeight } = measureStickySidebarHeights(slot, 20);
+  slot.style.setProperty("--corpus-browser-height", `${height}px`);
+  slot.style.setProperty("--corpus-browser-slot-min-height", `${restingHeight}px`);
+}
+
+function updateListSidebarHeight() {
+  updateEntryBrowserHeight();
+  if (state.activeView === "corpus") updateCorpusBrowserHeight();
+  if (state.activeView === "morphology-tables") updateMorphologyTableListHeight();
+}
+
 function clearEntryBrowserLayoutVariables() {
   const browser = elements.entryBrowser;
   const slot = elements.entryBrowserSlot;
@@ -4084,26 +4113,29 @@ function clearEntryBrowserLayoutVariables() {
   slot.style.removeProperty("--entry-browser-slot-min-height");
 }
 
-function scheduleEntryBrowserHeightUpdate() {
-  if (entryBrowserHeightFrame) {
+function scheduleListSidebarHeightUpdate() {
+  if (listSidebarHeightFrame) {
     return;
   }
-  entryBrowserHeightFrame = requestAnimationFrame(updateEntryBrowserHeight);
+  listSidebarHeightFrame = requestAnimationFrame(() => {
+    listSidebarHeightFrame = 0;
+    updateListSidebarHeight();
+  });
 }
 
-function scheduleEntryBrowserLayoutRefresh(duration = 240) {
-  entryBrowserLayoutRefreshUntil = Math.max(entryBrowserLayoutRefreshUntil, performance.now() + duration);
-  if (entryBrowserLayoutRefreshFrame) {
+function scheduleListSidebarLayoutRefresh(duration = 240) {
+  listSidebarLayoutRefreshUntil = Math.max(listSidebarLayoutRefreshUntil, performance.now() + duration);
+  if (listSidebarLayoutRefreshFrame) {
     return;
   }
   const refresh = () => {
-    entryBrowserLayoutRefreshFrame = 0;
-    updateEntryBrowserHeight();
-    if (performance.now() < entryBrowserLayoutRefreshUntil) {
-      entryBrowserLayoutRefreshFrame = requestAnimationFrame(refresh);
+    listSidebarLayoutRefreshFrame = 0;
+    updateListSidebarHeight();
+    if (performance.now() < listSidebarLayoutRefreshUntil) {
+      listSidebarLayoutRefreshFrame = requestAnimationFrame(refresh);
     }
   };
-  entryBrowserLayoutRefreshFrame = requestAnimationFrame(refresh);
+  listSidebarLayoutRefreshFrame = requestAnimationFrame(refresh);
 }
 
 function remeasureEntryVirtualList() {
@@ -7420,7 +7452,7 @@ function renderEditorEntrySelection() {
   renderEntryListSelection();
   renderDetail();
   renderLexicalNetwork();
-  scheduleEntryBrowserHeightUpdate();
+  scheduleListSidebarHeightUpdate();
 }
 
 function shouldUseCompactEntryCard(entry, options = {}) {
@@ -17912,7 +17944,7 @@ elements.navCollapseButton.addEventListener("click", () => {
   }
   shellState.wideNavCollapsed = !shellState.wideNavCollapsed;
   renderShellNav();
-  scheduleEntryBrowserLayoutRefresh();
+  scheduleListSidebarLayoutRefresh();
 });
 elements.mobileNavButton.addEventListener("click", () => {
   if (shellState.navDrawerOpen) {
@@ -18358,8 +18390,9 @@ elements.docsMarkdownInput.addEventListener("input", () => {
 });
 window.addEventListener("scroll", () => {
   rememberProcessScroll();
-  scheduleEntryBrowserHeightUpdate();
+  scheduleListSidebarHeightUpdate();
 }, { passive: true });
+elements.workspace.addEventListener("scroll", scheduleListSidebarHeightUpdate, { passive: true });
 elements.docsMarkdownInput.addEventListener("scroll", rememberDocsPaneScroll, { passive: true });
 elements.docsPreview.addEventListener("scroll", rememberDocsPaneScroll, { passive: true });
 elements.saveDocsButton.addEventListener("click", () => saveLanguageDocs(true));
@@ -18857,12 +18890,12 @@ desktopNavMediaQuery.addEventListener("change", () => {
   renderShellNav();
   renderShellEntryBrowser();
   renderMobileAppBar();
-  scheduleEntryBrowserLayoutRefresh();
+  scheduleListSidebarLayoutRefresh();
 });
 wideNavMediaQuery.addEventListener("change", () => {
   renderShellNav();
   renderMobileAppBar();
-  scheduleEntryBrowserLayoutRefresh();
+  scheduleListSidebarLayoutRefresh();
 });
 // Like the navigation, "auto" follows both the media query and resize.
 compactDensityMediaQuery.addEventListener("change", syncUiDensity);
@@ -18870,12 +18903,12 @@ window.addEventListener("resize", () => {
   renderShellNav();
   renderMobileAppBar();
   syncUiDensity();
-  scheduleEntryBrowserLayoutRefresh(120);
+  scheduleListSidebarLayoutRefresh(120);
   scheduleLexicalNetworkLayout();
 });
 elements.appShell.addEventListener("transitionend", (event) => {
   if (event.propertyName === "grid-template-columns") {
-    scheduleEntryBrowserHeightUpdate();
+    scheduleListSidebarHeightUpdate();
   }
 });
 

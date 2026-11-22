@@ -369,6 +369,7 @@ function observeMorphologyLayout() {
     if (state.activeView !== "morphology-tables" || panel.hidden) return;
     panel.style.setProperty("--morphology-toolbar-height", `${toolbar.offsetHeight}px`);
     panel.style.setProperty("--morphology-workspace-height", mobileShellMode() ? `${workspace.clientHeight}px` : "100dvh");
+    updateMorphologyTableListHeight();
     if (panel.querySelector(".morphology-drawer[open]") && !morphologyStructureIsNarrow()) {
       closeMorphologyDrawer({ docked: true });
     }
@@ -378,6 +379,16 @@ function observeMorphologyLayout() {
   morphologyLayoutObserver.observe(toolbar);
   morphologyLayoutObserver.observe(workspace);
   update();
+}
+
+function updateMorphologyTableListHeight() {
+  const slot = elements.morphologyTablesPanel.querySelector(".morphology-table-list-slot");
+  if (!slot?.getClientRects().length) return;
+  const list = slot.querySelector(".morphology-table-list");
+  const stickyOffset = Number.parseFloat(getComputedStyle(list).insetBlockStart);
+  const { height, restingHeight } = measureStickySidebarHeights(slot, stickyOffset, { minBottomGap: 12 });
+  slot.style.setProperty("--morphology-table-list-height", `${height}px`);
+  slot.style.setProperty("--morphology-table-list-slot-min-height", `${restingHeight}px`);
 }
 
 function morphologyFocusSnapshot(panel) {
@@ -754,7 +765,9 @@ function morphologyTablesViewHtml(page) {
       : items;
   }).join("");
   return `<div class="morphology-tables">
-    <nav class="morphology-table-list" data-mtp-scroll="table-list" aria-label="${escapeHtml(aText("表格列表", "Tables"))}"><ul>${list}</ul></nav>
+    <div class="morphology-table-list-slot">
+      <nav class="morphology-table-list" data-mtp-scroll="table-list" aria-label="${escapeHtml(aText("表格列表", "Tables"))}"><ul>${list}</ul></nav>
+    </div>
     <section class="morphology-table-editor" data-table-id="${escapeHtml(table.id)}">
       <input class="morphology-table-title-input" data-mtp-prop="title" data-mtp-focus="table-title" value="${escapeHtml(table.title)}" placeholder="${escapeHtml(aText("未命名表格", "Untitled table"))}" aria-label="${escapeHtml(aText("标题", "Title"))}">
       <div class="morphology-table-summary" data-mtp-region="table-summary"></div>

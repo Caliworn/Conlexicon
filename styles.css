@@ -4048,7 +4048,7 @@ span.pending-source {
   }
 }
 
-.morphology-table-list {
+.morphology-table-list-slot {
   grid-area: list;
   display: none;
 }
@@ -4070,11 +4070,17 @@ span.pending-source {
 }
 
 @container (width >= 760px) {
+  .morphology-table-list-slot {
+    display: block;
+    align-self: stretch;
+    min-block-size: var(--morphology-table-list-slot-min-height, 0px);
+    contain: size;
+  }
+
   .morphology-table-list {
     position: sticky;
     inset-block-start: var(--morphology-rail-top);
-    display: block;
-    max-block-size: var(--morphology-rail-height);
+    max-block-size: var(--morphology-table-list-height, var(--morphology-rail-height));
     padding: 3px;
     overflow: auto;
     overscroll-behavior: contain;
@@ -5610,14 +5616,20 @@ span.pending-source {
   align-items: start;
 }
 
+.corpus-browser-slot {
+  align-self: stretch;
+  min-block-size: var(--corpus-browser-slot-min-height, 0px);
+  min-inline-size: 0;
+  contain: size;
+}
+
 .corpus-browser {
   position: sticky;
   top: 20px;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
-  height: calc(100vh - 230px);
-  min-height: 420px;
+  height: var(--corpus-browser-height, 50dvh);
   min-width: 0;
 }
 
@@ -5644,7 +5656,11 @@ span.pending-source {
 
 .corpus-panel.is-empty .corpus-browser {
   height: auto;
-  min-height: 0;
+}
+
+.corpus-panel.is-empty .corpus-browser-slot {
+  min-block-size: 0;
+  contain: none;
 }
 
 .corpus-item-list {
@@ -8665,11 +8681,15 @@ body:has(> :is(.modal-overlay, .network-overlay):not([hidden])) .app-nav {
   .corpus-browser {
     position: static;
     height: auto;
-    min-height: 0;
+  }
+
+  .corpus-browser-slot {
+    min-block-size: 0;
+    contain: none;
   }
 
   .corpus-item-list {
-    max-height: 320px;
+    max-block-size: var(--corpus-item-list-height, 50dvh);
   }
 
 }
