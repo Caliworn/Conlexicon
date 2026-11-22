@@ -18864,7 +18864,7 @@ document.addEventListener("keydown", (event) => {
 
   if (state.activeView === "morphology-tables" && !elements.morphologyTablesPanel.hidden) {
     event.preventDefault();
-    if (!event.repeat && !elements.morphologyTablesPanel.inert && !morphologyModalIsOpen()) {
+    if (!event.repeat && !elements.morphologyTablesPanel.inert) {
       saveMorphologyTemplates().catch((error) => console.error(error));
     }
   }
