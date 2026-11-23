@@ -2035,40 +2035,42 @@ label span {
   gap: 12px;
 }
 
-/* Edge fades: cards dissolve into whatever is behind the list instead of being
-   cut at its top and bottom, so every skin shares one rule. Each fade shows only
-   while content is hidden past that edge (app.js sets the attributes). The
-   navigator is a sibling of the list and never masked. Mask colors only carry
-   alpha. */
-@property --entry-list-fade-top {
+/* Edge fades: a scroller marked data-edge-fade dissolves its content into whatever
+   is behind it instead of cutting it at the top and bottom, so every skin shares
+   one rule. Each fade shows only while content is hidden past that edge (app.js
+   sets the attributes). Scroll padding keeps an item that focus scrolls into view
+   clear of the fades. The entry list's navigator is a sibling of the list and
+   never masked. Mask colors only carry alpha. */
+@property --edge-fade-top {
   syntax: "<length>";
   inherits: false;
   initial-value: 0px;
 }
 
-@property --entry-list-fade-bottom {
+@property --edge-fade-bottom {
   syntax: "<length>";
   inherits: false;
   initial-value: 0px;
 }
 
-.entry-list {
-  --entry-list-fade-size: 12px;
-  -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--entry-list-fade-top), black calc(100% - var(--entry-list-fade-bottom)), transparent);
-  mask-image: linear-gradient(to bottom, transparent, black var(--entry-list-fade-top), black calc(100% - var(--entry-list-fade-bottom)), transparent);
-  transition: --entry-list-fade-top 140ms ease, --entry-list-fade-bottom 140ms ease;
+[data-edge-fade] {
+  --edge-fade-size: 12px;
+  scroll-padding-block: var(--edge-fade-size);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black var(--edge-fade-top), black calc(100% - var(--edge-fade-bottom)), transparent);
+  mask-image: linear-gradient(to bottom, transparent, black var(--edge-fade-top), black calc(100% - var(--edge-fade-bottom)), transparent);
+  transition: --edge-fade-top 140ms ease, --edge-fade-bottom 140ms ease;
 }
 
-.entry-list[data-fade-top] {
-  --entry-list-fade-top: var(--entry-list-fade-size);
+[data-edge-fade][data-fade-top] {
+  --edge-fade-top: var(--edge-fade-size);
 }
 
-.entry-list[data-fade-bottom] {
-  --entry-list-fade-bottom: var(--entry-list-fade-size);
+[data-edge-fade][data-fade-bottom] {
+  --edge-fade-bottom: var(--edge-fade-size);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .entry-list {
+  [data-edge-fade] {
     transition: none;
   }
 }

@@ -327,7 +327,6 @@ const entryVirtualList = createVirtualListState(entryCardEstimatedHeight());
 // The entry list's navigator replaces its native scrollbar. Root mode has the
 // thumb alone for now, positioned by estimated row heights.
 let entryListNavigator = null;
-let entryListEdgeFrame = 0;
 let entryListNavigatorHoldsLoads = false;
 let entryListNavigatorLayout = { items: null, rows: [], total: 0 };
 // Segments for the navigator's ticks and bubble, per entry query (key).
@@ -5055,31 +5054,64 @@ function renderVirtualListWindow(virtualList) {
   });
   if (container === elements.entryList) {
     entryListNavigator?.update();
-    scheduleEntryListEdges();
+  }
+  // The rendered window changes the content height without resizing the list.
+  if (container.hasAttribute("data-edge-fade")) {
+    scheduleEdgeFade(container);
   }
 }
 
-// The list fades its cards at an edge only while content is hidden past it.
-function updateEntryListEdges() {
-  entryListEdgeFrame = 0;
-  const list = elements.entryList;
-  list.toggleAttribute("data-fade-top", list.scrollTop > 1);
-  list.toggleAttribute("data-fade-bottom", list.scrollTop + list.clientHeight < list.scrollHeight - 1);
+// ---- Edge fades ----
+// A scroller marked data-edge-fade fades its content at an edge only while more is
+// hidden past it. Scrolling is caught for every scroller in the capture phase;
+// syncEdgeFades() watches the size of scrollers a render added and lets go of removed
+// ones. A render that changes a scroller's content height without resizing it calls
+// scheduleEdgeFade() itself.
+const edgeFadeFrames = new Map();
+const edgeFadeTargets = new Set();
+const edgeFadeResizeObserver = new ResizeObserver((entries) => {
+  entries.forEach(({ target }) => scheduleEdgeFade(target));
+});
+
+function updateEdgeFade(element) {
+  element.toggleAttribute("data-fade-top", element.scrollTop > 1);
+  element.toggleAttribute("data-fade-bottom", element.scrollTop + element.clientHeight < element.scrollHeight - 1);
 }
 
-function scheduleEntryListEdges() {
-  if (!entryListEdgeFrame) {
-    entryListEdgeFrame = requestAnimationFrame(updateEntryListEdges);
+function scheduleEdgeFade(element) {
+  if (edgeFadeFrames.has(element)) {
+    return;
   }
+  edgeFadeFrames.set(element, requestAnimationFrame(() => {
+    edgeFadeFrames.delete(element);
+    updateEdgeFade(element);
+  }));
 }
 
-// Positioning an entry keeps it clear of the edge fades.
+function syncEdgeFades() {
+  edgeFadeTargets.forEach((element) => {
+    if (!element.isConnected) {
+      edgeFadeResizeObserver.unobserve(element);
+      edgeFadeTargets.delete(element);
+    }
+  });
+  document.querySelectorAll("[data-edge-fade]").forEach((element) => {
+    if (!edgeFadeTargets.has(element)) {
+      edgeFadeTargets.add(element);
+      // The first observation reports the current size, which sets the initial fades.
+      edgeFadeResizeObserver.observe(element);
+    }
+  });
+}
+
+// Positioning a virtual list row keeps it clear of the edge fades.
 function virtualListEdgeInset(virtualList) {
-  if (virtualList !== entryVirtualList || !virtualList.container) {
+  const container = virtualList.container;
+  if (!container?.hasAttribute("data-edge-fade")) {
     return 0;
   }
-  const fade = Number.parseFloat(getComputedStyle(virtualList.container).getPropertyValue("--entry-list-fade-size"));
-  return Math.min(fade, virtualList.container.clientHeight / 4);
+  const fade = Number.parseFloat(getComputedStyle(container).getPropertyValue("--edge-fade-size"));
+  return Math.min(fade, container.clientHeight / 4);
 }
 
 // Normal mode positions by result index: an entry covers one result and an
@@ -5406,8 +5438,8 @@ function renderVirtualListEmpty(container, virtualList, content) {
     setEntryListNavigatorActive(false);
   }
   container.replaceChildren(content);
-  if (container === elements.entryList) {
-    scheduleEntryListEdges();
+  if (container.hasAttribute("data-edge-fade")) {
+    scheduleEdgeFade(container);
   }
 }
 
@@ -5417,13 +5449,14 @@ function scrollVirtualListItemIntoView(virtualList, key, behavior = "smooth") {
   if (index === undefined || !container) {
     return false;
   }
-  const start = virtualList.offsets[index];
-  const end = virtualList.offsets[index + 1];
+  const inset = virtualListEdgeInset(virtualList);
+  const start = virtualList.offsets[index] - inset;
+  const end = virtualList.offsets[index + 1] + inset;
   const viewportStart = container.scrollTop;
   const viewportEnd = viewportStart + container.clientHeight;
   let top = viewportStart;
   if (start < viewportStart) {
-    top = start;
+    top = Math.max(0, start);
   } else if (end > viewportEnd) {
     top = Math.max(0, end - container.clientHeight);
   }
@@ -10263,6 +10296,7 @@ function renderQuality(dictionary = activeDictionary()) {
   if (!dictionary) {
     elements.qualityPanel.innerHTML = "";
     elements.qualityHeaderTools.innerHTML = "";
+    syncEdgeFades();
     liquidGlassOpticalEngine?.syncMappedSurfaces();
     return;
   }
@@ -10280,6 +10314,7 @@ function renderQuality(dictionary = activeDictionary()) {
   const summary = qualitySummaryState.status === "ready" ? qualitySummaryState.response.summary : null;
   elements.qualityHeaderTools.innerHTML = qualityHeaderToolsHtml(subpage, summary);
   elements.qualityPanel.innerHTML = renderQualityPage(subpage, summary);
+  syncEdgeFades();
   restoreFocusKey(elements.qualityView, focusKey);
   setupQualityMasonryLayouts();
   liquidGlassOpticalEngine?.syncMappedSurfaces();
@@ -10591,7 +10626,7 @@ function renderQualityPage(subpage, summary) {
     return `<li><button type="button" class="page-side-list-item${active ? " active" : ""}" data-quality-subpage="${escapeHtml(key)}" data-focus-key="category:${escapeHtml(key)}" aria-current="${active}"${count === 0 && !active ? " disabled" : ""}><span>${escapeHtml(label)}</span>${count === null ? "" : qualityCountHtml("page-side-list-count", qualitySource(key), count)}</button></li>`;
   }).join("");
   return `<div class="quality-layout">
-    <nav class="quality-category-rail" aria-label="${escapeHtml(aText("分类", "Categories"))}">
+    <nav class="quality-category-rail" data-edge-fade aria-label="${escapeHtml(aText("分类", "Categories"))}">
       <ul class="page-side-list">${qualitySourceGroups(qualitySource(subpage)).map((group) => (
         group.label ? `<li class="page-side-list-group"><span>${escapeHtml(group.label)}</span><ul>${items(group)}</ul></li>` : items(group)
       )).join("")}</ul>
@@ -17935,14 +17970,18 @@ elements.entryList.addEventListener("pointerover", (event) => {
   updateEntryQualityIssueTooltipPlacement(issue);
 });
 elements.entryList.addEventListener("scroll", updateHoveredEntryQualityIssueTooltipPlacement, { passive: true });
-elements.entryList.addEventListener("scroll", scheduleEntryListEdges, { passive: true });
 // Scrolling by hand cancels a tick press still waiting for its window.
 ["wheel", "touchstart", "keydown"].forEach((type) => {
   elements.entryList.addEventListener(type, () => {
     entryListPendingJump = null;
   }, { passive: true });
 });
-new ResizeObserver(scheduleEntryListEdges).observe(elements.entryList);
+document.addEventListener("scroll", (event) => {
+  if (event.target instanceof Element && event.target.hasAttribute("data-edge-fade")) {
+    scheduleEdgeFade(event.target);
+  }
+}, { capture: true, passive: true });
+syncEdgeFades();
 
 document.addEventListener("pointerover", (event) => {
   const target = appTooltipTargetFromEvent(event);

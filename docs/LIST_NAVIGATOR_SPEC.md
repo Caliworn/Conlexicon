@@ -120,7 +120,7 @@
 - 导航条接管的列表用 `scrollbar-width: none`（Chromium 121 起支持；桌面外壳 Electron 31 为 Chromium 126）。只是不画滚动条，滚动容器不变，虚拟列表与锚点恢复只读写 `scrollTop`。
 - 始终隐藏，只要能滚动就显示导航条，避免原生滚动条时有时无导致列表宽度变化、卡片全部重新测高。
 - 导航条是列表容器的兄弟元素，叠在它右侧，因为虚拟列表每次渲染都会删除容器中不属于当前窗口的子元素。列表的 `padding-right` 给导航条留出位置。
-- 列表上下渐隐：遮罩在 `.entry-list` 上，`app.js` 的 `updateEntryListEdges()` 按能否继续滚动写 `data-fade-top`／`data-fade-bottom`。`virtualListNearestScrollTop()` 与 `stabilizeVirtualListItemScroll()` 通过 `virtualListEdgeInset()` 给词条列表留出渐隐高度，点刻度跳转也沿用这个边距，所以对准的那一行不会落在渐隐区里。
+- 列表上下渐隐：词条列表标 `data-edge-fade`，使用外壳的通用边缘渐隐（[外壳规范](APP_SHELL_SPEC.md#工具页页头)）。虚拟列表的 `virtualListNearestScrollTop()`、`stabilizeVirtualListItemScroll()` 和 `scrollVirtualListItemIntoView()` 通过 `virtualListEdgeInset()` 给带渐隐的列表留出 `--edge-fade-size`，点刻度跳转也沿用这个边距，所以对准的那一行不会落在渐隐区里。
 - 指针停在导航条上滚动时，滚轮事件到不了列表，需要转发：用非被动监听器取消默认行为（否则外层可滚动的祖先也会跟着滚），再用 `scrollBy` 转给列表，并按 `deltaMode` 把行、页单位换算成像素。
 
 ## 7. 模块与接口

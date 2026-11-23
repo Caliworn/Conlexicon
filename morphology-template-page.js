@@ -319,6 +319,7 @@ function renderMorphologyTemplatePage(dictionary = activeDictionary()) {
     </div>
   `;
   setMorphologyPageInert(page.saving);
+  syncEdgeFades();
   const entryPicker = panel.querySelector('[data-mtp-trial="entry"]');
   if (entryPicker) {
     bindSourceAutocompleteInput(entryPicker, {
@@ -776,7 +777,7 @@ function morphologyTablesViewHtml(page) {
   }).join("");
   return `<div class="morphology-tables">
     <div class="morphology-table-list-slot">
-      <nav class="morphology-table-list" data-mtp-scroll="table-list" aria-label="${escapeHtml(aText("表格列表", "Tables"))}"><ul class="page-side-list">${list}</ul></nav>
+      <nav class="morphology-table-list" data-mtp-scroll="table-list" data-edge-fade aria-label="${escapeHtml(aText("表格列表", "Tables"))}"><ul class="page-side-list">${list}</ul></nav>
     </div>
     <section class="morphology-table-editor" data-table-id="${escapeHtml(table.id)}">
       <input class="morphology-table-title-input" data-mtp-prop="title" data-mtp-focus="table-title" value="${escapeHtml(table.title)}" placeholder="${escapeHtml(aText("未命名表格", "Untitled table"))}" aria-label="${escapeHtml(aText("标题", "Title"))}">
@@ -869,6 +870,9 @@ function renderMorphologyTablesDerived(page, dictionary, problems) {
   panel.querySelectorAll(".morphology-table-list .page-side-list-item").forEach((button) => {
     button.innerHTML = morphologyTableTitleHtml(draftModel.findTable(page.draft, button.dataset.targetTableId));
   });
+  // Retitled tables can wrap and change the list's content height.
+  const tableList = panel.querySelector(".morphology-table-list");
+  if (tableList) scheduleEdgeFade(tableList);
   const cycleKeys = new Set(problems.cycles.filter(({ tableId }) => tableId === table.id).map(({ rowId, columnId }) => `${rowId}|${columnId}`));
   const errors = new Map(problems.cellErrors.filter(({ tableId }) => tableId === table.id).map((error) => [`${error.rowId}|${error.columnId}`, error.message]));
   editor.querySelectorAll(".morphology-grid-cell").forEach((cell) => {
