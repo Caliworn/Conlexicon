@@ -3255,15 +3255,24 @@ function renderLocaleActiveView() {
   }
 }
 
+// The page scrolls the window on desktop and the workspace in the mobile shell.
+function pageScrollTop() {
+  return mobileShellMode() ? elements.workspace.scrollTop : window.scrollY;
+}
+
+function scrollPageTo(top) {
+  (mobileShellMode() ? elements.workspace : window).scrollTo({ top, behavior: "auto" });
+}
+
 function rememberProcessScroll() {
   if (state.activeView === "docs") {
-    viewScrollMemory.docsPage = window.scrollY;
+    viewScrollMemory.docsPage = pageScrollTop();
   } else if (state.activeView === "analysis") {
     const analysisViewState = activeAnalysisViewState();
-    analysisViewState.scrollByRoute[analysisRouteKey()] = window.scrollY;
+    analysisViewState.scrollByRoute[analysisRouteKey()] = pageScrollTop();
   } else if (state.activeView === "quality") {
     const qualityViewState = activeQualityViewState();
-    qualityViewState.scrollBySubpage[qualityViewState.subpage] = window.scrollY;
+    qualityViewState.scrollBySubpage[qualityViewState.subpage] = pageScrollTop();
   }
 }
 
@@ -3273,15 +3282,15 @@ function restoreProcessScroll() {
   }
   requestAnimationFrame(() => {
     if (state.activeView === "docs") {
-      window.scrollTo({ top: viewScrollMemory.docsPage, behavior: "auto" });
+      scrollPageTo(viewScrollMemory.docsPage);
       elements.docsMarkdownInput.scrollTop = viewScrollMemory.docsEditor;
       elements.docsPreview.scrollTop = viewScrollMemory.docsPreview;
     } else if (state.activeView === "analysis") {
       const analysisViewState = activeAnalysisViewState();
-      window.scrollTo({ top: analysisViewState.scrollByRoute[analysisRouteKey()] || 0, behavior: "auto" });
+      scrollPageTo(analysisViewState.scrollByRoute[analysisRouteKey()] || 0);
     } else if (state.activeView === "quality") {
       const qualityViewState = activeQualityViewState();
-      window.scrollTo({ top: qualityViewState.scrollBySubpage[qualityViewState.subpage] || 0, behavior: "auto" });
+      scrollPageTo(qualityViewState.scrollBySubpage[qualityViewState.subpage] || 0);
     }
   });
 }
@@ -4053,7 +4062,7 @@ function measureStickySidebarHeights(anchor, stickyOffset, { minHeight = 0, minB
   const scrollsInWorkspace = mobileShellMode();
   const viewportTop = scrollsInWorkspace ? workspace.getBoundingClientRect().top + workspace.clientTop : 0;
   const viewportHeight = scrollsInWorkspace ? workspace.clientHeight : window.innerHeight;
-  const scrollTop = scrollsInWorkspace ? workspace.scrollTop : window.scrollY;
+  const scrollTop = pageScrollTop();
   const top = anchor.getBoundingClientRect().top;
   const bottomPadding = Number.parseFloat(getComputedStyle(workspace).paddingBottom) || 0;
   const bottom = viewportTop + viewportHeight - Math.max(minBottomGap, bottomPadding);
@@ -10539,6 +10548,15 @@ function qualityCategoryCount(subpage, summary) {
   return summary ? qualitySubpageEntryCount(summary, subpage) : null;
 }
 
+// Counts are affected entries or corpus items (what the entry list filter returns), not issues;
+// the unit is spoken but not shown.
+function qualityCountHtml(className, source, count) {
+  const unit = source === "corpus"
+    ? aText(" 条语料", count === 1 ? " corpus item" : " corpus items")
+    : aText(" 个词条", count === 1 ? " entry" : " entries");
+  return `<span class="${className}">${escapeHtml(count)}<span class="visually-hidden">${escapeHtml(unit)}</span></span>`;
+}
+
 function qualityHeaderToolsHtml(subpage, summary) {
   const source = qualitySource(subpage);
   const sources = [
@@ -10557,7 +10575,7 @@ function qualityHeaderToolsHtml(subpage, summary) {
       <div class="segmented-control view-header-switch" role="radiogroup" aria-label="${escapeHtml(aText("检查对象", "Checked content"))}">
         ${sources.map(([key, label, count]) => {
           const current = key === source;
-          return `<button type="button" role="radio" class="${current ? "active" : ""}" data-control-tone="neutral" data-control-selection data-quality-source="${key}" data-focus-key="source:${key}" aria-checked="${current}" tabindex="${current ? 0 : -1}">${escapeHtml(label)}${count === null ? "" : `<span class="view-header-switch-count">${escapeHtml(count)}</span>`}</button>`;
+          return `<button type="button" role="radio" class="${current ? "active" : ""}" data-control-tone="neutral" data-control-selection data-quality-source="${key}" data-focus-key="source:${key}" aria-checked="${current}" tabindex="${current ? 0 : -1}">${escapeHtml(label)}${count === null ? "" : qualityCountHtml("view-header-switch-count", key, count)}</button>`;
         }).join("")}
       </div>
     </div>
@@ -10570,7 +10588,7 @@ function renderQualityPage(subpage, summary) {
   const items = (group) => group.subpages.map(([key, label]) => {
     const count = qualityCategoryCount(key, summary);
     const active = key === subpage;
-    return `<li><button type="button" class="page-side-list-item${active ? " active" : ""}" data-quality-subpage="${escapeHtml(key)}" data-focus-key="category:${escapeHtml(key)}" aria-current="${active}"${count === 0 && !active ? " disabled" : ""}><span>${escapeHtml(label)}</span>${count === null ? "" : `<span class="page-side-list-count">${escapeHtml(count)}</span>`}</button></li>`;
+    return `<li><button type="button" class="page-side-list-item${active ? " active" : ""}" data-quality-subpage="${escapeHtml(key)}" data-focus-key="category:${escapeHtml(key)}" aria-current="${active}"${count === 0 && !active ? " disabled" : ""}><span>${escapeHtml(label)}</span>${count === null ? "" : qualityCountHtml("page-side-list-count", qualitySource(key), count)}</button></li>`;
   }).join("");
   return `<div class="quality-layout">
     <nav class="quality-category-rail" aria-label="${escapeHtml(aText("分类", "Categories"))}">
