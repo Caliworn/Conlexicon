@@ -340,8 +340,8 @@ morphologyTables: [{ tableId, notes, overrides: [Override] }],   // Override 见
   - 表在槽位之间移动不改变覆写的归属，不需要引用检查。
 - **形态分析**使用现有 `morphologyAnalysis`。模板页的当前词条数取 `tables[].assignedEntryCount`，以 `tableId` 关联并使用 `table` 分类跳转。覆写统计由 `overrideTables[]` 提供。[API 契约](API_CONTRACT.md#分析功能结果与质量查询)
 - **分配预览端点**（2.13 的"保存前影响"，阶段 3 实施）：
-  - `POST /api/dictionaries/:id/morphology/assignment-preview`，请求体只含决定分配的部分：`{ slots: [{ id, tables: [{ id, matchRules }] }] }`，取自 `morphologyForSave()` 的结果，与保存提交的规则相同，其余字段忽略。表和槽位的 ID 可以是草稿里尚未保存的 ID，服务端只用来标识结果。
-  - 校验复用 `PUT /morphology` 中槽位、表 ID 和规则的校验函数与错误码：`slots` 不是数组或槽位为空返回 400 `invalid_morphology_slot`，规则行按 2.2 返回 400 `invalid_morphology_match_rule`，表不是对象返回 400 `invalid_morphology_payload`，槽位与表之间的重复 ID 返回 409 `duplicate_entity_ids_scoped`。与保存的唯一差别：保存允许新槽位和新表省略 ID，预览要求每个槽位和表都带 ID（结果要按 ID 对应），缺少时返回 400 `invalid_morphology_payload`。格、行列、继承和形态函数不参与，所以表格视图里尚未修正的格错误不妨碍预览。
+  - `POST /api/dictionaries/:id/morphology/assignment-preview`，请求体只含决定分配的部分：`{ slots: [{ id, tables: [{ id, matchRules }] }] }`，取自 `morphologyForSave()` 的结果，与保存提交的规则相同，其余字段忽略。请求体上限与形态保存相同。表和槽位的 ID 可以是草稿里尚未保存的 ID，服务端只用来标识结果。
+  - 校验复用 `PUT /morphology` 中槽位、表 ID 和规则的校验函数与错误码：`slots` 不是数组、槽位为空或槽位 ID 不是字符串返回 400 `invalid_morphology_slot`，规则行按 2.2 返回 400 `invalid_morphology_match_rule`，表不是对象或表 ID 不是字符串返回 400 `invalid_morphology_payload`，槽位与表之间的重复 ID 返回 409 `duplicate_entity_ids_scoped`。与保存的唯一差别：保存允许新槽位和新表省略 ID，预览要求每个槽位和表都带 ID（结果要按 ID 对应），缺少或为空时返回 400 `invalid_morphology_payload`。格、行列、继承和形态函数不参与，所以表格视图里尚未修正的格错误不妨碍预览。
   - 服务端用当前已保存的模板和请求中的分配各解析一次自动模式词条，按词条比较合并后的生效表集合，只改顺序不算变化。返回 `{ changedEntryCount, gainedByTable: [{ tableId, entryCount }], lostByTable: [{ tableId, entryCount }], sampleEntries: [{ entryId, lemma, gainedTableIds, lostTableIds }] }`。两张表级列表只含计数大于 0 的表：`gainedByTable` 按请求中的表顺序，`lostByTable` 按已保存模板的表顺序，草稿删掉的表也在其中。
   - `sampleEntries` 按词条顺序取前 20 条，不返回完整 ID 列表。手动模式词条不参与。只读，不写入任何数据，也不推进查询会话 generation。
   - **匹配输入缓存**：解析只依赖每个词条的上下文标签列表（2.4），服务端把自动模式词条按这份列表聚合成 `{ contexts, entryCount, sample }`，`sample` 保留该组按词条顺序的前 20 个 `[position, entryId]`。每组只解析一次，示例的 lemma 最后按 ID 补读。聚合结果按词典缓存在进程内，与查询会话一起失效（词条、标签或模板写入后清除），第一次预览时建立。

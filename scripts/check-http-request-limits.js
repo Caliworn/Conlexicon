@@ -106,6 +106,16 @@ async function main() {
   assert.equal(docsHandled, true);
   assert.equal(docsStatus, 200);
 
+  // A preview carries the match rules of a morphology module, which saves under the module limit.
+  const previewResult = await callRoute("POST", "/api/dictionaries/dict-test/morphology/assignment-preview", JSON.stringify({ slots: [], padding }), {
+    repository: {
+      async previewMorphologyAssignment() {
+        return { changedEntryCount: 0, gainedByTable: [], lostByTable: [], sampleEntries: [] };
+      },
+    },
+  });
+  assert.equal(previewResult.statusCode, 200);
+
   let imported = false;
   const importResult = await callRoute("POST", "/api/import", defaultBody, {
     repository: {

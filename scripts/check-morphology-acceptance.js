@@ -745,7 +745,7 @@ async function checkDraftDetachmentSave(repository) {
 }
 
 function checkAssignmentKey() {
-  const base = { slots: [slot("s1", table("a", rule(["n", "irr"]), rule(["v"], ["x"]))), slot("s2", table("b", rule(["adj"])))] };
+  const base = { slots: [slot("s1", table("a", rule(["n", "irr"]), rule(["v"], ["x"]))), slot("s2", table("b", rule(["adj"])), table("c", rule(["adv"])))] };
   const key = morphologyAssignmentKey(base);
   const variant = (change) => {
     const next = structuredClone(base);
@@ -753,6 +753,7 @@ function checkAssignmentKey() {
     return morphologyAssignmentKey(next);
   };
   assert.equal(variant((next) => next.slots.reverse()), key, "slot order is display only");
+  assert.equal(variant((next) => next.slots[1].tables.reverse()), key, "table order within a slot is display only");
   assert.equal(variant((next) => {
     next.slots[0].tables[0].matchRules = [rule([" v "], ["x"]), rule(["irr", "n"]), rule(["n", "irr"])];
   }), key, "rule order, tag order, padding and duplicate rows do not change assignment");
@@ -761,7 +762,7 @@ function checkAssignmentKey() {
     next.slots[0].tables.push(next.slots[1].tables[0]);
     next.slots.pop();
   }), key, "moving a table into another slot changes competition");
-  assert.notEqual(variant((next) => next.slots.pop()), key, "removing a table");
+  assert.notEqual(variant((next) => next.slots[1].tables.pop()), key, "removing a table");
   assert.notEqual(variant((next) => next.slots.push(slot("s3", table("c")))), key, "adding a table");
 
   // The page keys the rules a save would submit: edited inputs live in allText/noneText.
@@ -769,6 +770,9 @@ function checkAssignmentKey() {
   edited.slots[1].tables[0].matchRules = [{ ...rule(["adj"]), allText: "adj, rare" }];
   assert.equal(morphologyAssignmentKey(edited), key);
   assert.notEqual(morphologyAssignmentKey(draftModel.morphologyForSave(edited)), key);
+  const excluded = structuredClone(base);
+  excluded.slots[0].tables[0].matchRules[1] = { ...rule(["v"], ["x"]), noneText: "x, y" };
+  assert.notEqual(morphologyAssignmentKey(draftModel.morphologyForSave(excluded)), key, "an edited exclusion input");
 }
 
 async function checkAssignmentPreview(repository) {
@@ -860,8 +864,18 @@ async function checkAssignmentPreview(repository) {
   const afterEdit = await preview(draft);
   assert.deepEqual(afterEdit, expected(edited, draft));
   assert.equal(afterEdit.changedEntryCount, 29);
+  // So do definition tag writes: the verb sense no longer gains the new table.
+  const both = edited.entries.find((entry) => entry.id === "noun-verb");
+  const definitions = both.definitions.map((definition) => (definition.tags.includes("v") ? { ...definition, tags: ["adj"] } : definition));
+  await callApi(repository, "PUT", `/api/dictionaries/${id}/entries/noun-verb`, { entry: { ...both, definitions } });
+  const afterDefinitionEdit = await preview(draft);
+  assert.deepEqual(afterDefinitionEdit, expected(await repository.getDictionarySnapshot(id), draft));
+  assert.equal(afterDefinitionEdit.changedEntryCount, 28);
+  assert.deepEqual(afterDefinitionEdit.gainedByTable, []);
 
-  const invalid = (body, code, status = 400) => assert.rejects(preview(body), expectApiError(code, status));
+  const invalid = (body, code, status = 400, reason) => assert.rejects(preview(body), (error) => (
+    expectApiError(code, status)(error) && (!reason || error.details.reason === reason)
+  ));
   await invalid({ slots: {} }, "invalid_morphology_slot");
   await invalid({ slots: [{ id: "s", tables: [] }] }, "invalid_morphology_slot");
   await invalid({ slots: [slot("s", { id: "t", matchRules: [rule([], ["n"])] })] }, "invalid_morphology_match_rule");
@@ -871,8 +885,11 @@ async function checkAssignmentPreview(repository) {
   await invalid({ slots: [slot("s", { matchRules: [] })] }, "invalid_morphology_payload");
   await invalid({ slots: [{ tables: [{ id: "t" }] }] }, "invalid_morphology_payload");
   await invalid({ slots: [slot("s", "t")] }, "invalid_morphology_payload");
-  const cells = await preview({ slots: [slot("s", { id: "t", matchRules: [rule(["n"])], cells: [{ kind: "rule" }] })] });
-  assert.equal(cells.lostByTable.length, 4, "cell content is not part of a preview");
+  await invalid({ slots: [{ id: 42, tables: [{ id: "t" }] }] }, "invalid_morphology_slot", 400, "invalid_slot_fields");
+  await invalid({ slots: [slot("s", { id: 42 })] }, "invalid_morphology_payload", 400, "invalid_table");
+  const plainDraft = { slots: [slot("s", { id: "t", matchRules: [rule(["n"])] })] };
+  const withCells = { slots: [slot("s", { id: "t", matchRules: [rule(["n"])], cells: [{ kind: "rule" }] })] };
+  assert.deepEqual(await preview(withCells), await preview(plainDraft), "cell content is not part of a preview");
 }
 
 async function runMorphologyAcceptanceCheck() {

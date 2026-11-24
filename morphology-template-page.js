@@ -430,6 +430,18 @@ function morphologyFocusAfterRender(key) {
   morphologyPageState().pendingFocus = key;
 }
 
+const morphologyRegionMarkup = new WeakMap();
+
+// Rewrites a region only when its markup changes, and keeps focus on the same control. Regions
+// refresh after counts and the save impact arrive, while focus may be on one of their buttons.
+function morphologyReplaceRegion(region, html) {
+  if (morphologyRegionMarkup.get(region) === html) return;
+  const key = region.contains(document.activeElement) ? document.activeElement.dataset.mtpFocus : "";
+  region.innerHTML = html;
+  morphologyRegionMarkup.set(region, html);
+  if (key) region.querySelector(`[data-mtp-focus="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
+}
+
 // ---- Structure view ----------------------------------------------------------------------------
 
 function morphologyStructureViewHtml(page) {
@@ -567,11 +579,11 @@ function morphologyCardInfoHtml(page, table, { coverage, counts, verdict, ruleEr
   let count = "";
   if (!savedIds.has(table.id)) count = `<span class="muted-text">${escapeHtml(aText("尚未保存", "Not saved yet"))}</span>`;
   else if (counts.status === "loading") count = `<span class="muted-text">${escapeHtml(aText("正在统计词条数", "Counting entries"))}</span>`;
-  else if (counts.status === "error") count = `<button class="text-link-button" type="button" data-mtp-action="retry-counts">${escapeHtml(aText("词条数加载失败，重试", "Could not count entries. Retry"))}</button>`;
+  else if (counts.status === "error") count = `<button class="text-link-button" type="button" data-mtp-action="retry-counts" data-mtp-focus="retry-counts:${escapeHtml(table.id)}">${escapeHtml(aText("词条数加载失败，重试", "Could not count entries. Retry"))}</button>`;
   else {
     const value = counts.counts.get(table.id) || 0;
     count = value
-      ? `<button class="text-link-button" type="button" data-mtp-action="open-entries">${escapeHtml(aText(`${value} 个词条`, `${value} entries`))}</button>`
+      ? `<button class="text-link-button" type="button" data-mtp-action="open-entries" data-mtp-focus="open-entries:${escapeHtml(table.id)}">${escapeHtml(aText(`${value} 个词条`, `${value} entries`))}</button>`
       : `<span class="muted-text">${escapeHtml(aText("0 个词条", "0 entries"))}</span>`;
   }
   return `<div class="morphology-rule-chips">${chips}</div>
@@ -705,14 +717,14 @@ function renderMorphologyStructureDerived(page, dictionary, problems) {
     slot.tables.forEach((table) => {
       const info = panel.querySelector(`[data-table-id="${CSS.escape(table.id)}"] [data-mtp-region="card-info"]`);
       if (!info) return;
-      info.innerHTML = morphologyCardInfoHtml(page, table, {
+      morphologyReplaceRegion(info, morphologyCardInfoHtml(page, table, {
         coverage: entry.coverage.get(table.id),
         counts,
         verdict: verdicts.get(table.id),
         ruleErrors: errorTables.has(table.id),
         savedIds,
         impact,
-      });
+      }));
       const card = info.closest(".morphology-table-card");
       card.querySelector(".morphology-table-card-head strong").innerHTML = morphologyTableTitleHtml(table);
       const verdict = verdicts.get(table.id);
@@ -1753,7 +1765,6 @@ async function openMorphologyTemplateTable(tableId) {
 // ---- Save impact preview -----------------------------------------------------------------------
 
 const MORPHOLOGY_IMPACT_DELAY = 400;
-const morphologyImpactMarkup = new WeakMap();
 
 function newMorphologyImpactState(open = false) {
   return { key: "", status: "idle", result: null, timer: 0, controller: null, open };
@@ -1904,12 +1915,7 @@ function renderMorphologyImpact(page, current) {
   const region = panel.querySelector('[data-mtp-region="impact"]');
   if (!region) return;
   region.hidden = page.impact.status === "idle";
-  const html = region.hidden ? "" : morphologyImpactHtml(page, current);
-  if (morphologyImpactMarkup.get(region) === html) return;
-  const focus = region.contains(document.activeElement) ? morphologyFocusSnapshot(panel) : null;
-  region.innerHTML = html;
-  morphologyImpactMarkup.set(region, html);
-  if (focus) morphologyRestoreFocus(panel, focus);
+  morphologyReplaceRegion(region, region.hidden ? "" : morphologyImpactHtml(page, current));
 }
 
 // An example entry goes into the assignment trial, which explains it against the draft.

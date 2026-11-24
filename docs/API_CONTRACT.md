@@ -60,7 +60,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 ### 请求体大小限制
 
 - 普通单对象与设置端点最多接受 5 MiB 请求体，包括全局偏好、新建词典、词典 metadata、普通设置、IPA 设置以及单词条新建/保存。
-- 模块级或批量保存端点最多接受 32 MiB，包括 `autosave`、语言文档、形态学和批量词条 patch。
+- 模块级或批量保存端点最多接受 32 MiB，包括 `autosave`、语言文档、形态学、形态分配预览和批量词条 patch。
 - JSON 导入端点最多接受 64 MiB。该上限只控制 HTTP 请求边界；导入仍会经历 JSON 解析、legacy migration 和规范化，不能据此推断峰值内存等于文件大小。
 - 后端会用合法的 `Content-Length` 提前拒绝明显超限请求，同时继续按实际收到的字节流累计检查；缺失、伪造或偏小的声明长度不能绕过上限。超限统一返回 `request_body_too_large`，并在 `details.limitBytes` 中给出当前端点的字节上限。
 
@@ -528,7 +528,7 @@ morphologyTables: [{ tableId, notes, overrides: [Override], createdAt, updatedAt
 
 `POST /api/dictionaries/:id/morphology/assignment-preview` 回答“保存这份分配草稿后，自动分配会有什么变化”，供模板页显示保存前影响。只读，不写入数据，也不推进查询会话 generation。
 
-- 请求体 `{ slots: [{ id, tables: [{ id, matchRules }] }] }`，其余字段忽略。表和槽位的 ID 可以是尚未保存的 ID。校验复用 `PUT /morphology` 的槽位、表 ID 和规则校验：`slots` 不是数组或槽位为空返回 400 `invalid_morphology_slot`，规则行无效返回 400 `invalid_morphology_match_rule`，表不是对象返回 400 `invalid_morphology_payload`，槽位与表的 ID 重复返回 409 `duplicate_entity_ids_scoped`。与保存不同，每个槽位和表都必须带 ID，缺少时返回 400 `invalid_morphology_payload`。格、行列、继承和形态函数不参与。
+- 请求体 `{ slots: [{ id, tables: [{ id, matchRules }] }] }`，其余字段忽略。表和槽位的 ID 可以是尚未保存的 ID。校验复用 `PUT /morphology` 的槽位、表 ID 和规则校验：`slots` 不是数组、槽位为空或槽位 ID 不是字符串返回 400 `invalid_morphology_slot`，规则行无效返回 400 `invalid_morphology_match_rule`，表不是对象或表 ID 不是字符串返回 400 `invalid_morphology_payload`，槽位与表的 ID 重复返回 409 `duplicate_entity_ids_scoped`。与保存不同，每个槽位和表都必须带 ID，缺少或为空时返回 400 `invalid_morphology_payload`。格、行列、继承和形态函数不参与。
 - 服务端用当前已保存的模板和请求中的分配各解析一次自动模式词条，按词条比较合并后的生效表集合，只改顺序不算变化。手动模式词条不参与。
 - 响应 `{ changedEntryCount, gainedByTable: [{ tableId, entryCount }], lostByTable: [{ tableId, entryCount }], sampleEntries: [{ entryId, lemma, gainedTableIds, lostTableIds }] }`。表级列表只含计数大于 0 的表，`gainedByTable` 按请求中的表顺序，`lostByTable` 按已保存模板的表顺序（请求中已删除的表也在其中）。`sampleEntries` 按词条顺序取前 20 条。
 - 服务端按词典在进程内缓存自动模式词条的匹配输入，按上下文标签组合聚合，每组只解析一次。缓存与查询会话一起失效：词条、标签和模板写入后清除，下一次预览重新读取。
