@@ -9,6 +9,7 @@ const {
   applyMorphologyRuleSyntax,
   createMorphologyResolver,
   explainAutomaticTables,
+  morphologyAssignmentKey,
   morphologyMatchContexts,
   morphologyMergeRegions,
   morphologySearchValueRecords,
@@ -743,9 +744,141 @@ async function checkDraftDetachmentSave(repository) {
   assert.equal(resolver.tableShape(child.id).rows.length, parent.rows.length);
 }
 
+function checkAssignmentKey() {
+  const base = { slots: [slot("s1", table("a", rule(["n", "irr"]), rule(["v"], ["x"]))), slot("s2", table("b", rule(["adj"])))] };
+  const key = morphologyAssignmentKey(base);
+  const variant = (change) => {
+    const next = structuredClone(base);
+    change(next);
+    return morphologyAssignmentKey(next);
+  };
+  assert.equal(variant((next) => next.slots.reverse()), key, "slot order is display only");
+  assert.equal(variant((next) => {
+    next.slots[0].tables[0].matchRules = [rule([" v "], ["x"]), rule(["irr", "n"]), rule(["n", "irr"])];
+  }), key, "rule order, tag order, padding and duplicate rows do not change assignment");
+  assert.notEqual(variant((next) => { next.slots[1].tables[0].matchRules = [rule(["Adj"])]; }), key, "tag case is structural");
+  assert.notEqual(variant((next) => {
+    next.slots[0].tables.push(next.slots[1].tables[0]);
+    next.slots.pop();
+  }), key, "moving a table into another slot changes competition");
+  assert.notEqual(variant((next) => next.slots.pop()), key, "removing a table");
+  assert.notEqual(variant((next) => next.slots.push(slot("s3", table("c")))), key, "adding a table");
+
+  // The page keys the rules a save would submit: edited inputs live in allText/noneText.
+  const edited = structuredClone(base);
+  edited.slots[1].tables[0].matchRules = [{ ...rule(["adj"]), allText: "adj, rare" }];
+  assert.equal(morphologyAssignmentKey(edited), key);
+  assert.notEqual(morphologyAssignmentKey(draftModel.morphologyForSave(edited)), key);
+}
+
+async function checkAssignmentPreview(repository) {
+  const id = "dict-morphology-assignment-preview";
+  const morphology = {
+    slots: [
+      slot("slot-noun", table("noun", rule(["n"]))),
+      slot("slot-irregular", table("irregular", rule(["n", "irr"]))),
+      slot("slot-verb", table("verb", rule(["v"]))),
+      slot("slot-old", table("old", rule(["archaic"]))),
+    ],
+  };
+  const { dictionary } = importDictionaryFromJsonPayload({
+    id, name: "Assignment preview", morphology,
+    entries: [
+      { id: "plain-noun", lemma: "plain", tags: ["n"] },
+      { id: "irregular-noun", lemma: "irregular", tags: ["n", "irr"] },
+      { id: "noun-verb", lemma: "both", definitions: [{ meaning: "thing", tags: ["n"] }, { meaning: "do", tags: ["v"] }] },
+      { id: "archaic-sense", lemma: "elder", definitions: [{ meaning: "old", tags: ["archaic"] }, { meaning: "untagged" }] },
+      { id: "manual-old", lemma: "manual", morphologyMode: "manual", morphologyTables: [{ tableId: "old", notes: "kept" }] },
+      ...Array.from({ length: 25 }, (_, index) => ({ id: `more-${index}`, lemma: `more-${index}`, tags: ["n", "irr"] })),
+    ],
+  });
+  await repository.importDictionarySnapshot(dictionary);
+  const preview = async (body) => (await callApi(repository, "POST", `/api/dictionaries/${id}/morphology/assignment-preview`, body)).body;
+  const assignment = (current) => ({
+    slots: current.slots.map((item) => ({
+      id: item.id, tables: item.tables.map(({ id: tableId, matchRules }) => ({ id: tableId, matchRules })),
+    })),
+  });
+  const expected = (current, draft) => {
+    const gained = new Map();
+    const lost = new Map();
+    const samples = [];
+    current.entries.filter((entry) => entry.morphologyMode !== "manual").forEach((entry) => {
+      const contexts = morphologyMatchContexts(entry);
+      const before = resolveAutomaticTables(contexts, current.morphology).tableIds;
+      const after = resolveAutomaticTables(contexts, draft).tableIds;
+      const gainedTableIds = after.filter((tableId) => !before.includes(tableId));
+      const lostTableIds = before.filter((tableId) => !after.includes(tableId));
+      if (!gainedTableIds.length && !lostTableIds.length) return;
+      gainedTableIds.forEach((tableId) => gained.set(tableId, (gained.get(tableId) || 0) + 1));
+      lostTableIds.forEach((tableId) => lost.set(tableId, (lost.get(tableId) || 0) + 1));
+      samples.push({ entryId: entry.id, lemma: entry.lemma, gainedTableIds, lostTableIds });
+    });
+    const counts = (map, source) => source.slots.flatMap((item) => item.tables)
+      .filter((item) => map.has(item.id)).map((item) => ({ tableId: item.id, entryCount: map.get(item.id) }));
+    return {
+      changedEntryCount: samples.length,
+      gainedByTable: counts(gained, draft),
+      lostByTable: counts(lost, current.morphology),
+      sampleEntries: samples.slice(0, 20),
+    };
+  };
+  const generation = () => repository.querySessionCache.generation(id);
+
+  const saved = await repository.getDictionarySnapshot(id);
+  const none = { changedEntryCount: 0, gainedByTable: [], lostByTable: [], sampleEntries: [] };
+  assert.deepEqual(await preview(assignment(saved.morphology)), none);
+  const reordered = assignment(saved.morphology);
+  reordered.slots.reverse();
+  reordered.slots[0].tables[0].matchRules = [rule([" archaic "]), rule(["archaic"])];
+  assert.deepEqual(await preview(reordered), none, "order, padding and duplicate rule rows do not change assignment");
+
+  // The irregular table competes with the noun table, the old table is deleted, and two new
+  // unsaved tables appear: one with a rule, one without.
+  const draft = assignment(saved.morphology);
+  draft.slots[0].tables.push(draft.slots[1].tables[0]);
+  draft.slots.splice(1, 1);
+  draft.slots.pop();
+  draft.slots.push(slot("mslot-new", { id: "mtable-fresh", matchRules: [rule(["v"])] }));
+  draft.slots.push(slot("mslot-empty", { id: "mtable-empty", matchRules: [] }));
+  const generationBefore = generation();
+  const result = await preview({ ...draft, functions: { leftV: 5 }, slots: draft.slots.map((item) => ({ ...item, name: 7 })) });
+  assert.deepEqual(result, expected(saved, draft), "grouped results match a per-entry comparison; other fields are ignored");
+  assert.equal(result.changedEntryCount, 28);
+  assert.deepEqual(result.lostByTable, [{ tableId: "noun", entryCount: 26 }, { tableId: "old", entryCount: 1 }]);
+  assert.deepEqual(result.gainedByTable, [{ tableId: "mtable-fresh", entryCount: 1 }], "zero counts are omitted");
+  assert.equal(result.sampleEntries.length, 20);
+  assert.deepEqual(result.sampleEntries.slice(0, 3).map(({ entryId }) => entryId), ["irregular-noun", "noun-verb", "archaic-sense"]);
+  assert.ok(!result.sampleEntries.some(({ entryId }) => entryId === "manual-old"), "manual entries are not previewed");
+  assert.equal(generation(), generationBefore, "a preview does not advance the query generation");
+  assert.equal((await repository.getDictionarySnapshot(id)).updatedAt, saved.updatedAt, "a preview writes nothing");
+
+  // Entry writes clear the cached match groups.
+  const plain = saved.entries.find((entry) => entry.id === "plain-noun");
+  await callApi(repository, "PUT", `/api/dictionaries/${id}/entries/plain-noun`, { entry: { ...plain, tags: ["n", "irr"] } });
+  const edited = await repository.getDictionarySnapshot(id);
+  const afterEdit = await preview(draft);
+  assert.deepEqual(afterEdit, expected(edited, draft));
+  assert.equal(afterEdit.changedEntryCount, 29);
+
+  const invalid = (body, code, status = 400) => assert.rejects(preview(body), expectApiError(code, status));
+  await invalid({ slots: {} }, "invalid_morphology_slot");
+  await invalid({ slots: [{ id: "s", tables: [] }] }, "invalid_morphology_slot");
+  await invalid({ slots: [slot("s", { id: "t", matchRules: [rule([], ["n"])] })] }, "invalid_morphology_match_rule");
+  await invalid({ slots: [slot("s", { id: "t", matchRules: [rule(["n"], ["n"])] })] }, "invalid_morphology_match_rule");
+  await invalid({ slots: [slot("s", { id: "t" }, { id: "t" })] }, "duplicate_entity_ids_scoped", 409);
+  await invalid({ slots: [slot("s", { id: "s" })] }, "duplicate_entity_ids_scoped", 409);
+  await invalid({ slots: [slot("s", { matchRules: [] })] }, "invalid_morphology_payload");
+  await invalid({ slots: [{ tables: [{ id: "t" }] }] }, "invalid_morphology_payload");
+  await invalid({ slots: [slot("s", "t")] }, "invalid_morphology_payload");
+  const cells = await preview({ slots: [slot("s", { id: "t", matchRules: [rule(["n"])], cells: [{ kind: "rule" }] })] });
+  assert.equal(cells.lostByTable.length, 4, "cell content is not part of a preview");
+}
+
 async function runMorphologyAcceptanceCheck() {
   requireSqliteRuntime("morphology acceptance check");
   checkAssignment();
+  checkAssignmentKey();
   checkCellResolution();
   checkBoundaryValidation();
   checkDisplayAlgorithms();
@@ -753,6 +886,7 @@ async function runMorphologyAcceptanceCheck() {
   try {
     await checkLegacyConversion(repository, dataDir);
     await checkStorageAndReferences(repository);
+    await checkAssignmentPreview(repository);
     await checkParentCreation(repository);
     await checkCrossChainParentSave(repository);
     await checkDraftDetachmentSave(repository);

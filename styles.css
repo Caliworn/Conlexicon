@@ -3657,6 +3657,101 @@ span.pending-source {
   list-style: none;
 }
 
+/* Save impact: what saving the draft's assignment changes, above the slots it comes from. */
+.morphology-impact {
+  display: grid;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--ui-accent) 35%, var(--ui-border));
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--ui-accent) 8%, transparent);
+  font-size: 0.9rem;
+}
+
+.morphology-impact-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.morphology-impact-updating {
+  color: var(--ui-text-muted);
+  font-size: 0.84rem;
+}
+
+.morphology-impact-details {
+  display: grid;
+  gap: 6px;
+}
+
+.morphology-impact-tables,
+.morphology-impact-samples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.morphology-impact-tables li {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.morphology-impact-heading {
+  margin: 4px 0 0;
+  color: var(--ui-text-muted);
+  font-size: 0.84rem;
+}
+
+.morphology-impact-samples {
+  gap: 6px;
+}
+
+.morphology-impact-sample {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  max-width: 100%;
+  padding: 2px 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--radius-control);
+  background: var(--material-panel-background);
+  color: var(--ui-text);
+  font: inherit;
+  font-size: 0.84rem;
+  text-align: start;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.morphology-impact-sample:hover {
+  border-color: var(--ui-accent);
+}
+
+.morphology-impact-lemma {
+  font-weight: 700;
+}
+
+.morphology-impact-gained {
+  color: var(--ui-accent);
+}
+
+.morphology-impact-lost {
+  color: var(--ui-text-muted);
+}
+
+.morphology-card-impact {
+  margin-inline-start: 8px;
+  white-space: nowrap;
+}
+
 .morphology-slot {
   position: relative;
   display: grid;

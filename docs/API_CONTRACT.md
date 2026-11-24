@@ -94,6 +94,7 @@ LAN 调试的来源和媒体类型规则不变。开启时启动日志另打印�
 | `PUT` | `/api/dictionaries/:id/settings` | 保存其他设置 | `{ id, updatedAt, settings }` | 不做实体 ID 检查；会保留既有 IPA 设置。`settings.search` 含字段级 `enabled/fuzzy`、`etymologyAutocomplete.fuzzy`，以及 `normalization: { unicodeNormalization: "none" | "nfc", caseFolding: boolean, customRules: { canonical, variants[] }[] }`。规范化默认严格关闭；自定义规则按最长变体优先且单次应用。前端据此生成读取 API 参数，并同步用于词根模式、搜索摘要/高亮、字段命中计数和词源自动补全。`settings.tagListSeparatorStyle` 支持 `commaSpace`、`fullwidthComma`、`ideographicComma`，只控制标签列表输入框重新显示时的分隔符。`settings.search.normalization.customRules` 必须是数组，每条规则须有非空的 `canonical` 和非空的 `variants`，同一变体不能对应不同的标准形式；任何一条不合规都整次拒绝，返回 400 `invalid_search_normalization_rule`（规则无效时运行期会忽略全部自定义规则，所以不接受部分保存）。`settings.toolNavOrder` 与 `settings.entrySectionOrder` 由服务端保留合法项顺序、去掉重复与未知项并补齐缺项；未知 settings 字段原样保留。 |
 | `PUT` | `/api/dictionaries/:id/docs` | 保存语言文档 | `{ id, updatedAt, docs }` | 不做实体 ID 检查。 |
 | `PUT` | `/api/dictionaries/:id/morphology` | 完整替换形态模块 | `{ id, updatedAt, morphology }` | 保存形态函数、槽位、表、行列及格。可带删除确认和按表的行列映射。请求、校验及投影更新见[形态分配与保存](#形态分配与保存)。 |
+| `POST` | `/api/dictionaries/:id/morphology/assignment-preview` | 预览保存一份分配草稿后自动分配的变化（只读） | `{ changedEntryCount, gainedByTable, lostByTable, sampleEntries }` | 请求体只含槽位、表 ID 和匹配规则，校验与错误码同 `PUT /morphology` 中的相应部分，另要求槽位和表都带 ID。见[分配预览](#分配预览)。 |
 | `PUT` | `/api/dictionaries/:id/settings/ipa` | 保存自动 IPA 设置 | `{ id, updatedAt, settings }` | 请求体是 `settings.ipa` 的字段，可另带 `ipaKeyboard`，两者在同一事务里写入 `settings`；不带时保留已有键盘。IPA 映射是按顺序保存的纯文本规则 `{ from, to, before, after }`，没有实体 ID，也不参与实体 ID 防撞。`syllable.vowels`、`onsetClusters`、`codaClusters`、`complexPhonemes` 都是字符串数组；写入字符串或含分隔符的数组项时，按空白、逗号、顿号拆开。 |
 | `POST` | `/api/dictionaries/:id/autosave` | 页面卸载时保存文档／已有语料 | `{ id, updatedAt, docs?, corpusItem? }` | `corpusItem` 为 `{ id, name, group, content }`，按 `PUT /corpus/items/:itemId` 保存。新草稿首次保存走 `POST /corpus/items`。请求至少须携带 `docs` 或带 `id` 的 `corpusItem`，否则返回 `invalid_autosave_payload`。 |
 
@@ -521,6 +522,16 @@ morphologyTables: [{ tableId, notes, overrides: [Override], createdAt, updatedAt
 - 删除表或行列导致手动选择、叠加层或覆写丢失时，返回 409 `morphology_references_in_use`，整次不保存。`details` 为 `{ referenceCount, targets: [{ tableId, rowId?, columnId?, label, entryCount }], references }`。`targets` 按被删表或链顶表上的行列聚合，`entryCount` 按词条去重。`references` 是按词条位置取的前 50 条，包含 `{ entryId, lemma, tableId, rowId?, columnId?, reason }`。其中 `tableId` 是实际持有该配置的表，`reason` 为 `manual_table`、`overlay` 或 `override`。用户确认后，在请求外层带 `confirmReferenceRemoval: true` 和弹窗里显示的摘要 `confirmedReferences: { referenceCount, targets: [{ tableId, rowId?, columnId?, entryCount }] }`。服务端在保存事务里重算引用：与摘要一致时清理引用、保存模板并更新投影；不一致时整次不执行，返回新的 409 摘要；此时已没有要清除的引用则照常保存。缺少摘要、摘要格式不对，或未确认却带了摘要，返回 400 `invalid_morphology_payload`。仍被继承的表返回 `morphology_table_has_children`。
 - 为现有链顶新建父表时，在同一次提交中把原行列及其 ID 移交给新链顶。服务端用这些 ID 确认新链顶承接了原坐标，已有覆写继续使用相同的表和行列 ID。草稿同时增删行列时，被删除的坐标仍走删除确认。
 - 跨链设置父表和解除继承都用 `coordinateMappings: [{ tableId, expectedUpdatedAt, rowIdMap, columnIdMap }]`。草稿用当前行列顺序配对旧链和新链的轴，并为每张受影响的已保存表合成「已保存 ID → 本次提交后的 ID」。两端都要属于该表在相应版本的链顶，目标 ID 各自唯一。实际删除的轴省略对应，相关覆写走删除确认。服务端在同一事务里核对表的 `updatedAt`、重定位覆写、更新搜索投影并推进表版本。仅覆写坐标变化时也推进版本。版本不一致返回 409 `morphology_coordinates_changed`，整次不保存。模板格及 syncretism 引用的最终坐标随 `morphology` 提交。已保存的表换了链顶，却既没有映射、也不是新链顶承接原行列时，返回 400 `invalid_morphology_inheritance`。
+- 是否重新分配由共享模型的 `morphologyAssignmentKey(morphology)` 判断：按表 ID 排序的 `[tableId, slotId, 规则键]`，规则键是去重排序后的规则行，每行的 `all`、`none` 为排序后的结构化键集合。规则顺序、行内标签顺序、首尾空白、重复的规则行和显示顺序都不改变键，改标签大小写、在槽位之间移动表、增删表会改变键。
+
+#### 分配预览
+
+`POST /api/dictionaries/:id/morphology/assignment-preview` 回答“保存这份分配草稿后，自动分配会有什么变化”，供模板页显示保存前影响。只读，不写入数据，也不推进查询会话 generation。
+
+- 请求体 `{ slots: [{ id, tables: [{ id, matchRules }] }] }`，其余字段忽略。表和槽位的 ID 可以是尚未保存的 ID。校验复用 `PUT /morphology` 的槽位、表 ID 和规则校验：`slots` 不是数组或槽位为空返回 400 `invalid_morphology_slot`，规则行无效返回 400 `invalid_morphology_match_rule`，表不是对象返回 400 `invalid_morphology_payload`，槽位与表的 ID 重复返回 409 `duplicate_entity_ids_scoped`。与保存不同，每个槽位和表都必须带 ID，缺少时返回 400 `invalid_morphology_payload`。格、行列、继承和形态函数不参与。
+- 服务端用当前已保存的模板和请求中的分配各解析一次自动模式词条，按词条比较合并后的生效表集合，只改顺序不算变化。手动模式词条不参与。
+- 响应 `{ changedEntryCount, gainedByTable: [{ tableId, entryCount }], lostByTable: [{ tableId, entryCount }], sampleEntries: [{ entryId, lemma, gainedTableIds, lostTableIds }] }`。表级列表只含计数大于 0 的表，`gainedByTable` 按请求中的表顺序，`lostByTable` 按已保存模板的表顺序（请求中已删除的表也在其中）。`sampleEntries` 按词条顺序取前 20 条。
+- 服务端按词典在进程内缓存自动模式词条的匹配输入，按上下文标签组合聚合，每组只解析一次。缓存与查询会话一起失效：词条、标签和模板写入后清除，下一次预览重新读取。
 
 ### 标签登记表
 

@@ -27,6 +27,7 @@ function newMorphologyPageState(dictionary) {
     trial: { mode: "tags", tagsText: "", entryQuery: "", entry: null, entryStatus: "idle", contextKey: "merged" },
     formTrial: { lemma: "", autoFilled: false },
     slotCoverageCache: new Map(),
+    impact: newMorphologyImpactState(),
     drawer: null,
     pick: null,
     ...morphologyPageBase(dictionary),
@@ -74,6 +75,7 @@ function discardMorphologyDraft(dictionary = activeDictionary()) {
   const page = morphologyPageStates.get(dictionary.id);
   if (!page) return;
   Object.assign(page, morphologyPageBase(dictionary), { pick: null });
+  cancelMorphologyImpact(page);
 }
 
 // Leaving the page clears the undo record once any unsaved check has passed.
@@ -93,6 +95,7 @@ async function confirmLeaveMorphologyTemplates() {
   }
   morphologyFinishDrag();
   if (page.trial.entryStatus === "loading") resetMorphologyTrialEntry(page);
+  cancelMorphologyImpact(page);
   page.undo = null;
   page.pick = null;
   page.parentPickerTableId = "";
@@ -347,6 +350,7 @@ function renderMorphologyTemplateDerived(dictionary = activeDictionary()) {
   if (!dictionary || panel.hidden || !panel.firstElementChild) return;
   const page = morphologyPageState(dictionary);
   const problems = morphologyDraftProblems(page);
+  syncMorphologyImpact(page, dictionary, problems);
   renderMorphologyToolbarState(page);
   if (page.view === "structure") {
     renderMorphologyStructureDerived(page, dictionary, problems);
@@ -441,6 +445,7 @@ function morphologyStructureViewHtml(page) {
       </section>
     </aside>
     <section class="morphology-structure-slots" aria-label="${escapeHtml(aText("槽位", "Slots"))}">
+      ${choices ? "" : `<div class="morphology-impact" data-mtp-region="impact" hidden></div>`}
       <ol class="morphology-slot-list" data-mtp-region="slots">${morphologySlotListHtml(page, choices)}</ol>
       ${choices ? "" : `<button class="secondary-button additive-button" type="button" data-control-tone="accent" data-control-emphasis="outline" data-mtp-action="new-table" data-mtp-focus="new-table">${escapeHtml(aText("新建表格", "New table"))}</button>`}
     </section>
@@ -548,7 +553,7 @@ function morphologyCardHtml(page, table) {
   </article>`;
 }
 
-function morphologyCardInfoHtml(page, table, { coverage, counts, verdict, ruleErrors, savedIds }) {
+function morphologyCardInfoHtml(page, table, { coverage, counts, verdict, ruleErrors, savedIds, impact }) {
   const draftModel = morphologyDraftModel();
   const rows = draftModel.collectRuleRows(table).filter(({ empty }) => !empty);
   const chips = rows.length
@@ -571,7 +576,7 @@ function morphologyCardInfoHtml(page, table, { coverage, counts, verdict, ruleEr
   }
   return `<div class="morphology-rule-chips">${chips}</div>
     ${parent}${coverText}${partialText}
-    <p class="morphology-card-line morphology-card-count">${count}</p>
+    <p class="morphology-card-line morphology-card-count">${count}${morphologyCardImpactHtml(impact, table.id)}</p>
     ${ruleErrors ? `<p class="morphology-card-line is-error">${escapeHtml(aText("匹配规则有误", "Match rules have errors"))}</p>` : ""}
     ${verdict ? `<p class="morphology-trial-verdict"><span class="morphology-trial-badge">${escapeHtml(verdict.badge)}</span>${verdict.detail ? `<span>${escapeHtml(verdict.detail)}</span>` : ""}</p>` : ""}`;
 }
@@ -688,6 +693,7 @@ function renderMorphologyStructureDerived(page, dictionary, problems) {
   const trialState = morphologyTrialState(page, problems);
   const verdicts = morphologyTrialVerdicts(page, trialState);
   const savedIds = new Set(draftModel.allTables(page.saved).map(({ id }) => id));
+  const impact = morphologyCurrentImpact(page);
   const errorTables = new Set(problems.ruleErrors.map(({ tableId }) => tableId));
   const slotCoverageCache = new Map();
   page.draft.slots.forEach((slot) => {
@@ -705,6 +711,7 @@ function renderMorphologyStructureDerived(page, dictionary, problems) {
         verdict: verdicts.get(table.id),
         ruleErrors: errorTables.has(table.id),
         savedIds,
+        impact,
       });
       const card = info.closest(".morphology-table-card");
       card.querySelector(".morphology-table-card-head strong").innerHTML = morphologyTableTitleHtml(table);
@@ -714,6 +721,7 @@ function renderMorphologyStructureDerived(page, dictionary, problems) {
     });
   });
   page.slotCoverageCache = slotCoverageCache;
+  renderMorphologyImpact(page, impact);
   const output = panel.querySelector('[data-mtp-region="trial-output"]');
   if (output) output.innerHTML = morphologyTrialOutputHtml(page, trialState, problems);
   const details = panel.querySelector(".morphology-trial-details");
@@ -1582,6 +1590,7 @@ async function runMorphologySave(dictionary, page) {
         resetEntryReadStateAfterSave();
         const keep = { view: page.view, selectedTableId: page.selectedTableId, trial: page.trial, formTrial: page.formTrial };
         Object.assign(page, morphologyPageBase(savedDictionary), keep);
+        cancelMorphologyImpact(page);
         showToast(t("dictionarySaved"));
         return true;
       } catch (error) {
@@ -1739,6 +1748,177 @@ async function openMorphologyTemplateTable(tableId) {
   if (morphologyDraftModel().findTable(page.draft, tableId)) {
     morphologySelectTable(tableId, { view: "structure", focus: `card:${tableId}` });
   }
+}
+
+// ---- Save impact preview -----------------------------------------------------------------------
+
+const MORPHOLOGY_IMPACT_DELAY = 400;
+const morphologyImpactMarkup = new WeakMap();
+
+function newMorphologyImpactState(open = false) {
+  return { key: "", status: "idle", result: null, timer: 0, controller: null, open };
+}
+
+// Drops the pending and in-flight preview and its result; the next draft change starts over.
+function cancelMorphologyImpact(page) {
+  clearTimeout(page.impact.timer);
+  page.impact.controller?.abort();
+  page.impact = newMorphologyImpactState(page.impact.open);
+}
+
+// Runs after every draft render. It previews only when the rules a save would submit change
+// which tables can apply, the same key the server uses to decide on reassignment.
+function syncMorphologyImpact(page, dictionary, problems) {
+  const model = window.ConlexiconMorphology;
+  const { impact } = page;
+  if (problems.ruleErrors.length) {
+    clearTimeout(impact.timer);
+    impact.controller?.abort();
+    Object.assign(impact, { key: "", status: "rule_error", timer: 0, controller: null });
+    return;
+  }
+  const draft = morphologyDraftModel().morphologyForSave(page.draft);
+  const key = model.morphologyAssignmentKey(draft);
+  if (key === model.morphologyAssignmentKey(page.saved)) {
+    if (impact.status !== "idle") cancelMorphologyImpact(page);
+    return;
+  }
+  if (key === impact.key) return;
+  clearTimeout(impact.timer);
+  impact.controller?.abort();
+  Object.assign(impact, { key, status: "pending", controller: null });
+  impact.timer = setTimeout(() => void requestMorphologyImpact(page, dictionary, draft, key), MORPHOLOGY_IMPACT_DELAY);
+}
+
+async function requestMorphologyImpact(page, dictionary, draft, key) {
+  const controller = new AbortController();
+  Object.assign(page.impact, { timer: 0, controller, status: "loading" });
+  const isCurrent = () => page.impact.controller === controller;
+  try {
+    const result = await api(`/api/dictionaries/${encodeURIComponent(dictionary.id)}/morphology/assignment-preview`, {
+      method: "POST",
+      signal: controller.signal,
+      body: JSON.stringify({
+        slots: draft.slots.map((slot) => ({
+          id: slot.id,
+          tables: slot.tables.map(({ id, matchRules }) => ({ id, matchRules })),
+        })),
+      }),
+    });
+    if (!isCurrent()) return;
+    Object.assign(page.impact, { status: "ready", result: { ...result, key }, controller: null });
+  } catch (error) {
+    // An aborted or superseded request belongs to a draft that is no longer shown.
+    if (!isCurrent()) return;
+    console.error(error);
+    Object.assign(page.impact, { status: "error", controller: null });
+  }
+  if (state.activeView === "morphology-tables" && activeDictionary()?.id === dictionary.id) {
+    renderMorphologyTemplateDerived(dictionary);
+  }
+}
+
+// The result for the draft on screen, or null while it is pending or out of date: an older
+// result may name tables the draft no longer has, so only its total stays visible.
+function morphologyCurrentImpact(page) {
+  const { impact } = page;
+  return impact.status === "ready" && impact.result.key === impact.key ? impact.result : null;
+}
+
+function morphologyImpactTableLabel(page, tableId) {
+  const draftModel = morphologyDraftModel();
+  const table = draftModel.findTable(page.draft, tableId);
+  if (table) return morphologyTableTitleText(table);
+  const label = morphologyTableTitleText(draftModel.findTable(page.saved, tableId));
+  return aText(`${label}（已删除）`, `${label} (deleted)`);
+}
+
+function morphologyImpactSummaryText(result) {
+  const count = result.changedEntryCount;
+  return count
+    ? aText(`保存后，自动分配的词条中有 ${count} 个会增减变化表`, `After saving, ${count} automatically assigned ${count === 1 ? "entry gains or loses" : "entries gain or lose"} tables`)
+    : aText("自动分配的词条不会增减任何变化表", "No automatically assigned entry gains or loses a table");
+}
+
+function morphologyImpactCountsHtml(gained, lost) {
+  return [
+    gained ? `<span class="morphology-impact-gained">+${gained}</span>` : "",
+    lost ? `<span class="morphology-impact-lost">−${lost}</span>` : "",
+  ].filter(Boolean).join(" ");
+}
+
+function morphologyCardImpactHtml(impact, tableId) {
+  if (!impact) return "";
+  const gained = impact.gainedByTable.find((row) => row.tableId === tableId)?.entryCount || 0;
+  const lost = impact.lostByTable.find((row) => row.tableId === tableId)?.entryCount || 0;
+  if (!gained && !lost) return "";
+  return `<span class="morphology-card-impact">${escapeHtml(aText("保存后", "After saving"))} ${morphologyImpactCountsHtml(gained, lost)}</span>`;
+}
+
+function morphologyImpactDetailsHtml(page, result) {
+  const draftModel = morphologyDraftModel();
+  const gained = new Map(result.gainedByTable.map(({ tableId, entryCount }) => [tableId, entryCount]));
+  const lost = new Map(result.lostByTable.map(({ tableId, entryCount }) => [tableId, entryCount]));
+  // Draft order first, then the deleted tables in their saved order.
+  const tableIds = [
+    ...draftModel.allTables(page.draft).map(({ id }) => id),
+    ...result.lostByTable.map(({ tableId }) => tableId),
+  ].filter((tableId, index, ids) => (gained.has(tableId) || lost.has(tableId)) && ids.indexOf(tableId) === index);
+  const names = (ids) => ids.map((id) => morphologyImpactTableLabel(page, id)).join(aText("、", ", "));
+  return `<ul class="morphology-impact-tables">
+      ${tableIds.map((tableId) => `<li><span>${escapeHtml(morphologyImpactTableLabel(page, tableId))}</span>${morphologyImpactCountsHtml(gained.get(tableId), lost.get(tableId))}</li>`).join("")}
+    </ul>
+    <p class="morphology-impact-heading">${escapeHtml(aText("示例词条", "Example entries"))}</p>
+    <ul class="morphology-impact-samples">
+      ${result.sampleEntries.map(({ entryId, lemma, gainedTableIds, lostTableIds }) => `<li><button class="morphology-impact-sample" type="button" data-mtp-action="impact-sample" data-entry-id="${escapeHtml(entryId)}" data-lemma="${escapeHtml(lemma)}" data-mtp-focus="impact-sample:${escapeHtml(entryId)}">
+        <span class="morphology-impact-lemma">${escapeHtml(lemma)}</span>
+        ${gainedTableIds.length ? `<span class="morphology-impact-gained">+${escapeHtml(names(gainedTableIds))}</span>` : ""}
+        ${lostTableIds.length ? `<span class="morphology-impact-lost">−${escapeHtml(names(lostTableIds))}</span>` : ""}
+      </button></li>`).join("")}
+    </ul>`;
+}
+
+function morphologyImpactHtml(page, current) {
+  const { impact } = page;
+  if (impact.status === "rule_error") {
+    return `<p class="morphology-impact-summary muted-text" role="status">${escapeHtml(aText("匹配规则有误，修正后再计算影响", "Fix the match rules to see the impact"))}</p>`;
+  }
+  if (impact.status === "error") {
+    return `<p class="morphology-impact-summary"><button class="text-link-button" type="button" data-mtp-action="impact-retry" data-mtp-focus="impact-retry">${escapeHtml(aText("影响计算失败，重试", "Could not calculate the impact. Retry"))}</button></p>`;
+  }
+  if (!current) {
+    return impact.result
+      ? `<p class="morphology-impact-summary" role="status"><span>${escapeHtml(morphologyImpactSummaryText(impact.result))}</span><span class="morphology-impact-updating">${escapeHtml(aText("正在更新", "Updating"))}</span></p>`
+      : `<p class="morphology-impact-summary muted-text" role="status">${escapeHtml(aText("正在计算影响…", "Calculating impact…"))}</p>`;
+  }
+  const expandable = current.changedEntryCount > 0;
+  return `<p class="morphology-impact-summary" role="status">
+      <span>${escapeHtml(morphologyImpactSummaryText(current))}</span>
+      ${expandable ? `<button class="text-link-button" type="button" data-mtp-action="impact-toggle" data-mtp-focus="impact-toggle" aria-expanded="${impact.open}" aria-controls="morphologyImpactDetails">${escapeHtml(impact.open ? aText("收起", "Hide details") : aText("查看详情", "Show details"))}</button>` : ""}
+    </p>
+    ${expandable && impact.open ? `<div class="morphology-impact-details" id="morphologyImpactDetails">${morphologyImpactDetailsHtml(page, current)}</div>` : ""}`;
+}
+
+function renderMorphologyImpact(page, current) {
+  const panel = elements.morphologyTablesPanel;
+  const region = panel.querySelector('[data-mtp-region="impact"]');
+  if (!region) return;
+  region.hidden = page.impact.status === "idle";
+  const html = region.hidden ? "" : morphologyImpactHtml(page, current);
+  if (morphologyImpactMarkup.get(region) === html) return;
+  const focus = region.contains(document.activeElement) ? morphologyFocusSnapshot(panel) : null;
+  region.innerHTML = html;
+  morphologyImpactMarkup.set(region, html);
+  if (focus) morphologyRestoreFocus(panel, focus);
+}
+
+// An example entry goes into the assignment trial, which explains it against the draft.
+function morphologyTrialImpactSample(page, button) {
+  page.trial.mode = "entry";
+  page.trial.contextKey = "merged";
+  if (morphologyStructureIsNarrow()) page.drawer = { pane: "trial", returnFocus: button.dataset.mtpFocus };
+  renderMorphologyTemplatePage();
+  void morphologyPickTrialEntry({ id: button.dataset.entryId, lemma: button.dataset.lemma });
 }
 
 // ---- Assignment trial entry picker -------------------------------------------------------------
@@ -1910,6 +2090,17 @@ function handleMorphologyPageClick(event) {
       break;
     case "select-table":
       morphologySelectTable(tableId, { focus: page.view === "structure" ? `card:${tableId}` : "table-title" });
+      break;
+    case "impact-toggle":
+      page.impact.open = !page.impact.open;
+      renderMorphologyTemplateDerived();
+      break;
+    case "impact-retry":
+      page.impact.key = "";
+      renderMorphologyTemplateDerived();
+      break;
+    case "impact-sample":
+      morphologyTrialImpactSample(page, actionNode);
       break;
     case "open-drawer":
       page.drawer = { pane: actionNode.dataset.pane, returnFocus: actionNode.dataset.mtpFocus };
