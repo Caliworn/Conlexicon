@@ -494,7 +494,7 @@ SQLite projection 查询中，带 `q` 的分页结果会为每个命中词条附
 
 ### 形态分配与保存
 
-形态模块和词条形态字段使用如下形状。完整的 `PUT /morphology` 可传模块本身，或使用含 `morphology` 字段的对象来携带保存选项。
+形态模块和词条形态字段使用如下形状。完整的 `PUT /morphology` 可传模块本身，或使用含 `morphology` 字段的对象来携带保存选项。模型的语义说明、模板页和词条侧界面见[形态规范](MORPHOLOGY_SPEC.md)。
 
 ```js
 morphology: {
